@@ -1,0 +1,86 @@
+import { Scene } from "@babylonjs/core/scene";
+import { Engine } from "@babylonjs/core/Engines/engine";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
+import { Player } from "./entities/player";
+import { UIManager } from "./ui/ui-manager";
+import { WorldManager } from "./world/world-manager";
+import { NPC } from "./entities/npc";
+import { ScheduleSystem } from "./systems/schedule-system";
+import { CombatSystem } from "./systems/combat-system";
+import { DialogueSystem } from "./systems/dialogue-system";
+import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
+import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
+
+export class Game {
+  public scene: Scene;
+  public canvas: HTMLCanvasElement;
+  public engine: Engine | WebGPUEngine;
+  public player: Player;
+  public ui: UIManager;
+  public world: WorldManager;
+  public scheduleSystem: ScheduleSystem;
+  public combatSystem: CombatSystem;
+  public dialogueSystem: DialogueSystem;
+
+  constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
+    this.scene = scene;
+    this.canvas = canvas;
+    this.engine = engine;
+
+    this.init();
+  }
+
+  init(): void {
+    this._setLight();
+    this.player = new Player(this.scene, this.canvas);
+    this.ui = new UIManager(this.scene);
+    this.world = new WorldManager(this.scene);
+    this.scheduleSystem = new ScheduleSystem(this.scene);
+
+    // Test NPC
+    const npc = new NPC(this.scene, new Vector3(10, 2, 10), "Guard");
+    npc.patrolPoints = [new Vector3(10, 2, 10), new Vector3(10, 2, 20), new Vector3(20, 2, 20), new Vector3(20, 2, 10)];
+    this.scheduleSystem.addNPC(npc);
+
+    this.combatSystem = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs);
+    this.dialogueSystem = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
+
+    // Input handling for combat
+    this.scene.onPointerObservable.add((pointerInfo) => {
+        if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
+            if (pointerInfo.event.button === 0) { // Left Click
+                this.combatSystem.meleeAttack();
+            } else if (pointerInfo.event.button === 2) { // Right Click
+                this.combatSystem.magicAttack();
+            }
+        }
+    });
+
+    // Input handling for interaction
+    this.scene.onKeyboardObservable.add((kbInfo) => {
+        if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
+            if (kbInfo.event.key === 'e' || kbInfo.event.key === 'E') {
+                this.dialogueSystem.interact();
+            }
+        }
+    });
+
+    // Game loop logic will go here
+    this.scene.onBeforeRenderObservable.add(() => {
+        this.update();
+    });
+  }
+
+  _setLight(): void {
+    const light = new HemisphericLight("light", new Vector3(0, 1, 0), this.scene);
+    light.intensity = 0.5;
+  }
+
+  update(): void {
+      const deltaTime = this.engine.getDeltaTime() / 1000;
+      this.world.update(this.player.camera.position);
+      this.scheduleSystem.update(deltaTime);
+  }
+}
