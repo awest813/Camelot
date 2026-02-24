@@ -6,8 +6,10 @@ import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { IInteractable } from "./interactable";
+import { Player } from "./player";
 
-export class NPC {
+export class NPC implements IInteractable {
   public mesh: Mesh;
   public physicsAggregate: PhysicsAggregate;
   public scene: Scene;
@@ -40,5 +42,12 @@ export class NPC {
 
     // Lock rotation to keep upright
     this.physicsAggregate.body.setMassProperties({ inertia: new Vector3(0, 0, 0) });
+
+    // Link mesh to this object for interaction
+    this.mesh.metadata = { interactable: this };
+  }
+
+  public interact(player: Player): void {
+      console.log(`Interacting with NPC ${this.mesh.name} by ${player.camera.name}`);
   }
 }

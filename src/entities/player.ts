@@ -11,6 +11,19 @@ export class Player {
   private canvas: HTMLCanvasElement;
   private physicsAggregate: PhysicsAggregate;
 
+  // Stats
+  public health: number = 100;
+  public maxHealth: number = 100;
+  public magicka: number = 100;
+  public maxMagicka: number = 100;
+  public stamina: number = 100;
+  public maxStamina: number = 100;
+
+  // Regeneration rates (per second)
+  public healthRegen: number = 0.5;
+  public magickaRegen: number = 1.0;
+  public staminaRegen: number = 5.0;
+
   constructor(scene: Scene, canvas: HTMLCanvasElement) {
     this.scene = scene;
     this.canvas = canvas;
@@ -55,5 +68,11 @@ export class Player {
 
     // Set to ANIMATED so it follows the camera (parent) but still interacts physically with other objects
     this.physicsAggregate.body.setMotionType(PhysicsMotionType.ANIMATED);
+  }
+
+  public update(deltaTime: number): void {
+      this.health = Math.min(this.health + this.healthRegen * deltaTime, this.maxHealth);
+      this.magicka = Math.min(this.magicka + this.magickaRegen * deltaTime, this.maxMagicka);
+      this.stamina = Math.min(this.stamina + this.staminaRegen * deltaTime, this.maxStamina);
   }
 }

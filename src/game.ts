@@ -10,6 +10,11 @@ import { NPC } from "./entities/npc";
 import { ScheduleSystem } from "./systems/schedule-system";
 import { CombatSystem } from "./systems/combat-system";
 import { DialogueSystem } from "./systems/dialogue-system";
+import { InteractionSystem } from "./systems/interaction-system";
+import { InventorySystem } from "./systems/inventory-system";
+import { InventoryUI } from "./ui/inventory-ui";
+import { Item, ItemType } from "./entities/item";
+import { WorldItem } from "./entities/world-item";
 import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 
@@ -23,6 +28,9 @@ export class Game {
   public scheduleSystem: ScheduleSystem;
   public combatSystem: CombatSystem;
   public dialogueSystem: DialogueSystem;
+  public interactionSystem: InteractionSystem;
+  public inventorySystem: InventorySystem;
+  public inventoryUI: InventoryUI;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
     this.scene = scene;
@@ -46,6 +54,14 @@ export class Game {
 
     this.combatSystem = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs);
     this.dialogueSystem = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
+    this.interactionSystem = new InteractionSystem(this.scene, this.player, this.dialogueSystem, this.scheduleSystem.npcs);
+
+    this.inventorySystem = new InventorySystem();
+    this.inventoryUI = new InventoryUI(this.scene, this.inventorySystem);
+
+    // Test Item
+    const swordItem = new Item("sword", "Iron Sword", ItemType.WEAPON, 5, 10);
+    new WorldItem(this.scene, swordItem, new Vector3(5, 1, 5), this.inventorySystem);
 
     // Input handling for combat
     this.scene.onPointerObservable.add((pointerInfo) => {
@@ -62,7 +78,9 @@ export class Game {
     this.scene.onKeyboardObservable.add((kbInfo) => {
         if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
             if (kbInfo.event.key === 'e' || kbInfo.event.key === 'E') {
-                this.dialogueSystem.interact();
+                this.interactionSystem.interact();
+            } else if (kbInfo.event.key === 'i' || kbInfo.event.key === 'I') {
+                this.inventoryUI.toggle();
             }
         }
     });
@@ -80,7 +98,12 @@ export class Game {
 
   update(): void {
       const deltaTime = this.engine.getDeltaTime() / 1000;
+      this.player.update(deltaTime);
       this.world.update(this.player.camera.position);
       this.scheduleSystem.update(deltaTime);
+
+      this.ui.updateHealth(this.player.health, this.player.maxHealth);
+      this.ui.updateMagicka(this.player.magicka, this.player.maxMagicka);
+      this.ui.updateStamina(this.player.stamina, this.player.maxStamina);
   }
 }
