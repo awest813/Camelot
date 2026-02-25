@@ -1,5 +1,5 @@
 import { Scene } from "@babylonjs/core/scene";
-import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Grid, Button } from "@babylonjs/gui/2D";
+import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Grid, Button, Ellipse } from "@babylonjs/gui/2D";
 import { Item } from "../systems/inventory-system";
 import { Player } from "../entities/player";
 
@@ -27,6 +27,7 @@ export class UIManager {
 
   // Interaction
   public interactionLabel: TextBlock;
+  public crosshair: Ellipse;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -144,6 +145,8 @@ export class UIManager {
       title.color = "white";
       title.fontSize = 48;
       title.height = "100px";
+      title.shadowBlur = 5;
+      title.shadowColor = "black";
       panel.addControl(title);
 
       this.resumeButton = this._createButton("Resume", panel);
@@ -157,15 +160,17 @@ export class UIManager {
       button.width = "100%";
       button.height = "50px";
       button.color = "white";
-      button.background = "rgba(100, 100, 100, 0.5)";
+      button.cornerRadius = 5;
+      button.background = "rgba(50, 50, 50, 0.8)";
       button.paddingBottom = "10px";
       button.hoverCursor = "pointer";
+      button.thickness = 1;
 
       button.onPointerEnterObservable.add(() => {
-          button.background = "rgba(150, 150, 150, 0.8)";
+          button.background = "rgba(100, 100, 100, 0.9)";
       });
       button.onPointerOutObservable.add(() => {
-          button.background = "rgba(100, 100, 100, 0.5)";
+          button.background = "rgba(50, 50, 50, 0.8)";
       });
 
       parent.addControl(button);
@@ -174,6 +179,7 @@ export class UIManager {
 
   public toggleInventory(visible: boolean): void {
       this.inventoryPanel.isVisible = visible;
+      this.toggleCrosshair(!visible);
       if (!visible) {
           this.inventoryDescription.text = "";
       }
@@ -181,6 +187,11 @@ export class UIManager {
 
   public togglePauseMenu(visible: boolean): void {
       this.pausePanel.isVisible = visible;
+      this.toggleCrosshair(!visible);
+  }
+
+  public toggleCrosshair(visible: boolean): void {
+      this.crosshair.isVisible = visible;
   }
 
   public updateStats(player: Player): void {
@@ -208,6 +219,7 @@ SP: ${Math.floor(player.stamina)} / ${player.maxStamina}`;
           slot.thickness = 1;
           slot.background = "rgba(255, 255, 255, 0.1)";
           slot.isPointerBlocker = true;
+          slot.hoverCursor = "pointer";
 
           // Hover events
           slot.onPointerEnterObservable.add(() => {
@@ -246,6 +258,15 @@ SP: ${Math.floor(player.stamina)} / ${player.maxStamina}`;
     this.interactionLabel.shadowColor = "black";
     this.interactionLabel.shadowBlur = 2;
     this._ui.addControl(this.interactionLabel);
+
+    // Crosshair (Center)
+    this.crosshair = new Ellipse();
+    this.crosshair.width = "10px";
+    this.crosshair.height = "10px";
+    this.crosshair.color = "white";
+    this.crosshair.thickness = 2;
+    this.crosshair.background = "rgba(255, 255, 255, 0.5)";
+    this._ui.addControl(this.crosshair);
 
     // Compass Bar (Top Center)
     const compassContainer = new Rectangle();

@@ -115,6 +115,8 @@ export class Game {
       this.ui.togglePauseMenu(this.isPaused);
 
       if (this.isPaused) {
+          // Clear interaction label when paused
+          this.ui.setInteractionText("");
           document.exitPointerLock();
           this.player.camera.detachControl();
       } else {

@@ -20,6 +20,7 @@ describe('InventorySystem', () => {
         mockUI = {
             toggleInventory: vi.fn(),
             updateInventory: vi.fn(),
+            setInteractionText: vi.fn(), // Added this mock
         };
         mockCanvas = {
             requestPointerLock: vi.fn(),
@@ -67,6 +68,7 @@ describe('InventorySystem', () => {
         expect(inventorySystem.isOpen).toBe(true);
         expect(mockUI.toggleInventory).toHaveBeenCalledWith(true);
         expect(mockPlayer.camera.detachControl).toHaveBeenCalled();
+        expect(mockUI.setInteractionText).toHaveBeenCalledWith(""); // Verify interaction text clear
 
         inventorySystem.toggleInventory();
         expect(inventorySystem.isOpen).toBe(false);
