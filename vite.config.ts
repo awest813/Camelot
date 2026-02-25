@@ -32,10 +32,10 @@ export default ({ mode }: any) => {
     // server config
     server: {
       // host: '192.168.0.0',
-      port: 8088,
-      open: true, // auto open
-      hmr: true,
-      cors: true,
+      port: Number(env.VITE_PORT) || 8088,
+      open: env.VITE_OPEN === "true",
+      hmr: env.VITE_HMR === "true",
+      cors: env.VITE_CORS === "true",
       // Cross domain
       // proxy: {
       //     '/api': {
