@@ -165,6 +165,22 @@ export class UIManager {
     title.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
     this.inventoryPanel.addControl(title);
 
+    // Close Button (Top Right)
+    const closeBtn = Button.CreateSimpleButton("closeBtn", "X");
+    closeBtn.width = "40px";
+    closeBtn.height = "40px";
+    closeBtn.color = "white";
+    closeBtn.background = "red";
+    closeBtn.cornerRadius = 20;
+    closeBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+    closeBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    closeBtn.top = "5px";
+    closeBtn.left = "-5px";
+    closeBtn.onPointerUpObservable.add(() => {
+        this.toggleInventory();
+    });
+    this.inventoryPanel.addControl(closeBtn);
+
     // Grid for items
     this.inventoryGrid = new Grid();
     this.inventoryGrid.width = "360px";

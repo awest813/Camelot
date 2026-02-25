@@ -2,6 +2,8 @@ import { Scene } from "@babylonjs/core/scene";
 import { Ray } from "@babylonjs/core/Culling/ray";
 import { Player } from "../entities/player";
 import { NPC } from "../entities/npc";
+import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { DialogueSystem } from "./dialogue-system";
 import { InventorySystem } from "./inventory-system";
 import { Loot } from "../entities/loot";
@@ -18,6 +20,7 @@ export class InteractionSystem {
   public npcs: NPC[];
   public lootItems: Loot[] = [];
   public currentTarget: InteractionTarget | null = null;
+  private _lastTargetMesh: AbstractMesh | null = null;
 
   constructor(scene: Scene, player: Player, dialogueSystem: DialogueSystem, inventorySystem: InventorySystem, npcs: NPC[]) {
     this.scene = scene;
@@ -44,16 +47,35 @@ export class InteractionSystem {
       const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
       if (npc) {
         this.currentTarget = { type: 'npc', entity: npc };
-        return;
       }
 
       // Check for Loot
       const loot = this.lootItems.find(l => l.mesh === hit.pickedMesh);
       if (loot) {
         this.currentTarget = { type: 'loot', entity: loot };
-        return;
       }
     }
+
+    this._updateHighlight();
+  }
+
+  private _updateHighlight(): void {
+      const currentMesh = this.currentTarget ? (this.currentTarget.type === 'npc' ? this.currentTarget.entity.mesh : this.currentTarget.entity.mesh) : null;
+
+      if (currentMesh !== this._lastTargetMesh) {
+          // Disable old
+          if (this._lastTargetMesh) {
+              this._lastTargetMesh.renderOverlay = false;
+          }
+
+          // Enable new
+          if (currentMesh) {
+              currentMesh.renderOverlay = true;
+              currentMesh.overlayColor = Color3.White();
+          }
+
+          this._lastTargetMesh = currentMesh;
+      }
   }
 
   public interact(): void {
