@@ -35,3 +35,9 @@
 2:56:01 PM [vite] (client) page reload src/ui/ui-manager.ts
 2:56:36 PM [vite] (client) page reload src/game.ts
 2:56:57 PM [vite] (client) page reload src/systems/inventory-system.ts
+3:05:42 PM [vite] (client) page reload src/ui/ui-manager.ts
+3:05:58 PM [vite] (client) page reload src/systems/inventory-system.ts
+3:06:12 PM [vite] (client) page reload src/systems/interaction-system.ts
+3:06:31 PM [vite] (client) page reload src/systems/combat-system.ts
+3:06:38 PM [vite] (client) page reload src/systems/combat-system.ts
+3:07:06 PM [vite] (client) page reload src/game.ts

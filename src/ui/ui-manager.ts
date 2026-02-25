@@ -29,11 +29,61 @@ export class UIManager {
   public interactionLabel: TextBlock;
   public crosshair: Ellipse;
 
+  // Notifications
+  public notificationPanel: StackPanel;
+
   constructor(scene: Scene) {
     this.scene = scene;
     this._initUI();
     this._initInventoryUI();
     this._initPauseMenu();
+    this._initNotificationUI();
+  }
+
+  private _initNotificationUI(): void {
+      this.notificationPanel = new StackPanel();
+      this.notificationPanel.width = "300px";
+      this.notificationPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+      this.notificationPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+      this.notificationPanel.top = "20px";
+      this.notificationPanel.left = "20px";
+      this.notificationPanel.isVertical = true;
+      this._ui.addControl(this.notificationPanel);
+  }
+
+  public addNotification(text: string): void {
+      const block = new TextBlock();
+      block.text = text;
+      block.color = "white";
+      block.fontSize = 18;
+      block.height = "30px";
+      block.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+      block.shadowBlur = 2;
+      block.shadowColor = "black";
+
+      this.notificationPanel.addControl(block);
+
+      // Fade out logic
+      let lifeTime = 3000; // 3 seconds visible
+      const fadeTime = 1000; // 1 second fade
+      let currentAlpha = 1.0;
+
+      const obs = this.scene.onBeforeRenderObservable.add((_, state) => {
+          const dt = this.scene.getEngine().getDeltaTime();
+          lifeTime -= dt;
+
+          if (lifeTime <= 0) {
+              // Start fading
+              currentAlpha -= (dt / fadeTime);
+              block.alpha = currentAlpha;
+
+              if (currentAlpha <= 0) {
+                  this.scene.onBeforeRenderObservable.remove(obs);
+                  this.notificationPanel.removeControl(block);
+                  block.dispose();
+              }
+          }
+      });
   }
 
   private _initInventoryUI(): void {

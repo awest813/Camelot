@@ -33,18 +33,20 @@ export class InventorySystem {
       if (existingItem) {
         existingItem.quantity += newItem.quantity;
         this._updateUI();
+        this._ui.addNotification(`Added ${newItem.name} (${newItem.quantity})`);
         return true;
       }
     }
 
     if (this.items.length >= this.maxCapacity) {
-      console.log("Inventory full!");
+      this._ui.addNotification("Inventory full!");
       return false;
     }
 
     // Add new item
     this.items.push({ ...newItem });
     this._updateUI();
+    this._ui.addNotification(`Added ${newItem.name}`);
     return true;
   }
 

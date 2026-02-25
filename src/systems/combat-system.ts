@@ -8,28 +8,29 @@ import { NPC } from "../entities/npc";
 import { Player } from "../entities/player";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { UIManager } from "../ui/ui-manager";
 
 export class CombatSystem {
   public scene: Scene;
   public player: Player;
   public npcs: NPC[]; // Reference to NPC list from ScheduleSystem or Game
+  public ui: UIManager;
 
-  constructor(scene: Scene, player: Player, npcs: NPC[]) {
+  constructor(scene: Scene, player: Player, npcs: NPC[], ui: UIManager) {
     this.scene = scene;
     this.player = player;
     this.npcs = npcs;
+    this.ui = ui;
   }
 
   public meleeAttack(): void {
     if (this.player.stamina < 15) {
-        console.log("Not enough stamina!");
+        this.ui.addNotification("Not enough stamina!");
         return;
     }
     this.player.stamina -= 15;
 
     // Play animation (todo)
-    console.log("Melee Attack!");
-
     // Raycast forward
     const origin = this.player.camera.position;
     const forward = this.player.camera.getForwardRay(3).direction;
@@ -63,12 +64,10 @@ export class CombatSystem {
 
   public magicAttack(): void {
     if (this.player.magicka < 20) {
-        console.log("Not enough magicka!");
+        this.ui.addNotification("Not enough magicka!");
         return;
     }
     this.player.magicka -= 20;
-
-    console.log("Magic Attack!");
 
     // Spawn projectile
     const origin = this.player.camera.position.add(this.player.camera.getForwardRay(1).direction);

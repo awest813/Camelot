@@ -20,7 +20,8 @@ describe('InventorySystem', () => {
         mockUI = {
             toggleInventory: vi.fn(),
             updateInventory: vi.fn(),
-            setInteractionText: vi.fn(), // Added this mock
+            setInteractionText: vi.fn(),
+            addNotification: vi.fn(), // Added this mock
         };
         mockCanvas = {
             requestPointerLock: vi.fn(),
@@ -35,6 +36,7 @@ describe('InventorySystem', () => {
         expect(result).toBe(true);
         expect(inventorySystem.items.length).toBe(1);
         expect(mockUI.updateInventory).toHaveBeenCalled();
+        expect(mockUI.addNotification).toHaveBeenCalled();
     });
 
     it('should stack stackable items', () => {
@@ -68,7 +70,7 @@ describe('InventorySystem', () => {
         expect(inventorySystem.isOpen).toBe(true);
         expect(mockUI.toggleInventory).toHaveBeenCalledWith(true);
         expect(mockPlayer.camera.detachControl).toHaveBeenCalled();
-        expect(mockUI.setInteractionText).toHaveBeenCalledWith(""); // Verify interaction text clear
+        expect(mockUI.setInteractionText).toHaveBeenCalledWith("");
 
         inventorySystem.toggleInventory();
         expect(inventorySystem.isOpen).toBe(false);
