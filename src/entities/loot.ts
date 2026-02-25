@@ -21,8 +21,11 @@ export class Loot {
   }
 
   private _createMesh(position: Vector3): void {
-    // Simple visual: A small box or sphere based on item type?
-    // Let's use a small box for now.
+    // Optimization: Clone a base mesh if possible, but for now CreateBox is fine.
+    // However, we should freeze the world matrix if it was purely static.
+    // But since we are rotating it in _rotate, we CANNOT freeze the world matrix.
+    // We can however freeze the material if it doesn't change color.
+
     this.mesh = MeshBuilder.CreateBox("loot_" + this.item.id, { size: 0.5 }, this.scene);
     this.mesh.position = position;
 
@@ -36,8 +39,7 @@ export class Loot {
         default: material.diffuseColor = Color3.White(); break;
     }
     this.mesh.material = material;
-
-    // Static so it doesn't fall or get kicked
+    material.freeze();
     this.physicsAggregate = new PhysicsAggregate(this.mesh, PhysicsShapeType.BOX, { mass: 0, restitution: 0.5 }, this.scene);
     this.physicsAggregate.body.setMotionType(PhysicsMotionType.STATIC);
 

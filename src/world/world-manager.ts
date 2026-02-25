@@ -56,7 +56,13 @@ export class WorldManager {
     const g = 0.5 + (Math.cos(z) + 1) * 0.2;
     const b = (Math.sin(x + z) + 1) * 0.1;
     material.diffuseColor = new Color3(r, g, b);
+
+    // Performance: Freeze material
+    material.freeze();
     chunkMesh.material = material;
+
+    // Performance: Freeze world matrix since chunks don't move
+    chunkMesh.freezeWorldMatrix();
 
     this.loadedChunks.set(key, chunkMesh);
     // console.log(`Loaded chunk ${key}`);

@@ -80,4 +80,12 @@ export class Player {
     // Set to ANIMATED so it follows the camera (parent) but still interacts physically with other objects
     this.physicsAggregate.body.setMotionType(PhysicsMotionType.ANIMATED);
   }
+
+  public detachControl(): void {
+    this.camera.detachControl();
+  }
+
+  public attachControl(): void {
+    this.camera.attachControl(this.canvas, true);
+  }
 }

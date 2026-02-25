@@ -180,18 +180,31 @@ export class UIManager {
 
   public toggleInventory(): void {
     this.inventoryPanel.isVisible = !this.inventoryPanel.isVisible;
+
+    // We can't easily access Player here without dependency injection or global access.
+    // However, Game has 'ui'.
+    // A quick hack is to find the player camera and detach/attach.
+    const camera = this.scene.getCameraByName("playerCam");
+
     if (this.inventoryPanel.isVisible) {
         document.exitPointerLock();
+        if (camera) camera.detachControl();
     } else {
-        this.scene.getEngine().getRenderingCanvas()?.requestPointerLock();
+        const canvas = this.scene.getEngine().getRenderingCanvas();
+        if (canvas) {
+            canvas.requestPointerLock();
+            if (camera) camera.attachControl(canvas, true);
+        }
     }
   }
 
   public updateInventory(items: Item[]): void {
       this.inventoryGrid.children.forEach(c => c.dispose()); // Clear old items (inefficient but simple)
 
-      items.forEach((item, index) => {
-          if (index >= 20) return; // Limit to grid size
+      // Limit to grid size (20)
+      const displayItems = items.slice(0, 20);
+
+      displayItems.forEach((item, index) => {
 
           const row = Math.floor(index / 4);
           const col = index % 4;
