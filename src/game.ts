@@ -11,6 +11,7 @@ import { ScheduleSystem } from "./systems/schedule-system";
 import { CombatSystem } from "./systems/combat-system";
 import { DialogueSystem } from "./systems/dialogue-system";
 import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
+import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { InventorySystem } from "./systems/inventory-system";
 import { InteractionSystem } from "./systems/interaction-system";
 import { Loot } from "./entities/loot";
@@ -27,6 +28,8 @@ export class Game {
   public dialogueSystem: DialogueSystem;
   public inventorySystem: InventorySystem;
   public interactionSystem: InteractionSystem;
+
+  public isPaused: boolean = false;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
     this.scene = scene;
@@ -75,6 +78,8 @@ export class Game {
 
     // Input handling for combat
     this.scene.onPointerObservable.add((pointerInfo) => {
+        if (this.isPaused || this.inventorySystem.isOpen) return;
+
         if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
             if (pointerInfo.event.button === 0) { // Left Click
                 this.combatSystem.meleeAttack();
@@ -84,10 +89,38 @@ export class Game {
         }
     });
 
+    // Input handling for pause
+    this.scene.onKeyboardObservable.add((kbInfo) => {
+        if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
+            if (kbInfo.event.key === "Escape") {
+                this.togglePause();
+            }
+        }
+    });
+
+    // Wire up Pause Menu buttons
+    this.ui.resumeButton.onPointerUpObservable.add(() => this.togglePause());
+    this.ui.saveButton.onPointerUpObservable.add(() => console.log("Save Game (Mock)"));
+    this.ui.loadButton.onPointerUpObservable.add(() => console.log("Load Game (Mock)"));
+    this.ui.quitButton.onPointerUpObservable.add(() => window.location.reload());
+
     // Game loop logic will go here
     this.scene.onBeforeRenderObservable.add(() => {
         this.update();
     });
+  }
+
+  togglePause(): void {
+      this.isPaused = !this.isPaused;
+      this.ui.togglePauseMenu(this.isPaused);
+
+      if (this.isPaused) {
+          document.exitPointerLock();
+          this.player.camera.detachControl();
+      } else {
+          this.canvas.requestPointerLock();
+          this.player.camera.attachControl(this.canvas, true);
+      }
   }
 
   _setLight(): void {
@@ -96,6 +129,8 @@ export class Game {
   }
 
   update(): void {
+      if (this.isPaused) return;
+
       const deltaTime = this.engine.getDeltaTime() / 1000;
 
       this.player.update(deltaTime);
@@ -106,5 +141,10 @@ export class Game {
       this.ui.updateHealth(this.player.health, this.player.maxHealth);
       this.ui.updateMagicka(this.player.magicka, this.player.maxMagicka);
       this.ui.updateStamina(this.player.stamina, this.player.maxStamina);
+
+      // Update stats only if inventory is open (optimization)
+      if (this.inventorySystem.isOpen) {
+          this.ui.updateStats(this.player);
+      }
   }
 }

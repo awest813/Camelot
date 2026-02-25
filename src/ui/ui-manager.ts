@@ -1,6 +1,7 @@
 import { Scene } from "@babylonjs/core/scene";
-import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Grid } from "@babylonjs/gui/2D";
+import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Grid, Button } from "@babylonjs/gui/2D";
 import { Item } from "../systems/inventory-system";
+import { Player } from "../entities/player";
 
 export class UIManager {
   public scene: Scene;
@@ -15,6 +16,14 @@ export class UIManager {
   public inventoryPanel: Rectangle;
   public inventoryGrid: Grid;
   public inventoryDescription: TextBlock;
+  public statsText: TextBlock;
+
+  // Pause Menu
+  public pausePanel: Rectangle;
+  public resumeButton: Button;
+  public saveButton: Button;
+  public loadButton: Button;
+  public quitButton: Button;
 
   // Interaction
   public interactionLabel: TextBlock;
@@ -23,11 +32,12 @@ export class UIManager {
     this.scene = scene;
     this._initUI();
     this._initInventoryUI();
+    this._initPauseMenu();
   }
 
   private _initInventoryUI(): void {
     this.inventoryPanel = new Rectangle();
-    this.inventoryPanel.width = "400px";
+    this.inventoryPanel.width = "600px"; // Wider for split view
     this.inventoryPanel.height = "600px";
     this.inventoryPanel.cornerRadius = 10;
     this.inventoryPanel.color = "white";
@@ -48,30 +58,43 @@ export class UIManager {
     title.top = "10px";
     this.inventoryPanel.addControl(title);
 
-    this.inventoryGrid = new Grid();
-    this.inventoryGrid.width = "360px";
-    this.inventoryGrid.height = "400px";
-    this.inventoryGrid.top = "-50px"; // Shift up to make room for description
+    // Main Grid: Left (Items), Right (Details & Stats)
+    const mainGrid = new Grid();
+    mainGrid.width = "560px";
+    mainGrid.height = "520px";
+    mainGrid.top = "40px";
+    mainGrid.addColumnDefinition(0.6); // 60% Items
+    mainGrid.addColumnDefinition(0.4); // 40% Stats
+    this.inventoryPanel.addControl(mainGrid);
 
-    // Define grid columns and rows (e.g., 4x5)
-    for (let i = 0; i < 5; i++) {
+    // Inventory Grid (Left Column)
+    this.inventoryGrid = new Grid();
+    this.inventoryGrid.width = "100%";
+    this.inventoryGrid.height = "100%";
+
+    // Define grid columns and rows (e.g., 5x4)
+    for (let i = 0; i < 6; i++) {
         this.inventoryGrid.addRowDefinition(1);
     }
     for (let i = 0; i < 4; i++) {
         this.inventoryGrid.addColumnDefinition(1);
     }
+    mainGrid.addControl(this.inventoryGrid, 0, 0);
 
-    this.inventoryPanel.addControl(this.inventoryGrid);
+    // Right Column (Details + Stats)
+    const rightPanel = new StackPanel();
+    rightPanel.width = "100%";
+    rightPanel.height = "100%";
+    mainGrid.addControl(rightPanel, 0, 1);
 
     // Description Area
     const descContainer = new Rectangle();
-    descContainer.width = "360px";
-    descContainer.height = "100px";
-    descContainer.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-    descContainer.paddingBottom = "20px";
+    descContainer.width = "100%";
+    descContainer.height = "200px";
     descContainer.color = "white";
     descContainer.thickness = 1;
-    this.inventoryPanel.addControl(descContainer);
+    descContainer.background = "rgba(0,0,0,0.5)";
+    rightPanel.addControl(descContainer);
 
     this.inventoryDescription = new TextBlock();
     this.inventoryDescription.text = "";
@@ -80,6 +103,73 @@ export class UIManager {
     this.inventoryDescription.textWrapping = true;
     this.inventoryDescription.paddingLeft = "5px";
     descContainer.addControl(this.inventoryDescription);
+
+    // Stats Area
+    const statsContainer = new Rectangle();
+    statsContainer.width = "100%";
+    statsContainer.height = "200px";
+    statsContainer.color = "white";
+    statsContainer.thickness = 1;
+    statsContainer.background = "rgba(0,0,0,0.5)";
+    statsContainer.top = "20px"; // Margin top
+    rightPanel.addControl(statsContainer);
+
+    this.statsText = new TextBlock();
+    this.statsText.text = "Stats:\nHP: --\nMP: --\nSP: --";
+    this.statsText.color = "white";
+    this.statsText.fontSize = 16;
+    this.statsText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this.statsText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.statsText.paddingTop = "10px";
+    this.statsText.paddingLeft = "10px";
+    statsContainer.addControl(this.statsText);
+  }
+
+  private _initPauseMenu(): void {
+      this.pausePanel = new Rectangle();
+      this.pausePanel.width = "100%";
+      this.pausePanel.height = "100%";
+      this.pausePanel.background = "rgba(0, 0, 0, 0.8)";
+      this.pausePanel.isVisible = false;
+      this.pausePanel.zIndex = 100; // On top
+      this._ui.addControl(this.pausePanel);
+
+      const panel = new StackPanel();
+      panel.width = "300px";
+      panel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+      this.pausePanel.addControl(panel);
+
+      const title = new TextBlock();
+      title.text = "PAUSED";
+      title.color = "white";
+      title.fontSize = 48;
+      title.height = "100px";
+      panel.addControl(title);
+
+      this.resumeButton = this._createButton("Resume", panel);
+      this.saveButton = this._createButton("Save", panel);
+      this.loadButton = this._createButton("Load", panel);
+      this.quitButton = this._createButton("Quit", panel);
+  }
+
+  private _createButton(text: string, parent: StackPanel): Button {
+      const button = Button.CreateSimpleButton("btn_" + text, text);
+      button.width = "100%";
+      button.height = "50px";
+      button.color = "white";
+      button.background = "rgba(100, 100, 100, 0.5)";
+      button.paddingBottom = "10px";
+      button.hoverCursor = "pointer";
+
+      button.onPointerEnterObservable.add(() => {
+          button.background = "rgba(150, 150, 150, 0.8)";
+      });
+      button.onPointerOutObservable.add(() => {
+          button.background = "rgba(100, 100, 100, 0.5)";
+      });
+
+      parent.addControl(button);
+      return button;
   }
 
   public toggleInventory(visible: boolean): void {
@@ -87,6 +177,17 @@ export class UIManager {
       if (!visible) {
           this.inventoryDescription.text = "";
       }
+  }
+
+  public togglePauseMenu(visible: boolean): void {
+      this.pausePanel.isVisible = visible;
+  }
+
+  public updateStats(player: Player): void {
+      this.statsText.text = `Stats:
+HP: ${Math.floor(player.health)} / ${player.maxHealth}
+MP: ${Math.floor(player.magicka)} / ${player.maxMagicka}
+SP: ${Math.floor(player.stamina)} / ${player.maxStamina}`;
   }
 
   public updateInventory(items: Item[]): void {
