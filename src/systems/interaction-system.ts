@@ -6,6 +6,10 @@ import { DialogueSystem } from "./dialogue-system";
 import { InventorySystem } from "./inventory-system";
 import { Loot } from "../entities/loot";
 
+export type InteractionTarget =
+  | { type: 'npc', entity: NPC }
+  | { type: 'loot', entity: Loot };
+
 export class InteractionSystem {
   public scene: Scene;
   public player: Player;
@@ -13,7 +17,7 @@ export class InteractionSystem {
   public inventorySystem: InventorySystem;
   public npcs: NPC[];
   public lootItems: Loot[] = [];
-  public currentTarget: { type: 'npc' | 'loot', entity: any } | null = null;
+  public currentTarget: InteractionTarget | null = null;
 
   constructor(scene: Scene, player: Player, dialogueSystem: DialogueSystem, inventorySystem: InventorySystem, npcs: NPC[]) {
     this.scene = scene;
@@ -56,9 +60,9 @@ export class InteractionSystem {
     if (!this.currentTarget) return;
 
     if (this.currentTarget.type === 'npc') {
-        this.dialogueSystem.startDialogue(this.currentTarget.entity as NPC);
+        this.dialogueSystem.startDialogue(this.currentTarget.entity);
     } else if (this.currentTarget.type === 'loot') {
-        const loot = this.currentTarget.entity as Loot;
+        const loot = this.currentTarget.entity;
         if (this.inventorySystem.addItem(loot.item)) {
             loot.dispose();
             const index = this.lootItems.indexOf(loot);

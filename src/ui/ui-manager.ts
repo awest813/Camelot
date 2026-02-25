@@ -1,9 +1,11 @@
 import { Scene } from "@babylonjs/core/scene";
 import { AdvancedDynamicTexture, Control, Grid, Rectangle, StackPanel, TextBlock, Button, Ellipse } from "@babylonjs/gui/2D";
-import { Item } from "../systems/inventory-system";
+import { InventorySystem, Item } from "../systems/inventory-system";
+import { Player } from "../entities/player";
 
 export class UIManager {
   public scene: Scene;
+  public player: Player;
   private _ui: AdvancedDynamicTexture;
 
   // Bars
@@ -21,8 +23,9 @@ export class UIManager {
   // Callback for item use
   public onUseItem: (item: Item) => void;
 
-  constructor(scene: Scene) {
+  constructor(scene: Scene, player: Player) {
     this.scene = scene;
+    this.player = player;
     this._initUI();
     this._initInteractionUI();
     this._initInventoryUI();
@@ -168,11 +171,15 @@ export class UIManager {
     this.inventoryGrid.height = "400px";
     this.inventoryGrid.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
     this.inventoryGrid.paddingBottom = "20px";
-    // 4 columns, 5 rows
-    for (let i = 0; i < 4; i++) {
+
+    // Dynamic columns/rows based on CAPACITY (Assuming 4 columns)
+    const cols = 4;
+    const rows = Math.ceil(InventorySystem.CAPACITY / cols);
+
+    for (let i = 0; i < cols; i++) {
         this.inventoryGrid.addColumnDefinition(1);
     }
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < rows; i++) {
         this.inventoryGrid.addRowDefinition(1);
     }
     this.inventoryPanel.addControl(this.inventoryGrid);
@@ -181,19 +188,14 @@ export class UIManager {
   public toggleInventory(): void {
     this.inventoryPanel.isVisible = !this.inventoryPanel.isVisible;
 
-    // We can't easily access Player here without dependency injection or global access.
-    // However, Game has 'ui'.
-    // A quick hack is to find the player camera and detach/attach.
-    const camera = this.scene.getCameraByName("playerCam");
-
     if (this.inventoryPanel.isVisible) {
         document.exitPointerLock();
-        if (camera) camera.detachControl();
+        this.player.detachControl();
     } else {
         const canvas = this.scene.getEngine().getRenderingCanvas();
         if (canvas) {
             canvas.requestPointerLock();
-            if (camera) camera.attachControl(canvas, true);
+            this.player.attachControl();
         }
     }
   }
@@ -201,8 +203,8 @@ export class UIManager {
   public updateInventory(items: Item[]): void {
       this.inventoryGrid.children.forEach(c => c.dispose()); // Clear old items (inefficient but simple)
 
-      // Limit to grid size (20)
-      const displayItems = items.slice(0, 20);
+      // Limit to grid size
+      const displayItems = items.slice(0, InventorySystem.CAPACITY);
 
       displayItems.forEach((item, index) => {
 

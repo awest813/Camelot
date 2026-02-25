@@ -40,7 +40,7 @@ export class Game {
   init(): void {
     this._setLight();
     this.player = new Player(this.scene, this.canvas);
-    this.ui = new UIManager(this.scene);
+    this.ui = new UIManager(this.scene, this.player);
     this.world = new WorldManager(this.scene);
     this.scheduleSystem = new ScheduleSystem(this.scene);
 

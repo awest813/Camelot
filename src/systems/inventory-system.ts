@@ -9,13 +9,13 @@ export interface Item {
 }
 
 export class InventorySystem {
+  public static readonly CAPACITY: number = 20;
   public items: Item[] = [];
-  public maxItems: number = 20;
 
   constructor() {}
 
   public addItem(item: Item): boolean {
-    if (this.items.length < this.maxItems) {
+    if (this.items.length < InventorySystem.CAPACITY) {
       this.items.push(item);
       console.log(`Added ${item.name} to inventory.`);
       return true;
