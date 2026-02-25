@@ -13,6 +13,7 @@ export class InteractionSystem {
   public inventorySystem: InventorySystem;
   public npcs: NPC[];
   public lootItems: Loot[] = [];
+  public currentTarget: { type: 'npc' | 'loot', entity: any } | null = null;
 
   constructor(scene: Scene, player: Player, dialogueSystem: DialogueSystem, inventorySystem: InventorySystem, npcs: NPC[]) {
     this.scene = scene;
@@ -22,8 +23,8 @@ export class InteractionSystem {
     this.npcs = npcs;
   }
 
-  public interact(): void {
-    // Raycast forward
+  public update(): void {
+    // Raycast forward constantly for UI
     const origin = this.player.camera.position;
     const forward = this.player.camera.getForwardRay(3).direction;
     const ray = new Ray(origin, forward, 3);
@@ -32,28 +33,41 @@ export class InteractionSystem {
        return mesh.name !== "playerBody" && !mesh.name.startsWith("chunk_");
     });
 
-    if (hit && hit.pickedMesh) {
-      console.log(`Interacted with ${hit.pickedMesh.name}`);
+    this.currentTarget = null;
 
+    if (hit && hit.pickedMesh) {
       // Check for NPC
       const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
       if (npc) {
-        this.dialogueSystem.startDialogue(npc);
+        this.currentTarget = { type: 'npc', entity: npc };
         return;
       }
 
       // Check for Loot
       const loot = this.lootItems.find(l => l.mesh === hit.pickedMesh);
       if (loot) {
+        this.currentTarget = { type: 'loot', entity: loot };
+        return;
+      }
+    }
+  }
+
+  public interact(): void {
+    if (!this.currentTarget) return;
+
+    if (this.currentTarget.type === 'npc') {
+        this.dialogueSystem.startDialogue(this.currentTarget.entity as NPC);
+    } else if (this.currentTarget.type === 'loot') {
+        const loot = this.currentTarget.entity as Loot;
         if (this.inventorySystem.addItem(loot.item)) {
             loot.dispose();
             const index = this.lootItems.indexOf(loot);
             if (index > -1) {
                 this.lootItems.splice(index, 1);
             }
+            // Clear target since it's gone
+            this.currentTarget = null;
         }
-        return;
-      }
     }
   }
 

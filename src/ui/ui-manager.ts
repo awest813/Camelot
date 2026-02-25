@@ -1,5 +1,5 @@
 import { Scene } from "@babylonjs/core/scene";
-import { AdvancedDynamicTexture, Control, Grid, Rectangle, StackPanel, TextBlock, Button } from "@babylonjs/gui/2D";
+import { AdvancedDynamicTexture, Control, Grid, Rectangle, StackPanel, TextBlock, Button, Ellipse } from "@babylonjs/gui/2D";
 import { Item } from "../systems/inventory-system";
 
 export class UIManager {
@@ -11,13 +11,20 @@ export class UIManager {
   public magickaBar: Rectangle;
   public staminaBar: Rectangle;
 
+  // Interaction
+  public interactionLabel: TextBlock;
+
   // Inventory
   public inventoryPanel: Rectangle;
   public inventoryGrid: Grid;
 
+  // Callback for item use
+  public onUseItem: (item: Item) => void;
+
   constructor(scene: Scene) {
     this.scene = scene;
     this._initUI();
+    this._initInteractionUI();
     this._initInventoryUI();
   }
 
@@ -112,6 +119,28 @@ export class UIManager {
       this.staminaBar.width = `${Math.max(0, current / max) * 100}%`;
   }
 
+  private _initInteractionUI(): void {
+      // Crosshair
+      const crosshair = new Ellipse();
+      crosshair.width = "4px";
+      crosshair.height = "4px";
+      crosshair.color = "white";
+      crosshair.background = "white";
+      crosshair.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+      crosshair.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+      this._ui.addControl(crosshair);
+
+      // Label
+      this.interactionLabel = new TextBlock();
+      this.interactionLabel.text = "";
+      this.interactionLabel.color = "white";
+      this.interactionLabel.fontSize = 18;
+      this.interactionLabel.top = "30px";
+      this.interactionLabel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+      this.interactionLabel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+      this._ui.addControl(this.interactionLabel);
+  }
+
   private _initInventoryUI(): void {
     // Inventory Panel (Center)
     this.inventoryPanel = new Rectangle();
@@ -151,6 +180,11 @@ export class UIManager {
 
   public toggleInventory(): void {
     this.inventoryPanel.isVisible = !this.inventoryPanel.isVisible;
+    if (this.inventoryPanel.isVisible) {
+        document.exitPointerLock();
+    } else {
+        this.scene.getEngine().getRenderingCanvas()?.requestPointerLock();
+    }
   }
 
   public updateInventory(items: Item[]): void {
@@ -178,6 +212,14 @@ export class UIManager {
           text.color = "black";
           text.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
           btn.addControl(text);
+
+          btn.onPointerUpObservable.add(() => {
+              if (this.onUseItem) {
+                  this.onUseItem(item);
+                  // Refresh UI? Ideally Game or System calls updateInventory again
+                  // We can remove the button here but better to re-render
+              }
+          });
 
           this.inventoryGrid.addControl(btn, row, col);
       });

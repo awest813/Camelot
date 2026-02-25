@@ -54,6 +54,12 @@ export class Game {
     this.inventorySystem = new InventorySystem();
     this.interactionSystem = new InteractionSystem(this.scene, this.player, this.dialogueSystem, this.inventorySystem, this.scheduleSystem.npcs);
 
+    // Bind UI actions
+    this.ui.onUseItem = (item) => {
+        this.inventorySystem.useItem(item);
+        this.ui.updateInventory(this.inventorySystem.items);
+    };
+
     // Spawn test loot
     this._spawnTestLoot();
 
@@ -117,6 +123,18 @@ export class Game {
       this.player.update(deltaTime);
       this.world.update(this.player.camera.position);
       this.scheduleSystem.update(deltaTime);
+
+      // Interaction Update
+      this.interactionSystem.update();
+      if (this.interactionSystem.currentTarget) {
+          if (this.interactionSystem.currentTarget.type === 'npc') {
+              this.ui.interactionLabel.text = "E to Talk";
+          } else {
+              this.ui.interactionLabel.text = `E to Pick Up ${this.interactionSystem.currentTarget.entity.item.name}`;
+          }
+      } else {
+          this.ui.interactionLabel.text = "";
+      }
 
       this.ui.updateHealth(this.player.health, this.player.maxHealth);
       this.ui.updateMagicka(this.player.magicka, this.player.maxMagicka);

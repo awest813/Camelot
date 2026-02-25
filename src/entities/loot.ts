@@ -37,11 +37,22 @@ export class Loot {
     }
     this.mesh.material = material;
 
-    this.physicsAggregate = new PhysicsAggregate(this.mesh, PhysicsShapeType.BOX, { mass: 1, restitution: 0.5 }, this.scene);
-    this.physicsAggregate.body.setMotionType(PhysicsMotionType.DYNAMIC);
+    // Static so it doesn't fall or get kicked
+    this.physicsAggregate = new PhysicsAggregate(this.mesh, PhysicsShapeType.BOX, { mass: 0, restitution: 0.5 }, this.scene);
+    this.physicsAggregate.body.setMotionType(PhysicsMotionType.STATIC);
+
+    // Make it rotate
+    this.scene.onBeforeRenderObservable.add(this._rotate);
   }
 
+  private _rotate = (): void => {
+      if (this.mesh) {
+          this.mesh.rotation.y += 0.01;
+      }
+  };
+
   public dispose(): void {
+      this.scene.onBeforeRenderObservable.removeCallback(this._rotate);
       this.mesh.dispose();
       this.physicsAggregate.dispose();
   }

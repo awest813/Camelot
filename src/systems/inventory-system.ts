@@ -35,4 +35,15 @@ export class InventorySystem {
   public hasItem(itemId: string): boolean {
     return this.items.some(i => i.id === itemId);
   }
+
+  public useItem(item: Item): void {
+      console.log(`Using ${item.name}...`);
+      if (item.type === "Consumable") {
+          // Placeholder for logic (e.g., heal player)
+          console.log(`Consumed ${item.name}. Restored health.`);
+          this.removeItem(item);
+      } else {
+          console.log(`Equipped ${item.name}.`);
+      }
+  }
 }
