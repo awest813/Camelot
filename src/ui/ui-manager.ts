@@ -12,11 +12,14 @@ export class UIManager {
   public magickaBar: Rectangle;
   public staminaBar: Rectangle;
 
-  // Inventory
-  public inventoryPanel: Rectangle;
+  // Character Menu (Inventory + Stats)
+  public characterMenuPanel: Rectangle;
   public inventoryGrid: Grid;
   public inventoryDescription: TextBlock;
   public statsText: TextBlock;
+
+  private _itemsView: Grid;
+  private _statsView: Rectangle;
 
   // Pause Menu
   public pausePanel: Rectangle;
@@ -35,7 +38,7 @@ export class UIManager {
   constructor(scene: Scene) {
     this.scene = scene;
     this._initUI();
-    this._initInventoryUI();
+    this._initCharacterMenu();
     this._initPauseMenu();
     this._initNotificationUI();
   }
@@ -63,9 +66,8 @@ export class UIManager {
 
       this.notificationPanel.addControl(block);
 
-      // Fade out logic
-      let lifeTime = 3000; // 3 seconds visible
-      const fadeTime = 1000; // 1 second fade
+      let lifeTime = 3000;
+      const fadeTime = 1000;
       let currentAlpha = 1.0;
 
       const obs = this.scene.onBeforeRenderObservable.add((_, state) => {
@@ -73,7 +75,6 @@ export class UIManager {
           lifeTime -= dt;
 
           if (lifeTime <= 0) {
-              // Start fading
               currentAlpha -= (dt / fadeTime);
               block.alpha = currentAlpha;
 
@@ -86,94 +87,114 @@ export class UIManager {
       });
   }
 
-  private _initInventoryUI(): void {
-    this.inventoryPanel = new Rectangle();
-    this.inventoryPanel.width = "600px"; // Wider for split view
-    this.inventoryPanel.height = "600px";
-    this.inventoryPanel.cornerRadius = 10;
-    this.inventoryPanel.color = "white";
-    this.inventoryPanel.thickness = 2;
-    this.inventoryPanel.background = "rgba(0, 0, 0, 0.9)";
-    this.inventoryPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
-    this.inventoryPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
-    this.inventoryPanel.left = "-20px";
-    this.inventoryPanel.isVisible = false;
-    this._ui.addControl(this.inventoryPanel);
+  private _initCharacterMenu(): void {
+    // Full screen semi-transparent background
+    this.characterMenuPanel = new Rectangle();
+    this.characterMenuPanel.width = "800px";
+    this.characterMenuPanel.height = "600px";
+    this.characterMenuPanel.cornerRadius = 10;
+    this.characterMenuPanel.color = "white";
+    this.characterMenuPanel.thickness = 2;
+    this.characterMenuPanel.background = "rgba(20, 20, 20, 0.95)";
+    this.characterMenuPanel.isVisible = false;
+    this._ui.addControl(this.characterMenuPanel);
 
-    const title = new TextBlock();
-    title.text = "Inventory";
-    title.color = "white";
-    title.fontSize = 24;
-    title.height = "40px";
-    title.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    title.top = "10px";
-    this.inventoryPanel.addControl(title);
+    // Header (Tabs)
+    const header = new StackPanel();
+    header.isVertical = false;
+    header.height = "50px";
+    header.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    header.paddingTop = "10px";
+    this.characterMenuPanel.addControl(header);
 
-    // Main Grid: Left (Items), Right (Details & Stats)
-    const mainGrid = new Grid();
-    mainGrid.width = "560px";
-    mainGrid.height = "520px";
-    mainGrid.top = "40px";
-    mainGrid.addColumnDefinition(0.6); // 60% Items
-    mainGrid.addColumnDefinition(0.4); // 40% Stats
-    this.inventoryPanel.addControl(mainGrid);
+    const itemsTab = this._createTabButton("ITEMS", header, () => this._switchTab("items"));
+    const statsTab = this._createTabButton("STATS", header, () => this._switchTab("stats"));
+    // const magicTab = this._createTabButton("MAGIC", header, () => console.log("Magic Tab"));
 
-    // Inventory Grid (Left Column)
+    // Content Container
+    const content = new Rectangle();
+    content.width = "760px";
+    content.height = "520px";
+    content.top = "60px";
+    content.thickness = 0;
+    content.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.characterMenuPanel.addControl(content);
+
+    // -- Items View --
+    this._itemsView = new Grid();
+    this._itemsView.width = "100%";
+    this._itemsView.height = "100%";
+    this._itemsView.addColumnDefinition(0.6); // Grid
+    this._itemsView.addColumnDefinition(0.4); // Desc
+    content.addControl(this._itemsView);
+
     this.inventoryGrid = new Grid();
     this.inventoryGrid.width = "100%";
     this.inventoryGrid.height = "100%";
+    for (let i = 0; i < 6; i++) this.inventoryGrid.addRowDefinition(1);
+    for (let i = 0; i < 4; i++) this.inventoryGrid.addColumnDefinition(1);
+    this._itemsView.addControl(this.inventoryGrid, 0, 0);
 
-    // Define grid columns and rows (e.g., 5x4)
-    for (let i = 0; i < 6; i++) {
-        this.inventoryGrid.addRowDefinition(1);
-    }
-    for (let i = 0; i < 4; i++) {
-        this.inventoryGrid.addColumnDefinition(1);
-    }
-    mainGrid.addControl(this.inventoryGrid, 0, 0);
-
-    // Right Column (Details + Stats)
-    const rightPanel = new StackPanel();
-    rightPanel.width = "100%";
-    rightPanel.height = "100%";
-    mainGrid.addControl(rightPanel, 0, 1);
-
-    // Description Area
-    const descContainer = new Rectangle();
-    descContainer.width = "100%";
-    descContainer.height = "200px";
-    descContainer.color = "white";
-    descContainer.thickness = 1;
-    descContainer.background = "rgba(0,0,0,0.5)";
-    rightPanel.addControl(descContainer);
+    const descPanel = new Rectangle();
+    descPanel.thickness = 1;
+    descPanel.color = "gray";
+    descPanel.background = "rgba(0,0,0,0.3)";
+    descPanel.paddingLeft = "10px";
+    this._itemsView.addControl(descPanel, 0, 1);
 
     this.inventoryDescription = new TextBlock();
-    this.inventoryDescription.text = "";
+    this.inventoryDescription.text = "Select an item";
     this.inventoryDescription.color = "white";
-    this.inventoryDescription.fontSize = 14;
     this.inventoryDescription.textWrapping = true;
-    this.inventoryDescription.paddingLeft = "5px";
-    descContainer.addControl(this.inventoryDescription);
+    this.inventoryDescription.fontSize = 16;
+    descPanel.addControl(this.inventoryDescription);
 
-    // Stats Area
-    const statsContainer = new Rectangle();
-    statsContainer.width = "100%";
-    statsContainer.height = "200px";
-    statsContainer.color = "white";
-    statsContainer.thickness = 1;
-    statsContainer.background = "rgba(0,0,0,0.5)";
-    statsContainer.top = "20px"; // Margin top
-    rightPanel.addControl(statsContainer);
+    // -- Stats View --
+    this._statsView = new Rectangle();
+    this._statsView.width = "100%";
+    this._statsView.height = "100%";
+    this._statsView.thickness = 0;
+    this._statsView.isVisible = false;
+    content.addControl(this._statsView);
 
     this.statsText = new TextBlock();
-    this.statsText.text = "Stats:\nHP: --\nMP: --\nSP: --";
+    this.statsText.text = "Stats Loading...";
     this.statsText.color = "white";
-    this.statsText.fontSize = 16;
+    this.statsText.fontSize = 24;
     this.statsText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     this.statsText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this.statsText.paddingTop = "10px";
-    this.statsText.paddingLeft = "10px";
-    statsContainer.addControl(this.statsText);
+    this.statsText.paddingTop = "20px";
+    this.statsText.paddingLeft = "20px";
+    this._statsView.addControl(this.statsText);
+  }
+
+  private _createTabButton(text: string, parent: StackPanel, onClick: () => void): Button {
+      const btn = Button.CreateSimpleButton("tab_" + text, text);
+      btn.width = "150px";
+      btn.height = "40px";
+      btn.color = "white";
+      btn.background = "transparent";
+      btn.thickness = 0;
+      btn.fontSize = 20;
+      btn.hoverCursor = "pointer";
+
+      // Underline or highlight on hover
+      btn.onPointerEnterObservable.add(() => btn.color = "yellow");
+      btn.onPointerOutObservable.add(() => btn.color = "white");
+      btn.onPointerUpObservable.add(onClick);
+
+      parent.addControl(btn);
+      return btn;
+  }
+
+  private _switchTab(tab: "items" | "stats"): void {
+      if (tab === "items") {
+          this._itemsView.isVisible = true;
+          this._statsView.isVisible = false;
+      } else {
+          this._itemsView.isVisible = false;
+          this._statsView.isVisible = true;
+      }
   }
 
   private _initPauseMenu(): void {
@@ -227,8 +248,8 @@ export class UIManager {
       return button;
   }
 
-  public toggleInventory(visible: boolean): void {
-      this.inventoryPanel.isVisible = visible;
+  public toggleCharacterMenu(visible: boolean): void {
+      this.characterMenuPanel.isVisible = visible;
       this.toggleCrosshair(!visible);
       if (!visible) {
           this.inventoryDescription.text = "";
@@ -245,10 +266,17 @@ export class UIManager {
   }
 
   public updateStats(player: Player): void {
-      this.statsText.text = `Stats:
-HP: ${Math.floor(player.health)} / ${player.maxHealth}
-MP: ${Math.floor(player.magicka)} / ${player.maxMagicka}
-SP: ${Math.floor(player.stamina)} / ${player.maxStamina}`;
+      this.statsText.text =
+`LEVEL 1
+
+Health:   ${Math.floor(player.health)} / ${player.maxHealth}
+Magicka:  ${Math.floor(player.magicka)} / ${player.maxMagicka}
+Stamina:  ${Math.floor(player.stamina)} / ${player.maxStamina}
+
+Regen Rates:
+HP: ${player.healthRegen}/s
+MP: ${player.magickaRegen}/s
+SP: ${player.staminaRegen}/s`;
   }
 
   public updateInventory(items: Item[]): void {
@@ -257,7 +285,7 @@ SP: ${Math.floor(player.stamina)} / ${player.maxStamina}`;
       }
 
       items.forEach((item, index) => {
-          if (index >= 20) return; // Limit to grid size
+          if (index >= 24) return; // Limit to grid size (6x4)
 
           const row = Math.floor(index / 4);
           const col = index % 4;
@@ -273,11 +301,15 @@ SP: ${Math.floor(player.stamina)} / ${player.maxStamina}`;
 
           // Hover events
           slot.onPointerEnterObservable.add(() => {
-              this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}`;
+              this.inventoryDescription.text = `${item.name}\n\n${item.description}\n\nQuantity: ${item.quantity}`;
+              if (item.stats) {
+                  this.inventoryDescription.text += `\n\nStats: ${JSON.stringify(item.stats)}`;
+              }
               slot.background = "rgba(255, 255, 255, 0.3)";
           });
           slot.onPointerOutObservable.add(() => {
-              this.inventoryDescription.text = "";
+              // Keep description or clear? Skyrim keeps last selected.
+              // this.inventoryDescription.text = "";
               slot.background = "rgba(255, 255, 255, 0.1)";
           });
 
@@ -338,12 +370,6 @@ SP: ${Math.floor(player.stamina)} / ${player.maxStamina}`;
     compassContainer.addControl(compassLabel);
 
     // Status Bars Container (Bottom Center)
-    // Skyrim style: Magicka (Left), Health (Center), Stamina (Right)
-    // But usually in Skyrim:
-    // Health is center. Magicka is left. Stamina is right.
-    // They are separate bars that appear when needed.
-    // For now, I'll make them persistent at the bottom.
-
     const barsPanel = new StackPanel();
     barsPanel.isVertical = false;
     barsPanel.height = "30px";
@@ -351,7 +377,6 @@ SP: ${Math.floor(player.stamina)} / ${player.maxStamina}`;
     barsPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
     barsPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
     barsPanel.top = "-20px";
-    // barsPanel.spacing = 20; // Check if supported
     this._ui.addControl(barsPanel);
 
     // Magicka Bar (Blue)

@@ -82,5 +82,6 @@ export class InventorySystem {
 
   private _updateUI(): void {
     this._ui.updateInventory(this.items);
+    this._ui.updateStats(this._player);
   }
 }

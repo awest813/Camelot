@@ -18,8 +18,9 @@ describe('InventorySystem', () => {
             }
         };
         mockUI = {
-            toggleCharacterMenu: vi.fn(), // Renamed
+            toggleCharacterMenu: vi.fn(),
             updateInventory: vi.fn(),
+            updateStats: vi.fn(), // Added mock for updateStats
             setInteractionText: vi.fn(),
             addNotification: vi.fn(),
         };
@@ -71,6 +72,7 @@ describe('InventorySystem', () => {
         expect(mockUI.toggleCharacterMenu).toHaveBeenCalledWith(true);
         expect(mockPlayer.camera.detachControl).toHaveBeenCalled();
         expect(mockUI.setInteractionText).toHaveBeenCalledWith("");
+        expect(mockUI.updateStats).toHaveBeenCalled();
 
         inventorySystem.toggleCharacterMenu();
         expect(inventorySystem.isOpen).toBe(false);

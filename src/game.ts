@@ -60,6 +60,10 @@ export class Game {
         if (this.isPaused || this.inventorySystem.isOpen) return;
 
         if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
+            // Need to check if clicking on GUI?
+            // Babylon GUI usually blocks pointer events if isPointerBlocker is true.
+            // But just in case, we have the isOpen check.
+
             if (pointerInfo.event.button === 0) { // Left Click
                 this.combatSystem.meleeAttack();
             } else if (pointerInfo.event.button === 2) { // Right Click
