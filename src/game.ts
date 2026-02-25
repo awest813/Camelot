@@ -11,7 +11,9 @@ import { ScheduleSystem } from "./systems/schedule-system";
 import { CombatSystem } from "./systems/combat-system";
 import { DialogueSystem } from "./systems/dialogue-system";
 import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
-import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
+import { InventorySystem } from "./systems/inventory-system";
+import { InteractionSystem } from "./systems/interaction-system";
+import { Loot } from "./entities/loot";
 
 export class Game {
   public scene: Scene;
@@ -23,6 +25,8 @@ export class Game {
   public scheduleSystem: ScheduleSystem;
   public combatSystem: CombatSystem;
   public dialogueSystem: DialogueSystem;
+  public inventorySystem: InventorySystem;
+  public interactionSystem: InteractionSystem;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
     this.scene = scene;
@@ -46,6 +50,28 @@ export class Game {
 
     this.combatSystem = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs);
     this.dialogueSystem = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
+    this.inventorySystem = new InventorySystem(this.player, this.ui, this.canvas);
+    this.interactionSystem = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem);
+
+    // Test Loot
+    new Loot(this.scene, new Vector3(5, 1, 5), {
+        id: "sword_01",
+        name: "Iron Sword",
+        description: "A rusty iron sword.",
+        stackable: false,
+        quantity: 1,
+        slot: "mainHand",
+        stats: { damage: 10 }
+    });
+
+    new Loot(this.scene, new Vector3(7, 1, 5), {
+        id: "potion_hp_01",
+        name: "Health Potion",
+        description: "Restores 50 HP.",
+        stackable: true,
+        quantity: 1,
+        stats: { heal: 50 }
+    });
 
     // Input handling for combat
     this.scene.onPointerObservable.add((pointerInfo) => {
@@ -54,15 +80,6 @@ export class Game {
                 this.combatSystem.meleeAttack();
             } else if (pointerInfo.event.button === 2) { // Right Click
                 this.combatSystem.magicAttack();
-            }
-        }
-    });
-
-    // Input handling for interaction
-    this.scene.onKeyboardObservable.add((kbInfo) => {
-        if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
-            if (kbInfo.event.key === 'e' || kbInfo.event.key === 'E') {
-                this.dialogueSystem.interact();
             }
         }
     });

@@ -68,27 +68,8 @@ export class DialogueSystem {
     this._cinematicCamera = new ArcRotateCamera("cinematicCam", 0, 0, 5, Vector3.Zero(), this.scene);
   }
 
-  public interact(): void {
+  public startDialogue(npc: NPC): void {
     if (this._isInDialogue) return;
-
-    // Raycast forward
-    const origin = this.player.camera.position;
-    const forward = this.player.camera.getForwardRay(3).direction;
-    const ray = new Ray(origin, forward, 3);
-
-    const hit = this.scene.pickWithRay(ray, (mesh) => {
-       return mesh.name !== "playerBody" && !mesh.name.startsWith("chunk_");
-    });
-
-    if (hit && hit.pickedMesh) {
-      const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
-      if (npc) {
-        this._startDialogue(npc);
-      }
-    }
-  }
-
-  private _startDialogue(npc: NPC): void {
     this._isInDialogue = true;
 
     // Switch Camera

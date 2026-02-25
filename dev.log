@@ -1,0 +1,11 @@
+
+> vite-babylon-800@0.0.1 dev
+> vite
+
+
+  VITE v6.3.6  ready in 565 ms
+
+  ➜  Local:   http://localhost:8088/
+  ➜  Network: use --host to expose
+1:54:54 PM [vite] (client) page reload src/systems/inventory-system.ts
+1:54:59 PM [vite] (client) page reload src/systems/interaction-system.ts

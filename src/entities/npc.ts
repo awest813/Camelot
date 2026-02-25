@@ -40,5 +40,8 @@ export class NPC {
 
     // Lock rotation to keep upright
     this.physicsAggregate.body.setMassProperties({ inertia: new Vector3(0, 0, 0) });
+
+    // Interaction metadata
+    this.mesh.metadata = { type: "npc", npc: this };
   }
 }
