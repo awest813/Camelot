@@ -82,7 +82,7 @@ export class UIManager {
     parent.addControl(container);
 
     const bar = new Rectangle();
-    bar.width = 1; // 100%
+    bar.width = "100%"; // 100%
     bar.height = "100%";
     bar.cornerRadius = 2;
     bar.color = color;
@@ -95,14 +95,14 @@ export class UIManager {
   }
 
   public updateHealth(current: number, max: number): void {
-      this.healthBar.width = Math.max(0, current / max);
+      this.healthBar.width = `${Math.max(0, current / max) * 100}%`;
   }
 
   public updateMagicka(current: number, max: number): void {
-      this.magickaBar.width = Math.max(0, current / max);
+      this.magickaBar.width = `${Math.max(0, current / max) * 100}%`;
   }
 
   public updateStamina(current: number, max: number): void {
-      this.staminaBar.width = Math.max(0, current / max);
+      this.staminaBar.width = `${Math.max(0, current / max) * 100}%`;
   }
 }

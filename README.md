@@ -1,31 +1,78 @@
-# Babylon.js 8 + Vite 6 Typescript Template with Havok Physics
+# Babylon.js RPG Template
 
-### Dev Environment
-
-`npm i`
-
-`npm run dev`
-
-### Production Environment
-
-`npm run build`
-
-`npm run preview`
+A modern RPG framework built with Babylon.js 8, Vite 6, and TypeScript. Featuring Havok physics, infinite terrain chunks, player controller with RPG stats, and basic NPC interaction/combat systems.
 
 ## Features
 
-- Freshiest Babylon.js, Vite, Typescript and all other dependencies
-- WebGPU engine by default, WebGL2 supported as well
-- Havok Physics already set up and included in the demo scene
-- FPS Counter in the right top corner
-- Inspector - press Ctrl+Alt+Shift+I
-- Axes Viewer
-- Default Rendering Pipeline with FXAA and MSAA enabled
-- All `console.log` messages are cleared in the production build
-- Easy to disable not needed functions (Havok, Axes Viewer, Pipeline etc)
-- Tree-shaking to reduce bundle size
-- Inspector's import only for DEV mode to reduce bundle size
+- **Engine**: Babylon.js 8 + Vite 6 + TypeScript (Fast HMR & Builds)
+- **Physics**: Havok Physics integration for rigid bodies and interactions.
+- **Player Controller**:
+  - FPS Camera with physics-based movement.
+  - RPG Stats: Health, Magicka, Stamina (with regeneration).
+  - Combat: Melee (Stamina cost) and Magic (Magicka cost) attacks.
+- **World**:
+  - Infinite procedural terrain generation (chunk-based).
+  - Dynamic chunk loading/unloading logic.
+- **NPCs & AI**:
+  - Patrol points and movement logic.
+  - Interaction system with cinematic dialogue camera.
+- **UI**:
+  - Real-time HUD (Health, Magicka, Stamina bars).
+  - Dialogue interface with choices.
+- **Debug Tools**:
+  - Inspector (Ctrl+Alt+Shift+I).
+  - FPS counter.
 
-Based on old good https://github.com/minibao/babylon-vite
+## Controls
 
-**Made by https://babylonpress.org/**
+- **WASD**: Move Player
+- **Mouse**: Look around
+- **Left Click**: Melee Attack (Costs Stamina)
+- **Right Click**: Magic Attack (Costs Magicka)
+- **E**: Interact with NPCs
+- **I**: Toggle Inventory (Planned)
+
+## Getting Started
+
+### Prerequisites
+- Node.js (v18+)
+- npm
+
+### Installation
+
+1. Clone the repository.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+### Development
+Run the development server with hot module replacement:
+```bash
+npm run dev
+```
+Open `http://localhost:5173` in your browser.
+
+### Production Build
+Build for production:
+```bash
+npm run build
+```
+Preview the production build:
+```bash
+npm run preview
+```
+
+## Project Structure
+
+- `src/game.ts`: Main entry point and game loop.
+- `src/entities/`: Player, NPC, and other entity classes.
+- `src/systems/`: Game systems (Combat, Dialogue, Schedule, Physics).
+- `src/world/`: World generation and management.
+- `src/ui/`: UI components and manager.
+
+## Roadmap
+See [ROADMAP.md](./ROADMAP.md) for future plans.
+
+---
+Based on [babylon-vite-template](https://github.com/minibao/babylon-vite)
