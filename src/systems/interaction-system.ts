@@ -26,7 +26,7 @@ export class InteractionSystem {
         if (kbInfo.event.key === 'e' || kbInfo.event.key === 'E') {
           this.interact();
         } else if (kbInfo.event.key === 'i' || kbInfo.event.key === 'I') {
-            this.inventorySystem.toggleInventory();
+            this.inventorySystem.toggleCharacterMenu();
         }
       }
     });
@@ -53,7 +53,7 @@ export class InteractionSystem {
 
   public interact(): void {
     if (this.inventorySystem.isOpen) {
-        this.inventorySystem.toggleInventory();
+        this.inventorySystem.toggleCharacterMenu();
         return;
     }
 

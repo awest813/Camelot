@@ -64,21 +64,17 @@ export class InventorySystem {
     return true;
   }
 
-  public toggleInventory(): void {
+  public toggleCharacterMenu(): void {
     this.isOpen = !this.isOpen;
 
     if (this.isOpen) {
-      this._ui.toggleInventory(true);
-      // Ensure crosshair is hidden (UI manager handles this via toggleInventory mostly, but double check)
-      // Actually ui.toggleInventory calls toggleCrosshair(!visible), so it's handled.
-      // But we need to make sure InteractionSystem clears text too.
+      this._ui.toggleCharacterMenu(true);
       this._ui.setInteractionText("");
-
       document.exitPointerLock();
       this._player.camera.detachControl();
       this._updateUI();
     } else {
-      this._ui.toggleInventory(false);
+      this._ui.toggleCharacterMenu(false);
       this._canvas.requestPointerLock();
       this._player.camera.attachControl(this._canvas, true);
     }

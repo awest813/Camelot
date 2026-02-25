@@ -44,3 +44,6 @@
 3:19:51 PM [vite] (client) page reload src/world/world-manager.ts
 3:20:33 PM [vite] (client) page reload src/game.ts
 3:20:45 PM [vite] (client) page reload src/game.ts
+4:09:29 PM [vite] (client) page reload src/systems/inventory-system.ts
+4:12:10 PM [vite] (client) page reload src/systems/interaction-system.ts
+4:12:10 PM [vite] (client) page reload src/systems/interaction-system.ts

@@ -18,10 +18,10 @@ describe('InventorySystem', () => {
             }
         };
         mockUI = {
-            toggleInventory: vi.fn(),
+            toggleCharacterMenu: vi.fn(), // Renamed
             updateInventory: vi.fn(),
             setInteractionText: vi.fn(),
-            addNotification: vi.fn(), // Added this mock
+            addNotification: vi.fn(),
         };
         mockCanvas = {
             requestPointerLock: vi.fn(),
@@ -62,19 +62,19 @@ describe('InventorySystem', () => {
         expect(inventorySystem.items.length).toBe(0);
     });
 
-    it('should toggle inventory', () => {
+    it('should toggle character menu', () => {
         // Mock document.exitPointerLock
         document.exitPointerLock = vi.fn();
 
-        inventorySystem.toggleInventory();
+        inventorySystem.toggleCharacterMenu();
         expect(inventorySystem.isOpen).toBe(true);
-        expect(mockUI.toggleInventory).toHaveBeenCalledWith(true);
+        expect(mockUI.toggleCharacterMenu).toHaveBeenCalledWith(true);
         expect(mockPlayer.camera.detachControl).toHaveBeenCalled();
         expect(mockUI.setInteractionText).toHaveBeenCalledWith("");
 
-        inventorySystem.toggleInventory();
+        inventorySystem.toggleCharacterMenu();
         expect(inventorySystem.isOpen).toBe(false);
-        expect(mockUI.toggleInventory).toHaveBeenCalledWith(false);
+        expect(mockUI.toggleCharacterMenu).toHaveBeenCalledWith(false);
         expect(mockPlayer.camera.attachControl).toHaveBeenCalled();
     });
 });
