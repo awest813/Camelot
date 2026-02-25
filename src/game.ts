@@ -51,7 +51,7 @@ export class Game {
 
     this.combatSystem = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs);
     this.dialogueSystem = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
-    this.inventorySystem = new InventorySystem();
+    this.inventorySystem = new InventorySystem(this.player);
     this.interactionSystem = new InteractionSystem(this.scene, this.player, this.dialogueSystem, this.inventorySystem, this.scheduleSystem.npcs);
 
     // Bind UI actions
@@ -112,7 +112,9 @@ export class Game {
           name: "Iron Sword",
           type: "Weapon",
           description: "Sharp and pointy.",
-          color: "gray" // mapping "gray" might default to white in my switch, which is fine
+          color: "gray",
+          slot: "mainHand",
+          stats: { damage: 10 }
       });
       this.interactionSystem.addLoot(sword);
   }

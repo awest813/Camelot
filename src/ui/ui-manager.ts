@@ -219,6 +219,14 @@ export class UIManager {
           btn.cornerRadius = 5;
           btn.fontSize = 20;
 
+          if (this.player.equipment.mainHand === item) {
+              btn.thickness = 4;
+              btn.color = "lime";
+          } else {
+              btn.thickness = 1;
+              btn.color = "white";
+          }
+
           // Tooltip logic (simple text on hover)
           // For now, just display name
           const text = new TextBlock();

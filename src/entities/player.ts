@@ -4,12 +4,18 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { Item } from "../systems/inventory-system";
 
 export class Player {
   public camera: UniversalCamera;
   public scene: Scene;
   private canvas: HTMLCanvasElement;
   private physicsAggregate: PhysicsAggregate;
+
+  // Equipment
+  public equipment: { mainHand: Item | null } = { mainHand: null };
+  public weaponMesh: Mesh | null = null;
 
   // Stats
   public health: number;
@@ -87,5 +93,42 @@ export class Player {
 
   public attachControl(): void {
     this.camera.attachControl(this.canvas, true);
+  }
+
+  public equip(item: Item): void {
+      if (item.slot === 'mainHand') {
+          // Unequip current
+          if (this.weaponMesh) {
+              this.weaponMesh.dispose();
+              this.weaponMesh = null;
+          }
+
+          this.equipment.mainHand = item;
+          console.log(`Equipped ${item.name} in Main Hand.`);
+
+          // Create visual representation attached to camera (FPS view)
+          // Simple cylinder for now
+          this.weaponMesh = MeshBuilder.CreateCylinder("weapon", { height: 1, diameter: 0.1 }, this.scene);
+          this.weaponMesh.parent = this.camera;
+          // Position relative to camera: forward and right
+          this.weaponMesh.position.set(0.5, -0.5, 1);
+          // Rotate to point forward
+          this.weaponMesh.rotation.x = Math.PI / 2;
+
+          // Disable collision for the weapon mesh itself
+          this.weaponMesh.checkCollisions = false;
+          this.weaponMesh.isPickable = false;
+      }
+  }
+
+  public unequip(slot: string): void {
+      if (slot === 'mainHand') {
+          this.equipment.mainHand = null;
+          if (this.weaponMesh) {
+              this.weaponMesh.dispose();
+              this.weaponMesh = null;
+          }
+          console.log("Unequipped Main Hand.");
+      }
   }
 }

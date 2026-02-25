@@ -27,8 +27,12 @@ export class CombatSystem {
     }
     this.player.stamina -= 15;
 
+    // Calculate damage
+    const damage = this.player.equipment.mainHand?.stats?.damage || 2;
+    const weaponName = this.player.equipment.mainHand?.name || "Fists";
+
     // Play animation (todo)
-    console.log("Melee Attack!");
+    console.log(`Melee Attack with ${weaponName} (${damage} dmg)!`);
 
     // Raycast forward
     const origin = this.player.camera.position;
