@@ -1,0 +1,37 @@
+
+> vite-babylon-800@0.0.1 dev
+> vite
+
+
+  VITE v6.3.6  ready in 565 ms
+
+  ➜  Local:   http://localhost:8088/
+  ➜  Network: use --host to expose
+1:54:54 PM [vite] (client) page reload src/systems/inventory-system.ts
+1:54:59 PM [vite] (client) page reload src/systems/interaction-system.ts
+2:09:05 PM [vite] (client) page reload src/ui/ui-manager.ts
+2:09:10 PM [vite] (client) page reload src/ui/ui-manager.ts
+2:09:26 PM [vite] (client) page reload src/systems/interaction-system.ts
+2:09:33 PM [vite] (client) page reload src/systems/inventory-system.ts
+2:09:39 PM [vite] (client) page reload src/systems/interaction-system.ts
+2:09:53 PM [vite] (client) page reload src/game.ts
+2:39:00 PM [vite] (client) page reload src/ui/ui-manager.ts
+2:39:14 PM [vite] (client) page reload src/game.ts
+2:39:22 PM [vite] (client) page reload src/game.ts
+2:39:28 PM [vite] (client) page reload src/game.ts
+2:41:31 PM [vite] (client) page reload src/game.ts
+2:42:31 PM [vite] (client) page reload src/game.ts
+2:43:11 PM [vite] (client) page reload src/game.ts
+2:46:44 PM [vite] (client) page reload src/game.ts
+2:47:23 PM [vite] (client) page reload src/game.ts
+2:47:29 PM [vite] (client) page reload src/systems/interaction-system.ts
+2:48:35 PM [vite] (client) page reload src/game.ts
+2:49:10 PM [vite] (client) page reload src/game.ts
+2:49:17 PM [vite] (client) page reload src/systems/interaction-system.ts
+2:55:22 PM [vite] (client) page reload src/ui/ui-manager.ts
+2:55:34 PM [vite] (client) page reload src/ui/ui-manager.ts
+2:55:42 PM [vite] (client) page reload src/ui/ui-manager.ts
+2:55:48 PM [vite] (client) page reload src/ui/ui-manager.ts
+2:56:01 PM [vite] (client) page reload src/ui/ui-manager.ts
+2:56:36 PM [vite] (client) page reload src/game.ts
+2:56:57 PM [vite] (client) page reload src/systems/inventory-system.ts

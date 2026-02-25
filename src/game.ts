@@ -12,6 +12,9 @@ import { CombatSystem } from "./systems/combat-system";
 import { DialogueSystem } from "./systems/dialogue-system";
 import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
+import { InventorySystem } from "./systems/inventory-system";
+import { InteractionSystem } from "./systems/interaction-system";
+import { Loot } from "./entities/loot";
 
 export class Game {
   public scene: Scene;
@@ -23,6 +26,10 @@ export class Game {
   public scheduleSystem: ScheduleSystem;
   public combatSystem: CombatSystem;
   public dialogueSystem: DialogueSystem;
+  public inventorySystem: InventorySystem;
+  public interactionSystem: InteractionSystem;
+
+  public isPaused: boolean = false;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
     this.scene = scene;
@@ -46,9 +53,33 @@ export class Game {
 
     this.combatSystem = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs);
     this.dialogueSystem = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
+    this.inventorySystem = new InventorySystem(this.player, this.ui, this.canvas);
+    this.interactionSystem = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem);
+
+    // Test Loot
+    new Loot(this.scene, new Vector3(5, 1, 5), {
+        id: "sword_01",
+        name: "Iron Sword",
+        description: "A rusty iron sword.",
+        stackable: false,
+        quantity: 1,
+        slot: "mainHand",
+        stats: { damage: 10 }
+    });
+
+    new Loot(this.scene, new Vector3(7, 1, 5), {
+        id: "potion_hp_01",
+        name: "Health Potion",
+        description: "Restores 50 HP.",
+        stackable: true,
+        quantity: 1,
+        stats: { heal: 50 }
+    });
 
     // Input handling for combat
     this.scene.onPointerObservable.add((pointerInfo) => {
+        if (this.isPaused || this.inventorySystem.isOpen) return;
+
         if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
             if (pointerInfo.event.button === 0) { // Left Click
                 this.combatSystem.meleeAttack();
@@ -58,19 +89,40 @@ export class Game {
         }
     });
 
-    // Input handling for interaction
+    // Input handling for pause
     this.scene.onKeyboardObservable.add((kbInfo) => {
         if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
-            if (kbInfo.event.key === 'e' || kbInfo.event.key === 'E') {
-                this.dialogueSystem.interact();
+            if (kbInfo.event.key === "Escape") {
+                this.togglePause();
             }
         }
     });
+
+    // Wire up Pause Menu buttons
+    this.ui.resumeButton.onPointerUpObservable.add(() => this.togglePause());
+    this.ui.saveButton.onPointerUpObservable.add(() => console.log("Save Game (Mock)"));
+    this.ui.loadButton.onPointerUpObservable.add(() => console.log("Load Game (Mock)"));
+    this.ui.quitButton.onPointerUpObservable.add(() => window.location.reload());
 
     // Game loop logic will go here
     this.scene.onBeforeRenderObservable.add(() => {
         this.update();
     });
+  }
+
+  togglePause(): void {
+      this.isPaused = !this.isPaused;
+      this.ui.togglePauseMenu(this.isPaused);
+
+      if (this.isPaused) {
+          // Clear interaction label when paused
+          this.ui.setInteractionText("");
+          document.exitPointerLock();
+          this.player.camera.detachControl();
+      } else {
+          this.canvas.requestPointerLock();
+          this.player.camera.attachControl(this.canvas, true);
+      }
   }
 
   _setLight(): void {
@@ -79,14 +131,22 @@ export class Game {
   }
 
   update(): void {
+      if (this.isPaused) return;
+
       const deltaTime = this.engine.getDeltaTime() / 1000;
 
       this.player.update(deltaTime);
       this.world.update(this.player.camera.position);
       this.scheduleSystem.update(deltaTime);
+      this.interactionSystem.update();
 
       this.ui.updateHealth(this.player.health, this.player.maxHealth);
       this.ui.updateMagicka(this.player.magicka, this.player.maxMagicka);
       this.ui.updateStamina(this.player.stamina, this.player.maxStamina);
+
+      // Update stats only if inventory is open (optimization)
+      if (this.inventorySystem.isOpen) {
+          this.ui.updateStats(this.player);
+      }
   }
 }
