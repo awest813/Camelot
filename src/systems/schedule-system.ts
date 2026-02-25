@@ -6,6 +6,13 @@ export class ScheduleSystem {
   public scene: Scene;
   public npcs: NPC[] = [];
 
+  // Scratch vectors for performance optimization
+  private _direction: Vector3 = new Vector3();
+  private _velocity: Vector3 = new Vector3();
+  private _currentVel: Vector3 = new Vector3();
+  private _newVel: Vector3 = new Vector3();
+  private _lookAtTarget: Vector3 = new Vector3();
+
   constructor(scene: Scene) {
     this.scene = scene;
   }
@@ -32,10 +39,10 @@ export class ScheduleSystem {
 
     const target = npc.patrolPoints[npc.currentPatrolIndex];
     const currentPos = npc.mesh.position;
-    const direction = target.subtract(currentPos);
+    target.subtractToRef(currentPos, this._direction);
 
     // Ignore Y component for distance check on ground
-    const distXZ = Math.sqrt(direction.x * direction.x + direction.z * direction.z);
+    const distXZ = Math.sqrt(this._direction.x * this._direction.x + this._direction.z * this._direction.z);
 
     if (distXZ < 1.0) {
       // Reached target
@@ -43,19 +50,20 @@ export class ScheduleSystem {
       npc.waitTime = 2.0; // Wait 2 seconds
     } else {
       // Move towards target
-      direction.y = 0;
-      direction.normalize();
-      const velocity = direction.scale(npc.moveSpeed);
+      this._direction.y = 0;
+      this._direction.normalize();
+      this._direction.scaleToRef(npc.moveSpeed, this._velocity);
 
       if (npc.physicsAggregate && npc.physicsAggregate.body) {
-         const currentVel = new Vector3();
-         npc.physicsAggregate.body.getLinearVelocityToRef(currentVel);
+         npc.physicsAggregate.body.getLinearVelocityToRef(this._currentVel);
 
          // Set X and Z velocity, keep Y (gravity)
-         npc.physicsAggregate.body.setLinearVelocity(new Vector3(velocity.x, currentVel.y, velocity.z));
+         this._newVel.set(this._velocity.x, this._currentVel.y, this._velocity.z);
+         npc.physicsAggregate.body.setLinearVelocity(this._newVel);
 
          // Rotate to face movement (ignore Y difference)
-         npc.mesh.lookAt(new Vector3(target.x, npc.mesh.position.y, target.z));
+         this._lookAtTarget.set(target.x, npc.mesh.position.y, target.z);
+         npc.mesh.lookAt(this._lookAtTarget);
       }
     }
   }

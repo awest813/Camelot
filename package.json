@@ -14,11 +14,13 @@
   },
   "devDependencies": {
     "@types/node": "^24.7.0",
+    "jsdom": "^28.1.0",
     "typescript": "^5.9.3",
     "vite": "^6.2.3",
     "vite-plugin-compression": "^0.5.1",
     "vite-plugin-glsl": "^1.5.4",
-    "vite-plugin-html": "^3.2.2"
+    "vite-plugin-html": "^3.2.2",
+    "vitest": "^4.0.18"
   },
   "dependencies": {
     "@babylonjs/core": "^8.52.1",
