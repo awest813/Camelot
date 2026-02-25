@@ -6,13 +6,12 @@ import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { Player } from "./entities/player";
 import { UIManager } from "./ui/ui-manager";
 import { WorldManager } from "./world/world-manager";
-import { NPC } from "./entities/npc";
+import { LevelManager } from "./world/level-manager";
 import { ScheduleSystem } from "./systems/schedule-system";
 import { CombatSystem } from "./systems/combat-system";
 import { DialogueSystem } from "./systems/dialogue-system";
 import { InventorySystem } from "./systems/inventory-system";
 import { InteractionSystem } from "./systems/interaction-system";
-import { Loot } from "./entities/loot";
 import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 
@@ -23,6 +22,7 @@ export class Game {
   public player: Player;
   public ui: UIManager;
   public world: WorldManager;
+  public levelManager: LevelManager;
   public scheduleSystem: ScheduleSystem;
   public combatSystem: CombatSystem;
   public dialogueSystem: DialogueSystem;
@@ -47,24 +47,20 @@ export class Game {
     this.world = new WorldManager(this.scene);
     this.scheduleSystem = new ScheduleSystem(this.scene);
 
-    // Test NPC
-    const npc = new NPC(this.scene, new Vector3(10, 2, 10), "Guard");
-    npc.patrolPoints = [new Vector3(10, 2, 10), new Vector3(10, 2, 20), new Vector3(20, 2, 20), new Vector3(20, 2, 10)];
-    this.scheduleSystem.addNPC(npc);
-
     this.combatSystem = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs);
     this.dialogueSystem = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
     this.inventorySystem = new InventorySystem(this.player);
     this.interactionSystem = new InteractionSystem(this.scene, this.player, this.dialogueSystem, this.inventorySystem, this.scheduleSystem.npcs);
+
+    // Level Manager
+    this.levelManager = new LevelManager(this.scene, this.scheduleSystem, this.interactionSystem);
+    this.levelManager.loadTestLevel();
 
     // Bind UI actions
     this.ui.onUseItem = (item) => {
         this.inventorySystem.useItem(item);
         this.ui.updateInventory(this.inventorySystem.items);
     };
-
-    // Spawn test loot
-    this._spawnTestLoot();
 
     // Input handling for combat
     this.scene.onPointerObservable.add((pointerInfo) => {
@@ -98,28 +94,6 @@ export class Game {
   _setLight(): void {
     const light = new HemisphericLight("light", new Vector3(0, 1, 0), this.scene);
     light.intensity = 0.5;
-  }
-
-  _spawnTestLoot(): void {
-      const potion = new Loot(this.scene, new Vector3(5, 5, 5), {
-          id: "pot_health",
-          name: "Health Potion",
-          type: "Consumable",
-          description: "Restores health.",
-          color: "red"
-      });
-      this.interactionSystem.addLoot(potion);
-
-      const sword = new Loot(this.scene, new Vector3(8, 5, 8), {
-          id: "wep_sword",
-          name: "Iron Sword",
-          type: "Weapon",
-          description: "Sharp and pointy.",
-          color: "gray",
-          slot: "mainHand",
-          stats: { damage: 10 }
-      });
-      this.interactionSystem.addLoot(sword);
   }
 
   update(): void {
