@@ -80,7 +80,13 @@ export class Game {
 
   update(): void {
       const deltaTime = this.engine.getDeltaTime() / 1000;
+
+      this.player.update(deltaTime);
       this.world.update(this.player.camera.position);
       this.scheduleSystem.update(deltaTime);
+
+      this.ui.updateHealth(this.player.health, this.player.maxHealth);
+      this.ui.updateMagicka(this.player.magicka, this.player.maxMagicka);
+      this.ui.updateStamina(this.player.stamina, this.player.maxStamina);
   }
 }

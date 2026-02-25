@@ -21,6 +21,12 @@ export class CombatSystem {
   }
 
   public meleeAttack(): void {
+    if (this.player.stamina < 15) {
+        console.log("Not enough stamina!");
+        return;
+    }
+    this.player.stamina -= 15;
+
     // Play animation (todo)
     console.log("Melee Attack!");
 
@@ -56,6 +62,12 @@ export class CombatSystem {
   }
 
   public magicAttack(): void {
+    if (this.player.magicka < 20) {
+        console.log("Not enough magicka!");
+        return;
+    }
+    this.player.magicka -= 20;
+
     console.log("Magic Attack!");
 
     // Spawn projectile

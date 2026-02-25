@@ -11,11 +11,35 @@ export class Player {
   private canvas: HTMLCanvasElement;
   private physicsAggregate: PhysicsAggregate;
 
+  // Stats
+  public health: number;
+  public maxHealth: number = 100;
+  public magicka: number;
+  public maxMagicka: number = 100;
+  public stamina: number;
+  public maxStamina: number = 100;
+
+  // Regeneration rates
+  public healthRegen: number = 0.5;
+  public magickaRegen: number = 2;
+  public staminaRegen: number = 5;
+
   constructor(scene: Scene, canvas: HTMLCanvasElement) {
     this.scene = scene;
     this.canvas = canvas;
+
+    this.health = this.maxHealth;
+    this.magicka = this.maxMagicka;
+    this.stamina = this.maxStamina;
+
     this._initCamera();
     this._initPhysics();
+  }
+
+  public update(deltaTime: number): void {
+      this.health = Math.min(this.maxHealth, this.health + this.healthRegen * deltaTime);
+      this.magicka = Math.min(this.maxMagicka, this.magicka + this.magickaRegen * deltaTime);
+      this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen * deltaTime);
   }
 
   private _initCamera(): void {
