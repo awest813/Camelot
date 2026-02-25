@@ -10,6 +10,9 @@ import { NPC } from "./entities/npc";
 import { ScheduleSystem } from "./systems/schedule-system";
 import { CombatSystem } from "./systems/combat-system";
 import { DialogueSystem } from "./systems/dialogue-system";
+import { InventorySystem } from "./systems/inventory-system";
+import { InteractionSystem } from "./systems/interaction-system";
+import { Loot } from "./entities/loot";
 import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 
@@ -23,6 +26,8 @@ export class Game {
   public scheduleSystem: ScheduleSystem;
   public combatSystem: CombatSystem;
   public dialogueSystem: DialogueSystem;
+  public inventorySystem: InventorySystem;
+  public interactionSystem: InteractionSystem;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
     this.scene = scene;
@@ -46,6 +51,11 @@ export class Game {
 
     this.combatSystem = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs);
     this.dialogueSystem = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
+    this.inventorySystem = new InventorySystem();
+    this.interactionSystem = new InteractionSystem(this.scene, this.player, this.dialogueSystem, this.inventorySystem, this.scheduleSystem.npcs);
+
+    // Spawn test loot
+    this._spawnTestLoot();
 
     // Input handling for combat
     this.scene.onPointerObservable.add((pointerInfo) => {
@@ -62,7 +72,10 @@ export class Game {
     this.scene.onKeyboardObservable.add((kbInfo) => {
         if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
             if (kbInfo.event.key === 'e' || kbInfo.event.key === 'E') {
-                this.dialogueSystem.interact();
+                this.interactionSystem.interact();
+            } else if (kbInfo.event.key === 'i' || kbInfo.event.key === 'I') {
+                this.ui.toggleInventory();
+                this.ui.updateInventory(this.inventorySystem.items);
             }
         }
     });
@@ -76,6 +89,26 @@ export class Game {
   _setLight(): void {
     const light = new HemisphericLight("light", new Vector3(0, 1, 0), this.scene);
     light.intensity = 0.5;
+  }
+
+  _spawnTestLoot(): void {
+      const potion = new Loot(this.scene, new Vector3(5, 5, 5), {
+          id: "pot_health",
+          name: "Health Potion",
+          type: "Consumable",
+          description: "Restores health.",
+          color: "red"
+      });
+      this.interactionSystem.addLoot(potion);
+
+      const sword = new Loot(this.scene, new Vector3(8, 5, 8), {
+          id: "wep_sword",
+          name: "Iron Sword",
+          type: "Weapon",
+          description: "Sharp and pointy.",
+          color: "gray" // mapping "gray" might default to white in my switch, which is fine
+      });
+      this.interactionSystem.addLoot(sword);
   }
 
   update(): void {

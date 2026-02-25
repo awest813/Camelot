@@ -1,5 +1,6 @@
 import { Scene } from "@babylonjs/core/scene";
-import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock } from "@babylonjs/gui/2D";
+import { AdvancedDynamicTexture, Control, Grid, Rectangle, StackPanel, TextBlock, Button } from "@babylonjs/gui/2D";
+import { Item } from "../systems/inventory-system";
 
 export class UIManager {
   public scene: Scene;
@@ -10,9 +11,14 @@ export class UIManager {
   public magickaBar: Rectangle;
   public staminaBar: Rectangle;
 
+  // Inventory
+  public inventoryPanel: Rectangle;
+  public inventoryGrid: Grid;
+
   constructor(scene: Scene) {
     this.scene = scene;
     this._initUI();
+    this._initInventoryUI();
   }
 
   private _initUI(): void {
@@ -104,5 +110,76 @@ export class UIManager {
 
   public updateStamina(current: number, max: number): void {
       this.staminaBar.width = `${Math.max(0, current / max) * 100}%`;
+  }
+
+  private _initInventoryUI(): void {
+    // Inventory Panel (Center)
+    this.inventoryPanel = new Rectangle();
+    this.inventoryPanel.width = "400px";
+    this.inventoryPanel.height = "500px";
+    this.inventoryPanel.cornerRadius = 10;
+    this.inventoryPanel.color = "white";
+    this.inventoryPanel.thickness = 2;
+    this.inventoryPanel.background = "rgba(0, 0, 0, 0.9)";
+    this.inventoryPanel.isVisible = false;
+    this._ui.addControl(this.inventoryPanel);
+
+    // Title
+    const title = new TextBlock();
+    title.text = "Inventory";
+    title.color = "white";
+    title.fontSize = 24;
+    title.height = "50px";
+    title.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.inventoryPanel.addControl(title);
+
+    // Grid for items
+    this.inventoryGrid = new Grid();
+    this.inventoryGrid.width = "360px";
+    this.inventoryGrid.height = "400px";
+    this.inventoryGrid.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+    this.inventoryGrid.paddingBottom = "20px";
+    // 4 columns, 5 rows
+    for (let i = 0; i < 4; i++) {
+        this.inventoryGrid.addColumnDefinition(1);
+    }
+    for (let i = 0; i < 5; i++) {
+        this.inventoryGrid.addRowDefinition(1);
+    }
+    this.inventoryPanel.addControl(this.inventoryGrid);
+  }
+
+  public toggleInventory(): void {
+    this.inventoryPanel.isVisible = !this.inventoryPanel.isVisible;
+  }
+
+  public updateInventory(items: Item[]): void {
+      this.inventoryGrid.children.forEach(c => c.dispose()); // Clear old items (inefficient but simple)
+
+      items.forEach((item, index) => {
+          if (index >= 20) return; // Limit to grid size
+
+          const row = Math.floor(index / 4);
+          const col = index % 4;
+
+          const btn = Button.CreateSimpleButton(`btn_${item.id}`, item.name.substring(0, 2));
+          btn.width = "80px";
+          btn.height = "80px";
+          btn.color = "white";
+          btn.background = item.color;
+          btn.cornerRadius = 5;
+          btn.fontSize = 20;
+
+          // Tooltip logic (simple text on hover)
+          // For now, just display name
+          const text = new TextBlock();
+          text.text = item.name;
+          text.fontSize = 12;
+          text.color = "black";
+          text.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+          btn.addControl(text);
+
+          this.inventoryGrid.addControl(btn, row, col);
+      });
   }
 }
