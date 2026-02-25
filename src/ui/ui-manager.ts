@@ -14,6 +14,10 @@ export class UIManager {
   // Inventory
   public inventoryPanel: Rectangle;
   public inventoryGrid: Grid;
+  public inventoryDescription: TextBlock;
+
+  // Interaction
+  public interactionLabel: TextBlock;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -24,7 +28,7 @@ export class UIManager {
   private _initInventoryUI(): void {
     this.inventoryPanel = new Rectangle();
     this.inventoryPanel.width = "400px";
-    this.inventoryPanel.height = "500px";
+    this.inventoryPanel.height = "600px";
     this.inventoryPanel.cornerRadius = 10;
     this.inventoryPanel.color = "white";
     this.inventoryPanel.thickness = 2;
@@ -47,7 +51,7 @@ export class UIManager {
     this.inventoryGrid = new Grid();
     this.inventoryGrid.width = "360px";
     this.inventoryGrid.height = "400px";
-    this.inventoryGrid.top = "50px";
+    this.inventoryGrid.top = "-50px"; // Shift up to make room for description
 
     // Define grid columns and rows (e.g., 4x5)
     for (let i = 0; i < 5; i++) {
@@ -58,10 +62,31 @@ export class UIManager {
     }
 
     this.inventoryPanel.addControl(this.inventoryGrid);
+
+    // Description Area
+    const descContainer = new Rectangle();
+    descContainer.width = "360px";
+    descContainer.height = "100px";
+    descContainer.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+    descContainer.paddingBottom = "20px";
+    descContainer.color = "white";
+    descContainer.thickness = 1;
+    this.inventoryPanel.addControl(descContainer);
+
+    this.inventoryDescription = new TextBlock();
+    this.inventoryDescription.text = "";
+    this.inventoryDescription.color = "white";
+    this.inventoryDescription.fontSize = 14;
+    this.inventoryDescription.textWrapping = true;
+    this.inventoryDescription.paddingLeft = "5px";
+    descContainer.addControl(this.inventoryDescription);
   }
 
   public toggleInventory(visible: boolean): void {
       this.inventoryPanel.isVisible = visible;
+      if (!visible) {
+          this.inventoryDescription.text = "";
+      }
   }
 
   public updateInventory(items: Item[]): void {
@@ -81,6 +106,17 @@ export class UIManager {
           slot.color = "gray";
           slot.thickness = 1;
           slot.background = "rgba(255, 255, 255, 0.1)";
+          slot.isPointerBlocker = true;
+
+          // Hover events
+          slot.onPointerEnterObservable.add(() => {
+              this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}`;
+              slot.background = "rgba(255, 255, 255, 0.3)";
+          });
+          slot.onPointerOutObservable.add(() => {
+              this.inventoryDescription.text = "";
+              slot.background = "rgba(255, 255, 255, 0.1)";
+          });
 
           const text = new TextBlock();
           text.text = item.name + (item.quantity > 1 ? ` (${item.quantity})` : "");
@@ -93,8 +129,22 @@ export class UIManager {
       });
   }
 
+  public setInteractionText(text: string): void {
+      this.interactionLabel.text = text;
+  }
+
   private _initUI(): void {
     this._ui = AdvancedDynamicTexture.CreateFullscreenUI("UI");
+
+    // Interaction Label (Center)
+    this.interactionLabel = new TextBlock();
+    this.interactionLabel.text = "";
+    this.interactionLabel.color = "white";
+    this.interactionLabel.fontSize = 20;
+    this.interactionLabel.top = "50px"; // Slightly below center
+    this.interactionLabel.shadowColor = "black";
+    this.interactionLabel.shadowBlur = 2;
+    this._ui.addControl(this.interactionLabel);
 
     // Compass Bar (Top Center)
     const compassContainer = new Rectangle();

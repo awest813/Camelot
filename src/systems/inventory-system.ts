@@ -16,9 +16,9 @@ export class InventorySystem {
   public items: Item[] = [];
   public maxCapacity: number = 20;
   public isOpen: boolean = false;
-  private _player: Player;
-  private _ui: UIManager;
-  private _canvas: HTMLCanvasElement;
+  public _player: Player;
+  public _ui: UIManager;
+  public _canvas: HTMLCanvasElement;
 
   constructor(player: Player, ui: UIManager, canvas: HTMLCanvasElement) {
     this._player = player;

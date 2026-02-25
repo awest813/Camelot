@@ -9,3 +9,9 @@
   ➜  Network: use --host to expose
 1:54:54 PM [vite] (client) page reload src/systems/inventory-system.ts
 1:54:59 PM [vite] (client) page reload src/systems/interaction-system.ts
+2:09:05 PM [vite] (client) page reload src/ui/ui-manager.ts
+2:09:10 PM [vite] (client) page reload src/ui/ui-manager.ts
+2:09:26 PM [vite] (client) page reload src/systems/interaction-system.ts
+2:09:33 PM [vite] (client) page reload src/systems/inventory-system.ts
+2:09:39 PM [vite] (client) page reload src/systems/interaction-system.ts
+2:09:53 PM [vite] (client) page reload src/game.ts

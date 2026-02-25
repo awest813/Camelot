@@ -32,20 +32,32 @@ export class InteractionSystem {
     });
   }
 
+  public update(): void {
+      if (this.inventorySystem.isOpen) {
+          this.inventorySystem._ui.setInteractionText("");
+          return;
+      }
+
+      const hit = this._raycast();
+      if (hit && hit.pickedMesh && hit.pickedMesh.metadata) {
+          const metadata = hit.pickedMesh.metadata;
+          if (metadata.type === 'npc') {
+              this.inventorySystem._ui.setInteractionText(`Press E to Talk to ${metadata.npc.mesh.name}`);
+          } else if (metadata.type === 'loot') {
+              this.inventorySystem._ui.setInteractionText(`Press E to Take ${metadata.loot.item.name}`);
+          }
+      } else {
+          this.inventorySystem._ui.setInteractionText("");
+      }
+  }
+
   public interact(): void {
-    // If inventory is open, maybe 'E' closes it? Or does nothing.
     if (this.inventorySystem.isOpen) {
         this.inventorySystem.toggleInventory();
         return;
     }
 
-    const origin = this.player.camera.position;
-    const forward = this.player.camera.getForwardRay(3).direction;
-    const ray = new Ray(origin, forward, 3);
-
-    const hit = this.scene.pickWithRay(ray, (mesh) => {
-       return mesh.isVisible && mesh.name !== "playerBody" && !mesh.name.startsWith("chunk_");
-    });
+    const hit = this._raycast();
 
     if (hit && hit.pickedMesh && hit.pickedMesh.metadata) {
       const metadata = hit.pickedMesh.metadata;
@@ -60,5 +72,15 @@ export class InteractionSystem {
           }
       }
     }
+  }
+
+  private _raycast() {
+    const origin = this.player.camera.position;
+    const forward = this.player.camera.getForwardRay(3).direction;
+    const ray = new Ray(origin, forward, 3);
+
+    return this.scene.pickWithRay(ray, (mesh) => {
+       return mesh.isVisible && mesh.name !== "playerBody" && !mesh.name.startsWith("chunk_");
+    });
   }
 }

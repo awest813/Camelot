@@ -101,6 +101,7 @@ export class Game {
       this.player.update(deltaTime);
       this.world.update(this.player.camera.position);
       this.scheduleSystem.update(deltaTime);
+      this.interactionSystem.update();
 
       this.ui.updateHealth(this.player.health, this.player.maxHealth);
       this.ui.updateMagicka(this.player.magicka, this.player.maxMagicka);
