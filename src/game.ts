@@ -38,6 +38,9 @@ export class Game {
   }
 
   init(): void {
+    // Rendering config for weapon overlay (group 1)
+    this.scene.setRenderingAutoClearDepthStencil(1, true, true, true);
+
     this._setLight();
     this.player = new Player(this.scene, this.canvas);
     this.ui = new UIManager(this.scene, this.player);

@@ -118,6 +118,9 @@ export class Player {
           // Disable collision for the weapon mesh itself
           this.weaponMesh.checkCollisions = false;
           this.weaponMesh.isPickable = false;
+
+          // Render on top of world
+          this.weaponMesh.renderingGroupId = 1;
       }
   }
 

@@ -69,7 +69,6 @@ export class InteractionSystem {
             if (index > -1) {
                 this.lootItems.splice(index, 1);
             }
-            // Clear target since it's gone
             this.currentTarget = null;
         }
     }

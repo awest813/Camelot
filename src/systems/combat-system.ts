@@ -32,7 +32,7 @@ export class CombatSystem {
     const weaponName = this.player.equipment.mainHand?.name || "Fists";
 
     // Play animation (todo)
-    console.log(`Melee Attack with ${weaponName} (${damage} dmg)!`);
+    // console.log(`Melee Attack with ${weaponName} (${damage} dmg)!`);
 
     // Raycast forward
     const origin = this.player.camera.position;
