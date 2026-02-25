@@ -29,6 +29,9 @@ export class UIManager {
   public interactionLabel: TextBlock;
   public crosshair: Ellipse;
 
+  // Notifications
+  public notificationPanel: StackPanel;
+
   constructor(scene: Scene) {
     this.scene = scene;
     this._initUI();
@@ -319,6 +322,44 @@ SP: ${Math.floor(player.stamina)} / ${player.maxStamina}`;
     const staminaContainer = this._createBarContainer("green", barsPanel);
     staminaContainer.paddingLeft = "10px";
     this.staminaBar = (staminaContainer.children[0] as Rectangle);
+
+    // Notification Panel (Top Left)
+    this.notificationPanel = new StackPanel();
+    this.notificationPanel.width = "300px";
+    this.notificationPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this.notificationPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.notificationPanel.top = "100px";
+    this.notificationPanel.left = "20px";
+    this.notificationPanel.isVertical = true;
+    this._ui.addControl(this.notificationPanel);
+  }
+
+  public showNotification(text: string, duration: number = 3000): void {
+      const rect = new Rectangle();
+      rect.width = "100%";
+      rect.height = "40px";
+      rect.cornerRadius = 5;
+      rect.color = "white";
+      rect.thickness = 1;
+      rect.background = "rgba(0, 0, 0, 0.7)";
+      rect.paddingBottom = "5px";
+
+      const label = new TextBlock();
+      label.text = text;
+      label.color = "white";
+      label.fontSize = 16;
+      rect.addControl(label);
+
+      // Add to top of stack by default? StackPanel adds to end.
+      // Newer notifications appear below older ones.
+      this.notificationPanel.addControl(rect);
+
+      setTimeout(() => {
+          if (this.notificationPanel.children.includes(rect)) {
+              this.notificationPanel.removeControl(rect);
+          }
+          rect.dispose();
+      }, duration);
   }
 
   private _createBarContainer(color: string, parent: StackPanel): Rectangle {

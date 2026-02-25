@@ -21,6 +21,7 @@ describe('InventorySystem', () => {
             toggleInventory: vi.fn(),
             updateInventory: vi.fn(),
             setInteractionText: vi.fn(), // Added this mock
+            showNotification: vi.fn(),
         };
         mockCanvas = {
             requestPointerLock: vi.fn(),
