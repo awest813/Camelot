@@ -24,39 +24,46 @@ class App {
     this.canvas.id = "renderCanvas";
     document.body.appendChild(this.canvas);
 
-    this.init(); // Uncomment to use WebGL2 engine
-    // this.initWebGPU(); // Comment not to use WebGPU engine
+    this._initialize();
   }
 
-  async init(): Promise<void> {
+  private async _initialize(): Promise<void> {
+    await this._initEngine();
+    await this._setupScene();
+  }
+
+  private async _initEngine(): Promise<void> {
+    const useWebGPU = import.meta.env.VITE_USE_WEBGPU === "true";
+
+    if (useWebGPU) {
+      await this._initWebGPUEngine();
+    } else {
+      await this._initWebGL2Engine();
+    }
+  }
+
+  private async _initWebGL2Engine(): Promise<void> {
     this.engine = new Engine(this.canvas, true, {
       powerPreference: "high-performance",
       preserveDrawingBuffer: true,
       stencil: true,
       disableWebGL2Support: false,
     });
-
-    this.scene = new Scene(this.engine);
-
-    // Add physics. If not needed, you can annotate it to improve loading speed and environment performance.
-    await this._setPhysics();
-
-    new MainScene(this.scene, this.canvas, this.engine);
-
-    this._config();
-    this._renderer();
   }
 
-  async initWebGPU(): Promise<void> {
-    const webgpu = (this.engine = new WebGPUEngine(this.canvas, {
+  private async _initWebGPUEngine(): Promise<void> {
+    const webgpu = new WebGPUEngine(this.canvas, {
       adaptToDeviceRatio: true,
       antialias: true,
-    }));
+    });
     await webgpu.initAsync();
     this.engine = webgpu;
     console.log(this.engine);
+  }
 
+  private async _setupScene(): Promise<void> {
     this.scene = new Scene(this.engine);
+
     // Add physics. If not needed, you can annotate it to improve loading speed and environment performance.
     await this._setPhysics();
 

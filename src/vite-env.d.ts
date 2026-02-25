@@ -17,3 +17,11 @@ declare module 'recast-detour'
 declare class CustomErr extends Error {
   constructor(message: string)
 }
+
+interface ImportMetaEnv {
+  readonly VITE_USE_WEBGPU: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
