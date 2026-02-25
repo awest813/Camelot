@@ -6,7 +6,7 @@ import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { Player } from "./entities/player";
 import { UIManager } from "./ui/ui-manager";
 import { WorldManager } from "./world/world-manager";
-import { NPC } from "./entities/npc";
+import { LevelManager } from "./world/level-manager";
 import { ScheduleSystem } from "./systems/schedule-system";
 import { CombatSystem } from "./systems/combat-system";
 import { DialogueSystem } from "./systems/dialogue-system";
@@ -14,7 +14,6 @@ import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { InventorySystem } from "./systems/inventory-system";
 import { InteractionSystem } from "./systems/interaction-system";
-import { Loot } from "./entities/loot";
 
 export class Game {
   public scene: Scene;
@@ -23,6 +22,7 @@ export class Game {
   public player: Player;
   public ui: UIManager;
   public world: WorldManager;
+  public levelManager: LevelManager;
   public scheduleSystem: ScheduleSystem;
   public combatSystem: CombatSystem;
   public dialogueSystem: DialogueSystem;
@@ -45,36 +45,15 @@ export class Game {
     this.ui = new UIManager(this.scene);
     this.world = new WorldManager(this.scene);
     this.scheduleSystem = new ScheduleSystem(this.scene);
-
-    // Test NPC
-    const npc = new NPC(this.scene, new Vector3(10, 2, 10), "Guard");
-    npc.patrolPoints = [new Vector3(10, 2, 10), new Vector3(10, 2, 20), new Vector3(20, 2, 20), new Vector3(20, 2, 10)];
-    this.scheduleSystem.addNPC(npc);
+    this.levelManager = new LevelManager(this.scene, this.scheduleSystem);
 
     this.combatSystem = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs, this.ui);
     this.dialogueSystem = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
     this.inventorySystem = new InventorySystem(this.player, this.ui, this.canvas);
     this.interactionSystem = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem);
 
-    // Test Loot
-    new Loot(this.scene, new Vector3(5, 1, 5), {
-        id: "sword_01",
-        name: "Iron Sword",
-        description: "A rusty iron sword.",
-        stackable: false,
-        quantity: 1,
-        slot: "mainHand",
-        stats: { damage: 10 }
-    });
-
-    new Loot(this.scene, new Vector3(7, 1, 5), {
-        id: "potion_hp_01",
-        name: "Health Potion",
-        description: "Restores 50 HP.",
-        stackable: true,
-        quantity: 1,
-        stats: { heal: 50 }
-    });
+    // Load initial level
+    this.levelManager.loadLevel();
 
     // Input handling for combat
     this.scene.onPointerObservable.add((pointerInfo) => {

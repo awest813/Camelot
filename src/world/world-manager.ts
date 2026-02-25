@@ -28,8 +28,25 @@ export class WorldManager {
       }
     }
 
-    // Optional: Unload chunks too far away
-    // For now, let's keep it simple and additive
+    // Unload chunks too far away
+    for (const [key, mesh] of this.loadedChunks.entries()) {
+      const [x, z] = key.split(',').map(Number);
+      if (Math.abs(x - chunkX) > this.loadDistance + 1 || Math.abs(z - chunkZ) > this.loadDistance + 1) {
+        mesh.dispose(); // This also disposes children/physics usually if attached?
+        // Note: PhysicsAggregate creates a body that might need manual disposal if not parented correctly or tracked.
+        // In our case, the aggregate is not stored on the mesh metadata, so we rely on Babylon's dispose handling.
+        // Actually, for Havok, we might need to be careful. But let's assume basic dispose for now.
+        // To be safe, we should probably track aggregates if we want to dispose them cleanly.
+
+        // Let's assume the physics aggregate is disposed when the mesh is disposed.
+        // Actually, looking at docs, PhysicsAggregate needs explicit dispose often.
+        if (mesh.metadata && mesh.metadata.physicsAggregate) {
+            mesh.metadata.physicsAggregate.dispose();
+        }
+
+        this.loadedChunks.delete(key);
+      }
+    }
   }
 
   private _loadChunk(x: number, z: number): void {
@@ -39,8 +56,8 @@ export class WorldManager {
     }
 
     // Create ground for this chunk
-    const chunkMesh = MeshBuilder.CreateGround(`chunk_${key}`, { width: this.chunkSize, height: this.chunkSize }, this.scene);
-    // Position is center of mesh, so offset by half size
+    // Use subdivisions for potential heightmap later
+    const chunkMesh = MeshBuilder.CreateGround(`chunk_${key}`, { width: this.chunkSize, height: this.chunkSize, subdivisions: 4 }, this.scene);
     chunkMesh.position.x = x * this.chunkSize;
     chunkMesh.position.z = z * this.chunkSize;
 
@@ -48,17 +65,26 @@ export class WorldManager {
     chunkMesh.checkCollisions = true;
 
     // Add physics
-    new PhysicsAggregate(chunkMesh, PhysicsShapeType.BOX, { mass: 0 }, this.scene);
+    const aggregate = new PhysicsAggregate(chunkMesh, PhysicsShapeType.BOX, { mass: 0, restitution: 0.1 }, this.scene);
 
-    // Make it varied green
+    // Store aggregate for disposal
+    chunkMesh.metadata = { physicsAggregate: aggregate };
+
+    // Make it varied green (simple biome placeholder)
     const material = new StandardMaterial(`mat_${key}`, this.scene);
-    const r = (Math.sin(x) + 1) * 0.1;
-    const g = 0.5 + (Math.cos(z) + 1) * 0.2;
+    // Simple noise-like color variation
+    const r = (Math.sin(x * 0.5) + 1) * 0.1;
+    const g = 0.4 + (Math.cos(z * 0.5) + 1) * 0.2 + (Math.random() * 0.1);
     const b = (Math.sin(x + z) + 1) * 0.1;
     material.diffuseColor = new Color3(r, g, b);
+
+    // Freeze material for performance
+    material.freeze();
     chunkMesh.material = material;
 
+    // Freeze world matrix as these are static
+    chunkMesh.freezeWorldMatrix();
+
     this.loadedChunks.set(key, chunkMesh);
-    // console.log(`Loaded chunk ${key}`);
   }
 }
