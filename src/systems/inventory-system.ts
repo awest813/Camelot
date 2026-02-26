@@ -188,8 +188,15 @@ export class InventorySystem {
     }));
   }
 
-  public toggleInventory(): void {
-    this.isOpen = !this.isOpen;
+  /**
+   * Toggle inventory visibility. Optionally pass explicit state.
+   */
+  public toggleInventory(visible?: boolean): void {
+    if (visible !== undefined) {
+      this.isOpen = visible;
+    } else {
+      this.isOpen = !this.isOpen;
+    }
 
     if (this.isOpen) {
       this._ui.toggleInventory(true);

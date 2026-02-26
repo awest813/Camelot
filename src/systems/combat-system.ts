@@ -10,8 +10,9 @@ import { UIManager } from "../ui/ui-manager";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 
-const MELEE_DAMAGE = 10;
-const MAGIC_DAMAGE = 20;
+// Base damage amounts (can be modified by player stats)
+const BASE_MELEE_DAMAGE = 10;
+const BASE_MAGIC_DAMAGE = 20;
 
 export class CombatSystem {
   public scene: Scene;
@@ -33,6 +34,9 @@ export class CombatSystem {
     }
     this.player.stamina -= 15;
 
+    // Calculate damage based on player stats (equipment affected)
+    const damageDealt = Math.round(BASE_MELEE_DAMAGE * this.player.damage);
+
     // Raycast forward 3 units
     const origin = this.player.camera.position;
     const forward = this.player.camera.getForwardRay(3).direction;
@@ -46,13 +50,13 @@ export class CombatSystem {
       const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
       if (npc && !npc.isDead) {
         // Apply damage
-        npc.takeDamage(MELEE_DAMAGE);
+        npc.takeDamage(damageDealt);
 
         // Show damage number above the hit point
         const numberPos = hit.pickedPoint
           ? hit.pickedPoint.add(new Vector3(0, 1, 0))
           : npc.mesh.position.add(new Vector3(0, 2, 0));
-        this._ui.showDamageNumber(numberPos, MELEE_DAMAGE, this.scene);
+        this._ui.showDamageNumber(numberPos, damageDealt, this.scene);
 
         // Yellow flash: player landed a hit
         this._ui.showHitFlash("rgba(255, 200, 0, 0.25)");
@@ -79,6 +83,9 @@ export class CombatSystem {
     }
     this.player.magicka -= 20;
 
+    // Calculate damage based on player stats (magic damage not affected by physical damage stat)
+    const damageDealt = BASE_MAGIC_DAMAGE;
+
     const origin = this.player.camera.position.add(this.player.camera.getForwardRay(1).direction);
     const projectile = MeshBuilder.CreateSphere("fireball", { diameter: 0.5 }, this.scene);
     projectile.position = origin.clone();
@@ -102,10 +109,10 @@ export class CombatSystem {
         if (npc.isDead) continue;
         const dist = Vector3.Distance(projectile.position, npc.mesh.position);
         if (dist < 1.2) {
-          npc.takeDamage(MAGIC_DAMAGE);
+          npc.takeDamage(damageDealt);
           this._ui.showDamageNumber(
             npc.mesh.position.add(new Vector3(0, 2, 0)),
-            MAGIC_DAMAGE,
+            damageDealt,
             this.scene
           );
           this._ui.showHitFlash("rgba(255, 100, 0, 0.3)");
@@ -164,11 +171,14 @@ export class CombatSystem {
       // Attack if within melee range
       if (dist <= npc.attackRange) {
         npc.attackTimer = npc.attackCooldown;
-        const dmg = npc.attackDamage;
+        // Apply armor damage reduction: 1% damage reduction per armor point
+        const armorReduction = Math.min(0.8, this.player.armor * 0.01);
+        const dmg = Math.round(npc.attackDamage * (1 - armorReduction));
         this.player.health = Math.max(0, this.player.health - dmg);
         // Red flash: player took damage
         this._ui.showHitFlash("rgba(200, 0, 0, 0.4)");
-        this._ui.showNotification(`${npc.mesh.name} attacks you for ${dmg} damage!`, 2000);
+        const armorText = this.player.armor > 0 ? ` (reduced by armor)` : "";
+        this._ui.showNotification(`${npc.mesh.name} attacks you for ${dmg} damage!${armorText}`, 2000);
       }
     }
   }

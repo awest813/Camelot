@@ -199,10 +199,35 @@ export class UIManager {
   }
 
   public updateStats(player: Player): void {
-      this.statsText.text = `Stats:
-HP: ${Math.floor(player.health)} / ${player.maxHealth}
-MP: ${Math.floor(player.magicka)} / ${player.maxMagicka}
+      // Calculate bonuses from equipment
+      const healthBonus = player.maxHealth - player.baseMaxHealth;
+      const magickaBonus = player.maxMagicka - player.baseMaxMagicka;
+      const staminaBonus = player.maxStamina - player.baseMaxStamina;
+      const damageBonus = player.damage - 1;
+      const armorBonus = player.armor;
+
+      let statsText = `Stats:
+HP: ${Math.floor(player.health)} / ${player.maxHealth}`;
+      if (healthBonus > 0) statsText += ` [+${healthBonus}]`;
+
+      statsText += `
+MP: ${Math.floor(player.magicka)} / ${player.maxMagicka}`;
+      if (magickaBonus > 0) statsText += ` [+${magickaBonus}]`;
+
+      statsText += `
 SP: ${Math.floor(player.stamina)} / ${player.maxStamina}`;
+      if (staminaBonus > 0) statsText += ` [+${staminaBonus}]`;
+
+      statsText += `
+DMG: ${player.damage.toFixed(1)}`;
+      if (damageBonus > 0) statsText += ` [+${damageBonus.toFixed(1)}]`;
+
+      if (armorBonus > 0) {
+        statsText += `
+ARM: ${armorBonus}`;
+      }
+
+      this.statsText.text = statsText;
   }
 
   public updateInventory(
