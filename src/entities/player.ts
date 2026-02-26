@@ -4,36 +4,119 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Item } from "../systems/inventory-system";
+
+interface EquipmentBonuses {
+  maxHealth?: number;
+  maxMagicka?: number;
+  maxStamina?: number;
+  damage?: number;
+  armor?: number;
+  healthRegen?: number;
+  magickaRegen?: number;
+  staminaRegen?: number;
+}
 
 export class Player {
   public camera: UniversalCamera;
   public scene: Scene;
   private canvas: HTMLCanvasElement;
   private physicsAggregate: PhysicsAggregate;
+  private playerMesh: any; // Visual mesh for armor display
 
-  // Stats
+  // Base stats (before equipment bonuses)
+  public baseMaxHealth: number = 100;
+  public baseMaxMagicka: number = 100;
+  public baseMaxStamina: number = 100;
+  public baseHealthRegen: number = 0.5;
+  public baseMagickaRegen: number = 2;
+  public baseStaminaRegen: number = 5;
+
+  // Current stats (includes equipment bonuses)
   public health: number;
   public maxHealth: number = 100;
   public magicka: number;
   public maxMagicka: number = 100;
   public stamina: number;
   public maxStamina: number = 100;
-
-  // Regeneration rates
   public healthRegen: number = 0.5;
   public magickaRegen: number = 2;
   public staminaRegen: number = 5;
+  public damage: number = 1; // base damage
+  public armor: number = 0; // armor reduces incoming damage
+
+  // Equipment bonuses
+  private _equipmentBonuses: EquipmentBonuses = {};
 
   constructor(scene: Scene, canvas: HTMLCanvasElement) {
     this.scene = scene;
     this.canvas = canvas;
 
-    this.health = this.maxHealth;
-    this.magicka = this.maxMagicka;
-    this.stamina = this.maxStamina;
+    this.health = this.baseMaxHealth;
+    this.magicka = this.baseMaxMagicka;
+    this.stamina = this.baseMaxStamina;
 
     this._initCamera();
     this._initPhysics();
+  }
+
+  /**
+   * Apply equipment bonuses from an item.
+   */
+  public applyEquipmentBonus(item: Item): void {
+    if (!item.stats) return;
+
+    // Track bonuses
+    if (item.stats.maxHealth) this._equipmentBonuses.maxHealth = (this._equipmentBonuses.maxHealth || 0) + item.stats.maxHealth;
+    if (item.stats.maxMagicka) this._equipmentBonuses.maxMagicka = (this._equipmentBonuses.maxMagicka || 0) + item.stats.maxMagicka;
+    if (item.stats.maxStamina) this._equipmentBonuses.maxStamina = (this._equipmentBonuses.maxStamina || 0) + item.stats.maxStamina;
+    if (item.stats.damage) this._equipmentBonuses.damage = (this._equipmentBonuses.damage || 0) + item.stats.damage;
+    if (item.stats.armor) this._equipmentBonuses.armor = (this._equipmentBonuses.armor || 0) + item.stats.armor;
+    if (item.stats.healthRegen) this._equipmentBonuses.healthRegen = (this._equipmentBonuses.healthRegen || 0) + item.stats.healthRegen;
+    if (item.stats.magickaRegen) this._equipmentBonuses.magickaRegen = (this._equipmentBonuses.magickaRegen || 0) + item.stats.magickaRegen;
+    if (item.stats.staminaRegen) this._equipmentBonuses.staminaRegen = (this._equipmentBonuses.staminaRegen || 0) + item.stats.staminaRegen;
+
+    this._recalculateStats();
+  }
+
+  /**
+   * Remove equipment bonuses from an item.
+   */
+  public removeEquipmentBonus(item: Item): void {
+    if (!item.stats) return;
+
+    if (item.stats.maxHealth) this._equipmentBonuses.maxHealth = Math.max(0, (this._equipmentBonuses.maxHealth || 0) - item.stats.maxHealth);
+    if (item.stats.maxMagicka) this._equipmentBonuses.maxMagicka = Math.max(0, (this._equipmentBonuses.maxMagicka || 0) - item.stats.maxMagicka);
+    if (item.stats.maxStamina) this._equipmentBonuses.maxStamina = Math.max(0, (this._equipmentBonuses.maxStamina || 0) - item.stats.maxStamina);
+    if (item.stats.damage) this._equipmentBonuses.damage = Math.max(0, (this._equipmentBonuses.damage || 0) - item.stats.damage);
+    if (item.stats.armor) this._equipmentBonuses.armor = Math.max(0, (this._equipmentBonuses.armor || 0) - item.stats.armor);
+    if (item.stats.healthRegen) this._equipmentBonuses.healthRegen = Math.max(0, (this._equipmentBonuses.healthRegen || 0) - item.stats.healthRegen);
+    if (item.stats.magickaRegen) this._equipmentBonuses.magickaRegen = Math.max(0, (this._equipmentBonuses.magickaRegen || 0) - item.stats.magickaRegen);
+    if (item.stats.staminaRegen) this._equipmentBonuses.staminaRegen = Math.max(0, (this._equipmentBonuses.staminaRegen || 0) - item.stats.staminaRegen);
+
+    this._recalculateStats();
+  }
+
+  /**
+   * Recalculate stats based on base stats + equipment bonuses.
+   * Also clamp current values to not exceed max.
+   */
+  private _recalculateStats(): void {
+    this.maxHealth = this.baseMaxHealth + (this._equipmentBonuses.maxHealth || 0);
+    this.maxMagicka = this.baseMaxMagicka + (this._equipmentBonuses.maxMagicka || 0);
+    this.maxStamina = this.baseMaxStamina + (this._equipmentBonuses.maxStamina || 0);
+    this.healthRegen = this.baseHealthRegen + (this._equipmentBonuses.healthRegen || 0);
+    this.magickaRegen = this.baseMagickaRegen + (this._equipmentBonuses.magickaRegen || 0);
+    this.staminaRegen = this.baseStaminaRegen + (this._equipmentBonuses.staminaRegen || 0);
+    this.damage = 1 + (this._equipmentBonuses.damage || 0);
+    this.armor = this._equipmentBonuses.armor || 0;
+
+    // Clamp current values to max
+    this.health = Math.min(this.health, this.maxHealth);
+    this.magicka = Math.min(this.magicka, this.maxMagicka);
+    this.stamina = Math.min(this.stamina, this.maxStamina);
   }
 
   public update(deltaTime: number): void {
@@ -69,15 +152,36 @@ export class Player {
 
   private _initPhysics(): void {
     const playerMesh = MeshBuilder.CreateCapsule("playerBody", { radius: 0.5, height: 2 }, this.scene);
-    playerMesh.isVisible = false;
+    playerMesh.isVisible = false; // Hidden by default (just for physics)
     // Parent the mesh to the camera so it moves with it
     playerMesh.parent = this.camera;
     // Offset slightly down so camera is at head height
     playerMesh.position.y = -1;
 
+    this.playerMesh = playerMesh;
+
     this.physicsAggregate = new PhysicsAggregate(playerMesh, PhysicsShapeType.CAPSULE, { mass: 1, restitution: 0 }, this.scene);
 
     // Set to ANIMATED so it follows the camera (parent) but still interacts physically with other objects
     this.physicsAggregate.body.setMotionType(PhysicsMotionType.ANIMATED);
+  }
+
+  /**
+   * Update player visual based on equipped armor (change color, material, etc).
+   */
+  public updateArmorVisual(armorLevel: number): void {
+    if (!this.playerMesh?.material) return;
+    const mat = this.playerMesh.material as StandardMaterial;
+
+    // Color based on armor level: blue for unarmored → steel gray for heavily armored
+    if (armorLevel === 0) {
+      mat.diffuseColor = new Color3(0.7, 0.7, 0.7); // Light gray (no armor)
+    } else if (armorLevel < 5) {
+      mat.diffuseColor = new Color3(0.5, 0.6, 0.8); // Light blue (light armor)
+    } else if (armorLevel < 10) {
+      mat.diffuseColor = new Color3(0.4, 0.5, 0.7); // Medium blue (medium armor)
+    } else {
+      mat.diffuseColor = new Color3(0.3, 0.4, 0.6); // Dark blue (heavy armor)
+    }
   }
 }

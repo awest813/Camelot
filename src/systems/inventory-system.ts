@@ -100,6 +100,14 @@ export class InventorySystem {
     // Equip the new item
     this.equipped.set(slot, item);
     this.removeItem(itemId, 1); // Remove from inventory
+
+    // Apply equipment bonuses to player
+    this._player.applyEquipmentBonus(item);
+
+    // Update armor visual if this is armor
+    const totalArmor = this._getTotalArmor();
+    this._player.updateArmorVisual(totalArmor);
+
     this._ui.showNotification(`Equipped ${item.name}`);
     this._updateUI();
     return true;
@@ -112,16 +120,38 @@ export class InventorySystem {
     const item = this.equipped.get(slot);
     if (!item) return false;
 
+    // Remove equipment bonuses from player
+    this._player.removeEquipmentBonus(item);
+
     // Return to inventory
     if (!this.addItem(item)) {
       // If inventory is full, re-equip
+      this._player.applyEquipmentBonus(item);
       return false;
     }
 
     this.equipped.set(slot, null as any);
+
+    // Update armor visual
+    const totalArmor = this._getTotalArmor();
+    this._player.updateArmorVisual(totalArmor);
+
     this._ui.showNotification(`Unequipped ${item.name}`);
     this._updateUI();
     return true;
+  }
+
+  /**
+   * Calculate total armor from equipped items.
+   */
+  private _getTotalArmor(): number {
+    let totalArmor = 0;
+    for (const [_, item] of this.equipped) {
+      if (item?.stats?.armor) {
+        totalArmor += item.stats.armor;
+      }
+    }
+    return totalArmor;
   }
 
   /**

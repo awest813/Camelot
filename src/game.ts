@@ -60,7 +60,7 @@ export class Game {
     new Loot(this.scene, new Vector3(5, 1, 5), {
         id: "sword_01",
         name: "Iron Sword",
-        description: "A rusty iron sword.",
+        description: "A rusty iron sword. +10 damage",
         stackable: false,
         quantity: 1,
         slot: "mainHand",
@@ -74,6 +74,36 @@ export class Game {
         stackable: true,
         quantity: 1,
         stats: { heal: 50 }
+    });
+
+    new Loot(this.scene, new Vector3(8, 1, 8), {
+        id: "armor_leather_01",
+        name: "Leather Armor",
+        description: "Light leather armor. +3 armor, +20 max health",
+        stackable: false,
+        quantity: 1,
+        slot: "armor",
+        stats: { armor: 3, maxHealth: 20 }
+    });
+
+    new Loot(this.scene, new Vector3(9, 1, 9), {
+        id: "shield_01",
+        name: "Iron Shield",
+        description: "A sturdy iron shield. +5 armor, -10% stamina regen",
+        stackable: false,
+        quantity: 1,
+        slot: "offHand",
+        stats: { armor: 5, staminaRegen: -0.2 }
+    });
+
+    new Loot(this.scene, new Vector3(6, 1, 6), {
+        id: "helmet_01",
+        name: "Iron Helmet",
+        description: "Protective iron helmet. +2 armor",
+        stackable: false,
+        quantity: 1,
+        slot: "head",
+        stats: { armor: 2 }
     });
 
     // Input handling for combat
