@@ -62,8 +62,8 @@ export class CombatSystem {
         this._ui.showHitFlash("rgba(255, 200, 0, 0.25)");
 
         // Knockback impulse
-        if (npc.physicsAggregate?.body) {
-          npc.physicsAggregate.body.applyImpulse(forward.scale(10), hit.pickedPoint!);
+        if (npc.physicsAggregate?.body && hit.pickedPoint) {
+          npc.physicsAggregate.body.applyImpulse(forward.scale(10), hit.pickedPoint);
         }
 
         if (npc.isDead) {
@@ -201,7 +201,10 @@ export class CombatSystem {
 
     if (newLevel > 0) {
       // Player leveled up!
-      this.player.health = this.player.maxHealth; // Restore health on level up
+      // Update player stats to include leveling bonuses
+      this.player.updateStats();
+      // Restore health on level up
+      this.player.health = this.player.maxHealth;
       this.player.magicka = this.player.maxMagicka;
       this.player.stamina = this.player.maxStamina;
       this._ui.showNotification(`🎉 Level Up! Reached Level ${newLevel}!`, 3000);

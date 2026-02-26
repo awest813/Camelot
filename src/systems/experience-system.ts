@@ -112,6 +112,8 @@ export class ExperienceSystem {
    * Get XP progress to next level (0-100).
    */
   public getXPProgress(): number {
+    if (this.nextLevelXP <= 0) return 100; // At max level
+
     // Find total XP needed from level 1 to current level
     let totalXPNeeded = 0;
     for (let i = 0; i < this.level - 1; i++) {

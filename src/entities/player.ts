@@ -169,6 +169,14 @@ export class Player {
   }
 
   /**
+   * Notify player that stats may have changed (e.g., from leveling).
+   * Recalculates all stats including leveling bonuses.
+   */
+  public updateStats(): void {
+    this._recalculateStats();
+  }
+
+  /**
    * Update player visual based on equipped armor (change color).
    * Creates a material if needed.
    */
