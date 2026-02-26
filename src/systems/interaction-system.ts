@@ -67,7 +67,6 @@ export class InteractionSystem {
       } else if (metadata.type === 'loot') {
           const loot = metadata.loot;
           if (this.inventorySystem.addItem(loot.item)) {
-              console.log(`Picked up ${loot.item.name}`);
               loot.dispose();
           }
       }

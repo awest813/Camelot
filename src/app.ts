@@ -58,7 +58,6 @@ class App {
     });
     await webgpu.initAsync();
     this.engine = webgpu;
-    console.log(this.engine);
   }
 
   private async _setupScene(): Promise<void> {

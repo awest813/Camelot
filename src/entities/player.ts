@@ -6,18 +6,13 @@ import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
-import { Item } from "../systems/inventory-system";
+import { Item, ItemStats } from "../systems/inventory-system";
 
-interface EquipmentBonuses {
-  maxHealth?: number;
-  maxMagicka?: number;
-  maxStamina?: number;
-  damage?: number;
-  armor?: number;
-  healthRegen?: number;
-  magickaRegen?: number;
-  staminaRegen?: number;
-}
+/**
+ * Cumulative stat bonuses from all equipped items.
+ * Extends ItemStats since equipment can provide those bonuses.
+ */
+interface EquipmentBonuses extends ItemStats {}
 
 export class Player {
   public camera: UniversalCamera;
@@ -167,13 +162,21 @@ export class Player {
   }
 
   /**
-   * Update player visual based on equipped armor (change color, material, etc).
+   * Update player visual based on equipped armor (change color).
+   * Creates a material if needed.
    */
   public updateArmorVisual(armorLevel: number): void {
-    if (!this.playerMesh?.material) return;
+    if (!this.playerMesh) return;
+
+    // Create material if it doesn't exist
+    if (!this.playerMesh.material) {
+      const mat = new StandardMaterial("playerMat", this.scene);
+      this.playerMesh.material = mat;
+    }
+
     const mat = this.playerMesh.material as StandardMaterial;
 
-    // Color based on armor level: blue for unarmored → steel gray for heavily armored
+    // Color based on armor level: gray for unarmored → dark blue for heavily armored
     if (armorLevel === 0) {
       mat.diffuseColor = new Color3(0.7, 0.7, 0.7); // Light gray (no armor)
     } else if (armorLevel < 5) {

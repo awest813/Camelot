@@ -1,6 +1,21 @@
 import { Player } from "../entities/player";
 import { UIManager } from "../ui/ui-manager";
 
+/**
+ * Item stat bonuses that can be applied to the player.
+ */
+export interface ItemStats {
+  maxHealth?: number;
+  maxMagicka?: number;
+  maxStamina?: number;
+  damage?: number;
+  armor?: number;
+  healthRegen?: number;
+  magickaRegen?: number;
+  staminaRegen?: number;
+  heal?: number; // For consumables
+}
+
 export interface Item {
   id: string;
   name: string;
@@ -9,7 +24,7 @@ export interface Item {
   stackable: boolean;
   quantity: number;
   slot?: string; // equipment slot this item can go in (mainHand, offHand, armor, head, feet, accessory)
-  stats?: any;
+  stats?: ItemStats;
 }
 
 export class InventorySystem {
@@ -50,7 +65,6 @@ export class InventorySystem {
     }
 
     if (this.items.length >= this.maxCapacity) {
-      console.log("Inventory full!");
       this._ui.showNotification("Inventory Full!", 2000);
       return false;
     }
@@ -147,7 +161,7 @@ export class InventorySystem {
   private _getTotalArmor(): number {
     let totalArmor = 0;
     for (const [_, item] of this.equipped) {
-      if (item?.stats?.armor) {
+      if (item && item.stats?.armor) {
         totalArmor += item.stats.armor;
       }
     }

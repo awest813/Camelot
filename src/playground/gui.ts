@@ -6,7 +6,6 @@ export const setUI = async (scene: Scene) => {
     // WebGPU specific imports
     await import("@babylonjs/core/Engines/WebGPU/Extensions/engine.dynamicTexture");
     await import("@babylonjs/core/Engines/WebGPU/Extensions/engine.renderTarget");
-    console.log("WebGPU GUI extensions loaded");
   }
 
   const advancedTexture = AdvancedDynamicTexture.CreateFullscreenUI("myUI");

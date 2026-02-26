@@ -130,8 +130,8 @@ export class Game {
 
     // Wire up Pause Menu buttons
     this.ui.resumeButton.onPointerUpObservable.add(() => this.togglePause());
-    this.ui.saveButton.onPointerUpObservable.add(() => console.log("Save Game (Mock)"));
-    this.ui.loadButton.onPointerUpObservable.add(() => console.log("Load Game (Mock)"));
+    this.ui.saveButton.onPointerUpObservable.add(() => this.ui.showNotification("Save Game (Coming Soon)", 2000));
+    this.ui.loadButton.onPointerUpObservable.add(() => this.ui.showNotification("Load Game (Coming Soon)", 2000));
     this.ui.quitButton.onPointerUpObservable.add(() => window.location.reload());
 
     // Game loop logic will go here
