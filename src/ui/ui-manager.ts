@@ -205,45 +205,153 @@ MP: ${Math.floor(player.magicka)} / ${player.maxMagicka}
 SP: ${Math.floor(player.stamina)} / ${player.maxStamina}`;
   }
 
-  public updateInventory(items: Item[]): void {
+  public updateInventory(
+    items: Item[],
+    equipment?: Array<{ slot: string; item: Item | null }>,
+    callbacks?: { onEquip?: (itemId: string, slot: string) => void; onUnequip?: (slot: string) => void }
+  ): void {
+      // Store callbacks for UI interactions
+      (this as any)._equipCallbacks = callbacks;
+
+      // Update inventory grid
       while (this.inventoryGrid.children.length > 0) {
           this.inventoryGrid.children[0].dispose();
       }
 
       items.forEach((item, index) => {
-          if (index >= 20) return; // Limit to grid size
-
+          if (index >= 20) return;
           const row = Math.floor(index / 4);
           const col = index % 4;
-
-          const slot = new Rectangle();
-          slot.width = "80px";
-          slot.height = "80px";
-          slot.color = "gray";
-          slot.thickness = 1;
-          slot.background = "rgba(255, 255, 255, 0.1)";
-          slot.isPointerBlocker = true;
-          slot.hoverCursor = "pointer";
-
-          // Hover events
-          slot.onPointerEnterObservable.add(() => {
-              this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}`;
-              slot.background = "rgba(255, 255, 255, 0.3)";
-          });
-          slot.onPointerOutObservable.add(() => {
-              this.inventoryDescription.text = "";
-              slot.background = "rgba(255, 255, 255, 0.1)";
-          });
-
-          const text = new TextBlock();
-          text.text = item.name + (item.quantity > 1 ? ` (${item.quantity})` : "");
-          text.color = "white";
-          text.fontSize = 12;
-          text.textWrapping = true;
-          slot.addControl(text);
-
-          this.inventoryGrid.addControl(slot, row, col);
+          this._createInventorySlot(item, index, row, col);
       });
+
+      // Update equipment slots
+      if (equipment) {
+          this._updateEquipmentSlots(equipment);
+      }
+  }
+
+  private _createInventorySlot(item: Item, index: number, row: number, col: number): void {
+      const slot = new Rectangle();
+      slot.width = "80px";
+      slot.height = "80px";
+      slot.color = "gray";
+      slot.thickness = 1;
+      slot.background = "rgba(255, 255, 255, 0.1)";
+      slot.isPointerBlocker = true;
+      slot.hoverCursor = "pointer";
+
+      // Metadata for drag-and-drop
+      (slot as any).itemIndex = index;
+      (slot as any).itemData = item;
+
+      slot.onPointerEnterObservable.add(() => {
+          this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}`;
+          slot.background = "rgba(255, 255, 255, 0.3)";
+      });
+      slot.onPointerOutObservable.add(() => {
+          this.inventoryDescription.text = "";
+          slot.background = "rgba(255, 255, 255, 0.1)";
+      });
+
+      // Double-click to equip
+      let lastClickTime = 0;
+      slot.onPointerUpObservable.add(() => {
+          const now = Date.now();
+          if (now - lastClickTime < 300) {
+              // Double-click detected
+              const callbacks = (this as any)._equipCallbacks;
+              if (callbacks?.onEquip) {
+                  if (item.stats?.damage) {
+                      callbacks.onEquip(item.id, "mainHand");
+                  } else if (item.stats?.armor) {
+                      callbacks.onEquip(item.id, "armor");
+                  } else {
+                      callbacks.onEquip(item.id, "accessory");
+                  }
+              }
+          }
+          lastClickTime = now;
+      });
+
+      const text = new TextBlock();
+      text.text = item.name + (item.quantity > 1 ? ` (${item.quantity})` : "");
+      text.color = "white";
+      text.fontSize = 12;
+      text.textWrapping = true;
+      slot.addControl(text);
+
+      this.inventoryGrid.addControl(slot, row, col);
+  }
+
+  private _updateEquipmentSlots(equipment: Array<{ slot: string; item: Item | null }>): void {
+      // Find or create the equipment panel (next to stats)
+      // We'll add it dynamically if it doesn't exist
+      let equipPanel = (this as any)._equipmentPanel;
+      if (!equipPanel) {
+          // Create equipment panel on the right side
+          equipPanel = new Rectangle();
+          equipPanel.width = "100%";
+          equipPanel.height = "220px";
+          equipPanel.color = "white";
+          equipPanel.thickness = 1;
+          equipPanel.background = "rgba(0,0,0,0.5)";
+          equipPanel.top = "-220px"; // Position above stats
+          const rightPanel = this.inventoryPanel.children[0] as any; // The main grid
+          const statsContainer = rightPanel.children?.[1]; // Stats is at index 1
+          if (statsContainer?.parent) {
+              statsContainer.parent.insertControl(equipPanel, statsContainer, true);
+          }
+          (this as any)._equipmentPanel = equipPanel;
+      }
+
+      // Clear existing equipment slots
+      while (equipPanel.children?.length > 0) {
+          equipPanel.children[0].dispose();
+      }
+
+      // Create a grid for equipment slots (6 slots in 2 rows x 3 cols)
+      const equipGrid = new Grid();
+      equipGrid.width = "100%";
+      equipGrid.height = "100%";
+      for (let i = 0; i < 2; i++) equipGrid.addRowDefinition(1);
+      for (let i = 0; i < 3; i++) equipGrid.addColumnDefinition(1);
+
+      equipment.forEach(({ slot, item }, idx) => {
+          const row = Math.floor(idx / 3);
+          const col = idx % 3;
+          const slotRect = new Rectangle();
+          slotRect.width = "80px";
+          slotRect.height = "80px";
+          slotRect.color = "white";
+          slotRect.thickness = 1;
+          slotRect.background = item ? "rgba(0, 200, 0, 0.2)" : "rgba(100, 100, 100, 0.3)";
+          slotRect.isPointerBlocker = true;
+          slotRect.hoverCursor = "pointer";
+
+          // Metadata
+          (slotRect as any).slotName = slot;
+          (slotRect as any).item = item;
+
+          // Click to unequip
+          slotRect.onPointerUpObservable.add(() => {
+              if (item) {
+                  const callbacks = (this as any)._equipCallbacks;
+                  callbacks?.onUnequip?.(slot);
+              }
+          });
+
+          const slotLabel = new TextBlock();
+          slotLabel.text = item ? item.name : slot.toUpperCase();
+          slotLabel.color = "white";
+          slotLabel.fontSize = 11;
+          slotLabel.textWrapping = true;
+          slotRect.addControl(slotLabel);
+
+          equipGrid.addControl(slotRect, row, col);
+      });
+
+      equipPanel.addControl(equipGrid);
   }
 
   public setInteractionText(text: string): void {
