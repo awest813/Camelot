@@ -35,6 +35,7 @@ export class InteractionSystem {
   public update(): void {
       if (this.inventorySystem.isOpen) {
           this.inventorySystem._ui.setInteractionText("");
+          this.inventorySystem._ui.setCrosshairActive(false);
           return;
       }
 
@@ -43,11 +44,14 @@ export class InteractionSystem {
           const metadata = hit.pickedMesh.metadata;
           if (metadata.type === 'npc') {
               this.inventorySystem._ui.setInteractionText(`Press E to Talk to ${metadata.npc.mesh.name}`);
+              this.inventorySystem._ui.setCrosshairActive(true);
           } else if (metadata.type === 'loot') {
               this.inventorySystem._ui.setInteractionText(`Press E to Take ${metadata.loot.item.name}`);
+              this.inventorySystem._ui.setCrosshairActive(true);
           }
       } else {
           this.inventorySystem._ui.setInteractionText("");
+          this.inventorySystem._ui.setCrosshairActive(false);
       }
   }
 
