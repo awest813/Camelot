@@ -28,8 +28,17 @@ export class WorldManager {
       }
     }
 
-    // Optional: Unload chunks too far away
-    // For now, let's keep it simple and additive
+    // Unload chunks too far away (prevent memory leak)
+    const unloadDistance = this.loadDistance + 1;
+    const keysToUnload: string[] = [];
+    for (const key of this.loadedChunks.keys()) {
+      const [x, z] = key.split(',').map(Number);
+      const dist = Math.max(Math.abs(x - chunkX), Math.abs(z - chunkZ));
+      if (dist > unloadDistance) {
+        keysToUnload.push(key);
+      }
+    }
+    keysToUnload.forEach(key => this._unloadChunk(key));
   }
 
   private _loadChunk(x: number, z: number): void {
@@ -59,6 +68,13 @@ export class WorldManager {
     chunkMesh.material = material;
 
     this.loadedChunks.set(key, chunkMesh);
-    // console.log(`Loaded chunk ${key}`);
+  }
+
+  private _unloadChunk(key: string): void {
+    const chunkMesh = this.loadedChunks.get(key);
+    if (chunkMesh) {
+      chunkMesh.dispose();
+      this.loadedChunks.delete(key);
+    }
   }
 }

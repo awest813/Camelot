@@ -35,8 +35,8 @@ export class InventorySystem {
   public _ui: UIManager;
   public _canvas: HTMLCanvasElement;
 
-  // Equipment slots
-  public equipped: Map<string, Item> = new Map();
+  // Equipment slots (null means empty)
+  public equipped: Map<string, Item | null> = new Map();
   private _equipmentSlots = ["mainHand", "offHand", "armor", "head", "feet", "accessory"];
 
   constructor(player: Player, ui: UIManager, canvas: HTMLCanvasElement) {
@@ -48,7 +48,7 @@ export class InventorySystem {
 
   private _initEquipmentSlots(): void {
     for (const slot of this._equipmentSlots) {
-      this.equipped.set(slot, null as any);
+      this.equipped.set(slot, null);
     }
   }
 
@@ -144,7 +144,7 @@ export class InventorySystem {
       return false;
     }
 
-    this.equipped.set(slot, null as any);
+    this.equipped.set(slot, null);
 
     // Update armor visual
     const totalArmor = this._getTotalArmor();

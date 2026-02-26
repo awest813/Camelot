@@ -171,13 +171,12 @@ export class Game {
       this.combatSystem.updateNPCAI(deltaTime);
       this.interactionSystem.update();
 
+      // Update UI bars every frame
       this.ui.updateHealth(this.player.health, this.player.maxHealth);
       this.ui.updateMagicka(this.player.magicka, this.player.maxMagicka);
       this.ui.updateStamina(this.player.stamina, this.player.maxStamina);
 
-      // Update stats only if inventory is open (optimization)
-      if (this.inventorySystem.isOpen) {
-          this.ui.updateStats(this.player);
-      }
+      // Update stats display every frame (includes level and XP bar)
+      this.ui.updateStats(this.player);
   }
 }

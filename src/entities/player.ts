@@ -6,6 +6,7 @@ import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { Item, ItemStats } from "../systems/inventory-system";
 import { ExperienceSystem } from "../systems/experience-system";
 
@@ -20,7 +21,7 @@ export class Player {
   public scene: Scene;
   private canvas: HTMLCanvasElement;
   private physicsAggregate: PhysicsAggregate;
-  private playerMesh: any; // Visual mesh for armor display
+  private playerMesh: Mesh | null = null; // Visual mesh for armor display
 
   // Base stats (before equipment bonuses)
   public baseMaxHealth: number = 100;
