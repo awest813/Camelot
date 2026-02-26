@@ -423,7 +423,12 @@ SP: ${Math.floor(player.stamina)} / ${player.maxStamina}`;
     if (!camera) return;
     const engine = scene.getEngine();
     const viewport = camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight());
-    const screenPos = Vector3.Project(worldPos, Matrix.Identity(), scene.getTransformMatrix(), viewport);
+    const screenPos = Vector3.Project(
+      worldPos,
+      Matrix.Identity(),
+      camera.getViewMatrix(),
+      viewport
+    );
     if (screenPos.z < 0 || screenPos.z > 1) return;
 
     const hw = engine.getRenderWidth() / 2;
