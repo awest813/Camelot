@@ -198,6 +198,24 @@ export class UIManager {
       this.crosshair.isVisible = visible;
   }
 
+  public setCrosshairActive(active: boolean): void {
+    if (active) {
+        if (this.crosshair.color !== "#FFD700") {
+            this.crosshair.color = "#FFD700"; // Gold
+            this.crosshair.scaleX = 1.2;
+            this.crosshair.scaleY = 1.2;
+            this.crosshair.thickness = 3;
+        }
+    } else {
+        if (this.crosshair.color !== "white") {
+            this.crosshair.color = "white";
+            this.crosshair.scaleX = 1.0;
+            this.crosshair.scaleY = 1.0;
+            this.crosshair.thickness = 2;
+        }
+    }
+  }
+
   public updateStats(player: Player): void {
       this.statsText.text = `Stats:
 HP: ${Math.floor(player.health)} / ${player.maxHealth}
