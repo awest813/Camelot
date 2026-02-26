@@ -51,7 +51,7 @@ export class Game {
     npc.patrolPoints = [new Vector3(10, 2, 10), new Vector3(10, 2, 20), new Vector3(20, 2, 20), new Vector3(20, 2, 10)];
     this.scheduleSystem.addNPC(npc);
 
-    this.combatSystem = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs);
+    this.combatSystem = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs, this.ui);
     this.dialogueSystem = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
     this.inventorySystem = new InventorySystem(this.player, this.ui, this.canvas);
     this.interactionSystem = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem);
@@ -138,6 +138,7 @@ export class Game {
       this.player.update(deltaTime);
       this.world.update(this.player.camera.position);
       this.scheduleSystem.update(deltaTime);
+      this.combatSystem.updateNPCAI(deltaTime);
       this.interactionSystem.update();
 
       this.ui.updateHealth(this.player.health, this.player.maxHealth);

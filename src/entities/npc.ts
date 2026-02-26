@@ -19,9 +19,49 @@ export class NPC {
   public currentPatrolIndex: number = 0;
   public waitTime: number = 0;
 
+  // Health
+  public health: number = 100;
+  public maxHealth: number = 100;
+  public isDead: boolean = false;
+
+  // Combat AI
+  public isAggressive: boolean = false;
+  public aggroRange: number = 12;
+  public attackRange: number = 2.5;
+  public attackDamage: number = 5;
+  public attackTimer: number = 0;
+  public attackCooldown: number = 2; // seconds between attacks
+
+  private _baseColor: Color3 = Color3.Yellow();
+
   constructor(scene: Scene, position: Vector3, name: string) {
     this.scene = scene;
     this._createMesh(position, name);
+  }
+
+  public takeDamage(amount: number): void {
+    if (this.isDead) return;
+    this.health = Math.max(0, this.health - amount);
+    this._flashHit();
+    if (this.health <= 0) {
+      this._die();
+    }
+  }
+
+  private _flashHit(): void {
+    const mat = this.mesh.material as StandardMaterial;
+    mat.diffuseColor = Color3.Red();
+    setTimeout(() => {
+      if (!this.isDead) mat.diffuseColor = this._baseColor.clone();
+    }, 150);
+  }
+
+  private _die(): void {
+    this.isDead = true;
+    this.isAggressive = false;
+    const mat = this.mesh.material as StandardMaterial;
+    mat.diffuseColor = new Color3(0.3, 0.3, 0.3);
+    this.physicsAggregate.body.setMotionType(PhysicsMotionType.STATIC);
   }
 
   private _createMesh(position: Vector3, name: string): void {

@@ -1,4 +1,5 @@
 import { Scene } from "@babylonjs/core/scene";
+import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Grid, Button, Ellipse } from "@babylonjs/gui/2D";
 import { Item } from "../systems/inventory-system";
 import { Player } from "../entities/player";
@@ -395,5 +396,62 @@ SP: ${Math.floor(player.stamina)} / ${player.maxStamina}`;
 
   public updateStamina(current: number, max: number): void {
       this.staminaBar.width = `${Math.max(0, current / max) * 100}%`;
+  }
+
+  /** Flash a translucent color overlay to signal being hit or dealing damage. */
+  public showHitFlash(color: string = "red"): void {
+    const flash = new Rectangle();
+    flash.width = "100%";
+    flash.height = "100%";
+    flash.background = color;
+    flash.alpha = 0.35;
+    flash.isPointerBlocker = false;
+    flash.zIndex = 50;
+    this._ui.addControl(flash);
+    setTimeout(() => {
+      this._ui.removeControl(flash);
+      flash.dispose();
+    }, 150);
+  }
+
+  /**
+   * Spawn a floating damage number at the given world position.
+   * It drifts upward and fades out over ~1 second.
+   */
+  public showDamageNumber(worldPos: Vector3, damage: number, scene: Scene): void {
+    const camera = scene.activeCamera;
+    if (!camera) return;
+    const engine = scene.getEngine();
+    const viewport = camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight());
+    const screenPos = Vector3.Project(worldPos, Matrix.Identity(), scene.getTransformMatrix(), viewport);
+    if (screenPos.z < 0 || screenPos.z > 1) return;
+
+    const hw = engine.getRenderWidth() / 2;
+    const hh = engine.getRenderHeight() / 2;
+
+    const text = new TextBlock();
+    text.text = `-${damage}`;
+    text.color = "orange";
+    text.fontSize = 22;
+    text.fontWeight = "bold";
+    text.shadowColor = "black";
+    text.shadowBlur = 3;
+    text.left = `${screenPos.x - hw}px`;
+    text.top = `${screenPos.y - hh}px`;
+    text.zIndex = 60;
+    this._ui.addControl(text);
+
+    let elapsed = 0;
+    const interval = setInterval(() => {
+      elapsed += 50;
+      const topPx = parseFloat(text.top as string) - 1.5;
+      text.top = `${topPx}px`;
+      text.alpha = Math.max(0, 1 - elapsed / 1000);
+      if (elapsed >= 1000) {
+        clearInterval(interval);
+        this._ui.removeControl(text);
+        text.dispose();
+      }
+    }, 50);
   }
 }
