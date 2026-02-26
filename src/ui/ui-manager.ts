@@ -19,6 +19,10 @@ export class UIManager {
   public inventoryDescription: TextBlock;
   public statsText: TextBlock;
 
+  // Level and XP display
+  public levelText: TextBlock;
+  public xpBar: Rectangle;
+
   // Pause Menu
   public pausePanel: Rectangle;
   public resumeButton: Button;
@@ -228,6 +232,11 @@ ARM: ${armorBonus}`;
       }
 
       this.statsText.text = statsText;
+
+      // Update level and XP bar
+      this.levelText.text = `Level: ${player.experience.level}`;
+      const xpProgress = player.experience.getXPProgress();
+      this.xpBar.width = `${Math.max(0, Math.min(100, xpProgress))}%`;
   }
 
   public updateInventory(
@@ -423,6 +432,53 @@ ARM: ${armorBonus}`;
     compassLabel.color = "white";
     compassLabel.fontSize = 20;
     compassContainer.addControl(compassLabel);
+
+    // Level and XP Display (Top Right)
+    const levelContainer = new Rectangle();
+    levelContainer.width = "150px";
+    levelContainer.height = "70px";
+    levelContainer.cornerRadius = 5;
+    levelContainer.color = "white";
+    levelContainer.thickness = 2;
+    levelContainer.background = "rgba(0, 0, 0, 0.5)";
+    levelContainer.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+    levelContainer.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    levelContainer.top = "20px";
+    levelContainer.left = "-20px";
+    this._ui.addControl(levelContainer);
+
+    // Level text
+    this.levelText = new TextBlock();
+    this.levelText.text = "Level: 1";
+    this.levelText.color = "gold";
+    this.levelText.fontSize = 16;
+    this.levelText.fontWeight = "bold";
+    this.levelText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.levelText.paddingTop = "5px";
+    levelContainer.addControl(this.levelText);
+
+    // XP Bar container
+    const xpContainer = new Rectangle();
+    xpContainer.width = "130px";
+    xpContainer.height = "12px";
+    xpContainer.cornerRadius = 2;
+    xpContainer.color = "white";
+    xpContainer.thickness = 1;
+    xpContainer.background = "black";
+    xpContainer.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+    xpContainer.top = "-8px";
+    levelContainer.addControl(xpContainer);
+
+    // XP progress bar
+    this.xpBar = new Rectangle();
+    this.xpBar.width = "100%";
+    this.xpBar.height = "100%";
+    this.xpBar.cornerRadius = 2;
+    this.xpBar.color = "blue";
+    this.xpBar.thickness = 0;
+    this.xpBar.background = "blue";
+    this.xpBar.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    xpContainer.addControl(this.xpBar);
 
     // Status Bars Container (Bottom Center)
     // Skyrim style: Magicka (Left), Health (Center), Stamina (Right)

@@ -68,6 +68,7 @@ export class CombatSystem {
 
         if (npc.isDead) {
           this._ui.showNotification(`${npc.mesh.name} defeated!`);
+          this._awardXPForKill(npc);
         } else {
           // Aggro the NPC
           npc.isAggressive = true;
@@ -117,7 +118,10 @@ export class CombatSystem {
           );
           this._ui.showHitFlash("rgba(255, 100, 0, 0.3)");
           npc.isAggressive = true;
-          if (npc.isDead) this._ui.showNotification(`${npc.mesh.name} defeated!`);
+          if (npc.isDead) {
+            this._ui.showNotification(`${npc.mesh.name} defeated!`);
+            this._awardXPForKill(npc);
+          }
           // Detonate fireball
           alive = false;
           this.scene.onBeforeRenderObservable.remove(obs);
@@ -180,6 +184,29 @@ export class CombatSystem {
         const armorText = this.player.armor > 0 ? ` (reduced by armor)` : "";
         this._ui.showNotification(`${npc.mesh.name} attacks you for ${dmg} damage!${armorText}`, 2000);
       }
+    }
+  }
+
+  /**
+   * Award XP for defeating an NPC. Calculates XP based on NPC level/difficulty.
+   */
+  private _awardXPForKill(npc: NPC): void {
+    // Base XP = 50, modified by NPC max health (difficulty indicator)
+    const baseXP = 50;
+    const xpMultiplier = 1 + (npc.maxHealth / 100); // More health = more XP
+    const totalXP = Math.round(baseXP * xpMultiplier);
+
+    // Gain XP and check for level up
+    const newLevel = this.player.experience.gainXP(totalXP);
+
+    if (newLevel > 0) {
+      // Player leveled up!
+      this.player.health = this.player.maxHealth; // Restore health on level up
+      this.player.magicka = this.player.maxMagicka;
+      this.player.stamina = this.player.maxStamina;
+      this._ui.showNotification(`🎉 Level Up! Reached Level ${newLevel}!`, 3000);
+    } else {
+      this._ui.showNotification(`+${totalXP} XP`, 2000);
     }
   }
 }

@@ -7,6 +7,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Item, ItemStats } from "../systems/inventory-system";
+import { ExperienceSystem } from "../systems/experience-system";
 
 /**
  * Cumulative stat bonuses from all equipped items.
@@ -44,6 +45,9 @@ export class Player {
 
   // Equipment bonuses
   private _equipmentBonuses: EquipmentBonuses = {};
+
+  // Experience and leveling
+  public experience: ExperienceSystem = new ExperienceSystem();
 
   constructor(scene: Scene, canvas: HTMLCanvasElement) {
     this.scene = scene;
@@ -95,13 +99,16 @@ export class Player {
   }
 
   /**
-   * Recalculate stats based on base stats + equipment bonuses.
+   * Recalculate stats based on base stats + equipment bonuses + leveling bonuses.
    * Also clamp current values to not exceed max.
    */
   private _recalculateStats(): void {
-    this.maxHealth = this.baseMaxHealth + (this._equipmentBonuses.maxHealth || 0);
-    this.maxMagicka = this.baseMaxMagicka + (this._equipmentBonuses.maxMagicka || 0);
-    this.maxStamina = this.baseMaxStamina + (this._equipmentBonuses.maxStamina || 0);
+    // Get leveling bonuses
+    const levelBonuses = this.experience.getStatBonuses();
+
+    this.maxHealth = this.baseMaxHealth + (this._equipmentBonuses.maxHealth || 0) + levelBonuses.health;
+    this.maxMagicka = this.baseMaxMagicka + (this._equipmentBonuses.maxMagicka || 0) + levelBonuses.magicka;
+    this.maxStamina = this.baseMaxStamina + (this._equipmentBonuses.maxStamina || 0) + levelBonuses.stamina;
     this.healthRegen = this.baseHealthRegen + (this._equipmentBonuses.healthRegen || 0);
     this.magickaRegen = this.baseMagickaRegen + (this._equipmentBonuses.magickaRegen || 0);
     this.staminaRegen = this.baseStaminaRegen + (this._equipmentBonuses.staminaRegen || 0);
