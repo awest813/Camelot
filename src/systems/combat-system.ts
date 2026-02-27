@@ -99,8 +99,20 @@ export class CombatSystem {
 
     // Check for NPC collision every frame until the fireball is gone
     let alive = true;
+    let elapsedMs = 0;
     const obs = this.scene.onBeforeRenderObservable.add(() => {
       if (!alive) return;
+
+      // Auto-clean after 5 seconds
+      elapsedMs += this.scene.getEngine().getDeltaTime();
+      if (elapsedMs >= 5000) {
+        alive = false;
+        this.scene.onBeforeRenderObservable.remove(obs);
+        projectile.dispose();
+        agg.dispose();
+        return;
+      }
+
       for (const npc of this.npcs) {
         if (npc.isDead) continue;
         const dist = Vector3.Distance(projectile.position, npc.mesh.position);
@@ -126,16 +138,6 @@ export class CombatSystem {
         }
       }
     });
-
-    // Auto-clean after 5 seconds
-    setTimeout(() => {
-      if (alive) {
-        alive = false;
-        this.scene.onBeforeRenderObservable.remove(obs);
-        projectile.dispose();
-        agg.dispose();
-      }
-    }, 5000);
   }
 
   /**
