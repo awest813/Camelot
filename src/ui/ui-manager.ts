@@ -236,12 +236,21 @@ export class UIManager {
       button.hoverCursor = "pointer";
       button.thickness = 1;
 
-      button.onPointerEnterObservable.add(() => {
+      button.isFocusInvisible = false;
+      button.tabIndex = 0;
+      button.accessibilityTag = { description: text };
+
+      const setHoverState = () => {
           button.background = "rgba(100, 100, 100, 0.9)";
-      });
-      button.onPointerOutObservable.add(() => {
+      };
+      const setNormalState = () => {
           button.background = "rgba(50, 50, 50, 0.8)";
-      });
+      };
+
+      button.onPointerEnterObservable.add(setHoverState);
+      button.onPointerOutObservable.add(setNormalState);
+      button.onFocusObservable.add(setHoverState);
+      button.onBlurObservable.add(setNormalState);
 
       parent.addControl(button);
       return button;
@@ -380,26 +389,43 @@ Armor: ${player.bonusArmor}`;
           slot.isPointerBlocker = true;
           slot.hoverCursor = "pointer";
 
+          slot.isFocusInvisible = false;
+          slot.tabIndex = 0;
+          slot.accessibilityTag = { description: item.name };
+
           const baseColor = isEquipped ? "rgba(255, 215, 0, 0.15)" : "rgba(255, 255, 255, 0.1)";
           const hoverColor = isEquipped ? "rgba(255, 215, 0, 0.35)" : "rgba(255, 255, 255, 0.3)";
 
-          // Hover events
-          slot.onPointerEnterObservable.add(() => {
+          const setHoverState = () => {
               const equipped = this._equippedIds.has(item.id);
               const hint = item.slot ? (equipped ? "\n[Click to Unequip]" : "\n[Click to Equip]") : "";
               this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}${hint}`;
               slot.background = hoverColor;
-          });
-          slot.onPointerOutObservable.add(() => {
+          };
+
+          const setNormalState = () => {
               this.inventoryDescription.text = "";
               slot.background = baseColor;
-          });
+          };
+
+          // Hover and Focus events
+          slot.onPointerEnterObservable.add(setHoverState);
+          slot.onPointerOutObservable.add(setNormalState);
+          slot.onFocusObservable.add(setHoverState);
+          slot.onBlurObservable.add(setNormalState);
+
+          const triggerItem = () => {
+              if (item.slot && this.onInventoryItemClick) {
+                  this.onInventoryItemClick(item);
+              }
+          };
 
           // Click to equip/unequip
           if (item.slot) {
-              slot.onPointerUpObservable.add(() => {
-                  if (this.onInventoryItemClick) {
-                      this.onInventoryItemClick(item);
+              slot.onPointerUpObservable.add(triggerItem);
+              slot.onKeyboardEventProcessedObservable.add((evt) => {
+                  if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
+                      triggerItem();
                   }
               });
           }
