@@ -495,20 +495,20 @@ Armor: ${player.bonusArmor}`;
     this._ui.addControl(barsPanel);
 
     // Magicka Bar (Blue)
-    const magickaContainer = this._createBarContainer("blue", barsPanel);
+    const { container: magickaContainer, bar: magickaBar } = this._createBarContainer("blue", barsPanel);
     magickaContainer.paddingRight = "10px";
-    this.magickaBar = (magickaContainer.children[0] as Rectangle);
+    this.magickaBar = magickaBar;
 
     // Health Bar (Red)
-    const healthContainer = this._createBarContainer("red", barsPanel);
+    const { container: healthContainer, bar: healthBar } = this._createBarContainer("red", barsPanel);
     healthContainer.paddingLeft = "5px";
     healthContainer.paddingRight = "5px";
-    this.healthBar = (healthContainer.children[0] as Rectangle);
+    this.healthBar = healthBar;
 
     // Stamina Bar (Green)
-    const staminaContainer = this._createBarContainer("green", barsPanel);
+    const { container: staminaContainer, bar: staminaBar } = this._createBarContainer("green", barsPanel);
     staminaContainer.paddingLeft = "10px";
-    this.staminaBar = (staminaContainer.children[0] as Rectangle);
+    this.staminaBar = staminaBar;
 
     // Notification Panel (Top Left)
     this.notificationPanel = new StackPanel();
@@ -549,7 +549,7 @@ Armor: ${player.bonusArmor}`;
       }, duration);
   }
 
-  private _createBarContainer(color: string, parent: StackPanel): Rectangle {
+  private _createBarContainer(color: string, parent: StackPanel): { container: Rectangle, bar: Rectangle } {
     const container = new Rectangle();
     container.width = "180px";
     container.height = "15px";
@@ -569,7 +569,7 @@ Armor: ${player.bonusArmor}`;
     bar.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     container.addControl(bar);
 
-    return container;
+    return { container, bar };
   }
 
   public updateHealth(current: number, max: number): void {
