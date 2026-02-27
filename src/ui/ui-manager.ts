@@ -2,6 +2,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Grid, Button, Ellipse } from "@babylonjs/gui/2D";
 import { Item } from "../systems/inventory-system";
+import { EquipSlot } from "../systems/equipment-system";
 import { Player } from "../entities/player";
 
 export class UIManager {
@@ -18,6 +19,13 @@ export class UIManager {
   public inventoryGrid: Grid;
   public inventoryDescription: TextBlock;
   public statsText: TextBlock;
+  public equipmentText: TextBlock;
+
+  // Equipped item IDs (used when rendering the inventory grid)
+  private _equippedIds: Set<string> = new Set();
+
+  /** Called when the player clicks an inventory item slot. Set by Game to hook into EquipmentSystem. */
+  public onInventoryItemClick: ((item: Item) => void) | null = null;
 
   // Pause Menu
   public pausePanel: Rectangle;
@@ -95,7 +103,7 @@ export class UIManager {
     // Description Area
     const descContainer = new Rectangle();
     descContainer.width = "100%";
-    descContainer.height = "200px";
+    descContainer.height = "150px";
     descContainer.color = "white";
     descContainer.thickness = 1;
     descContainer.background = "rgba(0,0,0,0.5)";
@@ -112,22 +120,42 @@ export class UIManager {
     // Stats Area
     const statsContainer = new Rectangle();
     statsContainer.width = "100%";
-    statsContainer.height = "200px";
+    statsContainer.height = "150px";
     statsContainer.color = "white";
     statsContainer.thickness = 1;
     statsContainer.background = "rgba(0,0,0,0.5)";
-    statsContainer.top = "20px"; // Margin top
+    statsContainer.top = "10px";
     rightPanel.addControl(statsContainer);
 
     this.statsText = new TextBlock();
     this.statsText.text = "Stats:\nHP: --\nMP: --\nSP: --";
     this.statsText.color = "white";
-    this.statsText.fontSize = 16;
+    this.statsText.fontSize = 14;
     this.statsText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     this.statsText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this.statsText.paddingTop = "10px";
+    this.statsText.paddingTop = "8px";
     this.statsText.paddingLeft = "10px";
     statsContainer.addControl(this.statsText);
+
+    // Equipment Slots Area
+    const equipContainer = new Rectangle();
+    equipContainer.width = "100%";
+    equipContainer.height = "185px";
+    equipContainer.color = "white";
+    equipContainer.thickness = 1;
+    equipContainer.background = "rgba(0,0,0,0.5)";
+    equipContainer.top = "20px";
+    rightPanel.addControl(equipContainer);
+
+    this.equipmentText = new TextBlock();
+    this.equipmentText.text = "Equipment:\nMain Hand: --\nOff Hand: --\nHead: --\nChest: --\nLegs: --\nFeet: --";
+    this.equipmentText.color = "#FFD700";
+    this.equipmentText.fontSize = 13;
+    this.equipmentText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this.equipmentText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.equipmentText.paddingTop = "8px";
+    this.equipmentText.paddingLeft = "10px";
+    equipContainer.addControl(this.equipmentText);
   }
 
   private _initPauseMenu(): void {
@@ -220,7 +248,13 @@ export class UIManager {
       this.statsText.text = `Stats:
 HP: ${Math.floor(player.health)} / ${player.maxHealth}
 MP: ${Math.floor(player.magicka)} / ${player.maxMagicka}
-SP: ${Math.floor(player.stamina)} / ${player.maxStamina}`;
+SP: ${Math.floor(player.stamina)} / ${player.maxStamina}
+DMG Bonus: +${player.bonusDamage}
+Armor: ${player.bonusArmor}`;
+  }
+
+  public setEquippedIds(ids: Set<string>): void {
+      this._equippedIds = ids;
   }
 
   public updateInventory(items: Item[]): void {
@@ -233,35 +267,67 @@ SP: ${Math.floor(player.stamina)} / ${player.maxStamina}`;
 
           const row = Math.floor(index / 4);
           const col = index % 4;
+          const isEquipped = this._equippedIds.has(item.id);
 
           const slot = new Rectangle();
           slot.width = "80px";
           slot.height = "80px";
-          slot.color = "gray";
-          slot.thickness = 1;
-          slot.background = "rgba(255, 255, 255, 0.1)";
+          slot.color = isEquipped ? "#FFD700" : "gray";
+          slot.thickness = isEquipped ? 2 : 1;
+          slot.background = isEquipped ? "rgba(255, 215, 0, 0.15)" : "rgba(255, 255, 255, 0.1)";
           slot.isPointerBlocker = true;
           slot.hoverCursor = "pointer";
 
+          const baseColor = isEquipped ? "rgba(255, 215, 0, 0.15)" : "rgba(255, 255, 255, 0.1)";
+          const hoverColor = isEquipped ? "rgba(255, 215, 0, 0.35)" : "rgba(255, 255, 255, 0.3)";
+
           // Hover events
           slot.onPointerEnterObservable.add(() => {
-              this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}`;
-              slot.background = "rgba(255, 255, 255, 0.3)";
+              const equipped = this._equippedIds.has(item.id);
+              const hint = item.slot ? (equipped ? "\n[Click to Unequip]" : "\n[Click to Equip]") : "";
+              this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}${hint}`;
+              slot.background = hoverColor;
           });
           slot.onPointerOutObservable.add(() => {
               this.inventoryDescription.text = "";
-              slot.background = "rgba(255, 255, 255, 0.1)";
+              slot.background = baseColor;
           });
+
+          // Click to equip/unequip
+          if (item.slot) {
+              slot.onPointerUpObservable.add(() => {
+                  if (this.onInventoryItemClick) {
+                      this.onInventoryItemClick(item);
+                  }
+              });
+          }
 
           const text = new TextBlock();
           text.text = item.name + (item.quantity > 1 ? ` (${item.quantity})` : "");
-          text.color = "white";
+          text.color = isEquipped ? "#FFD700" : "white";
           text.fontSize = 12;
           text.textWrapping = true;
           slot.addControl(text);
 
           this.inventoryGrid.addControl(slot, row, col);
       });
+  }
+
+  public updateEquipment(slots: Map<EquipSlot, import("../systems/inventory-system").Item>): void {
+      const slotLabels: { key: EquipSlot; label: string }[] = [
+          { key: "mainHand", label: "Main Hand" },
+          { key: "offHand",  label: "Off Hand"  },
+          { key: "head",     label: "Head"      },
+          { key: "chest",    label: "Chest"     },
+          { key: "legs",     label: "Legs"      },
+          { key: "feet",     label: "Feet"      },
+      ];
+      const lines = ["Equipment:"];
+      for (const { key, label } of slotLabels) {
+          const item = slots.get(key);
+          lines.push(`${label}: ${item ? item.name : "--"}`);
+      }
+      this.equipmentText.text = lines.join("\n");
   }
 
   public setInteractionText(text: string): void {

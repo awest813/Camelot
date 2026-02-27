@@ -24,6 +24,10 @@ export class Player {
   public magickaRegen: number = 2;
   public staminaRegen: number = 5;
 
+  // Equipment bonuses
+  public bonusDamage: number = 0;
+  public bonusArmor: number = 0;
+
   constructor(scene: Scene, canvas: HTMLCanvasElement) {
     this.scene = scene;
     this.canvas = canvas;

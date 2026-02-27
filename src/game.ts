@@ -13,6 +13,7 @@ import { DialogueSystem } from "./systems/dialogue-system";
 import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { InventorySystem } from "./systems/inventory-system";
+import { EquipmentSystem } from "./systems/equipment-system";
 import { InteractionSystem } from "./systems/interaction-system";
 import { Loot } from "./entities/loot";
 
@@ -27,6 +28,7 @@ export class Game {
   public combatSystem: CombatSystem;
   public dialogueSystem: DialogueSystem;
   public inventorySystem: InventorySystem;
+  public equipmentSystem: EquipmentSystem;
   public interactionSystem: InteractionSystem;
 
   public isPaused: boolean = false;
@@ -54,6 +56,8 @@ export class Game {
     this.combatSystem = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs, this.ui);
     this.dialogueSystem = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
     this.inventorySystem = new InventorySystem(this.player, this.ui, this.canvas);
+    this.equipmentSystem = new EquipmentSystem(this.player, this.inventorySystem, this.ui);
+    this.ui.onInventoryItemClick = (item) => this.equipmentSystem.handleItemClick(item);
     this.interactionSystem = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem);
 
     // Test Loot
@@ -74,6 +78,26 @@ export class Game {
         stackable: true,
         quantity: 1,
         stats: { heal: 50 }
+    });
+
+    new Loot(this.scene, new Vector3(6, 1, 7), {
+        id: "leather_chest_01",
+        name: "Leather Chest",
+        description: "Light armor. +3 Armor.",
+        stackable: false,
+        quantity: 1,
+        slot: "chest",
+        stats: { armor: 3 }
+    });
+
+    new Loot(this.scene, new Vector3(8, 1, 7), {
+        id: "iron_helm_01",
+        name: "Iron Helm",
+        description: "A sturdy iron helmet. +2 Armor.",
+        stackable: false,
+        quantity: 1,
+        slot: "head",
+        stats: { armor: 2 }
     });
 
     // Input handling for combat
