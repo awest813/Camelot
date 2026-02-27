@@ -14,6 +14,8 @@ import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { InventorySystem } from "./systems/inventory-system";
 import { EquipmentSystem } from "./systems/equipment-system";
+import { SaveSystem } from "./systems/save-system";
+import { QuestSystem } from "./systems/quest-system";
 import { InteractionSystem } from "./systems/interaction-system";
 import { Loot } from "./entities/loot";
 
@@ -29,6 +31,8 @@ export class Game {
   public dialogueSystem: DialogueSystem;
   public inventorySystem: InventorySystem;
   public equipmentSystem: EquipmentSystem;
+  public saveSystem: SaveSystem;
+  public questSystem: QuestSystem;
   public interactionSystem: InteractionSystem;
 
   public isPaused: boolean = false;
@@ -58,7 +62,16 @@ export class Game {
     this.inventorySystem = new InventorySystem(this.player, this.ui, this.canvas);
     this.equipmentSystem = new EquipmentSystem(this.player, this.inventorySystem, this.ui);
     this.ui.onInventoryItemClick = (item) => this.equipmentSystem.handleItemClick(item);
+    this.saveSystem = new SaveSystem(this.player, this.inventorySystem, this.equipmentSystem, this.ui);
+    this.questSystem = new QuestSystem(this.ui);
+    this.saveSystem.setQuestSystem(this.questSystem);
+    this.saveSystem.onAfterLoad = () => this._cleanupCollectedLoot();
     this.interactionSystem = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem);
+
+    // Wire quest event callbacks
+    this.combatSystem.onNPCDeath    = (name)   => this.questSystem.onKill(name);
+    this.interactionSystem.onLootPickup = (id) => this.questSystem.onPickup(id);
+    this.dialogueSystem.onTalkStart  = (name)  => this.questSystem.onTalk(name);
 
     // Test Loot
     new Loot(this.scene, new Vector3(5, 1, 5), {
@@ -100,6 +113,59 @@ export class Game {
         stats: { armor: 2 }
     });
 
+    // Test Quests
+    this.questSystem.addQuest({
+        id: "quest_kill_guard",
+        name: "Eliminate the Guard",
+        description: "A rogue guard threatens the village. Defeat him.",
+        isCompleted: false,
+        isActive: true,
+        reward: "100 XP",
+        objectives: [{
+            id: "obj_kill_guard",
+            type: "kill",
+            description: "Defeat the Guard",
+            targetId: "Guard",
+            required: 1,
+            current: 0,
+            completed: false
+        }]
+    }, true);
+    this.questSystem.addQuest({
+        id: "quest_collect_potions",
+        name: "Stock the Medicine Chest",
+        description: "The village healer needs supplies.",
+        isCompleted: false,
+        isActive: true,
+        reward: "50 XP",
+        objectives: [{
+            id: "obj_collect_potions",
+            type: "fetch",
+            description: "Collect Health Potions",
+            targetId: "potion_hp_01",
+            required: 1,
+            current: 0,
+            completed: false
+        }]
+    }, true);
+    this.questSystem.addQuest({
+        id: "quest_speak_guard",
+        name: "Parley with the Guard",
+        description: "Try talking to the Guard before resorting to violence.",
+        isCompleted: false,
+        isActive: true,
+        reward: "25 XP",
+        objectives: [{
+            id: "obj_talk_guard",
+            type: "talk",
+            description: "Speak with the Guard",
+            targetId: "Guard",
+            required: 1,
+            current: 0,
+            completed: false
+        }]
+    }, true);
+
     // Input handling for combat
     this.scene.onPointerObservable.add((pointerInfo) => {
         if (this.isPaused || this.inventorySystem.isOpen) return;
@@ -118,14 +184,20 @@ export class Game {
         if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
             if (kbInfo.event.key === "Escape") {
                 this.togglePause();
+            } else if (kbInfo.event.key === "j" || kbInfo.event.key === "J") {
+                if (!this.isPaused) this.questSystem.toggleQuestLog();
+            } else if (kbInfo.event.key === "F5") {
+                if (!this.isPaused) this.saveSystem.save();
+            } else if (kbInfo.event.key === "F9") {
+                if (!this.isPaused) this.saveSystem.load();
             }
         }
     });
 
     // Wire up Pause Menu buttons
     this.ui.resumeButton.onPointerUpObservable.add(() => this.togglePause());
-    this.ui.saveButton.onPointerUpObservable.add(() => console.log("Save Game (Mock)"));
-    this.ui.loadButton.onPointerUpObservable.add(() => console.log("Load Game (Mock)"));
+    this.ui.saveButton.onPointerUpObservable.add(() => this.saveSystem.save());
+    this.ui.loadButton.onPointerUpObservable.add(() => this.saveSystem.load());
     this.ui.quitButton.onPointerUpObservable.add(() => window.location.reload());
 
     // Game loop logic will go here
@@ -139,11 +211,21 @@ export class Game {
       this.ui.togglePauseMenu(this.isPaused);
 
       if (this.isPaused) {
-          // Clear interaction label when paused
+          // Close any open overlays
+          if (this.inventorySystem.isOpen) {
+              this.inventorySystem.isOpen = false;
+              this.ui.toggleInventory(false);
+          }
+          if (this.questSystem.isLogOpen) {
+              this.questSystem.isLogOpen = false;
+              this.ui.toggleQuestLog(false);
+          }
+          this.interactionSystem.isBlocked = true;
           this.ui.setInteractionText("");
           document.exitPointerLock();
           this.player.camera.detachControl();
       } else {
+          this.interactionSystem.isBlocked = false;
           this.canvas.requestPointerLock();
           this.player.camera.attachControl(this.canvas, true);
       }
@@ -152,6 +234,26 @@ export class Game {
   _setLight(): void {
     const light = new HemisphericLight("light", new Vector3(0, 1, 0), this.scene);
     light.intensity = 0.5;
+  }
+
+  /** Remove world loot objects whose item IDs are now in inventory or equipment (called after load). */
+  private _cleanupCollectedLoot(): void {
+      const collectedIds = new Set<string>();
+      for (const item of this.inventorySystem.items) {
+          collectedIds.add(item.id);
+      }
+      for (const item of this.equipmentSystem.getEquipped().values()) {
+          collectedIds.add(item.id);
+      }
+      // Iterate a snapshot to avoid mutation during iteration
+      for (const mesh of this.scene.meshes.slice()) {
+          if (mesh.metadata?.type === 'loot') {
+              const loot = mesh.metadata.loot;
+              if (collectedIds.has(loot.item.id)) {
+                  loot.dispose();
+              }
+          }
+      }
   }
 
   update(): void {

@@ -1,6 +1,6 @@
 # Babylon.js RPG Template
 
-A modern RPG framework built with Babylon.js 8, Vite 6, and TypeScript. Featuring Havok physics, infinite terrain chunks, player controller with RPG stats, and basic NPC interaction/combat systems.
+A modern RPG framework built with Babylon.js 8, Vite 6, and TypeScript. Featuring Havok physics, infinite terrain chunks, player controller with RPG stats, NPC interaction/combat systems, inventory, equipment, save/load, and a quest system.
 
 ## Features
 
@@ -15,22 +15,45 @@ A modern RPG framework built with Babylon.js 8, Vite 6, and TypeScript. Featurin
   - Dynamic chunk loading/unloading logic.
 - **NPCs & AI**:
   - Patrol points and movement logic.
+  - Aggro system — NPCs attack the player when provoked or in range.
   - Interaction system with cinematic dialogue camera.
+- **Inventory & Equipment**:
+  - Item pickup, stacking, and grid-based inventory UI (toggle with I).
+  - Equipment slots (mainHand, offHand, head, chest, legs, feet).
+  - Equipped weapons add bonus damage; armor reduces incoming damage.
+  - Click items in inventory to equip/unequip; gold highlight for equipped items.
+- **Quest System**:
+  - Quest log overlay (toggle with J).
+  - Three objective types: Kill, Fetch, and Talk.
+  - Automatic progress tracking via NPC death, item pickup, and dialogue events.
+  - Quest completion notification; quest state saved and loaded with the game.
+- **Save / Load**:
+  - Persist player position, stats, inventory, equipment, and quest progress to localStorage.
+  - Save with F5 or from the pause menu; load with F9 or from the pause menu.
 - **UI**:
   - Real-time HUD (Health, Magicka, Stamina bars).
+  - Compass bar, crosshair with highlight on interactables.
+  - Floating damage numbers and screen-flash hit indicators.
   - Dialogue interface with choices.
+  - Notification system for pickups, attacks, quest events.
 - **Debug Tools**:
   - Inspector (Ctrl+Alt+Shift+I).
   - FPS counter.
 
 ## Controls
 
-- **WASD**: Move Player
-- **Mouse**: Look around
-- **Left Click**: Melee Attack (Costs Stamina)
-- **Right Click**: Magic Attack (Costs Magicka)
-- **E**: Interact with NPCs
-- **I**: Toggle Inventory (Planned)
+| Key / Button | Action |
+|---|---|
+| WASD | Move |
+| Mouse | Look around |
+| Left Click | Melee Attack (costs Stamina) |
+| Right Click | Magic Attack (costs Magicka) |
+| E | Interact / Pick up loot / Talk to NPC |
+| I | Toggle Inventory |
+| J | Toggle Quest Log |
+| Escape | Pause Menu |
+| F5 | Quick Save |
+| F9 | Quick Load |
 
 ## Getting Started
 
@@ -51,7 +74,7 @@ Run the development server with hot module replacement:
 ```bash
 npm run dev
 ```
-Open `http://localhost:5173` in your browser.
+Open `http://localhost:8088` in your browser.
 
 ### Production Build
 Build for production:
@@ -63,13 +86,18 @@ Preview the production build:
 npm run preview
 ```
 
+### Tests
+```bash
+npx vitest run
+```
+
 ## Project Structure
 
-- `src/game.ts`: Main entry point and game loop.
-- `src/entities/`: Player, NPC, and other entity classes.
-- `src/systems/`: Game systems (Combat, Dialogue, Schedule, Physics).
-- `src/world/`: World generation and management.
-- `src/ui/`: UI components and manager.
+- `src/game.ts`: Main entry point, game loop, and system wiring.
+- `src/entities/`: Player, NPC, and Loot entity classes.
+- `src/systems/`: Game systems — Combat, Dialogue, Interaction, Inventory, Equipment, Save, Quest, Schedule.
+- `src/world/`: World generation and chunk management.
+- `src/ui/`: UIManager (HUD, inventory, quest log, pause menu, notifications).
 
 ## Roadmap
 See [ROADMAP.md](./ROADMAP.md) for future plans.

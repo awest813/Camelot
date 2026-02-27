@@ -80,6 +80,33 @@ export class EquipmentSystem {
     return ids;
   }
 
+  /**
+   * Equip an item directly into a slot without touching inventory or the UI.
+   * Used by SaveSystem when restoring saved equipment.
+   */
+  public equipSilent(item: Item, slot: EquipSlot): void {
+    const current = this._slots.get(slot);
+    if (current) this._removeStats(current);
+    this._slots.set(slot, { ...item, quantity: 1 });
+    this._applyStats(item);
+  }
+
+  /**
+   * Remove an item from a slot without touching inventory or the UI.
+   * Used by SaveSystem when clearing equipment before a load.
+   */
+  public unequipSilent(slot: EquipSlot): void {
+    const item = this._slots.get(slot);
+    if (!item) return;
+    this._removeStats(item);
+    this._slots.delete(slot);
+  }
+
+  /** Trigger a full UI sync. Called by SaveSystem after restoring all state. */
+  public refreshUI(): void {
+    this._refreshUI();
+  }
+
   private _refreshUI(): void {
     this._ui.setEquippedIds(this.getEquippedIds());
     this._ui.updateInventory(this._inventory.items);

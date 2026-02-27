@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { InventorySystem, Item } from './inventory-system';
 
 describe('InventorySystem', () => {
@@ -27,7 +27,13 @@ describe('InventorySystem', () => {
             requestPointerLock: vi.fn(),
         };
 
-        inventorySystem = new InventorySystem(mockPlayer, mockUI, mockCanvas);
+            inventorySystem = new InventorySystem(mockPlayer, mockUI, mockCanvas);
+
+        vi.stubGlobal('document', { exitPointerLock: vi.fn() });
+    });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
     });
 
     it('should add an item', () => {
@@ -62,9 +68,6 @@ describe('InventorySystem', () => {
     });
 
     it('should toggle inventory', () => {
-        // Mock document.exitPointerLock
-        document.exitPointerLock = vi.fn();
-
         inventorySystem.toggleInventory();
         expect(inventorySystem.isOpen).toBe(true);
         expect(mockUI.toggleInventory).toHaveBeenCalledWith(true);

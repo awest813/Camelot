@@ -21,6 +21,9 @@ export class DialogueSystem {
   private _originalCamera: Camera | null = null;
   private _isInDialogue: boolean = false;
 
+  /** Fired with the NPC's mesh name when a conversation begins. */
+  public onTalkStart: ((npcName: string) => void) | null = null;
+
   constructor(scene: Scene, player: Player, npcs: NPC[], canvas: HTMLCanvasElement) {
     this.scene = scene;
     this.player = player;
@@ -72,6 +75,7 @@ export class DialogueSystem {
   public startDialogue(npc: NPC): void {
     if (this._isInDialogue) return;
     this._isInDialogue = true;
+    if (this.onTalkStart) this.onTalkStart(npc.mesh.name);
 
     // Switch Camera
     this._originalCamera = this.scene.activeCamera;

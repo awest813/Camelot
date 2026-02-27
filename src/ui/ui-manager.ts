@@ -2,6 +2,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Grid, Button, Ellipse } from "@babylonjs/gui/2D";
 import { Item } from "../systems/inventory-system";
+import { Quest } from "../systems/quest-system";
 import { EquipSlot } from "../systems/equipment-system";
 import { Player } from "../entities/player";
 
@@ -38,6 +39,10 @@ export class UIManager {
   public interactionLabel: TextBlock;
   public crosshair: Ellipse;
 
+  // Quest Log
+  public questLogPanel: Rectangle;
+  public questLogContent: StackPanel;
+
   // Notifications
   public notificationPanel: StackPanel;
 
@@ -46,6 +51,7 @@ export class UIManager {
     this._initUI();
     this._initInventoryUI();
     this._initPauseMenu();
+    this._initQuestLogUI();
   }
 
   private _initInventoryUI(): void {
@@ -187,6 +193,38 @@ export class UIManager {
       this.quitButton = this._createButton("Quit", panel);
   }
 
+  private _initQuestLogUI(): void {
+    this.questLogPanel = new Rectangle();
+    this.questLogPanel.width = "360px";
+    this.questLogPanel.height = "500px";
+    this.questLogPanel.cornerRadius = 10;
+    this.questLogPanel.color = "white";
+    this.questLogPanel.thickness = 2;
+    this.questLogPanel.background = "rgba(0, 0, 0, 0.88)";
+    this.questLogPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this.questLogPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    this.questLogPanel.left = "20px";
+    this.questLogPanel.zIndex = 10;
+    this.questLogPanel.isVisible = false;
+    this._ui.addControl(this.questLogPanel);
+
+    const title = new TextBlock();
+    title.text = "Quest Log  [J]";
+    title.color = "#FFD700";
+    title.fontSize = 20;
+    title.height = "36px";
+    title.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    title.top = "8px";
+    this.questLogPanel.addControl(title);
+
+    this.questLogContent = new StackPanel();
+    this.questLogContent.width = "340px";
+    this.questLogContent.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.questLogContent.top = "50px";
+    this.questLogContent.isVertical = true;
+    this.questLogPanel.addControl(this.questLogContent);
+  }
+
   private _createButton(text: string, parent: StackPanel): Button {
       const button = Button.CreateSimpleButton("btn_" + text, text);
       button.width = "100%";
@@ -221,6 +259,70 @@ export class UIManager {
       this.pausePanel.isVisible = visible;
       this.toggleCrosshair(!visible);
   }
+
+  public toggleQuestLog(visible: boolean): void {
+      this.questLogPanel.isVisible = visible;
+  }
+
+  public updateQuestLog(quests: Quest[]): void {
+      while (this.questLogContent.children.length > 0) {
+          this.questLogContent.children[0].dispose();
+      }
+
+      const active = quests.filter(q => q.isActive && !q.isCompleted);
+      const done   = quests.filter(q => q.isCompleted);
+
+      const addEntry = (quest: Quest): void => {
+          const header = new TextBlock();
+          header.text = (quest.isCompleted ? "✓ " : "● ") + quest.name;
+          header.color = quest.isCompleted ? "#aaaaaa" : "#FFD700";
+          header.fontSize = 14;
+          header.fontWeight = "bold";
+          header.height = "24px";
+          header.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+          header.paddingLeft = "10px";
+          header.paddingTop = "6px";
+          this.questLogContent.addControl(header);
+
+          for (const obj of quest.objectives) {
+              const objText = new TextBlock();
+              const check = obj.completed ? "[x]" : "[ ]";
+              objText.text = `  ${check} ${obj.description} (${obj.current}/${obj.required})`;
+              objText.color = obj.completed ? "#666666" : "white";
+              objText.fontSize = 12;
+              objText.height = "20px";
+              objText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+              objText.paddingLeft = "10px";
+              this.questLogContent.addControl(objText);
+          }
+
+          if (quest.reward) {
+              const rewardText = new TextBlock();
+              rewardText.text = `  Reward: ${quest.reward}`;
+              rewardText.color = "#88cc88";
+              rewardText.fontSize = 11;
+              rewardText.height = "18px";
+              rewardText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+              rewardText.paddingLeft = "10px";
+              this.questLogContent.addControl(rewardText);
+          }
+      };
+
+      for (const q of active) addEntry(q);
+      for (const q of done)   addEntry(q);
+
+      if (active.length === 0 && done.length === 0) {
+          const empty = new TextBlock();
+          empty.text = "No quests yet.";
+          empty.color = "#888888";
+          empty.fontSize = 13;
+          empty.height = "30px";
+          empty.paddingLeft = "10px";
+          this.questLogContent.addControl(empty);
+      }
+  }
+
+
 
   public toggleCrosshair(visible: boolean): void {
       this.crosshair.isVisible = visible;
