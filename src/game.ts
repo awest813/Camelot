@@ -14,6 +14,7 @@ import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { InventorySystem } from "./systems/inventory-system";
 import { EquipmentSystem } from "./systems/equipment-system";
+import { SaveSystem } from "./systems/save-system";
 import { InteractionSystem } from "./systems/interaction-system";
 import { Loot } from "./entities/loot";
 
@@ -29,6 +30,7 @@ export class Game {
   public dialogueSystem: DialogueSystem;
   public inventorySystem: InventorySystem;
   public equipmentSystem: EquipmentSystem;
+  public saveSystem: SaveSystem;
   public interactionSystem: InteractionSystem;
 
   public isPaused: boolean = false;
@@ -58,6 +60,7 @@ export class Game {
     this.inventorySystem = new InventorySystem(this.player, this.ui, this.canvas);
     this.equipmentSystem = new EquipmentSystem(this.player, this.inventorySystem, this.ui);
     this.ui.onInventoryItemClick = (item) => this.equipmentSystem.handleItemClick(item);
+    this.saveSystem = new SaveSystem(this.player, this.inventorySystem, this.equipmentSystem, this.ui);
     this.interactionSystem = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem);
 
     // Test Loot
@@ -118,14 +121,18 @@ export class Game {
         if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
             if (kbInfo.event.key === "Escape") {
                 this.togglePause();
+            } else if (kbInfo.event.key === "F5") {
+                this.saveSystem.save();
+            } else if (kbInfo.event.key === "F9") {
+                this.saveSystem.load();
             }
         }
     });
 
     // Wire up Pause Menu buttons
     this.ui.resumeButton.onPointerUpObservable.add(() => this.togglePause());
-    this.ui.saveButton.onPointerUpObservable.add(() => console.log("Save Game (Mock)"));
-    this.ui.loadButton.onPointerUpObservable.add(() => console.log("Load Game (Mock)"));
+    this.ui.saveButton.onPointerUpObservable.add(() => this.saveSystem.save());
+    this.ui.loadButton.onPointerUpObservable.add(() => this.saveSystem.load());
     this.ui.quitButton.onPointerUpObservable.add(() => window.location.reload());
 
     // Game loop logic will go here
