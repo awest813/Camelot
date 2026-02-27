@@ -40,7 +40,12 @@ export class Player {
     this._initPhysics();
   }
 
+  get isDead(): boolean {
+    return this.health <= 0;
+  }
+
   public update(deltaTime: number): void {
+      if (this.isDead) return;
       this.health = Math.min(this.maxHealth, this.health + this.healthRegen * deltaTime);
       this.magicka = Math.min(this.maxMagicka, this.magicka + this.magickaRegen * deltaTime);
       this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen * deltaTime);

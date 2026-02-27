@@ -85,8 +85,9 @@ export class DialogueSystem {
     this._cinematicCamera.setTarget(npcHeadPos);
 
     // Position camera in front of NPC
-    // Calculate direction from NPC to Player
-    const direction = this.player.camera.position.subtract(npc.mesh.position).normalize();
+    // Calculate direction from NPC to Player (fall back to world-forward if coincident)
+    const rawDir = this.player.camera.position.subtract(npc.mesh.position);
+    const direction = rawDir.length() > 0.01 ? rawDir.normalize() : new Vector3(0, 0, 1);
     const camPos = npc.mesh.position.add(direction.scale(1.5)).add(new Vector3(0, 0.5, 0));
 
     this._cinematicCamera.position = camPos;
@@ -125,7 +126,9 @@ export class DialogueSystem {
     this._choicesPanel.clearControls();
 
     // Restore Camera
-    this.scene.activeCamera = this._originalCamera;
+    if (this._originalCamera) {
+      this.scene.activeCamera = this._originalCamera;
+    }
 
     // Restore controls
     this.player.camera.attachControl(this.canvas, true);

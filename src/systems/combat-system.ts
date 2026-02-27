@@ -45,14 +45,13 @@ export class CombatSystem {
     if (hit && hit.pickedMesh) {
       const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
       if (npc && !npc.isDead) {
-        // Apply damage (base + equipped weapon bonus)
-        const meleeDmg = MELEE_DAMAGE + this.player.bonusDamage;
+        // Apply damage (base + equipped weapon bonus, minimum 1)
+        const meleeDmg = Math.max(1, MELEE_DAMAGE + this.player.bonusDamage);
         npc.takeDamage(meleeDmg);
 
         // Show damage number above the hit point
-        const numberPos = hit.pickedPoint
-          ? hit.pickedPoint.add(new Vector3(0, 1, 0))
-          : npc.mesh.position.add(new Vector3(0, 2, 0));
+        const hitPoint = hit.pickedPoint ?? npc.mesh.position.add(new Vector3(0, 1, 0));
+        const numberPos = hitPoint.add(new Vector3(0, 1, 0));
         this._ui.showDamageNumber(numberPos, meleeDmg, this.scene);
 
         // Yellow flash: player landed a hit
@@ -60,7 +59,7 @@ export class CombatSystem {
 
         // Knockback impulse
         if (npc.physicsAggregate?.body) {
-          npc.physicsAggregate.body.applyImpulse(forward.scale(10), hit.pickedPoint!);
+          npc.physicsAggregate.body.applyImpulse(forward.scale(10), hitPoint);
         }
 
         if (npc.isDead) {

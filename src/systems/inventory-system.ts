@@ -39,7 +39,6 @@ export class InventorySystem {
     }
 
     if (this.items.length >= this.maxCapacity) {
-      console.log("Inventory full!");
       this._ui.showNotification("Inventory Full!", 2000);
       return false;
     }

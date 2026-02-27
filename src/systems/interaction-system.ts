@@ -68,10 +68,9 @@ export class InteractionSystem {
 
       if (metadata.type === 'npc') {
           this.dialogueSystem.startDialogue(metadata.npc);
-      } else if (metadata.type === 'loot') {
+      } else if (metadata.type === 'loot' && metadata.loot) {
           const loot = metadata.loot;
           if (this.inventorySystem.addItem(loot.item)) {
-              console.log(`Picked up ${loot.item.name}`);
               loot.dispose();
           }
       }

@@ -30,7 +30,7 @@ A modern RPG framework built with Babylon.js 8, Vite 6, and TypeScript. Featurin
 - **Left Click**: Melee Attack (Costs Stamina)
 - **Right Click**: Magic Attack (Costs Magicka)
 - **E**: Interact with NPCs
-- **I**: Toggle Inventory (Planned)
+- **I**: Toggle Inventory
 
 ## Getting Started
 

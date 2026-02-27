@@ -7,11 +7,17 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType } from "@babylonjs/core/Physics";
 
+interface ChunkData {
+  mesh: Mesh;
+  agg: PhysicsAggregate;
+}
+
 export class WorldManager {
   private scene: Scene;
   private chunkSize: number = 50;
-  private loadedChunks: Map<string, Mesh> = new Map();
+  private loadedChunks: Map<string, ChunkData> = new Map();
   private loadDistance: number = 2; // Radius of chunks to load
+  private unloadDistance: number = 4; // Chunks beyond this are disposed
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -28,8 +34,15 @@ export class WorldManager {
       }
     }
 
-    // Optional: Unload chunks too far away
-    // For now, let's keep it simple and additive
+    // Unload chunks too far away
+    for (const [key, chunk] of this.loadedChunks) {
+      const [cx, cz] = key.split(",").map(Number);
+      if (Math.abs(cx - chunkX) > this.unloadDistance || Math.abs(cz - chunkZ) > this.unloadDistance) {
+        chunk.agg.dispose();
+        chunk.mesh.dispose();
+        this.loadedChunks.delete(key);
+      }
+    }
   }
 
   private _loadChunk(x: number, z: number): void {
@@ -48,7 +61,7 @@ export class WorldManager {
     chunkMesh.checkCollisions = true;
 
     // Add physics
-    new PhysicsAggregate(chunkMesh, PhysicsShapeType.BOX, { mass: 0 }, this.scene);
+    const agg = new PhysicsAggregate(chunkMesh, PhysicsShapeType.BOX, { mass: 0 }, this.scene);
 
     // Make it varied green
     const material = new StandardMaterial(`mat_${key}`, this.scene);
@@ -58,6 +71,6 @@ export class WorldManager {
     material.diffuseColor = new Color3(r, g, b);
     chunkMesh.material = material;
 
-    this.loadedChunks.set(key, chunkMesh);
+    this.loadedChunks.set(key, { mesh: chunkMesh, agg });
   }
 }
