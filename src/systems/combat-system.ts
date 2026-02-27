@@ -1,6 +1,5 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { Ray } from "@babylonjs/core/Culling/ray";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
@@ -36,14 +35,7 @@ export class CombatSystem {
     }
     this.player.stamina -= 15;
 
-    // Raycast forward 3 units
-    const origin = this.player.camera.position;
-    const forward = this.player.camera.getForwardRay(3).direction;
-    const ray = new Ray(origin, forward, 3);
-
-    const hit = this.scene.pickWithRay(ray, (mesh) => {
-      return mesh.name !== "playerBody" && !mesh.name.startsWith("chunk_");
-    });
+    const hit = this.player.raycastForward(3);
 
     if (hit && hit.pickedMesh) {
       const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);

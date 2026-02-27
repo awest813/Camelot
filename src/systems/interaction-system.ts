@@ -1,5 +1,4 @@
 import { Scene } from "@babylonjs/core/scene";
-import { Ray } from "@babylonjs/core/Culling/ray";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { Player } from "../entities/player";
 import { InventorySystem } from "./inventory-system";
@@ -88,12 +87,6 @@ export class InteractionSystem {
   }
 
   private _raycast() {
-    const origin = this.player.camera.position;
-    const forward = this.player.camera.getForwardRay(3).direction;
-    const ray = new Ray(origin, forward, 3);
-
-    return this.scene.pickWithRay(ray, (mesh) => {
-       return mesh.isVisible && mesh.name !== "playerBody" && !mesh.name.startsWith("chunk_");
-    });
+    return this.player.raycastForward(3, true); // true to require isVisible
   }
 }
