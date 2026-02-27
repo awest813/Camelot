@@ -2,6 +2,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Ray } from "@babylonjs/core/Culling/ray";
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
+import { Camera } from "@babylonjs/core/Cameras/camera";
 import { AdvancedDynamicTexture, Button, Control, Rectangle, StackPanel, TextBlock } from "@babylonjs/gui/2D";
 import { NPC } from "../entities/npc";
 import { Player } from "../entities/player";
@@ -17,7 +18,7 @@ export class DialogueSystem {
   private _textBlock: TextBlock;
   private _choicesPanel: StackPanel;
   private _cinematicCamera: ArcRotateCamera;
-  private _originalCamera: any; // To store original camera
+  private _originalCamera: Camera | null = null;
   private _isInDialogue: boolean = false;
 
   constructor(scene: Scene, player: Player, npcs: NPC[], canvas: HTMLCanvasElement) {

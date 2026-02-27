@@ -40,7 +40,7 @@ describe('EquipmentSystem', () => {
         mockPlayer = { bonusDamage: 0, bonusArmor: 0, maxHealth: 100, maxMagicka: 100, maxStamina: 100 };
         mockInventory = {
             items: [{ ...sword }, { ...helm }],
-            removeItem: vi.fn((id: string, amount: number) => {
+            removeItem: vi.fn((id: string, _amount: number) => {
                 const idx = mockInventory.items.findIndex((i: Item) => i.id === id);
                 if (idx !== -1) mockInventory.items.splice(idx, 1);
                 return true;

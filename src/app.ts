@@ -1,5 +1,3 @@
-//import "@babylonjs/core/Debug/debugLayer";
-//import "@babylonjs/inspector";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
 import { AxesViewer } from "@babylonjs/core/Debug/axesViewer";
@@ -97,7 +95,8 @@ class App {
     // Works only in DEV mode to reduce the size of the PRODUCTION build
     // Comment IF statement to work in both modes
     if (import.meta.env.DEV) {
-      await Promise.all([import("@babylonjs/core/Debug/debugLayer"), import("@babylonjs/inspector")]);
+      await import("@babylonjs/core/Debug/debugLayer");
+      await import("@babylonjs/inspector");
 
       window.addEventListener("keydown", (ev) => {
         // Shift+Ctrl+Alt+I
