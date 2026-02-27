@@ -22,8 +22,6 @@ export class ScheduleSystem {
   }
 
   public update(deltaTime: number): void {
-    // Convert deltaTime to seconds if needed (Babylon often provides ms)
-    // Assuming deltaTime is in seconds
     for (const npc of this.npcs) {
       this._updateNPC(npc, deltaTime);
     }

@@ -59,6 +59,5 @@ export class WorldManager {
     chunkMesh.material = material;
 
     this.loadedChunks.set(key, chunkMesh);
-    // console.log(`Loaded chunk ${key}`);
   }
 }
