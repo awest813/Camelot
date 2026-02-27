@@ -1,6 +1,7 @@
 import { Scene } from "@babylonjs/core/scene";
 import { UniversalCamera } from "@babylonjs/core/Cameras/universalCamera";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Ray } from "@babylonjs/core/Culling/ray";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
@@ -44,6 +45,21 @@ export class Player {
       this.health = Math.min(this.maxHealth, this.health + this.healthRegen * deltaTime);
       this.magicka = Math.min(this.maxMagicka, this.magicka + this.magickaRegen * deltaTime);
       this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen * deltaTime);
+  }
+
+  public raycastForward(distance: number, requireVisible: boolean = false) {
+    // Raycast forward
+    const origin = this.camera.position;
+    const forward = this.camera.getForwardRay(distance).direction;
+    const ray = new Ray(origin, forward, distance);
+
+    return this.scene.pickWithRay(ray, (mesh) => {
+       const baseCondition = mesh.name !== "playerBody" && !mesh.name.startsWith("chunk_");
+       if (requireVisible) {
+           return mesh.isVisible && baseCondition;
+       }
+       return baseCondition;
+    });
   }
 
   private _initCamera(): void {
