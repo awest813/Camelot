@@ -81,11 +81,11 @@ class App {
   _fps(): void {
     const dom = document.getElementById("display-fps");
     if (dom) {
-      dom.innerHTML = `${this.engine.getFps().toFixed()} fps`;
+      dom.textContent = `${this.engine.getFps().toFixed()} fps`;
     } else {
       const div = document.createElement("div");
       div.id = "display-fps";
-      div.innerHTML = "0";
+      div.textContent = "0";
       document.body.appendChild(div);
     }
   }
