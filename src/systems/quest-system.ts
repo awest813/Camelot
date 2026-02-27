@@ -39,9 +39,9 @@ export class QuestSystem {
     this._ui = ui;
   }
 
-  public addQuest(quest: Quest): void {
+  public addQuest(quest: Quest, silent = false): void {
     this._quests.push(quest);
-    this._ui.showNotification(`New Quest: ${quest.name}`, 3000);
+    if (!silent) this._ui.showNotification(`New Quest: ${quest.name}`, 3000);
     this._syncUI();
   }
 

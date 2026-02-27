@@ -62,6 +62,8 @@ export class NPC {
     const mat = this.mesh.material as StandardMaterial;
     mat.diffuseColor = new Color3(0.3, 0.3, 0.3);
     this.physicsAggregate.body.setMotionType(PhysicsMotionType.STATIC);
+    // Remove interaction metadata so dead NPCs can't be targeted
+    this.mesh.metadata = null;
   }
 
   private _createMesh(position: Vector3, name: string): void {

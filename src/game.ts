@@ -65,6 +65,7 @@ export class Game {
     this.saveSystem = new SaveSystem(this.player, this.inventorySystem, this.equipmentSystem, this.ui);
     this.questSystem = new QuestSystem(this.ui);
     this.saveSystem.setQuestSystem(this.questSystem);
+    this.saveSystem.onAfterLoad = () => this._cleanupCollectedLoot();
     this.interactionSystem = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem);
 
     // Wire quest event callbacks
@@ -129,7 +130,7 @@ export class Game {
             current: 0,
             completed: false
         }]
-    });
+    }, true);
     this.questSystem.addQuest({
         id: "quest_collect_potions",
         name: "Stock the Medicine Chest",
@@ -146,7 +147,7 @@ export class Game {
             current: 0,
             completed: false
         }]
-    });
+    }, true);
     this.questSystem.addQuest({
         id: "quest_speak_guard",
         name: "Parley with the Guard",
@@ -163,7 +164,7 @@ export class Game {
             current: 0,
             completed: false
         }]
-    });
+    }, true);
 
     // Input handling for combat
     this.scene.onPointerObservable.add((pointerInfo) => {
@@ -184,11 +185,11 @@ export class Game {
             if (kbInfo.event.key === "Escape") {
                 this.togglePause();
             } else if (kbInfo.event.key === "j" || kbInfo.event.key === "J") {
-                this.questSystem.toggleQuestLog();
+                if (!this.isPaused) this.questSystem.toggleQuestLog();
             } else if (kbInfo.event.key === "F5") {
-                this.saveSystem.save();
+                if (!this.isPaused) this.saveSystem.save();
             } else if (kbInfo.event.key === "F9") {
-                this.saveSystem.load();
+                if (!this.isPaused) this.saveSystem.load();
             }
         }
     });
@@ -210,11 +211,21 @@ export class Game {
       this.ui.togglePauseMenu(this.isPaused);
 
       if (this.isPaused) {
-          // Clear interaction label when paused
+          // Close any open overlays
+          if (this.inventorySystem.isOpen) {
+              this.inventorySystem.isOpen = false;
+              this.ui.toggleInventory(false);
+          }
+          if (this.questSystem.isLogOpen) {
+              this.questSystem.isLogOpen = false;
+              this.ui.toggleQuestLog(false);
+          }
+          this.interactionSystem.isBlocked = true;
           this.ui.setInteractionText("");
           document.exitPointerLock();
           this.player.camera.detachControl();
       } else {
+          this.interactionSystem.isBlocked = false;
           this.canvas.requestPointerLock();
           this.player.camera.attachControl(this.canvas, true);
       }
@@ -223,6 +234,26 @@ export class Game {
   _setLight(): void {
     const light = new HemisphericLight("light", new Vector3(0, 1, 0), this.scene);
     light.intensity = 0.5;
+  }
+
+  /** Remove world loot objects whose item IDs are now in inventory or equipment (called after load). */
+  private _cleanupCollectedLoot(): void {
+      const collectedIds = new Set<string>();
+      for (const item of this.inventorySystem.items) {
+          collectedIds.add(item.id);
+      }
+      for (const item of this.equipmentSystem.getEquipped().values()) {
+          collectedIds.add(item.id);
+      }
+      // Iterate a snapshot to avoid mutation during iteration
+      for (const mesh of this.scene.meshes.slice()) {
+          if (mesh.metadata?.type === 'loot') {
+              const loot = mesh.metadata.loot;
+              if (collectedIds.has(loot.item.id)) {
+                  loot.dispose();
+              }
+          }
+      }
   }
 
   update(): void {

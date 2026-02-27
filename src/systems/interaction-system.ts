@@ -14,6 +14,9 @@ export class InteractionSystem {
   /** Fired with the item's id when loot is successfully picked up. */
   public onLootPickup: ((itemId: string) => void) | null = null;
 
+  /** Set to true while the game is paused or a UI overlay owns focus. */
+  public isBlocked: boolean = false;
+
   constructor(scene: Scene, player: Player, inventorySystem: InventorySystem, dialogueSystem: DialogueSystem) {
     this.scene = scene;
     this.player = player;
@@ -25,6 +28,7 @@ export class InteractionSystem {
 
   private _initInput(): void {
     this.scene.onKeyboardObservable.add((kbInfo) => {
+      if (this.isBlocked) return;
       if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
         if (kbInfo.event.key === 'e' || kbInfo.event.key === 'E') {
           this.interact();

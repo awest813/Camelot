@@ -36,6 +36,9 @@ export class SaveSystem {
   private _quests: QuestSystem | null = null;
   private _ui: UIManager;
 
+  /** Called after a successful load so Game can clean up world state (e.g. remove already-collected loot). */
+  public onAfterLoad: (() => void) | null = null;
+
   constructor(player: Player, inventory: InventorySystem, equipment: EquipmentSystem, ui: UIManager) {
     this._player = player;
     this._inventory = inventory;
@@ -138,6 +141,10 @@ export class SaveSystem {
     // Sync UI once after all state is restored
     this._equipment.refreshUI();
     this._ui.showNotification("Game Loaded!", 2500);
+
+    // Let Game clean up world objects that are now in inventory/equipment
+    this.onAfterLoad?.();
+
     return true;
   }
 
