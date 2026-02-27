@@ -24,6 +24,10 @@ export class DialogueSystem {
   /** Fired with the NPC's mesh name when a conversation begins. */
   public onTalkStart: ((npcName: string) => void) | null = null;
 
+  public get isInDialogue(): boolean {
+    return this._isInDialogue;
+  }
+
   constructor(scene: Scene, player: Player, npcs: NPC[], canvas: HTMLCanvasElement) {
     this.scene = scene;
     this.player = player;

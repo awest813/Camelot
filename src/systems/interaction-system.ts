@@ -40,7 +40,7 @@ export class InteractionSystem {
   }
 
   public update(): void {
-      if (this.inventorySystem.isOpen) {
+      if (this.dialogueSystem.isInDialogue || this.inventorySystem.isOpen) {
           this.inventorySystem._ui.setInteractionText("");
           this.inventorySystem._ui.setCrosshairActive(false);
           return;
@@ -63,6 +63,7 @@ export class InteractionSystem {
   }
 
   public interact(): void {
+    if (this.dialogueSystem.isInDialogue) return;
     if (this.inventorySystem.isOpen) {
         this.inventorySystem.toggleInventory();
         return;
