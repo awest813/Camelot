@@ -2,10 +2,11 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Player } from "../entities/player";
 import { Item, InventorySystem } from "./inventory-system";
 import { EquipmentSystem, EquipSlot } from "./equipment-system";
+import { QuestSystem, QuestSaveState } from "./quest-system";
 import { UIManager } from "../ui/ui-manager";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2;
 
 interface PlayerSaveData {
   position: { x: number; y: number; z: number };
@@ -25,12 +26,14 @@ export interface SaveData {
   player: PlayerSaveData;
   inventory: Item[];
   equipment: EquipmentEntry[];
+  quests: QuestSaveState[];
 }
 
 export class SaveSystem {
   private _player: Player;
   private _inventory: InventorySystem;
   private _equipment: EquipmentSystem;
+  private _quests: QuestSystem | null = null;
   private _ui: UIManager;
 
   constructor(player: Player, inventory: InventorySystem, equipment: EquipmentSystem, ui: UIManager) {
@@ -40,11 +43,29 @@ export class SaveSystem {
     this._ui = ui;
   }
 
+  /** Inject QuestSystem after construction (avoids circular init order in Game). */
+  public setQuestSystem(qs: QuestSystem): void {
+    this._quests = qs;
+  }
+
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
     for (const [slot, item] of this._equipment.getEquipped()) {
       equipmentEntries.push({ slot, item });
     }
+
+    const questSaveStates: QuestSaveState[] = this._quests
+      ? this._quests.getQuests().map(q => ({
+          id: q.id,
+          isCompleted: q.isCompleted,
+          isActive: q.isActive,
+          objectives: q.objectives.map(o => ({
+            id: o.id,
+            current: o.current,
+            completed: o.completed,
+          })),
+        }))
+      : [];
 
     const data: SaveData = {
       version: SAVE_VERSION,
@@ -61,6 +82,7 @@ export class SaveSystem {
       },
       inventory: [...this._inventory.items],
       equipment: equipmentEntries,
+      quests: questSaveStates,
     };
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -106,6 +128,11 @@ export class SaveSystem {
     }
     for (const { slot, item } of data.equipment) {
       this._equipment.equipSilent(item, slot as EquipSlot);
+    }
+
+    // Restore quest progress
+    if (this._quests && data.quests?.length) {
+      this._quests.restoreState(data.quests);
     }
 
     // Sync UI once after all state is restored

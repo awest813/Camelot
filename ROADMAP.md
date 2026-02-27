@@ -32,9 +32,11 @@
   - Version-checked save data with corrupt/missing-file handling.
 
 ### Medium Term
-- [ ] **Quest System**:
-  - Quest log and tracking.
-  - Objective types (Kill, Fetch, Talk).
+- [x] **Quest System**:
+  - Quest log and tracking (toggle with J).
+  - Objective types: Kill, Fetch, Talk with automatic progress tracking.
+  - Notifications on quest accept and completion.
+  - Quest state persisted in save file.
 - [ ] **Improved AI**:
   - Aggressive state (attack player).
   - Pathfinding (Recast/Detour integration).

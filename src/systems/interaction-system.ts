@@ -11,6 +11,9 @@ export class InteractionSystem {
   public inventorySystem: InventorySystem;
   public dialogueSystem: DialogueSystem;
 
+  /** Fired with the item's id when loot is successfully picked up. */
+  public onLootPickup: ((itemId: string) => void) | null = null;
+
   constructor(scene: Scene, player: Player, inventorySystem: InventorySystem, dialogueSystem: DialogueSystem) {
     this.scene = scene;
     this.player = player;
@@ -73,6 +76,7 @@ export class InteractionSystem {
           if (this.inventorySystem.addItem(loot.item)) {
               console.log(`Picked up ${loot.item.name}`);
               loot.dispose();
+              if (this.onLootPickup) this.onLootPickup(loot.item.id);
           }
       }
     }

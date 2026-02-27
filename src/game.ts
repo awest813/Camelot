@@ -15,6 +15,7 @@ import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { InventorySystem } from "./systems/inventory-system";
 import { EquipmentSystem } from "./systems/equipment-system";
 import { SaveSystem } from "./systems/save-system";
+import { QuestSystem } from "./systems/quest-system";
 import { InteractionSystem } from "./systems/interaction-system";
 import { Loot } from "./entities/loot";
 
@@ -31,6 +32,7 @@ export class Game {
   public inventorySystem: InventorySystem;
   public equipmentSystem: EquipmentSystem;
   public saveSystem: SaveSystem;
+  public questSystem: QuestSystem;
   public interactionSystem: InteractionSystem;
 
   public isPaused: boolean = false;
@@ -61,7 +63,14 @@ export class Game {
     this.equipmentSystem = new EquipmentSystem(this.player, this.inventorySystem, this.ui);
     this.ui.onInventoryItemClick = (item) => this.equipmentSystem.handleItemClick(item);
     this.saveSystem = new SaveSystem(this.player, this.inventorySystem, this.equipmentSystem, this.ui);
+    this.questSystem = new QuestSystem(this.ui);
+    this.saveSystem.setQuestSystem(this.questSystem);
     this.interactionSystem = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem);
+
+    // Wire quest event callbacks
+    this.combatSystem.onNPCDeath    = (name)   => this.questSystem.onKill(name);
+    this.interactionSystem.onLootPickup = (id) => this.questSystem.onPickup(id);
+    this.dialogueSystem.onTalkStart  = (name)  => this.questSystem.onTalk(name);
 
     // Test Loot
     new Loot(this.scene, new Vector3(5, 1, 5), {
@@ -103,6 +112,59 @@ export class Game {
         stats: { armor: 2 }
     });
 
+    // Test Quests
+    this.questSystem.addQuest({
+        id: "quest_kill_guard",
+        name: "Eliminate the Guard",
+        description: "A rogue guard threatens the village. Defeat him.",
+        isCompleted: false,
+        isActive: true,
+        reward: "100 XP",
+        objectives: [{
+            id: "obj_kill_guard",
+            type: "kill",
+            description: "Defeat the Guard",
+            targetId: "Guard",
+            required: 1,
+            current: 0,
+            completed: false
+        }]
+    });
+    this.questSystem.addQuest({
+        id: "quest_collect_potions",
+        name: "Stock the Medicine Chest",
+        description: "The village healer needs supplies.",
+        isCompleted: false,
+        isActive: true,
+        reward: "50 XP",
+        objectives: [{
+            id: "obj_collect_potions",
+            type: "fetch",
+            description: "Collect Health Potions",
+            targetId: "potion_hp_01",
+            required: 1,
+            current: 0,
+            completed: false
+        }]
+    });
+    this.questSystem.addQuest({
+        id: "quest_speak_guard",
+        name: "Parley with the Guard",
+        description: "Try talking to the Guard before resorting to violence.",
+        isCompleted: false,
+        isActive: true,
+        reward: "25 XP",
+        objectives: [{
+            id: "obj_talk_guard",
+            type: "talk",
+            description: "Speak with the Guard",
+            targetId: "Guard",
+            required: 1,
+            current: 0,
+            completed: false
+        }]
+    });
+
     // Input handling for combat
     this.scene.onPointerObservable.add((pointerInfo) => {
         if (this.isPaused || this.inventorySystem.isOpen) return;
@@ -121,6 +183,8 @@ export class Game {
         if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
             if (kbInfo.event.key === "Escape") {
                 this.togglePause();
+            } else if (kbInfo.event.key === "j" || kbInfo.event.key === "J") {
+                this.questSystem.toggleQuestLog();
             } else if (kbInfo.event.key === "F5") {
                 this.saveSystem.save();
             } else if (kbInfo.event.key === "F9") {
