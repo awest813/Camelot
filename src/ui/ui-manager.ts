@@ -124,37 +124,40 @@ export class UIManager {
     const descContainer = new Rectangle();
     descContainer.width = "100%";
     descContainer.height = "200px";
-    descContainer.color = "white";
-    descContainer.thickness = 1;
-    descContainer.background = "rgba(0,0,0,0.5)";
+    descContainer.color = SKYRIM_COLORS.BROWN;
+    descContainer.thickness = 2;
+    descContainer.background = SKYRIM_COLORS.DARK;
     rightPanel.addControl(descContainer);
 
     this.inventoryDescription = new TextBlock();
     this.inventoryDescription.text = "";
-    this.inventoryDescription.color = "white";
+    this.inventoryDescription.color = SKYRIM_COLORS.GOLD;
     this.inventoryDescription.fontSize = 14;
     this.inventoryDescription.textWrapping = true;
-    this.inventoryDescription.paddingLeft = "5px";
+    this.inventoryDescription.paddingLeft = "10px";
+    this.inventoryDescription.paddingTop = "10px";
+    this.inventoryDescription.fontStyle = "italic";
     descContainer.addControl(this.inventoryDescription);
 
     // Stats Area
     const statsContainer = new Rectangle();
     statsContainer.width = "100%";
     statsContainer.height = "200px";
-    statsContainer.color = "white";
-    statsContainer.thickness = 1;
-    statsContainer.background = "rgba(0,0,0,0.5)";
+    statsContainer.color = SKYRIM_COLORS.BROWN;
+    statsContainer.thickness = 2;
+    statsContainer.background = SKYRIM_COLORS.DARK;
     statsContainer.top = "20px"; // Margin top
     rightPanel.addControl(statsContainer);
 
     this.statsText = new TextBlock();
     this.statsText.text = "Stats:\nHP: --\nMP: --\nSP: --";
-    this.statsText.color = "white";
+    this.statsText.color = SKYRIM_COLORS.GOLD;
     this.statsText.fontSize = 16;
     this.statsText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     this.statsText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
     this.statsText.paddingTop = "10px";
     this.statsText.paddingLeft = "10px";
+    this.statsText.fontStyle = "bold";
     statsContainer.addControl(this.statsText);
   }
 
@@ -281,7 +284,7 @@ ARM: ${armorBonus}`;
       this.statsText.text = statsText;
 
       // Update level and XP bar
-      this.levelText.text = `Level: ${player.experience.level}`;
+      this.levelText.text = `◆ Level ${player.experience.level} ◆`;
       const xpProgress = player.experience.getXPProgress();
       this.xpBar.width = `${Math.max(0, Math.min(100, xpProgress))}%`;
   }
@@ -316,9 +319,9 @@ ARM: ${armorBonus}`;
       const slot = new Rectangle();
       slot.width = "80px";
       slot.height = "80px";
-      slot.color = "gray";
-      slot.thickness = 1;
-      slot.background = "rgba(255, 255, 255, 0.1)";
+      slot.color = SKYRIM_COLORS.BROWN;
+      slot.thickness = 2;
+      slot.background = SKYRIM_COLORS.DARK_INTERIOR;
       slot.isPointerBlocker = true;
       slot.hoverCursor = "pointer";
 
@@ -328,11 +331,13 @@ ARM: ${armorBonus}`;
 
       slot.onPointerEnterObservable.add(() => {
           this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}`;
-          slot.background = "rgba(255, 255, 255, 0.3)";
+          slot.background = SKYRIM_COLORS.LIGHT_BROWN;
+          slot.color = SKYRIM_COLORS.GOLD;
       });
       slot.onPointerOutObservable.add(() => {
           this.inventoryDescription.text = "";
-          slot.background = "rgba(255, 255, 255, 0.1)";
+          slot.background = SKYRIM_COLORS.DARK_INTERIOR;
+          slot.color = SKYRIM_COLORS.BROWN;
       });
 
       // Double-click to equip
@@ -357,8 +362,9 @@ ARM: ${armorBonus}`;
 
       const text = new TextBlock();
       text.text = item.name + (item.quantity > 1 ? ` (${item.quantity})` : "");
-      text.color = "white";
+      text.color = SKYRIM_COLORS.GOLD;
       text.fontSize = 12;
+      text.fontStyle = "bold";
       text.textWrapping = true;
       slot.addControl(text);
 
@@ -374,9 +380,9 @@ ARM: ${armorBonus}`;
           equipPanel = new Rectangle();
           equipPanel.width = "100%";
           equipPanel.height = "220px";
-          equipPanel.color = "white";
-          equipPanel.thickness = 1;
-          equipPanel.background = "rgba(0,0,0,0.5)";
+          equipPanel.color = SKYRIM_COLORS.BROWN;
+          equipPanel.thickness = 2;
+          equipPanel.background = SKYRIM_COLORS.DARK;
           equipPanel.top = "-220px"; // Position above stats
           const rightPanel = this.inventoryPanel.children[0] as any; // The main grid
           const statsContainer = rightPanel.children?.[1]; // Stats is at index 1
@@ -404,15 +410,25 @@ ARM: ${armorBonus}`;
           const slotRect = new Rectangle();
           slotRect.width = "80px";
           slotRect.height = "80px";
-          slotRect.color = "white";
-          slotRect.thickness = 1;
-          slotRect.background = item ? "rgba(0, 200, 0, 0.2)" : "rgba(100, 100, 100, 0.3)";
+          slotRect.color = item ? SKYRIM_COLORS.GOLD : SKYRIM_COLORS.BROWN;
+          slotRect.thickness = 2;
+          slotRect.background = item ? SKYRIM_COLORS.LIGHT_BROWN : SKYRIM_COLORS.DARK_INTERIOR;
           slotRect.isPointerBlocker = true;
           slotRect.hoverCursor = "pointer";
 
           // Metadata
           (slotRect as any).slotName = slot;
           (slotRect as any).item = item;
+
+          // Hover effect
+          slotRect.onPointerEnterObservable.add(() => {
+              slotRect.background = SKYRIM_COLORS.LIGHT_BROWN;
+              slotRect.color = SKYRIM_COLORS.GOLD;
+          });
+          slotRect.onPointerOutObservable.add(() => {
+              slotRect.background = item ? SKYRIM_COLORS.LIGHT_BROWN : SKYRIM_COLORS.DARK_INTERIOR;
+              slotRect.color = item ? SKYRIM_COLORS.GOLD : SKYRIM_COLORS.BROWN;
+          });
 
           // Click to unequip
           slotRect.onPointerUpObservable.add(() => {
@@ -424,9 +440,10 @@ ARM: ${armorBonus}`;
 
           const slotLabel = new TextBlock();
           slotLabel.text = item ? item.name : slot.toUpperCase();
-          slotLabel.color = "white";
+          slotLabel.color = SKYRIM_COLORS.GOLD;
           slotLabel.fontSize = 11;
           slotLabel.textWrapping = true;
+          slotLabel.fontStyle = "bold";
           slotRect.addControl(slotLabel);
 
           equipGrid.addControl(slotRect, row, col);
@@ -549,18 +566,18 @@ ARM: ${armorBonus}`;
     this._ui.addControl(barsPanel);
 
     // Magicka Bar (Blue)
-    const magickaContainer = this._createBarContainer("blue", barsPanel);
+    const magickaContainer = this._createBarContainer(SKYRIM_COLORS.MAGICKA_BLUE, barsPanel);
     magickaContainer.paddingRight = "10px";
     this.magickaBar = (magickaContainer.children[0] as Rectangle);
 
     // Health Bar (Red)
-    const healthContainer = this._createBarContainer("red", barsPanel);
+    const healthContainer = this._createBarContainer(SKYRIM_COLORS.HEALTH_RED, barsPanel);
     healthContainer.paddingLeft = "5px";
     healthContainer.paddingRight = "5px";
     this.healthBar = (healthContainer.children[0] as Rectangle);
 
     // Stamina Bar (Green)
-    const staminaContainer = this._createBarContainer("green", barsPanel);
+    const staminaContainer = this._createBarContainer(SKYRIM_COLORS.STAMINA_GREEN, barsPanel);
     staminaContainer.paddingLeft = "10px";
     this.staminaBar = (staminaContainer.children[0] as Rectangle);
 
@@ -579,16 +596,19 @@ ARM: ${armorBonus}`;
       const rect = new Rectangle();
       rect.width = "100%";
       rect.height = "40px";
-      rect.cornerRadius = 5;
-      rect.color = "white";
-      rect.thickness = 1;
-      rect.background = "rgba(0, 0, 0, 0.7)";
+      rect.cornerRadius = 0;
+      rect.color = SKYRIM_COLORS.BROWN;
+      rect.thickness = 2;
+      rect.background = SKYRIM_COLORS.DARK_INTERIOR;
       rect.paddingBottom = "5px";
 
       const label = new TextBlock();
       label.text = text;
-      label.color = "white";
+      label.color = SKYRIM_COLORS.GOLD;
       label.fontSize = 16;
+      label.fontStyle = "bold";
+      label.shadowBlur = 2;
+      label.shadowColor = "black";
       rect.addControl(label);
 
       // Add to top of stack by default? StackPanel adds to end.

@@ -123,9 +123,15 @@ export class Player {
   }
 
   public update(deltaTime: number): void {
+      // Regenerate stats (clamped to max)
       this.health = Math.min(this.maxHealth, this.health + this.healthRegen * deltaTime);
       this.magicka = Math.min(this.maxMagicka, this.magicka + this.magickaRegen * deltaTime);
       this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen * deltaTime);
+
+      // Ensure values don't go negative
+      this.health = Math.max(0, this.health);
+      this.magicka = Math.max(0, this.magicka);
+      this.stamina = Math.max(0, this.stamina);
   }
 
   private _initCamera(): void {
