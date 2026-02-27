@@ -28,6 +28,8 @@ export class ScheduleSystem {
   }
 
   private _updateNPC(npc: NPC, deltaTime: number): void {
+    // When dead or aggressive the combat system owns movement
+    if (npc.isDead || npc.isAggressive) return;
     if (npc.patrolPoints.length === 0) return;
 
     if (npc.waitTime > 0) {

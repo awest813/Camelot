@@ -185,7 +185,7 @@ export class Game {
             if (kbInfo.event.key === "Escape") {
                 this.togglePause();
             } else if (kbInfo.event.key === "j" || kbInfo.event.key === "J") {
-                if (!this.isPaused) this.questSystem.toggleQuestLog();
+                if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue) this.questSystem.toggleQuestLog();
             } else if (kbInfo.event.key === "F5") {
                 if (!this.isPaused) this.saveSystem.save();
             } else if (kbInfo.event.key === "F9") {

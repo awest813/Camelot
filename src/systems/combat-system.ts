@@ -165,6 +165,24 @@ export class CombatSystem {
         continue;
       }
 
+      // Chase or stop based on distance
+      if (npc.physicsAggregate?.body) {
+        const currentVel = new Vector3();
+        npc.physicsAggregate.body.getLinearVelocityToRef(currentVel);
+        if (dist > npc.attackRange) {
+          // Move toward player, preserve Y for gravity
+          const dir = playerPos.subtract(npc.mesh.position);
+          dir.y = 0;
+          dir.normalize();
+          const vel = dir.scale(npc.moveSpeed);
+          npc.physicsAggregate.body.setLinearVelocity(new Vector3(vel.x, currentVel.y, vel.z));
+          npc.mesh.lookAt(new Vector3(playerPos.x, npc.mesh.position.y, playerPos.z));
+        } else {
+          // In attack range — stop horizontal movement
+          npc.physicsAggregate.body.setLinearVelocity(new Vector3(0, currentVel.y, 0));
+        }
+      }
+
       // Tick attack cooldown
       npc.attackTimer -= deltaTime;
       if (npc.attackTimer > 0) continue;
