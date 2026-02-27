@@ -15,6 +15,7 @@ import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { InventorySystem } from "./systems/inventory-system";
 import { EquipmentSystem } from "./systems/equipment-system";
 import { InteractionSystem } from "./systems/interaction-system";
+import { SaveSystem } from "./systems/save-system";
 import { Loot } from "./entities/loot";
 
 export class Game {
@@ -30,6 +31,7 @@ export class Game {
   public inventorySystem: InventorySystem;
   public equipmentSystem: EquipmentSystem;
   public interactionSystem: InteractionSystem;
+  public saveSystem: SaveSystem;
 
   public isPaused: boolean = false;
 
@@ -59,6 +61,7 @@ export class Game {
     this.equipmentSystem = new EquipmentSystem(this.player, this.inventorySystem, this.ui);
     this.ui.onInventoryItemClick = (item) => this.equipmentSystem.handleItemClick(item);
     this.interactionSystem = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem);
+    this.saveSystem = new SaveSystem(this.player, this.inventorySystem, this.equipmentSystem, this.ui);
 
     // Test Loot
     new Loot(this.scene, new Vector3(5, 1, 5), {
@@ -124,8 +127,8 @@ export class Game {
 
     // Wire up Pause Menu buttons
     this.ui.resumeButton.onPointerUpObservable.add(() => this.togglePause());
-    this.ui.saveButton.onPointerUpObservable.add(() => console.log("Save Game (Mock)"));
-    this.ui.loadButton.onPointerUpObservable.add(() => console.log("Load Game (Mock)"));
+    this.ui.saveButton.onPointerUpObservable.add(() => this.saveSystem.save());
+    this.ui.loadButton.onPointerUpObservable.add(() => this.saveSystem.load());
     this.ui.quitButton.onPointerUpObservable.add(() => window.location.reload());
 
     // Game loop logic will go here

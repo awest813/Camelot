@@ -80,6 +80,12 @@ export class EquipmentSystem {
     return ids;
   }
 
+  /** Restore equipment from a save without re-applying stats (stats are set directly on the player). */
+  public restoreFromSave(slots: Map<EquipSlot, Item>): void {
+    this._slots = new Map(slots);
+    this._refreshUI();
+  }
+
   private _refreshUI(): void {
     this._ui.setEquippedIds(this.getEquippedIds());
     this._ui.updateInventory(this._inventory.items);

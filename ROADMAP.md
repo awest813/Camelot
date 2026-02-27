@@ -26,7 +26,7 @@
   - Stat bonuses applied on equip (damage, armor, health/magicka/stamina bonuses).
   - Inventory UI highlights equipped items in gold; click to equip/unequip.
   - Equipment panel in inventory showing all active slots.
-- [ ] **Save/Load System**:
+- [x] **Save/Load System**:
   - Persist player stats, position, and inventory.
   - World state persistence.
 
