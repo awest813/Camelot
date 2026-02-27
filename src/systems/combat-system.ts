@@ -19,6 +19,12 @@ export class CombatSystem {
   public npcs: NPC[];
   private _ui: UIManager;
 
+  // Scratch vectors for performance optimization
+  private _currentVel: Vector3 = new Vector3();
+  private _dir: Vector3 = new Vector3();
+  private _newVel: Vector3 = new Vector3();
+  private _lookAtTarget: Vector3 = new Vector3();
+
   /** Fired with the NPC's mesh name whenever an NPC dies. */
   public onNPCDeath: ((npcName: string) => void) | null = null;
 
@@ -167,19 +173,23 @@ export class CombatSystem {
 
       // Chase or stop based on distance
       if (npc.physicsAggregate?.body) {
-        const currentVel = new Vector3();
-        npc.physicsAggregate.body.getLinearVelocityToRef(currentVel);
+        npc.physicsAggregate.body.getLinearVelocityToRef(this._currentVel);
         if (dist > npc.attackRange) {
           // Move toward player, preserve Y for gravity
-          const dir = playerPos.subtract(npc.mesh.position);
-          dir.y = 0;
-          dir.normalize();
-          const vel = dir.scale(npc.moveSpeed);
-          npc.physicsAggregate.body.setLinearVelocity(new Vector3(vel.x, currentVel.y, vel.z));
-          npc.mesh.lookAt(new Vector3(playerPos.x, npc.mesh.position.y, playerPos.z));
+          playerPos.subtractToRef(npc.mesh.position, this._dir);
+          this._dir.y = 0;
+          this._dir.normalize();
+          this._dir.scaleToRef(npc.moveSpeed, this._newVel);
+
+          this._newVel.y = this._currentVel.y;
+          npc.physicsAggregate.body.setLinearVelocity(this._newVel);
+
+          this._lookAtTarget.set(playerPos.x, npc.mesh.position.y, playerPos.z);
+          npc.mesh.lookAt(this._lookAtTarget);
         } else {
           // In attack range — stop horizontal movement
-          npc.physicsAggregate.body.setLinearVelocity(new Vector3(0, currentVel.y, 0));
+          this._newVel.set(0, this._currentVel.y, 0);
+          npc.physicsAggregate.body.setLinearVelocity(this._newVel);
         }
       }
 

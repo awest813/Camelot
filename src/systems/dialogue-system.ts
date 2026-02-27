@@ -21,6 +21,10 @@ export class DialogueSystem {
   private _originalCamera: Camera | null = null;
   private _isInDialogue: boolean = false;
 
+  // Scratch vectors for performance optimization
+  private _direction: Vector3 = new Vector3();
+  private _camPos: Vector3 = new Vector3();
+
   /** Fired with the NPC's mesh name when a conversation begins. */
   public onTalkStart: ((npcName: string) => void) | null = null;
 
@@ -94,10 +98,15 @@ export class DialogueSystem {
 
     // Position camera in front of NPC
     // Calculate direction from NPC to Player
-    const direction = this.player.camera.position.subtract(npc.mesh.position).normalize();
-    const camPos = npc.mesh.position.add(direction.scale(1.5)).add(new Vector3(0, 0.5, 0));
+    this.player.camera.position.subtractToRef(npc.mesh.position, this._direction);
+    this._direction.normalize();
 
-    this._cinematicCamera.position = camPos;
+    // Scale direction and add to npc position
+    this._direction.scaleToRef(1.5, this._camPos);
+    this._camPos.addInPlace(npc.mesh.position);
+    this._camPos.addInPlaceFromFloats(0, 0.5, 0);
+
+    this._cinematicCamera.position.copyFrom(this._camPos);
     this._cinematicCamera.minZ = 0.1;
 
     this.scene.activeCamera = this._cinematicCamera;
