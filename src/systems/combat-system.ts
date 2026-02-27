@@ -45,14 +45,15 @@ export class CombatSystem {
     if (hit && hit.pickedMesh) {
       const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
       if (npc && !npc.isDead) {
-        // Apply damage
-        npc.takeDamage(MELEE_DAMAGE);
+        // Apply damage (base + equipped weapon bonus)
+        const meleeDmg = MELEE_DAMAGE + this.player.bonusDamage;
+        npc.takeDamage(meleeDmg);
 
         // Show damage number above the hit point
         const numberPos = hit.pickedPoint
           ? hit.pickedPoint.add(new Vector3(0, 1, 0))
           : npc.mesh.position.add(new Vector3(0, 2, 0));
-        this._ui.showDamageNumber(numberPos, MELEE_DAMAGE, this.scene);
+        this._ui.showDamageNumber(numberPos, meleeDmg, this.scene);
 
         // Yellow flash: player landed a hit
         this._ui.showHitFlash("rgba(255, 200, 0, 0.25)");
@@ -164,7 +165,9 @@ export class CombatSystem {
       // Attack if within melee range
       if (dist <= npc.attackRange) {
         npc.attackTimer = npc.attackCooldown;
-        const dmg = npc.attackDamage;
+        const rawDmg = npc.attackDamage;
+        // Reduce incoming damage by player armor (minimum 1)
+        const dmg = Math.max(1, rawDmg - this.player.bonusArmor);
         this.player.health = Math.max(0, this.player.health - dmg);
         // Red flash: player took damage
         this._ui.showHitFlash("rgba(200, 0, 0, 0.4)");

@@ -17,13 +17,15 @@
 ## Future Plans
 
 ### Short Term
-- [ ] **Inventory System**:
+- [x] **Inventory System**:
   - Item data structure.
   - Inventory UI grid.
   - Pickup/Drop functionality.
-- [ ] **Equipment**:
-  - Equippable weapons and armor.
-  - Visible equipment on player/NPCs.
+- [x] **Equipment**:
+  - Equippable weapons and armor (mainHand, offHand, head, chest, legs, feet slots).
+  - Stat bonuses applied on equip (damage, armor, health/magicka/stamina bonuses).
+  - Inventory UI highlights equipped items in gold; click to equip/unequip.
+  - Equipment panel in inventory showing all active slots.
 - [ ] **Save/Load System**:
   - Persist player stats, position, and inventory.
   - World state persistence.
