@@ -162,6 +162,7 @@ describe('SaveSystem', () => {
             player: { position: { x: 0, y: 0, z: 0 }, health: 100, magicka: 100, stamina: 100 },
             inventory: [],
             equipment: [],
+            quests: [],
         };
         localStorageMock['camelot_save'] = JSON.stringify(badData);
         const result = saveSystem.load();

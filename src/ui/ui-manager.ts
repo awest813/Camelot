@@ -204,6 +204,7 @@ export class UIManager {
     this.questLogPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     this.questLogPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
     this.questLogPanel.left = "20px";
+    this.questLogPanel.zIndex = 10;
     this.questLogPanel.isVisible = false;
     this._ui.addControl(this.questLogPanel);
 
@@ -261,7 +262,6 @@ export class UIManager {
 
   public toggleQuestLog(visible: boolean): void {
       this.questLogPanel.isVisible = visible;
-      if (visible) this.questLogPanel.bringToFront();
   }
 
   public updateQuestLog(quests: Quest[]): void {
