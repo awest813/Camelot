@@ -45,9 +45,9 @@
   - Structures and dungeons.
 
 ### Long Term
-- [ ] **Skill System**:
-  - Leveling and experience.
-  - Skill trees (Magic, Combat, Stealth).
+- [x] **Skill System**:
+  - [x] Leveling and experience (XP from kills and quest completion, level-up stat bonuses, HUD XP bar, save/load support).
+  - [ ] Skill trees (Magic, Combat, Stealth).
 - [ ] **Audio System**:
   - Footsteps, combat sounds, ambient music.
 - [ ] **Multiplayer**:

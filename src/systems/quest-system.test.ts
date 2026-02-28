@@ -189,4 +189,37 @@ describe('QuestSystem', () => {
         qs.onKill('Guard'); // extra kill after completion — should not overflow
         expect(qs.getQuests()[0].objectives[0].current).toBe(1);
     });
+
+    // ── onQuestComplete / xpReward ────────────────────────────────────────────
+
+    it('onQuestComplete fires with xpReward when quest is completed', () => {
+        const xpCallback = vi.fn();
+        qs.onQuestComplete = xpCallback;
+        qs.addQuest(makeQuest({
+            xpReward: 100,
+            objectives: [{ id: 'o1', type: 'kill', description: '', targetId: 'Guard', required: 1, current: 0, completed: false }],
+        }));
+        qs.onKill('Guard');
+        expect(xpCallback).toHaveBeenCalledOnce();
+        expect(xpCallback).toHaveBeenCalledWith(100);
+    });
+
+    it('onQuestComplete does not fire when quest has no xpReward', () => {
+        const xpCallback = vi.fn();
+        qs.onQuestComplete = xpCallback;
+        qs.addQuest(makeQuest({
+            objectives: [{ id: 'o1', type: 'kill', description: '', targetId: 'Guard', required: 1, current: 0, completed: false }],
+        }));
+        qs.onKill('Guard');
+        expect(xpCallback).not.toHaveBeenCalled();
+    });
+
+    it('onQuestComplete does not fire when callback is null', () => {
+        qs.onQuestComplete = null;
+        qs.addQuest(makeQuest({
+            xpReward: 50,
+            objectives: [{ id: 'o1', type: 'kill', description: '', targetId: 'Guard', required: 1, current: 0, completed: false }],
+        }));
+        expect(() => qs.onKill('Guard')).not.toThrow();
+    });
 });

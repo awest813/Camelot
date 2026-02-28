@@ -41,6 +41,8 @@ export class Game {
   private _lastHealth: number = -1;
   private _lastMagicka: number = -1;
   private _lastStamina: number = -1;
+  private _lastExperience: number = -1;
+  private _lastLevel: number = -1;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
     this.scene = scene;
@@ -74,9 +76,22 @@ export class Game {
     this.interactionSystem = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem);
 
     // Wire quest event callbacks
-    this.combatSystem.onNPCDeath    = (name)   => this.questSystem.onKill(name);
+    this.combatSystem.onNPCDeath = (name, xp) => {
+        this.questSystem.onKill(name);
+        this.player.addExperience(xp);
+        this.ui.showNotification(`+${xp} XP`, 2000);
+    };
     this.interactionSystem.onLootPickup = (id) => this.questSystem.onPickup(id);
     this.dialogueSystem.onTalkStart  = (name)  => this.questSystem.onTalk(name);
+
+    // Wire XP callbacks
+    this.questSystem.onQuestComplete = (xp) => {
+        this.player.addExperience(xp);
+        this.ui.showNotification(`+${xp} XP`, 2000);
+    };
+    this.player.onLevelUp = (newLevel) => {
+        this.ui.showNotification(`Level Up! You are now level ${newLevel}!`, 4000);
+    };
 
     // Test Loot
     new Loot(this.scene, new Vector3(5, 1, 5), {
@@ -126,6 +141,7 @@ export class Game {
         isCompleted: false,
         isActive: true,
         reward: "100 XP",
+        xpReward: 100,
         objectives: [{
             id: "obj_kill_guard",
             type: "kill",
@@ -143,6 +159,7 @@ export class Game {
         isCompleted: false,
         isActive: true,
         reward: "50 XP",
+        xpReward: 50,
         objectives: [{
             id: "obj_collect_potions",
             type: "fetch",
@@ -160,6 +177,7 @@ export class Game {
         isCompleted: false,
         isActive: true,
         reward: "25 XP",
+        xpReward: 25,
         objectives: [{
             id: "obj_talk_guard",
             type: "talk",
@@ -284,6 +302,12 @@ export class Game {
       if (this.player.stamina !== this._lastStamina) {
           this._lastStamina = this.player.stamina;
           this.ui.updateStamina(this.player.stamina, this.player.maxStamina);
+      }
+
+      if (this.player.experience !== this._lastExperience || this.player.level !== this._lastLevel) {
+          this._lastExperience = this.player.experience;
+          this._lastLevel = this.player.level;
+          this.ui.updateXP(this.player.experience, this.player.experienceToNextLevel, this.player.level);
       }
 
       // Update stats only if inventory is open (optimization)

@@ -21,6 +21,7 @@ export interface Quest {
   isCompleted: boolean;
   isActive: boolean;
   reward?: string;
+  xpReward?: number;
 }
 
 export interface QuestSaveState {
@@ -34,6 +35,9 @@ export class QuestSystem {
   private _quests: Quest[] = [];
   private _ui: UIManager;
   public isLogOpen: boolean = false;
+
+  /** Fired with the quest's xpReward when a quest is completed. */
+  public onQuestComplete: ((xpReward: number) => void) | null = null;
 
   constructor(ui: UIManager) {
     this._ui = ui;
@@ -117,6 +121,9 @@ export class QuestSystem {
       quest.isCompleted = true;
       quest.isActive = false;
       this._ui.showNotification(`Quest Complete: ${quest.name}!`, 4000);
+      if (this.onQuestComplete && quest.xpReward) {
+        this.onQuestComplete(quest.xpReward);
+      }
     }
   }
 

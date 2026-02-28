@@ -24,8 +24,8 @@ export class CombatSystem {
   private _newVel: Vector3 = new Vector3();
   private _lookAtTarget: Vector3 = new Vector3();
 
-  /** Fired with the NPC's mesh name whenever an NPC dies. */
-  public onNPCDeath: ((npcName: string) => void) | null = null;
+  /** Fired with the NPC's mesh name and XP reward whenever an NPC dies. */
+  public onNPCDeath: ((npcName: string, xpReward: number) => void) | null = null;
 
   constructor(scene: Scene, player: Player, npcs: NPC[], ui: UIManager) {
     this.scene = scene;
@@ -67,7 +67,7 @@ export class CombatSystem {
 
         if (npc.isDead) {
           this._ui.showNotification(`${npc.mesh.name} defeated!`);
-          if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name);
+          if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward);
         } else {
           // Aggro the NPC
           npc.isAggressive = true;
@@ -127,7 +127,7 @@ export class CombatSystem {
           npc.isAggressive = true;
           if (npc.isDead) {
             this._ui.showNotification(`${npc.mesh.name} defeated!`);
-            if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name);
+            if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward);
           }
           // Detonate fireball
           alive = false;

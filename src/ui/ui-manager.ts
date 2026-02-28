@@ -43,6 +43,10 @@ export class UIManager {
   public questLogPanel: Rectangle;
   public questLogContent: StackPanel;
 
+  // XP Bar
+  public xpBar: Rectangle;
+  private _xpLevelLabel: TextBlock;
+
   // Notifications
   public notificationPanel: StackPanel;
 
@@ -357,6 +361,7 @@ export class UIManager {
 
   public updateStats(player: Player): void {
       this.statsText.text = `Stats:
+Lv: ${player.level}  XP: ${Math.floor(player.experience)}/${player.experienceToNextLevel}
 HP: ${Math.floor(player.health)} / ${player.maxHealth}
 MP: ${Math.floor(player.magicka)} / ${player.maxMagicka}
 SP: ${Math.floor(player.stamina)} / ${player.maxStamina}
@@ -536,6 +541,42 @@ Armor: ${player.bonusArmor}`;
     staminaContainer.paddingLeft = "10px";
     this.staminaBar = staminaBar;
 
+    // XP Bar (Below stat bars)
+    const xpRow = new StackPanel();
+    xpRow.isVertical = false;
+    xpRow.height = "18px";
+    xpRow.width = "600px";
+    xpRow.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    xpRow.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+    xpRow.top = "-44px";
+    this._ui.addControl(xpRow);
+
+    this._xpLevelLabel = new TextBlock();
+    this._xpLevelLabel.text = "Lv.1";
+    this._xpLevelLabel.color = "#FFD700";
+    this._xpLevelLabel.fontSize = 12;
+    this._xpLevelLabel.width = "40px";
+    this._xpLevelLabel.height = "100%";
+    xpRow.addControl(this._xpLevelLabel);
+
+    const xpBarContainer = new Rectangle();
+    xpBarContainer.width = "554px";
+    xpBarContainer.height = "10px";
+    xpBarContainer.cornerRadius = 2;
+    xpBarContainer.color = "#FFD700";
+    xpBarContainer.thickness = 1;
+    xpBarContainer.background = "black";
+    xpRow.addControl(xpBarContainer);
+
+    this.xpBar = new Rectangle();
+    this.xpBar.width = "0%";
+    this.xpBar.height = "100%";
+    this.xpBar.cornerRadius = 2;
+    this.xpBar.thickness = 0;
+    this.xpBar.background = "#FFD700";
+    this.xpBar.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    xpBarContainer.addControl(this.xpBar);
+
     // Notification Panel (Top Left)
     this.notificationPanel = new StackPanel();
     this.notificationPanel.width = "300px";
@@ -608,6 +649,11 @@ Armor: ${player.bonusArmor}`;
 
   public updateStamina(current: number, max: number): void {
       this.staminaBar.width = `${Math.max(0, current / max) * 100}%`;
+  }
+
+  public updateXP(current: number, max: number, level: number): void {
+      this.xpBar.width = `${Math.max(0, current / max) * 100}%`;
+      this._xpLevelLabel.text = `Lv.${level}`;
   }
 
   /** Flash a translucent color overlay to signal being hit or dealing damage. */
