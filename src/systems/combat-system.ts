@@ -32,6 +32,9 @@ export class CombatSystem {
   /** Fired with the NPC's mesh name and XP reward whenever an NPC dies. */
   public onNPCDeath: ((npcName: string, xpReward: number) => void) | null = null;
 
+  /** Fired whenever the player takes damage from an NPC. */
+  public onPlayerHit: (() => void) | null = null;
+
   constructor(scene: Scene, player: Player, npcs: NPC[], ui: UIManager) {
     this.scene = scene;
     this.player = player;
@@ -222,6 +225,7 @@ export class CombatSystem {
         this.player.health = Math.max(0, this.player.health - dmg);
         // Red flash: player took damage
         this._ui.showHitFlash("rgba(200, 0, 0, 0.4)");
+        if (this.onPlayerHit) this.onPlayerHit();
         this._ui.showNotification(`${npc.mesh.name} attacks you for ${dmg} damage!`, 2000);
       }
     }

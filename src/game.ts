@@ -18,6 +18,7 @@ import { SaveSystem } from "./systems/save-system";
 import { QuestSystem } from "./systems/quest-system";
 import { InteractionSystem } from "./systems/interaction-system";
 import { SkillTreeSystem } from "./systems/skill-tree-system";
+import { AudioSystem } from "./systems/audio-system";
 import { Loot } from "./entities/loot";
 
 export class Game {
@@ -36,6 +37,7 @@ export class Game {
   public questSystem: QuestSystem;
   public interactionSystem: InteractionSystem;
   public skillTreeSystem: SkillTreeSystem;
+  public audioSystem: AudioSystem;
 
   public isPaused: boolean = false;
 
@@ -86,13 +88,16 @@ export class Game {
     this.skillTreeSystem = new SkillTreeSystem(this.player, this.ui);
     this.ui.onSkillPurchase = (treeIdx, skillIdx) => this.skillTreeSystem.purchaseSkill(treeIdx, skillIdx);
     this.saveSystem.setSkillTreeSystem(this.skillTreeSystem);
+    this.audioSystem = new AudioSystem();
 
     // Wire quest event callbacks
     this.combatSystem.onNPCDeath = (name, xp) => {
         this.questSystem.onKill(name);
         this.player.addExperience(xp);
         this.ui.showNotification(`+${xp} XP`, 2000);
+        this.audioSystem.playNPCDeath();
     };
+    this.combatSystem.onPlayerHit = () => this.audioSystem.playPlayerHit();
     this.interactionSystem.onLootPickup = (id) => this.questSystem.onPickup(id);
     this.dialogueSystem.onTalkStart  = (name)  => this.questSystem.onTalk(name);
 
@@ -207,8 +212,10 @@ export class Game {
 
         if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
             if (pointerInfo.event.button === 0) { // Left Click
+                this.audioSystem.playMeleeAttack();
                 this.combatSystem.meleeAttack();
             } else if (pointerInfo.event.button === 2) { // Right Click
+                this.audioSystem.playMagicAttack();
                 this.combatSystem.magicAttack();
             }
         }
@@ -234,6 +241,9 @@ export class Game {
                         this.player.camera.attachControl(this.canvas, true);
                     }
                 }
+            } else if (kbInfo.event.key === "m" || kbInfo.event.key === "M") {
+                this.audioSystem.toggleMute();
+                this.ui.showNotification(this.audioSystem.isMuted ? "Audio muted" : "Audio unmuted", 1500);
             } else if (kbInfo.event.key === "F5") {
                 if (!this.isPaused) this.saveSystem.save();
             } else if (kbInfo.event.key === "F9") {
@@ -315,6 +325,7 @@ export class Game {
       const deltaTime = this.engine.getDeltaTime() / 1000;
 
       this.player.update(deltaTime);
+      this.audioSystem.updateFootsteps(deltaTime, this.player.camera.position);
       this.world.update(this.player.camera.position);
       this.scheduleSystem.update(deltaTime);
       this.combatSystem.updateNPCAI(deltaTime);
