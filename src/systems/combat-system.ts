@@ -198,8 +198,16 @@ export class CombatSystem {
   private _tickNPC(npc: NPC, playerPos: Vector3, deltaTime: number): void {
     const distSq      = Vector3.DistanceSquared(npc.mesh.position, playerPos);
     const aggroRangeSq  = npc.aggroRange * npc.aggroRange;
-    const attackRangeSq = npc.attackRange * npc.attackRange;
+    const attackEngageRange = this._getAttackEngageRange(npc);
+    const attackDisengageRange = this._getAttackDisengageRange(npc);
+    const attackEngageRangeSq = attackEngageRange * attackEngageRange;
+    const attackDisengageRangeSq = attackDisengageRange * attackDisengageRange;
     const deaggroRangeSq = 4 * aggroRangeSq; // (2 × aggroRange)²
+
+    // Cooldown discipline: keep ticking while hostile, even when repositioning.
+    if (npc.isAggressive) {
+      npc.attackTimer = Math.max(0, npc.attackTimer - deltaTime);
+    }
 
     switch (npc.aiState) {
 
@@ -239,7 +247,7 @@ export class CombatSystem {
           this._transitionTo(npc, AIState.RETURN);
           break;
         }
-        if (distSq <= attackRangeSq) {
+        if (distSq <= attackEngageRangeSq) {
           this._transitionTo(npc, AIState.ATTACK);
           break;
         }
@@ -252,7 +260,7 @@ export class CombatSystem {
           this._transitionTo(npc, AIState.RETURN);
           break;
         }
-        if (distSq > attackRangeSq) {
+        if (distSq > attackDisengageRangeSq) {
           this._transitionTo(npc, AIState.CHASE);
           break;
         }
@@ -261,7 +269,6 @@ export class CombatSystem {
         this._faceTarget(npc, playerPos);
 
         // Melee attack on cooldown
-        npc.attackTimer -= deltaTime;
         if (npc.attackTimer <= 0) {
           npc.attackTimer = npc.attackCooldown;
           const dmg = Math.max(1, npc.attackDamage - this.player.bonusArmor);
@@ -317,6 +324,8 @@ export class CombatSystem {
         break;
 
       case AIState.ATTACK:
+        // enforce a minimum windup before first swing
+        npc.attackTimer = Math.max(npc.attackTimer, npc.attackWindup);
         this._stopMovement(npc);
         npc.setStateColor(COLOR_CHASE); // stay red while attacking
         break;
@@ -335,6 +344,17 @@ export class CombatSystem {
         this._stopMovement(npc);
         break;
     }
+  }
+
+  private _getAttackEngageRange(npc: NPC): number {
+    const engage = npc.attackRange * npc.attackEngageRangeMultiplier;
+    return Math.max(0.1, Math.min(engage, npc.attackRange));
+  }
+
+  private _getAttackDisengageRange(npc: NPC): number {
+    const engage = this._getAttackEngageRange(npc);
+    const disengage = npc.attackRange * npc.attackDisengageRangeMultiplier;
+    return Math.max(engage, disengage);
   }
 
   // ─── Movement helpers ──────────────────────────────────────────────────────
