@@ -1,7 +1,9 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { Player } from "./entities/player";
 import { UIManager } from "./ui/ui-manager";
@@ -307,8 +309,26 @@ export class Game {
   }
 
   _setLight(): void {
-    const light = new HemisphericLight("light", new Vector3(0, 1, 0), this.scene);
-    light.intensity = 0.5;
+    // Sky-blue clear color
+    this.scene.clearColor = new Color4(0.42, 0.55, 0.72, 1.0);
+
+    // Ambient hemisphere light — warm sky, cool ground
+    const hLight = new HemisphericLight("hLight", new Vector3(0, 1, 0), this.scene);
+    hLight.intensity = 0.55;
+    hLight.diffuse    = new Color3(0.95, 0.90, 0.78);
+    hLight.groundColor = new Color3(0.28, 0.22, 0.16);
+    hLight.specular   = new Color3(0, 0, 0);
+
+    // Directional sun light for depth-shading
+    const sun = new DirectionalLight("sun", new Vector3(-1.4, -2.2, -1.0).normalize(), this.scene);
+    sun.intensity = 0.85;
+    sun.diffuse   = new Color3(1.0, 0.96, 0.82);
+    sun.specular  = new Color3(0.18, 0.16, 0.10);
+
+    // Atmospheric distance fog
+    this.scene.fogMode    = Scene.FOGMODE_EXP2;
+    this.scene.fogDensity = 0.006;
+    this.scene.fogColor   = new Color3(0.50, 0.60, 0.72);
   }
 
   /** Remove world loot objects whose item IDs are now in inventory or equipment (called after load). */
