@@ -131,6 +131,31 @@ export class DialogueSystem {
     button.color = "white";
     button.background = "gray";
     button.paddingBottom = "10px";
+
+    button.isFocusInvisible = false;
+    button.tabIndex = 0;
+    button.accessibilityTag = { description: text };
+
+    const setHover = () => {
+      button.background = "lightgray";
+      button.color = "black";
+    };
+    const setNormal = () => {
+      button.background = "gray";
+      button.color = "white";
+    };
+
+    button.onPointerEnterObservable.add(setHover);
+    button.onPointerOutObservable.add(setNormal);
+    button.onFocusObservable.add(setHover);
+    button.onBlurObservable.add(setNormal);
+
+    button.onKeyboardEventProcessedObservable.add((evt) => {
+      if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
+        callback();
+      }
+    });
+
     button.onPointerUpObservable.add(callback);
     this._choicesPanel.addControl(button);
   }
