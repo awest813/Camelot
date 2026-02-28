@@ -37,6 +37,11 @@ export class Game {
 
   public isPaused: boolean = false;
 
+  // Cached stat values to avoid redundant UI bar updates every frame
+  private _lastHealth: number = -1;
+  private _lastMagicka: number = -1;
+  private _lastStamina: number = -1;
+
   constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
     this.scene = scene;
     this.canvas = canvas;
@@ -267,9 +272,19 @@ export class Game {
       this.combatSystem.updateNPCAI(deltaTime);
       this.interactionSystem.update();
 
-      this.ui.updateHealth(this.player.health, this.player.maxHealth);
-      this.ui.updateMagicka(this.player.magicka, this.player.maxMagicka);
-      this.ui.updateStamina(this.player.stamina, this.player.maxStamina);
+      // Only update UI bars when values have actually changed
+      if (this.player.health !== this._lastHealth) {
+          this._lastHealth = this.player.health;
+          this.ui.updateHealth(this.player.health, this.player.maxHealth);
+      }
+      if (this.player.magicka !== this._lastMagicka) {
+          this._lastMagicka = this.player.magicka;
+          this.ui.updateMagicka(this.player.magicka, this.player.maxMagicka);
+      }
+      if (this.player.stamina !== this._lastStamina) {
+          this._lastStamina = this.player.stamina;
+          this.ui.updateStamina(this.player.stamina, this.player.maxStamina);
+      }
 
       // Update stats only if inventory is open (optimization)
       if (this.inventorySystem.isOpen) {

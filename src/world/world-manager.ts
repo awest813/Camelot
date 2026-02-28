@@ -12,12 +12,20 @@ export class WorldManager {
   private chunkSize: number = 50;
   private loadedChunks: Map<string, Mesh> = new Map();
   private loadDistance: number = 2; // Radius of chunks to load
+  private unloadDistance: number = 4; // Chunks beyond this radius are disposed
+
+  // Throttle: only run chunk logic every N frames
+  private _frameCounter: number = 0;
+  private _updateInterval: number = 10;
 
   constructor(scene: Scene) {
     this.scene = scene;
   }
 
   public update(playerPosition: Vector3): void {
+    // Run chunk management every _updateInterval frames instead of every frame
+    if (++this._frameCounter % this._updateInterval !== 0) return;
+
     const chunkX = Math.floor(playerPosition.x / this.chunkSize);
     const chunkZ = Math.floor(playerPosition.z / this.chunkSize);
 
@@ -28,8 +36,14 @@ export class WorldManager {
       }
     }
 
-    // Optional: Unload chunks too far away
-    // For now, let's keep it simple and additive
+    // Unload chunks that are too far from the player
+    for (const [key, mesh] of this.loadedChunks) {
+      const [cx, cz] = key.split(",").map(Number);
+      if (Math.abs(cx - chunkX) > this.unloadDistance || Math.abs(cz - chunkZ) > this.unloadDistance) {
+        mesh.dispose(false, true); // true = also dispose material & textures
+        this.loadedChunks.delete(key);
+      }
+    }
   }
 
   private _loadChunk(x: number, z: number): void {

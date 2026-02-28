@@ -61,6 +61,7 @@ export class CombatSystem {
 
         // Knockback impulse
         if (npc.physicsAggregate?.body) {
+          const forward = this.player.camera.getForwardRay(1).direction;
           npc.physicsAggregate.body.applyImpulse(forward.scale(10), hit.pickedPoint!);
         }
 
@@ -115,8 +116,7 @@ export class CombatSystem {
 
       for (const npc of this.npcs) {
         if (npc.isDead) continue;
-        const dist = Vector3.Distance(projectile.position, npc.mesh.position);
-        if (dist < 1.2) {
+        if (Vector3.DistanceSquared(projectile.position, npc.mesh.position) <= 1.44) { // 1.2^2 = 1.44
           npc.takeDamage(MAGIC_DAMAGE);
           this._ui.showDamageNumber(
             npc.mesh.position.add(new Vector3(0, 2, 0)),
@@ -150,17 +150,20 @@ export class CombatSystem {
     for (const npc of this.npcs) {
       if (npc.isDead) continue;
 
-      const dist = Vector3.Distance(npc.mesh.position, playerPos);
+      // Use squared distances to avoid sqrt overhead on every NPC every frame
+      const distSq = Vector3.DistanceSquared(npc.mesh.position, playerPos);
+      const aggroRangeSq = npc.aggroRange * npc.aggroRange;
+      const attackRangeSq = npc.attackRange * npc.attackRange;
 
       // Enter aggro if player gets close
-      if (!npc.isAggressive && dist <= npc.aggroRange) {
+      if (!npc.isAggressive && distSq <= aggroRangeSq) {
         npc.isAggressive = true;
       }
 
       if (!npc.isAggressive) continue;
 
       // Leave aggro if player runs far away
-      if (dist > npc.aggroRange * 2) {
+      if (distSq > (npc.aggroRange * 2) * (npc.aggroRange * 2)) {
         npc.isAggressive = false;
         continue;
       }
@@ -168,7 +171,7 @@ export class CombatSystem {
       // Chase or stop based on distance
       if (npc.physicsAggregate?.body) {
         npc.physicsAggregate.body.getLinearVelocityToRef(this._currentVel);
-        if (dist > npc.attackRange) {
+        if (distSq > attackRangeSq) {
           // Move toward player, preserve Y for gravity
           playerPos.subtractToRef(npc.mesh.position, this._dir);
           this._dir.y = 0;
@@ -192,7 +195,7 @@ export class CombatSystem {
       if (npc.attackTimer > 0) continue;
 
       // Attack if within melee range
-      if (dist <= npc.attackRange) {
+      if (distSq <= attackRangeSq) {
         npc.attackTimer = npc.attackCooldown;
         const rawDmg = npc.attackDamage;
         // Reduce incoming damage by player armor (minimum 1)
