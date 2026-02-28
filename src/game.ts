@@ -43,6 +43,8 @@ export class Game {
   private _lastStamina: number = -1;
   private _lastExperience: number = -1;
   private _lastLevel: number = -1;
+  private _lastBonusDamage: number = -1;
+  private _lastBonusArmor: number = -1;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
     this.scene = scene;
@@ -315,9 +317,22 @@ export class Game {
           this.ui.updateXP(this.player.experience, this.player.experienceToNextLevel, this.player.level);
       }
 
-      // Update stats only if inventory is open (optimization)
+      // Update stats panel only when inventory is open and a tracked value changed
       if (this.inventorySystem.isOpen) {
-          this.ui.updateStats(this.player);
+          const { bonusDamage, bonusArmor } = this.player;
+          if (
+              bonusDamage !== this._lastBonusDamage ||
+              bonusArmor  !== this._lastBonusArmor  ||
+              this.player.health     !== this._lastHealth   ||
+              this.player.magicka    !== this._lastMagicka  ||
+              this.player.stamina    !== this._lastStamina  ||
+              this.player.experience !== this._lastExperience ||
+              this.player.level      !== this._lastLevel
+          ) {
+              this._lastBonusDamage = bonusDamage;
+              this._lastBonusArmor  = bonusArmor;
+              this.ui.updateStats(this.player);
+          }
       }
   }
 }

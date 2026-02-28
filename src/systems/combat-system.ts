@@ -23,6 +23,11 @@ export class CombatSystem {
   private _dir: Vector3 = new Vector3();
   private _newVel: Vector3 = new Vector3();
   private _lookAtTarget: Vector3 = new Vector3();
+  private _hitPos: Vector3 = new Vector3();
+
+  // Reusable offsets to avoid per-hit Vector3 allocations
+  private static readonly _OFFSET_Y1 = new Vector3(0, 1, 0);
+  private static readonly _OFFSET_Y2 = new Vector3(0, 2, 0);
 
   /** Fired with the NPC's mesh name and XP reward whenever an NPC dies. */
   public onNPCDeath: ((npcName: string, xpReward: number) => void) | null = null;
@@ -50,10 +55,10 @@ export class CombatSystem {
         const meleeDmg = MELEE_DAMAGE + this.player.bonusDamage;
         npc.takeDamage(meleeDmg);
 
-        // Show damage number above the hit point
+        // Show damage number above the hit point (reuse scratch vector to avoid allocation)
         const numberPos = hit.pickedPoint
-          ? hit.pickedPoint.add(new Vector3(0, 1, 0))
-          : npc.mesh.position.add(new Vector3(0, 2, 0));
+          ? hit.pickedPoint.addToRef(CombatSystem._OFFSET_Y1, this._hitPos)
+          : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos);
         this._ui.showDamageNumber(numberPos, meleeDmg, this.scene);
 
         // Yellow flash: player landed a hit
@@ -98,14 +103,18 @@ export class CombatSystem {
     const forward = this.player.camera.getForwardRay(1).direction;
     agg.body.applyImpulse(forward.scale(20), origin);
 
-    // Check for NPC collision every frame until the fireball is gone
+    // Check for NPC collision every other frame until the fireball is gone
     let alive = true;
     let elapsedMs = 0;
+    let _fbFrame = 0;
     const obs = this.scene.onBeforeRenderObservable.add(() => {
       if (!alive) return;
 
+      // Skip odd frames — halves the per-fireball collision work each frame
+      if (++_fbFrame % 2 !== 0) return;
+
       // Auto-clean after 5 seconds
-      elapsedMs += this.scene.getEngine().getDeltaTime();
+      elapsedMs += this.scene.getEngine().getDeltaTime() * 2; // *2 because we skip half the frames
       if (elapsedMs >= 5000) {
         alive = false;
         this.scene.onBeforeRenderObservable.remove(obs);
@@ -118,12 +127,13 @@ export class CombatSystem {
         return;
       }
 
+      const projPos = projectile.position;
       for (const npc of this.npcs) {
         if (npc.isDead) continue;
-        if (Vector3.DistanceSquared(projectile.position, npc.mesh.position) <= 1.44) { // 1.2^2 = 1.44
+        if (Vector3.DistanceSquared(projPos, npc.mesh.position) <= 1.44) { // 1.2^2 = 1.44
           npc.takeDamage(MAGIC_DAMAGE);
           this._ui.showDamageNumber(
-            npc.mesh.position.add(new Vector3(0, 2, 0)),
+            npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos),
             MAGIC_DAMAGE,
             this.scene
           );
@@ -170,8 +180,8 @@ export class CombatSystem {
 
       if (!npc.isAggressive) continue;
 
-      // Leave aggro if player runs far away
-      if (distSq > (npc.aggroRange * 2) * (npc.aggroRange * 2)) {
+      // Leave aggro if player runs far away (4 * aggroRange^2 == (2*aggroRange)^2)
+      if (distSq > 4 * aggroRangeSq) {
         npc.isAggressive = false;
         continue;
       }
