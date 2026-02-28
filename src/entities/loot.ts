@@ -16,18 +16,27 @@ export class Loot {
   constructor(scene: Scene, position: Vector3, item: Item) {
     this.item = item;
 
-    // Create mesh (simple box for now)
-    this.mesh = MeshBuilder.CreateBox("loot_" + item.id, { size: 0.5 }, scene);
+    // Small sphere — more visible and gem-like than a plain box
+    this.mesh = MeshBuilder.CreateSphere("loot_" + item.id, { diameter: 0.45, segments: 6 }, scene);
     this.mesh.position = position;
 
-    // Add color based on item type or just random?
-    // Let's make it green for loot
-    const material = new StandardMaterial("lootMat", scene);
-    material.diffuseColor = Color3.Green();
+    // Color by category: equipment = silvery-blue, consumable/misc = golden
+    const material = new StandardMaterial("lootMat_" + item.id, scene);
+    if (item.slot) {
+      material.diffuseColor  = new Color3(0.55, 0.72, 1.00);
+      material.emissiveColor = new Color3(0.10, 0.16, 0.40);
+      material.specularColor = new Color3(1.00, 1.00, 1.00);
+      material.specularPower = 64;
+    } else {
+      material.diffuseColor  = new Color3(1.00, 0.82, 0.18);
+      material.emissiveColor = new Color3(0.30, 0.18, 0.00);
+      material.specularColor = new Color3(1.00, 0.92, 0.50);
+      material.specularPower = 32;
+    }
     this.mesh.material = material;
 
-    // Physics
-    this.physicsAggregate = new PhysicsAggregate(this.mesh, PhysicsShapeType.BOX, { mass: 1, restitution: 0.5 }, scene);
+    // Physics (sphere shape)
+    this.physicsAggregate = new PhysicsAggregate(this.mesh, PhysicsShapeType.SPHERE, { mass: 1, restitution: 0.5 }, scene);
     this.physicsAggregate.body.setMotionType(PhysicsMotionType.DYNAMIC);
 
     // Metadata for interaction

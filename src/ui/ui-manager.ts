@@ -1,11 +1,35 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
-import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Grid, Button, Ellipse } from "@babylonjs/gui/2D";
+import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Grid, Button } from "@babylonjs/gui/2D";
 import { Item } from "../systems/inventory-system";
 import { Quest } from "../systems/quest-system";
 import { EquipSlot } from "../systems/equipment-system";
 import { Player } from "../entities/player";
 import type { SkillTree } from "../systems/skill-tree-system";
+
+// ── Design tokens ─────────────────────────────────────────────────────────────
+const T = {
+  PANEL_BG:     "rgba(6, 4, 2, 0.95)",
+  PANEL_BORDER: "#6B4F12",
+  TITLE:        "#D4A017",
+  TEXT:         "#EEE0C0",
+  DIM:          "#998877",
+  GOOD:         "#5EC45E",
+  HP_FILL:      "#CC1A1A",
+  HP_BG:        "rgba(60, 4, 4, 0.7)",
+  MP_FILL:      "#1A4ACC",
+  MP_BG:        "rgba(4, 12, 60, 0.7)",
+  SP_FILL:      "#1A8840",
+  SP_BG:        "rgba(4, 28, 12, 0.7)",
+  XP_FILL:      "#D4A017",
+  XP_BG:        "rgba(30, 18, 0, 0.7)",
+  BTN_BG:       "rgba(28, 20, 6, 0.95)",
+  BTN_HOVER:    "rgba(80, 56, 10, 0.98)",
+  SLOT_BG:      "rgba(20, 14, 4, 0.85)",
+  SLOT_HOVER:   "rgba(50, 36, 8, 0.90)",
+  EQUIP_BG:     "rgba(40, 28, 0, 0.85)",
+  EQUIP_BORDER: "#D4A017",
+};
 
 export class UIManager {
   public scene: Scene;
@@ -23,7 +47,6 @@ export class UIManager {
   public statsText: TextBlock;
   public equipmentText: TextBlock;
 
-  // Equipped item IDs (used when rendering the inventory grid)
   private _equippedIds: Set<string> = new Set();
 
   /** Called when the player clicks an inventory item slot. Set by Game to hook into EquipmentSystem. */
@@ -38,7 +61,8 @@ export class UIManager {
 
   // Interaction
   public interactionLabel: TextBlock;
-  public crosshair: Ellipse;
+  public crosshair: Rectangle;
+  private _crosshairArms: Rectangle[] = [];
 
   // Quest Log
   public questLogPanel: Rectangle;
@@ -68,153 +92,323 @@ export class UIManager {
     this._initSkillTreeUI();
   }
 
+  // ── Init methods ─────────────────────────────────────────────────────────────
+
+  private _initUI(): void {
+    this._ui = AdvancedDynamicTexture.CreateFullscreenUI("UI");
+
+    // ── Cross-shaped Crosshair ────────────────────────────────────────────────
+    this.crosshair = new Rectangle("crosshairContainer");
+    this.crosshair.width = "30px";
+    this.crosshair.height = "30px";
+    this.crosshair.thickness = 0;
+    this.crosshair.background = "transparent";
+    this._ui.addControl(this.crosshair);
+
+    // 4 arms: top, bottom, left, right (with a gap at center)
+    const armDefs = [
+      { w: "2px", h: "9px", top: "-10px", left:   "0px" }, // top
+      { w: "2px", h: "9px", top:  "10px", left:   "0px" }, // bottom
+      { w: "9px", h: "2px", top:   "0px", left: "-10px" }, // left
+      { w: "9px", h: "2px", top:   "0px", left:  "10px" }, // right
+    ];
+    for (const def of armDefs) {
+      const arm = new Rectangle();
+      arm.width = def.w;
+      arm.height = def.h;
+      arm.top = def.top;
+      arm.left = def.left;
+      arm.thickness = 0;
+      arm.background = "rgba(255,255,255,0.9)";
+      this.crosshair.addControl(arm);
+      this._crosshairArms.push(arm);
+    }
+    // Center dot
+    const dot = new Rectangle();
+    dot.width = "3px";
+    dot.height = "3px";
+    dot.thickness = 0;
+    dot.background = "rgba(255,255,255,0.9)";
+    this.crosshair.addControl(dot);
+    this._crosshairArms.push(dot);
+
+    // ── Interaction Label ─────────────────────────────────────────────────────
+    this.interactionLabel = new TextBlock();
+    this.interactionLabel.text = "";
+    this.interactionLabel.color = T.TEXT;
+    this.interactionLabel.fontSize = 18;
+    this.interactionLabel.fontWeight = "bold";
+    this.interactionLabel.top = "60px";
+    this.interactionLabel.shadowColor = "rgba(0,0,0,0.9)";
+    this.interactionLabel.shadowBlur = 5;
+    this._ui.addControl(this.interactionLabel);
+
+    // ── Status Bars (Bottom Center) ───────────────────────────────────────────
+    const barsPanel = new StackPanel();
+    barsPanel.isVertical = false;
+    barsPanel.height = "28px";
+    barsPanel.width = "630px";
+    barsPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    barsPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+    barsPanel.top = "-18px";
+    this._ui.addControl(barsPanel);
+
+    // Magicka Bar (left)
+    const { container: mpContainer, bar: mpBar } = this._createBar("MP", T.MP_FILL, T.MP_BG, barsPanel);
+    mpContainer.paddingRight = "8px";
+    this.magickaBar = mpBar;
+
+    // Health Bar (center)
+    const { container: hpContainer, bar: hpBar } = this._createBar("HP", T.HP_FILL, T.HP_BG, barsPanel);
+    hpContainer.paddingLeft = "8px";
+    hpContainer.paddingRight = "8px";
+    this.healthBar = hpBar;
+
+    // Stamina Bar (right)
+    const { container: spContainer, bar: spBar } = this._createBar("SP", T.SP_FILL, T.SP_BG, barsPanel);
+    spContainer.paddingLeft = "8px";
+    this.staminaBar = spBar;
+
+    // ── XP Bar ────────────────────────────────────────────────────────────────
+    const xpRow = new StackPanel();
+    xpRow.isVertical = false;
+    xpRow.height = "16px";
+    xpRow.width = "630px";
+    xpRow.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    xpRow.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+    xpRow.top = "-50px";
+    this._ui.addControl(xpRow);
+
+    this._xpLevelLabel = new TextBlock();
+    this._xpLevelLabel.text = "Lv.1";
+    this._xpLevelLabel.color = T.TITLE;
+    this._xpLevelLabel.fontSize = 11;
+    this._xpLevelLabel.fontWeight = "bold";
+    this._xpLevelLabel.width = "44px";
+    this._xpLevelLabel.height = "100%";
+    xpRow.addControl(this._xpLevelLabel);
+
+    const xpBarContainer = new Rectangle();
+    xpBarContainer.width = "580px";
+    xpBarContainer.height = "8px";
+    xpBarContainer.cornerRadius = 4;
+    xpBarContainer.color = T.PANEL_BORDER;
+    xpBarContainer.thickness = 1;
+    xpBarContainer.background = T.XP_BG;
+    xpRow.addControl(xpBarContainer);
+
+    this.xpBar = new Rectangle();
+    this.xpBar.width = "0%";
+    this.xpBar.height = "100%";
+    this.xpBar.cornerRadius = 4;
+    this.xpBar.thickness = 0;
+    this.xpBar.background = T.XP_FILL;
+    this.xpBar.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    xpBarContainer.addControl(this.xpBar);
+
+    // ── Notifications (Top-Right) ─────────────────────────────────────────────
+    this.notificationPanel = new StackPanel();
+    this.notificationPanel.width = "320px";
+    this.notificationPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+    this.notificationPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.notificationPanel.top = "70px";
+    this.notificationPanel.left = "-16px";
+    this.notificationPanel.isVertical = true;
+    this._ui.addControl(this.notificationPanel);
+  }
+
   private _initInventoryUI(): void {
     this.inventoryPanel = new Rectangle();
-    this.inventoryPanel.width = "600px"; // Wider for split view
-    this.inventoryPanel.height = "600px";
-    this.inventoryPanel.cornerRadius = 10;
-    this.inventoryPanel.color = "white";
+    this.inventoryPanel.width = "620px";
+    this.inventoryPanel.height = "620px";
+    this.inventoryPanel.cornerRadius = 8;
+    this.inventoryPanel.color = T.PANEL_BORDER;
     this.inventoryPanel.thickness = 2;
-    this.inventoryPanel.background = "rgba(0, 0, 0, 0.9)";
+    this.inventoryPanel.background = T.PANEL_BG;
     this.inventoryPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
     this.inventoryPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
     this.inventoryPanel.left = "-20px";
     this.inventoryPanel.isVisible = false;
     this._ui.addControl(this.inventoryPanel);
 
-    const title = new TextBlock();
-    title.text = "Inventory";
-    title.color = "white";
-    title.fontSize = 24;
-    title.height = "40px";
-    title.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    title.top = "10px";
-    this.inventoryPanel.addControl(title);
+    // Title bar
+    const titleBar = new Rectangle();
+    titleBar.width = "100%";
+    titleBar.height = "44px";
+    titleBar.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    titleBar.thickness = 0;
+    titleBar.background = "rgba(30, 20, 0, 0.60)";
+    titleBar.cornerRadius = 8;
+    this.inventoryPanel.addControl(titleBar);
 
-    // Main Grid: Left (Items), Right (Details & Stats)
+    const title = new TextBlock();
+    title.text = "✦  INVENTORY  ✦";
+    title.color = T.TITLE;
+    title.fontSize = 19;
+    title.fontWeight = "bold";
+    titleBar.addControl(title);
+
+    // Separator
+    const sep = new Rectangle();
+    sep.width = "96%";
+    sep.height = "1px";
+    sep.background = T.PANEL_BORDER;
+    sep.thickness = 0;
+    sep.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    sep.top = "44px";
+    this.inventoryPanel.addControl(sep);
+
+    // Main Grid: 60% items | 40% details
     const mainGrid = new Grid();
-    mainGrid.width = "560px";
-    mainGrid.height = "520px";
-    mainGrid.top = "40px";
-    mainGrid.addColumnDefinition(0.6); // 60% Items
-    mainGrid.addColumnDefinition(0.4); // 40% Stats
+    mainGrid.width = "580px";
+    mainGrid.height = "550px";
+    mainGrid.top = "50px";
+    mainGrid.addColumnDefinition(0.6);
+    mainGrid.addColumnDefinition(0.4);
     this.inventoryPanel.addControl(mainGrid);
 
-    // Inventory Grid (Left Column)
+    // Inventory Grid (Left)
     this.inventoryGrid = new Grid();
     this.inventoryGrid.width = "100%";
     this.inventoryGrid.height = "100%";
-
-    // Define grid columns and rows (e.g., 5x4)
-    for (let i = 0; i < 6; i++) {
-        this.inventoryGrid.addRowDefinition(1);
-    }
-    for (let i = 0; i < 4; i++) {
-        this.inventoryGrid.addColumnDefinition(1);
-    }
+    for (let i = 0; i < 6; i++) this.inventoryGrid.addRowDefinition(1);
+    for (let i = 0; i < 4; i++) this.inventoryGrid.addColumnDefinition(1);
     mainGrid.addControl(this.inventoryGrid, 0, 0);
 
-    // Right Column (Details + Stats)
+    // Right panel
     const rightPanel = new StackPanel();
     rightPanel.width = "100%";
     rightPanel.height = "100%";
     mainGrid.addControl(rightPanel, 0, 1);
 
-    // Description Area
+    // Description box
     const descContainer = new Rectangle();
     descContainer.width = "100%";
-    descContainer.height = "150px";
-    descContainer.color = "white";
+    descContainer.height = "155px";
+    descContainer.color = T.PANEL_BORDER;
     descContainer.thickness = 1;
-    descContainer.background = "rgba(0,0,0,0.5)";
+    descContainer.background = "rgba(20, 12, 2, 0.80)";
+    descContainer.cornerRadius = 4;
     rightPanel.addControl(descContainer);
 
     this.inventoryDescription = new TextBlock();
     this.inventoryDescription.text = "";
-    this.inventoryDescription.color = "white";
-    this.inventoryDescription.fontSize = 14;
+    this.inventoryDescription.color = T.TEXT;
+    this.inventoryDescription.fontSize = 13;
     this.inventoryDescription.textWrapping = true;
-    this.inventoryDescription.paddingLeft = "5px";
+    this.inventoryDescription.paddingLeft = "8px";
+    this.inventoryDescription.paddingRight = "8px";
+    this.inventoryDescription.paddingTop = "8px";
+    this.inventoryDescription.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
     descContainer.addControl(this.inventoryDescription);
 
-    // Stats Area
+    // Stats box
     const statsContainer = new Rectangle();
     statsContainer.width = "100%";
-    statsContainer.height = "150px";
-    statsContainer.color = "white";
+    statsContainer.height = "155px";
+    statsContainer.color = T.PANEL_BORDER;
     statsContainer.thickness = 1;
-    statsContainer.background = "rgba(0,0,0,0.5)";
-    statsContainer.top = "10px";
+    statsContainer.background = "rgba(20, 12, 2, 0.80)";
+    statsContainer.cornerRadius = 4;
+    statsContainer.top = "8px";
     rightPanel.addControl(statsContainer);
 
     this.statsText = new TextBlock();
     this.statsText.text = "Stats:\nHP: --\nMP: --\nSP: --";
-    this.statsText.color = "white";
-    this.statsText.fontSize = 14;
+    this.statsText.color = T.TEXT;
+    this.statsText.fontSize = 13;
     this.statsText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     this.statsText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this.statsText.paddingTop = "8px";
-    this.statsText.paddingLeft = "10px";
+    this.statsText.paddingTop = "10px";
+    this.statsText.paddingLeft = "12px";
     statsContainer.addControl(this.statsText);
 
-    // Equipment Slots Area
+    // Equipment box
     const equipContainer = new Rectangle();
     equipContainer.width = "100%";
-    equipContainer.height = "185px";
-    equipContainer.color = "white";
+    equipContainer.height = "218px";
+    equipContainer.color = T.EQUIP_BORDER;
     equipContainer.thickness = 1;
-    equipContainer.background = "rgba(0,0,0,0.5)";
-    equipContainer.top = "20px";
+    equipContainer.background = "rgba(22, 14, 0, 0.90)";
+    equipContainer.cornerRadius = 4;
+    equipContainer.top = "16px";
     rightPanel.addControl(equipContainer);
 
     this.equipmentText = new TextBlock();
     this.equipmentText.text = "Equipment:\nMain Hand: --\nOff Hand: --\nHead: --\nChest: --\nLegs: --\nFeet: --";
-    this.equipmentText.color = "#FFD700";
-    this.equipmentText.fontSize = 13;
+    this.equipmentText.color = T.TITLE;
+    this.equipmentText.fontSize = 12;
     this.equipmentText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     this.equipmentText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this.equipmentText.paddingTop = "8px";
-    this.equipmentText.paddingLeft = "10px";
+    this.equipmentText.paddingTop = "10px";
+    this.equipmentText.paddingLeft = "12px";
     equipContainer.addControl(this.equipmentText);
   }
 
   private _initPauseMenu(): void {
-      this.pausePanel = new Rectangle();
-      this.pausePanel.width = "100%";
-      this.pausePanel.height = "100%";
-      this.pausePanel.background = "rgba(0, 0, 0, 0.8)";
-      this.pausePanel.isVisible = false;
-      this.pausePanel.zIndex = 100; // On top
-      this._ui.addControl(this.pausePanel);
+    this.pausePanel = new Rectangle();
+    this.pausePanel.width = "100%";
+    this.pausePanel.height = "100%";
+    this.pausePanel.background = "rgba(0, 0, 0, 0.82)";
+    this.pausePanel.isVisible = false;
+    this.pausePanel.zIndex = 100;
+    this._ui.addControl(this.pausePanel);
 
-      const panel = new StackPanel();
-      panel.width = "300px";
-      panel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
-      this.pausePanel.addControl(panel);
+    // Central card
+    const card = new Rectangle();
+    card.width = "340px";
+    card.height = "440px";
+    card.cornerRadius = 10;
+    card.color = T.PANEL_BORDER;
+    card.thickness = 2;
+    card.background = T.PANEL_BG;
+    card.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    this.pausePanel.addControl(card);
 
-      const title = new TextBlock();
-      title.text = "PAUSED";
-      title.color = "white";
-      title.fontSize = 48;
-      title.height = "100px";
-      title.shadowBlur = 5;
-      title.shadowColor = "black";
-      panel.addControl(title);
+    const panel = new StackPanel();
+    panel.width = "290px";
+    panel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    card.addControl(panel);
 
-      this.resumeButton = this._createButton("Resume", panel);
-      this.saveButton = this._createButton("Save", panel);
-      this.loadButton = this._createButton("Load", panel);
-      this.quitButton = this._createButton("Quit", panel);
+    const gameName = new TextBlock();
+    gameName.text = "CAMELOT";
+    gameName.color = T.TITLE;
+    gameName.fontSize = 36;
+    gameName.fontWeight = "bold";
+    gameName.height = "64px";
+    gameName.shadowColor = "rgba(0,0,0,0.9)";
+    gameName.shadowBlur = 8;
+    panel.addControl(gameName);
+
+    const subtitle = new TextBlock();
+    subtitle.text = "—  PAUSED  —";
+    subtitle.color = T.DIM;
+    subtitle.fontSize = 14;
+    subtitle.height = "26px";
+    panel.addControl(subtitle);
+
+    const divider = new Rectangle();
+    divider.width = "75%";
+    divider.height = "1px";
+    divider.background = T.PANEL_BORDER;
+    divider.thickness = 0;
+    divider.paddingBottom = "14px";
+    panel.addControl(divider);
+
+    this.resumeButton = this._createButton("Resume",        panel);
+    this.saveButton   = this._createButton("Save Game",     panel);
+    this.loadButton   = this._createButton("Load Game",     panel);
+    this.quitButton   = this._createButton("Quit to Menu",  panel);
   }
 
   private _initQuestLogUI(): void {
     this.questLogPanel = new Rectangle();
-    this.questLogPanel.width = "360px";
+    this.questLogPanel.width = "380px";
     this.questLogPanel.height = "500px";
-    this.questLogPanel.cornerRadius = 10;
-    this.questLogPanel.color = "white";
+    this.questLogPanel.cornerRadius = 8;
+    this.questLogPanel.color = T.PANEL_BORDER;
     this.questLogPanel.thickness = 2;
-    this.questLogPanel.background = "rgba(0, 0, 0, 0.88)";
+    this.questLogPanel.background = T.PANEL_BG;
     this.questLogPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     this.questLogPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
     this.questLogPanel.left = "20px";
@@ -222,63 +416,99 @@ export class UIManager {
     this.questLogPanel.isVisible = false;
     this._ui.addControl(this.questLogPanel);
 
+    // Title bar
+    const titleBar = new Rectangle();
+    titleBar.width = "100%";
+    titleBar.height = "42px";
+    titleBar.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    titleBar.thickness = 0;
+    titleBar.background = "rgba(30, 20, 0, 0.60)";
+    titleBar.cornerRadius = 8;
+    this.questLogPanel.addControl(titleBar);
+
     const title = new TextBlock();
-    title.text = "Quest Log  [J]";
-    title.color = "#FFD700";
-    title.fontSize = 20;
-    title.height = "36px";
-    title.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    title.top = "8px";
-    this.questLogPanel.addControl(title);
+    title.text = "✦  QUEST LOG  [J]";
+    title.color = T.TITLE;
+    title.fontSize = 17;
+    title.fontWeight = "bold";
+    titleBar.addControl(title);
+
+    const sep = new Rectangle();
+    sep.width = "96%";
+    sep.height = "1px";
+    sep.background = T.PANEL_BORDER;
+    sep.thickness = 0;
+    sep.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    sep.top = "42px";
+    this.questLogPanel.addControl(sep);
 
     this.questLogContent = new StackPanel();
-    this.questLogContent.width = "340px";
+    this.questLogContent.width = "360px";
     this.questLogContent.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this.questLogContent.top = "50px";
+    this.questLogContent.top = "52px";
     this.questLogContent.isVertical = true;
     this.questLogPanel.addControl(this.questLogContent);
   }
 
   private _initSkillTreeUI(): void {
     this.skillTreePanel = new Rectangle();
-    this.skillTreePanel.width = "750px";
-    this.skillTreePanel.height = "530px";
-    this.skillTreePanel.cornerRadius = 10;
-    this.skillTreePanel.color = "white";
+    this.skillTreePanel.width = "780px";
+    this.skillTreePanel.height = "560px";
+    this.skillTreePanel.cornerRadius = 8;
+    this.skillTreePanel.color = T.PANEL_BORDER;
     this.skillTreePanel.thickness = 2;
-    this.skillTreePanel.background = "rgba(0, 0, 0, 0.92)";
+    this.skillTreePanel.background = T.PANEL_BG;
     this.skillTreePanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
     this.skillTreePanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
     this.skillTreePanel.zIndex = 10;
     this.skillTreePanel.isVisible = false;
     this._ui.addControl(this.skillTreePanel);
 
+    // Title bar
+    const titleBar = new Rectangle();
+    titleBar.width = "100%";
+    titleBar.height = "42px";
+    titleBar.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    titleBar.thickness = 0;
+    titleBar.background = "rgba(30, 20, 0, 0.60)";
+    titleBar.cornerRadius = 8;
+    this.skillTreePanel.addControl(titleBar);
+
     const title = new TextBlock();
-    title.text = "Skill Tree  [K]";
-    title.color = "#FFD700";
-    title.fontSize = 22;
-    title.height = "40px";
-    title.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    title.top = "8px";
-    this.skillTreePanel.addControl(title);
+    title.text = "✦  SKILL TREE  [K]";
+    title.color = T.TITLE;
+    title.fontSize = 17;
+    title.fontWeight = "bold";
+    titleBar.addControl(title);
+
+    const sep = new Rectangle();
+    sep.width = "96%";
+    sep.height = "1px";
+    sep.background = T.PANEL_BORDER;
+    sep.thickness = 0;
+    sep.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    sep.top = "42px";
+    this.skillTreePanel.addControl(sep);
 
     this._skillPointsLabel = new TextBlock();
     this._skillPointsLabel.text = "Skill Points: 0";
-    this._skillPointsLabel.color = "#88ff88";
-    this._skillPointsLabel.fontSize = 15;
-    this._skillPointsLabel.height = "28px";
+    this._skillPointsLabel.color = T.GOOD;
+    this._skillPointsLabel.fontSize = 14;
+    this._skillPointsLabel.height = "30px";
     this._skillPointsLabel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this._skillPointsLabel.top = "44px";
+    this._skillPointsLabel.top = "48px";
     this.skillTreePanel.addControl(this._skillPointsLabel);
 
     this._skillTreeContent = new StackPanel();
     this._skillTreeContent.isVertical = false;
-    this._skillTreeContent.width = "720px";
-    this._skillTreeContent.height = "440px";
+    this._skillTreeContent.width = "756px";
+    this._skillTreeContent.height = "462px";
     this._skillTreeContent.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this._skillTreeContent.top = "80px";
+    this._skillTreeContent.top = "84px";
     this.skillTreePanel.addControl(this._skillTreeContent);
   }
+
+  // ── Public methods ────────────────────────────────────────────────────────────
 
   public toggleSkillTree(visible: boolean): void {
     this.skillTreePanel.isVisible = visible;
@@ -295,28 +525,40 @@ export class UIManager {
     trees.forEach((tree, treeIdx) => {
       const col = new StackPanel();
       col.isVertical = true;
-      col.width = "240px";
+      col.width = "252px";
       col.height = "100%";
-      col.paddingLeft = "6px";
-      col.paddingRight = "6px";
+      col.paddingLeft = "8px";
+      col.paddingRight = "8px";
+
+      // Column header
+      const headerBg = new Rectangle();
+      headerBg.width = "100%";
+      headerBg.height = "34px";
+      headerBg.cornerRadius = 5;
+      headerBg.background = "rgba(50, 36, 0, 0.85)";
+      headerBg.thickness = 1;
+      headerBg.color = T.PANEL_BORDER;
+      col.addControl(headerBg);
 
       const header = new TextBlock();
       header.text = tree.name.toUpperCase();
-      header.color = "#FFD700";
-      header.fontSize = 15;
+      header.color = T.TITLE;
+      header.fontSize = 14;
       header.fontWeight = "bold";
-      header.height = "28px";
-      col.addControl(header);
+      headerBg.addControl(header);
 
       tree.skills.forEach((skill, skillIdx) => {
+        const isMax  = skill.currentRank >= skill.maxRank;
+        const canBuy = !isMax && skillPoints > 0;
+
         const card = new Rectangle();
-        card.width = "228px";
-        card.height = "128px";
-        card.cornerRadius = 5;
-        card.color = "#444455";
+        card.width = "236px";
+        card.height = "132px";
+        card.cornerRadius = 6;
+        card.color = isMax ? "#3a6a3a" : T.PANEL_BORDER;
         card.thickness = 1;
-        card.background = "rgba(15, 15, 35, 0.85)";
-        card.paddingBottom = "6px";
+        card.background = isMax ? "rgba(10, 28, 10, 0.88)" : "rgba(16, 10, 2, 0.92)";
+        card.paddingTop = "6px";
         col.addControl(card);
 
         const inner = new StackPanel();
@@ -326,7 +568,7 @@ export class UIManager {
 
         const nameText = new TextBlock();
         nameText.text = skill.name;
-        nameText.color = "white";
+        nameText.color = isMax ? T.GOOD : T.TEXT;
         nameText.fontSize = 13;
         nameText.fontWeight = "bold";
         nameText.height = "24px";
@@ -335,27 +577,26 @@ export class UIManager {
         const stars = "★".repeat(skill.currentRank) + "☆".repeat(skill.maxRank - skill.currentRank);
         const rankText = new TextBlock();
         rankText.text = `${stars}  (${skill.currentRank}/${skill.maxRank})`;
-        rankText.color = "#FFD700";
+        rankText.color = T.TITLE;
         rankText.fontSize = 12;
         rankText.height = "20px";
         inner.addControl(rankText);
 
         const descText = new TextBlock();
         descText.text = skill.description;
-        descText.color = "#aaaaaa";
+        descText.color = T.DIM;
         descText.fontSize = 11;
-        descText.height = "20px";
+        descText.height = "22px";
+        descText.textWrapping = true;
         inner.addControl(descText);
 
-        const isMax = skill.currentRank >= skill.maxRank;
-        const canBuy = !isMax && skillPoints > 0;
-
-        const buyBtn = Button.CreateSimpleButton(`skill_${treeIdx}_${skillIdx}`, isMax ? "MAX" : "[+] Upgrade");
+        const buyLabel = isMax ? "✦ MASTERED" : (canBuy ? "[+] Upgrade" : "Need Points");
+        const buyBtn = Button.CreateSimpleButton(`skill_${treeIdx}_${skillIdx}`, buyLabel);
         buyBtn.width = "90%";
-        buyBtn.height = "28px";
-        buyBtn.color = isMax ? "#666666" : (canBuy ? "#88ff88" : "#888888");
-        buyBtn.background = isMax ? "rgba(20,20,20,0.5)" : (canBuy ? "rgba(0,70,0,0.7)" : "rgba(20,20,20,0.5)");
-        buyBtn.cornerRadius = 3;
+        buyBtn.height = "30px";
+        buyBtn.color = isMax ? T.GOOD : (canBuy ? T.TITLE : T.DIM);
+        buyBtn.background = isMax ? "rgba(10,40,10,0.65)" : (canBuy ? "rgba(60,40,0,0.85)" : "rgba(18,12,2,0.55)");
+        buyBtn.cornerRadius = 4;
         buyBtn.thickness = 1;
         buyBtn.fontSize = 12;
         buyBtn.hoverCursor = canBuy ? "pointer" : "default";
@@ -364,6 +605,8 @@ export class UIManager {
           buyBtn.onPointerUpObservable.add(() => {
             if (this.onSkillPurchase) this.onSkillPurchase(treeIdx, skillIdx);
           });
+          buyBtn.onPointerEnterObservable.add(() => { buyBtn.background = "rgba(100,70,0,0.95)"; });
+          buyBtn.onPointerOutObservable.add(() => { buyBtn.background = "rgba(60,40,0,0.85)"; });
         }
 
         inner.addControl(buyBtn);
@@ -374,436 +617,319 @@ export class UIManager {
   }
 
   private _createButton(text: string, parent: StackPanel): Button {
-      const button = Button.CreateSimpleButton("btn_" + text, text);
-      button.width = "100%";
-      button.height = "50px";
-      button.color = "white";
-      button.cornerRadius = 5;
-      button.background = "rgba(50, 50, 50, 0.8)";
-      button.paddingBottom = "10px";
-      button.hoverCursor = "pointer";
-      button.thickness = 1;
+    const button = Button.CreateSimpleButton("btn_" + text, text);
+    button.width = "100%";
+    button.height = "52px";
+    button.color = T.TEXT;
+    button.cornerRadius = 6;
+    button.background = T.BTN_BG;
+    button.paddingBottom = "8px";
+    button.hoverCursor = "pointer";
+    button.thickness = 1;
+    button.fontSize = 16;
 
-      button.isFocusInvisible = false;
-      button.tabIndex = 0;
-      button.accessibilityTag = { description: text };
+    button.isFocusInvisible = false;
+    button.tabIndex = 0;
+    button.accessibilityTag = { description: text };
 
-      const setHoverState = () => {
-          button.background = "rgba(100, 100, 100, 0.9)";
-      };
-      const setNormalState = () => {
-          button.background = "rgba(50, 50, 50, 0.8)";
-      };
+    const setHover = () => {
+      button.background = T.BTN_HOVER;
+      button.color = T.TITLE;
+    };
+    const setNormal = () => {
+      button.background = T.BTN_BG;
+      button.color = T.TEXT;
+    };
 
-      button.onPointerEnterObservable.add(setHoverState);
-      button.onPointerOutObservable.add(setNormalState);
-      button.onFocusObservable.add(setHoverState);
-      button.onBlurObservable.add(setNormalState);
+    button.onPointerEnterObservable.add(setHover);
+    button.onPointerOutObservable.add(setNormal);
+    button.onFocusObservable.add(setHover);
+    button.onBlurObservable.add(setNormal);
 
-      parent.addControl(button);
-      return button;
+    parent.addControl(button);
+    return button;
   }
 
   public toggleInventory(visible: boolean): void {
-      this.inventoryPanel.isVisible = visible;
-      this.toggleCrosshair(!visible);
-      if (!visible) {
-          this.inventoryDescription.text = "";
-      }
-  }
-
-  public togglePauseMenu(visible: boolean): void {
-      this.pausePanel.isVisible = visible;
-      this.toggleCrosshair(!visible);
-  }
-
-  public toggleQuestLog(visible: boolean): void {
-      this.questLogPanel.isVisible = visible;
-      this.toggleCrosshair(!visible);
-  }
-
-  public updateQuestLog(quests: Quest[]): void {
-      while (this.questLogContent.children.length > 0) {
-          this.questLogContent.children[0].dispose();
-      }
-
-      const active = quests.filter(q => q.isActive && !q.isCompleted);
-      const done   = quests.filter(q => q.isCompleted);
-
-      const addEntry = (quest: Quest): void => {
-          const header = new TextBlock();
-          header.text = (quest.isCompleted ? "✓ " : "● ") + quest.name;
-          header.color = quest.isCompleted ? "#aaaaaa" : "#FFD700";
-          header.fontSize = 14;
-          header.fontWeight = "bold";
-          header.height = "24px";
-          header.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-          header.paddingLeft = "10px";
-          header.paddingTop = "6px";
-          this.questLogContent.addControl(header);
-
-          for (const obj of quest.objectives) {
-              const objText = new TextBlock();
-              const check = obj.completed ? "[x]" : "[ ]";
-              objText.text = `  ${check} ${obj.description} (${obj.current}/${obj.required})`;
-              objText.color = obj.completed ? "#666666" : "white";
-              objText.fontSize = 12;
-              objText.height = "20px";
-              objText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-              objText.paddingLeft = "10px";
-              this.questLogContent.addControl(objText);
-          }
-
-          if (quest.reward) {
-              const rewardText = new TextBlock();
-              rewardText.text = `  Reward: ${quest.reward}`;
-              rewardText.color = "#88cc88";
-              rewardText.fontSize = 11;
-              rewardText.height = "18px";
-              rewardText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-              rewardText.paddingLeft = "10px";
-              this.questLogContent.addControl(rewardText);
-          }
-      };
-
-      for (const q of active) addEntry(q);
-      for (const q of done)   addEntry(q);
-
-      if (active.length === 0 && done.length === 0) {
-          const empty = new TextBlock();
-          empty.text = "No quests yet.";
-          empty.color = "#888888";
-          empty.fontSize = 13;
-          empty.height = "30px";
-          empty.paddingLeft = "10px";
-          this.questLogContent.addControl(empty);
-      }
-  }
-
-
-
-  public toggleCrosshair(visible: boolean): void {
-      this.crosshair.isVisible = visible;
-  }
-
-  public setCrosshairActive(active: boolean): void {
-    if (active) {
-        if (this.crosshair.color !== "#FFD700") {
-            this.crosshair.color = "#FFD700"; // Gold
-            this.crosshair.scaleX = 1.2;
-            this.crosshair.scaleY = 1.2;
-            this.crosshair.thickness = 3;
-        }
-    } else {
-        if (this.crosshair.color !== "white") {
-            this.crosshair.color = "white";
-            this.crosshair.scaleX = 1.0;
-            this.crosshair.scaleY = 1.0;
-            this.crosshair.thickness = 2;
-        }
+    this.inventoryPanel.isVisible = visible;
+    this.toggleCrosshair(!visible);
+    if (!visible) {
+      this.inventoryDescription.text = "";
     }
   }
 
+  public togglePauseMenu(visible: boolean): void {
+    this.pausePanel.isVisible = visible;
+    this.toggleCrosshair(!visible);
+  }
+
+  public toggleQuestLog(visible: boolean): void {
+    this.questLogPanel.isVisible = visible;
+    this.toggleCrosshair(!visible);
+  }
+
+  public updateQuestLog(quests: Quest[]): void {
+    while (this.questLogContent.children.length > 0) {
+      this.questLogContent.children[0].dispose();
+    }
+
+    const active = quests.filter(q => q.isActive && !q.isCompleted);
+    const done   = quests.filter(q => q.isCompleted);
+
+    const addEntry = (quest: Quest): void => {
+      const header = new TextBlock();
+      header.text = (quest.isCompleted ? "✓ " : "◆ ") + quest.name;
+      header.color = quest.isCompleted ? T.DIM : T.TITLE;
+      header.fontSize = 14;
+      header.fontWeight = "bold";
+      header.height = "26px";
+      header.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+      header.paddingLeft = "12px";
+      header.paddingTop = "4px";
+      this.questLogContent.addControl(header);
+
+      for (const obj of quest.objectives) {
+        const objText = new TextBlock();
+        const check = obj.completed ? "✓" : "○";
+        objText.text = `    ${check} ${obj.description} (${obj.current}/${obj.required})`;
+        objText.color = obj.completed ? T.DIM : T.TEXT;
+        objText.fontSize = 12;
+        objText.height = "20px";
+        objText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+        objText.paddingLeft = "12px";
+        this.questLogContent.addControl(objText);
+      }
+
+      if (quest.reward) {
+        const rewardText = new TextBlock();
+        rewardText.text = `    Reward: ${quest.reward}`;
+        rewardText.color = T.GOOD;
+        rewardText.fontSize = 11;
+        rewardText.height = "18px";
+        rewardText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+        rewardText.paddingLeft = "12px";
+        this.questLogContent.addControl(rewardText);
+      }
+
+      // Subtle divider between quest entries
+      const questSep = new Rectangle();
+      questSep.width = "88%";
+      questSep.height = "1px";
+      questSep.background = "rgba(107, 79, 18, 0.35)";
+      questSep.thickness = 0;
+      questSep.paddingTop = "4px";
+      this.questLogContent.addControl(questSep);
+    };
+
+    for (const q of active) addEntry(q);
+    for (const q of done)   addEntry(q);
+
+    if (active.length === 0 && done.length === 0) {
+      const empty = new TextBlock();
+      empty.text = "No quests yet.";
+      empty.color = T.DIM;
+      empty.fontSize = 13;
+      empty.height = "30px";
+      empty.paddingLeft = "12px";
+      this.questLogContent.addControl(empty);
+    }
+  }
+
+  public toggleCrosshair(visible: boolean): void {
+    this.crosshair.isVisible = visible;
+  }
+
+  public setCrosshairActive(active: boolean): void {
+    const color = active ? T.TITLE : "rgba(255,255,255,0.9)";
+    const scale = active ? 1.25 : 1.0;
+    if (this._crosshairArms[0]?.background === color) return;
+    for (const arm of this._crosshairArms) {
+      arm.background = color;
+    }
+    this.crosshair.scaleX = scale;
+    this.crosshair.scaleY = scale;
+  }
+
   public updateStats(player: Player): void {
-      this.statsText.text = `Stats:
-Lv: ${player.level}  XP: ${Math.floor(player.experience)}/${player.experienceToNextLevel}
-HP: ${Math.floor(player.health)} / ${player.maxHealth}
-MP: ${Math.floor(player.magicka)} / ${player.maxMagicka}
-SP: ${Math.floor(player.stamina)} / ${player.maxStamina}
-DMG Bonus: +${player.bonusDamage}
-Armor: ${player.bonusArmor}`;
+    this.statsText.text = `Stats:\nLv: ${player.level}  XP: ${Math.floor(player.experience)}/${player.experienceToNextLevel}\nHP: ${Math.floor(player.health)} / ${player.maxHealth}\nMP: ${Math.floor(player.magicka)} / ${player.maxMagicka}\nSP: ${Math.floor(player.stamina)} / ${player.maxStamina}\nDMG Bonus: +${player.bonusDamage}\nArmor: ${player.bonusArmor}`;
   }
 
   public setEquippedIds(ids: Set<string>): void {
-      this._equippedIds = ids;
+    this._equippedIds = ids;
   }
 
   public updateInventory(items: Item[]): void {
-      while (this.inventoryGrid.children.length > 0) {
-          this.inventoryGrid.children[0].dispose();
+    while (this.inventoryGrid.children.length > 0) {
+      this.inventoryGrid.children[0].dispose();
+    }
+
+    items.forEach((item, index) => {
+      if (index >= 20) return;
+
+      const row = Math.floor(index / 4);
+      const col = index % 4;
+      const isEquipped = this._equippedIds.has(item.id);
+
+      const slot = new Rectangle();
+      slot.width = "82px";
+      slot.height = "82px";
+      slot.cornerRadius = 5;
+      slot.color = isEquipped ? T.EQUIP_BORDER : T.PANEL_BORDER;
+      slot.thickness = isEquipped ? 2 : 1;
+      slot.background = isEquipped ? T.EQUIP_BG : T.SLOT_BG;
+      slot.isPointerBlocker = true;
+      slot.hoverCursor = "pointer";
+
+      slot.isFocusInvisible = false;
+      slot.tabIndex = 0;
+      slot.accessibilityTag = { description: item.name };
+
+      const baseColor  = isEquipped ? T.EQUIP_BG  : T.SLOT_BG;
+      const hoverColor = isEquipped ? "rgba(60, 44, 0, 0.95)" : T.SLOT_HOVER;
+
+      const setHoverState = () => {
+        const equipped = this._equippedIds.has(item.id);
+        const hint = item.slot ? (equipped ? "\n[Click to Unequip]" : "\n[Click to Equip]") : "";
+        this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}${hint}`;
+        slot.background = hoverColor;
+      };
+      const setNormalState = () => {
+        this.inventoryDescription.text = "";
+        slot.background = baseColor;
+      };
+
+      slot.onPointerEnterObservable.add(setHoverState);
+      slot.onPointerOutObservable.add(setNormalState);
+      slot.onFocusObservable.add(setHoverState);
+      slot.onBlurObservable.add(setNormalState);
+
+      const triggerItem = () => {
+        if (item.slot && this.onInventoryItemClick) {
+          this.onInventoryItemClick(item);
+        }
+      };
+
+      if (item.slot) {
+        slot.onPointerUpObservable.add(triggerItem);
+        slot.onKeyboardEventProcessedObservable.add((evt) => {
+          if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
+            triggerItem();
+          }
+        });
       }
 
-      items.forEach((item, index) => {
-          if (index >= 20) return; // Limit to grid size
+      const text = new TextBlock();
+      text.text = item.name + (item.quantity > 1 ? ` (${item.quantity})` : "");
+      text.color = isEquipped ? T.TITLE : T.TEXT;
+      text.fontSize = 11;
+      text.textWrapping = true;
+      slot.addControl(text);
 
-          const row = Math.floor(index / 4);
-          const col = index % 4;
-          const isEquipped = this._equippedIds.has(item.id);
-
-          const slot = new Rectangle();
-          slot.width = "80px";
-          slot.height = "80px";
-          slot.color = isEquipped ? "#FFD700" : "gray";
-          slot.thickness = isEquipped ? 2 : 1;
-          slot.background = isEquipped ? "rgba(255, 215, 0, 0.15)" : "rgba(255, 255, 255, 0.1)";
-          slot.isPointerBlocker = true;
-          slot.hoverCursor = "pointer";
-
-          slot.isFocusInvisible = false;
-          slot.tabIndex = 0;
-          slot.accessibilityTag = { description: item.name };
-
-          const baseColor = isEquipped ? "rgba(255, 215, 0, 0.15)" : "rgba(255, 255, 255, 0.1)";
-          const hoverColor = isEquipped ? "rgba(255, 215, 0, 0.35)" : "rgba(255, 255, 255, 0.3)";
-
-          const setHoverState = () => {
-              const equipped = this._equippedIds.has(item.id);
-              const hint = item.slot ? (equipped ? "\n[Click to Unequip]" : "\n[Click to Equip]") : "";
-              this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}${hint}`;
-              slot.background = hoverColor;
-          };
-
-          const setNormalState = () => {
-              this.inventoryDescription.text = "";
-              slot.background = baseColor;
-          };
-
-          // Hover and Focus events
-          slot.onPointerEnterObservable.add(setHoverState);
-          slot.onPointerOutObservable.add(setNormalState);
-          slot.onFocusObservable.add(setHoverState);
-          slot.onBlurObservable.add(setNormalState);
-
-          const triggerItem = () => {
-              if (item.slot && this.onInventoryItemClick) {
-                  this.onInventoryItemClick(item);
-              }
-          };
-
-          // Click to equip/unequip
-          if (item.slot) {
-              slot.onPointerUpObservable.add(triggerItem);
-              slot.onKeyboardEventProcessedObservable.add((evt) => {
-                  if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
-                      triggerItem();
-                  }
-              });
-          }
-
-          const text = new TextBlock();
-          text.text = item.name + (item.quantity > 1 ? ` (${item.quantity})` : "");
-          text.color = isEquipped ? "#FFD700" : "white";
-          text.fontSize = 12;
-          text.textWrapping = true;
-          slot.addControl(text);
-
-          this.inventoryGrid.addControl(slot, row, col);
-      });
+      this.inventoryGrid.addControl(slot, row, col);
+    });
   }
 
   public updateEquipment(slots: Map<EquipSlot, import("../systems/inventory-system").Item>): void {
-      const slotLabels: { key: EquipSlot; label: string }[] = [
-          { key: "mainHand", label: "Main Hand" },
-          { key: "offHand",  label: "Off Hand"  },
-          { key: "head",     label: "Head"      },
-          { key: "chest",    label: "Chest"     },
-          { key: "legs",     label: "Legs"      },
-          { key: "feet",     label: "Feet"      },
-      ];
-      const lines = ["Equipment:"];
-      for (const { key, label } of slotLabels) {
-          const item = slots.get(key);
-          lines.push(`${label}: ${item ? item.name : "--"}`);
-      }
-      this.equipmentText.text = lines.join("\n");
+    const slotLabels: { key: EquipSlot; label: string }[] = [
+      { key: "mainHand", label: "Main Hand" },
+      { key: "offHand",  label: "Off Hand"  },
+      { key: "head",     label: "Head"      },
+      { key: "chest",    label: "Chest"     },
+      { key: "legs",     label: "Legs"      },
+      { key: "feet",     label: "Feet"      },
+    ];
+    const lines = ["Equipment:"];
+    for (const { key, label } of slotLabels) {
+      const item = slots.get(key);
+      lines.push(`${label}: ${item ? item.name : "--"}`);
+    }
+    this.equipmentText.text = lines.join("\n");
   }
 
   public setInteractionText(text: string): void {
-      this.interactionLabel.text = text;
-  }
-
-  private _initUI(): void {
-    this._ui = AdvancedDynamicTexture.CreateFullscreenUI("UI");
-
-    // Interaction Label (Center)
-    this.interactionLabel = new TextBlock();
-    this.interactionLabel.text = "";
-    this.interactionLabel.color = "white";
-    this.interactionLabel.fontSize = 20;
-    this.interactionLabel.top = "50px"; // Slightly below center
-    this.interactionLabel.shadowColor = "black";
-    this.interactionLabel.shadowBlur = 2;
-    this._ui.addControl(this.interactionLabel);
-
-    // Crosshair (Center)
-    this.crosshair = new Ellipse();
-    this.crosshair.width = "10px";
-    this.crosshair.height = "10px";
-    this.crosshair.color = "white";
-    this.crosshair.thickness = 2;
-    this.crosshair.background = "rgba(255, 255, 255, 0.5)";
-    this._ui.addControl(this.crosshair);
-
-    // Compass Bar (Top Center)
-    const compassContainer = new Rectangle();
-    compassContainer.width = "400px";
-    compassContainer.height = "30px";
-    compassContainer.cornerRadius = 5;
-    compassContainer.color = "white";
-    compassContainer.thickness = 2;
-    compassContainer.background = "rgba(0, 0, 0, 0.5)";
-    compassContainer.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    compassContainer.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    compassContainer.top = "20px";
-    this._ui.addControl(compassContainer);
-
-    const compassLabel = new TextBlock();
-    compassLabel.text = "N -- E -- S -- W"; // Placeholder for compass directions
-    compassLabel.color = "white";
-    compassLabel.fontSize = 20;
-    compassContainer.addControl(compassLabel);
-
-    // Status Bars Container (Bottom Center)
-    // Skyrim style: Magicka (Left), Health (Center), Stamina (Right)
-    // But usually in Skyrim:
-    // Health is center. Magicka is left. Stamina is right.
-    // They are separate bars that appear when needed.
-    // For now, I'll make them persistent at the bottom.
-
-    const barsPanel = new StackPanel();
-    barsPanel.isVertical = false;
-    barsPanel.height = "30px";
-    barsPanel.width = "600px";
-    barsPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    barsPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-    barsPanel.top = "-20px";
-    // barsPanel.spacing = 20; // Check if supported
-    this._ui.addControl(barsPanel);
-
-    // Magicka Bar (Blue)
-    const { container: magickaContainer, bar: magickaBar } = this._createBarContainer("blue", barsPanel);
-    magickaContainer.paddingRight = "10px";
-    this.magickaBar = magickaBar;
-
-    // Health Bar (Red)
-    const { container: healthContainer, bar: healthBar } = this._createBarContainer("red", barsPanel);
-    healthContainer.paddingLeft = "5px";
-    healthContainer.paddingRight = "5px";
-    this.healthBar = healthBar;
-
-    // Stamina Bar (Green)
-    const { container: staminaContainer, bar: staminaBar } = this._createBarContainer("green", barsPanel);
-    staminaContainer.paddingLeft = "10px";
-    this.staminaBar = staminaBar;
-
-    // XP Bar (Below stat bars)
-    const xpRow = new StackPanel();
-    xpRow.isVertical = false;
-    xpRow.height = "18px";
-    xpRow.width = "600px";
-    xpRow.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    xpRow.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-    xpRow.top = "-44px";
-    this._ui.addControl(xpRow);
-
-    this._xpLevelLabel = new TextBlock();
-    this._xpLevelLabel.text = "Lv.1";
-    this._xpLevelLabel.color = "#FFD700";
-    this._xpLevelLabel.fontSize = 12;
-    this._xpLevelLabel.width = "40px";
-    this._xpLevelLabel.height = "100%";
-    xpRow.addControl(this._xpLevelLabel);
-
-    const xpBarContainer = new Rectangle();
-    xpBarContainer.width = "554px";
-    xpBarContainer.height = "10px";
-    xpBarContainer.cornerRadius = 2;
-    xpBarContainer.color = "#FFD700";
-    xpBarContainer.thickness = 1;
-    xpBarContainer.background = "black";
-    xpRow.addControl(xpBarContainer);
-
-    this.xpBar = new Rectangle();
-    this.xpBar.width = "0%";
-    this.xpBar.height = "100%";
-    this.xpBar.cornerRadius = 2;
-    this.xpBar.thickness = 0;
-    this.xpBar.background = "#FFD700";
-    this.xpBar.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    xpBarContainer.addControl(this.xpBar);
-
-    // Notification Panel (Top Left)
-    this.notificationPanel = new StackPanel();
-    this.notificationPanel.width = "300px";
-    this.notificationPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    this.notificationPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this.notificationPanel.top = "100px";
-    this.notificationPanel.left = "20px";
-    this.notificationPanel.isVertical = true;
-    this._ui.addControl(this.notificationPanel);
+    this.interactionLabel.text = text;
   }
 
   public showNotification(text: string, duration: number = 3000): void {
-      const rect = new Rectangle();
-      rect.width = "100%";
-      rect.height = "40px";
-      rect.cornerRadius = 5;
-      rect.color = "white";
-      rect.thickness = 1;
-      rect.background = "rgba(0, 0, 0, 0.7)";
-      rect.paddingBottom = "5px";
+    const rect = new Rectangle();
+    rect.width = "100%";
+    rect.height = "38px";
+    rect.cornerRadius = 6;
+    rect.color = T.PANEL_BORDER;
+    rect.thickness = 1;
+    rect.background = "rgba(8, 5, 0, 0.92)";
+    rect.paddingBottom = "4px";
 
-      const label = new TextBlock();
-      label.text = text;
-      label.color = "white";
-      label.fontSize = 16;
-      rect.addControl(label);
+    const label = new TextBlock();
+    label.text = text;
+    label.color = T.TITLE;
+    label.fontSize = 14;
+    label.fontWeight = "bold";
+    rect.addControl(label);
 
-      // Add to top of stack by default? StackPanel adds to end.
-      // Newer notifications appear below older ones.
-      this.notificationPanel.addControl(rect);
+    this.notificationPanel.addControl(rect);
 
-      let elapsedMs = 0;
-      const obs = this.scene.onBeforeRenderObservable.add(() => {
-          elapsedMs += this.scene.getEngine().getDeltaTime();
-          if (elapsedMs >= duration) {
-              this.scene.onBeforeRenderObservable.remove(obs);
-              if (this.notificationPanel.children.includes(rect)) {
-                  this.notificationPanel.removeControl(rect);
-              }
-              rect.dispose();
-          }
-      });
+    let elapsedMs = 0;
+    const obs = this.scene.onBeforeRenderObservable.add(() => {
+      elapsedMs += this.scene.getEngine().getDeltaTime();
+      if (elapsedMs >= duration) {
+        this.scene.onBeforeRenderObservable.remove(obs);
+        if (this.notificationPanel.children.includes(rect)) {
+          this.notificationPanel.removeControl(rect);
+        }
+        rect.dispose();
+      }
+    });
   }
 
-  private _createBarContainer(color: string, parent: StackPanel): { container: Rectangle, bar: Rectangle } {
+  private _createBar(label: string, fillColor: string, trackColor: string, parent: StackPanel): { container: Rectangle, bar: Rectangle } {
     const container = new Rectangle();
-    container.width = "180px";
-    container.height = "15px";
-    container.cornerRadius = 2;
-    container.color = "white";
+    container.width = "192px";
+    container.height = "22px";
+    container.cornerRadius = 5;
+    container.color = "rgba(255,255,255,0.10)";
     container.thickness = 1;
-    container.background = "black";
+    container.background = trackColor;
     parent.addControl(container);
 
     const bar = new Rectangle();
-    bar.width = "100%"; // 100%
+    bar.width = "100%";
     bar.height = "100%";
-    bar.cornerRadius = 2;
-    bar.color = color;
+    bar.cornerRadius = 5;
     bar.thickness = 0;
-    bar.background = color;
+    bar.background = fillColor;
     bar.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     container.addControl(bar);
+
+    // Label overlaid on top of bar
+    const labelText = new TextBlock();
+    labelText.text = label;
+    labelText.color = "rgba(255,255,255,0.82)";
+    labelText.fontSize = 10;
+    labelText.fontWeight = "bold";
+    labelText.width = "100%";
+    labelText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    labelText.paddingLeft = "7px";
+    container.addControl(labelText);
 
     return { container, bar };
   }
 
   public updateHealth(current: number, max: number): void {
-      this.healthBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
+    this.healthBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
   }
 
   public updateMagicka(current: number, max: number): void {
-      this.magickaBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
+    this.magickaBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
   }
 
   public updateStamina(current: number, max: number): void {
-      this.staminaBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
+    this.staminaBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
   }
 
   public updateXP(current: number, max: number, level: number): void {
-      this.xpBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
-      this._xpLevelLabel.text = `Lv.${level}`;
+    this.xpBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
+    this._xpLevelLabel.text = `Lv.${level}`;
   }
 
   /** Flash a translucent color overlay to signal being hit or dealing damage. */
@@ -812,18 +938,18 @@ Armor: ${player.bonusArmor}`;
     flash.width = "100%";
     flash.height = "100%";
     flash.background = color;
-    flash.alpha = 0.35;
+    flash.alpha = 0.28;
     flash.isPointerBlocker = false;
     flash.zIndex = 50;
     this._ui.addControl(flash);
     let elapsedMs = 0;
     const obs = this.scene.onBeforeRenderObservable.add(() => {
-        elapsedMs += this.scene.getEngine().getDeltaTime();
-        if (elapsedMs >= 150) {
-            this.scene.onBeforeRenderObservable.remove(obs);
-            this._ui.removeControl(flash);
-            flash.dispose();
-        }
+      elapsedMs += this.scene.getEngine().getDeltaTime();
+      if (elapsedMs >= 150) {
+        this.scene.onBeforeRenderObservable.remove(obs);
+        this._ui.removeControl(flash);
+        flash.dispose();
+      }
     });
   }
 
@@ -844,11 +970,11 @@ Armor: ${player.bonusArmor}`;
 
     const text = new TextBlock();
     text.text = `-${damage}`;
-    text.color = "orange";
-    text.fontSize = 22;
+    text.color = "#FF6030";
+    text.fontSize = 24;
     text.fontWeight = "bold";
     text.shadowColor = "black";
-    text.shadowBlur = 3;
+    text.shadowBlur = 4;
     text.left = `${screenPos.x - hw}px`;
     text.top = `${screenPos.y - hh}px`;
     text.zIndex = 60;
@@ -856,22 +982,17 @@ Armor: ${player.bonusArmor}`;
 
     let elapsed = 0;
     const obs = this.scene.onBeforeRenderObservable.add(() => {
-        const dt = this.scene.getEngine().getDeltaTime();
-        elapsed += dt;
-
-        // Approximate 50ms steps for position update, but scaled by dt
-        // 1.5px per 50ms is roughly 30px per 1000ms
-        const moveRate = 30 * (dt / 1000);
-        const topPx = parseFloat(text.top as string) - moveRate;
-        text.top = `${topPx}px`;
-
-        text.alpha = Math.max(0, 1 - elapsed / 1000);
-
-        if (elapsed >= 1000) {
-            this.scene.onBeforeRenderObservable.remove(obs);
-            this._ui.removeControl(text);
-            text.dispose();
-        }
+      const dt = this.scene.getEngine().getDeltaTime();
+      elapsed += dt;
+      const moveRate = 30 * (dt / 1000);
+      const topPx = parseFloat(text.top as string) - moveRate;
+      text.top = `${topPx}px`;
+      text.alpha = Math.max(0, 1 - elapsed / 1000);
+      if (elapsed >= 1000) {
+        this.scene.onBeforeRenderObservable.remove(obs);
+        this._ui.removeControl(text);
+        text.dispose();
+      }
     });
   }
 }
