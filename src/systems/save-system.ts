@@ -3,10 +3,11 @@ import { Player } from "../entities/player";
 import { Item, InventorySystem } from "./inventory-system";
 import { EquipmentSystem, EquipSlot } from "./equipment-system";
 import { QuestSystem, QuestSaveState } from "./quest-system";
+import { SkillTreeSystem, SkillSaveState } from "./skill-tree-system";
 import { UIManager } from "../ui/ui-manager";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 
 interface PlayerSaveData {
   position: { x: number; y: number; z: number };
@@ -30,6 +31,8 @@ export interface SaveData {
   inventory: Item[];
   equipment: EquipmentEntry[];
   quests: QuestSaveState[];
+  skills?: SkillSaveState[];
+  skillPoints?: number;
 }
 
 export class SaveSystem {
@@ -37,6 +40,7 @@ export class SaveSystem {
   private _inventory: InventorySystem;
   private _equipment: EquipmentSystem;
   private _quests: QuestSystem | null = null;
+  private _skills: SkillTreeSystem | null = null;
   private _ui: UIManager;
 
   /** Called after a successful load so Game can clean up world state (e.g. remove already-collected loot). */
@@ -52,6 +56,11 @@ export class SaveSystem {
   /** Inject QuestSystem after construction (avoids circular init order in Game). */
   public setQuestSystem(qs: QuestSystem): void {
     this._quests = qs;
+  }
+
+  /** Inject SkillTreeSystem after construction. */
+  public setSkillTreeSystem(sts: SkillTreeSystem): void {
+    this._skills = sts;
   }
 
   public save(): void {
@@ -92,6 +101,8 @@ export class SaveSystem {
       inventory: [...this._inventory.items],
       equipment: equipmentEntries,
       quests: questSaveStates,
+      skills: this._skills ? this._skills.getSaveState() : [],
+      skillPoints: this._player.skillPoints,
     };
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -151,6 +162,12 @@ export class SaveSystem {
     // Restore quest progress
     if (this._quests && data.quests?.length) {
       this._quests.restoreState(data.quests);
+    }
+
+    // Restore skill tree state
+    this._player.skillPoints = data.skillPoints ?? 0;
+    if (this._skills && data.skills?.length) {
+      this._skills.restoreState(data.skills);
     }
 
     // Sync UI once after all state is restored

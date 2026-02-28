@@ -5,6 +5,7 @@ import { Item } from "../systems/inventory-system";
 import { Quest } from "../systems/quest-system";
 import { EquipSlot } from "../systems/equipment-system";
 import { Player } from "../entities/player";
+import type { SkillTree } from "../systems/skill-tree-system";
 
 export class UIManager {
   public scene: Scene;
@@ -50,12 +51,21 @@ export class UIManager {
   // Notifications
   public notificationPanel: StackPanel;
 
+  // Skill Tree
+  public skillTreePanel: Rectangle;
+  private _skillPointsLabel: TextBlock;
+  private _skillTreeContent: StackPanel;
+
+  /** Called when the player clicks a skill upgrade button. Set by Game. */
+  public onSkillPurchase: ((treeIndex: number, skillIndex: number) => void) | null = null;
+
   constructor(scene: Scene) {
     this.scene = scene;
     this._initUI();
     this._initInventoryUI();
     this._initPauseMenu();
     this._initQuestLogUI();
+    this._initSkillTreeUI();
   }
 
   private _initInventoryUI(): void {
@@ -227,6 +237,140 @@ export class UIManager {
     this.questLogContent.top = "50px";
     this.questLogContent.isVertical = true;
     this.questLogPanel.addControl(this.questLogContent);
+  }
+
+  private _initSkillTreeUI(): void {
+    this.skillTreePanel = new Rectangle();
+    this.skillTreePanel.width = "750px";
+    this.skillTreePanel.height = "530px";
+    this.skillTreePanel.cornerRadius = 10;
+    this.skillTreePanel.color = "white";
+    this.skillTreePanel.thickness = 2;
+    this.skillTreePanel.background = "rgba(0, 0, 0, 0.92)";
+    this.skillTreePanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    this.skillTreePanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    this.skillTreePanel.zIndex = 10;
+    this.skillTreePanel.isVisible = false;
+    this._ui.addControl(this.skillTreePanel);
+
+    const title = new TextBlock();
+    title.text = "Skill Tree  [K]";
+    title.color = "#FFD700";
+    title.fontSize = 22;
+    title.height = "40px";
+    title.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    title.top = "8px";
+    this.skillTreePanel.addControl(title);
+
+    this._skillPointsLabel = new TextBlock();
+    this._skillPointsLabel.text = "Skill Points: 0";
+    this._skillPointsLabel.color = "#88ff88";
+    this._skillPointsLabel.fontSize = 15;
+    this._skillPointsLabel.height = "28px";
+    this._skillPointsLabel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this._skillPointsLabel.top = "44px";
+    this.skillTreePanel.addControl(this._skillPointsLabel);
+
+    this._skillTreeContent = new StackPanel();
+    this._skillTreeContent.isVertical = false;
+    this._skillTreeContent.width = "720px";
+    this._skillTreeContent.height = "440px";
+    this._skillTreeContent.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this._skillTreeContent.top = "80px";
+    this.skillTreePanel.addControl(this._skillTreeContent);
+  }
+
+  public toggleSkillTree(visible: boolean): void {
+    this.skillTreePanel.isVisible = visible;
+    this.toggleCrosshair(!visible);
+  }
+
+  public refreshSkillTree(trees: SkillTree[], skillPoints: number): void {
+    this._skillPointsLabel.text = `Skill Points: ${skillPoints}`;
+
+    while (this._skillTreeContent.children.length > 0) {
+      this._skillTreeContent.children[0].dispose();
+    }
+
+    trees.forEach((tree, treeIdx) => {
+      const col = new StackPanel();
+      col.isVertical = true;
+      col.width = "240px";
+      col.height = "100%";
+      col.paddingLeft = "6px";
+      col.paddingRight = "6px";
+
+      const header = new TextBlock();
+      header.text = tree.name.toUpperCase();
+      header.color = "#FFD700";
+      header.fontSize = 15;
+      header.fontWeight = "bold";
+      header.height = "28px";
+      col.addControl(header);
+
+      tree.skills.forEach((skill, skillIdx) => {
+        const card = new Rectangle();
+        card.width = "228px";
+        card.height = "128px";
+        card.cornerRadius = 5;
+        card.color = "#444455";
+        card.thickness = 1;
+        card.background = "rgba(15, 15, 35, 0.85)";
+        card.paddingBottom = "6px";
+        col.addControl(card);
+
+        const inner = new StackPanel();
+        inner.isVertical = true;
+        inner.width = "100%";
+        card.addControl(inner);
+
+        const nameText = new TextBlock();
+        nameText.text = skill.name;
+        nameText.color = "white";
+        nameText.fontSize = 13;
+        nameText.fontWeight = "bold";
+        nameText.height = "24px";
+        inner.addControl(nameText);
+
+        const stars = "★".repeat(skill.currentRank) + "☆".repeat(skill.maxRank - skill.currentRank);
+        const rankText = new TextBlock();
+        rankText.text = `${stars}  (${skill.currentRank}/${skill.maxRank})`;
+        rankText.color = "#FFD700";
+        rankText.fontSize = 12;
+        rankText.height = "20px";
+        inner.addControl(rankText);
+
+        const descText = new TextBlock();
+        descText.text = skill.description;
+        descText.color = "#aaaaaa";
+        descText.fontSize = 11;
+        descText.height = "20px";
+        inner.addControl(descText);
+
+        const isMax = skill.currentRank >= skill.maxRank;
+        const canBuy = !isMax && skillPoints > 0;
+
+        const buyBtn = Button.CreateSimpleButton(`skill_${treeIdx}_${skillIdx}`, isMax ? "MAX" : "[+] Upgrade");
+        buyBtn.width = "90%";
+        buyBtn.height = "28px";
+        buyBtn.color = isMax ? "#666666" : (canBuy ? "#88ff88" : "#888888");
+        buyBtn.background = isMax ? "rgba(20,20,20,0.5)" : (canBuy ? "rgba(0,70,0,0.7)" : "rgba(20,20,20,0.5)");
+        buyBtn.cornerRadius = 3;
+        buyBtn.thickness = 1;
+        buyBtn.fontSize = 12;
+        buyBtn.hoverCursor = canBuy ? "pointer" : "default";
+
+        if (canBuy) {
+          buyBtn.onPointerUpObservable.add(() => {
+            if (this.onSkillPurchase) this.onSkillPurchase(treeIdx, skillIdx);
+          });
+        }
+
+        inner.addControl(buyBtn);
+      });
+
+      this._skillTreeContent.addControl(col);
+    });
   }
 
   private _createButton(text: string, parent: StackPanel): Button {

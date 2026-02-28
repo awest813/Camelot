@@ -82,6 +82,7 @@ describe('CombatSystem', () => {
             health: 100,
             bonusDamage: 0,
             bonusArmor: 0,
+            bonusMagicDamage: 0,
             camera: {
                 position: new Vector3(0, 0, 0),
                 getForwardRay: vi.fn(() => ({
@@ -172,7 +173,8 @@ describe('CombatSystem', () => {
             getDeltaTime: () => 5000
         });
 
-        // Trigger the observable manually
+        // Trigger the observable twice (first call skipped by frame-skip optimization)
+        addedObserver();
         addedObserver();
 
         // Since elapsed time is >= 5000, it should remove itself
@@ -196,6 +198,8 @@ describe('CombatSystem', () => {
         // Projectile position is initialized at player position + forward ray.
         // NPC is at (0, 0, 2). Projectile starts at (0, 0, 1). Distance is 1.0 < 1.2
 
+        // Call twice: first call skipped by frame-skip optimization, second executes logic
+        addedObserver();
         addedObserver();
 
         expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(20); // MAGIC_DAMAGE

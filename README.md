@@ -36,6 +36,13 @@ A modern RPG framework built with Babylon.js 8, Vite 6, and TypeScript. Featurin
   - Floating damage numbers and screen-flash hit indicators.
   - Dialogue interface with choices.
   - Notification system for pickups, attacks, quest events.
+- **Skill Trees**:
+  - Three trees: Combat, Magic, and Survival.
+  - Earn 1 skill point per level; spend points to upgrade skills (toggle with K).
+  - Combat skills: Iron Skin (+Armor), Warrior's Edge (+melee damage), Endurance (+Stamina).
+  - Magic skills: Arcane Power (+magic damage), Mystic Reserve (+Magicka), Mana Flow (+Magicka regen).
+  - Survival skills: Vitality (+Health), Swift Recovery (+HP regen), Second Wind (+Stamina regen).
+  - Skill ranks and unspent points persist across saves.
 - **Debug Tools**:
   - Inspector (Ctrl+Alt+Shift+I).
   - FPS counter.
@@ -51,6 +58,7 @@ A modern RPG framework built with Babylon.js 8, Vite 6, and TypeScript. Featurin
 | E | Interact / Pick up loot / Talk to NPC |
 | I | Toggle Inventory |
 | J | Toggle Quest Log |
+| K | Toggle Skill Tree |
 | Escape | Pause Menu |
 | F5 | Quick Save |
 | F9 | Quick Load |

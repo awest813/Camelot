@@ -28,11 +28,13 @@ export class Player {
   // Equipment bonuses
   public bonusDamage: number = 0;
   public bonusArmor: number = 0;
+  public bonusMagicDamage: number = 0;
 
   // Level & experience
   public level: number = 1;
   public experience: number = 0;
   public experienceToNextLevel: number = 100;
+  public skillPoints: number = 0;
 
   /** Fired with the new level whenever the player levels up. */
   public onLevelUp: ((newLevel: number) => void) | null = null;
@@ -69,6 +71,7 @@ export class Player {
           this.maxHealth += 10;
           this.maxMagicka += 10;
           this.maxStamina += 10;
+          this.skillPoints++;
           this.onLevelUp?.(this.level);
       }
   }
