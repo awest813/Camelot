@@ -16,6 +16,10 @@ export class InteractionSystem {
   /** Set to true while the game is paused or a UI overlay owns focus. */
   public isBlocked: boolean = false;
 
+  // Throttle raycast: only run every N frames
+  private _frameCounter: number = 0;
+  private _raycastInterval: number = 3;
+
   constructor(scene: Scene, player: Player, inventorySystem: InventorySystem, dialogueSystem: DialogueSystem) {
     this.scene = scene;
     this.player = player;
@@ -44,6 +48,9 @@ export class InteractionSystem {
           this.inventorySystem._ui.setCrosshairActive(false);
           return;
       }
+
+      // Throttle the raycast — only re-check every _raycastInterval frames
+      if (++this._frameCounter % this._raycastInterval !== 0) return;
 
       const hit = this._raycast();
       if (hit && hit.pickedMesh && hit.pickedMesh.metadata) {

@@ -13,6 +13,7 @@ class App {
   public scene: Scene;
 
   private canvas: HTMLCanvasElement;
+  private _fpsElement: HTMLElement | null = null;
 
   constructor() {
     // create the canvas html element and attach it to the webpage
@@ -43,7 +44,7 @@ class App {
   private async _initWebGL2Engine(): Promise<void> {
     this.engine = new Engine(this.canvas, true, {
       powerPreference: "high-performance",
-      preserveDrawingBuffer: true,
+      preserveDrawingBuffer: false,
       stencil: true,
       disableWebGL2Support: false,
     });
@@ -79,15 +80,17 @@ class App {
   }
 
   _fps(): void {
-    const dom = document.getElementById("display-fps");
-    if (dom) {
-      dom.textContent = `${this.engine.getFps().toFixed()} fps`;
-    } else {
-      const div = document.createElement("div");
-      div.id = "display-fps";
-      div.textContent = "0";
-      document.body.appendChild(div);
+    if (!this._fpsElement) {
+      this._fpsElement = document.getElementById("display-fps");
+      if (!this._fpsElement) {
+        const div = document.createElement("div");
+        div.id = "display-fps";
+        div.textContent = "0";
+        document.body.appendChild(div);
+        this._fpsElement = div;
+      }
     }
+    this._fpsElement.textContent = `${this.engine.getFps().toFixed()} fps`;
   }
 
   async _bindEvent(): Promise<void> {
@@ -125,8 +128,10 @@ class App {
 
   // Auxiliary Class Configuration
   _config(): void {
-    // Axes
-    new AxesViewer();
+    // Axes — only in dev to avoid adding extra meshes in production
+    if (import.meta.env.DEV) {
+      new AxesViewer();
+    }
 
     // Inspector and other stuff
     this._bindEvent();
