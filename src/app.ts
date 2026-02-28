@@ -14,6 +14,7 @@ class App {
 
   private canvas: HTMLCanvasElement;
   private _fpsElement: HTMLElement | null = null;
+  private _boundEvents = false;
 
   constructor() {
     // create the canvas html element and attach it to the webpage
@@ -23,7 +24,12 @@ class App {
     this.canvas.id = "renderCanvas";
     document.body.appendChild(this.canvas);
 
-    this._initialize();
+    this._initialize().catch((error: unknown) => {
+      console.error("Failed to initialize Camelot", error);
+      this._showFatalError(
+        "Failed to initialize Camelot. Please refresh or check the browser console for details.",
+      );
+    });
   }
 
   private async _initialize(): Promise<void> {
@@ -57,7 +63,6 @@ class App {
     });
     await webgpu.initAsync();
     this.engine = webgpu;
-    console.log(this.engine);
   }
 
   private async _setupScene(): Promise<void> {
@@ -94,6 +99,12 @@ class App {
   }
 
   async _bindEvent(): Promise<void> {
+    if (this._boundEvents) {
+      return;
+    }
+
+    this._boundEvents = true;
+
     // Imports and hide/show the Inspector
     // Works only in DEV mode to reduce the size of the PRODUCTION build
     // Comment IF statement to work in both modes
@@ -103,7 +114,11 @@ class App {
 
       window.addEventListener("keydown", (ev) => {
         // Shift+Ctrl+Alt+I
-        if (ev.shiftKey && ev.ctrlKey && ev.altKey && ev.keyCode === 73) {
+        if (ev.repeat) {
+          return;
+        }
+
+        if (ev.shiftKey && ev.ctrlKey && ev.altKey && ev.code === "KeyI") {
           if (this.scene.debugLayer.isVisible()) {
             this.scene.debugLayer.hide();
           } else {
@@ -142,6 +157,23 @@ class App {
       this._fps();
       this.scene.render();
     });
+  }
+
+  private _showFatalError(message: string): void {
+    const errorBanner = document.createElement("div");
+    errorBanner.style.position = "fixed";
+    errorBanner.style.left = "16px";
+    errorBanner.style.right = "16px";
+    errorBanner.style.bottom = "16px";
+    errorBanner.style.padding = "12px 16px";
+    errorBanner.style.borderRadius = "8px";
+    errorBanner.style.background = "rgba(120, 0, 0, 0.9)";
+    errorBanner.style.color = "#fff";
+    errorBanner.style.fontFamily = "system-ui, sans-serif";
+    errorBanner.style.fontSize = "14px";
+    errorBanner.style.zIndex = "9999";
+    errorBanner.textContent = message;
+    document.body.appendChild(errorBanner);
   }
 }
 
