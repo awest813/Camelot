@@ -27,6 +27,11 @@ export class InventorySystem {
   }
 
   public addItem(newItem: Item): boolean {
+    if (newItem.quantity <= 0) {
+      this._ui.showNotification("Invalid item quantity.", 2000);
+      return false;
+    }
+
     // Check if stackable
     if (newItem.stackable) {
       const existingItem = this.items.find(i => i.id === newItem.id);
@@ -39,7 +44,6 @@ export class InventorySystem {
     }
 
     if (this.items.length >= this.maxCapacity) {
-      console.log("Inventory full!");
       this._ui.showNotification("Inventory Full!", 2000);
       return false;
     }
@@ -52,6 +56,8 @@ export class InventorySystem {
   }
 
   public removeItem(itemId: string, amount: number = 1): boolean {
+    if (amount <= 0) return false;
+
     const index = this.items.findIndex(i => i.id === itemId);
     if (index === -1) return false;
 

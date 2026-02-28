@@ -67,6 +67,26 @@ describe('InventorySystem', () => {
         expect(inventorySystem.items.length).toBe(0);
     });
 
+    it('should reject adding an item with non-positive quantity', () => {
+        const item: Item = { id: '1', name: 'Broken Item', description: 'Desc', stackable: true, quantity: 0 };
+        const result = inventorySystem.addItem(item);
+
+        expect(result).toBe(false);
+        expect(inventorySystem.items).toHaveLength(0);
+        expect(mockUI.updateInventory).not.toHaveBeenCalled();
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Invalid item quantity.', 2000);
+    });
+
+    it('should reject removing a non-positive amount', () => {
+        const item: Item = { id: '1', name: 'Test Item', description: 'Desc', stackable: true, quantity: 2 };
+        inventorySystem.addItem(item);
+
+        const result = inventorySystem.removeItem('1', 0);
+
+        expect(result).toBe(false);
+        expect(inventorySystem.items[0].quantity).toBe(2);
+    });
+
     it('should toggle inventory', () => {
         inventorySystem.toggleInventory();
         expect(inventorySystem.isOpen).toBe(true);
