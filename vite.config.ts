@@ -7,7 +7,7 @@ function pathResolve(dir: string) {
 }
 
 // https://vitejs.dev/config/
-export default ({ mode }: any) => {
+export default ({ mode }: { mode: string }) => {
   const root = process.cwd();
   const env = loadEnv(mode, root);
   return defineConfig({
@@ -55,6 +55,17 @@ export default ({ mode }: any) => {
       assetsInlineLimit: 4096,
       rollupOptions: {
         output: {
+          manualChunks(id) {
+            if (id.includes("@babylonjs")) {
+              return "babylon-vendor";
+            }
+
+            if (id.includes("recast-detour")) {
+              return "recast-vendor";
+            }
+
+            return undefined;
+          },
           chunkFileNames: "static/js/[name]-[hash].js",
           entryFileNames: "static/js/[name]-[hash].js",
           assetFileNames: "static/[ext]/[name]-[hash].[ext]",
