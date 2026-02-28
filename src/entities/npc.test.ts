@@ -12,7 +12,8 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
             position: new Vector3(),
             material: null,
             metadata: null,
-            dispose: vi.fn()
+            dispose: vi.fn(),
+            isDisposed: vi.fn().mockReturnValue(false)
         }))
     }
 }));

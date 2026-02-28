@@ -53,16 +53,11 @@ export class NPC {
     if (this.mesh.isDisposed()) return;
     const mat = this.mesh.material as StandardMaterial;
     mat.diffuseColor = Color3.Red();
-    let elapsedMs = 0;
-    const obs = this.scene.onBeforeRenderObservable.add(() => {
-      elapsedMs += this.scene.getEngine().getDeltaTime();
-      if (elapsedMs >= 150) {
-        this.scene.onBeforeRenderObservable.remove(obs);
-        if (!this.isDead && !this.mesh.isDisposed()) {
-          mat.diffuseColor = this._baseColor.clone();
-        }
+    setTimeout(() => {
+      if (!this.isDead && !this.mesh.isDisposed()) {
+        mat.diffuseColor = this._baseColor.clone();
       }
-    });
+    }, 150);
   }
 
   private _die(): void {
