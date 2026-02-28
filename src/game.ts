@@ -21,6 +21,7 @@ import { QuestSystem } from "./systems/quest-system";
 import { InteractionSystem } from "./systems/interaction-system";
 import { SkillTreeSystem } from "./systems/skill-tree-system";
 import { AudioSystem } from "./systems/audio-system";
+import { NavigationSystem } from "./systems/navigation-system";
 import { Loot } from "./entities/loot";
 
 export class Game {
@@ -40,8 +41,13 @@ export class Game {
   public interactionSystem: InteractionSystem;
   public skillTreeSystem: SkillTreeSystem;
   public audioSystem: AudioSystem;
+  public navigationSystem: NavigationSystem;
 
   public isPaused: boolean = false;
+
+  // Chunk tracking for navmesh rebuild triggers
+  private _lastNavChunkX: number = NaN;
+  private _lastNavChunkZ: number = NaN;
 
   // Cached stat values to avoid redundant UI bar updates every frame
   private _lastHealth: number = -1;
@@ -65,6 +71,7 @@ export class Game {
     this.player = new Player(this.scene, this.canvas);
     this.ui = new UIManager(this.scene);
     this.world = new WorldManager(this.scene);
+    this.navigationSystem = new NavigationSystem(this.scene);
     this.scheduleSystem = new ScheduleSystem(this.scene);
 
     // Test NPC
@@ -77,7 +84,7 @@ export class Game {
       this.scheduleSystem.addNPC(npc);
     };
 
-    this.combatSystem = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs, this.ui);
+    this.combatSystem = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs, this.ui, this.navigationSystem);
     this.dialogueSystem = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
     this.inventorySystem = new InventorySystem(this.player, this.ui, this.canvas);
     this.equipmentSystem = new EquipmentSystem(this.player, this.inventorySystem, this.ui);
@@ -362,6 +369,18 @@ export class Game {
       this.scheduleSystem.update(deltaTime);
       this.combatSystem.updateNPCAI(deltaTime);
       this.interactionSystem.update();
+
+      // Tick the navmesh rebuild debounce; request a rebuild whenever the player
+      // crosses into a new terrain chunk (new ground meshes may have loaded).
+      this.navigationSystem.update(deltaTime);
+      const chunkSize = 50;
+      const cx = Math.floor(this.player.camera.position.x / chunkSize);
+      const cz = Math.floor(this.player.camera.position.z / chunkSize);
+      if (cx !== this._lastNavChunkX || cz !== this._lastNavChunkZ) {
+        this._lastNavChunkX = cx;
+        this._lastNavChunkZ = cz;
+        this.navigationSystem.requestRebuild();
+      }
 
       // Only update UI bars when values have actually changed
       if (this.player.health !== this._lastHealth) {
