@@ -40,9 +40,9 @@
 - [ ] **Improved AI**:
   - Aggressive state (attack player).
   - Pathfinding (Recast/Detour integration).
-- [ ] **Expanded World**:
+- [x] **Expanded World**:
   - [x] Biomes and vegetation (plains, forest, desert, tundra with matching terrain colors and procedural props).
-  - Structures and dungeons.
+  - [x] Structures (deterministic per-chunk spawning: stone ruins with guard NPCs in plains/forest, desert shrines with relic loot, tundra watchtowers with guard NPCs; physics-enabled walls, loot chests).
 
 ### Long Term
 - [x] **Skill System**:

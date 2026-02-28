@@ -64,6 +64,11 @@ export class Game {
     npc.patrolPoints = [new Vector3(10, 2, 10), new Vector3(10, 2, 20), new Vector3(20, 2, 20), new Vector3(20, 2, 10)];
     this.scheduleSystem.addNPC(npc);
 
+    // Wire up structure NPC spawning so guards are tracked by schedule & combat
+    this.world.structures.onNPCSpawn = (npc) => {
+      this.scheduleSystem.addNPC(npc);
+    };
+
     this.combatSystem = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs, this.ui);
     this.dialogueSystem = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
     this.inventorySystem = new InventorySystem(this.player, this.ui, this.canvas);
