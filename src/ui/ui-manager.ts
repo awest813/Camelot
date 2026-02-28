@@ -419,6 +419,7 @@ export class UIManager {
 
   public toggleQuestLog(visible: boolean): void {
       this.questLogPanel.isVisible = visible;
+      this.toggleCrosshair(!visible);
   }
 
   public updateQuestLog(quests: Quest[]): void {
@@ -789,19 +790,19 @@ Armor: ${player.bonusArmor}`;
   }
 
   public updateHealth(current: number, max: number): void {
-      this.healthBar.width = `${Math.max(0, current / max) * 100}%`;
+      this.healthBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
   }
 
   public updateMagicka(current: number, max: number): void {
-      this.magickaBar.width = `${Math.max(0, current / max) * 100}%`;
+      this.magickaBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
   }
 
   public updateStamina(current: number, max: number): void {
-      this.staminaBar.width = `${Math.max(0, current / max) * 100}%`;
+      this.staminaBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
   }
 
   public updateXP(current: number, max: number, level: number): void {
-      this.xpBar.width = `${Math.max(0, current / max) * 100}%`;
+      this.xpBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
       this._xpLevelLabel.text = `Lv.${level}`;
   }
 
