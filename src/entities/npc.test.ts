@@ -98,6 +98,9 @@ describe('NPC', () => {
             expect(npc.isAggressive).toBe(false);
             expect(npc.aggroRange).toBe(12);
             expect(npc.attackRange).toBe(2.5);
+            expect(npc.attackEngageRangeMultiplier).toBe(0.9);
+            expect(npc.attackDisengageRangeMultiplier).toBe(1.15);
+            expect(npc.attackWindup).toBe(0.35);
             expect(npc.attackDamage).toBe(5);
             expect(npc.attackTimer).toBe(0);
             expect(npc.attackCooldown).toBe(2);

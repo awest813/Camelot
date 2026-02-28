@@ -91,6 +91,18 @@ export class NPC {
 
   public aggroRange: number = 12;
   public attackRange: number = 2.5;
+  /**
+   * Inner threshold used when entering ATTACK from CHASE.
+   * Lower than attackRange to avoid edge jitter.
+   */
+  public attackEngageRangeMultiplier: number = 0.9;
+  /**
+   * Outer threshold used when leaving ATTACK back to CHASE.
+   * Higher than attackRange to avoid edge jitter.
+   */
+  public attackDisengageRangeMultiplier: number = 1.15;
+  /** Minimum delay before first swing after entering ATTACK state. */
+  public attackWindup: number = 0.35;
   public attackDamage: number = 5;
   public attackTimer: number = 0;
   public attackCooldown: number = 2; // seconds between attacks

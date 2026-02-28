@@ -214,4 +214,49 @@ describe('CombatSystem', () => {
         expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(20); // MAGIC_DAMAGE
         expect(mockScene.onBeforeRenderObservable.remove).toHaveBeenCalledWith(addedObserver);
     });
+
+    it('uses hysteresis band for attack state transitions', () => {
+        mockNpcs[0].aiState = 'CHASE';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackEngageRangeMultiplier = 0.9;
+        mockNpcs[0].attackDisengageRangeMultiplier = 1.2;
+
+        // Enter ATTACK inside engage range (2 * 0.9 = 1.8)
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.75);
+        combatSystem.updateNPCAI(0.016);
+        expect(mockNpcs[0].aiState).toBe('ATTACK');
+
+        // Stay in ATTACK inside disengage range (2 * 1.2 = 2.4)
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 2.2);
+        combatSystem.updateNPCAI(0.016);
+        expect(mockNpcs[0].aiState).toBe('ATTACK');
+
+        // Drop back to CHASE only after exceeding disengage range
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 2.5);
+        combatSystem.updateNPCAI(0.016);
+        expect(mockNpcs[0].aiState).toBe('CHASE');
+    });
+
+    it('applies attack windup and keeps cooldown ticking while chasing', () => {
+        mockNpcs[0].aiState = 'CHASE';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackEngageRangeMultiplier = 1;
+        mockNpcs[0].attackDisengageRangeMultiplier = 1.2;
+        mockNpcs[0].attackWindup = 0.5;
+        mockNpcs[0].attackCooldown = 2;
+        mockNpcs[0].attackTimer = 0;
+
+        // Enter ATTACK and set windup timer.
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.5);
+        combatSystem.updateNPCAI(0.1);
+        expect(mockNpcs[0].aiState).toBe('ATTACK');
+        expect(mockNpcs[0].attackTimer).toBe(0.5);
+
+        // Move out of attack band into CHASE; cooldown should continue ticking.
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 2.8);
+        combatSystem.updateNPCAI(0.2);
+        expect(mockNpcs[0].aiState).toBe('CHASE');
+        expect(mockNpcs[0].attackTimer).toBe(0.3);
+    });
+
 });
