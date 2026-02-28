@@ -17,6 +17,7 @@ import { EquipmentSystem } from "./systems/equipment-system";
 import { SaveSystem } from "./systems/save-system";
 import { QuestSystem } from "./systems/quest-system";
 import { InteractionSystem } from "./systems/interaction-system";
+import { SkillTreeSystem } from "./systems/skill-tree-system";
 import { Loot } from "./entities/loot";
 
 export class Game {
@@ -34,6 +35,7 @@ export class Game {
   public saveSystem: SaveSystem;
   public questSystem: QuestSystem;
   public interactionSystem: InteractionSystem;
+  public skillTreeSystem: SkillTreeSystem;
 
   public isPaused: boolean = false;
 
@@ -81,6 +83,9 @@ export class Game {
     this.saveSystem.setQuestSystem(this.questSystem);
     this.saveSystem.onAfterLoad = () => this._cleanupCollectedLoot();
     this.interactionSystem = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem);
+    this.skillTreeSystem = new SkillTreeSystem(this.player, this.ui);
+    this.ui.onSkillPurchase = (treeIdx, skillIdx) => this.skillTreeSystem.purchaseSkill(treeIdx, skillIdx);
+    this.saveSystem.setSkillTreeSystem(this.skillTreeSystem);
 
     // Wire quest event callbacks
     this.combatSystem.onNPCDeath = (name, xp) => {
@@ -216,6 +221,19 @@ export class Game {
                 this.togglePause();
             } else if (kbInfo.event.key === "j" || kbInfo.event.key === "J") {
                 if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue) this.questSystem.toggleQuestLog();
+            } else if (kbInfo.event.key === "k" || kbInfo.event.key === "K") {
+                if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue) {
+                    this.skillTreeSystem.toggle();
+                    if (this.skillTreeSystem.isOpen) {
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    } else {
+                        this.interactionSystem.isBlocked = false;
+                        this.canvas.requestPointerLock();
+                        this.player.camera.attachControl(this.canvas, true);
+                    }
+                }
             } else if (kbInfo.event.key === "F5") {
                 if (!this.isPaused) this.saveSystem.save();
             } else if (kbInfo.event.key === "F9") {
@@ -249,6 +267,11 @@ export class Game {
           if (this.questSystem.isLogOpen) {
               this.questSystem.isLogOpen = false;
               this.ui.toggleQuestLog(false);
+          }
+          if (this.skillTreeSystem.isOpen) {
+              this.skillTreeSystem.isOpen = false;
+              this.ui.toggleSkillTree(false);
+              // Pointer lock already released by togglePause path; no re-attachment needed here
           }
           this.interactionSystem.isBlocked = true;
           this.ui.setInteractionText("");

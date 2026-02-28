@@ -131,10 +131,11 @@ export class CombatSystem {
       for (const npc of this.npcs) {
         if (npc.isDead) continue;
         if (Vector3.DistanceSquared(projPos, npc.mesh.position) <= 1.44) { // 1.2^2 = 1.44
-          npc.takeDamage(MAGIC_DAMAGE);
+          const magicDmg = MAGIC_DAMAGE + this.player.bonusMagicDamage;
+          npc.takeDamage(magicDmg);
           this._ui.showDamageNumber(
             npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos),
-            MAGIC_DAMAGE,
+            magicDmg,
             this.scene
           );
           this._ui.showHitFlash("rgba(255, 100, 0, 0.3)");

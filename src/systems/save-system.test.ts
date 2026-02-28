@@ -63,7 +63,7 @@ describe('SaveSystem', () => {
         expect(localStorage.setItem).toHaveBeenCalledOnce();
         const raw = localStorageMock['camelot_save'];
         const data: SaveData = JSON.parse(raw);
-        expect(data.version).toBe(3);
+        expect(data.version).toBe(4);
         expect(data.player.health).toBe(80);
         expect(data.player.magicka).toBe(60);
         expect(data.player.stamina).toBe(90);

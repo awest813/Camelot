@@ -47,8 +47,10 @@
 ### Long Term
 - [x] **Skill System**:
   - [x] Leveling and experience (XP from kills and quest completion, level-up stat bonuses, HUD XP bar, save/load support).
-  - [ ] Skill trees (Magic, Combat, Stealth).
+  - [x] Skill trees (Combat, Magic, Survival) — 1 skill point per level, 3 skills × 3 trees, ranks persist in save file, toggle with K.
 - [ ] **Audio System**:
   - Footsteps, combat sounds, ambient music.
+- [ ] **Improved AI**:
+  - Pathfinding (Recast/Detour integration).
 - [ ] **Multiplayer**:
   - Basic replication and networking.
