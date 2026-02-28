@@ -61,6 +61,7 @@ export class CombatSystem {
 
         // Knockback impulse
         if (npc.physicsAggregate?.body) {
+          const forward = this.player.camera.getForwardRay(1).direction;
           npc.physicsAggregate.body.applyImpulse(forward.scale(10), hit.pickedPoint!);
         }
 
@@ -115,8 +116,7 @@ export class CombatSystem {
 
       for (const npc of this.npcs) {
         if (npc.isDead) continue;
-        if (Vector3.DistanceSquared(projectile.position, npc.mesh.position) > 1.44) continue; // 1.2^2 = 1.44
-        {
+        if (Vector3.DistanceSquared(projectile.position, npc.mesh.position) <= 1.44) { // 1.2^2 = 1.44
           npc.takeDamage(MAGIC_DAMAGE);
           this._ui.showDamageNumber(
             npc.mesh.position.add(new Vector3(0, 2, 0)),

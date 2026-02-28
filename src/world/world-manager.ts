@@ -40,7 +40,7 @@ export class WorldManager {
     for (const [key, mesh] of this.loadedChunks) {
       const [cx, cz] = key.split(",").map(Number);
       if (Math.abs(cx - chunkX) > this.unloadDistance || Math.abs(cz - chunkZ) > this.unloadDistance) {
-        mesh.dispose();
+        mesh.dispose(false, true); // true = also dispose material & textures
         this.loadedChunks.delete(key);
       }
     }
