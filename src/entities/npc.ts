@@ -50,11 +50,19 @@ export class NPC {
   }
 
   private _flashHit(): void {
+    if (this.mesh.isDisposed()) return;
     const mat = this.mesh.material as StandardMaterial;
     mat.diffuseColor = Color3.Red();
-    setTimeout(() => {
-      if (!this.isDead) mat.diffuseColor = this._baseColor.clone();
-    }, 150);
+    let elapsedMs = 0;
+    const obs = this.scene.onBeforeRenderObservable.add(() => {
+      elapsedMs += this.scene.getEngine().getDeltaTime();
+      if (elapsedMs >= 150) {
+        this.scene.onBeforeRenderObservable.remove(obs);
+        if (!this.isDead && !this.mesh.isDisposed()) {
+          mat.diffuseColor = this._baseColor.clone();
+        }
+      }
+    });
   }
 
   private _die(): void {

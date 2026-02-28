@@ -109,8 +109,12 @@ export class CombatSystem {
       if (elapsedMs >= 5000) {
         alive = false;
         this.scene.onBeforeRenderObservable.remove(obs);
-        projectile.dispose();
-        agg.dispose();
+        if (!projectile.isDisposed()) {
+          projectile.dispose();
+        }
+        if (agg.body && !agg.body.isDisposed) {
+          agg.dispose();
+        }
         return;
       }
 
@@ -132,8 +136,12 @@ export class CombatSystem {
           // Detonate fireball
           alive = false;
           this.scene.onBeforeRenderObservable.remove(obs);
-          projectile.dispose();
-          agg.dispose();
+          if (!projectile.isDisposed()) {
+            projectile.dispose();
+          }
+          if (agg.body && !agg.body.isDisposed) {
+            agg.dispose();
+          }
           return;
         }
       }
