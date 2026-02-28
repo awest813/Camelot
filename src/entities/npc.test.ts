@@ -7,7 +7,7 @@ import { PhysicsMotionType } from '@babylonjs/core/Physics';
 // Mock BabylonJS core features to avoid complex initialization
 vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
     MeshBuilder: {
-        CreateCapsule: vi.fn((name, options, scene) => ({
+        CreateCapsule: vi.fn((name, _options, _scene) => ({
             name,
             position: new Vector3(),
             material: null,
@@ -19,17 +19,15 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
 }));
 
 vi.mock('@babylonjs/core/Materials/standardMaterial', () => {
-    return {
-        StandardMaterial: class {
-            diffuseColor: any = null;
-            clone() {
-                const mat = new this.constructor();
-                mat.diffuseColor = this.diffuseColor ? { ...this.diffuseColor } : null;
-                return mat;
-            }
-            constructor() {}
+    class MockStandardMaterial {
+        diffuseColor: any = null;
+        clone() {
+            const mat = new MockStandardMaterial();
+            mat.diffuseColor = this.diffuseColor ? { ...this.diffuseColor } : null;
+            return mat;
         }
-    };
+    }
+    return { StandardMaterial: MockStandardMaterial };
 });
 
 vi.mock('@babylonjs/core/Physics/v2/physicsAggregate', () => {
@@ -115,9 +113,10 @@ describe('NPC', () => {
             // Verify mesh properties
             expect(npc.mesh.position).toEqual(new Vector3(1, 2, 3));
             expect(npc.mesh.material).toBeDefined();
-            expect(npc.mesh.material.diffuseColor.r).toBe(1);
-            expect(npc.mesh.material.diffuseColor.g).toBe(1);
-            expect(npc.mesh.material.diffuseColor.b).toBe(0);
+            const mat = npc.mesh.material as any;
+            expect(mat.diffuseColor.r).toBe(1);
+            expect(mat.diffuseColor.g).toBe(1);
+            expect(mat.diffuseColor.b).toBe(0);
 
             // Verify physics properties
             expect(npc.physicsAggregate.body.setMotionType).toHaveBeenCalledWith(PhysicsMotionType.DYNAMIC);
