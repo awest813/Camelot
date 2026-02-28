@@ -46,6 +46,7 @@ export class InteractionSystem {
       if (this.dialogueSystem.isInDialogue || this.inventorySystem.isOpen) {
           this.inventorySystem._ui.setInteractionText("");
           this.inventorySystem._ui.setCrosshairActive(false);
+          this.inventorySystem._ui.hideTargetInfo();
           return;
       }
 
@@ -56,15 +57,19 @@ export class InteractionSystem {
       if (hit && hit.pickedMesh && hit.pickedMesh.metadata) {
           const metadata = hit.pickedMesh.metadata;
           if (metadata.type === 'npc') {
-              this.inventorySystem._ui.setInteractionText(`Press E to Talk to ${metadata.npc.mesh.name}`);
+              const npc = metadata.npc;
+              this.inventorySystem._ui.setInteractionText(`Press E to Talk to ${npc.mesh.name}`);
               this.inventorySystem._ui.setCrosshairActive(true);
+              this.inventorySystem._ui.showTargetInfo(npc.mesh.name, npc.health, npc.maxHealth);
           } else if (metadata.type === 'loot') {
               this.inventorySystem._ui.setInteractionText(`Press E to Take ${metadata.loot.item.name}`);
               this.inventorySystem._ui.setCrosshairActive(true);
+              this.inventorySystem._ui.hideTargetInfo();
           }
       } else {
           this.inventorySystem._ui.setInteractionText("");
           this.inventorySystem._ui.setCrosshairActive(false);
+          this.inventorySystem._ui.hideTargetInfo();
       }
   }
 

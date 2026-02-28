@@ -50,6 +50,14 @@ export class UIManager {
   // Notifications
   public notificationPanel: StackPanel;
 
+  // Compass label (updated each frame via updateCompass)
+  private _compassLabel: TextBlock;
+
+  // Target info (shown when aiming at an NPC)
+  private _targetInfoPanel: Rectangle;
+  private _targetNameLabel: TextBlock;
+  private _targetHealthBar: Rectangle;
+
   constructor(scene: Scene) {
     this.scene = scene;
     this._initUI();
@@ -502,11 +510,11 @@ Armor: ${player.bonusArmor}`;
     compassContainer.top = "20px";
     this._ui.addControl(compassContainer);
 
-    const compassLabel = new TextBlock();
-    compassLabel.text = "N -- E -- S -- W"; // Placeholder for compass directions
-    compassLabel.color = "white";
-    compassLabel.fontSize = 20;
-    compassContainer.addControl(compassLabel);
+    this._compassLabel = new TextBlock();
+    this._compassLabel.text = "N -- E -- S -- W";
+    this._compassLabel.color = "white";
+    this._compassLabel.fontSize = 20;
+    compassContainer.addControl(this._compassLabel);
 
     // Status Bars Container (Bottom Center)
     // Skyrim style: Magicka (Left), Health (Center), Stamina (Right)
@@ -586,6 +594,49 @@ Armor: ${player.bonusArmor}`;
     this.notificationPanel.left = "20px";
     this.notificationPanel.isVertical = true;
     this._ui.addControl(this.notificationPanel);
+
+    // Target Info Panel (Center — shown above the crosshair when aiming at an NPC)
+    this._targetInfoPanel = new Rectangle();
+    this._targetInfoPanel.width = "220px";
+    this._targetInfoPanel.height = "44px";
+    this._targetInfoPanel.cornerRadius = 4;
+    this._targetInfoPanel.color = "rgba(255,255,255,0.6)";
+    this._targetInfoPanel.thickness = 1;
+    this._targetInfoPanel.background = "rgba(0,0,0,0.65)";
+    this._targetInfoPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    this._targetInfoPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    this._targetInfoPanel.top = "-40px";
+    this._targetInfoPanel.isVisible = false;
+    this._ui.addControl(this._targetInfoPanel);
+
+    this._targetNameLabel = new TextBlock();
+    this._targetNameLabel.text = "";
+    this._targetNameLabel.color = "#FFD700";
+    this._targetNameLabel.fontSize = 13;
+    this._targetNameLabel.height = "18px";
+    this._targetNameLabel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this._targetNameLabel.top = "4px";
+    this._targetInfoPanel.addControl(this._targetNameLabel);
+
+    const targetHpContainer = new Rectangle();
+    targetHpContainer.width = "200px";
+    targetHpContainer.height = "10px";
+    targetHpContainer.cornerRadius = 2;
+    targetHpContainer.color = "rgba(255,255,255,0.4)";
+    targetHpContainer.thickness = 1;
+    targetHpContainer.background = "#333";
+    targetHpContainer.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+    targetHpContainer.top = "-4px";
+    this._targetInfoPanel.addControl(targetHpContainer);
+
+    this._targetHealthBar = new Rectangle();
+    this._targetHealthBar.width = "100%";
+    this._targetHealthBar.height = "100%";
+    this._targetHealthBar.cornerRadius = 2;
+    this._targetHealthBar.thickness = 0;
+    this._targetHealthBar.background = "#cc4444";
+    this._targetHealthBar.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    targetHpContainer.addControl(this._targetHealthBar);
   }
 
   public showNotification(text: string, duration: number = 3000): void {
@@ -659,6 +710,38 @@ Armor: ${player.bonusArmor}`;
   public updateXP(current: number, max: number, level: number): void {
       this.xpBar.width = `${Math.max(0, current / max) * 100}%`;
       this._xpLevelLabel.text = `Lv.${level}`;
+  }
+
+  /**
+   * Show the target info panel with the NPC's name and a health bar.
+   * Call hideTargetInfo() to dismiss it.
+   */
+  public showTargetInfo(name: string, health: number, maxHealth: number): void {
+    this._targetInfoPanel.isVisible = true;
+    this._targetNameLabel.text = name;
+    const pct = maxHealth > 0 ? Math.max(0, health / maxHealth) * 100 : 0;
+    this._targetHealthBar.width = `${pct}%`;
+  }
+
+  /** Hide the NPC target info panel. */
+  public hideTargetInfo(): void {
+    this._targetInfoPanel.isVisible = false;
+  }
+
+  /**
+   * Update the compass label based on the camera's horizontal facing angle.
+   * @param yawDeg  Angle in degrees from Math.atan2(forward.x, forward.z) * RAD_TO_DEG.
+   *                0 = facing +Z, 90 = facing +X, 180 = facing -Z, 270 = facing -X.
+   */
+  public updateCompass(yawDeg: number): void {
+    // 0° = +Z (South), 90° = +X (East), 180° = -Z (North), 270° = -X (West)
+    const dirs = ['S', 'SE', 'E', 'NE', 'N', 'NW', 'W', 'SW'];
+    const normalized = ((yawDeg % 360) + 360) % 360;
+    const idx = Math.round(normalized / 45) % 8;
+    const prev = dirs[(idx + 7) % 8];
+    const curr = dirs[idx];
+    const next = dirs[(idx + 1) % 8];
+    this._compassLabel.text = `${prev}  ·  ${curr}  ·  ${next}`;
   }
 
   /** Flash a translucent color overlay to signal being hit or dealing damage. */

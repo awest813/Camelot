@@ -22,7 +22,7 @@ export class Loot {
 
     // Add color based on item type or just random?
     // Let's make it green for loot
-    const material = new StandardMaterial("lootMat", scene);
+    const material = new StandardMaterial(`lootMat_${item.id}`, scene);
     material.diffuseColor = Color3.Green();
     this.mesh.material = material;
 

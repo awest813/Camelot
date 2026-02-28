@@ -37,6 +37,11 @@ export class Game {
 
   public isPaused: boolean = false;
 
+  // Player death/respawn state
+  private _playerDead: boolean = false;
+  private _respawnTimer: number = 0;
+  private static readonly RESPAWN_DELAY_MS = 3000;
+
   // Cached stat values to avoid redundant UI bar updates every frame
   private _lastHealth: number = -1;
   private _lastMagicka: number = -1;
@@ -73,7 +78,14 @@ export class Game {
     this.dialogueSystem = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
     this.inventorySystem = new InventorySystem(this.player, this.ui, this.canvas);
     this.equipmentSystem = new EquipmentSystem(this.player, this.inventorySystem, this.ui);
-    this.ui.onInventoryItemClick = (item) => this.equipmentSystem.handleItemClick(item);
+    // Route consumable items (potions) to useItem; equipment items go to equip/unequip
+    this.ui.onInventoryItemClick = (item) => {
+        if (item.stats?.heal) {
+            this.inventorySystem.useItem(item.id);
+        } else {
+            this.equipmentSystem.handleItemClick(item);
+        }
+    };
     this.saveSystem = new SaveSystem(this.player, this.inventorySystem, this.equipmentSystem, this.ui);
     this.questSystem = new QuestSystem(this.ui);
     this.saveSystem.setQuestSystem(this.questSystem);
@@ -234,6 +246,21 @@ export class Game {
     });
   }
 
+  /** Respawn the player at origin with half health, reset NPC aggro. */
+  private _respawn(): void {
+      this._playerDead = false;
+      this.player.health = Math.floor(this.player.maxHealth * 0.5);
+      this.player.magicka = this.player.maxMagicka;
+      this.player.stamina = this.player.maxStamina;
+      this.player.camera.position = new Vector3(0, 5, 0);
+      this.player.camera.attachControl(this.canvas, true);
+      // De-aggro all living NPCs
+      for (const npc of this.scheduleSystem.npcs) {
+          if (!npc.isDead) npc.isAggressive = false;
+      }
+      this.ui.showNotification("Respawned. Stay vigilant!", 2500);
+  }
+
   togglePause(): void {
       this.isPaused = !this.isPaused;
       this.ui.togglePauseMenu(this.isPaused);
@@ -289,11 +316,32 @@ export class Game {
 
       const deltaTime = this.engine.getDeltaTime() / 1000;
 
+      // Handle player death / respawn
+      if (this.player.health <= 0 && !this._playerDead) {
+          this._playerDead = true;
+          this._respawnTimer = Game.RESPAWN_DELAY_MS;
+          this.ui.showNotification("You have been defeated! Respawning...", Game.RESPAWN_DELAY_MS);
+          this.player.camera.detachControl();
+      }
+
+      if (this._playerDead) {
+          this._respawnTimer -= deltaTime * 1000;
+          if (this._respawnTimer <= 0) {
+              this._respawn();
+          }
+          return; // skip remaining systems while dead
+      }
+
       this.player.update(deltaTime);
       this.world.update(this.player.camera.position);
       this.scheduleSystem.update(deltaTime);
       this.combatSystem.updateNPCAI(deltaTime);
       this.interactionSystem.update();
+
+      // Update compass from camera forward direction
+      const forward = this.player.camera.getForwardRay(1).direction;
+      const yawDeg = Math.atan2(forward.x, forward.z) * (180 / Math.PI);
+      this.ui.updateCompass(yawDeg);
 
       // Only update UI bars when values have actually changed
       if (this.player.health !== this._lastHealth) {

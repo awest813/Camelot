@@ -51,6 +51,21 @@ export class InventorySystem {
     return true;
   }
 
+  /**
+   * Consume a usable item (e.g. health potion). Restores health by `stats.heal`,
+   * removes one from the stack, and returns true on success.
+   */
+  public useItem(itemId: string): boolean {
+    const item = this.items.find(i => i.id === itemId);
+    if (!item || !item.stats?.heal) return false;
+
+    const heal = item.stats.heal as number;
+    this._player.health = Math.min(this._player.maxHealth, this._player.health + heal);
+    this.removeItem(itemId, 1);
+    this._ui.showNotification(`Used ${item.name}. +${heal} HP`, 2000);
+    return true;
+  }
+
   public removeItem(itemId: string, amount: number = 1): boolean {
     const index = this.items.findIndex(i => i.id === itemId);
     if (index === -1) return false;

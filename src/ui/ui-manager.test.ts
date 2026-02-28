@@ -73,6 +73,75 @@ describe('UIManager', () => {
         uiManager = new UIManager({} as Scene);
     });
 
+    // ── updateCompass ─────────────────────────────────────────────────────────
+
+    describe('updateCompass', () => {
+        it('shows S when facing +Z (yaw = 0)', () => {
+            uiManager.updateCompass(0);
+            const label = (uiManager as any)._compassLabel;
+            expect(label.text).toContain('S');
+        });
+
+        it('shows N when facing -Z (yaw = 180)', () => {
+            uiManager.updateCompass(180);
+            const label = (uiManager as any)._compassLabel;
+            expect(label.text).toContain('N');
+        });
+
+        it('shows E when facing +X (yaw = 90)', () => {
+            uiManager.updateCompass(90);
+            const label = (uiManager as any)._compassLabel;
+            expect(label.text).toContain('E');
+        });
+
+        it('shows W when facing -X (yaw = 270)', () => {
+            uiManager.updateCompass(270);
+            const label = (uiManager as any)._compassLabel;
+            expect(label.text).toContain('W');
+        });
+
+        it('is stable across full 360-degree rotation', () => {
+            for (let deg = 0; deg < 360; deg += 45) {
+                expect(() => uiManager.updateCompass(deg)).not.toThrow();
+            }
+        });
+    });
+
+    // ── showTargetInfo / hideTargetInfo ───────────────────────────────────────
+
+    describe('showTargetInfo / hideTargetInfo', () => {
+        it('makes the target info panel visible and sets name', () => {
+            uiManager.showTargetInfo('Guard', 75, 100);
+            const panel = (uiManager as any)._targetInfoPanel;
+            const nameLabel = (uiManager as any)._targetNameLabel;
+            expect(panel.isVisible).toBe(true);
+            expect(nameLabel.text).toBe('Guard');
+        });
+
+        it('sets health bar width proportionally', () => {
+            uiManager.showTargetInfo('Guard', 50, 100);
+            const bar = (uiManager as any)._targetHealthBar;
+            expect(bar.width).toBe('50%');
+        });
+
+        it('clamps health bar to 0% when health is 0', () => {
+            uiManager.showTargetInfo('Guard', 0, 100);
+            const bar = (uiManager as any)._targetHealthBar;
+            expect(bar.width).toBe('0%');
+        });
+
+        it('handles maxHealth of 0 gracefully', () => {
+            expect(() => uiManager.showTargetInfo('Guard', 0, 0)).not.toThrow();
+        });
+
+        it('hideTargetInfo hides the panel', () => {
+            uiManager.showTargetInfo('Guard', 50, 100);
+            uiManager.hideTargetInfo();
+            const panel = (uiManager as any)._targetInfoPanel;
+            expect(panel.isVisible).toBe(false);
+        });
+    });
+
     describe('updateHealth', () => {
         it('should update healthBar width based on normal health', () => {
             uiManager.updateHealth(50, 100);

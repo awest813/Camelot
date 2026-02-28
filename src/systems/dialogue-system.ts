@@ -115,11 +115,31 @@ export class DialogueSystem {
 
     // Show UI
     this._dialoguePanel.isVisible = true;
-    this._textBlock.text = `NPC: Hello, traveler.`;
+    this._textBlock.text = `${npc.mesh.name}: ${this._getGreeting(npc.mesh.name)}`;
 
     // Add choices
-    this._addChoice("Hello.", () => this._endDialogue());
+    this._addChoice("Tell me about this place.", () => {
+        this._textBlock.text = `${npc.mesh.name}: ${this._getLoreText(npc.mesh.name)}`;
+        this._choicesPanel.clearControls();
+        this._addChoice("I see. Thanks.", () => this._endDialogue());
+    });
     this._addChoice("Goodbye.", () => this._endDialogue());
+  }
+
+  /** Greeting line based on NPC name prefix. */
+  private _getGreeting(name: string): string {
+    if (name.startsWith("Guard")) return "Halt! State your business, stranger.";
+    if (name.startsWith("RuinGuard")) return "You dare trespass these ancient ruins?";
+    if (name.startsWith("TowerGuard")) return "The pass is watched. Turn back or face steel.";
+    return "Hello, traveler. What brings you here?";
+  }
+
+  /** Lore line based on NPC name prefix. */
+  private _getLoreText(name: string): string {
+    if (name.startsWith("Guard")) return "The village has seen darker days. Keep your sword handy and your wits sharper.";
+    if (name.startsWith("RuinGuard")) return "These ruins hold secrets older than memory. Leave them be.";
+    if (name.startsWith("TowerGuard")) return "The watchtower stands to warn of threats from the north. Danger is always near.";
+    return "This land is vast and treacherous. Trust no one you haven't tested in battle.";
   }
 
   private _addChoice(text: string, callback: () => void): void {

@@ -79,4 +79,59 @@ describe('InventorySystem', () => {
         expect(mockUI.toggleInventory).toHaveBeenCalledWith(false);
         expect(mockPlayer.camera.attachControl).toHaveBeenCalled();
     });
+
+    // ── useItem ───────────────────────────────────────────────────────────────
+
+    it('useItem restores health from a potion and removes it from inventory', () => {
+        const potion: Item = { id: 'hp_01', name: 'Health Potion', description: '', stackable: true, quantity: 1, stats: { heal: 50 } };
+        mockPlayer.health = 40;
+        mockPlayer.maxHealth = 100;
+        inventorySystem.addItem(potion);
+
+        const result = inventorySystem.useItem('hp_01');
+
+        expect(result).toBe(true);
+        expect(mockPlayer.health).toBe(90);
+        expect(inventorySystem.items.length).toBe(0); // removed
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Used Health Potion. +50 HP', 2000);
+    });
+
+    it('useItem does not exceed maxHealth', () => {
+        const potion: Item = { id: 'hp_01', name: 'Health Potion', description: '', stackable: true, quantity: 1, stats: { heal: 50 } };
+        mockPlayer.health = 90;
+        mockPlayer.maxHealth = 100;
+        inventorySystem.addItem(potion);
+
+        inventorySystem.useItem('hp_01');
+
+        expect(mockPlayer.health).toBe(100); // clamped to max
+    });
+
+    it('useItem returns false for non-consumable items', () => {
+        const sword: Item = { id: 'sword_01', name: 'Iron Sword', description: '', stackable: false, quantity: 1, slot: 'mainHand', stats: { damage: 10 } };
+        inventorySystem.addItem(sword);
+
+        const result = inventorySystem.useItem('sword_01');
+
+        expect(result).toBe(false);
+        expect(inventorySystem.items.length).toBe(1); // not removed
+    });
+
+    it('useItem returns false for unknown item id', () => {
+        const result = inventorySystem.useItem('nonexistent');
+        expect(result).toBe(false);
+    });
+
+    it('useItem decrements stack quantity rather than removing when quantity > 1', () => {
+        const potion: Item = { id: 'hp_01', name: 'Health Potion', description: '', stackable: true, quantity: 3, stats: { heal: 30 } };
+        mockPlayer.health = 50;
+        mockPlayer.maxHealth = 100;
+        inventorySystem.addItem(potion);
+
+        inventorySystem.useItem('hp_01');
+
+        expect(inventorySystem.items.length).toBe(1);
+        expect(inventorySystem.items[0].quantity).toBe(2);
+        expect(mockPlayer.health).toBe(80);
+    });
 });

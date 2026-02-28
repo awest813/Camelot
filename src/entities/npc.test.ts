@@ -12,7 +12,8 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
             position: new Vector3(),
             material: null,
             metadata: null,
-            dispose: vi.fn()
+            dispose: vi.fn(),
+            isDisposed: vi.fn(() => false),
         }))
     }
 }));
@@ -22,7 +23,7 @@ vi.mock('@babylonjs/core/Materials/standardMaterial', () => {
         StandardMaterial: class {
             diffuseColor: any = null;
             clone() {
-                const mat = new this.constructor();
+                const mat = new (this.constructor as any)();
                 mat.diffuseColor = this.diffuseColor ? { ...this.diffuseColor } : null;
                 return mat;
             }
@@ -70,15 +71,28 @@ vi.mock('@babylonjs/core/Maths/math.color', () => {
 
 describe('NPC', () => {
     let mockScene: any;
+    let observableCallbacks: Array<() => void>;
 
     beforeEach(() => {
-        mockScene = {};
-        vi.useFakeTimers();
+        observableCallbacks = [];
+        mockScene = {
+            onBeforeRenderObservable: {
+                add: vi.fn((cb: () => void) => {
+                    observableCallbacks.push(cb);
+                    return cb;
+                }),
+                remove: vi.fn((cb: () => void) => {
+                    observableCallbacks = observableCallbacks.filter(c => c !== cb);
+                }),
+            },
+            getEngine: vi.fn(() => ({
+                getDeltaTime: vi.fn(() => 200), // 200ms per frame → exceeds 150ms threshold
+            })),
+        };
     });
 
     afterEach(() => {
         vi.restoreAllMocks();
-        vi.useRealTimers();
     });
 
     describe('Initialization', () => {
@@ -144,7 +158,7 @@ describe('NPC', () => {
             expect(npc.isDead).toBe(false);
         });
 
-        it('should flash red when taking damage', () => {
+        it('should flash red when taking damage and restore color after observable fires', () => {
             npc.takeDamage(10);
 
             const mat = npc.mesh.material as any;
@@ -152,8 +166,8 @@ describe('NPC', () => {
             expect(mat.diffuseColor.g).toBe(0);
             expect(mat.diffuseColor.b).toBe(0);
 
-            // Fast forward time to pass the 150ms timeout
-            vi.advanceTimersByTime(150);
+            // Trigger the scene observable to simulate a render frame (200ms > 150ms threshold)
+            observableCallbacks.forEach(cb => cb());
 
             // Should be back to base color (yellow)
             expect(mat.diffuseColor.r).toBe(1);
@@ -184,7 +198,7 @@ describe('NPC', () => {
             expect(npc.health).toBe(0);
             expect(npc.isDead).toBe(true);
 
-            npc.takeDamage(10); // hit again
+            npc.takeDamage(10); // hit again — should have no effect
             expect(npc.health).toBe(0);
         });
 

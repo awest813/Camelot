@@ -71,8 +71,7 @@ export class WorldManager {
           this.chunkVegetation.delete(key);
         }
 
-        // Dispose structure meshes and loot for this chunk
-        const [cx, cz] = key.split(",").map(Number);
+        // Dispose structure meshes and loot for this chunk (cx/cz from outer destructure)
         this.structures.disposeChunk(cx, cz);
       }
     }
