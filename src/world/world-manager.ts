@@ -6,6 +6,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType } from "@babylonjs/core/Physics";
+import { StructureManager } from "./structure-manager";
 
 export type BiomeType = "plains" | "forest" | "desert" | "tundra";
 
@@ -17,12 +18,16 @@ export class WorldManager {
   private loadDistance: number = 2; // Radius of chunks to load
   private unloadDistance: number = 4; // Chunks beyond this radius are disposed
 
+  /** Manages procedural structures (ruins, shrines, towers) per chunk. */
+  public structures: StructureManager;
+
   // Throttle: only run chunk logic every N frames
   private _frameCounter: number = 0;
   private _updateInterval: number = 10;
 
   constructor(scene: Scene) {
     this.scene = scene;
+    this.structures = new StructureManager(scene);
   }
 
   /**
@@ -65,6 +70,10 @@ export class WorldManager {
           for (const m of veg) m.dispose(false, true);
           this.chunkVegetation.delete(key);
         }
+
+        // Dispose structure meshes and loot for this chunk
+        const [cx, cz] = key.split(",").map(Number);
+        this.structures.disposeChunk(cx, cz);
       }
     }
   }
@@ -101,6 +110,9 @@ export class WorldManager {
     if (vegMeshes.length > 0) {
       this.chunkVegetation.set(key, vegMeshes);
     }
+
+    // Spawn a structure for this chunk (ruins, shrine, or tower based on biome)
+    this.structures.trySpawnForChunk(x, z, biome, this.chunkSize);
   }
 
   private _getBiomeColor(biome: BiomeType): Color3 {
