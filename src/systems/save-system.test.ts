@@ -165,7 +165,7 @@ describe('SaveSystem', () => {
         const badData: SaveData = {
             version: 999,
             timestamp: Date.now(),
-            player: { position: { x: 0, y: 0, z: 0 }, health: 100, magicka: 100, stamina: 100 },
+            player: { position: { x: 0, y: 0, z: 0 }, health: 100, magicka: 100, stamina: 100, level: 1, experience: 0, experienceToNextLevel: 100 },
             inventory: [],
             equipment: [],
             quests: [],

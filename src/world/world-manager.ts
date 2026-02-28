@@ -72,7 +72,6 @@ export class WorldManager {
         }
 
         // Dispose structure meshes and loot for this chunk
-        const [cx, cz] = key.split(",").map(Number);
         this.structures.disposeChunk(cx, cz);
       }
     }
