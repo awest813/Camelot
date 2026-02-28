@@ -1,114 +1,131 @@
-# Babylon.js RPG Template
+# Camelot
 
-A modern RPG framework built with Babylon.js 8, Vite 6, and TypeScript. Featuring Havok physics, infinite terrain chunks, player controller with RPG stats, NPC interaction/combat systems, inventory, equipment, save/load, and a quest system.
+A modular, browser-based RPG sandbox built with **Babylon.js 8**, **TypeScript**, and **Vite**. Camelot combines action combat, progression systems, procedural world generation, and UI-heavy RPG workflows into a single project template that is easy to expand.
 
-## Features
+## Why Camelot
 
-- **Engine**: Babylon.js 8 + Vite 6 + TypeScript (Fast HMR & Builds)
-- **Physics**: Havok Physics integration for rigid bodies and interactions.
-- **Player Controller**:
-  - FPS Camera with physics-based movement.
-  - RPG Stats: Health, Magicka, Stamina (with regeneration).
-  - Combat: Melee (Stamina cost) and Magic (Magicka cost) attacks.
-- **World**:
-  - Infinite procedural terrain generation (chunk-based).
-  - Dynamic chunk loading/unloading logic.
-- **NPCs & AI**:
-  - Patrol points and movement logic.
-  - Aggro system — NPCs attack the player when provoked or in range.
-  - Interaction system with cinematic dialogue camera.
-- **Inventory & Equipment**:
-  - Item pickup, stacking, and grid-based inventory UI (toggle with I).
-  - Equipment slots (mainHand, offHand, head, chest, legs, feet).
-  - Equipped weapons add bonus damage; armor reduces incoming damage.
-  - Click items in inventory to equip/unequip; gold highlight for equipped items.
-- **Quest System**:
-  - Quest log overlay (toggle with J).
-  - Three objective types: Kill, Fetch, and Talk.
-  - Automatic progress tracking via NPC death, item pickup, and dialogue events.
-  - Quest completion notification; quest state saved and loaded with the game.
-- **Save / Load**:
-  - Persist player position, stats, inventory, equipment, and quest progress to localStorage.
-  - Save with F5 or from the pause menu; load with F9 or from the pause menu.
-- **UI**:
-  - Real-time HUD (Health, Magicka, Stamina bars).
-  - Compass bar, crosshair with highlight on interactables.
-  - Floating damage numbers and screen-flash hit indicators.
-  - Dialogue interface with choices.
-  - Notification system for pickups, attacks, quest events.
-- **Skill Trees**:
-  - Three trees: Combat, Magic, and Survival.
-  - Earn 1 skill point per level; spend points to upgrade skills (toggle with K).
-  - Combat skills: Iron Skin (+Armor), Warrior's Edge (+melee damage), Endurance (+Stamina).
-  - Magic skills: Arcane Power (+magic damage), Mystic Reserve (+Magicka), Mana Flow (+Magicka regen).
-  - Survival skills: Vitality (+Health), Swift Recovery (+HP regen), Second Wind (+Stamina regen).
-  - Skill ranks and unspent points persist across saves.
-- **Debug Tools**:
-  - Inspector (Ctrl+Alt+Shift+I).
-  - FPS counter.
+Camelot is designed for developers who want to prototype or ship first-person RPG mechanics quickly while keeping systems decoupled and maintainable.
+
+- Strong gameplay foundation: combat, stats, quests, skills, inventory, equipment.
+- Runtime persistence: save/load of major player and quest state.
+- Procedural world scaffolding: chunked terrain, biome content, structures.
+- Tool-ready architecture: systems are organized for future editor and content pipeline work.
+
+## Gameplay Systems
+
+### Player + Combat
+
+- Physics-based first-person movement.
+- Core RPG resources: **Health**, **Magicka**, **Stamina** with regeneration.
+- Melee and magic combat loops with resource costs.
+- Damage feedback via floating combat text and hit indicators.
+
+### NPCs + Interaction
+
+- NPC patrol behavior and aggro response.
+- Dialogue interactions with cinematic conversation camera.
+- Interaction prompts and crosshair-based focus highlighting.
+
+### World + Content
+
+- Infinite chunked terrain generation.
+- Biome variants and procedural props.
+- Deterministic structure spawns (ruins, shrines, watchtowers).
+- Loot placement and pickup flow.
+
+### Progression
+
+- Inventory with stacking and equip/unequip support.
+- Equipment slots with stat modifiers.
+- Quest log with objective tracking (Kill / Fetch / Talk).
+- Skill trees (Combat / Magic / Survival) with persistent rank progression.
+
+### UI + Quality of Life
+
+- Real-time HUD bars and XP display.
+- Pause menu with quick save/load actions.
+- Notifications for items, combat, and quest events.
+- Debug inspector and FPS overlay support.
 
 ## Controls
 
-| Key / Button | Action |
-|---|---|
-| WASD | Move |
-| Mouse | Look around |
-| Left Click | Melee Attack (costs Stamina) |
-| Right Click | Magic Attack (costs Magicka) |
-| E | Interact / Pick up loot / Talk to NPC |
-| I | Toggle Inventory |
-| J | Toggle Quest Log |
-| K | Toggle Skill Tree |
-| Escape | Pause Menu |
-| F5 | Quick Save |
-| F9 | Quick Load |
+| Key / Button | Action                    |
+| ------------ | ------------------------- |
+| WASD         | Move                      |
+| Mouse        | Look                      |
+| Left Click   | Melee attack (Stamina)    |
+| Right Click  | Magic attack (Magicka)    |
+| E            | Interact / pick up / talk |
+| I            | Toggle inventory          |
+| J            | Toggle quest log          |
+| K            | Toggle skill tree         |
+| M            | Toggle audio mute         |
+| F5           | Quick save                |
+| F9           | Quick load                |
+| Esc          | Pause menu                |
 
-## Getting Started
+## Tech Stack
+
+- **Rendering/Engine**: Babylon.js 8
+- **Language**: TypeScript
+- **Build Tool**: Vite 6
+- **Physics**: Havok
+- **Testing**: Vitest
+
+## Quick Start
 
 ### Prerequisites
-- Node.js (v18+)
+
+- Node.js 18+
 - npm
 
-### Installation
+### Install
 
-1. Clone the repository.
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+```
 
-### Development
-Run the development server with hot module replacement:
+### Run in development
+
 ```bash
 npm run dev
 ```
-Open `http://localhost:8088` in your browser.
 
-### Production Build
-Build for production:
+Open `http://localhost:8088`.
+
+### Build and preview
+
 ```bash
 npm run build
-```
-Preview the production build:
-```bash
 npm run preview
 ```
 
-### Tests
+### Run tests
+
 ```bash
 npx vitest run
 ```
 
-## Project Structure
+## Project Layout
 
-- `src/game.ts`: Main entry point, game loop, and system wiring.
-- `src/entities/`: Player, NPC, and Loot entity classes.
-- `src/systems/`: Game systems — Combat, Dialogue, Interaction, Inventory, Equipment, Save, Quest, Schedule.
-- `src/world/`: World generation and chunk management.
-- `src/ui/`: UIManager (HUD, inventory, quest log, pause menu, notifications).
+- `src/game.ts` – game bootstrap and system orchestration.
+- `src/entities/` – player, NPC, loot, and entity logic.
+- `src/systems/` – combat, interaction, dialogue, inventory, equipment, quest, save, and related systems.
+- `src/world/` – terrain chunking, biome generation, structures.
+- `src/ui/` – HUD, menus, overlays, notifications.
 
-## Roadmap
-See [ROADMAP.md](./ROADMAP.md) for future plans.
+## Roadmap Highlights
+
+The full roadmap lives in [`ROADMAP.md`](./ROADMAP.md). Key upcoming focus areas:
+
+- AI improvements (pathfinding, behavior depth).
+- Content tooling and data pipelines.
+- **Map Editor initiative** (in-engine + standalone workflows):
+  - Terrain paint/sculpt layers.
+  - Structure and spawn-point placement tools.
+  - Quest/NPC authoring helpers.
+  - Export/import for reusable map packs.
 
 ---
-Based on [babylon-vite-template](https://github.com/minibao/babylon-vite)
+
+Built on top of ideas from [babylon-vite-template](https://github.com/minibao/babylon-vite-template).
