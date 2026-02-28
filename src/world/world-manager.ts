@@ -13,7 +13,7 @@ export type BiomeType = "plains" | "forest" | "desert" | "tundra";
 export class WorldManager {
   private scene: Scene;
   private chunkSize: number = 50;
-  private loadedChunks: Map<string, Mesh> = new Map();
+  private loadedChunks: Map<string, { mesh: Mesh; cx: number; cz: number }> = new Map();
   private chunkVegetation: Map<string, Mesh[]> = new Map();
   private loadDistance: number = 2; // Radius of chunks to load
   private unloadDistance: number = 4; // Chunks beyond this radius are disposed
@@ -58,8 +58,7 @@ export class WorldManager {
     }
 
     // Unload chunks that are too far from the player
-    for (const [key, mesh] of this.loadedChunks) {
-      const [cx, cz] = key.split(",").map(Number);
+    for (const [key, { mesh, cx, cz }] of this.loadedChunks) {
       if (Math.abs(cx - chunkX) > this.unloadDistance || Math.abs(cz - chunkZ) > this.unloadDistance) {
         mesh.dispose(false, true); // true = also dispose material & textures
         this.loadedChunks.delete(key);
@@ -102,7 +101,7 @@ export class WorldManager {
     material.diffuseColor = this._getBiomeColor(biome);
     chunkMesh.material = material;
 
-    this.loadedChunks.set(key, chunkMesh);
+    this.loadedChunks.set(key, { mesh: chunkMesh, cx: x, cz: z });
 
     // Spawn vegetation for this chunk
     const vegMeshes = this._spawnVegetation(x, z, biome);
