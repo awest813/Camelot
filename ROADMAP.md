@@ -48,8 +48,11 @@
 - [x] **Skill System**:
   - [x] Leveling and experience (XP from kills and quest completion, level-up stat bonuses, HUD XP bar, save/load support).
   - [x] Skill trees (Combat, Magic, Survival) — 1 skill point per level, 3 skills × 3 trees, ranks persist in save file, toggle with K.
-- [ ] **Audio System**:
-  - Footsteps, combat sounds, ambient music.
+- [x] **Audio System**:
+  - [x] Footsteps (procedural, fire when player moves).
+  - [x] Combat sounds (melee swing, magic whoosh, player hit, NPC death).
+  - [x] Ambient wind drone (looping filtered noise).
+  - [x] Mute toggle (M key).
 - [ ] **Improved AI**:
   - Pathfinding (Recast/Detour integration).
 - [ ] **Multiplayer**:
