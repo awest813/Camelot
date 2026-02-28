@@ -29,6 +29,7 @@
     "@babylonjs/inspector": "^8.52.1",
     "@babylonjs/loaders": "^8.52.1",
     "@babylonjs/materials": "^8.52.1",
-    "@babylonjs/post-processes": "^8.52.1"
+    "@babylonjs/post-processes": "^8.52.1",
+    "recast-detour": "^1.5.0"
   }
 }

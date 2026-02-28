@@ -1,6 +1,6 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { NPC } from "../entities/npc";
+import { NPC, AIState } from "../entities/npc";
 
 export class ScheduleSystem {
   public scene: Scene;
@@ -28,9 +28,14 @@ export class ScheduleSystem {
   }
 
   private _updateNPC(npc: NPC, deltaTime: number): void {
-    // When dead or aggressive the combat system owns movement
+    // CombatSystem owns movement for any state other than IDLE/PATROL
     if (npc.isDead || npc.isAggressive) return;
     if (npc.patrolPoints.length === 0) return;
+
+    // Ensure aiState reflects that we are patrolling
+    if (npc.aiState === AIState.IDLE) {
+      npc.aiState = AIState.PATROL;
+    }
 
     if (npc.waitTime > 0) {
       npc.waitTime -= deltaTime;
