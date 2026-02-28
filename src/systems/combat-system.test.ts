@@ -116,6 +116,9 @@ describe('CombatSystem', () => {
             // Combat fields
             aggroRange: 10,
             attackRange: 2,
+            attackEngageRangeMultiplier: 0.9,
+            attackDisengageRangeMultiplier: 1.15,
+            attackWindup: 0.35,
             attackDamage: 5,
             attackTimer: 0,
             attackCooldown: 2,
@@ -257,6 +260,46 @@ describe('CombatSystem', () => {
         combatSystem.updateNPCAI(0.2);
         expect(mockNpcs[0].aiState).toBe('CHASE');
         expect(mockNpcs[0].attackTimer).toBe(0.3);
+    });
+
+    it('hands off attack ownership between nearby NPCs', () => {
+        const npcA = mockNpcs[0];
+        const npcB = {
+            ...mockNpcs[0],
+            mesh: {
+                name: 'npc2',
+                position: new Vector3(0, 0, 1.7),
+                lookAt: vi.fn()
+            },
+            setStateColor: vi.fn(),
+            physicsAggregate: {
+                body: { applyImpulse: vi.fn(), getLinearVelocityToRef: vi.fn(), setLinearVelocity: vi.fn() }
+            }
+        };
+
+        npcA.aiState = 'CHASE';
+        npcA.mesh.position = new Vector3(0, 0, 1.5);
+        npcA.attackTimer = 1;
+
+        npcB.aiState = 'CHASE';
+        npcB.attackTimer = 1;
+
+        combatSystem.npcs = [npcA, npcB];
+
+        // Closest NPC receives attack slot first.
+        combatSystem.updateNPCAI(0.016);
+        expect(npcA.aiState).toBe('ATTACK');
+        expect(npcB.aiState).toBe('CHASE');
+
+        // Move current attacker out of range so the second NPC takes over.
+        npcA.mesh.position = new Vector3(0, 0, 5);
+        combatSystem.updateNPCAI(0.016);
+        expect(npcA.aiState).toBe('CHASE');
+        expect(npcB.aiState).toBe('CHASE');
+
+        // Next update grants attack slot to the remaining close NPC.
+        combatSystem.updateNPCAI(0.016);
+        expect(npcB.aiState).toBe('ATTACK');
     });
 
 });

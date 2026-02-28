@@ -40,12 +40,24 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 
 ---
 
+## Alpha Stage Focus
+
+The current alpha stage is centered on combat readability and encounter stability while preserving rapid iteration velocity.
+
+### Alpha Milestones
+
+- ✅ Multi-NPC threat handoff and attack-slot arbitration.
+- 🚧 NPC combat decision loops (distance bands, cooldown discipline).
+- 🧭 Expanded patrol variation and reactive state transitions.
+
+---
+
 ## Near-Term (Next 1–2 Releases)
 
 ### AI and Encounter Quality
 
 - 🚧 Improve NPC combat decision loops (distance bands, cooldown discipline).
-- 🧭 Add better threat handoff (multi-NPC aggro arbitration).
+- ✅ Add better threat handoff (multi-NPC aggro arbitration).
 - 🧭 Expand patrol behaviors with idle variation and reactive states.
 
 ### Combat Feel and Balance

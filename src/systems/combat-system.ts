@@ -18,6 +18,7 @@ const COLOR_IDLE    = Color3.Yellow();
 const COLOR_ALERT   = new Color3(1.0, 0.55, 0.0);  // orange
 const COLOR_CHASE   = Color3.Red();
 const COLOR_RETURN  = new Color3(1.0, 0.85, 0.0);  // warm yellow — calming down
+const MAX_CONCURRENT_ATTACKERS = 1;
 
 export class CombatSystem {
   public scene: Scene;
@@ -32,6 +33,7 @@ export class CombatSystem {
   private _newVel: Vector3 = new Vector3();
   private _lookAtTarget: Vector3 = new Vector3();
   private _hitPos: Vector3 = new Vector3();
+  private _attackReservations: Set<NPC> = new Set();
 
   private static readonly _OFFSET_Y1 = new Vector3(0, 1, 0);
   private static readonly _OFFSET_Y2 = new Vector3(0, 2, 0);
@@ -186,10 +188,36 @@ export class CombatSystem {
    */
   public updateNPCAI(deltaTime: number): void {
     const playerPos = this.player.camera.position;
+    this._refreshAttackReservations(playerPos);
 
     for (const npc of this.npcs) {
       if (npc.isDead) continue;
       this._tickNPC(npc, playerPos, deltaTime);
+    }
+  }
+
+  /**
+   * Select which hostile NPCs are allowed to occupy ATTACK state this frame.
+   * Current attackers get priority to avoid constant handoff churn.
+   */
+  private _refreshAttackReservations(playerPos: Vector3): void {
+    this._attackReservations.clear();
+
+    const candidates = this.npcs
+      .filter((npc) => !npc.isDead && (
+        npc.aiState === AIState.CHASE || npc.aiState === AIState.ATTACK
+      ))
+      .sort((a, b) => {
+        if (a.aiState === AIState.ATTACK && b.aiState !== AIState.ATTACK) return -1;
+        if (b.aiState === AIState.ATTACK && a.aiState !== AIState.ATTACK) return 1;
+        const aDist = Vector3.DistanceSquared(a.mesh.position, playerPos);
+        const bDist = Vector3.DistanceSquared(b.mesh.position, playerPos);
+        return aDist - bDist;
+      });
+
+    for (const npc of candidates) {
+      if (this._attackReservations.size >= MAX_CONCURRENT_ATTACKERS) break;
+      this._attackReservations.add(npc);
     }
   }
 
@@ -247,7 +275,7 @@ export class CombatSystem {
           this._transitionTo(npc, AIState.RETURN);
           break;
         }
-        if (distSq <= attackEngageRangeSq) {
+        if (distSq <= attackEngageRangeSq && this._attackReservations.has(npc)) {
           this._transitionTo(npc, AIState.ATTACK);
           break;
         }
@@ -258,6 +286,10 @@ export class CombatSystem {
       case AIState.ATTACK:
         if (distSq > deaggroRangeSq) {
           this._transitionTo(npc, AIState.RETURN);
+          break;
+        }
+        if (!this._attackReservations.has(npc)) {
+          this._transitionTo(npc, AIState.CHASE);
           break;
         }
         if (distSq > attackDisengageRangeSq) {
