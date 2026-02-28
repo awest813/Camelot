@@ -31,7 +31,7 @@ export default ({ mode }: any) => {
     },
     // server config
     server: {
-      // host: '192.168.0.0',
+      host: env.VITE_HOST || 'localhost',
       port: Number(env.VITE_PORT) || 8088,
       open: env.VITE_OPEN === "true",
       hmr: env.VITE_HMR === "true",
