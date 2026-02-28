@@ -3,12 +3,14 @@ import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { Player } from "../entities/player";
 import { InventorySystem } from "./inventory-system";
 import { DialogueSystem } from "./dialogue-system";
+import { UIManager } from "../ui/ui-manager";
 
 export class InteractionSystem {
   public scene: Scene;
   public player: Player;
   public inventorySystem: InventorySystem;
   public dialogueSystem: DialogueSystem;
+  public ui: UIManager;
 
   /** Fired with the item's id when loot is successfully picked up. */
   public onLootPickup: ((itemId: string) => void) | null = null;
@@ -20,11 +22,12 @@ export class InteractionSystem {
   private _frameCounter: number = 0;
   private _raycastInterval: number = 3;
 
-  constructor(scene: Scene, player: Player, inventorySystem: InventorySystem, dialogueSystem: DialogueSystem) {
+  constructor(scene: Scene, player: Player, inventorySystem: InventorySystem, dialogueSystem: DialogueSystem, ui: UIManager) {
     this.scene = scene;
     this.player = player;
     this.inventorySystem = inventorySystem;
     this.dialogueSystem = dialogueSystem;
+    this.ui = ui;
 
     this._initInput();
   }
@@ -43,9 +46,9 @@ export class InteractionSystem {
   }
 
   public update(): void {
-      if (this.dialogueSystem.isInDialogue || this.inventorySystem.isOpen) {
-          this.inventorySystem._ui.setInteractionText("");
-          this.inventorySystem._ui.setCrosshairActive(false);
+      if (this.isBlocked || this.dialogueSystem.isInDialogue || this.inventorySystem.isOpen) {
+          this.ui.setInteractionText("");
+          this.ui.setCrosshairActive(false);
           return;
       }
 
@@ -56,15 +59,15 @@ export class InteractionSystem {
       if (hit && hit.pickedMesh && hit.pickedMesh.metadata) {
           const metadata = hit.pickedMesh.metadata;
           if (metadata.type === 'npc') {
-              this.inventorySystem._ui.setInteractionText(`Press E to Talk to ${metadata.npc.mesh.name}`);
-              this.inventorySystem._ui.setCrosshairActive(true);
+              this.ui.setInteractionText(`Press E to Talk to ${metadata.npc.mesh.name}`);
+              this.ui.setCrosshairActive(true);
           } else if (metadata.type === 'loot') {
-              this.inventorySystem._ui.setInteractionText(`Press E to Take ${metadata.loot.item.name}`);
-              this.inventorySystem._ui.setCrosshairActive(true);
+              this.ui.setInteractionText(`Press E to Take ${metadata.loot.item.name}`);
+              this.ui.setCrosshairActive(true);
           }
       } else {
-          this.inventorySystem._ui.setInteractionText("");
-          this.inventorySystem._ui.setCrosshairActive(false);
+          this.ui.setInteractionText("");
+          this.ui.setCrosshairActive(false);
       }
   }
 

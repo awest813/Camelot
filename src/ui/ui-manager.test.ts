@@ -106,12 +106,7 @@ describe('UIManager', () => {
 
         it('should handle zero max health safely', () => {
             uiManager.updateHealth(0, 0);
-            // In JavaScript 0/0 is NaN, so Math.max(0, NaN) * 100 -> NaN -> 'NaN%'
-            // Depending on implementation, NaN% is fine or we might want to check for it.
-            // Let's just expect NaN% for now, or maybe the code should handle it?
-            // The method is: `this.healthBar.width = ${Math.max(0, current / max) * 100}%;`
-            // Math.max(0, NaN) returns NaN.
-            expect(uiManager.healthBar.width).toBe('NaN%');
+            expect(uiManager.healthBar.width).toBe('0%');
         });
     });
 });

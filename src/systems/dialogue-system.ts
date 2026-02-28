@@ -19,6 +19,7 @@ export class DialogueSystem {
   private _cinematicCamera: ArcRotateCamera;
   private _originalCamera: Camera | null = null;
   private _isInDialogue: boolean = false;
+  private _choiceCount: number = 0;
 
   // Scratch vectors for performance optimization
   private _direction: Vector3 = new Vector3();
@@ -114,8 +115,9 @@ export class DialogueSystem {
     this.player.camera.detachControl();
 
     // Show UI
+    this._choiceCount = 0;
     this._dialoguePanel.isVisible = true;
-    this._textBlock.text = `NPC: Hello, traveler.`;
+    this._textBlock.text = `${npc.mesh.name}: Hello, traveler.`;
 
     // Add choices
     this._addChoice("Hello.", () => this._endDialogue());
@@ -123,7 +125,7 @@ export class DialogueSystem {
   }
 
   private _addChoice(text: string, callback: () => void): void {
-    const button = Button.CreateSimpleButton("btn", text);
+    const button = Button.CreateSimpleButton(`btn_choice_${this._choiceCount++}`, text);
     button.width = "700px";
     button.height = "40px";
     button.color = "white";

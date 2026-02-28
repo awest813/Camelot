@@ -84,7 +84,7 @@ export class Game {
     this.questSystem = new QuestSystem(this.ui);
     this.saveSystem.setQuestSystem(this.questSystem);
     this.saveSystem.onAfterLoad = () => this._cleanupCollectedLoot();
-    this.interactionSystem = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem);
+    this.interactionSystem = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem, this.ui);
     this.skillTreeSystem = new SkillTreeSystem(this.player, this.ui);
     this.ui.onSkillPurchase = (treeIdx, skillIdx) => this.skillTreeSystem.purchaseSkill(treeIdx, skillIdx);
     this.saveSystem.setSkillTreeSystem(this.skillTreeSystem);
@@ -227,9 +227,20 @@ export class Game {
             if (kbInfo.event.key === "Escape") {
                 this.togglePause();
             } else if (kbInfo.event.key === "j" || kbInfo.event.key === "J") {
-                if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue) this.questSystem.toggleQuestLog();
+                if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue && !this.skillTreeSystem.isOpen) {
+                    this.questSystem.toggleQuestLog();
+                    if (this.questSystem.isLogOpen) {
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    } else {
+                        this.interactionSystem.isBlocked = false;
+                        this.canvas.requestPointerLock();
+                        this.player.camera.attachControl(this.canvas, true);
+                    }
+                }
             } else if (kbInfo.event.key === "k" || kbInfo.event.key === "K") {
-                if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue) {
+                if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue && !this.questSystem.isLogOpen) {
                     this.skillTreeSystem.toggle();
                     if (this.skillTreeSystem.isOpen) {
                         this.interactionSystem.isBlocked = true;
@@ -277,6 +288,7 @@ export class Game {
           if (this.questSystem.isLogOpen) {
               this.questSystem.isLogOpen = false;
               this.ui.toggleQuestLog(false);
+              this.interactionSystem.isBlocked = true;
           }
           if (this.skillTreeSystem.isOpen) {
               this.skillTreeSystem.isOpen = false;
