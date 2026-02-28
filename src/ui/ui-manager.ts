@@ -608,12 +608,17 @@ Armor: ${player.bonusArmor}`;
       // Newer notifications appear below older ones.
       this.notificationPanel.addControl(rect);
 
-      setTimeout(() => {
-          if (this.notificationPanel.children.includes(rect)) {
-              this.notificationPanel.removeControl(rect);
+      let elapsedMs = 0;
+      const obs = this.scene.onBeforeRenderObservable.add(() => {
+          elapsedMs += this.scene.getEngine().getDeltaTime();
+          if (elapsedMs >= duration) {
+              this.scene.onBeforeRenderObservable.remove(obs);
+              if (this.notificationPanel.children.includes(rect)) {
+                  this.notificationPanel.removeControl(rect);
+              }
+              rect.dispose();
           }
-          rect.dispose();
-      }, duration);
+      });
   }
 
   private _createBarContainer(color: string, parent: StackPanel): { container: Rectangle, bar: Rectangle } {
@@ -666,10 +671,15 @@ Armor: ${player.bonusArmor}`;
     flash.isPointerBlocker = false;
     flash.zIndex = 50;
     this._ui.addControl(flash);
-    setTimeout(() => {
-      this._ui.removeControl(flash);
-      flash.dispose();
-    }, 150);
+    let elapsedMs = 0;
+    const obs = this.scene.onBeforeRenderObservable.add(() => {
+        elapsedMs += this.scene.getEngine().getDeltaTime();
+        if (elapsedMs >= 150) {
+            this.scene.onBeforeRenderObservable.remove(obs);
+            this._ui.removeControl(flash);
+            flash.dispose();
+        }
+    });
   }
 
   /**
@@ -700,16 +710,23 @@ Armor: ${player.bonusArmor}`;
     this._ui.addControl(text);
 
     let elapsed = 0;
-    const interval = setInterval(() => {
-      elapsed += 50;
-      const topPx = parseFloat(text.top as string) - 1.5;
-      text.top = `${topPx}px`;
-      text.alpha = Math.max(0, 1 - elapsed / 1000);
-      if (elapsed >= 1000) {
-        clearInterval(interval);
-        this._ui.removeControl(text);
-        text.dispose();
-      }
-    }, 50);
+    const obs = this.scene.onBeforeRenderObservable.add(() => {
+        const dt = this.scene.getEngine().getDeltaTime();
+        elapsed += dt;
+
+        // Approximate 50ms steps for position update, but scaled by dt
+        // 1.5px per 50ms is roughly 30px per 1000ms
+        const moveRate = 30 * (dt / 1000);
+        const topPx = parseFloat(text.top as string) - moveRate;
+        text.top = `${topPx}px`;
+
+        text.alpha = Math.max(0, 1 - elapsed / 1000);
+
+        if (elapsed >= 1000) {
+            this.scene.onBeforeRenderObservable.remove(obs);
+            this._ui.removeControl(text);
+            text.dispose();
+        }
+    });
   }
 }

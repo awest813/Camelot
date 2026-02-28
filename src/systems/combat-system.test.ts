@@ -9,7 +9,8 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
         CreateSphere: vi.fn(() => ({
             position: new Vector3(),
             material: null,
-            dispose: vi.fn()
+            dispose: vi.fn(),
+            isDisposed: vi.fn(() => false)
         }))
     }
 }));
