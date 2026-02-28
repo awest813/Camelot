@@ -31,6 +31,7 @@ export class NPC {
   public attackDamage: number = 5;
   public attackTimer: number = 0;
   public attackCooldown: number = 2; // seconds between attacks
+  public xpReward: number = 25;
 
   private _baseColor: Color3 = Color3.Yellow();
 

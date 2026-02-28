@@ -6,13 +6,16 @@ import { QuestSystem, QuestSaveState } from "./quest-system";
 import { UIManager } from "../ui/ui-manager";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 
 interface PlayerSaveData {
   position: { x: number; y: number; z: number };
   health: number;
   magicka: number;
   stamina: number;
+  level: number;
+  experience: number;
+  experienceToNextLevel: number;
 }
 
 interface EquipmentEntry {
@@ -82,6 +85,9 @@ export class SaveSystem {
         health: this._player.health,
         magicka: this._player.magicka,
         stamina: this._player.stamina,
+        level: this._player.level,
+        experience: this._player.experience,
+        experienceToNextLevel: this._player.experienceToNextLevel,
       },
       inventory: [...this._inventory.items],
       equipment: equipmentEntries,
@@ -121,6 +127,15 @@ export class SaveSystem {
     this._player.health = data.player.health;
     this._player.magicka = data.player.magicka;
     this._player.stamina = data.player.stamina;
+
+    // Restore level & XP; recalculate max stats from level
+    this._player.level = data.player.level ?? 1;
+    this._player.experience = data.player.experience ?? 0;
+    this._player.experienceToNextLevel = data.player.experienceToNextLevel ?? (this._player.level * 100);
+    const levelBonus = (this._player.level - 1) * 10;
+    this._player.maxHealth = 100 + levelBonus;
+    this._player.maxMagicka = 100 + levelBonus;
+    this._player.maxStamina = 100 + levelBonus;
 
     // Restore inventory
     this._inventory.items = data.inventory;

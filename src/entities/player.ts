@@ -29,6 +29,14 @@ export class Player {
   public bonusDamage: number = 0;
   public bonusArmor: number = 0;
 
+  // Level & experience
+  public level: number = 1;
+  public experience: number = 0;
+  public experienceToNextLevel: number = 100;
+
+  /** Fired with the new level whenever the player levels up. */
+  public onLevelUp: ((newLevel: number) => void) | null = null;
+
   constructor(scene: Scene, canvas: HTMLCanvasElement) {
     this.scene = scene;
     this.canvas = canvas;
@@ -45,6 +53,24 @@ export class Player {
       this.health = Math.min(this.maxHealth, this.health + this.healthRegen * deltaTime);
       this.magicka = Math.min(this.maxMagicka, this.magicka + this.magickaRegen * deltaTime);
       this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen * deltaTime);
+  }
+
+  /**
+   * Award experience points. Handles level-up(s) automatically.
+   * Each level requires `level * 100` XP. On level-up, max stats increase
+   * by 10 and `onLevelUp` is fired.
+   */
+  public addExperience(amount: number): void {
+      this.experience += amount;
+      while (this.experience >= this.experienceToNextLevel) {
+          this.experience -= this.experienceToNextLevel;
+          this.level++;
+          this.experienceToNextLevel = this.level * 100;
+          this.maxHealth += 10;
+          this.maxMagicka += 10;
+          this.maxStamina += 10;
+          this.onLevelUp?.(this.level);
+      }
   }
 
   public raycastForward(distance: number, requireVisible: boolean = false) {
