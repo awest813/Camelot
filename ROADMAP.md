@@ -41,7 +41,7 @@
   - Aggressive state (attack player).
   - Pathfinding (Recast/Detour integration).
 - [ ] **Expanded World**:
-  - Biomes and vegetation.
+  - [x] Biomes and vegetation (plains, forest, desert, tundra with matching terrain colors and procedural props).
   - Structures and dungeons.
 
 ### Long Term
