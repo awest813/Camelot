@@ -37,9 +37,9 @@
   - Objective types: Kill, Fetch, Talk with automatic progress tracking.
   - Notifications on quest accept and completion.
   - Quest state persisted in save file.
-- [ ] **Improved AI**:
+- [x] **Improved AI**:
   - Aggressive state (attack player).
-  - Pathfinding (Recast/Detour integration).
+  - Obstacle-avoidance steering (raycast fan-test; NPCs navigate around structure walls for both patrol and chase).
 - [x] **Expanded World**:
   - [x] Biomes and vegetation (plains, forest, desert, tundra with matching terrain colors and procedural props).
   - [x] Structures (deterministic per-chunk spawning: stone ruins with guard NPCs in plains/forest, desert shrines with relic loot, tundra watchtowers with guard NPCs; physics-enabled walls, loot chests).
@@ -50,7 +50,5 @@
   - [x] Skill trees (Combat, Magic, Survival) — 1 skill point per level, 3 skills × 3 trees, ranks persist in save file, toggle with K.
 - [ ] **Audio System**:
   - Footsteps, combat sounds, ambient music.
-- [ ] **Improved AI**:
-  - Pathfinding (Recast/Detour integration).
 - [ ] **Multiplayer**:
   - Basic replication and networking.

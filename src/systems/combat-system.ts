@@ -8,6 +8,7 @@ import { Player } from "../entities/player";
 import { UIManager } from "../ui/ui-manager";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { steerAroundObstacles } from "./steering";
 
 const MELEE_DAMAGE = 10;
 const MAGIC_DAMAGE = 20;
@@ -24,6 +25,7 @@ export class CombatSystem {
   private _newVel: Vector3 = new Vector3();
   private _lookAtTarget: Vector3 = new Vector3();
   private _hitPos: Vector3 = new Vector3();
+  private _steerDir: Vector3 = new Vector3();
 
   // Reusable offsets to avoid per-hit Vector3 allocations
   private static readonly _OFFSET_Y1 = new Vector3(0, 1, 0);
@@ -191,16 +193,22 @@ export class CombatSystem {
       if (npc.physicsAggregate?.body) {
         npc.physicsAggregate.body.getLinearVelocityToRef(this._currentVel);
         if (distSq > attackRangeSq) {
-          // Move toward player, preserve Y for gravity
+          // Move toward player with obstacle avoidance, preserve Y for gravity
           playerPos.subtractToRef(npc.mesh.position, this._dir);
           this._dir.y = 0;
           this._dir.normalize();
-          this._dir.scaleToRef(npc.moveSpeed, this._newVel);
+          steerAroundObstacles(this.scene, npc.mesh.position, this._dir, npc.mesh.name, this._steerDir);
+          this._steerDir.scaleToRef(npc.moveSpeed, this._newVel);
 
           this._newVel.y = this._currentVel.y;
           npc.physicsAggregate.body.setLinearVelocity(this._newVel);
 
-          this._lookAtTarget.set(playerPos.x, npc.mesh.position.y, playerPos.z);
+          // Face the steered direction so the NPC visually turns around corners
+          this._lookAtTarget.set(
+            npc.mesh.position.x + this._steerDir.x,
+            npc.mesh.position.y,
+            npc.mesh.position.z + this._steerDir.z,
+          );
           npc.mesh.lookAt(this._lookAtTarget);
         } else {
           // In attack range — stop horizontal movement

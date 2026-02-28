@@ -1,6 +1,7 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { NPC } from "../entities/npc";
+import { steerAroundObstacles } from "./steering";
 
 export class ScheduleSystem {
   public scene: Scene;
@@ -12,6 +13,7 @@ export class ScheduleSystem {
   private _currentVel: Vector3 = new Vector3();
   private _newVel: Vector3 = new Vector3();
   private _lookAtTarget: Vector3 = new Vector3();
+  private _steerDir: Vector3 = new Vector3();
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -49,10 +51,11 @@ export class ScheduleSystem {
       npc.currentPatrolIndex = (npc.currentPatrolIndex + 1) % npc.patrolPoints.length;
       npc.waitTime = 2.0; // Wait 2 seconds
     } else {
-      // Move towards target
+      // Move towards target, steering around obstacles
       this._direction.y = 0;
       this._direction.normalize();
-      this._direction.scaleToRef(npc.moveSpeed, this._velocity);
+      steerAroundObstacles(this.scene, npc.mesh.position, this._direction, npc.mesh.name, this._steerDir);
+      this._steerDir.scaleToRef(npc.moveSpeed, this._velocity);
 
       if (npc.physicsAggregate && npc.physicsAggregate.body) {
          npc.physicsAggregate.body.getLinearVelocityToRef(this._currentVel);
@@ -61,8 +64,13 @@ export class ScheduleSystem {
          this._newVel.set(this._velocity.x, this._currentVel.y, this._velocity.z);
          npc.physicsAggregate.body.setLinearVelocity(this._newVel);
 
-         // Rotate to face movement (ignore Y difference)
-         this._lookAtTarget.set(target.x, npc.mesh.position.y, target.z);
+         // Rotate to face the steered direction (not raw target) so the NPC
+         // visually turns when navigating around obstacles
+         this._lookAtTarget.set(
+           npc.mesh.position.x + this._steerDir.x,
+           npc.mesh.position.y,
+           npc.mesh.position.z + this._steerDir.z,
+         );
          npc.mesh.lookAt(this._lookAtTarget);
       }
     }

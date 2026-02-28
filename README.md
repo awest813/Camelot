@@ -16,6 +16,7 @@ A modern RPG framework built with Babylon.js 8, Vite 6, and TypeScript. Featurin
 - **NPCs & AI**:
   - Patrol points and movement logic.
   - Aggro system — NPCs attack the player when provoked or in range.
+  - Obstacle-avoidance steering — NPCs fan-test multiple directions and flow around structure walls automatically.
   - Interaction system with cinematic dialogue camera.
 - **Inventory & Equipment**:
   - Item pickup, stacking, and grid-based inventory UI (toggle with I).
