@@ -87,8 +87,9 @@ export class CombatSystem {
           this._ui.showNotification(`${npc.mesh.name} defeated!`);
           if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward);
         } else {
-          // Being hit skips the ALERT window — NPC immediately gives chase.
-          if (npc.aiState === AIState.IDLE || npc.aiState === AIState.PATROL || npc.aiState === AIState.ALERT) {
+          // A direct hit skips the ALERT window — immediately give chase.
+          // Don't re-transition if already chasing/attacking (would reset path).
+          if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
             this._transitionTo(npc, AIState.CHASE);
           }
         }
@@ -152,7 +153,7 @@ export class CombatSystem {
           if (npc.isDead) {
             this._ui.showNotification(`${npc.mesh.name} defeated!`);
             if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward);
-          } else if (npc.aiState === AIState.IDLE || npc.aiState === AIState.PATROL || npc.aiState === AIState.ALERT) {
+          } else if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
             this._transitionTo(npc, AIState.CHASE);
           }
 

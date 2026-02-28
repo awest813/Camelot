@@ -104,7 +104,16 @@ describe('CombatSystem', () => {
             physicsAggregate: {
                 body: { applyImpulse: vi.fn(), getLinearVelocityToRef: vi.fn(), setLinearVelocity: vi.fn() }
             },
+            // AI state machine fields
+            aiState: "PATROL",
             isAggressive: false,
+            spawnPosition: new Vector3(0, 0, 2),
+            alertTimer: 0,
+            currentPath: [],
+            pathIndex: 0,
+            pathRefreshTimer: 0,
+            setStateColor: vi.fn(),
+            // Combat fields
             aggroRange: 10,
             attackRange: 2,
             attackDamage: 5,
