@@ -47,7 +47,7 @@ The current alpha stage is centered on combat readability and encounter stabilit
 ### Alpha Milestones
 
 - ✅ Multi-NPC threat handoff and attack-slot arbitration.
-- 🚧 NPC combat decision loops (distance bands, cooldown discipline).
+- ✅ NPC combat decision loops (distance bands, cooldown discipline).
 - 🧭 Expanded patrol variation and reactive state transitions.
 
 ---
@@ -56,7 +56,7 @@ The current alpha stage is centered on combat readability and encounter stabilit
 
 ### AI and Encounter Quality
 
-- 🚧 Improve NPC combat decision loops (distance bands, cooldown discipline).
+- ✅ Improve NPC combat decision loops (distance bands, cooldown discipline).
 - ✅ Add better threat handoff (multi-NPC aggro arbitration).
 - 🧭 Expand patrol behaviors with idle variation and reactive states.
 
