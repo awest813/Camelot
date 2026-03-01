@@ -31,6 +31,12 @@ const T = {
   EQUIP_BORDER: "#D4A017",
 };
 
+const clampPercentage = (current: number, max: number): string => {
+  if (max <= 0) return "0%";
+  const percent = (current / max) * 100;
+  return `${Math.min(100, Math.max(0, percent))}%`;
+};
+
 export class UIManager {
   public scene: Scene;
   private _ui: AdvancedDynamicTexture;
@@ -916,19 +922,19 @@ export class UIManager {
   }
 
   public updateHealth(current: number, max: number): void {
-    this.healthBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
+    this.healthBar.width = clampPercentage(current, max);
   }
 
   public updateMagicka(current: number, max: number): void {
-    this.magickaBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
+    this.magickaBar.width = clampPercentage(current, max);
   }
 
   public updateStamina(current: number, max: number): void {
-    this.staminaBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
+    this.staminaBar.width = clampPercentage(current, max);
   }
 
   public updateXP(current: number, max: number, level: number): void {
-    this.xpBar.width = `${max > 0 ? Math.max(0, current / max) * 100 : 0}%`;
+    this.xpBar.width = clampPercentage(current, max);
     this._xpLevelLabel.text = `Lv.${level}`;
   }
 
