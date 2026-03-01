@@ -190,13 +190,14 @@ export class StructureManager {
       meshes.push(pillar);
     }
 
-    // Ancient relic on the altar
+    // Ancient relic on the altar — equippable off-hand talisman
     const relic = new Loot(this._scene, new Vector3(origin.x, 1.6, origin.z), {
       id: `shrine_relic_${cx}_${cz}`,
       name: "Ancient Relic",
-      description: "A weathered relic found on a desert altar.",
+      description: "A weathered relic found on a desert altar. +3 Damage.",
       stackable: false,
       quantity: 1,
+      slot: "offHand",
       stats: { damage: 3 },
     });
     loot.push(relic);

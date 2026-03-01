@@ -43,6 +43,7 @@ export class InteractionSystem {
           domEvent.preventDefault();
           this.interact();
         } else if (domEvent.key === 'i' || domEvent.key === 'I') {
+          if (this.dialogueSystem.isInDialogue) return;
           domEvent.preventDefault();
           this.inventorySystem.toggleInventory();
         }
