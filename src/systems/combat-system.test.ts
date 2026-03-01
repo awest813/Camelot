@@ -193,6 +193,27 @@ describe('CombatSystem', () => {
         // Testing that the observable is removed proves the condition was met and block executed.
     });
 
+    it('meleeAttack should fire onPlayerDeath when NPC attack reduces player health to 0', () => {
+        // Set up NPC in ATTACK state at close range (within attackRange of 2)
+        mockNpcs[0].aiState = "ATTACK";
+        mockNpcs[0].attackDamage = 200; // one-shot kill
+        mockPlayer.health = 1;
+        mockPlayer.bonusArmor = 0;
+
+        const deathSpy = vi.fn();
+        combatSystem.onPlayerDeath = deathSpy;
+
+        // Manually tick the NPC AI so the ATTACK state fires
+        (combatSystem as any)._tickNPC(
+            mockNpcs[0],
+            new Vector3(0, 0, 2), // player position — within attackRange of 2
+            2.5                   // deltaTime > attackCooldown so attack fires
+        );
+
+        expect(deathSpy).toHaveBeenCalledOnce();
+        expect(mockPlayer.health).toBe(0);
+    });
+
     it('magicAttack should clean up resources upon hitting an NPC', () => {
         combatSystem.magicAttack();
 

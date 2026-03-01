@@ -995,4 +995,54 @@ export class UIManager {
       }
     });
   }
+
+  // ─── Death screen ────────────────────────────────────────────────────────────
+
+  private _deathScreen: Rectangle | null = null;
+
+  /** Show a full-screen "YOU DIED" overlay with a Respawn button. */
+  public showDeathScreen(onRespawn: () => void): void {
+    if (this._deathScreen) return; // already showing
+
+    const overlay = new Rectangle();
+    overlay.width = "100%";
+    overlay.height = "100%";
+    overlay.background = "rgba(0,0,0,0.88)";
+    overlay.zIndex = 200;
+    overlay.isPointerBlocker = true;
+    this._ui.addControl(overlay);
+    this._deathScreen = overlay;
+
+    const title = new TextBlock();
+    title.text = "YOU DIED";
+    title.color = "#CC2222";
+    title.fontSize = 72;
+    title.fontWeight = "bold";
+    title.shadowColor = "#000";
+    title.shadowBlur = 12;
+    title.top = "-60px";
+    title.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    overlay.addControl(title);
+
+    const btn = Button.CreateSimpleButton("respawnBtn", "Respawn");
+    btn.width = "200px";
+    btn.height = "48px";
+    btn.top = "60px";
+    btn.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    btn.background = "#8B1A1A";
+    btn.color = "#F0D090";
+    btn.fontSize = 20;
+    btn.cornerRadius = 6;
+    btn.hoverCursor = "pointer";
+    btn.onPointerUpObservable.add(() => onRespawn());
+    overlay.addControl(btn);
+  }
+
+  /** Remove the death screen overlay. */
+  public hideDeathScreen(): void {
+    if (!this._deathScreen) return;
+    this._ui.removeControl(this._deathScreen);
+    this._deathScreen.dispose();
+    this._deathScreen = null;
+  }
 }

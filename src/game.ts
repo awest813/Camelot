@@ -77,6 +77,10 @@ export class Game {
     // Test NPC
     const npc = new NPC(this.scene, new Vector3(10, 2, 10), "Guard");
     npc.patrolPoints = [new Vector3(10, 2, 10), new Vector3(10, 2, 20), new Vector3(20, 2, 20), new Vector3(20, 2, 10)];
+    npc.lootTable = [
+      { item: { id: "guard_coin",  name: "Gold Coin",          description: "Coin taken from a fallen guard.", stackable: true,  quantity: 3 }, probability: 1.0 },
+      { item: { id: "guard_sword", name: "Guard's Short Sword", description: "A guard's issued blade.",         stackable: false, quantity: 1, slot: "mainHand", stats: { damage: 5 } }, probability: 0.4 },
+    ];
     this.scheduleSystem.addNPC(npc);
 
     // Wire up structure NPC spawning so guards are tracked by schedule & combat
@@ -100,13 +104,28 @@ export class Game {
     this.audioSystem = new AudioSystem();
 
     // Wire quest event callbacks
-    this.combatSystem.onNPCDeath = (name, xp) => {
+    this.combatSystem.onNPCDeath = (name, xp, deathPos) => {
         this.questSystem.onKill(name);
         this.player.addExperience(xp);
         this.ui.showNotification(`+${xp} XP`, 2000);
         this.audioSystem.playNPCDeath();
+        // Spawn loot drops from the NPC's loot table
+        const dead = this.scheduleSystem.npcs.find(n => n.mesh.name === name);
+        if (dead) {
+            for (const drop of dead.lootTable) {
+                if (Math.random() < drop.probability) {
+                    new Loot(this.scene, deathPos.add(new Vector3(0, 0.5, 0)), { ...drop.item });
+                }
+            }
+        }
     };
     this.combatSystem.onPlayerHit = () => this.audioSystem.playPlayerHit();
+    this.combatSystem.onPlayerDeath = () => {
+        this.isPaused = true;
+        document.exitPointerLock();
+        this.player.camera.detachControl();
+        this.ui.showDeathScreen(() => this._respawn());
+    };
     this.interactionSystem.onLootPickup = (id) => this.questSystem.onPickup(id);
     this.dialogueSystem.onTalkStart  = (name)  => this.questSystem.onTalk(name);
 
@@ -356,6 +375,17 @@ export class Game {
               }
           }
       }
+  }
+
+  private _respawn(): void {
+    this.player.health  = this.player.maxHealth;
+    this.player.stamina = this.player.maxStamina;
+    this.player.magicka = this.player.maxMagicka;
+    this.player.camera.position = new Vector3(0, 2, 0);
+    this.isPaused = false;
+    this.ui.hideDeathScreen();
+    this.canvas.requestPointerLock();
+    this.player.camera.attachControl(this.canvas, true);
   }
 
   update(): void {

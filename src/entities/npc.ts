@@ -6,6 +6,14 @@ import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Item } from "../systems/inventory-system";
+
+/** One entry in an NPC's loot table. */
+export interface LootDrop {
+  item: Item;
+  /** Probability (0–1) that this item drops when the NPC dies. */
+  probability: number;
+}
 
 /**
  * AI state machine states for NPC behaviour.
@@ -95,6 +103,11 @@ export class NPC {
   public attackTimer: number = 0;
   public attackCooldown: number = 2; // seconds between attacks
   public xpReward: number = 25;
+
+  // ─── Loot ───────────────────────────────────────────────────────────────────
+
+  /** Items this NPC may drop on death. Each entry is rolled independently. */
+  public lootTable: LootDrop[] = [];
 
   // ─── Visuals ────────────────────────────────────────────────────────────────
 

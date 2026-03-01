@@ -102,6 +102,7 @@ describe('NPC', () => {
             expect(npc.attackTimer).toBe(0);
             expect(npc.attackCooldown).toBe(2);
             expect(npc.xpReward).toBe(25);
+            expect(npc.lootTable).toEqual([]);
         });
 
         it('should create mesh and physics aggregate correctly', () => {

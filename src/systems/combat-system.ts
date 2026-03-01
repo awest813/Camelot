@@ -36,11 +36,14 @@ export class CombatSystem {
   private static readonly _OFFSET_Y1 = new Vector3(0, 1, 0);
   private static readonly _OFFSET_Y2 = new Vector3(0, 2, 0);
 
-  /** Fired with the NPC's mesh name and XP reward whenever an NPC dies. */
-  public onNPCDeath: ((npcName: string, xpReward: number) => void) | null = null;
+  /** Fired with the NPC's mesh name, XP reward, and world position whenever an NPC dies. */
+  public onNPCDeath: ((npcName: string, xpReward: number, deathPosition: Vector3) => void) | null = null;
 
   /** Fired whenever the player takes damage from an NPC. */
   public onPlayerHit: (() => void) | null = null;
+
+  /** Fired once when the player's health reaches zero. */
+  public onPlayerDeath: (() => void) | null = null;
 
   constructor(
     scene: Scene,
@@ -85,7 +88,7 @@ export class CombatSystem {
 
         if (npc.isDead) {
           this._ui.showNotification(`${npc.mesh.name} defeated!`);
-          if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward);
+          if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc.mesh.position.clone());
         } else {
           // A direct hit skips the ALERT window — immediately give chase.
           // Don't re-transition if already chasing/attacking (would reset path).
@@ -152,7 +155,7 @@ export class CombatSystem {
 
           if (npc.isDead) {
             this._ui.showNotification(`${npc.mesh.name} defeated!`);
-            if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward);
+            if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc.mesh.position.clone());
           } else if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
             this._transitionTo(npc, AIState.CHASE);
           }
@@ -269,6 +272,7 @@ export class CombatSystem {
           this._ui.showHitFlash("rgba(200, 0, 0, 0.4)");
           if (this.onPlayerHit) this.onPlayerHit();
           this._ui.showNotification(`${npc.mesh.name} attacks you for ${dmg} damage!`, 2000);
+          if (this.player.health <= 0 && this.onPlayerDeath) this.onPlayerDeath();
         }
         break;
 
