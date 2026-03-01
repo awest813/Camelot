@@ -608,11 +608,28 @@ export class UIManager {
         buyBtn.hoverCursor = canBuy ? "pointer" : "default";
 
         if (canBuy) {
-          buyBtn.onPointerUpObservable.add(() => {
+          buyBtn.isFocusInvisible = false;
+          buyBtn.tabIndex = 0;
+          buyBtn.accessibilityTag = { description: `Upgrade ${skill.name}` };
+
+          const triggerPurchase = () => {
             if (this.onSkillPurchase) this.onSkillPurchase(treeIdx, skillIdx);
+          };
+
+          const setHover = () => { buyBtn.background = "rgba(100,70,0,0.95)"; };
+          const setNormal = () => { buyBtn.background = "rgba(60,40,0,0.85)"; };
+
+          buyBtn.onPointerUpObservable.add(triggerPurchase);
+          buyBtn.onKeyboardEventProcessedObservable.add((evt) => {
+            if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
+              triggerPurchase();
+            }
           });
-          buyBtn.onPointerEnterObservable.add(() => { buyBtn.background = "rgba(100,70,0,0.95)"; });
-          buyBtn.onPointerOutObservable.add(() => { buyBtn.background = "rgba(60,40,0,0.85)"; });
+
+          buyBtn.onPointerEnterObservable.add(setHover);
+          buyBtn.onPointerOutObservable.add(setNormal);
+          buyBtn.onFocusObservable.add(setHover);
+          buyBtn.onBlurObservable.add(setNormal);
         }
 
         inner.addControl(buyBtn);
