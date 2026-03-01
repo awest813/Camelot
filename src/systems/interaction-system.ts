@@ -36,10 +36,15 @@ export class InteractionSystem {
     this.scene.onKeyboardObservable.add((kbInfo) => {
       if (this.isBlocked) return;
       if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
-        if (kbInfo.event.key === 'e' || kbInfo.event.key === 'E') {
+        const domEvent = kbInfo.event as KeyboardEvent;
+        if (domEvent.repeat) return;
+
+        if (domEvent.key === 'e' || domEvent.key === 'E') {
+          domEvent.preventDefault();
           this.interact();
-        } else if (kbInfo.event.key === 'i' || kbInfo.event.key === 'I') {
-            this.inventorySystem.toggleInventory();
+        } else if (domEvent.key === 'i' || domEvent.key === 'I') {
+          domEvent.preventDefault();
+          this.inventorySystem.toggleInventory();
         }
       }
     });
@@ -88,7 +93,6 @@ export class InteractionSystem {
       } else if (metadata.type === 'loot') {
           const loot = metadata.loot;
           if (this.inventorySystem.addItem(loot.item)) {
-              console.log(`Picked up ${loot.item.name}`);
               loot.dispose();
               if (this.onLootPickup) this.onLootPickup(loot.item.id);
           }
