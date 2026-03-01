@@ -45,6 +45,9 @@ export class CombatSystem {
   /** Fired once when the player's health reaches zero. */
   public onPlayerDeath: (() => void) | null = null;
 
+  /** Guards onPlayerDeath so it fires at most once per life. */
+  private _playerDeadFired: boolean = false;
+
   constructor(
     scene: Scene,
     player: Player,
@@ -127,16 +130,22 @@ export class CombatSystem {
     let alive = true;
     let elapsedMs = 0;
     let _fbFrame = 0;
+
+    // Single cleanup path — the alive flag ensures it runs at most once.
+    const cleanup = () => {
+      alive = false;
+      this.scene.onBeforeRenderObservable.remove(obs);
+      if (!projectile.isDisposed()) projectile.dispose();
+      agg.dispose();
+    };
+
     const obs = this.scene.onBeforeRenderObservable.add(() => {
       if (!alive) return;
       if (++_fbFrame % 2 !== 0) return;
 
       elapsedMs += this.scene.getEngine().getDeltaTime() * 2;
       if (elapsedMs >= 5000) {
-        alive = false;
-        this.scene.onBeforeRenderObservable.remove(obs);
-        if (!projectile.isDisposed()) projectile.dispose();
-        if (agg.body && !agg.body.isDisposed) agg.dispose();
+        cleanup();
         return;
       }
 
@@ -160,10 +169,7 @@ export class CombatSystem {
             this._transitionTo(npc, AIState.CHASE);
           }
 
-          alive = false;
-          this.scene.onBeforeRenderObservable.remove(obs);
-          if (!projectile.isDisposed()) projectile.dispose();
-          if (agg.body && !agg.body.isDisposed) agg.dispose();
+          cleanup();
           return;
         }
       }
@@ -193,6 +199,24 @@ export class CombatSystem {
     for (const npc of this.npcs) {
       if (npc.isDead) continue;
       this._tickNPC(npc, playerPos, deltaTime);
+    }
+  }
+
+  /**
+   * Called by Game on player respawn.
+   * Resets the one-shot death flag and gives all living, hostile NPCs a full
+   * attack cooldown so the player isn't immediately hit again.
+   * NPCs that were CHASING or ATTACKING are sent home (RETURN state) to give
+   * the player breathing room after respawn.
+   */
+  public resetForRespawn(): void {
+    this._playerDeadFired = false;
+    for (const npc of this.npcs) {
+      if (npc.isDead) continue;
+      npc.attackTimer = 0; // force a full cooldown before next hit
+      if (npc.aiState === AIState.CHASE || npc.aiState === AIState.ATTACK) {
+        this._transitionTo(npc, AIState.RETURN);
+      }
     }
   }
 
@@ -272,7 +296,10 @@ export class CombatSystem {
           this._ui.showHitFlash("rgba(200, 0, 0, 0.4)");
           if (this.onPlayerHit) this.onPlayerHit();
           this._ui.showNotification(`${npc.mesh.name} attacks you for ${dmg} damage!`, 2000);
-          if (this.player.health <= 0 && this.onPlayerDeath) this.onPlayerDeath();
+          if (this.player.health <= 0 && this.onPlayerDeath && !this._playerDeadFired) {
+            this._playerDeadFired = true;
+            this.onPlayerDeath();
+          }
         }
         break;
 

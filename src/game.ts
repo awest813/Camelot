@@ -382,6 +382,7 @@ export class Game {
     this.player.stamina = this.player.maxStamina;
     this.player.magicka = this.player.maxMagicka;
     this.player.camera.position = new Vector3(0, 2, 0);
+    this.combatSystem.resetForRespawn(); // reset death flag + retreat hostile NPCs
     this.isPaused = false;
     this.ui.hideDeathScreen();
     this.canvas.requestPointerLock();
