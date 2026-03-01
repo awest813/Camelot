@@ -43,6 +43,11 @@ export class NPC {
   public patrolPoints: Vector3[] = [];
   public currentPatrolIndex: number = 0;
   public waitTime: number = 0;
+  /** Randomized patrol pause duration range (seconds). */
+  public patrolWaitMin: number = 1.25;
+  public patrolWaitMax: number = 3.5;
+  /** While waiting, occasionally rotate to this offset heading (radians). */
+  public patrolLookAroundAngle: number = Math.PI / 5;
 
   // Health
   public health: number = 100;

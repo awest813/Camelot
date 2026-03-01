@@ -12,6 +12,7 @@ export class ScheduleSystem {
   private _currentVel: Vector3 = new Vector3();
   private _newVel: Vector3 = new Vector3();
   private _lookAtTarget: Vector3 = new Vector3();
+  private _patrolPauseHeading: WeakMap<NPC, Vector3> = new WeakMap();
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -39,6 +40,8 @@ export class ScheduleSystem {
 
     if (npc.waitTime > 0) {
       npc.waitTime -= deltaTime;
+      this._applyPatrolIdleLook(npc);
+      this._applyStopHorizontal(npc);
       return;
     }
 
@@ -52,7 +55,8 @@ export class ScheduleSystem {
     if (distXZ < 1.0) {
       // Reached target
       npc.currentPatrolIndex = (npc.currentPatrolIndex + 1) % npc.patrolPoints.length;
-      npc.waitTime = 2.0; // Wait 2 seconds
+      npc.waitTime = this._getPatrolWaitSeconds(npc);
+      this._setPatrolIdleHeading(npc);
     } else {
       // Move towards target
       this._direction.y = 0;
@@ -70,6 +74,40 @@ export class ScheduleSystem {
          this._lookAtTarget.set(target.x, npc.mesh.position.y, target.z);
          npc.mesh.lookAt(this._lookAtTarget);
       }
+
+      this._patrolPauseHeading.delete(npc);
     }
+  }
+
+  private _getPatrolWaitSeconds(npc: NPC): number {
+    const min = Math.max(0, Math.min(npc.patrolWaitMin, npc.patrolWaitMax));
+    const max = Math.max(min, Math.max(npc.patrolWaitMin, npc.patrolWaitMax));
+    return min + (max - min) * Math.random();
+  }
+
+  private _setPatrolIdleHeading(npc: NPC): void {
+    const toTarget = npc.patrolPoints[npc.currentPatrolIndex].subtract(npc.mesh.position);
+    const baseAngle = Math.atan2(toTarget.x, toTarget.z);
+    const randomOffset = (Math.random() * 2 - 1) * npc.patrolLookAroundAngle;
+    const heading = baseAngle + randomOffset;
+    this._patrolPauseHeading.set(npc, new Vector3(Math.sin(heading), 0, Math.cos(heading)));
+  }
+
+  private _applyPatrolIdleLook(npc: NPC): void {
+    const lookDir = this._patrolPauseHeading.get(npc);
+    if (!lookDir) return;
+    this._lookAtTarget.set(
+      npc.mesh.position.x + lookDir.x,
+      npc.mesh.position.y,
+      npc.mesh.position.z + lookDir.z,
+    );
+    npc.mesh.lookAt(this._lookAtTarget);
+  }
+
+  private _applyStopHorizontal(npc: NPC): void {
+    if (!npc.physicsAggregate?.body) return;
+    npc.physicsAggregate.body.getLinearVelocityToRef(this._currentVel);
+    this._newVel.set(0, this._currentVel.y, 0);
+    npc.physicsAggregate.body.setLinearVelocity(this._newVel);
   }
 }
