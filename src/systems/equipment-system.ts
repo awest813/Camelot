@@ -126,8 +126,17 @@ export class EquipmentSystem {
     if (!item.stats) return;
     if (item.stats.damage) this._player.bonusDamage -= item.stats.damage;
     if (item.stats.armor) this._player.bonusArmor -= item.stats.armor;
-    if (item.stats.healthBonus) this._player.maxHealth = Math.max(1, this._player.maxHealth - item.stats.healthBonus);
-    if (item.stats.magickaBonus) this._player.maxMagicka = Math.max(1, this._player.maxMagicka - item.stats.magickaBonus);
-    if (item.stats.staminaBonus) this._player.maxStamina = Math.max(1, this._player.maxStamina - item.stats.staminaBonus);
+    if (item.stats.healthBonus) {
+      this._player.maxHealth = Math.max(1, this._player.maxHealth - item.stats.healthBonus);
+      this._player.health = Math.min(this._player.health, this._player.maxHealth);
+    }
+    if (item.stats.magickaBonus) {
+      this._player.maxMagicka = Math.max(1, this._player.maxMagicka - item.stats.magickaBonus);
+      this._player.magicka = Math.min(this._player.magicka, this._player.maxMagicka);
+    }
+    if (item.stats.staminaBonus) {
+      this._player.maxStamina = Math.max(1, this._player.maxStamina - item.stats.staminaBonus);
+      this._player.stamina = Math.min(this._player.stamina, this._player.maxStamina);
+    }
   }
 }

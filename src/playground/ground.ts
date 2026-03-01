@@ -1,7 +1,7 @@
 import { Scene } from "@babylonjs/core/scene";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
-import { PhysicsShapeType } from "@babylonjs/core/Physics/";
+import { PhysicsShapeType } from "@babylonjs/core/Physics";
 
 export class Ground {
   constructor(private scene: Scene) {

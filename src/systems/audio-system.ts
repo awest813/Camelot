@@ -6,9 +6,10 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
  * Toggle mute with M. Footsteps fire automatically when the player moves.
  */
 export class AudioSystem {
-  private _ctx: AudioContext;
-  private _masterGain: GainNode;
-  private _noiseBuffer: AudioBuffer;
+  private _ctx!: AudioContext;
+  private _masterGain!: GainNode;
+  private _noiseBuffer!: AudioBuffer;
+  private _disabled = false;
 
   public isMuted: boolean = false;
 
@@ -19,24 +20,30 @@ export class AudioSystem {
   private _lastCamPos: Vector3 = Vector3.Zero();
 
   constructor() {
-    // AudioContext is a browser global; fall back to the webkit-prefixed variant on older Safari
-    const Ctx: typeof AudioContext =
-      (globalThis as typeof globalThis & { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext ?? AudioContext;
-    this._ctx = new Ctx();
-    this._masterGain = this._ctx.createGain();
-    this._masterGain.gain.value = 0.4;
-    this._masterGain.connect(this._ctx.destination);
+    try {
+      // AudioContext is a browser global; fall back to the webkit-prefixed variant on older Safari
+      const Ctx: typeof AudioContext =
+        (globalThis as typeof globalThis & { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext ?? AudioContext;
+      this._ctx = new Ctx();
+      this._masterGain = this._ctx.createGain();
+      this._masterGain.gain.value = 0.4;
+      this._masterGain.connect(this._ctx.destination);
 
-    // Pre-bake a 2-second white-noise buffer reused by all noise sounds
-    this._noiseBuffer = this._buildNoiseBuffer(2);
+      // Pre-bake a 2-second white-noise buffer reused by all noise sounds
+      this._noiseBuffer = this._buildNoiseBuffer(2);
 
-    this._startAmbient();
+      this._startAmbient();
+    } catch (err) {
+      console.warn("AudioSystem: Web Audio API unavailable, audio disabled.", err);
+      this._disabled = true;
+    }
   }
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
   public toggleMute(): void {
+    if (this._disabled) return;
     this.isMuted = !this.isMuted;
     this._masterGain.gain.linearRampToValueAtTime(
       this.isMuted ? 0 : 0.4,
@@ -133,6 +140,7 @@ export class AudioSystem {
   // ── Private helpers ─────────────────────────────────────────────────────────
 
   private _resume(): void {
+    if (this._disabled) return;
     if (this._ctx.state === "suspended") {
       this._ctx.resume();
     }

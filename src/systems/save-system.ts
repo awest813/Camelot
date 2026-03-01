@@ -129,6 +129,11 @@ export class SaveSystem {
       return false;
     }
 
+    if (!data.player || !data.player.position) {
+      this._ui.showNotification("Save file is corrupt.", 2500);
+      return false;
+    }
+
     // Restore player position and stats
     this._player.camera.position = new Vector3(
       data.player.position.x,

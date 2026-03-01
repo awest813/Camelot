@@ -142,8 +142,10 @@ export class DialogueSystem {
     this._dialoguePanel.isVisible = false;
     this._choicesPanel.clearControls();
 
-    // Restore Camera
-    this.scene.activeCamera = this._originalCamera;
+    // Restore Camera (guard against null — activeCamera could have been null at dialogue start)
+    if (this._originalCamera) {
+      this.scene.activeCamera = this._originalCamera;
+    }
 
     // Restore controls
     this.player.camera.attachControl(this.canvas, true);

@@ -149,7 +149,7 @@ class App {
     }
 
     // Inspector and other stuff
-    this._bindEvent();
+    void this._bindEvent();
   }
 
   _renderer(): void {

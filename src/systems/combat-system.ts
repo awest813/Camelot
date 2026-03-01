@@ -82,7 +82,8 @@ export class CombatSystem {
 
         if (npc.physicsAggregate?.body) {
           const forward = this.player.camera.getForwardRay(1).direction;
-          npc.physicsAggregate.body.applyImpulse(forward.scale(10), hit.pickedPoint!);
+          const impactPoint = hit.pickedPoint ?? npc.mesh.position;
+          npc.physicsAggregate.body.applyImpulse(forward.scale(10), impactPoint);
         }
 
         if (npc.isDead) {
@@ -134,8 +135,7 @@ export class CombatSystem {
       if (elapsedMs >= 5000) {
         alive = false;
         this.scene.onBeforeRenderObservable.remove(obs);
-        if (!projectile.isDisposed()) projectile.dispose();
-        if (agg.body && !agg.body.isDisposed) agg.dispose();
+        if (!projectile.isDisposed()) { agg.dispose(); projectile.dispose(); }
         return;
       }
 
@@ -161,8 +161,7 @@ export class CombatSystem {
 
           alive = false;
           this.scene.onBeforeRenderObservable.remove(obs);
-          if (!projectile.isDisposed()) projectile.dispose();
-          if (agg.body && !agg.body.isDisposed) agg.dispose();
+          if (!projectile.isDisposed()) { agg.dispose(); projectile.dispose(); }
           return;
         }
       }
