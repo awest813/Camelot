@@ -170,7 +170,8 @@ export class DialogueSystem {
     // Restore Camera
     this.scene.activeCamera = this._originalCamera;
 
-    // Restore controls
+    // Restore controls and pointer lock so mouse-look works immediately
+    this.canvas.requestPointerLock();
     this.player.camera.attachControl(this.canvas, true);
   }
 }
