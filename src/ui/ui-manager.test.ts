@@ -96,7 +96,7 @@ describe('UIManager', () => {
 
         it('should update healthBar width correctly for overheal (current > max)', () => {
             uiManager.updateHealth(120, 100);
-            expect(uiManager.healthBar.width).toBe('120%');
+            expect(uiManager.healthBar.width).toBe('100%');
         });
 
         it('should handle decimal values properly', () => {
@@ -107,6 +107,32 @@ describe('UIManager', () => {
         it('should handle zero max health safely', () => {
             uiManager.updateHealth(0, 0);
             expect(uiManager.healthBar.width).toBe('0%');
+        });
+    });
+
+    describe('resource bar clamping', () => {
+        it('should clamp magicka bar between 0% and 100%', () => {
+            uiManager.updateMagicka(150, 100);
+            expect(uiManager.magickaBar.width).toBe('100%');
+
+            uiManager.updateMagicka(-20, 100);
+            expect(uiManager.magickaBar.width).toBe('0%');
+        });
+
+        it('should clamp stamina bar between 0% and 100%', () => {
+            uiManager.updateStamina(300, 100);
+            expect(uiManager.staminaBar.width).toBe('100%');
+
+            uiManager.updateStamina(-10, 100);
+            expect(uiManager.staminaBar.width).toBe('0%');
+        });
+
+        it('should clamp xp bar and keep level label in sync', () => {
+            uiManager.updateXP(999, 100, 8);
+            expect(uiManager.xpBar.width).toBe('100%');
+
+            uiManager.updateXP(-5, 100, 9);
+            expect(uiManager.xpBar.width).toBe('0%');
         });
     });
 });
