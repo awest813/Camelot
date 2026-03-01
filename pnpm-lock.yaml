@@ -29,6 +29,9 @@ importers:
       '@babylonjs/post-processes':
         specifier: ^8.52.1
         version: 8.52.1(@babylonjs/core@8.52.1)
+      recast-detour:
+        specifier: ^1.5.0
+        version: 1.6.4
     devDependencies:
       '@types/node':
         specifier: ^24.7.0
@@ -1488,6 +1491,9 @@ packages:
   react@19.2.4:
     resolution: {integrity: sha512-9nfp2hYpCwOjAN+8TZFGhtWEwgvWHXqESH8qT89AT/lWklpLON22Lc8pEtnpsZz7VmawabSU0gCjnj8aC0euHQ==}
     engines: {node: '>=0.10.0'}
+
+  recast-detour@1.6.4:
+    resolution: {integrity: sha512-OwR6NvFuzZZa3umVT8FX+UdhXtHMVXZuvcGiEk7qYaCUUVLIIKX0rrNarb7l0N4kW2ENVGbc6v0WpuNG5X2+iQ==}
 
   relateurl@0.2.7:
     resolution: {integrity: sha512-G08Dxvm4iDN3MLM0EsP62EDV9IuhXPR6blNz6Utcp7zyV3tr4HVNINt6MpaRWbxoOHT3Q7YN2P+jaHX8vUbgog==}
@@ -3704,6 +3710,10 @@ snapshots:
       scheduler: 0.27.0
 
   react@19.2.4: {}
+
+  recast-detour@1.6.4:
+    dependencies:
+      '@types/emscripten': 1.41.5
 
   relateurl@0.2.7: {}
 
