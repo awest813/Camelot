@@ -103,7 +103,7 @@ npm run preview
 ### Run tests
 
 ```bash
-npx vitest run
+npm test
 ```
 
 ## Project Layout
