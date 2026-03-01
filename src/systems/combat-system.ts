@@ -296,9 +296,33 @@ export class CombatSystem {
           this._transitionTo(npc, AIState.CHASE);
           break;
         }
-        // Stop horizontal movement, face the player
-        this._stopMovement(npc);
+
         this._faceTarget(npc, playerPos);
+
+        // Distance bands and cooldown discipline
+        if (npc.attackTimer > npc.attackWindup) {
+          // On cooldown: try to maintain a standoff distance
+          const standoff = npc.attackRange * 0.8;
+          const dist = Math.sqrt(distSq);
+
+          if (dist < standoff - 0.5) {
+            // Back away slowly if player pushes in too close
+            this._moveRelativeToTarget(npc, playerPos, -npc.moveSpeed * 0.5);
+          } else if (dist > standoff + 0.5) {
+            // Move in slowly if player backs off too far inside the engage band
+            this._moveRelativeToTarget(npc, playerPos, npc.moveSpeed * 0.5);
+          } else {
+            this._stopMovement(npc);
+          }
+        } else {
+          // Ready to attack or winding up: close the distance aggressively if needed
+          const strikeRangeSq = (npc.attackRange * 0.5) * (npc.attackRange * 0.5);
+          if (distSq > strikeRangeSq) {
+             this._moveRelativeToTarget(npc, playerPos, npc.moveSpeed);
+          } else {
+             this._stopMovement(npc);
+          }
+        }
 
         // Melee attack on cooldown
         if (npc.attackTimer <= 0) {
@@ -474,6 +498,24 @@ export class CombatSystem {
 
     this._lookAtTarget.set(waypoint.x, npc.mesh.position.y, waypoint.z);
     npc.mesh.lookAt(this._lookAtTarget);
+  }
+
+  /** Moves an NPC straight towards or away from a target position without pathfinding. */
+  private _moveRelativeToTarget(npc: NPC, targetPos: Vector3, speed: number): void {
+    if (!npc.physicsAggregate?.body) return;
+    targetPos.subtractToRef(npc.mesh.position, this._dir);
+    this._dir.y = 0;
+
+    // Avoid normalization of zero vector
+    if (this._dir.lengthSquared() > 0.001) {
+       this._dir.normalize();
+       this._dir.scaleToRef(speed, this._newVel);
+       npc.physicsAggregate.body.getLinearVelocityToRef(this._currentVel);
+       this._newVel.y = this._currentVel.y; // preserve gravity
+       npc.physicsAggregate.body.setLinearVelocity(this._newVel);
+    } else {
+       this._stopMovement(npc);
+    }
   }
 
   /** Zero the NPC's horizontal velocity while preserving vertical (gravity). */
