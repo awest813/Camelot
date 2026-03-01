@@ -24,6 +24,11 @@ export class WorldManager {
   // Throttle: only run chunk logic every N frames
   private _frameCounter: number = 0;
   private _updateInterval: number = 10;
+  private readonly biomeMaterials: Map<BiomeType, StandardMaterial> = new Map();
+  private treeTrunkMaterial?: StandardMaterial;
+  private readonly treeCrownMaterials: Map<number, StandardMaterial> = new Map();
+  private cactusMaterial?: StandardMaterial;
+  private iceMaterial?: StandardMaterial;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -97,9 +102,7 @@ export class WorldManager {
     new PhysicsAggregate(chunkMesh, PhysicsShapeType.BOX, { mass: 0 }, this.scene);
 
     // Biome-specific terrain color
-    const material = new StandardMaterial(`mat_${key}`, this.scene);
-    material.diffuseColor = this._getBiomeColor(biome);
-    chunkMesh.material = material;
+    chunkMesh.material = this._getBiomeMaterial(biome);
 
     this.loadedChunks.set(key, { mesh: chunkMesh, cx: x, cz: z });
 
@@ -120,6 +123,63 @@ export class WorldManager {
       case "desert": return new Color3(0.80, 0.72, 0.45);
       case "tundra": return new Color3(0.82, 0.88, 0.92);
     }
+  }
+
+  private _getBiomeMaterial(biome: BiomeType): StandardMaterial {
+    let material = this.biomeMaterials.get(biome);
+    if (!material) {
+      material = new StandardMaterial(`mat_${biome}`, this.scene);
+      material.diffuseColor = this._getBiomeColor(biome);
+      material.freeze();
+      this.biomeMaterials.set(biome, material);
+    }
+
+    return material;
+  }
+
+  private _getTreeTrunkMaterial(): StandardMaterial {
+    if (!this.treeTrunkMaterial) {
+      this.treeTrunkMaterial = new StandardMaterial("tree_trunk_mat", this.scene);
+      this.treeTrunkMaterial.diffuseColor = new Color3(0.4, 0.25, 0.1);
+      this.treeTrunkMaterial.freeze();
+    }
+
+    return this.treeTrunkMaterial;
+  }
+
+  private _getTreeCrownMaterial(scale: number): StandardMaterial {
+    // Quantize variation to reduce material count while keeping visual diversity.
+    const bucket = Math.round(scale * 4);
+    let material = this.treeCrownMaterials.get(bucket);
+    if (!material) {
+      material = new StandardMaterial(`tree_crown_mat_${bucket}`, this.scene);
+      material.diffuseColor = new Color3(0.1, 0.45 + (bucket / 4) * 0.25, 0.1);
+      material.freeze();
+      this.treeCrownMaterials.set(bucket, material);
+    }
+
+    return material;
+  }
+
+  private _getCactusMaterial(): StandardMaterial {
+    if (!this.cactusMaterial) {
+      this.cactusMaterial = new StandardMaterial("cactus_mat", this.scene);
+      this.cactusMaterial.diffuseColor = new Color3(0.2, 0.55, 0.2);
+      this.cactusMaterial.freeze();
+    }
+
+    return this.cactusMaterial;
+  }
+
+  private _getIceMaterial(): StandardMaterial {
+    if (!this.iceMaterial) {
+      this.iceMaterial = new StandardMaterial("ice_mat", this.scene);
+      this.iceMaterial.diffuseColor = new Color3(0.7, 0.85, 1.0);
+      this.iceMaterial.alpha = 0.85;
+      this.iceMaterial.freeze();
+    }
+
+    return this.iceMaterial;
   }
 
   private _spawnVegetation(chunkX: number, chunkZ: number, biome: BiomeType): Mesh[] {
@@ -172,9 +232,7 @@ export class WorldManager {
       this.scene
     );
     trunk.position.set(x, trunkHeight / 2, z);
-    const trunkMat = new StandardMaterial(`${name}_trunkMat`, this.scene);
-    trunkMat.diffuseColor = new Color3(0.4, 0.25, 0.1);
-    trunk.material = trunkMat;
+    trunk.material = this._getTreeTrunkMaterial();
 
     const crownR = 1.2 + scale * 0.8; // 1.2–2 m radius
     const crown = MeshBuilder.CreateSphere(
@@ -183,17 +241,14 @@ export class WorldManager {
       this.scene
     );
     crown.position.set(x, trunkHeight + crownR * 0.7, z);
-    const crownMat = new StandardMaterial(`${name}_crownMat`, this.scene);
-    crownMat.diffuseColor = new Color3(0.1, 0.45 + scale * 0.25, 0.1);
-    crown.material = crownMat;
+    crown.material = this._getTreeCrownMaterial(scale);
 
     return [trunk, crown];
   }
 
   /** Spawn a stylised cactus: body + two arms. */
   private _spawnCactus(x: number, z: number, name: string): Mesh[] {
-    const mat = new StandardMaterial(`${name}_mat`, this.scene);
-    mat.diffuseColor = new Color3(0.2, 0.55, 0.2);
+    const mat = this._getCactusMaterial();
 
     const body = MeshBuilder.CreateCylinder(
       `${name}_body`,
@@ -234,10 +289,7 @@ export class WorldManager {
       this.scene
     );
     crystal.position.set(x, height / 2, z);
-    const mat = new StandardMaterial(`${name}_mat`, this.scene);
-    mat.diffuseColor = new Color3(0.7, 0.85, 1.0);
-    mat.alpha = 0.85;
-    crystal.material = mat;
+    crystal.material = this._getIceMaterial();
 
     return [crystal];
   }
