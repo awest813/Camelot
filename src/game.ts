@@ -263,7 +263,28 @@ export class Game {
         if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
             if (kbInfo.event.key === "Escape") {
                 if (this.dialogueSystem.isInDialogue) return;
-                this.togglePause();
+
+                if (this.mapEditorSystem.isEnabled) {
+                    this.mapEditorSystem.toggle();
+                    this.interactionSystem.isBlocked = false;
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
+                    this.ui.showNotification("Map editor mode disabled", 1800);
+                } else if (this.inventorySystem.isOpen) {
+                    this.inventorySystem.toggleInventory();
+                } else if (this.questSystem.isLogOpen) {
+                    this.questSystem.toggleQuestLog();
+                    this.interactionSystem.isBlocked = false;
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
+                } else if (this.skillTreeSystem.isOpen) {
+                    this.skillTreeSystem.toggle();
+                    this.interactionSystem.isBlocked = false;
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
+                } else {
+                    this.togglePause();
+                }
             } else if (kbInfo.event.key === "j" || kbInfo.event.key === "J") {
                 if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue && !this.skillTreeSystem.isOpen) {
                     this.questSystem.toggleQuestLog();
