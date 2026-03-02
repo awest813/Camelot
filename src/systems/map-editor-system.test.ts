@@ -162,6 +162,40 @@ describe('MapEditorSystem — Phase 2 (placement types)', () => {
     });
 });
 
+
+describe('MapEditorSystem — Phase 2 (entity properties)', () => {
+    it('stores and exposes per-entity properties', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'quest-marker');
+        const entityId = mesh.metadata?.editorEntityId as string;
+
+        const updated = editor.setEntityProperties(entityId, {
+            objectiveId: 'quest.main.001',
+            dialogueTriggerId: 'dialogue.intro_guard',
+            label: 'Guard briefing marker',
+        });
+
+        expect(updated).toBe(true);
+        expect(editor.getEntityProperties(entityId)).toMatchObject({
+            objectiveId: 'quest.main.001',
+            dialogueTriggerId: 'dialogue.intro_guard',
+            label: 'Guard briefing marker',
+        });
+        expect(mesh.metadata?.editorProperties).toMatchObject({
+            objectiveId: 'quest.main.001',
+            dialogueTriggerId: 'dialogue.intro_guard',
+            label: 'Guard briefing marker',
+        });
+    });
+
+    it('returns false when setting properties on a missing entity id', () => {
+        const { editor } = makeEditor();
+
+        expect(editor.setEntityProperties('missing', { label: 'noop' })).toBe(false);
+        expect(editor.getEntityProperties('missing')).toBeNull();
+    });
+});
+
 // ─── Phase 2: Patrol route authoring ─────────────────────────────────────────
 
 describe('MapEditorSystem — Phase 2 (patrol routes)', () => {
@@ -303,6 +337,29 @@ describe('MapEditorSystem — Phase 2 (export / import)', () => {
         expect(mesh.metadata?.editorEntityId).toBe(firstExport.entries[0].id);
     });
 
+
+
+    it('exportMap and importMap preserve entity properties', () => {
+        const { editor: src } = makeEditor();
+        const mesh = src.placeEntity(new Vector3(1, 1, 2), 'quest-marker');
+        const entityId = mesh.metadata?.editorEntityId as string;
+        src.setEntityProperties(entityId, {
+            objectiveId: 'quest.alpha.find-relic',
+            dialogueTriggerId: 'dialogue.relic_hint',
+            label: 'Relic hint marker',
+        });
+
+        const exported = src.exportMap();
+        const { editor: dst } = makeEditor();
+        dst.importMap(exported);
+
+        const imported = dst.exportMap();
+        expect(imported.entries[0].properties).toMatchObject({
+            objectiveId: 'quest.alpha.find-relic',
+            dialogueTriggerId: 'dialogue.relic_hint',
+            label: 'Relic hint marker',
+        });
+    });
     it('importMap recreates patrol groups and does not duplicate them on a second import', () => {
         const { editor: src } = makeEditor();
         src.startNewPatrolGroup();
