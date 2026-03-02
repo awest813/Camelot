@@ -23,6 +23,8 @@ import { SkillTreeSystem } from "./systems/skill-tree-system";
 import { AudioSystem } from "./systems/audio-system";
 import { NavigationSystem } from "./systems/navigation-system";
 import { Loot } from "./entities/loot";
+import { FrameworkRuntime } from "./framework/runtime/framework-runtime";
+import { frameworkBaseContent } from "./framework/content/base-content";
 
 export class Game {
   public scene: Scene;
@@ -42,6 +44,7 @@ export class Game {
   public skillTreeSystem: SkillTreeSystem;
   public audioSystem: AudioSystem;
   public navigationSystem: NavigationSystem;
+  public frameworkRuntime: FrameworkRuntime;
 
   public isPaused: boolean = false;
 
@@ -99,6 +102,10 @@ export class Game {
     this.ui.onSkillPurchase = (treeIdx, skillIdx) => this.skillTreeSystem.purchaseSkill(treeIdx, skillIdx);
     this.saveSystem.setSkillTreeSystem(this.skillTreeSystem);
     this.audioSystem = new AudioSystem();
+    this.frameworkRuntime = new FrameworkRuntime(frameworkBaseContent, {
+      inventoryCapacity: this.inventorySystem.maxCapacity,
+    });
+    this.frameworkRuntime.questEngine.activateQuest("quest_guard_resolution");
 
     // Prevent browser context menu from capturing right-click combat input.
     this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
