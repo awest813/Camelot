@@ -80,6 +80,9 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 | F5           | Quick save                |
 | F9           | Quick load                |
 | Esc          | Pause menu                |
+| F2           | Toggle map editor mode    |
+| G            | Cycle editor gizmo mode   |
+| N            | Place editor marker       |
 
 ## Tech Stack
 
@@ -145,8 +148,9 @@ The full roadmap lives in [`ROADMAP.md`](./ROADMAP.md). Key upcoming focus areas
 - AI improvements (pathfinding, behavior depth).
 - Content tooling and data pipelines.
 - **Map Editor initiative** (in-engine + standalone workflows):
-  - Terrain paint/sculpt layers.
-  - Structure and spawn-point placement tools.
+  - Phase 1 started: in-engine edit mode toggle + grid-snapped gizmo editing.
+  - Terrain paint/sculpt layers (planned).
+  - Structure and spawn-point placement tools (planned).
   - Quest/NPC authoring helpers.
   - Export/import for reusable map packs.
 
