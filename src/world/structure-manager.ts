@@ -306,6 +306,7 @@ export class StructureManager {
   private _mat(name: string, color: Color3): StandardMaterial {
     const mat = new StandardMaterial(name, this._scene);
     mat.diffuseColor = color;
+    mat.freeze();
     return mat;
   }
 
