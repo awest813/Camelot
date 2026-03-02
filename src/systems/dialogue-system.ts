@@ -6,6 +6,17 @@ import { AdvancedDynamicTexture, Button, Control, Rectangle, StackPanel, TextBlo
 import { NPC } from "../entities/npc";
 import { Player } from "../entities/player";
 
+// Design tokens — mirrored from UIManager to keep dialogue styling consistent.
+const D = {
+  PANEL_BG:     "rgba(6, 4, 2, 0.95)",
+  PANEL_BORDER: "#6B4F12",
+  TITLE:        "#D4A017",
+  TEXT:         "#EEE0C0",
+  DIM:          "#998877",
+  BTN_BG:       "rgba(28, 20, 6, 0.95)",
+  BTN_HOVER:    "rgba(80, 56, 10, 0.98)",
+};
+
 export class DialogueSystem {
   public scene: Scene;
   public player: Player;
@@ -14,6 +25,7 @@ export class DialogueSystem {
 
   private _ui: AdvancedDynamicTexture;
   private _dialoguePanel: Rectangle;
+  private _nameLabel: TextBlock;
   private _textBlock: TextBlock;
   private _choicesPanel: StackPanel;
   private _cinematicCamera: ArcRotateCamera;
@@ -46,33 +58,66 @@ export class DialogueSystem {
 
     // Main Panel (Bottom)
     this._dialoguePanel = new Rectangle();
-    this._dialoguePanel.width = "800px";
-    this._dialoguePanel.height = "300px";
-    this._dialoguePanel.cornerRadius = 10;
-    this._dialoguePanel.color = "white";
+    this._dialoguePanel.width = "820px";
+    this._dialoguePanel.height = "290px";
+    this._dialoguePanel.cornerRadius = 8;
+    this._dialoguePanel.color = D.PANEL_BORDER;
     this._dialoguePanel.thickness = 2;
-    this._dialoguePanel.background = "rgba(0, 0, 0, 0.8)";
+    this._dialoguePanel.background = D.PANEL_BG;
     this._dialoguePanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-    this._dialoguePanel.top = "-50px";
+    this._dialoguePanel.top = "-18px";
     this._dialoguePanel.isVisible = false;
     this._ui.addControl(this._dialoguePanel);
 
-    // NPC Text
+    // NPC name header
+    this._nameLabel = new TextBlock();
+    this._nameLabel.text = "";
+    this._nameLabel.color = D.TITLE;
+    this._nameLabel.fontSize = 16;
+    this._nameLabel.fontWeight = "bold";
+    this._nameLabel.height = "50px";
+    this._nameLabel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this._nameLabel.paddingTop = "12px";
+    this._nameLabel.paddingLeft = "20px";
+    this._nameLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this._nameLabel.shadowColor = "rgba(0,0,0,0.9)";
+    this._nameLabel.shadowBlur = 4;
+    this._dialoguePanel.addControl(this._nameLabel);
+
+    // Separator below header area
+    const sep = new Rectangle();
+    sep.width = "96%";
+    sep.height = "1px";
+    sep.background = D.PANEL_BORDER;
+    sep.thickness = 0;
+    sep.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    sep.top = "54px";
+    this._dialoguePanel.addControl(sep);
+
+    // NPC dialogue text
     this._textBlock = new TextBlock();
-    this._textBlock.text = "Hello there!";
-    this._textBlock.color = "white";
-    this._textBlock.fontSize = 24;
+    this._textBlock.text = "";
+    this._textBlock.color = D.TEXT;
+    this._textBlock.fontSize = 17;
+    this._textBlock.fontStyle = "italic";
     this._textBlock.textWrapping = true;
-    this._textBlock.height = "100px";
+    this._textBlock.height = "80px";
     this._textBlock.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this._textBlock.paddingTop = "20px";
+    this._textBlock.paddingTop = "62px";
+    this._textBlock.paddingLeft = "20px";
+    this._textBlock.paddingRight = "20px";
+    this._textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this._textBlock.shadowColor = "rgba(0,0,0,0.8)";
+    this._textBlock.shadowBlur = 3;
     this._dialoguePanel.addControl(this._textBlock);
 
     // Choices Panel
     this._choicesPanel = new StackPanel();
-    this._choicesPanel.height = "150px";
+    this._choicesPanel.height = "130px";
     this._choicesPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-    this._choicesPanel.paddingBottom = "20px";
+    this._choicesPanel.paddingBottom = "16px";
+    this._choicesPanel.paddingLeft = "20px";
+    this._choicesPanel.paddingRight = "20px";
     this._dialoguePanel.addControl(this._choicesPanel);
   }
 
@@ -116,8 +161,9 @@ export class DialogueSystem {
 
     // Show UI
     this._choiceCount = 0;
+    this._nameLabel.text = `✦  ${npc.mesh.name}`;
     this._dialoguePanel.isVisible = true;
-    this._textBlock.text = `${npc.mesh.name}: Hello, traveler.`;
+    this._textBlock.text = `"Hello, traveler. What brings you here?"`;
 
     // Add choices
     this._addChoice("Hello.", () => this._endDialogue());
@@ -126,23 +172,27 @@ export class DialogueSystem {
 
   private _addChoice(text: string, callback: () => void): void {
     const button = Button.CreateSimpleButton(`btn_choice_${this._choiceCount++}`, text);
-    button.width = "700px";
-    button.height = "40px";
-    button.color = "white";
-    button.background = "gray";
-    button.paddingBottom = "10px";
+    button.width = "100%";
+    button.height = "44px";
+    button.color = D.TEXT;
+    button.background = D.BTN_BG;
+    button.cornerRadius = 6;
+    button.thickness = 1;
+    button.fontSize = 15;
+    button.paddingBottom = "8px";
+    button.hoverCursor = "pointer";
 
     button.isFocusInvisible = false;
     button.tabIndex = 0;
     button.accessibilityTag = { description: text };
 
     const setHover = () => {
-      button.background = "lightgray";
-      button.color = "black";
+      button.background = D.BTN_HOVER;
+      button.color = D.TITLE;
     };
     const setNormal = () => {
-      button.background = "gray";
-      button.color = "white";
+      button.background = D.BTN_BG;
+      button.color = D.TEXT;
     };
 
     button.onPointerEnterObservable.add(setHover);
