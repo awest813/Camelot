@@ -182,7 +182,7 @@ export class CombatSystem {
         this._ui.showHitFlash("rgba(255, 200, 0, 0.25)");
 
         if (npc.physicsAggregate?.body) {
-          const forward = this.player.camera.getForwardRay(1).direction;
+          const forward = this.player.getForwardDirection(1);
           const impulsePoint = hit.pickedPoint
             ? hit.pickedPoint
             : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y1, this._hitPos);
@@ -219,7 +219,8 @@ export class CombatSystem {
     (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
       .notifyResourceSpent?.("magicka");
 
-    const origin = this.player.camera.position.add(this.player.camera.getForwardRay(1).direction);
+    const forward = this.player.getForwardDirection(1);
+    const origin = this.player.camera.position.add(forward);
     const projectile = MeshBuilder.CreateSphere("fireball", { diameter: 0.5 }, this.scene);
     projectile.position = origin.clone();
 
@@ -233,7 +234,6 @@ export class CombatSystem {
     );
     agg.body.setMotionType(PhysicsMotionType.DYNAMIC);
 
-    const forward = this.player.camera.getForwardRay(1).direction;
     agg.body.applyImpulse(forward.scale(magicProfile.projectileImpulse), origin);
 
     let alive = true;

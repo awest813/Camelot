@@ -91,7 +91,8 @@ describe('CombatSystem', () => {
                     direction: new Vector3(0, 0, 1)
                 }))
             },
-            raycastForward: vi.fn(() => mockScene.pickWithRay())
+            raycastForward: vi.fn(() => mockScene.pickWithRay()),
+            getForwardDirection: vi.fn(() => new Vector3(0, 0, 1))
         };
 
         const mockNpc = {
