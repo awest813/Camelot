@@ -361,6 +361,27 @@ describe('CombatSystem', () => {
         expect(mockNpcs[0].attackTimer).toBe(0.3);
     });
 
+    it('applies deterministic strafe reposition during attack cooldown', () => {
+        const setLinearVelocity = vi.fn();
+        mockNpcs[0].physicsAggregate.body.setLinearVelocity = setLinearVelocity;
+        mockNpcs[0].physicsAggregate.body.getLinearVelocityToRef = (v: Vector3) => v.set(0, 0, 0);
+
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackTimer = 1;
+        mockNpcs[0].attackWindup = 0.35;
+        mockNpcs[0].strafeTimer = 0;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.5);
+
+        vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.2);
+        combatSystem.updateNPCAI(0.016);
+
+        expect(mockNpcs[0].strafeDirection).toBe(-1);
+        expect(setLinearVelocity).toHaveBeenCalled();
+        const blendedVelocity = setLinearVelocity.mock.calls.at(-1)?.[0];
+        expect(blendedVelocity.x).toBeLessThan(0);
+    });
+
     it('hands off attack ownership between nearby NPCs', () => {
         const npcA = mockNpcs[0];
         const npcB = {
