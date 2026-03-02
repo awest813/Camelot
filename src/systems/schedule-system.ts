@@ -12,6 +12,7 @@ export class ScheduleSystem {
   private _currentVel: Vector3 = new Vector3();
   private _newVel: Vector3 = new Vector3();
   private _lookAtTarget: Vector3 = new Vector3();
+  private _toTarget: Vector3 = new Vector3();
   private _patrolPauseHeading: WeakMap<NPC, Vector3> = new WeakMap();
 
   constructor(scene: Scene) {
@@ -46,8 +47,7 @@ export class ScheduleSystem {
     }
 
     const target = npc.patrolPoints[npc.currentPatrolIndex];
-    const currentPos = npc.mesh.position;
-    target.subtractToRef(currentPos, this._direction);
+    target.subtractToRef(npc.mesh.position, this._direction);
 
     // Ignore Y component for distance check on ground
     const distXZ = Math.sqrt(this._direction.x * this._direction.x + this._direction.z * this._direction.z);
@@ -86,11 +86,17 @@ export class ScheduleSystem {
   }
 
   private _setPatrolIdleHeading(npc: NPC): void {
-    const toTarget = npc.patrolPoints[npc.currentPatrolIndex].subtract(npc.mesh.position);
-    const baseAngle = Math.atan2(toTarget.x, toTarget.z);
+    npc.patrolPoints[npc.currentPatrolIndex].subtractToRef(npc.mesh.position, this._toTarget);
+    const baseAngle = Math.atan2(this._toTarget.x, this._toTarget.z);
     const randomOffset = (Math.random() * 2 - 1) * npc.patrolLookAroundAngle;
     const heading = baseAngle + randomOffset;
-    this._patrolPauseHeading.set(npc, new Vector3(Math.sin(heading), 0, Math.cos(heading)));
+
+    let headingVec = this._patrolPauseHeading.get(npc);
+    if (!headingVec) {
+      headingVec = new Vector3();
+      this._patrolPauseHeading.set(npc, headingVec);
+    }
+    headingVec.set(Math.sin(heading), 0, Math.cos(heading));
   }
 
   private _applyPatrolIdleLook(npc: NPC): void {
