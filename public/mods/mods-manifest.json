@@ -1,0 +1,9 @@
+{
+  "mods": [
+    {
+      "id": "example_guard_overhaul",
+      "url": "./example-guard-overhaul.json",
+      "enabled": true
+    }
+  ]
+}

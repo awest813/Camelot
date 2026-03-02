@@ -1,0 +1,28 @@
+{
+  "id": "example_guard_overhaul",
+  "name": "Example Guard Overhaul",
+  "version": "1.0.0",
+  "content": {
+    "factions": [
+      {
+        "id": "village_guard",
+        "name": "Village Guard",
+        "description": "Guard allegiance tuned by mod pack.",
+        "defaultReputation": 10,
+        "hostileBelow": -35,
+        "friendlyAt": 20,
+        "alliedAt": 55
+      }
+    ],
+    "items": [
+      {
+        "id": "guard_token",
+        "name": "Guard Token",
+        "description": "Proof of service. May unlock dialogue branches.",
+        "stackable": true,
+        "maxStack": 5,
+        "tags": ["quest", "token"]
+      }
+    ]
+  }
+}

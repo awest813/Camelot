@@ -5,6 +5,8 @@ import { EquipmentSystem, EquipSlot } from "./equipment-system";
 import { QuestSystem, QuestSaveState } from "./quest-system";
 import { SkillTreeSystem, SkillSaveState } from "./skill-tree-system";
 import { UIManager } from "../ui/ui-manager";
+import { SaveEngine as FrameworkSaveEngine } from "../framework/save/save-engine";
+import type { FrameworkRuntime } from "../framework/runtime/framework-runtime";
 
 const SAVE_KEY = "camelot_save";
 const SAVE_VERSION = 4;
@@ -33,6 +35,7 @@ export interface SaveData {
   quests: QuestSaveState[];
   skills?: SkillSaveState[];
   skillPoints?: number;
+  framework?: string;
 }
 
 export class SaveSystem {
@@ -41,6 +44,8 @@ export class SaveSystem {
   private _equipment: EquipmentSystem;
   private _quests: QuestSystem | null = null;
   private _skills: SkillTreeSystem | null = null;
+  private _frameworkRuntime: FrameworkRuntime | null = null;
+  private _frameworkSaveEngine = new FrameworkSaveEngine();
   private _ui: UIManager;
 
   /** Called after a successful load so Game can clean up world state (e.g. remove already-collected loot). */
@@ -61,6 +66,11 @@ export class SaveSystem {
   /** Inject SkillTreeSystem after construction. */
   public setSkillTreeSystem(sts: SkillTreeSystem): void {
     this._skills = sts;
+  }
+
+  /** Inject framework runtime so modern headless state can be persisted with legacy save payloads. */
+  public setFrameworkRuntime(runtime: FrameworkRuntime): void {
+    this._frameworkRuntime = runtime;
   }
 
   public save(): void {
@@ -104,6 +114,10 @@ export class SaveSystem {
       skills: this._skills ? this._skills.getSaveState() : [],
       skillPoints: this._player.skillPoints,
     };
+
+    if (this._frameworkRuntime) {
+      data.framework = this._frameworkSaveEngine.serialize(this._frameworkRuntime.getSaveSnapshot(), "default");
+    }
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -178,6 +192,15 @@ export class SaveSystem {
     this._player.skillPoints = data.skillPoints ?? 0;
     if (this._skills) {
       this._skills.restoreState(Array.isArray(data.skills) ? data.skills : []);
+    }
+
+    if (this._frameworkRuntime && typeof data.framework === "string") {
+      try {
+        const frameworkSave = this._frameworkSaveEngine.deserialize(data.framework);
+        this._frameworkRuntime.restoreFromSave(frameworkSave);
+      } catch {
+        this._ui.showNotification("Framework save data was invalid; loaded legacy state only.", 2500);
+      }
     }
 
     // Sync UI once after all state is restored

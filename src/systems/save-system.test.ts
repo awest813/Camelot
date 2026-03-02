@@ -8,6 +8,7 @@ describe('SaveSystem', () => {
     let mockInventory: any;
     let mockEquipment: any;
     let mockSkills: any;
+    let mockFrameworkRuntime: any;
     let mockUI: any;
     let localStorageMock: Record<string, string>;
 
@@ -52,6 +53,16 @@ describe('SaveSystem', () => {
             getSaveState: vi.fn(() => []),
             restoreState: vi.fn(),
         };
+        mockFrameworkRuntime = {
+            getSaveSnapshot: vi.fn(() => ({
+                dialogueState: { active: "guard_intro" },
+                questState: {},
+                inventoryState: {},
+                factionState: {},
+                flags: { accepted_job: true },
+            })),
+            restoreFromSave: vi.fn(),
+        };
         mockUI = { showNotification: vi.fn() };
 
         saveSystem = new SaveSystem(mockPlayer, mockInventory, mockEquipment, mockUI);
@@ -83,6 +94,15 @@ describe('SaveSystem', () => {
     it('should show a save notification', () => {
         saveSystem.save();
         expect(mockUI.showNotification).toHaveBeenCalledWith('Game Saved!', 2500);
+    });
+
+    it('should include framework save payload when runtime is configured', () => {
+        saveSystem.setFrameworkRuntime(mockFrameworkRuntime);
+        saveSystem.save();
+        const raw = localStorageMock['camelot_save'];
+        const data: SaveData = JSON.parse(raw);
+        expect(typeof data.framework).toBe('string');
+        expect(mockFrameworkRuntime.getSaveSnapshot).toHaveBeenCalled();
     });
 
     it('hasSave returns false when nothing is saved', () => {
@@ -157,6 +177,14 @@ describe('SaveSystem', () => {
         saveSystem.save();
         saveSystem.load();
         expect(mockUI.showNotification).toHaveBeenCalledWith('Game Loaded!', 2500);
+    });
+
+    it('restores framework runtime state when framework data exists', () => {
+        saveSystem.setFrameworkRuntime(mockFrameworkRuntime);
+        saveSystem.save();
+
+        saveSystem.load();
+        expect(mockFrameworkRuntime.restoreFromSave).toHaveBeenCalled();
     });
 
     it('should restore an empty skill state when save has no skills', () => {
