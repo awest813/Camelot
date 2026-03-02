@@ -153,11 +153,12 @@ Camelot will evolve toward a creator-friendly worldbuilding pipeline through a d
 - 🧭 Place and configure structures, props, and spawn volumes with property panels.
 - ✅ Quest marker and dialogue trigger placement helpers with linked objective IDs.
 
-#### Phase 3: Data + Collaboration
+#### Phase 3: Data + Collaboration 🚧
 
+- ✅ Validation tooling baseline shipped (missing patrol refs, short patrol routes, overlap checks).
+- 🧭 Expand validation coverage (unreachable objective hints, invalid cross-system references).
 - 🧭 Serialize maps to portable JSON/asset bundles.
 - 🧭 Import/export map packs for sharing and testing.
-- 🧭 Validation tooling (missing refs, unreachable objectives, overlap checks).
 
 #### Phase 4: Production-Ready Pipeline
 
@@ -177,6 +178,7 @@ Camelot will evolve toward a creator-friendly worldbuilding pipeline through a d
 If you want to contribute now, high-impact areas are:
 
 1. Map editor Phase 2 completions: property panels for placed entities, terrain sculpting.
-2. Framework-first consolidation: wiring framework state as source-of-truth for demo systems.
-3. Quest/content authoring ergonomics.
-4. Save/load robustness and automated tests.
+2. Map editor Phase 3 expansion: richer validation rules and map-pack workflows.
+3. Framework-first consolidation: wiring framework state as source-of-truth for demo systems.
+4. Quest/content authoring ergonomics.
+5. Save/load robustness and automated tests.

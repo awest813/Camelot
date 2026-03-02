@@ -83,6 +83,11 @@ The in-engine **Map Editor** (activated with F2) lets you author world content w
 - **Patrol route authoring**: press P to start a new NPC patrol group; each NPC spawn point placed while the group is active is added to the route and connected by a visible overlay line.
 - **Map export / import**: press F4 to serialize the full editor layout (entities + patrol routes) to a portable JSON object (copied to clipboard or printed to console). The JSON can be re-imported to recreate the layout in a fresh session.
 
+### Phase 3 — Validation + Data Safety (active)
+
+- **Built-in map validation reports** now catch key authoring issues: orphaned NPC patrol references, under-defined patrol routes, and overlapping placements.
+- Validation is scriptable in tests and can be used as a pre-export quality gate for map content.
+
 ## Controls
 
 | Key / Button | Action                              |
@@ -159,6 +164,20 @@ npm run preview
 npm test
 ```
 
+### Debugging + targeted test workflow
+
+- Run a focused test file while iterating on a system:
+
+```bash
+npx vitest run src/systems/map-editor-system.test.ts
+```
+
+- Use watch mode during local debugging:
+
+```bash
+npm run test:watch
+```
+
 ## Project Layout
 
 - `src/game.ts` – game bootstrap and system orchestration.
@@ -172,10 +191,10 @@ npm test
 
 The full roadmap lives in [`ROADMAP.md`](./ROADMAP.md). Key upcoming focus areas:
 
-- **Map Editor Phase 2** (active): content placement property panels, terrain sculpt/paint layers.
+- **Map Editor Phase 2/3** (active): content placement property panels plus validation/report tooling for map quality checks.
 - **Framework-first consolidation**: wiring framework state as source-of-truth for all demo systems.
 - **Content tooling**: quest authoring utilities, mod validation CLI.
-- **Map Editor Phase 3+**: serialized map packs, validation tooling, standalone editor shell.
+- **Map Editor Phase 3+**: serialized map packs, collaboration workflows, standalone editor shell.
 
 ---
 
