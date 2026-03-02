@@ -141,7 +141,7 @@ Camelot will evolve toward a creator-friendly worldbuilding pipeline through a d
 - ✅ In-engine edit mode toggle (runtime-safe authoring sandbox) — F2 key.
 - ✅ Grid/snap controls and transform gizmos for placement — G key cycles position/rotation/scale.
 - ✅ Placement of editor marker objects with grid-snapping — N key.
-- 🧭 Terrain sculpt and paint tools (height, smoothing, biome masks).
+- ✅ Terrain sculpt and paint tools (chunk-level sculpt raise + paint tint pass in editor mode).
 
 #### Phase 2: Content Authoring Workflows 🚧
 

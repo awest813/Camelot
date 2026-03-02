@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { NullEngine } from '@babylonjs/core/Engines/nullEngine';
 import { Scene } from '@babylonjs/core/scene';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { Mesh } from '@babylonjs/core/Meshes/mesh';
 import { MapEditorSystem } from './map-editor-system';
 
 const disposables: Array<{ scene: Scene; engine: NullEngine }> = [];
@@ -54,6 +55,39 @@ describe('MapEditorSystem — Phase 1 (core)', () => {
         expect(marker.position.x).toBe(2);
         expect(marker.position.y).toBe(2);
         expect(marker.position.z).toBe(-2);
+    });
+});
+
+
+
+// ─── Phase 1: Terrain tools ───────────────────────────────────────────────────
+
+describe('MapEditorSystem — Phase 1 (terrain tools)', () => {
+    it('cycles terrain tool none -> sculpt -> paint -> none', () => {
+        const { editor } = makeEditor();
+
+        expect(editor.terrainTool).toBe('none');
+        expect(editor.cycleTerrainTool()).toBe('sculpt');
+        expect(editor.cycleTerrainTool()).toBe('paint');
+        expect(editor.cycleTerrainTool()).toBe('none');
+    });
+
+    it('clamps terrain sculpt step between 0.1 and 4', () => {
+        const { editor } = makeEditor();
+
+        expect(editor.adjustTerrainSculptStep(-10)).toBe(0.1);
+        expect(editor.adjustTerrainSculptStep(10)).toBe(4);
+    });
+
+    it('sculpt tool raises chunk mesh Y position by terrainSculptStep', () => {
+        const { editor, scene } = makeEditor();
+        const chunk = new Mesh('chunk_0,0', scene);
+        editor.terrainTool = 'sculpt';
+        editor.terrainSculptStep = 0.75;
+
+        editor.applyTerrainToolToMesh(chunk);
+
+        expect(chunk.position.y).toBe(0.75);
     });
 });
 
