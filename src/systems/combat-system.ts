@@ -77,11 +77,12 @@ const MAGIC_PROFILES: Record<MagicArchetype, MagicProfile> = {
 };
 
 // State colour palette
-const COLOR_IDLE    = Color3.Yellow();
-const COLOR_ALERT   = new Color3(1.0, 0.55, 0.0);  // orange
-const COLOR_CHASE   = Color3.Red();
-const COLOR_TELEGRAPH = new Color3(1.0, 0.15, 0.15);
-const COLOR_RETURN  = new Color3(1.0, 0.85, 0.0);  // warm yellow — calming down
+const COLOR_IDLE        = Color3.Yellow();
+const COLOR_ALERT       = new Color3(1.0, 0.55, 0.0);  // orange
+const COLOR_CHASE       = Color3.Red();
+const COLOR_TELEGRAPH   = new Color3(1.0, 0.15, 0.15);
+const COLOR_RETURN      = new Color3(1.0, 0.85, 0.0);  // warm yellow — calming down
+const COLOR_INVESTIGATE = new Color3(0.8, 0.65, 0.0);  // amber — cautious search
 const MAX_CONCURRENT_ATTACKERS = 1;
 
 export class CombatSystem {
@@ -292,15 +293,17 @@ export class CombatSystem {
    *
    * State machine overview
    * ──────────────────────
-   *  IDLE/PATROL → ALERT   : player enters aggroRange  (brief hesitation)
-   *  ALERT       → CHASE   : alertDuration elapsed, player still nearby
-   *  ALERT       → PATROL  : player escaped during alert window
-   *  CHASE       → ATTACK  : player within attackRange
-   *  CHASE       → RETURN  : player exceeded 2×aggroRange
-   *  ATTACK      → CHASE   : player stepped back out of attackRange
-   *  ATTACK      → RETURN  : player exceeded 2×aggroRange
-   *  RETURN      → ALERT   : player re-enters aggroRange during return trip
-   *  RETURN      → PATROL  : NPC reached spawnPosition
+   *  IDLE/PATROL → ALERT       : player enters aggroRange  (brief hesitation)
+   *  ALERT       → CHASE       : alertDuration elapsed, player still nearby
+   *  ALERT       → INVESTIGATE : player escaped during alert window — search last known position
+   *  INVESTIGATE → PATROL      : reached last known pos, or investigateDuration elapsed
+   *  INVESTIGATE → ALERT       : player re-enters aggroRange while searching
+   *  CHASE       → ATTACK      : player within attackRange
+   *  CHASE       → RETURN      : player exceeded 2×aggroRange
+   *  ATTACK      → CHASE       : player stepped back out of attackRange
+   *  ATTACK      → RETURN      : player exceeded 2×aggroRange
+   *  RETURN      → ALERT       : player re-enters aggroRange during return trip
+   *  RETURN      → PATROL      : NPC reached spawnPosition
    */
   public updateNPCAI(deltaTime: number): void {
     this._tickPlayerAttackCooldowns(deltaTime);
@@ -360,6 +363,11 @@ export class CombatSystem {
       npc.attackTimer = Math.max(0, npc.attackTimer - deltaTime);
     }
 
+    // Track the player's last known world position any time they are within aggro range.
+    if (distSq <= aggroRangeSq) {
+      npc.lastKnownPlayerPos = playerPos.clone();
+    }
+
     switch (npc.aiState) {
 
       // ── IDLE ──────────────────────────────────────────────────────────────
@@ -385,10 +393,34 @@ export class CombatSystem {
       case AIState.ALERT:
         npc.alertTimer += deltaTime;
         if (distSq > deaggroRangeSq) {
-          // Player escaped while we were still hesitating
-          this._transitionTo(npc, npc.patrolPoints.length > 0 ? AIState.PATROL : AIState.IDLE);
+          // Player escaped while we were still hesitating — investigate last known position.
+          if (npc.lastKnownPlayerPos !== null) {
+            this._transitionTo(npc, AIState.INVESTIGATE);
+          } else {
+            this._transitionTo(npc, npc.patrolPoints.length > 0 ? AIState.PATROL : AIState.IDLE);
+          }
         } else if (npc.alertTimer >= npc.alertDuration) {
           this._transitionTo(npc, AIState.CHASE);
+        }
+        break;
+
+      // ── INVESTIGATE ───────────────────────────────────────────────────────
+      case AIState.INVESTIGATE:
+        // Re-aggro if the player returns while we're searching.
+        if (distSq <= aggroRangeSq) {
+          this._transitionTo(npc, AIState.ALERT);
+          break;
+        }
+        npc.investigateTimer += deltaTime;
+        if (npc.lastKnownPlayerPos !== null) {
+          this._moveRelativeToTarget(npc, npc.lastKnownPlayerPos, npc.moveSpeed * 0.7, deltaTime);
+          const distToLastKnownSq = Vector3.DistanceSquared(npc.mesh.position, npc.lastKnownPlayerPos);
+          const reachedLastKnown  = distToLastKnownSq < 4.0;
+          if (reachedLastKnown || npc.investigateTimer >= npc.investigateDuration) {
+            this._transitionTo(npc, npc.patrolPoints.length > 0 ? AIState.RETURN : AIState.IDLE);
+          }
+        } else if (npc.investigateTimer >= npc.investigateDuration) {
+          this._transitionTo(npc, npc.patrolPoints.length > 0 ? AIState.RETURN : AIState.IDLE);
         }
         break;
 
@@ -468,10 +500,11 @@ export class CombatSystem {
 
     // Keep legacy flag in sync for ScheduleSystem / DialogueSystem
     npc.isAggressive = (
-      newState === AIState.ALERT  ||
-      newState === AIState.CHASE  ||
-      newState === AIState.ATTACK ||
-      newState === AIState.RETURN
+      newState === AIState.ALERT       ||
+      newState === AIState.CHASE       ||
+      newState === AIState.ATTACK      ||
+      newState === AIState.RETURN      ||
+      newState === AIState.INVESTIGATE
     );
 
     switch (newState) {
@@ -481,6 +514,17 @@ export class CombatSystem {
         npc.attackTelegraphTimer = 0;
         npc.setStateColor(COLOR_ALERT);
         this._stopMovement(npc);
+        break;
+
+      case AIState.INVESTIGATE:
+        npc.investigateTimer = 0;
+        npc.currentPath = [];
+        npc.pathIndex = 0;
+        npc.isAttackTelegraphing = false;
+        npc.attackTelegraphTimer = 0;
+        npc.strafeDirection = 0;
+        npc.strafeTimer = 0;
+        npc.setStateColor(COLOR_INVESTIGATE);
         break;
 
       case AIState.CHASE:
@@ -524,6 +568,7 @@ export class CombatSystem {
         npc.attackTelegraphTimer = 0;
         npc.strafeDirection = 0;
         npc.strafeTimer = 0;
+        npc.lastKnownPlayerPos = null;
         npc.setStateColor(COLOR_IDLE);
         this._stopMovement(npc);
         break;

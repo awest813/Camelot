@@ -320,12 +320,35 @@ export class Game {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const mode = this.mapEditorSystem.cycleGizmoMode();
                 this.ui.showNotification(`Editor gizmo: ${mode}`, 1400);
+            } else if (kbInfo.event.key === "t" || kbInfo.event.key === "T") {
+                if (!this.mapEditorSystem.isEnabled) return;
+                const ptype = this.mapEditorSystem.cyclePlacementType();
+                this.ui.showNotification(`Place type: ${ptype}`, 1400);
+            } else if (kbInfo.event.key === "p" || kbInfo.event.key === "P") {
+                if (!this.mapEditorSystem.isEnabled) return;
+                const groupId = this.mapEditorSystem.startNewPatrolGroup();
+                this.ui.showNotification(`New patrol group: ${groupId}`, 1600);
+            } else if (kbInfo.event.key === "F4") {
+                if (!this.mapEditorSystem.isEnabled) return;
+                const mapData = this.mapEditorSystem.exportMap();
+                const json = JSON.stringify(mapData, null, 2);
+                console.log("[MapEditor] Exported map:", json);
+                try {
+                    navigator.clipboard.writeText(json).then(() => {
+                        this.ui.showNotification("Map exported to clipboard", 2000);
+                    }).catch(() => {
+                        this.ui.showNotification("Map exported (see console)", 2000);
+                    });
+                } catch {
+                    this.ui.showNotification("Map exported (see console)", 2000);
+                }
             } else if (kbInfo.event.key === "n" || kbInfo.event.key === "N") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const placeAt = this.player.camera.position.add(this.player.camera.getForwardRay(8).direction.scale(4));
                 placeAt.y = Math.max(1, placeAt.y);
-                this.mapEditorSystem.placeMarkerAt(placeAt);
-                this.ui.showNotification("Editor marker placed", 1200);
+                this.mapEditorSystem.placeEntity(placeAt);
+                const ptype = this.mapEditorSystem.currentPlacementType;
+                this.ui.showNotification(`Placed: ${ptype}`, 1200);
             } else if (kbInfo.event.key === "F5") {
                 if (!this.isPaused) this.saveSystem.save();
             } else if (kbInfo.event.key === "F9") {

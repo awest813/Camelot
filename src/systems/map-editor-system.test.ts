@@ -21,7 +21,9 @@ afterEach(() => {
     }
 });
 
-describe('MapEditorSystem', () => {
+// ─── Phase 1: Core editor mode ────────────────────────────────────────────────
+
+describe('MapEditorSystem — Phase 1 (core)', () => {
     it('toggles edit mode on and off', () => {
         const { editor } = makeEditor();
 
@@ -48,9 +50,257 @@ describe('MapEditorSystem', () => {
         const marker = editor.placeMarkerAt(new Vector3(1.4, 1.1, -2.6));
 
         expect(marker.metadata?.editable).toBe(true);
-        expect(marker.metadata?.editorMarker).toBe(true);
+        expect(marker.metadata?.editorType).toBe('marker');
         expect(marker.position.x).toBe(2);
         expect(marker.position.y).toBe(2);
         expect(marker.position.z).toBe(-2);
+    });
+});
+
+// ─── Phase 2: Placement types ─────────────────────────────────────────────────
+
+describe('MapEditorSystem — Phase 2 (placement types)', () => {
+    it('defaults to marker placement type', () => {
+        const { editor } = makeEditor();
+        expect(editor.currentPlacementType).toBe('marker');
+    });
+
+    it('cycles placement type through all values and wraps around', () => {
+        const { editor } = makeEditor();
+
+        const order: string[] = [];
+        for (let i = 0; i < 6; i++) {
+            order.push(editor.cyclePlacementType());
+        }
+
+        expect(order[0]).toBe('loot');
+        expect(order[1]).toBe('npc-spawn');
+        expect(order[2]).toBe('quest-marker');
+        expect(order[3]).toBe('structure');
+        expect(order[4]).toBe('marker');       // wrapped back
+        expect(order[5]).toBe('loot');         // second cycle
+    });
+
+    it('placeEntity uses currentPlacementType by default', () => {
+        const { editor } = makeEditor();
+        editor.currentPlacementType = 'loot';
+
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0));
+
+        expect(mesh.metadata?.editorType).toBe('loot');
+        expect(mesh.metadata?.editable).toBe(true);
+    });
+
+    it('placeEntity accepts an explicit type override', () => {
+        const { editor } = makeEditor();
+        editor.currentPlacementType = 'marker';
+
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'structure');
+
+        expect(mesh.metadata?.editorType).toBe('structure');
+    });
+
+    it('snaps placed entities to the current snapSize', () => {
+        const { editor } = makeEditor();
+        editor.snapSize = 4;
+
+        // 5.9/4 = 1.475 → rounds to 1 → 4; 1.1/4 = 0.275 → rounds to 0 → 0; -3.0/4 = -0.75 → rounds to -1 → -4
+        const mesh = editor.placeEntity(new Vector3(5.9, 1.1, -3.0));
+
+        expect(mesh.position.x).toBe(4);
+        expect(mesh.position.y).toBe(0);
+        expect(mesh.position.z).toBe(-4);
+    });
+
+    it('each placed entity receives a unique editorEntityId', () => {
+        const { editor } = makeEditor();
+
+        const m1 = editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        const m2 = editor.placeEntity(new Vector3(1, 1, 0), 'loot');
+        const m3 = editor.placeEntity(new Vector3(2, 1, 0), 'npc-spawn');
+
+        const ids = [
+            m1.metadata?.editorEntityId,
+            m2.metadata?.editorEntityId,
+            m3.metadata?.editorEntityId,
+        ];
+        expect(new Set(ids).size).toBe(3);
+    });
+});
+
+// ─── Phase 2: Patrol route authoring ─────────────────────────────────────────
+
+describe('MapEditorSystem — Phase 2 (patrol routes)', () => {
+    it('startNewPatrolGroup returns a unique group id each call', () => {
+        const { editor } = makeEditor();
+
+        const id1 = editor.startNewPatrolGroup();
+        const id2 = editor.startNewPatrolGroup();
+
+        expect(id1).not.toBe(id2);
+        expect(editor.getPatrolGroups().has(id1)).toBe(true);
+        expect(editor.getPatrolGroups().has(id2)).toBe(true);
+    });
+
+    it('npc-spawn entities placed while a patrol group is active are assigned to that group', () => {
+        const { editor } = makeEditor();
+        const groupId = editor.startNewPatrolGroup();
+
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'npc-spawn');
+
+        expect(mesh.metadata?.patrolGroupId).toBe(groupId);
+    });
+
+    it('npc-spawn entities placed without an active patrol group have no patrolGroupId', () => {
+        const { editor } = makeEditor();
+        editor.clearActivePatrolGroup();
+
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'npc-spawn');
+
+        expect(mesh.metadata?.patrolGroupId).toBeUndefined();
+    });
+
+    it('waypoints accumulate in the patrol group as npc-spawn entities are placed', () => {
+        const { editor } = makeEditor();
+        const groupId = editor.startNewPatrolGroup();
+
+        editor.placeEntity(new Vector3(0, 1, 0), 'npc-spawn');
+        editor.placeEntity(new Vector3(10, 1, 0), 'npc-spawn');
+        editor.placeEntity(new Vector3(10, 1, 10), 'npc-spawn');
+
+        const group = editor.getPatrolGroups().get(groupId);
+        expect(group?.waypoints.length).toBe(3);
+    });
+
+    it('non-npc-spawn entities do not add waypoints to the active patrol group', () => {
+        const { editor } = makeEditor();
+        const groupId = editor.startNewPatrolGroup();
+
+        editor.placeEntity(new Vector3(0, 1, 0), 'loot');
+        editor.placeEntity(new Vector3(0, 1, 5), 'quest-marker');
+
+        const group = editor.getPatrolGroups().get(groupId);
+        expect(group?.waypoints.length).toBe(0);
+    });
+
+    it('clearActivePatrolGroup stops new npc-spawn from joining the previous group', () => {
+        const { editor } = makeEditor();
+        const groupId = editor.startNewPatrolGroup();
+        editor.placeEntity(new Vector3(0, 1, 0), 'npc-spawn');
+        editor.clearActivePatrolGroup();
+
+        editor.placeEntity(new Vector3(10, 1, 0), 'npc-spawn');
+
+        const group = editor.getPatrolGroups().get(groupId);
+        expect(group?.waypoints.length).toBe(1);
+    });
+});
+
+// ─── Phase 2: Export / import ─────────────────────────────────────────────────
+
+describe('MapEditorSystem — Phase 2 (export / import)', () => {
+    it('exportMap returns version 1 with entries and patrolRoutes', () => {
+        const { editor } = makeEditor();
+
+        const data = editor.exportMap();
+
+        expect(data.version).toBe(1);
+        expect(Array.isArray(data.entries)).toBe(true);
+        expect(Array.isArray(data.patrolRoutes)).toBe(true);
+    });
+
+    it('exportMap captures all placed entities with correct type and position', () => {
+        const { editor } = makeEditor();
+
+        editor.placeEntity(new Vector3(2, 1, 3), 'loot');
+        editor.placeEntity(new Vector3(5, 1, 0), 'quest-marker');
+
+        const data = editor.exportMap();
+
+        expect(data.entries.length).toBe(2);
+        const lootEntry = data.entries.find(e => e.type === 'loot');
+        expect(lootEntry).toBeDefined();
+        expect(lootEntry?.position.x).toBe(2);
+        expect(lootEntry?.position.z).toBe(3);
+    });
+
+    it('exportMap captures patrol route waypoints', () => {
+        const { editor } = makeEditor();
+        const groupId = editor.startNewPatrolGroup();
+        editor.placeEntity(new Vector3(0, 1, 0), 'npc-spawn');
+        editor.placeEntity(new Vector3(8, 1, 0), 'npc-spawn');
+
+        const data = editor.exportMap();
+
+        const route = data.patrolRoutes.find(r => r.id === groupId);
+        expect(route).toBeDefined();
+        expect(route?.waypoints.length).toBe(2);
+        expect(route?.waypoints[0]).toMatchObject({ x: 0, y: 1, z: 0 });
+        expect(route?.waypoints[1]).toMatchObject({ x: 8, y: 1, z: 0 });
+    });
+
+    it('importMap re-creates entities from exported data', () => {
+        const { editor: src, scene: srcScene, engine: srcEngine } = makeEditor();
+        src.placeEntity(new Vector3(3, 1, 7), 'structure');
+        const exported = src.exportMap();
+        srcScene.dispose();
+        srcEngine.dispose();
+        disposables.pop(); // already disposed above
+
+        const { editor: dst } = makeEditor();
+        dst.importMap(exported);
+
+        const dstData = dst.exportMap();
+        expect(dstData.entries.length).toBe(1);
+        expect(dstData.entries[0].type).toBe('structure');
+        expect(dstData.entries[0].position).toMatchObject({ x: 3, y: 1, z: 7 });
+    });
+
+    it('importMap skips entities whose id already exists', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        const firstExport = editor.exportMap();
+
+        // Import the same data again — should not duplicate
+        editor.importMap(firstExport);
+
+        const data = editor.exportMap();
+        expect(data.entries.length).toBe(1);
+        expect(mesh.metadata?.editorEntityId).toBe(firstExport.entries[0].id);
+    });
+
+    it('importMap recreates patrol groups and does not duplicate them on a second import', () => {
+        const { editor: src } = makeEditor();
+        src.startNewPatrolGroup();
+        src.placeEntity(new Vector3(0, 1, 0), 'npc-spawn');
+        src.placeEntity(new Vector3(5, 1, 0), 'npc-spawn');
+        const exported = src.exportMap();
+
+        const { editor: dst } = makeEditor();
+        dst.importMap(exported);
+        dst.importMap(exported); // second import — no duplicates
+
+        const groups = Array.from(dst.getPatrolGroups().values());
+        expect(groups.length).toBe(1);
+        expect(groups[0].waypoints.length).toBe(2);
+    });
+});
+
+// ─── Phase 2: clearAll ────────────────────────────────────────────────────────
+
+describe('MapEditorSystem — Phase 2 (clearAll)', () => {
+    it('clearAll removes all entities and patrol groups', () => {
+        const { editor } = makeEditor();
+        editor.startNewPatrolGroup();
+        editor.placeEntity(new Vector3(0, 1, 0), 'npc-spawn');
+        editor.placeEntity(new Vector3(5, 1, 0), 'npc-spawn');
+        editor.placeEntity(new Vector3(0, 1, 5), 'loot');
+
+        editor.clearAll();
+
+        const data = editor.exportMap();
+        expect(data.entries.length).toBe(0);
+        expect(data.patrolRoutes.length).toBe(0);
+        expect(editor.activePatrolGroupId).toBeNull();
     });
 });
