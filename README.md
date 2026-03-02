@@ -1,15 +1,30 @@
-# Camelot
+# Camelot Framework
 
-A modular, browser-based RPG sandbox built with **Babylon.js 8**, **TypeScript**, and **Vite**. Camelot combines action combat, progression systems, procedural world generation, and UI-heavy RPG workflows into a single project template that is easy to expand.
+A modular, browser-based RPG **framework** built with **Babylon.js 8**, **TypeScript**, and **Vite**. Camelot now ships as:
 
-## Why Camelot
+1. a **headless RPG engine layer** (dialogue, quests, inventory, factions, saves, mods), and  
+2. a **Babylon demo runtime** proving how the framework can drive a playable experience.
 
-Camelot is designed for developers who want to prototype or ship first-person RPG mechanics quickly while keeping systems decoupled and maintainable.
+## Why Camelot Framework
 
-- Strong gameplay foundation: combat, stats, quests, skills, inventory, equipment.
-- Runtime persistence: save/load of major player and quest state.
-- Procedural world scaffolding: chunked terrain, biome content, structures.
-- Tool-ready architecture: systems are organized for future editor and content pipeline work.
+Camelot is designed for developers who want to build Bethesda-lite RPG workflows in the browser while keeping systems decoupled and maintainable.
+
+- Framework foundation: dialogue engine, quest graph, inventory domain, faction reputation.
+- Runtime persistence: versioned save-state JSON architecture with migration hooks.
+- Mod-ready architecture: manifest-driven mod folder loading in browser-safe format.
+- Demo game client: combat, world streaming, UI, and procedural content to validate the stack.
+
+## Framework Core (new)
+
+The framework modules live under `src/framework/` and are intentionally engine-agnostic:
+
+- `dialogue/` — branching dialogue sessions with typed conditions/effects.
+- `quests/` — graph-based quest progression and event ingestion.
+- `inventory/` — capacity/stack/equipment intent logic without UI coupling.
+- `factions/` — reputation + disposition model (hostile/neutral/friendly/allied).
+- `save/` — schema-versioned save files with migration support.
+- `mods/` — manifest-driven mod loading and deterministic content merge.
+- `runtime/` — convenience orchestration layer combining these modules.
 
 ## Gameplay Systems
 
@@ -95,6 +110,12 @@ npm run dev
 
 Open `http://localhost:8088`.
 
+### Mod folder workflow
+
+- Mod manifest path: `public/mods/mods-manifest.json`
+- Example mod pack: `public/mods/example-guard-overhaul.json`
+- Loader contract: manifest lists mod JSON files; each mod provides partial content bundles.
+
 ### Build and preview
 
 ```bash
@@ -111,6 +132,7 @@ npm test
 ## Project Layout
 
 - `src/game.ts` – game bootstrap and system orchestration.
+- `src/framework/` – headless RPG framework modules.
 - `src/entities/` – player, NPC, loot, and entity logic.
 - `src/systems/` – combat, interaction, dialogue, inventory, equipment, quest, save, and related systems.
 - `src/world/` – terrain chunking, biome generation, structures.

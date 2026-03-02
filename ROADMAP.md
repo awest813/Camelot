@@ -18,6 +18,16 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ Havok-powered physics integration.
 - ✅ First-person controller with resource-driven combat.
 
+### Framework Core (New Direction)
+
+- ✅ Initial `src/framework` package scaffolded.
+- ✅ Dialogue graph engine (conditions, effects, traversal sessions).
+- ✅ Quest graph engine (node dependencies, trigger ingestion, branching progression).
+- ✅ Headless inventory engine (capacity, stack, equip intent).
+- ✅ Faction system (reputation + disposition bands).
+- ✅ Save-state JSON architecture with schema migration pipeline.
+- ✅ Mod folder infrastructure (`public/mods` manifest + loader + content merge reports).
+
 ### RPG Systems
 
 - ✅ Stats + regeneration (Health, Magicka, Stamina).
@@ -53,6 +63,14 @@ The current alpha stage is centered on combat readability and encounter stabilit
 ---
 
 ## Near-Term (Next 1–2 Releases)
+
+### Framework-First Consolidation
+
+- 🧭 Expand framework runtime adapters so demo gameplay systems consume framework state as source-of-truth.
+- 🧭 Add richer dialogue effect hooks (quest activation, inventory consume/give, conditional branches by faction tiers).
+- 🧭 Add quest authoring utilities and graph validation diagnostics (dead-end node detection, cycle hints).
+- 🧭 Harden save migrations with fixtures for multiple historical schema versions.
+- 🧭 Add CLI/dev tooling for mod manifest generation and content schema validation.
 
 ### Natural-Feel Systems Overhaul (Decision)
 
