@@ -145,7 +145,7 @@ class App {
   _config(): void {
     // Axes — only in dev to avoid adding extra meshes in production
     if (import.meta.env.DEV) {
-      new AxesViewer();
+      new AxesViewer(this.scene);
     }
 
     // Inspector and other stuff
