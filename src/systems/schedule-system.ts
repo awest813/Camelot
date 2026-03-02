@@ -12,6 +12,7 @@ export class ScheduleSystem {
   private _currentVel: Vector3 = new Vector3();
   private _newVel: Vector3 = new Vector3();
   private _lookAtTarget: Vector3 = new Vector3();
+  private _toTarget: Vector3 = new Vector3();
   private _patrolPauseHeading: WeakMap<NPC, Vector3> = new WeakMap();
 
   constructor(scene: Scene) {
@@ -86,8 +87,8 @@ export class ScheduleSystem {
   }
 
   private _setPatrolIdleHeading(npc: NPC): void {
-    const toTarget = npc.patrolPoints[npc.currentPatrolIndex].subtract(npc.mesh.position);
-    const baseAngle = Math.atan2(toTarget.x, toTarget.z);
+    npc.patrolPoints[npc.currentPatrolIndex].subtractToRef(npc.mesh.position, this._toTarget);
+    const baseAngle = Math.atan2(this._toTarget.x, this._toTarget.z);
     const randomOffset = (Math.random() * 2 - 1) * npc.patrolLookAroundAngle;
     const heading = baseAngle + randomOffset;
     this._patrolPauseHeading.set(npc, new Vector3(Math.sin(heading), 0, Math.cos(heading)));
