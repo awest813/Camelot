@@ -356,7 +356,7 @@ export class Game {
                 }
             } else if (kbInfo.event.key === "n" || kbInfo.event.key === "N") {
                 if (!this.mapEditorSystem.isEnabled) return;
-                const placeAt = this.player.camera.position.add(this.player.camera.getForwardRay(8).direction.scale(4));
+                const placeAt = this.player.camera.position.add(this.player.getForwardDirection(8).scale(4));
                 placeAt.y = Math.max(1, placeAt.y);
                 this.mapEditorSystem.placeEntity(placeAt);
                 const ptype = this.mapEditorSystem.currentPlacementType;

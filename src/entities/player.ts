@@ -118,10 +118,14 @@ export class Player {
       }
   }
 
+  public getForwardDirection(distance: number = 1): Vector3 {
+      return this.camera.getForwardRay(distance).direction;
+  }
+
   public raycastForward(distance: number, requireVisible: boolean = false) {
     // Raycast forward
     const origin = this.camera.position;
-    const forward = this.camera.getForwardRay(distance).direction;
+    const forward = this.getForwardDirection(distance);
     const ray = new Ray(origin, forward, distance);
 
     return this.scene.pickWithRay(ray, (mesh) => {
