@@ -111,6 +111,20 @@ export class NPC {
   public attackDamage: number = 5;
   public attackTimer: number = 0;
   public attackCooldown: number = 2; // seconds between attacks
+  /** True while the NPC is in a visible pre-strike telegraph animation window. */
+  public isAttackTelegraphing: boolean = false;
+  /** Remaining seconds before a telegraphed strike resolves. */
+  public attackTelegraphTimer: number = 0;
+  /** Strike reach factor used when resolving telegraphed attacks. */
+  public dodgeWindowRangeMultiplier: number = 0.7;
+  /** Lateral movement choice during ATTACK cooldown windows (-1 left, +1 right). */
+  public strafeDirection: -1 | 0 | 1 = 0;
+  /** Seconds remaining until strafeDirection is rerolled. */
+  public strafeTimer: number = 0;
+  /** Side-step speed as a multiple of moveSpeed. */
+  public strafeSpeedMultiplier: number = 0.65;
+  /** How quickly horizontal velocity blends toward desired movement. */
+  public movementResponsiveness: number = 8;
   public xpReward: number = 25;
 
   // ─── Visuals ────────────────────────────────────────────────────────────────
@@ -167,6 +181,10 @@ export class NPC {
     this.isAggressive = false;
     this.aiState = AIState.IDLE;
     this.currentPath = [];
+    this.isAttackTelegraphing = false;
+    this.attackTelegraphTimer = 0;
+    this.strafeDirection = 0;
+    this.strafeTimer = 0;
     const mat = this.mesh.material as StandardMaterial;
     mat.diffuseColor = new Color3(0.3, 0.3, 0.3);
     this.physicsAggregate.body.setMotionType(PhysicsMotionType.STATIC);

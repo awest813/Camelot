@@ -59,6 +59,8 @@ Camelot is designed for developers who want to prototype or ship first-person RP
 | I            | Toggle inventory          |
 | J            | Toggle quest log          |
 | K            | Toggle skill tree         |
+| 1 / 2 / 3    | Melee archetype select    |
+| 4 / 5 / 6    | Magic archetype select    |
 | M            | Toggle audio mute         |
 | F5           | Quick save                |
 | F9           | Quick load                |

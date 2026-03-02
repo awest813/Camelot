@@ -65,10 +65,10 @@ three-step overhaul track:
 2. ✅ **Combat cadence and recovery pacing**  
    - Add player attack cadence windows (melee/magic cooldown discipline).  
    - Add combat-aware regeneration delays after damage and resource spend.
-3. 🧭 **Follow-up readability + motion pass**  
-   - Add clearer enemy telegraphs and dodge windows.  
-   - Add NPC strafe/reposition variety and movement smoothing.  
-   - Tune stamina/magicka economy per weapon/spell archetype.
+3. ✅ **Follow-up readability + motion pass**  
+   - Added clearer enemy telegraphs and dodge windows.  
+   - Added NPC strafe/reposition variety and movement smoothing.  
+   - Tuned stamina/magicka economy per weapon/spell archetype.
 
 ### AI and Encounter Quality
 

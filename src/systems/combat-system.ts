@@ -12,15 +12,75 @@ import { NavigationSystem } from "./navigation-system";
 
 const MELEE_DAMAGE = 10;
 const MAGIC_DAMAGE = 20;
-const MELEE_STAMINA_COST = 15;
-const MAGIC_MAGICKA_COST = 20;
-const MELEE_COOLDOWN = 0.45;
-const MAGIC_COOLDOWN = 0.7;
+
+export type MeleeArchetype = "duelist" | "soldier" | "bruiser";
+export type MagicArchetype = "spark" | "bolt" | "surge";
+
+interface MeleeProfile {
+  staminaCost: number;
+  cooldown: number;
+  damageMultiplier: number;
+  label: string;
+}
+
+interface MagicProfile {
+  magickaCost: number;
+  cooldown: number;
+  damageMultiplier: number;
+  projectileImpulse: number;
+  label: string;
+}
+
+const MELEE_PROFILES: Record<MeleeArchetype, MeleeProfile> = {
+  duelist: {
+    staminaCost: 9,
+    cooldown: 0.32,
+    damageMultiplier: 0.82,
+    label: "Duelist stance",
+  },
+  soldier: {
+    staminaCost: 15,
+    cooldown: 0.45,
+    damageMultiplier: 1,
+    label: "Soldier stance",
+  },
+  bruiser: {
+    staminaCost: 24,
+    cooldown: 0.72,
+    damageMultiplier: 1.4,
+    label: "Bruiser stance",
+  },
+};
+
+const MAGIC_PROFILES: Record<MagicArchetype, MagicProfile> = {
+  spark: {
+    magickaCost: 12,
+    cooldown: 0.45,
+    damageMultiplier: 0.78,
+    projectileImpulse: 17,
+    label: "Spark cantrip",
+  },
+  bolt: {
+    magickaCost: 20,
+    cooldown: 0.7,
+    damageMultiplier: 1,
+    projectileImpulse: 20,
+    label: "Bolt cast",
+  },
+  surge: {
+    magickaCost: 30,
+    cooldown: 1.05,
+    damageMultiplier: 1.38,
+    projectileImpulse: 23,
+    label: "Surge cast",
+  },
+};
 
 // State colour palette
 const COLOR_IDLE    = Color3.Yellow();
 const COLOR_ALERT   = new Color3(1.0, 0.55, 0.0);  // orange
 const COLOR_CHASE   = Color3.Red();
+const COLOR_TELEGRAPH = new Color3(1.0, 0.15, 0.15);
 const COLOR_RETURN  = new Color3(1.0, 0.85, 0.0);  // warm yellow — calming down
 const MAX_CONCURRENT_ATTACKERS = 1;
 
@@ -34,12 +94,17 @@ export class CombatSystem {
   // Scratch vectors — reused every frame to avoid GC pressure
   private _currentVel: Vector3 = new Vector3();
   private _dir: Vector3 = new Vector3();
+  private _lateralDir: Vector3 = new Vector3();
   private _newVel: Vector3 = new Vector3();
+  private _desiredVel: Vector3 = new Vector3();
+  private _blendedVel: Vector3 = new Vector3();
   private _lookAtTarget: Vector3 = new Vector3();
   private _hitPos: Vector3 = new Vector3();
   private _attackReservations: Set<NPC> = new Set();
   private _meleeCooldownRemaining: number = 0;
   private _magicCooldownRemaining: number = 0;
+  private _meleeArchetype: MeleeArchetype = "soldier";
+  private _magicArchetype: MagicArchetype = "bolt";
 
   private static readonly _OFFSET_Y1 = new Vector3(0, 1, 0);
   private static readonly _OFFSET_Y2 = new Vector3(0, 2, 0);
@@ -64,19 +129,38 @@ export class CombatSystem {
     this._nav = nav ?? null;
   }
 
+  public setMeleeArchetype(archetype: MeleeArchetype): void {
+    this._meleeArchetype = archetype;
+    this._ui.showNotification(`${MELEE_PROFILES[archetype].label} selected`, 1400);
+  }
+
+  public setMagicArchetype(archetype: MagicArchetype): void {
+    this._magicArchetype = archetype;
+    this._ui.showNotification(`${MAGIC_PROFILES[archetype].label} selected`, 1400);
+  }
+
+  public get activeMeleeArchetype(): MeleeArchetype {
+    return this._meleeArchetype;
+  }
+
+  public get activeMagicArchetype(): MagicArchetype {
+    return this._magicArchetype;
+  }
+
   // ─── Player actions ────────────────────────────────────────────────────────
 
   public meleeAttack(): boolean {
+    const meleeProfile = MELEE_PROFILES[this._meleeArchetype];
     if (this._meleeCooldownRemaining > 0) {
       return false;
     }
 
-    if (this.player.stamina < MELEE_STAMINA_COST) {
+    if (this.player.stamina < meleeProfile.staminaCost) {
       this._ui.showNotification("Not enough stamina!");
       return false;
     }
-    this.player.stamina -= MELEE_STAMINA_COST;
-    this._meleeCooldownRemaining = MELEE_COOLDOWN;
+    this.player.stamina -= meleeProfile.staminaCost;
+    this._meleeCooldownRemaining = meleeProfile.cooldown;
     (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
       .notifyResourceSpent?.("stamina");
 
@@ -84,7 +168,10 @@ export class CombatSystem {
     if (hit && hit.pickedMesh) {
       const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
       if (npc && !npc.isDead) {
-        const meleeDmg = MELEE_DAMAGE + this.player.bonusDamage;
+        const meleeDmg = Math.max(
+          1,
+          Math.round((MELEE_DAMAGE + this.player.bonusDamage) * meleeProfile.damageMultiplier)
+        );
         npc.takeDamage(meleeDmg);
 
         const numberPos = hit.pickedPoint
@@ -117,16 +204,17 @@ export class CombatSystem {
   }
 
   public magicAttack(): boolean {
+    const magicProfile = MAGIC_PROFILES[this._magicArchetype];
     if (this._magicCooldownRemaining > 0) {
       return false;
     }
 
-    if (this.player.magicka < MAGIC_MAGICKA_COST) {
+    if (this.player.magicka < magicProfile.magickaCost) {
       this._ui.showNotification("Not enough magicka!");
       return false;
     }
-    this.player.magicka -= MAGIC_MAGICKA_COST;
-    this._magicCooldownRemaining = MAGIC_COOLDOWN;
+    this.player.magicka -= magicProfile.magickaCost;
+    this._magicCooldownRemaining = magicProfile.cooldown;
     (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
       .notifyResourceSpent?.("magicka");
 
@@ -145,7 +233,7 @@ export class CombatSystem {
     agg.body.setMotionType(PhysicsMotionType.DYNAMIC);
 
     const forward = this.player.camera.getForwardRay(1).direction;
-    agg.body.applyImpulse(forward.scale(20), origin);
+    agg.body.applyImpulse(forward.scale(magicProfile.projectileImpulse), origin);
 
     let alive = true;
     let elapsedMs = 0;
@@ -167,7 +255,10 @@ export class CombatSystem {
       for (const npc of this.npcs) {
         if (npc.isDead) continue;
         if (Vector3.DistanceSquared(projPos, npc.mesh.position) <= 1.44) {
-          const magicDmg = MAGIC_DAMAGE + this.player.bonusMagicDamage;
+          const magicDmg = Math.max(
+            1,
+            Math.round((MAGIC_DAMAGE + this.player.bonusMagicDamage) * magicProfile.damageMultiplier)
+          );
           npc.takeDamage(magicDmg);
           this._ui.showDamageNumber(
             npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos),
@@ -331,40 +422,26 @@ export class CombatSystem {
 
         this._faceTarget(npc, playerPos);
 
+        if (npc.isAttackTelegraphing) {
+          this._tickAttackTelegraph(npc, distSq, deltaTime);
+          break;
+        }
+
         // Distance bands and cooldown discipline
         if (npc.attackTimer > npc.attackWindup) {
-          // On cooldown: try to maintain a standoff distance
-          const standoff = npc.attackRange * 0.8;
-          const dist = Math.sqrt(distSq);
-
-          if (dist < standoff - 0.5) {
-            // Back away slowly if player pushes in too close
-            this._moveRelativeToTarget(npc, playerPos, -npc.moveSpeed * 0.5);
-          } else if (dist > standoff + 0.5) {
-            // Move in slowly if player backs off too far inside the engage band
-            this._moveRelativeToTarget(npc, playerPos, npc.moveSpeed * 0.5);
-          } else {
-            this._stopMovement(npc);
-          }
+          this._updateAttackReposition(npc, playerPos, distSq, deltaTime);
         } else {
           // Ready to attack or winding up: close the distance aggressively if needed
           const strikeRangeSq = (npc.attackRange * 0.5) * (npc.attackRange * 0.5);
           if (distSq > strikeRangeSq) {
-             this._moveRelativeToTarget(npc, playerPos, npc.moveSpeed);
+             this._moveRelativeToTarget(npc, playerPos, npc.moveSpeed, deltaTime);
           } else {
              this._stopMovement(npc);
           }
         }
 
-        // Melee attack on cooldown
         if (npc.attackTimer <= 0) {
-          npc.attackTimer = npc.attackCooldown;
-          const dmg = Math.max(1, npc.attackDamage - this.player.bonusArmor);
-          this.player.health = Math.max(0, this.player.health - dmg);
-          (this.player as unknown as { notifyDamageTaken?: () => void }).notifyDamageTaken?.();
-          this._ui.showHitFlash("rgba(200, 0, 0, 0.4)");
-          if (this.onPlayerHit) this.onPlayerHit();
-          this._ui.showNotification(`${npc.mesh.name} attacks you for ${dmg} damage!`, 2000);
+          this._beginAttackTelegraph(npc);
         }
         break;
 
@@ -400,6 +477,8 @@ export class CombatSystem {
     switch (newState) {
       case AIState.ALERT:
         npc.alertTimer = 0;
+        npc.isAttackTelegraphing = false;
+        npc.attackTelegraphTimer = 0;
         npc.setStateColor(COLOR_ALERT);
         this._stopMovement(npc);
         break;
@@ -409,12 +488,20 @@ export class CombatSystem {
         npc.currentPath = [];
         npc.pathIndex = 0;
         npc.pathRefreshTimer = 0;
+        npc.isAttackTelegraphing = false;
+        npc.attackTelegraphTimer = 0;
+        npc.strafeDirection = 0;
+        npc.strafeTimer = 0;
         npc.setStateColor(COLOR_CHASE);
         break;
 
       case AIState.ATTACK:
         // enforce a minimum windup before first swing
         npc.attackTimer = Math.max(npc.attackTimer, npc.attackWindup);
+        npc.isAttackTelegraphing = false;
+        npc.attackTelegraphTimer = 0;
+        npc.strafeDirection = 0;
+        npc.strafeTimer = 0;
         this._stopMovement(npc);
         npc.setStateColor(COLOR_CHASE); // stay red while attacking
         break;
@@ -423,12 +510,20 @@ export class CombatSystem {
         npc.currentPath = [];
         npc.pathIndex = 0;
         npc.pathRefreshTimer = 0;
+        npc.isAttackTelegraphing = false;
+        npc.attackTelegraphTimer = 0;
+        npc.strafeDirection = 0;
+        npc.strafeTimer = 0;
         npc.setStateColor(COLOR_RETURN);
         break;
 
       case AIState.PATROL:
       case AIState.IDLE:
         npc.currentPath = [];
+        npc.isAttackTelegraphing = false;
+        npc.attackTelegraphTimer = 0;
+        npc.strafeDirection = 0;
+        npc.strafeTimer = 0;
         npc.setStateColor(COLOR_IDLE);
         this._stopMovement(npc);
         break;
@@ -444,6 +539,76 @@ export class CombatSystem {
     const engage = this._getAttackEngageRange(npc);
     const disengage = npc.attackRange * npc.attackDisengageRangeMultiplier;
     return Math.max(engage, disengage);
+  }
+
+  private _beginAttackTelegraph(npc: NPC): void {
+    npc.isAttackTelegraphing = true;
+    npc.attackTelegraphTimer = Math.max(0.12, npc.attackWindup);
+    this._stopMovement(npc);
+    npc.setStateColor(COLOR_TELEGRAPH);
+  }
+
+  private _tickAttackTelegraph(npc: NPC, distSq: number, deltaTime: number): void {
+    npc.attackTelegraphTimer -= deltaTime;
+    this._stopMovement(npc);
+    if (npc.attackTelegraphTimer > 0) return;
+
+    npc.isAttackTelegraphing = false;
+    npc.attackTelegraphTimer = 0;
+    npc.attackTimer = npc.attackCooldown;
+    npc.setStateColor(COLOR_CHASE);
+
+    const strikeRange = npc.attackRange * npc.dodgeWindowRangeMultiplier;
+    if (distSq > strikeRange * strikeRange) {
+      this._ui.showNotification(`You dodge ${npc.mesh.name}'s strike!`, 1200);
+      return;
+    }
+
+    const dmg = Math.max(1, npc.attackDamage - this.player.bonusArmor);
+    this.player.health = Math.max(0, this.player.health - dmg);
+    (this.player as unknown as { notifyDamageTaken?: () => void }).notifyDamageTaken?.();
+    this._ui.showHitFlash("rgba(200, 0, 0, 0.4)");
+    if (this.onPlayerHit) this.onPlayerHit();
+    this._ui.showNotification(`${npc.mesh.name} attacks you for ${dmg} damage!`, 2000);
+  }
+
+  private _updateAttackReposition(npc: NPC, playerPos: Vector3, distSq: number, deltaTime: number): void {
+    const standoff = npc.attackRange * 0.82;
+    const dist = Math.sqrt(distSq);
+    let radialSpeed = 0;
+    if (dist < standoff - 0.45) {
+      radialSpeed = -npc.moveSpeed * 0.55;
+    } else if (dist > standoff + 0.55) {
+      radialSpeed = npc.moveSpeed * 0.45;
+    }
+
+    npc.strafeTimer = Math.max(0, npc.strafeTimer - deltaTime);
+    if (npc.strafeTimer <= 0) {
+      npc.strafeTimer = 0.3 + Math.random() * 0.55;
+      const roll = Math.random();
+      if (roll < 0.38) {
+        npc.strafeDirection = -1;
+      } else if (roll < 0.76) {
+        npc.strafeDirection = 1;
+      } else {
+        npc.strafeDirection = 0;
+      }
+    }
+
+    playerPos.subtractToRef(npc.mesh.position, this._dir);
+    this._dir.y = 0;
+    if (this._dir.lengthSquared() <= 0.001) {
+      this._stopMovement(npc);
+      return;
+    }
+
+    this._dir.normalize();
+    this._lateralDir.set(-this._dir.z, 0, this._dir.x);
+    this._dir.scaleToRef(radialSpeed, this._desiredVel);
+    this._lateralDir.scaleInPlace(npc.moveSpeed * npc.strafeSpeedMultiplier * npc.strafeDirection);
+    this._desiredVel.addInPlace(this._lateralDir);
+
+    this._setSmoothedHorizontalVelocity(npc, this._desiredVel, deltaTime);
   }
 
   // ─── Movement helpers ──────────────────────────────────────────────────────
@@ -472,7 +637,7 @@ export class CombatSystem {
       npc.pathIndex = 0;
     }
 
-    this._followPath(npc, npc.moveSpeed);
+    this._followPath(npc, npc.moveSpeed, deltaTime);
   }
 
   /**
@@ -497,7 +662,7 @@ export class CombatSystem {
       npc.pathIndex = 0;
     }
 
-    this._followPath(npc, npc.moveSpeed * 0.8); // slightly slower on the walk home
+    this._followPath(npc, npc.moveSpeed * 0.8, deltaTime); // slightly slower on the walk home
 
     // Arrived at home?
     if (Vector3.DistanceSquared(npc.mesh.position, npc.spawnPosition) < 4.0) {
@@ -509,7 +674,7 @@ export class CombatSystem {
    * Advance the NPC along its currentPath[] using physics velocity.
    * Waypoints within 0.5 m are skipped to prevent oscillation.
    */
-  private _followPath(npc: NPC, speed: number): void {
+  private _followPath(npc: NPC, speed: number, deltaTime: number): void {
     if (npc.currentPath.length === 0 || npc.pathIndex >= npc.currentPath.length) return;
 
     const waypoint = npc.currentPath[npc.pathIndex];
@@ -524,17 +689,15 @@ export class CombatSystem {
     }
 
     this._dir.normalize();
-    this._dir.scaleToRef(speed, this._newVel);
-    npc.physicsAggregate.body.getLinearVelocityToRef(this._currentVel);
-    this._newVel.y = this._currentVel.y; // preserve gravity
-    npc.physicsAggregate.body.setLinearVelocity(this._newVel);
+    this._dir.scaleToRef(speed, this._desiredVel);
+    this._setSmoothedHorizontalVelocity(npc, this._desiredVel, deltaTime);
 
     this._lookAtTarget.set(waypoint.x, npc.mesh.position.y, waypoint.z);
     npc.mesh.lookAt(this._lookAtTarget);
   }
 
   /** Moves an NPC straight towards or away from a target position without pathfinding. */
-  private _moveRelativeToTarget(npc: NPC, targetPos: Vector3, speed: number): void {
+  private _moveRelativeToTarget(npc: NPC, targetPos: Vector3, speed: number, deltaTime: number): void {
     if (!npc.physicsAggregate?.body) return;
     targetPos.subtractToRef(npc.mesh.position, this._dir);
     this._dir.y = 0;
@@ -542,13 +705,22 @@ export class CombatSystem {
     // Avoid normalization of zero vector
     if (this._dir.lengthSquared() > 0.001) {
        this._dir.normalize();
-       this._dir.scaleToRef(speed, this._newVel);
-       npc.physicsAggregate.body.getLinearVelocityToRef(this._currentVel);
-       this._newVel.y = this._currentVel.y; // preserve gravity
-       npc.physicsAggregate.body.setLinearVelocity(this._newVel);
+       this._dir.scaleToRef(speed, this._desiredVel);
+       this._setSmoothedHorizontalVelocity(npc, this._desiredVel, deltaTime);
     } else {
        this._stopMovement(npc);
     }
+  }
+
+  private _setSmoothedHorizontalVelocity(npc: NPC, desiredVelocity: Vector3, deltaTime: number): void {
+    if (!npc.physicsAggregate?.body) return;
+    npc.physicsAggregate.body.getLinearVelocityToRef(this._currentVel);
+
+    const blend = Math.min(1, Math.max(0.02, npc.movementResponsiveness) * Math.max(0.001, deltaTime));
+    this._blendedVel.x = this._currentVel.x + (desiredVelocity.x - this._currentVel.x) * blend;
+    this._blendedVel.z = this._currentVel.z + (desiredVelocity.z - this._currentVel.z) * blend;
+    this._blendedVel.y = this._currentVel.y;
+    npc.physicsAggregate.body.setLinearVelocity(this._blendedVel);
   }
 
   /** Zero the NPC's horizontal velocity while preserving vertical (gravity). */

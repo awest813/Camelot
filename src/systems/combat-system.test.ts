@@ -124,6 +124,13 @@ describe('CombatSystem', () => {
             attackDamage: 5,
             attackTimer: 0,
             attackCooldown: 2,
+            isAttackTelegraphing: false,
+            attackTelegraphTimer: 0,
+            dodgeWindowRangeMultiplier: 0.7,
+            strafeDirection: 0,
+            strafeTimer: 0,
+            strafeSpeedMultiplier: 0.65,
+            movementResponsiveness: 8,
             moveSpeed: 2
         };
 
@@ -254,6 +261,62 @@ describe('CombatSystem', () => {
         expect(mockScene.onBeforeRenderObservable.remove).toHaveBeenCalledWith(addedObserver);
     });
 
+    it('supports melee and magic archetype cadence tuning', () => {
+        mockScene.pickWithRay.mockReturnValue(null);
+
+        combatSystem.setMeleeArchetype('duelist');
+        expect(combatSystem.activeMeleeArchetype).toBe('duelist');
+
+        expect(combatSystem.meleeAttack()).toBe(true);
+        expect(mockPlayer.stamina).toBe(91);
+        expect(combatSystem.meleeAttack()).toBe(false);
+
+        combatSystem.updateNPCAI(0.33);
+        expect(combatSystem.meleeAttack()).toBe(true);
+        expect(mockPlayer.stamina).toBe(82);
+
+        combatSystem.setMagicArchetype('surge');
+        expect(combatSystem.activeMagicArchetype).toBe('surge');
+        expect(combatSystem.magicAttack()).toBe(true);
+        expect(mockPlayer.magicka).toBe(70);
+    });
+
+    it('resolves telegraphed attacks as dodges when player exits strike window', () => {
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.2);
+
+        combatSystem.updateNPCAI(0.016);
+        expect(mockNpcs[0].isAttackTelegraphing).toBe(true);
+
+        // Stay inside disengage range, but outside telegraphed strike range.
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 2.1);
+        combatSystem.updateNPCAI(0.25);
+
+        expect(mockNpcs[0].isAttackTelegraphing).toBe(false);
+        expect(mockPlayer.health).toBe(100);
+        expect(mockPlayer.notifyDamageTaken).not.toHaveBeenCalled();
+        expect(mockUI.showNotification).toHaveBeenCalledWith("You dodge npc1's strike!", 1200);
+    });
+
+    it('applies damage when telegraphed attack lands inside strike window', () => {
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+
+        combatSystem.updateNPCAI(0.016);
+        expect(mockNpcs[0].isAttackTelegraphing).toBe(true);
+
+        combatSystem.updateNPCAI(0.25);
+        expect(mockPlayer.health).toBe(95);
+        expect(mockPlayer.notifyDamageTaken).toHaveBeenCalled();
+        expect(mockUI.showHitFlash).toHaveBeenCalledWith("rgba(200, 0, 0, 0.4)");
+    });
+
     it('uses hysteresis band for attack state transitions', () => {
         mockNpcs[0].aiState = 'CHASE';
         mockNpcs[0].attackRange = 2;
@@ -296,6 +359,27 @@ describe('CombatSystem', () => {
         combatSystem.updateNPCAI(0.2);
         expect(mockNpcs[0].aiState).toBe('CHASE');
         expect(mockNpcs[0].attackTimer).toBe(0.3);
+    });
+
+    it('applies deterministic strafe reposition during attack cooldown', () => {
+        const setLinearVelocity = vi.fn();
+        mockNpcs[0].physicsAggregate.body.setLinearVelocity = setLinearVelocity;
+        mockNpcs[0].physicsAggregate.body.getLinearVelocityToRef = (v: Vector3) => v.set(0, 0, 0);
+
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackTimer = 1;
+        mockNpcs[0].attackWindup = 0.35;
+        mockNpcs[0].strafeTimer = 0;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.5);
+
+        vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.2);
+        combatSystem.updateNPCAI(0.016);
+
+        expect(mockNpcs[0].strafeDirection).toBe(-1);
+        expect(setLinearVelocity).toHaveBeenCalled();
+        const blendedVelocity = setLinearVelocity.mock.calls.at(-1)?.[0];
+        expect(blendedVelocity.x).toBeLessThan(0);
     });
 
     it('hands off attack ownership between nearby NPCs', () => {
