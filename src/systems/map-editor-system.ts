@@ -29,6 +29,18 @@ export interface MapExportData {
   }>;
 }
 
+export interface MapValidationIssue {
+  code: "missing-patrol-group" | "patrol-route-too-short" | "entity-overlap";
+  message: string;
+  entityIds?: string[];
+  patrolGroupId?: string;
+}
+
+export interface MapValidationReport {
+  isValid: boolean;
+  issues: MapValidationIssue[];
+}
+
 interface EditorEntity {
   mesh: Mesh;
   type: EditorPlacementType;
@@ -274,6 +286,61 @@ export class MapEditorSystem {
     }));
 
     return { version: 1, entries, patrolRoutes };
+  }
+
+  /**
+   * Validate editor map data for common authoring issues before sharing.
+   * - NPC spawns referencing missing patrol groups
+   * - Patrol routes that have too few waypoints to form a route
+   * - Entity overlap (same/near-identical position)
+   */
+  validateMap(minEntitySpacing: number = 0.5): MapValidationReport {
+    const issues: MapValidationIssue[] = [];
+    const data = this.exportMap();
+    const patrolGroupIds = new Set(data.patrolRoutes.map((route) => route.id));
+
+    for (const entry of data.entries) {
+      if (entry.type !== "npc-spawn" || !entry.patrolGroupId) continue;
+      if (!patrolGroupIds.has(entry.patrolGroupId)) {
+        issues.push({
+          code: "missing-patrol-group",
+          message: `NPC spawn '${entry.id}' references missing patrol group '${entry.patrolGroupId}'.`,
+          entityIds: [entry.id],
+          patrolGroupId: entry.patrolGroupId,
+        });
+      }
+    }
+
+    for (const route of data.patrolRoutes) {
+      if (route.waypoints.length >= 2) continue;
+      issues.push({
+        code: "patrol-route-too-short",
+        message: `Patrol group '${route.id}' has ${route.waypoints.length} waypoint(s); at least 2 are required.`,
+        patrolGroupId: route.id,
+      });
+    }
+
+    for (let i = 0; i < data.entries.length; i++) {
+      for (let j = i + 1; j < data.entries.length; j++) {
+        const a = data.entries[i];
+        const b = data.entries[j];
+        const dx = a.position.x - b.position.x;
+        const dy = a.position.y - b.position.y;
+        const dz = a.position.z - b.position.z;
+        const distance = Math.sqrt((dx * dx) + (dy * dy) + (dz * dz));
+        if (distance > minEntitySpacing) continue;
+        issues.push({
+          code: "entity-overlap",
+          message: `Entities '${a.id}' and '${b.id}' overlap (distance ${distance.toFixed(2)}).`,
+          entityIds: [a.id, b.id],
+        });
+      }
+    }
+
+    return {
+      isValid: issues.length === 0,
+      issues,
+    };
   }
 
   /**

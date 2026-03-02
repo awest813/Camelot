@@ -338,3 +338,57 @@ describe('MapEditorSystem — Phase 2 (clearAll)', () => {
         expect(editor.activePatrolGroupId).toBeNull();
     });
 });
+
+// ─── Phase 3: validation tooling ─────────────────────────────────────────────
+
+describe('MapEditorSystem — Phase 3 (validation)', () => {
+    it('returns a valid report when no issues are found', () => {
+        const { editor } = makeEditor();
+        editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        editor.placeEntity(new Vector3(5, 1, 0), 'loot');
+
+        const report = editor.validateMap();
+
+        expect(report.isValid).toBe(true);
+        expect(report.issues.length).toBe(0);
+    });
+
+    it('detects npc-spawn entries that reference a missing patrol group', () => {
+        const { editor } = makeEditor();
+        const exported = editor.exportMap();
+        exported.entries.push({
+            id: 'editor_entity_external',
+            type: 'npc-spawn',
+            position: { x: 0, y: 1, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            patrolGroupId: 'missing_group',
+        });
+        editor.importMap(exported);
+
+        const report = editor.validateMap();
+
+        expect(report.isValid).toBe(false);
+        expect(report.issues.some(issue => issue.code === 'missing-patrol-group')).toBe(true);
+    });
+
+    it('detects patrol routes with too few waypoints', () => {
+        const { editor } = makeEditor();
+        editor.startNewPatrolGroup();
+
+        const report = editor.validateMap();
+
+        expect(report.isValid).toBe(false);
+        expect(report.issues.some(issue => issue.code === 'patrol-route-too-short')).toBe(true);
+    });
+
+    it('detects overlapping entities', () => {
+        const { editor } = makeEditor();
+        editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        editor.placeEntity(new Vector3(0.1, 1, 0), 'loot');
+
+        const report = editor.validateMap(0.5);
+
+        expect(report.isValid).toBe(false);
+        expect(report.issues.some(issue => issue.code === 'entity-overlap')).toBe(true);
+    });
+});
