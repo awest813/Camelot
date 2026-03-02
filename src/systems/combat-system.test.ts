@@ -83,6 +83,8 @@ describe('CombatSystem', () => {
             bonusDamage: 0,
             bonusArmor: 0,
             bonusMagicDamage: 0,
+            notifyResourceSpent: vi.fn(),
+            notifyDamageTaken: vi.fn(),
             camera: {
                 position: new Vector3(0, 0, 0),
                 getForwardRay: vi.fn(() => ({
@@ -138,7 +140,8 @@ describe('CombatSystem', () => {
 
     it('meleeAttack should fail if stamina is too low', () => {
         mockPlayer.stamina = 10;
-        combatSystem.meleeAttack();
+        const ok = combatSystem.meleeAttack();
+        expect(ok).toBe(false);
         expect(mockUI.showNotification).toHaveBeenCalledWith('Not enough stamina!');
         expect(mockPlayer.stamina).toBe(10);
         expect(mockScene.pickWithRay).not.toHaveBeenCalled();
@@ -150,28 +153,33 @@ describe('CombatSystem', () => {
             pickedPoint: new Vector3(0, 0, 1)
         });
 
-        combatSystem.meleeAttack();
+        const ok = combatSystem.meleeAttack();
 
+        expect(ok).toBe(true);
         expect(mockPlayer.stamina).toBe(85);
         expect(mockScene.pickWithRay).toHaveBeenCalled();
         expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(10); // Base MELEE_DAMAGE
         expect(mockUI.showDamageNumber).toHaveBeenCalled();
         expect(mockUI.showHitFlash).toHaveBeenCalled();
         expect(mockNpcs[0].isAggressive).toBe(true);
+        expect(mockPlayer.notifyResourceSpent).toHaveBeenCalledWith('stamina');
     });
 
     it('magicAttack should fail if magicka is too low', () => {
         mockPlayer.magicka = 10;
-        combatSystem.magicAttack();
+        const ok = combatSystem.magicAttack();
+        expect(ok).toBe(false);
         expect(mockUI.showNotification).toHaveBeenCalledWith('Not enough magicka!');
         expect(mockScene.onBeforeRenderObservable.add).not.toHaveBeenCalled();
     });
 
     it('magicAttack should succeed and deduct magicka', () => {
-        combatSystem.magicAttack();
+        const ok = combatSystem.magicAttack();
 
+        expect(ok).toBe(true);
         expect(mockPlayer.magicka).toBe(80);
         expect(mockScene.onBeforeRenderObservable.add).toHaveBeenCalled();
+        expect(mockPlayer.notifyResourceSpent).toHaveBeenCalledWith('magicka');
     });
 
     it('magicAttack should safely clean up resources via observable after 5 seconds', () => {
@@ -194,6 +202,34 @@ describe('CombatSystem', () => {
 
         // Note: Projectile and Agg disposal are internal to the function and we've mocked the classes.
         // Testing that the observable is removed proves the condition was met and block executed.
+    });
+
+    it('meleeAttack enforces cooldown cadence between swings', () => {
+        mockScene.pickWithRay.mockReturnValue(null);
+
+        expect(combatSystem.meleeAttack()).toBe(true);
+        expect(mockPlayer.stamina).toBe(85);
+
+        // Immediate second click should be rejected by cooldown.
+        expect(combatSystem.meleeAttack()).toBe(false);
+        expect(mockPlayer.stamina).toBe(85);
+
+        // Cooldown ticks in updateNPCAI.
+        combatSystem.updateNPCAI(0.5);
+        expect(combatSystem.meleeAttack()).toBe(true);
+        expect(mockPlayer.stamina).toBe(70);
+    });
+
+    it('magicAttack enforces cooldown cadence between casts', () => {
+        expect(combatSystem.magicAttack()).toBe(true);
+        expect(mockPlayer.magicka).toBe(80);
+
+        expect(combatSystem.magicAttack()).toBe(false);
+        expect(mockPlayer.magicka).toBe(80);
+
+        combatSystem.updateNPCAI(0.8);
+        expect(combatSystem.magicAttack()).toBe(true);
+        expect(mockPlayer.magicka).toBe(60);
     });
 
     it('magicAttack should clean up resources upon hitting an NPC', () => {

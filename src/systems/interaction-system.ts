@@ -65,7 +65,11 @@ export class InteractionSystem {
       if (hit && hit.pickedMesh && hit.pickedMesh.metadata) {
           const metadata = hit.pickedMesh.metadata;
           if (metadata.type === 'npc') {
-              this.ui.setInteractionText(`Press E to Talk to ${metadata.npc.mesh.name}`);
+              if (metadata.npc.isAggressive) {
+                  this.ui.setInteractionText(`${metadata.npc.mesh.name} is hostile`);
+              } else {
+                  this.ui.setInteractionText(`Press E to Talk to ${metadata.npc.mesh.name}`);
+              }
               this.ui.setCrosshairActive(true);
           } else if (metadata.type === 'loot') {
               this.ui.setInteractionText(`Press E to Take ${metadata.loot.item.name}`);
@@ -90,6 +94,10 @@ export class InteractionSystem {
       const metadata = hit.pickedMesh.metadata;
 
       if (metadata.type === 'npc') {
+          if (metadata.npc.isAggressive) {
+              this.ui.showNotification(`${metadata.npc.mesh.name} is hostile!`, 1500);
+              return;
+          }
           this.dialogueSystem.startDialogue(metadata.npc);
       } else if (metadata.type === 'loot') {
           const loot = metadata.loot;

@@ -54,6 +54,22 @@ The current alpha stage is centered on combat readability and encounter stabilit
 
 ## Near-Term (Next 1–2 Releases)
 
+### Natural-Feel Systems Overhaul (Decision)
+
+To make combat and interaction loops feel less mechanical, Camelot will follow a
+three-step overhaul track:
+
+1. ✅ **Input + interaction sanity pass**  
+   - Block combat clicks while dialogue/UI overlays own focus.  
+   - Prevent dialogue start against hostile NPCs.
+2. ✅ **Combat cadence and recovery pacing**  
+   - Add player attack cadence windows (melee/magic cooldown discipline).  
+   - Add combat-aware regeneration delays after damage and resource spend.
+3. 🧭 **Follow-up readability + motion pass**  
+   - Add clearer enemy telegraphs and dodge windows.  
+   - Add NPC strafe/reposition variety and movement smoothing.  
+   - Tune stamina/magicka economy per weapon/spell archetype.
+
 ### AI and Encounter Quality
 
 - ✅ Improve NPC combat decision loops (distance bands, cooldown discipline).
