@@ -58,7 +58,7 @@ The current alpha stage is centered on combat readability and encounter stabilit
 
 - ✅ Multi-NPC threat handoff and attack-slot arbitration.
 - ✅ NPC combat decision loops (distance bands, cooldown discipline).
-- 🧭 Expanded patrol variation and reactive state transitions.
+- ✅ Expanded patrol variation and reactive state transitions.
 
 ---
 
@@ -92,7 +92,9 @@ three-step overhaul track:
 
 - ✅ Improve NPC combat decision loops (distance bands, cooldown discipline).
 - ✅ Add better threat handoff (multi-NPC aggro arbitration).
-- 🧭 Expand patrol behaviors with idle variation and reactive states.
+- ✅ Expand patrol behaviors with idle variation and reactive states.
+  - Randomised wait durations and look-around during patrol pauses.
+  - New **INVESTIGATE** state: when a player escapes the ALERT window the NPC moves to the last known player position before resuming patrol, rather than immediately standing down.
 
 ### Combat Feel and Balance
 
@@ -134,17 +136,22 @@ three-step overhaul track:
 
 Camelot will evolve toward a creator-friendly worldbuilding pipeline through a dedicated **Map Editor** effort.
 
-#### Phase 1: Foundational Editing
+#### Phase 1: Foundational Editing ✅
 
-- 🧭 In-engine edit mode toggle (runtime-safe authoring sandbox).
+- ✅ In-engine edit mode toggle (runtime-safe authoring sandbox) — F2 key.
+- ✅ Grid/snap controls and transform gizmos for placement — G key cycles position/rotation/scale.
+- ✅ Placement of editor marker objects with grid-snapping — N key.
 - 🧭 Terrain sculpt and paint tools (height, smoothing, biome masks).
-- 🧭 Grid/snap controls and transform gizmos for placement.
 
-#### Phase 2: Content Authoring Workflows
+#### Phase 2: Content Authoring Workflows 🚧
 
-- 🧭 Place and configure structures, props, loot nodes, and spawn volumes.
-- 🧭 Author NPC spawn groups with patrol route visualization.
-- 🧭 Quest marker and dialogue trigger placement helpers.
+- ✅ Multi-type entity placement: **marker**, **loot**, **NPC spawn**, **quest marker**, **structure** — T key cycles type.
+- ✅ Visual differentiation by type: each placement type has a distinct mesh shape and colour.
+- ✅ Patrol route authoring — P key starts a new NPC patrol group; NPC spawn points placed in the same group are connected by a visible route line.
+- ✅ Map export to portable JSON — F4 key serializes all placed entities and patrol routes.
+- ✅ Map import from JSON — re-creates editor entities from a previously exported layout.
+- 🧭 Place and configure structures, props, and spawn volumes with property panels.
+- 🧭 Quest marker and dialogue trigger placement helpers with linked objective IDs.
 
 #### Phase 3: Data + Collaboration
 
@@ -169,7 +176,7 @@ Camelot will evolve toward a creator-friendly worldbuilding pipeline through a d
 
 If you want to contribute now, high-impact areas are:
 
-1. AI behavior quality and pathfinding groundwork.
-2. Quest/content authoring ergonomics.
-3. Save/load robustness and automated tests.
-4. Early groundwork for map-editor-compatible data formats.
+1. Map editor Phase 2 completions: property panels for placed entities, terrain sculpting.
+2. Framework-first consolidation: wiring framework state as source-of-truth for demo systems.
+3. Quest/content authoring ergonomics.
+4. Save/load robustness and automated tests.

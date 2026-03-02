@@ -14,7 +14,7 @@ Camelot is designed for developers who want to build Bethesda-lite RPG workflows
 - Mod-ready architecture: manifest-driven mod folder loading in browser-safe format.
 - Demo game client: combat, world streaming, UI, and procedural content to validate the stack.
 
-## Framework Core (new)
+## Framework Core
 
 The framework modules live under `src/framework/` and are intentionally engine-agnostic:
 
@@ -32,19 +32,23 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 
 - Physics-based first-person movement.
 - Core RPG resources: **Health**, **Magicka**, **Stamina** with regeneration.
-- Melee and magic combat loops with resource costs.
+- Melee and magic combat loops with resource costs and cooldown discipline.
 - Damage feedback via floating combat text and hit indicators.
+- Three melee archetypes (Duelist / Soldier / Bruiser) and three magic archetypes (Spark / Bolt / Surge).
 
-### NPCs + Interaction
+### NPCs + AI
 
-- NPC patrol behavior and aggro response.
+- NPC patrol behavior with randomised wait durations and idle look-around.
+- Full AI state machine: **IDLE → PATROL → ALERT → INVESTIGATE → CHASE → ATTACK → RETURN**.
+  - **INVESTIGATE**: when a player escapes the alert window, the NPC moves to the last known player position before standing down — rather than immediately returning to patrol.
+- Multi-NPC threat handoff and attack-slot arbitration (one attacker engages at a time).
 - Dialogue interactions with cinematic conversation camera.
 - Interaction prompts and crosshair-based focus highlighting.
 
 ### World + Content
 
 - Infinite chunked terrain generation.
-- Biome variants and procedural props.
+- Biome variants (plains, forest, desert, tundra) with procedural props.
 - Deterministic structure spawns (ruins, shrines, watchtowers).
 - Loot placement and pickup flow.
 
@@ -62,27 +66,46 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 - Notifications for items, combat, and quest events.
 - Debug inspector and FPS overlay support.
 
+## Map Editor
+
+The in-engine **Map Editor** (activated with F2) lets you author world content without leaving the game runtime.
+
+### Phase 1 — Foundational Editing (complete)
+
+- Edit mode toggle that safely suspends gameplay input.
+- Transform gizmos (position / rotation / scale) with configurable grid snapping.
+- Marker placement at the player's view position.
+
+### Phase 2 — Content Authoring (active)
+
+- **Five placement types** selectable with T: `marker`, `loot`, `npc-spawn`, `quest-marker`, `structure` — each with a distinct mesh shape and colour.
+- **Patrol route authoring**: press P to start a new NPC patrol group; each NPC spawn point placed while the group is active is added to the route and connected by a visible overlay line.
+- **Map export / import**: press F4 to serialize the full editor layout (entities + patrol routes) to a portable JSON object (copied to clipboard or printed to console). The JSON can be re-imported to recreate the layout in a fresh session.
+
 ## Controls
 
-| Key / Button | Action                    |
-| ------------ | ------------------------- |
-| WASD         | Move                      |
-| Mouse        | Look                      |
-| Left Click   | Melee attack (Stamina)    |
-| Right Click  | Magic attack (Magicka)    |
-| E            | Interact / pick up / talk |
-| I            | Toggle inventory          |
-| J            | Toggle quest log          |
-| K            | Toggle skill tree         |
-| 1 / 2 / 3    | Melee archetype select    |
-| 4 / 5 / 6    | Magic archetype select    |
-| M            | Toggle audio mute         |
-| F5           | Quick save                |
-| F9           | Quick load                |
-| Esc          | Pause menu                |
-| F2           | Toggle map editor mode    |
-| G            | Cycle editor gizmo mode   |
-| N            | Place editor marker       |
+| Key / Button | Action                              |
+| ------------ | ----------------------------------- |
+| WASD         | Move                                |
+| Mouse        | Look                                |
+| Left Click   | Melee attack (Stamina)              |
+| Right Click  | Magic attack (Magicka)              |
+| E            | Interact / pick up / talk           |
+| I            | Toggle inventory                    |
+| J            | Toggle quest log                    |
+| K            | Toggle skill tree                   |
+| 1 / 2 / 3    | Melee archetype select              |
+| 4 / 5 / 6    | Magic archetype select              |
+| M            | Toggle audio mute                   |
+| F5           | Quick save                          |
+| F9           | Quick load                          |
+| Esc          | Pause menu                          |
+| **F2**       | **Toggle map editor mode**          |
+| **G**        | **Cycle editor gizmo mode**         |
+| **T**        | **Cycle editor placement type**     |
+| **N**        | **Place entity (current type)**     |
+| **P**        | **Start new NPC patrol group**      |
+| **F4**       | **Export map to JSON (clipboard)**  |
 
 ## Tech Stack
 
@@ -90,6 +113,7 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 - **Language**: TypeScript
 - **Build Tool**: Vite 6
 - **Physics**: Havok
+- **Navigation**: Recast/Detour
 - **Testing**: Vitest
 
 ## Quick Start
@@ -137,7 +161,7 @@ npm test
 - `src/game.ts` – game bootstrap and system orchestration.
 - `src/framework/` – headless RPG framework modules.
 - `src/entities/` – player, NPC, loot, and entity logic.
-- `src/systems/` – combat, interaction, dialogue, inventory, equipment, quest, save, and related systems.
+- `src/systems/` – combat, interaction, dialogue, inventory, equipment, quest, save, map editor, and related systems.
 - `src/world/` – terrain chunking, biome generation, structures.
 - `src/ui/` – HUD, menus, overlays, notifications.
 
@@ -145,14 +169,10 @@ npm test
 
 The full roadmap lives in [`ROADMAP.md`](./ROADMAP.md). Key upcoming focus areas:
 
-- AI improvements (pathfinding, behavior depth).
-- Content tooling and data pipelines.
-- **Map Editor initiative** (in-engine + standalone workflows):
-  - Phase 1 started: in-engine edit mode toggle + grid-snapped gizmo editing.
-  - Terrain paint/sculpt layers (planned).
-  - Structure and spawn-point placement tools (planned).
-  - Quest/NPC authoring helpers.
-  - Export/import for reusable map packs.
+- **Map Editor Phase 2** (active): content placement property panels, terrain sculpt/paint layers.
+- **Framework-first consolidation**: wiring framework state as source-of-truth for all demo systems.
+- **Content tooling**: quest authoring utilities, mod validation CLI.
+- **Map Editor Phase 3+**: serialized map packs, validation tooling, standalone editor shell.
 
 ---
 
