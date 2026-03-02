@@ -25,6 +25,7 @@ import { NavigationSystem } from "./systems/navigation-system";
 import { Loot } from "./entities/loot";
 import { FrameworkRuntime } from "./framework/runtime/framework-runtime";
 import { frameworkBaseContent } from "./framework/content/base-content";
+import { MapEditorSystem } from "./systems/map-editor-system";
 
 export class Game {
   public scene: Scene;
@@ -45,6 +46,7 @@ export class Game {
   public audioSystem: AudioSystem;
   public navigationSystem: NavigationSystem;
   public frameworkRuntime: FrameworkRuntime;
+  public mapEditorSystem: MapEditorSystem;
 
   public isPaused: boolean = false;
 
@@ -110,6 +112,7 @@ export class Game {
     this.saveSystem.setFrameworkRuntime(this.frameworkRuntime);
     this.dialogueSystem.dialogueSessionProvider = (targetNpc) => this._createFrameworkDialogueSession(targetNpc.mesh.name);
     this._loadFrameworkMods();
+    this.mapEditorSystem = new MapEditorSystem(this.scene);
 
     // Prevent browser context menu from capturing right-click combat input.
     this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
@@ -302,6 +305,27 @@ export class Game {
             } else if (kbInfo.event.key === "m" || kbInfo.event.key === "M") {
                 this.audioSystem.toggleMute();
                 this.ui.showNotification(this.audioSystem.isMuted ? "Audio muted" : "Audio unmuted", 1500);
+            } else if (kbInfo.event.key === "F2") {
+                const isEnabled = this.mapEditorSystem.toggle();
+                this.interactionSystem.isBlocked = isEnabled;
+                if (isEnabled) {
+                    document.exitPointerLock();
+                    this.player.camera.detachControl();
+                } else {
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
+                }
+                this.ui.showNotification(isEnabled ? "Map editor mode enabled" : "Map editor mode disabled", 1800);
+            } else if (kbInfo.event.key === "g" || kbInfo.event.key === "G") {
+                if (!this.mapEditorSystem.isEnabled) return;
+                const mode = this.mapEditorSystem.cycleGizmoMode();
+                this.ui.showNotification(`Editor gizmo: ${mode}`, 1400);
+            } else if (kbInfo.event.key === "n" || kbInfo.event.key === "N") {
+                if (!this.mapEditorSystem.isEnabled) return;
+                const placeAt = this.player.camera.position.add(this.player.camera.getForwardRay(8).direction.scale(4));
+                placeAt.y = Math.max(1, placeAt.y);
+                this.mapEditorSystem.placeMarkerAt(placeAt);
+                this.ui.showNotification("Editor marker placed", 1200);
             } else if (kbInfo.event.key === "F5") {
                 if (!this.isPaused) this.saveSystem.save();
             } else if (kbInfo.event.key === "F9") {
@@ -518,6 +542,7 @@ export class Game {
   private _isCombatInputBlocked(): boolean {
       return (
           this.isPaused ||
+          this.mapEditorSystem.isEnabled ||
           this.inventorySystem.isOpen ||
           this.questSystem.isLogOpen ||
           this.skillTreeSystem.isOpen ||
