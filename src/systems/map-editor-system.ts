@@ -18,6 +18,16 @@ export interface MapExportEntry {
   position: { x: number; y: number; z: number };
   rotation: { x: number; y: number; z: number };
   patrolGroupId?: string;
+  properties?: EditorEntityProperties;
+}
+
+export interface EditorEntityProperties {
+  label?: string;
+  lootTableId?: string;
+  spawnTemplateId?: string;
+  objectiveId?: string;
+  dialogueTriggerId?: string;
+  structureId?: string;
 }
 
 export interface MapExportData {
@@ -45,6 +55,7 @@ interface EditorEntity {
   mesh: Mesh;
   type: EditorPlacementType;
   patrolGroupId?: string;
+  properties: EditorEntityProperties;
 }
 
 interface PatrolGroup {
@@ -218,7 +229,7 @@ export class MapEditorSystem {
       editorType: type,
     };
 
-    const entity: EditorEntity = { mesh, type };
+    const entity: EditorEntity = { mesh, type, properties: {} };
 
     if (type === "npc-spawn" && this._activePatrolGroupId !== null) {
       entity.patrolGroupId = this._activePatrolGroupId;
@@ -226,9 +237,27 @@ export class MapEditorSystem {
       this._addWaypointToGroup(this._activePatrolGroupId, snapped);
     }
 
+    mesh.metadata.editorProperties = entity.properties;
+
     this._entities.push(entity);
     this.gizmoManager.attachToMesh(mesh);
     return mesh;
+  }
+
+  getEntityProperties(entityId: string): Readonly<EditorEntityProperties> | null {
+    return this._findEntityById(entityId)?.properties ?? null;
+  }
+
+  setEntityProperties(entityId: string, properties: EditorEntityProperties): boolean {
+    const entity = this._findEntityById(entityId);
+    if (!entity) return false;
+
+    entity.properties = { ...entity.properties, ...properties };
+    entity.mesh.metadata = {
+      ...(entity.mesh.metadata ?? {}),
+      editorProperties: entity.properties,
+    };
+    return true;
   }
 
   // ─── Patrol route authoring ─────────────────────────────────────────────────
@@ -278,6 +307,7 @@ export class MapEditorSystem {
         z: e.mesh.rotation.z,
       },
       ...(e.patrolGroupId !== undefined ? { patrolGroupId: e.patrolGroupId } : {}),
+      ...(Object.keys(e.properties).length > 0 ? { properties: { ...e.properties } } : {}),
     }));
 
     const patrolRoutes = Array.from(this._patrolGroups.values()).map((g) => ({
@@ -360,8 +390,14 @@ export class MapEditorSystem {
         editorEntityId: entry.id,
         editorType: entry.type,
         ...(entry.patrolGroupId !== undefined ? { patrolGroupId: entry.patrolGroupId } : {}),
+        ...(entry.properties !== undefined ? { editorProperties: { ...entry.properties } } : {}),
       };
-      this._entities.push({ mesh, type: entry.type, patrolGroupId: entry.patrolGroupId });
+      this._entities.push({
+        mesh,
+        type: entry.type,
+        patrolGroupId: entry.patrolGroupId,
+        properties: { ...(entry.properties ?? {}) },
+      });
     }
 
     for (const route of data.patrolRoutes) {
@@ -467,6 +503,12 @@ export class MapEditorSystem {
       Math.round(value.y / s) * s,
       Math.round(value.z / s) * s,
     );
+  }
+
+  private _findEntityById(entityId: string): EditorEntity | undefined {
+    return this._entities.find((entity) => {
+      return entity.mesh.metadata?.editorEntityId === entityId;
+    });
   }
 
   private _createGridMesh(): Mesh {
