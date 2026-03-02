@@ -50,9 +50,9 @@ export class ScheduleSystem {
     target.subtractToRef(currentPos, this._direction);
 
     // Ignore Y component for distance check on ground
-    const distXZ = Math.sqrt(this._direction.x * this._direction.x + this._direction.z * this._direction.z);
+    const distSqXZ = this._direction.x * this._direction.x + this._direction.z * this._direction.z;
 
-    if (distXZ < 1.0) {
+    if (distSqXZ < 1.0) { // 1.0 squared is 1.0
       // Reached target
       npc.currentPatrolIndex = (npc.currentPatrolIndex + 1) % npc.patrolPoints.length;
       npc.waitTime = this._getPatrolWaitSeconds(npc);
