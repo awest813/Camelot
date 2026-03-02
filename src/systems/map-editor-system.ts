@@ -10,6 +10,7 @@ import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 
 export type EditorGizmoMode = "position" | "rotation" | "scale";
 export type EditorPlacementType = "marker" | "loot" | "npc-spawn" | "quest-marker" | "structure";
+export type EditorTerrainTool = "none" | "sculpt" | "paint";
 
 export interface MapExportEntry {
   id: string;
@@ -78,6 +79,8 @@ export class MapEditorSystem {
   public isEnabled: boolean = false;
   public snapSize: number = 1;
   public currentPlacementType: EditorPlacementType = "marker";
+  public terrainTool: EditorTerrainTool = "none";
+  public terrainSculptStep: number = 0.5;
 
   private readonly scene: Scene;
   private readonly gizmoManager: GizmoManager;
@@ -114,6 +117,12 @@ export class MapEditorSystem {
 
     this.scene.onPointerObservable.add((pointerInfo) => {
       if (!this.isEnabled || pointerInfo.type !== PointerEventTypes.POINTERDOWN) return;
+
+      if (this.terrainTool !== "none") {
+        this._applyTerrainToolFromPointer();
+        return;
+      }
+
       const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) => {
         if (!mesh || mesh === this.gridMesh) return false;
         return mesh.metadata?.editable === true;
@@ -148,6 +157,20 @@ export class MapEditorSystem {
 
   get mode(): EditorGizmoMode {
     return this._mode;
+  }
+
+  cycleTerrainTool(): EditorTerrainTool {
+    this.terrainTool = this.terrainTool === "none"
+      ? "sculpt"
+      : this.terrainTool === "sculpt"
+        ? "paint"
+        : "none";
+    return this.terrainTool;
+  }
+
+  adjustTerrainSculptStep(delta: number): number {
+    this.terrainSculptStep = Math.min(4, Math.max(0.1, this.terrainSculptStep + delta));
+    return this.terrainSculptStep;
   }
 
   /** Advance to the next placement type and return it. */
@@ -390,5 +413,38 @@ export class MapEditorSystem {
     grid.color = new Color3(0.2, 0.6, 0.9);
     grid.isPickable = false;
     return grid;
+  }
+
+  applyTerrainToolToMesh(mesh: Mesh): void {
+    if (this.terrainTool === "none") return;
+
+    if (this.terrainTool === "sculpt") {
+      mesh.position.y += this.terrainSculptStep;
+      return;
+    }
+
+    const sourceMat = mesh.material;
+    const mat = sourceMat instanceof StandardMaterial
+      ? sourceMat
+      : new StandardMaterial(`${mesh.name}_paint`, this.scene);
+
+    if (mesh.material !== mat) {
+      mesh.material = mat;
+    }
+
+    const next = (mat.diffuseColor ?? new Color3(0.3, 0.7, 0.3)).clone();
+    next.r = Math.min(1, next.r + 0.05);
+    next.g = Math.max(0.1, next.g - 0.05);
+    next.b = Math.max(0.1, next.b - 0.03);
+    mat.diffuseColor = next;
+  }
+
+  private _applyTerrainToolFromPointer(): void {
+    const pick = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) => {
+      return Boolean(mesh?.name?.startsWith("chunk_"));
+    });
+    if (!pick?.hit || !pick.pickedMesh) return;
+
+    this.applyTerrainToolToMesh(pick.pickedMesh as Mesh);
   }
 }

@@ -328,6 +328,18 @@ export class Game {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const groupId = this.mapEditorSystem.startNewPatrolGroup();
                 this.ui.showNotification(`New patrol group: ${groupId}`, 1600);
+            } else if (kbInfo.event.key === "h" || kbInfo.event.key === "H") {
+                if (!this.mapEditorSystem.isEnabled) return;
+                const terrainTool = this.mapEditorSystem.cycleTerrainTool();
+                this.ui.showNotification(`Terrain tool: ${terrainTool}`, 1600);
+            } else if (kbInfo.event.key === "[") {
+                if (!this.mapEditorSystem.isEnabled) return;
+                const step = this.mapEditorSystem.adjustTerrainSculptStep(-0.1);
+                this.ui.showNotification(`Terrain sculpt step: ${step.toFixed(1)}`, 1200);
+            } else if (kbInfo.event.key === "]") {
+                if (!this.mapEditorSystem.isEnabled) return;
+                const step = this.mapEditorSystem.adjustTerrainSculptStep(0.1);
+                this.ui.showNotification(`Terrain sculpt step: ${step.toFixed(1)}`, 1200);
             } else if (kbInfo.event.key === "F4") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const mapData = this.mapEditorSystem.exportMap();

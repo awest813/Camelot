@@ -75,6 +75,7 @@ The in-engine **Map Editor** (activated with F2) lets you author world content w
 - Edit mode toggle that safely suspends gameplay input.
 - Transform gizmos (position / rotation / scale) with configurable grid snapping.
 - Marker placement at the player's view position.
+- Terrain sculpt/paint pass on loaded chunk meshes (press **H** to cycle terrain tool; click to apply).
 
 ### Phase 2 — Content Authoring (active)
 
@@ -105,6 +106,8 @@ The in-engine **Map Editor** (activated with F2) lets you author world content w
 | **T**        | **Cycle editor placement type**     |
 | **N**        | **Place entity (current type)**     |
 | **P**        | **Start new NPC patrol group**      |
+| **H**        | **Cycle terrain tool (none/sculpt/paint)** |
+| **[ / ]**    | **Decrease / increase terrain sculpt step** |
 | **F4**       | **Export map to JSON (clipboard)**  |
 
 ## Tech Stack
