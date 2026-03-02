@@ -104,6 +104,13 @@ describe('NPC', () => {
             expect(npc.attackDamage).toBe(5);
             expect(npc.attackTimer).toBe(0);
             expect(npc.attackCooldown).toBe(2);
+            expect(npc.isAttackTelegraphing).toBe(false);
+            expect(npc.attackTelegraphTimer).toBe(0);
+            expect(npc.dodgeWindowRangeMultiplier).toBe(0.7);
+            expect(npc.strafeDirection).toBe(0);
+            expect(npc.strafeTimer).toBe(0);
+            expect(npc.strafeSpeedMultiplier).toBe(0.65);
+            expect(npc.movementResponsiveness).toBe(8);
             expect(npc.xpReward).toBe(25);
         });
 

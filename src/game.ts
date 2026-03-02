@@ -267,6 +267,18 @@ export class Game {
                         this.player.camera.attachControl(this.canvas, true);
                     }
                 }
+            } else if (kbInfo.event.key === "1") {
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMeleeArchetype("duelist");
+            } else if (kbInfo.event.key === "2") {
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMeleeArchetype("soldier");
+            } else if (kbInfo.event.key === "3") {
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMeleeArchetype("bruiser");
+            } else if (kbInfo.event.key === "4") {
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMagicArchetype("spark");
+            } else if (kbInfo.event.key === "5") {
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMagicArchetype("bolt");
+            } else if (kbInfo.event.key === "6") {
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMagicArchetype("surge");
             } else if (kbInfo.event.key === "m" || kbInfo.event.key === "M") {
                 this.audioSystem.toggleMute();
                 this.ui.showNotification(this.audioSystem.isMuted ? "Audio muted" : "Audio unmuted", 1500);
