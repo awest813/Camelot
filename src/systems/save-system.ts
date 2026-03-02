@@ -173,10 +173,11 @@ export class SaveSystem {
       this._quests.restoreState(data.quests);
     }
 
-    // Restore skill tree state
+    // Restore skill tree state. Always pass an array so loading a save with
+    // no skills correctly clears any in-session skill ranks/effects.
     this._player.skillPoints = data.skillPoints ?? 0;
-    if (this._skills && data.skills?.length) {
-      this._skills.restoreState(data.skills);
+    if (this._skills) {
+      this._skills.restoreState(Array.isArray(data.skills) ? data.skills : []);
     }
 
     // Sync UI once after all state is restored

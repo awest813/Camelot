@@ -7,6 +7,7 @@ describe('SaveSystem', () => {
     let mockPlayer: any;
     let mockInventory: any;
     let mockEquipment: any;
+    let mockSkills: any;
     let mockUI: any;
     let localStorageMock: Record<string, string>;
 
@@ -46,6 +47,10 @@ describe('SaveSystem', () => {
             equipSilent: vi.fn(),
             unequipSilent: vi.fn(),
             refreshUI: vi.fn(),
+        };
+        mockSkills = {
+            getSaveState: vi.fn(() => []),
+            restoreState: vi.fn(),
         };
         mockUI = { showNotification: vi.fn() };
 
@@ -152,6 +157,16 @@ describe('SaveSystem', () => {
         saveSystem.save();
         saveSystem.load();
         expect(mockUI.showNotification).toHaveBeenCalledWith('Game Loaded!', 2500);
+    });
+
+    it('should restore an empty skill state when save has no skills', () => {
+        saveSystem.setSkillTreeSystem(mockSkills);
+        saveSystem.save();
+
+        mockSkills.restoreState.mockClear();
+        const result = saveSystem.load();
+        expect(result).toBe(true);
+        expect(mockSkills.restoreState).toHaveBeenCalledWith([]);
     });
 
     it('should handle corrupt JSON gracefully', () => {
