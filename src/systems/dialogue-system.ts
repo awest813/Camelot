@@ -5,6 +5,8 @@ import { Camera } from "@babylonjs/core/Cameras/camera";
 import { AdvancedDynamicTexture, Button, Control, Rectangle, StackPanel, TextBlock } from "@babylonjs/gui/2D";
 import { NPC } from "../entities/npc";
 import { Player } from "../entities/player";
+import { DialogueSession } from "../framework/dialogue/dialogue-engine";
+import { DialogueNodeView } from "../framework/dialogue/dialogue-types";
 
 // Design tokens — mirrored from UIManager to keep dialogue styling consistent.
 const D = {
@@ -32,6 +34,7 @@ export class DialogueSystem {
   private _originalCamera: Camera | null = null;
   private _isInDialogue: boolean = false;
   private _choiceCount: number = 0;
+  private _activeSession: DialogueSession | null = null;
 
   // Scratch vectors for performance optimization
   private _direction: Vector3 = new Vector3();
@@ -39,6 +42,8 @@ export class DialogueSystem {
 
   /** Fired with the NPC's mesh name when a conversation begins. */
   public onTalkStart: ((npcName: string) => void) | null = null;
+  /** Optional session factory. If provided, dialogue UI is driven by framework data. */
+  public dialogueSessionProvider: ((npc: NPC) => DialogueSession | null) | null = null;
 
   public get isInDialogue(): boolean {
     return this._isInDialogue;
@@ -128,6 +133,7 @@ export class DialogueSystem {
   public startDialogue(npc: NPC): void {
     if (this._isInDialogue) return;
     this._isInDialogue = true;
+    this._activeSession = null;
     if (this.onTalkStart) this.onTalkStart(npc.mesh.name);
 
     // Switch Camera
@@ -161,26 +167,70 @@ export class DialogueSystem {
 
     // Show UI
     this._choiceCount = 0;
-    this._nameLabel.text = `✦  ${npc.mesh.name}`;
     this._dialoguePanel.isVisible = true;
-    this._textBlock.text = `"Hello, traveler. What brings you here?"`;
 
-    // Add choices
+    const session = this.dialogueSessionProvider ? this.dialogueSessionProvider(npc) : null;
+    const node = session?.getCurrentNode() ?? null;
+    if (session && node) {
+      this._activeSession = session;
+      this._renderNode(node);
+      return;
+    }
+
+    // Fallback legacy dialogue when no framework session is available.
+    this._nameLabel.text = `✦  ${npc.mesh.name}`;
+    this._textBlock.text = `"Hello, traveler. What brings you here?"`;
     this._addChoice("Hello.", () => this._endDialogue());
     this._addChoice("Goodbye.", () => this._endDialogue());
   }
 
-  private _addChoice(text: string, callback: () => void): void {
+  private _renderNode(node: DialogueNodeView): void {
+    this._nameLabel.text = `✦  ${node.speaker}`;
+    this._textBlock.text = `"${node.text}"`;
+    this._choicesPanel.clearControls();
+    this._choiceCount = 0;
+
+    if (node.choices.length === 0) {
+      this._addChoice("Goodbye.", () => this._endDialogue());
+      return;
+    }
+
+    for (const choice of node.choices) {
+      const label = choice.isAvailable ? choice.text : `${choice.text} (locked)`;
+      this._addChoice(label, () => this._handleFrameworkChoice(choice.id), choice.isAvailable);
+    }
+  }
+
+  private _handleFrameworkChoice(choiceId: string): void {
+    if (!this._activeSession) {
+      this._endDialogue();
+      return;
+    }
+
+    const result = this._activeSession.choose(choiceId);
+    if (!result.success && result.currentNode) {
+      this._renderNode(result.currentNode);
+      return;
+    }
+    if (result.isComplete || !result.currentNode) {
+      this._endDialogue();
+      return;
+    }
+    this._renderNode(result.currentNode);
+  }
+
+  private _addChoice(text: string, callback: () => void, enabled: boolean = true): void {
     const button = Button.CreateSimpleButton(`btn_choice_${this._choiceCount++}`, text);
     button.width = "100%";
     button.height = "44px";
-    button.color = D.TEXT;
-    button.background = D.BTN_BG;
+    button.color = enabled ? D.TEXT : D.DIM;
+    button.background = enabled ? D.BTN_BG : "rgba(20, 16, 10, 0.9)";
     button.cornerRadius = 6;
     button.thickness = 1;
     button.fontSize = 15;
     button.paddingBottom = "8px";
-    button.hoverCursor = "pointer";
+    button.hoverCursor = enabled ? "pointer" : "default";
+    button.isEnabled = enabled;
 
     button.isFocusInvisible = false;
     button.tabIndex = 0;
@@ -195,23 +245,27 @@ export class DialogueSystem {
       button.color = D.TEXT;
     };
 
-    button.onPointerEnterObservable.add(setHover);
-    button.onPointerOutObservable.add(setNormal);
-    button.onFocusObservable.add(setHover);
-    button.onBlurObservable.add(setNormal);
+    if (enabled) {
+      button.onPointerEnterObservable.add(setHover);
+      button.onPointerOutObservable.add(setNormal);
+      button.onFocusObservable.add(setHover);
+      button.onBlurObservable.add(setNormal);
+    }
 
     button.onKeyboardEventProcessedObservable.add((evt) => {
+      if (!enabled) return;
       if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
         callback();
       }
     });
 
-    button.onPointerUpObservable.add(callback);
+    if (enabled) button.onPointerUpObservable.add(callback);
     this._choicesPanel.addControl(button);
   }
 
   private _endDialogue(): void {
     this._isInDialogue = false;
+    this._activeSession = null;
 
     // Hide UI
     this._dialoguePanel.isVisible = false;

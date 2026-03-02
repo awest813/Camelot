@@ -104,8 +104,12 @@ export class Game {
     this.audioSystem = new AudioSystem();
     this.frameworkRuntime = new FrameworkRuntime(frameworkBaseContent, {
       inventoryCapacity: this.inventorySystem.maxCapacity,
+      fetchImpl: (url: string) => fetch(url),
     });
     this.frameworkRuntime.questEngine.activateQuest("quest_guard_resolution");
+    this.saveSystem.setFrameworkRuntime(this.frameworkRuntime);
+    this.dialogueSystem.dialogueSessionProvider = (targetNpc) => this._createFrameworkDialogueSession(targetNpc.mesh.name);
+    this._loadFrameworkMods();
 
     // Prevent browser context menu from capturing right-click combat input.
     this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
@@ -113,13 +117,22 @@ export class Game {
     // Wire quest event callbacks
     this.combatSystem.onNPCDeath = (name, xp) => {
         this.questSystem.onKill(name);
+        this._applyFrameworkQuestEvent("kill", this._toFrameworkTargetId(name));
         this.player.addExperience(xp);
         this.ui.showNotification(`+${xp} XP`, 2000);
         this.audioSystem.playNPCDeath();
     };
     this.combatSystem.onPlayerHit = () => this.audioSystem.playPlayerHit();
-    this.interactionSystem.onLootPickup = (id) => this.questSystem.onPickup(id);
-    this.dialogueSystem.onTalkStart  = (name)  => this.questSystem.onTalk(name);
+    this.interactionSystem.onLootPickup = (id) => {
+        this.questSystem.onPickup(id);
+        this._applyFrameworkQuestEvent("pickup", id);
+        const frameworkItemId = this._toFrameworkInventoryItemId(id);
+        if (frameworkItemId) this.frameworkRuntime.inventoryEngine.addItem(frameworkItemId, 1);
+    };
+    this.dialogueSystem.onTalkStart  = (name)  => {
+        this.questSystem.onTalk(name);
+        this._applyFrameworkQuestEvent("talk", this._toFrameworkTargetId(name));
+    };
 
     // Wire XP callbacks
     this.questSystem.onQuestComplete = (xp) => {
@@ -379,6 +392,66 @@ export class Game {
               if (collectedIds.has(loot.item.id)) {
                   loot.dispose();
               }
+          }
+      }
+  }
+
+  private _loadFrameworkMods(): void {
+      this.frameworkRuntime
+          .loadModsFromManifest("/mods/mods-manifest.json")
+          .then((report) => {
+              if (report.loadedModIds.length > 0) {
+                  this.ui.showNotification(`Framework mods loaded: ${report.loadedModIds.length}`, 2200);
+              }
+              if (report.failures.length > 0) {
+                  this.ui.showNotification(`Framework mod failures: ${report.failures.length}`, 3000);
+              }
+          })
+          .catch(() => {
+              // Mods are optional for local runtime; ignore network/404 failures.
+          });
+  }
+
+  private _createFrameworkDialogueSession(npcName: string) {
+      const dialogueId = this._resolveFrameworkDialogueId(npcName);
+      if (!dialogueId) return null;
+      try {
+          return this.frameworkRuntime.createDialogueSession(dialogueId);
+      } catch {
+          return null;
+      }
+  }
+
+  private _resolveFrameworkDialogueId(npcName: string): string | null {
+      if (npcName.includes("Guard")) return "guard_intro";
+      return null;
+  }
+
+  private _toFrameworkTargetId(entityName: string): string {
+      if (entityName.startsWith("RuinGuard")) return "RuinGuard";
+      if (entityName.startsWith("TowerGuard")) return "TowerGuard";
+      return entityName.split("_")[0];
+  }
+
+  private _toFrameworkInventoryItemId(itemId: string): string | null {
+      if (itemId === "potion_hp_01") return "health_potion";
+      if (itemId === "sword_01") return "iron_sword";
+      if (itemId === "guard_token") return "guard_token";
+      return null;
+  }
+
+  private _applyFrameworkQuestEvent(
+      type: "kill" | "pickup" | "talk" | "custom",
+      targetId: string,
+      amount: number = 1
+  ): void {
+      const updates = this.frameworkRuntime.applyQuestEvent({ type, targetId, amount });
+      for (const update of updates) {
+          if (!update.questCompleted) continue;
+          this.ui.showNotification(`Framework quest complete: ${update.questId}`, 2800);
+          if (update.xpReward > 0) {
+              this.player.addExperience(update.xpReward);
+              this.ui.showNotification(`+${update.xpReward} XP`, 2000);
           }
       }
   }
