@@ -306,10 +306,6 @@ export class Game {
                 this.audioSystem.toggleMute();
                 this.ui.showNotification(this.audioSystem.isMuted ? "Audio muted" : "Audio unmuted", 1500);
             } else if (kbInfo.event.key === "F2") {
-                if (this.isPaused || this.dialogueSystem.isInDialogue || this.inventorySystem.isOpen || this.questSystem.isLogOpen || this.skillTreeSystem.isOpen) {
-                    this.ui.showNotification("Close menus/dialogue before entering editor mode", 1800);
-                    return;
-                }
                 const isEnabled = this.mapEditorSystem.toggle();
                 this.interactionSystem.isBlocked = isEnabled;
                 if (isEnabled) {
