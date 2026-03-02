@@ -87,7 +87,9 @@ export class NavigationSystem {
     try {
       this._plugin.createNavMesh(groundMeshes, NAV_PARAMS);
       this._ready = true;
-      console.log(`[Nav] Navmesh built from ${groundMeshes.length} ground mesh(es).`);
+      if (import.meta.env.DEV) {
+        console.log(`[Nav] Navmesh built from ${groundMeshes.length} ground mesh(es).`);
+      }
     } catch (e) {
       console.warn("[Nav] createNavMesh failed:", e);
       this._ready = false;
@@ -178,7 +180,9 @@ export class NavigationSystem {
       const { default: Recast } = await import("recast-detour");
       const recast = await Recast();
       this._plugin = new RecastJSPlugin(recast);
-      console.log("[Nav] Recast/Detour plugin ready.");
+      if (import.meta.env.DEV) {
+        console.log("[Nav] Recast/Detour plugin ready.");
+      }
 
       // Attempt an initial navmesh build from whatever chunks are already loaded.
       const meshes = this.collectGroundMeshes();
