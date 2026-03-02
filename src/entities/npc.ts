@@ -11,25 +11,28 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
  * AI state machine states for NPC behaviour.
  *
  * Transition graph:
- *   IDLE   → PATROL  (if patrolPoints assigned)
- *   IDLE   → ALERT   (player enters aggroRange)
- *   PATROL → ALERT   (player enters aggroRange)
- *   ALERT  → CHASE   (alertDuration elapsed, player still close)
- *   ALERT  → PATROL  (player escaped during alert window)
- *   CHASE  → ATTACK  (player within attackRange)
- *   CHASE  → RETURN  (player > 2×aggroRange away)
- *   ATTACK → CHASE   (player stepped out of attackRange)
- *   ATTACK → RETURN  (player > 2×aggroRange away)
- *   RETURN → ALERT   (player re-enters aggroRange during return)
- *   RETURN → PATROL  (reached spawnPosition)
+ *   IDLE        → PATROL      (if patrolPoints assigned)
+ *   IDLE        → ALERT       (player enters aggroRange)
+ *   PATROL      → ALERT       (player enters aggroRange)
+ *   ALERT       → CHASE       (alertDuration elapsed, player still close)
+ *   ALERT       → INVESTIGATE (player escaped during alert window — move to last seen pos)
+ *   INVESTIGATE → PATROL      (reached lastKnownPlayerPos or investigateDuration elapsed)
+ *   INVESTIGATE → ALERT       (player re-enters aggroRange while investigating)
+ *   CHASE       → ATTACK      (player within attackRange)
+ *   CHASE       → RETURN      (player > 2×aggroRange away)
+ *   ATTACK      → CHASE       (player stepped out of attackRange)
+ *   ATTACK      → RETURN      (player > 2×aggroRange away)
+ *   RETURN      → ALERT       (player re-enters aggroRange during return)
+ *   RETURN      → PATROL      (reached spawnPosition)
  */
 export enum AIState {
-  IDLE   = "IDLE",
-  PATROL = "PATROL",
-  ALERT  = "ALERT",
-  CHASE  = "CHASE",
-  ATTACK = "ATTACK",
-  RETURN = "RETURN",
+  IDLE        = "IDLE",
+  PATROL      = "PATROL",
+  ALERT       = "ALERT",
+  CHASE       = "CHASE",
+  ATTACK      = "ATTACK",
+  RETURN      = "RETURN",
+  INVESTIGATE = "INVESTIGATE",
 }
 
 export class NPC {
@@ -77,6 +80,17 @@ export class NPC {
 
   /** How long (seconds) the NPC pauses in ALERT before transitioning to CHASE. */
   public readonly alertDuration: number = 1.5;
+
+  // ─── Investigate state ───────────────────────────────────────────────────────
+
+  /** Last recorded player world position — updated each frame the player is in aggroRange. */
+  public lastKnownPlayerPos: Vector3 | null = null;
+
+  /** Seconds spent in INVESTIGATE state. */
+  public investigateTimer: number = 0;
+
+  /** Max seconds the NPC searches before giving up and returning to patrol. */
+  public readonly investigateDuration: number = 5.0;
 
   // ─── Pathfinding ────────────────────────────────────────────────────────────
 
