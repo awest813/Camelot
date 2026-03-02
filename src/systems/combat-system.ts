@@ -12,6 +12,10 @@ import { NavigationSystem } from "./navigation-system";
 
 const MELEE_DAMAGE = 10;
 const MAGIC_DAMAGE = 20;
+const MELEE_STAMINA_COST = 15;
+const MAGIC_MAGICKA_COST = 20;
+const MELEE_COOLDOWN = 0.45;
+const MAGIC_COOLDOWN = 0.7;
 
 // State colour palette
 const COLOR_IDLE    = Color3.Yellow();
@@ -34,6 +38,8 @@ export class CombatSystem {
   private _lookAtTarget: Vector3 = new Vector3();
   private _hitPos: Vector3 = new Vector3();
   private _attackReservations: Set<NPC> = new Set();
+  private _meleeCooldownRemaining: number = 0;
+  private _magicCooldownRemaining: number = 0;
 
   private static readonly _OFFSET_Y1 = new Vector3(0, 1, 0);
   private static readonly _OFFSET_Y2 = new Vector3(0, 2, 0);
@@ -60,12 +66,19 @@ export class CombatSystem {
 
   // ─── Player actions ────────────────────────────────────────────────────────
 
-  public meleeAttack(): void {
-    if (this.player.stamina < 15) {
-      this._ui.showNotification("Not enough stamina!");
-      return;
+  public meleeAttack(): boolean {
+    if (this._meleeCooldownRemaining > 0) {
+      return false;
     }
-    this.player.stamina -= 15;
+
+    if (this.player.stamina < MELEE_STAMINA_COST) {
+      this._ui.showNotification("Not enough stamina!");
+      return false;
+    }
+    this.player.stamina -= MELEE_STAMINA_COST;
+    this._meleeCooldownRemaining = MELEE_COOLDOWN;
+    (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
+      .notifyResourceSpent?.("stamina");
 
     const hit = this.player.raycastForward(3);
     if (hit && hit.pickedMesh) {
@@ -82,7 +95,10 @@ export class CombatSystem {
 
         if (npc.physicsAggregate?.body) {
           const forward = this.player.camera.getForwardRay(1).direction;
-          npc.physicsAggregate.body.applyImpulse(forward.scale(10), hit.pickedPoint!);
+          const impulsePoint = hit.pickedPoint
+            ? hit.pickedPoint
+            : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y1, this._hitPos);
+          npc.physicsAggregate.body.applyImpulse(forward.scale(10), impulsePoint);
         }
 
         if (npc.isDead) {
@@ -97,14 +113,22 @@ export class CombatSystem {
         }
       }
     }
+    return true;
   }
 
-  public magicAttack(): void {
-    if (this.player.magicka < 20) {
-      this._ui.showNotification("Not enough magicka!");
-      return;
+  public magicAttack(): boolean {
+    if (this._magicCooldownRemaining > 0) {
+      return false;
     }
-    this.player.magicka -= 20;
+
+    if (this.player.magicka < MAGIC_MAGICKA_COST) {
+      this._ui.showNotification("Not enough magicka!");
+      return false;
+    }
+    this.player.magicka -= MAGIC_MAGICKA_COST;
+    this._magicCooldownRemaining = MAGIC_COOLDOWN;
+    (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
+      .notifyResourceSpent?.("magicka");
 
     const origin = this.player.camera.position.add(this.player.camera.getForwardRay(1).direction);
     const projectile = MeshBuilder.CreateSphere("fireball", { diameter: 0.5 }, this.scene);
@@ -167,6 +191,7 @@ export class CombatSystem {
         }
       }
     });
+    return true;
   }
 
   // ─── NPC AI update (state machine) ────────────────────────────────────────
@@ -187,6 +212,8 @@ export class CombatSystem {
    *  RETURN      → PATROL  : NPC reached spawnPosition
    */
   public updateNPCAI(deltaTime: number): void {
+    this._tickPlayerAttackCooldowns(deltaTime);
+
     const playerPos = this.player.camera.position;
     this._refreshAttackReservations(playerPos);
 
@@ -219,6 +246,11 @@ export class CombatSystem {
       if (this._attackReservations.size >= MAX_CONCURRENT_ATTACKERS) break;
       this._attackReservations.add(npc);
     }
+  }
+
+  private _tickPlayerAttackCooldowns(deltaTime: number): void {
+    this._meleeCooldownRemaining = Math.max(0, this._meleeCooldownRemaining - deltaTime);
+    this._magicCooldownRemaining = Math.max(0, this._magicCooldownRemaining - deltaTime);
   }
 
   // ─── State machine implementation ──────────────────────────────────────────
@@ -329,6 +361,7 @@ export class CombatSystem {
           npc.attackTimer = npc.attackCooldown;
           const dmg = Math.max(1, npc.attackDamage - this.player.bonusArmor);
           this.player.health = Math.max(0, this.player.health - dmg);
+          (this.player as unknown as { notifyDamageTaken?: () => void }).notifyDamageTaken?.();
           this._ui.showHitFlash("rgba(200, 0, 0, 0.4)");
           if (this.onPlayerHit) this.onPlayerHit();
           this._ui.showNotification(`${npc.mesh.name} attacks you for ${dmg} damage!`, 2000);

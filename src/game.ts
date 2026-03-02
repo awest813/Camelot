@@ -97,6 +97,9 @@ export class Game {
     this.saveSystem.setSkillTreeSystem(this.skillTreeSystem);
     this.audioSystem = new AudioSystem();
 
+    // Prevent browser context menu from capturing right-click combat input.
+    this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+
     // Wire quest event callbacks
     this.combatSystem.onNPCDeath = (name, xp) => {
         this.questSystem.onKill(name);
@@ -215,15 +218,16 @@ export class Game {
 
     // Input handling for combat
     this.scene.onPointerObservable.add((pointerInfo) => {
-        if (this.isPaused || this.inventorySystem.isOpen) return;
+        if (this._isCombatInputBlocked()) return;
 
         if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
             if (pointerInfo.event.button === 0) { // Left Click
-                this.audioSystem.playMeleeAttack();
-                this.combatSystem.meleeAttack();
+                const attacked = this.combatSystem.meleeAttack();
+                if (attacked) this.audioSystem.playMeleeAttack();
             } else if (pointerInfo.event.button === 2) { // Right Click
-                this.audioSystem.playMagicAttack();
-                this.combatSystem.magicAttack();
+                pointerInfo.event.preventDefault();
+                const casted = this.combatSystem.magicAttack();
+                if (casted) this.audioSystem.playMagicAttack();
             }
         }
     });
@@ -232,6 +236,7 @@ export class Game {
     this.scene.onKeyboardObservable.add((kbInfo) => {
         if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
             if (kbInfo.event.key === "Escape") {
+                if (this.dialogueSystem.isInDialogue) return;
                 this.togglePause();
             } else if (kbInfo.event.key === "j" || kbInfo.event.key === "J") {
                 if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue && !this.skillTreeSystem.isOpen) {
@@ -405,5 +410,16 @@ export class Game {
       if (this.inventorySystem.isOpen) {
           this.ui.updateStats(this.player);
       }
+  }
+
+  private _isCombatInputBlocked(): boolean {
+      return (
+          this.isPaused ||
+          this.inventorySystem.isOpen ||
+          this.questSystem.isLogOpen ||
+          this.skillTreeSystem.isOpen ||
+          this.dialogueSystem.isInDialogue ||
+          this.interactionSystem.isBlocked
+      );
   }
 }

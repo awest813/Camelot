@@ -25,6 +25,15 @@ export class Player {
   public magickaRegen: number = 2;
   public staminaRegen: number = 5;
 
+  // Regen gating timers (seconds remaining)
+  private _healthRegenDelayRemaining: number = 0;
+  private _magickaRegenDelayRemaining: number = 0;
+  private _staminaRegenDelayRemaining: number = 0;
+
+  public static readonly HEALTH_REGEN_DELAY_AFTER_DAMAGE = 3.5;
+  public static readonly MAGICKA_REGEN_DELAY_AFTER_CAST = 0.8;
+  public static readonly STAMINA_REGEN_DELAY_AFTER_ATTACK = 0.55;
+
   // Equipment bonuses
   public bonusDamage: number = 0;
   public bonusArmor: number = 0;
@@ -52,9 +61,42 @@ export class Player {
   }
 
   public update(deltaTime: number): void {
-      this.health = Math.min(this.maxHealth, this.health + this.healthRegen * deltaTime);
-      this.magicka = Math.min(this.maxMagicka, this.magicka + this.magickaRegen * deltaTime);
-      this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen * deltaTime);
+      this._healthRegenDelayRemaining = Math.max(0, this._healthRegenDelayRemaining - deltaTime);
+      this._magickaRegenDelayRemaining = Math.max(0, this._magickaRegenDelayRemaining - deltaTime);
+      this._staminaRegenDelayRemaining = Math.max(0, this._staminaRegenDelayRemaining - deltaTime);
+
+      if (this._healthRegenDelayRemaining <= 0) {
+        this.health = Math.min(this.maxHealth, this.health + this.healthRegen * deltaTime);
+      }
+      if (this._magickaRegenDelayRemaining <= 0) {
+        this.magicka = Math.min(this.maxMagicka, this.magicka + this.magickaRegen * deltaTime);
+      }
+      if (this._staminaRegenDelayRemaining <= 0) {
+        this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen * deltaTime);
+      }
+  }
+
+  /** Delay health recovery after receiving combat damage. */
+  public notifyDamageTaken(): void {
+    this._healthRegenDelayRemaining = Math.max(
+      this._healthRegenDelayRemaining,
+      Player.HEALTH_REGEN_DELAY_AFTER_DAMAGE
+    );
+  }
+
+  /** Delay resource recovery after spending combat resources. */
+  public notifyResourceSpent(resource: "magicka" | "stamina"): void {
+    if (resource === "magicka") {
+      this._magickaRegenDelayRemaining = Math.max(
+        this._magickaRegenDelayRemaining,
+        Player.MAGICKA_REGEN_DELAY_AFTER_CAST
+      );
+      return;
+    }
+    this._staminaRegenDelayRemaining = Math.max(
+      this._staminaRegenDelayRemaining,
+      Player.STAMINA_REGEN_DELAY_AFTER_ATTACK
+    );
   }
 
   /**
