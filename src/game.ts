@@ -56,6 +56,9 @@ export class Game {
   private _lastExperience: number = -1;
   private _lastLevel: number = -1;
 
+  // Death feedback: true while health is at 0 so the notification fires once per "death"
+  private _playerAtZeroHP: boolean = false;
+
   constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
     this.scene = scene;
     this.canvas = canvas;
@@ -389,6 +392,14 @@ export class Game {
       if (this.player.health !== this._lastHealth) {
           this._lastHealth = this.player.health;
           this.ui.updateHealth(this.player.health, this.player.maxHealth);
+
+          if (this.player.health <= 0 && !this._playerAtZeroHP) {
+              this._playerAtZeroHP = true;
+              this.ui.showHitFlash("rgba(180, 0, 0, 0.55)");
+              this.ui.showNotification("You are gravely wounded!", 3500);
+          } else if (this.player.health > 0 && this._playerAtZeroHP) {
+              this._playerAtZeroHP = false;
+          }
       }
       if (this.player.magicka !== this._lastMagicka) {
           this._lastMagicka = this.player.magicka;
