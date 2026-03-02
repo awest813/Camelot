@@ -164,6 +164,16 @@ export class SkillTreeSystem {
   }
 
   public restoreState(state: SkillSaveState[]): void {
+    // Reset all ranks to 0 first so that loading into any session state
+    // (e.g. loading a second time, or loading after purchasing skills) is idempotent.
+    // SaveSystem already zeroed the underlying stat bonuses before calling this,
+    // so we only need to reset the rank counters here.
+    for (const tree of this.trees) {
+      for (const skill of tree.skills) {
+        skill.currentRank = 0;
+      }
+    }
+
     const rankMap = new Map(state.map(s => [s.id, s.rank]));
     for (const tree of this.trees) {
       for (const skill of tree.skills) {

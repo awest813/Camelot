@@ -148,6 +148,15 @@ export class SaveSystem {
     this._player.maxMagicka = 100 + levelBonus;
     this._player.maxStamina = 100 + levelBonus;
 
+    // Reset all derived stat bonuses so equipment and skills can be applied cleanly
+    // without doubling effects that were already active in this session.
+    this._player.bonusDamage = 0;
+    this._player.bonusArmor = 0;
+    this._player.bonusMagicDamage = 0;
+    this._player.healthRegen = 0.5;
+    this._player.magickaRegen = 2;
+    this._player.staminaRegen = 5;
+
     // Restore inventory
     this._inventory.items = data.inventory;
 
