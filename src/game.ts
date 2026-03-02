@@ -351,6 +351,9 @@ export class Game {
       this.ui.togglePauseMenu(this.isPaused);
 
       if (this.isPaused) {
+          if (this.mapEditorSystem.isEnabled) {
+              this.mapEditorSystem.toggle();
+          }
           // Close any open overlays
           if (this.inventorySystem.isOpen) {
               this.inventorySystem.isOpen = false;
