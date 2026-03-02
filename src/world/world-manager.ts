@@ -65,13 +65,16 @@ export class WorldManager {
     // Unload chunks that are too far from the player
     for (const [key, { mesh, cx, cz }] of this.loadedChunks) {
       if (Math.abs(cx - chunkX) > this.unloadDistance || Math.abs(cz - chunkZ) > this.unloadDistance) {
-        mesh.dispose(false, true); // true = also dispose material & textures
+        // Dispose geometry only — biome materials are shared across chunks of the same biome
+        // and must not be destroyed here.
+        mesh.dispose(false, false);
         this.loadedChunks.delete(key);
 
         // Dispose vegetation meshes for this chunk
         const veg = this.chunkVegetation.get(key);
         if (veg) {
-          for (const m of veg) m.dispose(false, true);
+          // Trunk/crown/cactus/ice materials are shared pools — preserve them.
+          for (const m of veg) m.dispose(false, false);
           this.chunkVegetation.delete(key);
         }
 
