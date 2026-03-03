@@ -240,13 +240,15 @@ export class CombatSystem {
     let elapsedMs = 0;
     let _fbFrame = 0;
     const obs = this.scene.onBeforeRenderObservable.add(() => {
-      if (!alive) return;
+      if (!alive || this.scene.isDisposed) return;
       if (++_fbFrame % 2 !== 0) return;
 
       elapsedMs += this.scene.getEngine().getDeltaTime() * 2;
       if (elapsedMs >= 5000) {
         alive = false;
-        this.scene.onBeforeRenderObservable.remove(obs);
+        if (!this.scene.isDisposed) {
+          this.scene.onBeforeRenderObservable.remove(obs);
+        }
         if (!projectile.isDisposed()) projectile.dispose();
         if (agg.body && !agg.body.isDisposed) agg.dispose();
         return;
@@ -276,7 +278,9 @@ export class CombatSystem {
           }
 
           alive = false;
-          this.scene.onBeforeRenderObservable.remove(obs);
+          if (!this.scene.isDisposed) {
+            this.scene.onBeforeRenderObservable.remove(obs);
+          }
           if (!projectile.isDisposed()) projectile.dispose();
           if (agg.body && !agg.body.isDisposed) agg.dispose();
           return;
