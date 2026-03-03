@@ -68,11 +68,11 @@ export class InteractionSystem {
               if (metadata.npc.isAggressive) {
                   this.ui.setInteractionText(`${metadata.npc.mesh.name} is hostile`);
               } else {
-                  this.ui.setInteractionText(`Press E to Talk to ${metadata.npc.mesh.name}`);
+                  this.ui.setInteractionText(`[E] Talk to ${metadata.npc.mesh.name}`);
               }
               this.ui.setCrosshairActive(true);
           } else if (metadata.type === 'loot') {
-              this.ui.setInteractionText(`Press E to Take ${metadata.loot.item.name}`);
+              this.ui.setInteractionText(`[E] Take ${metadata.loot.item.name}`);
               this.ui.setCrosshairActive(true);
           }
       } else {
