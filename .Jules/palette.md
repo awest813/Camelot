@@ -1,0 +1,6 @@
+## 2026-03-02 - Unified UI Closing with Escape
+**Learning:** In Babylon.js games with multiple UI systems managing pointer lock and camera controls (Inventory, Quests, Skill Tree, Editor), relying solely on individual toggle keys (I, J, K) creates trapped states. Users instinctively press Escape to close overlays, which jarringly triggers the pause menu instead.
+**Action:** Always intercept the Escape key handler globally to check for active UI overlay states. Prioritize calling their respective  methods and restoring pointer lock/camera controls *before* falling back to the default pause menu behavior.
+## 2026-03-02 - Unified UI Closing with Escape
+**Learning:** In Babylon.js games with multiple UI systems managing pointer lock and camera controls (Inventory, Quests, Skill Tree, Editor), relying solely on individual toggle keys (I, J, K) creates trapped states. Users instinctively press Escape to close overlays, which jarringly triggers the pause menu instead.
+**Action:** Always intercept the Escape key handler globally to check for active UI overlay states. Prioritize calling their respective toggle methods and restoring pointer lock/camera controls *before* falling back to the default pause menu behavior.
