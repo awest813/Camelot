@@ -130,11 +130,6 @@ export class DialogueSystem {
     this._cinematicCamera = new ArcRotateCamera("cinematicCam", 0, 0, 5, Vector3.Zero(), this.scene);
   }
 
-  // Refactored duplicate raycast logic: using shared method player.raycastForward
-  public checkLineOfSight(): any {
-      return this.player.raycastForward(3);
-  }
-
   public startDialogue(npc: NPC): void {
     if (this._isInDialogue) return;
     this._isInDialogue = true;
