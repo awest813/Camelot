@@ -35,7 +35,12 @@ export default ({ mode }: { mode: string }) => {
       port: Number(env.VITE_PORT) || 8088,
       open: env.VITE_OPEN === "true",
       hmr: env.VITE_HMR === "true",
-      cors: env.VITE_CORS === "true",
+      cors: env.VITE_CORS === "true" ? {
+        origin: [
+          `http://localhost:${Number(env.VITE_PORT) || 8088}`,
+          `http://127.0.0.1:${Number(env.VITE_PORT) || 8088}`,
+        ],
+      } : false,
       // Cross domain
       // proxy: {
       //     '/api': {
