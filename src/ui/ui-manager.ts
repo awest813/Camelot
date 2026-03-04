@@ -248,7 +248,7 @@ export class UIManager {
     this.inventoryPanel.addControl(titleBar);
 
     const title = new TextBlock();
-    title.text = "✦  INVENTORY  ✦";
+    title.text = "✦  INVENTORY  [I]  ✦";
     title.color = T.TITLE;
     title.fontSize = 19;
     title.fontWeight = "bold";
@@ -668,6 +668,12 @@ export class UIManager {
     button.onPointerOutObservable.add(setNormal);
     button.onFocusObservable.add(setHover);
     button.onBlurObservable.add(setNormal);
+
+    button.onKeyboardEventProcessedObservable.add((evt) => {
+      if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
+        button.onPointerUpObservable.notifyObservers(null as any);
+      }
+    });
 
     parent.addControl(button);
     return button;
