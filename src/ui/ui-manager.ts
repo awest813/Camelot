@@ -607,17 +607,27 @@ export class UIManager {
         buyBtn.fontSize = 12;
         buyBtn.hoverCursor = canBuy ? "pointer" : "default";
 
-        if (canBuy) {
-          buyBtn.isFocusInvisible = false;
-          buyBtn.tabIndex = 0;
-          buyBtn.accessibilityTag = { description: `Upgrade ${skill.name}` };
+        buyBtn.isFocusInvisible = false;
+        buyBtn.tabIndex = 0;
+        buyBtn.accessibilityTag = {
+          description: isMax ? `${skill.name} Mastered` : (canBuy ? `Upgrade ${skill.name}` : `Need Points for ${skill.name}`)
+        };
 
+        const defaultBg = isMax ? "rgba(10,40,10,0.65)" : (canBuy ? "rgba(60,40,0,0.85)" : "rgba(18,12,2,0.55)");
+        const focusBg   = isMax ? "rgba(20,60,20,0.85)" : (canBuy ? "rgba(100,70,0,0.95)" : "rgba(30,20,10,0.75)");
+
+        const setFocusState = () => { buyBtn.background = focusBg; buyBtn.color = T.TEXT; };
+        const setNormalState = () => { buyBtn.background = defaultBg; buyBtn.color = isMax ? T.GOOD : (canBuy ? T.TITLE : T.DIM); };
+
+        buyBtn.onPointerEnterObservable.add(setFocusState);
+        buyBtn.onPointerOutObservable.add(setNormalState);
+        buyBtn.onFocusObservable.add(setFocusState);
+        buyBtn.onBlurObservable.add(setNormalState);
+
+        if (canBuy) {
           const triggerPurchase = () => {
             if (this.onSkillPurchase) this.onSkillPurchase(treeIdx, skillIdx);
           };
-
-          const setHover = () => { buyBtn.background = "rgba(100,70,0,0.95)"; };
-          const setNormal = () => { buyBtn.background = "rgba(60,40,0,0.85)"; };
 
           buyBtn.onPointerUpObservable.add(triggerPurchase);
           buyBtn.onKeyboardEventProcessedObservable.add((evt) => {
@@ -625,11 +635,6 @@ export class UIManager {
               triggerPurchase();
             }
           });
-
-          buyBtn.onPointerEnterObservable.add(setHover);
-          buyBtn.onPointerOutObservable.add(setNormal);
-          buyBtn.onFocusObservable.add(setHover);
-          buyBtn.onBlurObservable.add(setNormal);
         }
 
         inner.addControl(buyBtn);
