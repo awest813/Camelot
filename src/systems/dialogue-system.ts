@@ -239,16 +239,23 @@ export class DialogueSystem {
     const setHover = () => {
       button.background = D.BTN_HOVER;
       button.color = D.TITLE;
+      if (button.thickness !== 2) button.thickness = 1;
+    };
+    const setFocus = () => {
+      button.background = D.BTN_HOVER;
+      button.color = D.TITLE;
+      button.thickness = 2;
     };
     const setNormal = () => {
       button.background = D.BTN_BG;
       button.color = D.TEXT;
+      button.thickness = 1;
     };
 
     if (enabled) {
       button.onPointerEnterObservable.add(setHover);
       button.onPointerOutObservable.add(setNormal);
-      button.onFocusObservable.add(setHover);
+      button.onFocusObservable.add(setFocus);
       button.onBlurObservable.add(setNormal);
     }
 
