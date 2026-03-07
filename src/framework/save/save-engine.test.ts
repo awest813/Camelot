@@ -56,4 +56,109 @@ describe("SaveEngine", () => {
     expect(loaded?.state.flags.started).toBe(true);
     expect(loaded?.state.dialogueState.node).toBe("a");
   });
+
+  it("exportSave and importSave round-trip with checksum verification", () => {
+    const engine = new SaveEngine();
+    const snapshot = {
+      dialogueState: {},
+      questState: { quests: { q1: { status: "active", nodes: {} } } },
+      inventoryState: {},
+      factionState: {},
+      flags: { hero: true },
+    };
+
+    const exported = engine.exportSave(snapshot, "hero_profile");
+    const parsed = JSON.parse(exported);
+    expect(typeof parsed.checksum).toBe("string");
+    expect(parsed.checksum).toHaveLength(8);
+
+    const imported = engine.importSave(exported);
+    expect(imported.profileId).toBe("hero_profile");
+    expect(imported.state.flags.hero).toBe(true);
+  });
+
+  it("importSave throws on corrupt JSON", () => {
+    const engine = new SaveEngine();
+    expect(() => engine.importSave("not valid json {{{")).toThrow(/not valid JSON/i);
+  });
+
+  it("importSave throws on checksum mismatch", () => {
+    const engine = new SaveEngine();
+    const snapshot = {
+      dialogueState: {},
+      questState: {},
+      inventoryState: {},
+      factionState: {},
+      flags: {},
+    };
+
+    const exported = JSON.parse(engine.exportSave(snapshot));
+    // Tamper with the state after export
+    exported.state.flags.tampered = true;
+    expect(() => engine.importSave(JSON.stringify(exported))).toThrow(/checksum mismatch/i);
+  });
+
+  it("importSave accepts a save without checksum (partial recovery path)", () => {
+    const engine = new SaveEngine();
+    const raw = JSON.stringify({
+      schemaVersion: 1,
+      savedAt: 999,
+      profileId: "old_save",
+      state: {
+        dialogueState: {},
+        questState: {},
+        inventoryState: {},
+        factionState: {},
+        flags: { found_key: true },
+      },
+      // No checksum field — should load without error
+    });
+
+    const imported = engine.importSave(raw);
+    expect(imported.profileId).toBe("old_save");
+    expect(imported.state.flags.found_key).toBe(true);
+  });
+
+  it("validateSaveFile returns valid for a well-formed save", () => {
+    const engine = new SaveEngine();
+    const snapshot = {
+      dialogueState: {},
+      questState: {},
+      inventoryState: {},
+      factionState: {},
+      flags: { accepted: true },
+    };
+    const saveFile = engine.createSave(snapshot, "player1");
+    const result = engine.validateSaveFile(saveFile);
+    expect(result.valid).toBe(true);
+  });
+
+  it("validateSaveFile detects missing state", () => {
+    const engine = new SaveEngine();
+    const result = engine.validateSaveFile({
+      schemaVersion: 1,
+      savedAt: Date.now(),
+      profileId: "p1",
+      state: null as unknown as any,
+    });
+    expect(result.valid).toBe(false);
+    expect(result.reason).toMatch(/state/i);
+  });
+
+  it("validateSaveFile detects checksum mismatch", () => {
+    const engine = new SaveEngine();
+    const snapshot = {
+      dialogueState: {},
+      questState: {},
+      inventoryState: {},
+      factionState: {},
+      flags: {},
+    };
+    const saveFile = engine.createSave(snapshot, "p1");
+    // Attach a wrong checksum
+    (saveFile as any).checksum = "deadbeef";
+    const result = engine.validateSaveFile(saveFile);
+    expect(result.valid).toBe(false);
+    expect(result.reason).toMatch(/checksum/i);
+  });
 });

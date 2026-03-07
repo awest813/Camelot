@@ -3,7 +3,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
-import { NPC, AIState } from "../entities/npc";
+import { NPC, AIState, DamageType } from "../entities/npc";
 import { Player } from "../entities/player";
 import { UIManager } from "../ui/ui-manager";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -12,6 +12,24 @@ import { NavigationSystem } from "./navigation-system";
 
 const MELEE_DAMAGE = 10;
 const MAGIC_DAMAGE = 20;
+
+/**
+ * Applies NPC-specific resistance and weakness modifiers to a raw damage amount.
+ *
+ * Final damage = baseDamage × max(0, 1 − resistance + weakness)
+ *
+ * Resistance values are clamped to [0, 1] so that full immunity is the maximum.
+ * A missing entry defaults to 0 (no modification).
+ *
+ * **Minimum damage floor**: The result is always at least 1.
+ * Even a fully resistant NPC takes 1 point of damage per hit, ensuring attacks
+ * are never silently ignored and preserving gameplay feedback.
+ */
+function applyDamageWithResistance(baseDamage: number, npc: NPC, type: DamageType): number {
+  const resistance = Math.min(1, Math.max(0, npc.damageResistances?.[type] ?? 0));
+  const weakness = Math.max(0, npc.damageWeaknesses?.[type] ?? 0);
+  return Math.max(1, Math.round(baseDamage * (1 - resistance + weakness)));
+}
 
 export type MeleeArchetype = "duelist" | "soldier" | "bruiser";
 export type MagicArchetype = "spark" | "bolt" | "surge";
@@ -74,6 +92,13 @@ const MAGIC_PROFILES: Record<MagicArchetype, MagicProfile> = {
     projectileImpulse: 23,
     label: "Surge cast",
   },
+};
+
+/** Maps each magic archetype to its damage type for resistance calculations. */
+const MAGIC_ARCHETYPE_DAMAGE_TYPE: Record<MagicArchetype, DamageType> = {
+  spark: "shock",
+  bolt:  "fire",
+  surge: "fire",
 };
 
 // State colour palette
@@ -169,10 +194,11 @@ export class CombatSystem {
     if (hit && hit.pickedMesh) {
       const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
       if (npc && !npc.isDead) {
-        const meleeDmg = Math.max(
+        const rawMeleeDmg = Math.max(
           1,
           Math.round((MELEE_DAMAGE + this.player.bonusDamage) * meleeProfile.damageMultiplier)
         );
+        const meleeDmg = applyDamageWithResistance(rawMeleeDmg, npc, "physical");
         npc.takeDamage(meleeDmg);
 
         const numberPos = hit.pickedPoint
@@ -206,6 +232,7 @@ export class CombatSystem {
 
   public magicAttack(): boolean {
     const magicProfile = MAGIC_PROFILES[this._magicArchetype];
+    const magicDamageType = MAGIC_ARCHETYPE_DAMAGE_TYPE[this._magicArchetype];
     if (this._magicCooldownRemaining > 0) {
       return false;
     }
@@ -258,10 +285,11 @@ export class CombatSystem {
       for (const npc of this.npcs) {
         if (npc.isDead) continue;
         if (Vector3.DistanceSquared(projPos, npc.mesh.position) <= 1.44) {
-          const magicDmg = Math.max(
+          const rawMagicDmg = Math.max(
             1,
             Math.round((MAGIC_DAMAGE + this.player.bonusMagicDamage) * magicProfile.damageMultiplier)
           );
+          const magicDmg = applyDamageWithResistance(rawMagicDmg, npc, magicDamageType);
           npc.takeDamage(magicDmg);
           this._ui.showDamageNumber(
             npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos),

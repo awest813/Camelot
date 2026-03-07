@@ -49,3 +49,17 @@ export interface QuestEventResult {
 export interface QuestSnapshot {
   quests: Record<string, QuestRuntimeState>;
 }
+
+export type QuestValidationIssueType = "dead_end" | "unreachable" | "cycle" | "not_found";
+
+export interface QuestValidationIssue {
+  type: QuestValidationIssueType;
+  nodeId: string;
+  detail: string;
+}
+
+export interface QuestValidationReport {
+  questId: string;
+  valid: boolean;
+  issues: QuestValidationIssue[];
+}

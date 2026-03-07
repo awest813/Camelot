@@ -35,6 +35,15 @@ export enum AIState {
   INVESTIGATE = "INVESTIGATE",
 }
 
+/**
+ * Damage categories used for resistance and weakness calculations.
+ * - physical: melee and unarmed strikes
+ * - fire: flame spells and burning effects
+ * - frost: ice spells and cold effects
+ * - shock: lightning spells and electrical effects
+ */
+export type DamageType = "physical" | "fire" | "frost" | "shock";
+
 export class NPC {
   public mesh: Mesh;
   public physicsAggregate: PhysicsAggregate;
@@ -140,6 +149,21 @@ export class NPC {
   /** How quickly horizontal velocity blends toward desired movement. */
   public movementResponsiveness: number = 8;
   public xpReward: number = 25;
+
+  // ─── Resistances and Weaknesses ─────────────────────────────────────────────
+
+  /**
+   * Damage resistances per type (0–1 range, where 1 = fully immune).
+   * Values > 1 are clamped to 1. Negative values increase damage taken.
+   * Example: `{ fire: 0.5 }` means 50% less fire damage.
+   */
+  public damageResistances: Partial<Record<DamageType, number>> = {};
+
+  /**
+   * Damage weaknesses per type (positive multiplier added on top of base).
+   * Example: `{ frost: 0.25 }` means 25% extra frost damage (1.25× total).
+   */
+  public damageWeaknesses: Partial<Record<DamageType, number>> = {};
 
   // ─── Visuals ────────────────────────────────────────────────────────────────
 

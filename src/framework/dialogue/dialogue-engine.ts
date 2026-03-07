@@ -213,6 +213,8 @@ export class DialogueSession {
         return this._context.getQuestStatus(condition.questId) === condition.status;
       case "has_item":
         return this._context.getInventoryCount(condition.itemId) >= condition.minQuantity;
+      case "skill_min":
+        return (this._context.getSkillLevel?.(condition.skillId) ?? 0) >= condition.min;
       default:
         return false;
     }
@@ -230,6 +232,15 @@ export class DialogueSession {
           break;
         case "emit_event":
           this._context.emitEvent?.(effect.eventId, effect.payload);
+          break;
+        case "activate_quest":
+          this._context.activateQuest?.(effect.questId);
+          break;
+        case "consume_item":
+          this._context.consumeItem?.(effect.itemId, effect.quantity);
+          break;
+        case "give_item":
+          this._context.giveItem?.(effect.itemId, effect.quantity);
           break;
       }
     }
