@@ -204,6 +204,36 @@ describe('SaveSystem', () => {
         expect(mockUI.showNotification).toHaveBeenCalledWith('Save file is corrupt.', 2500);
     });
 
+
+    it('should reject save data with corrupt player structure', () => {
+        localStorageMock['camelot_save'] = JSON.stringify({
+            version: 6,
+            timestamp: Date.now(),
+            player: { position: { x: 0, y: 0 }, health: 100, magicka: 100, stamina: 100, level: 1, experience: 0, experienceToNextLevel: 100 },
+            inventory: [],
+            equipment: [],
+            quests: [],
+        });
+
+        const result = saveSystem.load();
+        expect(result).toBe(false);
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Save file is corrupt.', 2500);
+    });
+
+    it('importFromJson returns false for corrupt save structure', () => {
+        const result = saveSystem.importFromJson(JSON.stringify({
+            version: 6,
+            timestamp: Date.now(),
+            player: { position: { x: 0, y: 0, z: 0 }, health: 100, magicka: 100, stamina: 100, level: 1, experience: 0, experienceToNextLevel: 100 },
+            inventory: {},
+            equipment: [],
+            quests: [],
+        }));
+
+        expect(result).toBe(false);
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Import failed: corrupt save structure.', 2500);
+    });
+
     it('should reject saves with a mismatched version', () => {
         const badData: SaveData = {
             version: 999,
