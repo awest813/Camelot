@@ -79,7 +79,7 @@ describe('SaveSystem', () => {
         expect(localStorage.setItem).toHaveBeenCalledOnce();
         const raw = localStorageMock['camelot_save'];
         const data: SaveData = JSON.parse(raw);
-        expect(data.version).toBe(5);
+        expect(data.version).toBe(6);
         expect(data.player.health).toBe(80);
         expect(data.player.magicka).toBe(60);
         expect(data.player.stamina).toBe(90);
@@ -217,5 +217,35 @@ describe('SaveSystem', () => {
         const result = saveSystem.load();
         expect(result).toBe(false);
         expect(mockUI.showNotification).toHaveBeenCalledWith('Incompatible save version.', 2500);
+    });
+
+    // ── importFromJson() ───────────────────────────────────────────────────
+
+    it('importFromJson returns false for invalid JSON', () => {
+        const result = saveSystem.importFromJson('{bad json!!}');
+        expect(result).toBe(false);
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Import failed: invalid JSON.', 2500);
+    });
+
+    it('importFromJson returns false for wrong version', () => {
+        saveSystem.save();
+        const raw = localStorageMock['camelot_save'];
+        const data = JSON.parse(raw);
+        data.version = 999;
+        const result = saveSystem.importFromJson(JSON.stringify(data));
+        expect(result).toBe(false);
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Import failed: incompatible save version.', 2500);
+    });
+
+    it('importFromJson loads valid save data and notifies the player', () => {
+        saveSystem.save();
+        const raw = localStorageMock['camelot_save'];
+
+        // Mutate state to simulate a different session
+        mockPlayer.health = 1;
+
+        const result = saveSystem.importFromJson(raw);
+        expect(result).toBe(true);
+        expect(mockPlayer.health).toBe(80); // restored from exported save
     });
 });

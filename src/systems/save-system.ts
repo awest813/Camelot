@@ -13,9 +13,11 @@ import type { CrimeSystem } from "./crime-system";
 import type { ContainerSystem } from "./container-system";
 import type { BarterSystem } from "./barter-system";
 import type { CellManager } from "../world/cell-manager";
+import type { SpellSystem } from "./spell-system";
+import type { PersuasionSystem } from "./persuasion-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 5;
+const SAVE_VERSION = 6;
 
 interface PlayerSaveData {
   position: { x: number; y: number; z: number };
@@ -51,6 +53,9 @@ export interface SaveData {
   containers?: any;
   barter?: any;
   cell?: any;
+  // v6 additions
+  spells?: any;
+  persuasion?: any;
 }
 
 export class SaveSystem {
@@ -70,6 +75,10 @@ export class SaveSystem {
   private _containerSystem: ContainerSystem | null = null;
   private _barterSystem: BarterSystem | null = null;
   private _cellManager: CellManager | null = null;
+
+  // v6 optional systems
+  private _spellSystem: SpellSystem | null = null;
+  private _persuasionSystem: PersuasionSystem | null = null;
 
   /** Called after a successful load so Game can clean up world state (e.g. remove already-collected loot). */
   public onAfterLoad: (() => void) | null = null;
@@ -104,6 +113,11 @@ export class SaveSystem {
   public setContainerSystem(s: ContainerSystem): void  { this._containerSystem = s; }
   public setBarterSystem(s: BarterSystem): void        { this._barterSystem = s; }
   public setCellManager(s: CellManager): void          { this._cellManager = s; }
+
+  // ── v6 system injection ───────────────────────────────────────────────────
+
+  public setSpellSystem(s: SpellSystem): void          { this._spellSystem = s; }
+  public setPersuasionSystem(s: PersuasionSystem): void { this._persuasionSystem = s; }
 
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
@@ -158,6 +172,8 @@ export class SaveSystem {
     if (this._containerSystem)  data.containers  = this._containerSystem.getSaveState();
     if (this._barterSystem)     data.barter      = this._barterSystem.getSaveState();
     if (this._cellManager)      data.cell        = this._cellManager.getSaveState();
+    if (this._spellSystem)      data.spells      = this._spellSystem.getSaveState();
+    if (this._persuasionSystem) data.persuasion  = this._persuasionSystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -251,6 +267,10 @@ export class SaveSystem {
     if (this._barterSystem && data.barter)     this._barterSystem.restoreFromSave(data.barter);
     if (this._cellManager && data.cell)        this._cellManager.restoreFromSave(data.cell);
 
+    // v6 systems
+    if (this._spellSystem && data.spells)           this._spellSystem.restoreFromSave(data.spells);
+    if (this._persuasionSystem && data.persuasion)  this._persuasionSystem.restoreFromSave(data.persuasion);
+
     // Restore encumbrance stats
     if (typeof data.player.maxCarryWeight === "number") {
       this._player.maxCarryWeight = data.player.maxCarryWeight;
@@ -274,5 +294,87 @@ export class SaveSystem {
 
   public deleteSave(): void {
     localStorage.removeItem(SAVE_KEY);
+  }
+
+  // ── File export / import (browser-safe) ───────────────────────────────────
+
+  /**
+   * Export the current save to a JSON file download in the browser.
+   * Silently no-ops in non-browser environments (e.g. tests).
+   *
+   * The exported file can be re-imported with `importFromFile()`.
+   */
+  public exportToFile(): void {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) {
+      this._ui.showNotification("Nothing to export — save first.", 2500);
+      return;
+    }
+
+    if (typeof document === "undefined") return; // headless / SSR guard
+
+    const blob = new Blob([raw], { type: "application/json" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `camelot_save_${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    this._ui.showNotification("Save exported!", 2000);
+  }
+
+  /**
+   * Import a save from a File object (from an `<input type="file">` element).
+   * Returns a Promise that resolves to `true` on success, `false` on failure.
+   */
+  public async importFromFile(file: File): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const json = e.target?.result as string;
+        const ok = this._applyImportedJson(json);
+        resolve(ok);
+      };
+      reader.onerror = () => {
+        this._ui.showNotification("Failed to read save file.", 2500);
+        resolve(false);
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  /**
+   * Import a save from a raw JSON string.
+   * Useful for programmatic imports (e.g. copy-paste in a debug UI).
+   * Returns `true` on success.
+   */
+  public importFromJson(json: string): boolean {
+    return this._applyImportedJson(json);
+  }
+
+  private _applyImportedJson(json: string): boolean {
+    let data: SaveData;
+    try {
+      data = JSON.parse(json);
+    } catch {
+      this._ui.showNotification("Import failed: invalid JSON.", 2500);
+      return false;
+    }
+
+    if (data?.version !== SAVE_VERSION) {
+      this._ui.showNotification("Import failed: incompatible save version.", 2500);
+      return false;
+    }
+
+    // Write into localStorage then immediately load
+    localStorage.setItem(SAVE_KEY, json);
+    const ok = this.load();
+    if (ok) {
+      this._ui.showNotification("Save imported successfully!", 2500);
+    }
+    return ok;
   }
 }

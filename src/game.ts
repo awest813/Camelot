@@ -34,6 +34,10 @@ import { ContainerSystem } from "./systems/container-system";
 import { ProjectileSystem } from "./systems/projectile-system";
 import { BarterSystem } from "./systems/barter-system";
 import { CellManager } from "./world/cell-manager";
+import { SpellSystem } from "./systems/spell-system";
+import { PersuasionSystem } from "./systems/persuasion-system";
+import { GameEventBus } from "./systems/event-bus";
+import { LootTableSystem, STARTER_LOOT_TABLES } from "./systems/loot-table-system";
 
 export class Game {
   public scene: Scene;
@@ -65,6 +69,12 @@ export class Game {
   public projectileSystem: ProjectileSystem;
   public barterSystem: BarterSystem;
   public cellManager: CellManager;
+
+  // v3 systems (Oblivion-lite depth)
+  public spellSystem: SpellSystem;
+  public persuasionSystem: PersuasionSystem;
+  public eventBus: GameEventBus;
+  public lootTableSystem: LootTableSystem;
 
   public isPaused: boolean = false;
 
@@ -166,10 +176,32 @@ export class Game {
     this.saveSystem.setBarterSystem(this.barterSystem);
     this.saveSystem.setCellManager(this.cellManager);
 
+    // ── v3 system wiring ──────────────────────────────────────────────────────
+    this.eventBus        = new GameEventBus();
+    this.lootTableSystem = new LootTableSystem();
+    for (const t of STARTER_LOOT_TABLES) this.lootTableSystem.registerTable(t);
+
+    this.spellSystem     = new SpellSystem(this.player, this.scheduleSystem.npcs, this.ui, this.scene);
+    // Seed the player with the two starter spells
+    this.spellSystem.learnSpell("flames");
+    this.spellSystem.learnSpell("healing");
+    this.spellSystem.equipSpell("flames");
+    // Sync magic damage bonus from attributes
+    this.spellSystem.magicDamageBonus = this.attributeSystem.magicDamageBonus;
+
+    this.persuasionSystem = new PersuasionSystem();
+
+    // Register v3 systems with save
+    this.saveSystem.setSpellSystem(this.spellSystem);
+    this.saveSystem.setPersuasionSystem(this.persuasionSystem);
+
     // Level-up awards attribute points
     this.player.onLevelUp = (newLevel) => {
       this.ui.showNotification(`Level Up! You are now level ${newLevel}!`, 4000);
       this.attributeSystem.awardLevelUpPoints(1);
+      // Sync magic damage bonus after level-up attribute award
+      this.spellSystem.magicDamageBonus = this.attributeSystem.magicDamageBonus;
+      this.eventBus.emit("player:levelUp", { newLevel });
     };
 
     // Guard crime challenge
@@ -177,11 +209,24 @@ export class Game {
       this.ui.showNotification(
         `${guardNpc.mesh.name}: "Stop! You have a ${bounty}g bounty in ${factionId}!"`, 4000
       );
+      this.eventBus.emit("crime:committed", { crimeType: "challenge", factionId, bounty });
     };
 
     // Stealth detection notification
     this.stealthSystem.onDetected = (detectedBy) => {
       this.ui.showNotification(`${detectedBy.mesh.name} spotted you!`, 2000);
+      this.eventBus.emit("stealth:detected", { npcName: detectedBy.mesh.name });
+    };
+
+    // Spell cast events forwarded to event bus
+    this.spellSystem.onSpellCast = (spell, result) => {
+      this.eventBus.emit("spell:cast", { spellId: spell.id, spellName: spell.name, magickaCost: spell.magickaCost });
+      if (result.hitNpc && result.damage) {
+        this.eventBus.emit("spell:hit", { spellId: spell.id, npcName: result.hitNpc, damage: result.damage });
+      }
+      if (result.heal) {
+        this.eventBus.emit("spell:heal", { spellId: spell.id, amount: result.heal });
+      }
     };
 
     // Spawn a test container chest
@@ -502,6 +547,22 @@ export class Game {
                 if (!this.isPaused) this.saveSystem.save();
             } else if (kbInfo.event.key === "F9") {
                 if (!this.isPaused) this.saveSystem.load();
+            } else if (kbInfo.event.key === "q" || kbInfo.event.key === "Q") {
+                // Cast equipped spell
+                if (!this._isCombatInputBlocked()) {
+                    this.spellSystem.castSpell();
+                }
+            } else if (kbInfo.event.key === "z" || kbInfo.event.key === "Z") {
+                // Cycle through known spells
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+                    const spells = this.spellSystem.knownSpells;
+                    if (spells.length > 0) {
+                        const current = this.spellSystem.equippedSpell;
+                        const idx = current ? spells.findIndex(s => s.id === current.id) : -1;
+                        const next = spells[(idx + 1) % spells.length];
+                        this.spellSystem.equipSpell(next.id);
+                    }
+                }
             } else if (kbInfo.event.key === "F3") {
                 const shown = this.ui.toggleDebugOverlay();
                 this.ui.showNotification(shown ? "Debug overlay ON" : "Debug overlay OFF", 1200);
@@ -675,6 +736,7 @@ export class Game {
       this.stealthSystem.update(deltaTime, this.timeSystem.ambientIntensity);
       this.crimeSystem.update(deltaTime);
       this.projectileSystem.update(deltaTime);
+      this.spellSystem.update(deltaTime);
 
       // Tick the navmesh rebuild debounce; request a rebuild whenever the player
       // crosses into a new terrain chunk (new ground meshes may have loaded).

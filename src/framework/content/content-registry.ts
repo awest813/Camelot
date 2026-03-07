@@ -1,4 +1,4 @@
-import { RpgContentBundle } from "./content-types";
+import { NpcArchetypeDefinition, RpgContentBundle } from "./content-types";
 
 type ContentWithId = { id: string };
 type DomainName = keyof RpgContentBundle;
@@ -13,6 +13,7 @@ export class ContentRegistry {
   private _quests = new Map<string, RegistryRecord<RpgContentBundle["quests"][number]>>();
   private _items = new Map<string, RegistryRecord<RpgContentBundle["items"][number]>>();
   private _factions = new Map<string, RegistryRecord<RpgContentBundle["factions"][number]>>();
+  private _npcArchetypes = new Map<string, RegistryRecord<NpcArchetypeDefinition>>();
 
   public loadBase(bundle: RpgContentBundle): void {
     this.registerBundle(bundle, "base", true);
@@ -23,6 +24,7 @@ export class ContentRegistry {
     this._registerDomain("quests", bundle.quests ?? [], this._quests, source, override);
     this._registerDomain("items", bundle.items ?? [], this._items, source, override);
     this._registerDomain("factions", bundle.factions ?? [], this._factions, source, override);
+    this._registerDomain("npcArchetypes", bundle.npcArchetypes ?? [], this._npcArchetypes, source, override);
   }
 
   public toBundle(): RpgContentBundle {
@@ -31,7 +33,18 @@ export class ContentRegistry {
       quests: Array.from(this._quests.values()).map((entry) => entry.value),
       items: Array.from(this._items.values()).map((entry) => entry.value),
       factions: Array.from(this._factions.values()).map((entry) => entry.value),
+      npcArchetypes: Array.from(this._npcArchetypes.values()).map((entry) => entry.value),
     };
+  }
+
+  /** Return a registered NPC archetype by id, or null. */
+  public getNpcArchetype(id: string): NpcArchetypeDefinition | null {
+    return this._npcArchetypes.get(id)?.value ?? null;
+  }
+
+  /** All registered NPC archetypes. */
+  public getAllNpcArchetypes(): NpcArchetypeDefinition[] {
+    return Array.from(this._npcArchetypes.values()).map(r => r.value);
   }
 
   public getSource(domain: DomainName, id: string): string | null {
@@ -44,6 +57,8 @@ export class ContentRegistry {
         return this._items.get(id)?.source ?? null;
       case "factions":
         return this._factions.get(id)?.source ?? null;
+      case "npcArchetypes":
+        return this._npcArchetypes.get(id)?.source ?? null;
     }
   }
 
