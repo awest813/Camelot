@@ -631,10 +631,23 @@ export class UIManager {
         const defaultBg = isMax ? "rgba(10,40,10,0.65)" : (canBuy ? "rgba(60,40,0,0.85)" : "rgba(18,12,2,0.55)");
         const focusBg   = isMax ? "rgba(20,60,20,0.85)" : (canBuy ? "rgba(100,70,0,0.95)" : "rgba(30,20,10,0.75)");
 
-        const setFocusState = () => { buyBtn.background = focusBg; buyBtn.color = T.TEXT; };
-        const setNormalState = () => { buyBtn.background = defaultBg; buyBtn.color = isMax ? T.GOOD : (canBuy ? T.TITLE : T.DIM); };
+        const setHoverState = () => {
+          buyBtn.background = focusBg;
+          buyBtn.color = T.TEXT;
+          if (buyBtn.thickness !== 2) buyBtn.thickness = 1;
+        };
+        const setFocusState = () => {
+          buyBtn.background = focusBg;
+          buyBtn.color = T.TEXT;
+          buyBtn.thickness = 2;
+        };
+        const setNormalState = () => {
+          buyBtn.background = defaultBg;
+          buyBtn.color = isMax ? T.GOOD : (canBuy ? T.TITLE : T.DIM);
+          buyBtn.thickness = 1;
+        };
 
-        buyBtn.onPointerEnterObservable.add(setFocusState);
+        buyBtn.onPointerEnterObservable.add(setHoverState);
         buyBtn.onPointerOutObservable.add(setNormalState);
         buyBtn.onFocusObservable.add(setFocusState);
         buyBtn.onBlurObservable.add(setNormalState);
@@ -848,15 +861,25 @@ export class UIManager {
         const hint = item.slot ? (equipped ? "\n[Click to Unequip]" : "\n[Click to Equip]") : "";
         this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}${hint}`;
         slot.background = hoverColor;
+        if (slot.thickness !== 3) slot.thickness = equipped ? 2 : 1;
+      };
+      const setFocusState = () => {
+        const equipped = this._equippedIds.has(item.id);
+        const hint = item.slot ? (equipped ? "\n[Click to Unequip]" : "\n[Click to Equip]") : "";
+        this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}${hint}`;
+        slot.background = hoverColor;
+        slot.thickness = 3; // Distinct visual indicator for keyboard focus
       };
       const setNormalState = () => {
         this.inventoryDescription.text = "";
         slot.background = baseColor;
+        const equipped = this._equippedIds.has(item.id);
+        slot.thickness = equipped ? 2 : 1;
       };
 
       slot.onPointerEnterObservable.add(setHoverState);
       slot.onPointerOutObservable.add(setNormalState);
-      slot.onFocusObservable.add(setHoverState);
+      slot.onFocusObservable.add(setFocusState);
       slot.onBlurObservable.add(setNormalState);
 
       const triggerItem = () => {
