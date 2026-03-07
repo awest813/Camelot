@@ -26,6 +26,14 @@ import { Loot } from "./entities/loot";
 import { FrameworkRuntime } from "./framework/runtime/framework-runtime";
 import { frameworkBaseContent } from "./framework/content/base-content";
 import { MapEditorSystem } from "./systems/map-editor-system";
+import { AttributeSystem } from "./systems/attribute-system";
+import { TimeSystem } from "./systems/time-system";
+import { StealthSystem } from "./systems/stealth-system";
+import { CrimeSystem } from "./systems/crime-system";
+import { ContainerSystem } from "./systems/container-system";
+import { ProjectileSystem } from "./systems/projectile-system";
+import { BarterSystem } from "./systems/barter-system";
+import { CellManager } from "./world/cell-manager";
 
 export class Game {
   public scene: Scene;
@@ -47,6 +55,16 @@ export class Game {
   public navigationSystem: NavigationSystem;
   public frameworkRuntime: FrameworkRuntime;
   public mapEditorSystem: MapEditorSystem;
+
+  // v2 systems (Oblivion-lite)
+  public attributeSystem: AttributeSystem;
+  public timeSystem: TimeSystem;
+  public stealthSystem: StealthSystem;
+  public crimeSystem: CrimeSystem;
+  public containerSystem: ContainerSystem;
+  public projectileSystem: ProjectileSystem;
+  public barterSystem: BarterSystem;
+  public cellManager: CellManager;
 
   public isPaused: boolean = false;
 
@@ -80,6 +98,25 @@ export class Game {
     this.navigationSystem = new NavigationSystem(this.scene);
     this.scheduleSystem = new ScheduleSystem(this.scene);
 
+    // ── v2 Oblivion-lite systems ──────────────────────────────────────────────
+    this.attributeSystem = new AttributeSystem();
+    this.timeSystem      = new TimeSystem(120, 8);  // 2-min real day, start at 08:00
+    this.cellManager     = new CellManager(this.scene, this.player);
+
+    // Sync initial derived stats from attributes
+    this.player.maxHealth      = this.attributeSystem.maxHealth;
+    this.player.maxMagicka     = this.attributeSystem.maxMagicka;
+    this.player.maxStamina     = this.attributeSystem.maxStamina;
+    this.player.maxCarryWeight = this.attributeSystem.carryWeight;
+    this.player.health         = this.player.maxHealth;
+    this.player.magicka        = this.player.maxMagicka;
+    this.player.stamina        = this.player.maxStamina;
+
+    // Notify player of location changes
+    this.cellManager.onCellChanged = (_cellId, cellName) => {
+      this.ui.showNotification(`Entered: ${cellName}`, 2500);
+    };
+
     // Test NPC
     const npc = new NPC(this.scene, new Vector3(10, 2, 10), "Guard");
     npc.patrolPoints = [new Vector3(10, 2, 10), new Vector3(10, 2, 20), new Vector3(20, 2, 20), new Vector3(20, 2, 10)];
@@ -90,21 +127,21 @@ export class Game {
       this.scheduleSystem.addNPC(npc);
     };
 
-    this.combatSystem = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs, this.ui, this.navigationSystem);
-    this.dialogueSystem = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
-    this.inventorySystem = new InventorySystem(this.player, this.ui, this.canvas);
-    this.equipmentSystem = new EquipmentSystem(this.player, this.inventorySystem, this.ui);
+    this.combatSystem       = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs, this.ui, this.navigationSystem);
+    this.dialogueSystem     = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
+    this.inventorySystem    = new InventorySystem(this.player, this.ui, this.canvas);
+    this.equipmentSystem    = new EquipmentSystem(this.player, this.inventorySystem, this.ui);
     this.ui.onInventoryItemClick = (item) => this.equipmentSystem.handleItemClick(item);
-    this.saveSystem = new SaveSystem(this.player, this.inventorySystem, this.equipmentSystem, this.ui);
-    this.questSystem = new QuestSystem(this.ui);
+    this.saveSystem         = new SaveSystem(this.player, this.inventorySystem, this.equipmentSystem, this.ui);
+    this.questSystem        = new QuestSystem(this.ui);
     this.saveSystem.setQuestSystem(this.questSystem);
     this.saveSystem.onAfterLoad = () => this._cleanupCollectedLoot();
-    this.interactionSystem = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem, this.ui);
-    this.skillTreeSystem = new SkillTreeSystem(this.player, this.ui);
+    this.interactionSystem  = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem, this.ui);
+    this.skillTreeSystem    = new SkillTreeSystem(this.player, this.ui);
     this.ui.onSkillPurchase = (treeIdx, skillIdx) => this.skillTreeSystem.purchaseSkill(treeIdx, skillIdx);
     this.saveSystem.setSkillTreeSystem(this.skillTreeSystem);
-    this.audioSystem = new AudioSystem();
-    this.frameworkRuntime = new FrameworkRuntime(frameworkBaseContent, {
+    this.audioSystem        = new AudioSystem();
+    this.frameworkRuntime   = new FrameworkRuntime(frameworkBaseContent, {
       inventoryCapacity: this.inventorySystem.maxCapacity,
       fetchImpl: (url: string) => fetch(url),
     });
@@ -113,6 +150,75 @@ export class Game {
     this.dialogueSystem.dialogueSessionProvider = (targetNpc) => this._createFrameworkDialogueSession(targetNpc.mesh.name);
     this._loadFrameworkMods();
     this.mapEditorSystem = new MapEditorSystem(this.scene);
+
+    // ── v2 system wiring ──────────────────────────────────────────────────────
+    this.stealthSystem   = new StealthSystem(this.player, this.scheduleSystem.npcs, this.ui);
+    this.crimeSystem     = new CrimeSystem(this.player, this.scheduleSystem.npcs, this.ui);
+    this.containerSystem = new ContainerSystem(this.scene, this.player, this.inventorySystem, this.ui);
+    this.projectileSystem = new ProjectileSystem(this.scene, this.player, this.scheduleSystem.npcs, this.ui);
+    this.barterSystem    = new BarterSystem(this.inventorySystem, this.ui);
+
+    // Register v2 systems with save
+    this.saveSystem.setAttributeSystem(this.attributeSystem);
+    this.saveSystem.setTimeSystem(this.timeSystem);
+    this.saveSystem.setCrimeSystem(this.crimeSystem);
+    this.saveSystem.setContainerSystem(this.containerSystem);
+    this.saveSystem.setBarterSystem(this.barterSystem);
+    this.saveSystem.setCellManager(this.cellManager);
+
+    // Level-up awards attribute points
+    this.player.onLevelUp = (newLevel) => {
+      this.ui.showNotification(`Level Up! You are now level ${newLevel}!`, 4000);
+      this.attributeSystem.awardLevelUpPoints(1);
+    };
+
+    // Guard crime challenge
+    this.crimeSystem.onGuardChallenge = (guardNpc, factionId, bounty) => {
+      this.ui.showNotification(
+        `${guardNpc.mesh.name}: "Stop! You have a ${bounty}g bounty in ${factionId}!"`, 4000
+      );
+    };
+
+    // Stealth detection notification
+    this.stealthSystem.onDetected = (detectedBy) => {
+      this.ui.showNotification(`${detectedBy.mesh.name} spotted you!`, 2000);
+    };
+
+    // Spawn a test container chest
+    this.containerSystem.spawnContainer({
+      id: "chest_01",
+      name: "Old Chest",
+      position: new Vector3(5, 1, 5),
+      contents: [
+        { id: "gold_coins", name: "Gold Coins", description: "A handful of gold coins.", stackable: true, quantity: 50, weight: 0.1, stats: { value: 1 } },
+        { id: "iron_sword", name: "Iron Sword", description: "A basic iron sword.", stackable: false, quantity: 1, slot: "mainHand", weight: 3, stats: { damage: 10, value: 80 } },
+      ],
+    });
+
+    // Spawn a test cave entrance portal near the starting area
+    this.cellManager.buildSimpleInterior(
+      "cave_01",
+      "Old Cave",
+      "portal_cave_entrance",
+      new Vector3(-8, 1, 8),
+      new Vector3(-8, 2, 8),  // return position after exiting
+    );
+
+    // Register a sample merchant
+    this.barterSystem.registerMerchant({
+      id: "merchant_01",
+      name: "Trader Elan",
+      factionId: "town",
+      inventory: [
+        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 5, weight: 0.3, stats: { value: 25 } },
+        { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 3, weight: 1, stats: { value: 15 } },
+      ],
+      gold: 500,
+      priceMultiplier: 1.1,
+      isOpen: true,
+      openHour: 8,
+      closeHour: 20,
+    });
 
     // Prevent browser context menu from capturing right-click combat input.
     this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
@@ -142,9 +248,7 @@ export class Game {
         this.player.addExperience(xp);
         this.ui.showNotification(`+${xp} XP`, 2000);
     };
-    this.player.onLevelUp = (newLevel) => {
-        this.ui.showNotification(`Level Up! You are now level ${newLevel}!`, 4000);
-    };
+    // Note: player.onLevelUp is wired above in the v2 system wiring block
 
     // Test Loot
     new Loot(this.scene, new Vector3(5, 1, 5), {
@@ -323,6 +427,18 @@ export class Game {
                 if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMagicArchetype("bolt");
             } else if (kbInfo.event.key === "6") {
                 if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMagicArchetype("surge");
+            } else if (kbInfo.event.key === "r" || kbInfo.event.key === "R") {
+                // Fire arrow (bow mode)
+                if (!this._isCombatInputBlocked()) {
+                    const fired = this.projectileSystem.fireArrow();
+                    if (fired) this.audioSystem.playMeleeAttack(); // reuse existing SFX placeholder
+                }
+            } else if (kbInfo.event.key === "c" || kbInfo.event.key === "C") {
+                // Toggle crouch / stealth
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+                    const crouching = this.stealthSystem.toggleCrouch();
+                    this.ui.showNotification(crouching ? "Sneaking..." : "Standing", 1200);
+                }
             } else if (kbInfo.event.key === "m" || kbInfo.event.key === "M") {
                 this.audioSystem.toggleMute();
                 this.ui.showNotification(this.audioSystem.isMuted ? "Audio muted" : "Audio unmuted", 1500);
@@ -550,6 +666,12 @@ export class Game {
       this.scheduleSystem.update(deltaTime);
       this.combatSystem.updateNPCAI(deltaTime);
       this.interactionSystem.update();
+
+      // v2 system updates
+      this.timeSystem.update(deltaTime);
+      this.stealthSystem.update(deltaTime, this.timeSystem.ambientIntensity);
+      this.crimeSystem.update(deltaTime);
+      this.projectileSystem.update(deltaTime);
 
       // Tick the navmesh rebuild debounce; request a rebuild whenever the player
       // crosses into a new terrain chunk (new ground meshes may have loaded).

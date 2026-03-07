@@ -9,6 +9,8 @@ export interface Item {
   stackable: boolean;
   quantity: number;
   slot?: string;
+  /** Item weight in units (per single item). Used for encumbrance. */
+  weight?: number;
   stats?: any;
 }
 
@@ -26,6 +28,18 @@ export class InventorySystem {
     this._canvas = canvas;
   }
 
+  // ── Weight / encumbrance ──────────────────────────────────────────────────
+
+  /** Sum of (item.weight ?? 0.5) × item.quantity across all items. */
+  public get totalWeight(): number {
+    return this.items.reduce((sum, item) => sum + (item.weight ?? 0.5) * item.quantity, 0);
+  }
+
+  /** Sync player.carryWeight from the current inventory contents. */
+  private _syncCarryWeight(): void {
+    this._player.carryWeight = this.totalWeight;
+  }
+
   public addItem(newItem: Item): boolean {
     if (newItem.quantity <= 0) {
       this._ui.showNotification("Invalid item quantity.", 2000);
@@ -37,6 +51,7 @@ export class InventorySystem {
       const existingItem = this.items.find(i => i.id === newItem.id);
       if (existingItem) {
         existingItem.quantity += newItem.quantity;
+        this._syncCarryWeight();
         this._updateUI();
         this._ui.showNotification(`Added ${newItem.quantity}x ${newItem.name}`);
         return true;
@@ -50,6 +65,7 @@ export class InventorySystem {
 
     // Add new item
     this.items.push({ ...newItem });
+    this._syncCarryWeight();
     this._updateUI();
     this._ui.showNotification(`Added ${newItem.name}`);
     return true;
@@ -67,6 +83,7 @@ export class InventorySystem {
     } else {
       this.items.splice(index, 1);
     }
+    this._syncCarryWeight();
     this._updateUI();
     return true;
   }
