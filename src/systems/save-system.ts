@@ -31,6 +31,26 @@ interface PlayerSaveData {
   maxCarryWeight?: number;
 }
 
+interface ParsedSaveData {
+  version: number;
+  timestamp: number;
+  player: PlayerSaveData;
+  inventory: Item[];
+  equipment: EquipmentEntry[];
+  quests: QuestSaveState[];
+  skills?: SkillSaveState[];
+  skillPoints?: number;
+  framework?: string;
+  attributes?: unknown;
+  time?: unknown;
+  crime?: unknown;
+  containers?: unknown;
+  barter?: unknown;
+  cell?: unknown;
+  spells?: unknown;
+  persuasion?: unknown;
+}
+
 interface EquipmentEntry {
   slot: string;
   item: Item;
@@ -186,10 +206,16 @@ export class SaveSystem {
       return false;
     }
 
-    let data: SaveData;
+    let parsed: unknown;
     try {
-      data = JSON.parse(raw);
+      parsed = JSON.parse(raw);
     } catch {
+      this._ui.showNotification("Save file is corrupt.", 2500);
+      return false;
+    }
+
+    const data = this._parseAndValidateSaveData(parsed);
+    if (!data) {
       this._ui.showNotification("Save file is corrupt.", 2500);
       return false;
     }
@@ -356,11 +382,17 @@ export class SaveSystem {
   }
 
   private _applyImportedJson(json: string): boolean {
-    let data: SaveData;
+    let parsed: unknown;
     try {
-      data = JSON.parse(json);
+      parsed = JSON.parse(json);
     } catch {
       this._ui.showNotification("Import failed: invalid JSON.", 2500);
+      return false;
+    }
+
+    const data = this._parseAndValidateSaveData(parsed);
+    if (!data) {
+      this._ui.showNotification("Import failed: corrupt save structure.", 2500);
       return false;
     }
 
@@ -376,5 +408,82 @@ export class SaveSystem {
       this._ui.showNotification("Save imported successfully!", 2500);
     }
     return ok;
+  }
+
+  private _parseAndValidateSaveData(value: unknown): ParsedSaveData | null {
+    if (!value || typeof value !== "object") return null;
+
+    const data = value as Partial<SaveData>;
+    if (!this._isFiniteNumber(data.version) || !this._isFiniteNumber(data.timestamp)) return null;
+
+    const player = this._validatePlayerData(data.player);
+    if (!player) return null;
+
+    if (!Array.isArray(data.inventory) || !Array.isArray(data.equipment) || !Array.isArray(data.quests)) {
+      return null;
+    }
+
+    if (data.framework !== undefined && typeof data.framework !== "string") return null;
+    if (data.skillPoints !== undefined && !this._isFiniteNumber(data.skillPoints)) return null;
+    if (data.skills !== undefined && !Array.isArray(data.skills)) return null;
+
+    return {
+      version: data.version,
+      timestamp: data.timestamp,
+      player,
+      inventory: data.inventory,
+      equipment: data.equipment,
+      quests: data.quests,
+      skills: data.skills,
+      skillPoints: data.skillPoints,
+      framework: data.framework,
+      attributes: data.attributes,
+      time: data.time,
+      crime: data.crime,
+      containers: data.containers,
+      barter: data.barter,
+      cell: data.cell,
+      spells: data.spells,
+      persuasion: data.persuasion,
+    };
+  }
+
+  private _validatePlayerData(player: SaveData["player"] | undefined): PlayerSaveData | null {
+    if (!player || typeof player !== "object") return null;
+    const position = player.position;
+    if (!position || typeof position !== "object") return null;
+
+    if (
+      !this._isFiniteNumber(position.x) ||
+      !this._isFiniteNumber(position.y) ||
+      !this._isFiniteNumber(position.z) ||
+      !this._isFiniteNumber(player.health) ||
+      !this._isFiniteNumber(player.magicka) ||
+      !this._isFiniteNumber(player.stamina) ||
+      !this._isFiniteNumber(player.level) ||
+      !this._isFiniteNumber(player.experience) ||
+      !this._isFiniteNumber(player.experienceToNextLevel)
+    ) {
+      return null;
+    }
+
+    if (player.carryWeight !== undefined && !this._isFiniteNumber(player.carryWeight)) return null;
+    if (player.maxCarryWeight !== undefined && !this._isFiniteNumber(player.maxCarryWeight)) return null;
+
+    return {
+      position: { x: position.x, y: position.y, z: position.z },
+      health: player.health,
+      magicka: player.magicka,
+      stamina: player.stamina,
+      level: player.level,
+      experience: player.experience,
+      experienceToNextLevel: player.experienceToNextLevel,
+      carryWeight: player.carryWeight,
+      maxCarryWeight: player.maxCarryWeight,
+    };
+  }
+
+  private _isFiniteNumber(value: unknown): value is number {
+    return typeof value === "number" && Number.isFinite(value);
   }
 }
