@@ -387,7 +387,7 @@ export class UIManager {
     panel.addControl(gameName);
 
     const subtitle = new TextBlock();
-    subtitle.text = "—  PAUSED  —";
+    subtitle.text = "—  PAUSED  [Esc]  —";
     subtitle.color = T.DIM;
     subtitle.fontSize = 14;
     subtitle.height = "26px";
@@ -663,15 +663,22 @@ export class UIManager {
     const setHover = () => {
       button.background = T.BTN_HOVER;
       button.color = T.TITLE;
+      if (button.thickness !== 2) button.thickness = 1;
+    };
+    const setFocus = () => {
+      button.background = T.BTN_HOVER;
+      button.color = T.TITLE;
+      button.thickness = 2; // Distinct visual indicator for keyboard focus
     };
     const setNormal = () => {
       button.background = T.BTN_BG;
       button.color = T.TEXT;
+      button.thickness = 1;
     };
 
     button.onPointerEnterObservable.add(setHover);
     button.onPointerOutObservable.add(setNormal);
-    button.onFocusObservable.add(setHover);
+    button.onFocusObservable.add(setFocus);
     button.onBlurObservable.add(setNormal);
 
     button.onKeyboardEventProcessedObservable.add((evt) => {
