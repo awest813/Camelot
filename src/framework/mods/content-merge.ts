@@ -10,6 +10,7 @@ export const mergeContent = (base: RpgContentBundle, mods: RpgMod[]): ContentMer
     quests: [ ...base.quests ],
     items: [ ...base.items ],
     factions: [ ...base.factions ],
+    npcArchetypes: [ ...(base.npcArchetypes ?? []) ],
   };
   const collisions: ContentCollision[] = [];
 
@@ -18,12 +19,14 @@ export const mergeContent = (base: RpgContentBundle, mods: RpgMod[]): ContentMer
   primeSources("quests", merged.quests, "base", domainSources);
   primeSources("items", merged.items, "base", domainSources);
   primeSources("factions", merged.factions, "base", domainSources);
+  primeSources("npcArchetypes", merged.npcArchetypes, "base", domainSources);
 
   for (const mod of mods) {
     mergeDomain("dialogues", merged.dialogues, mod.content.dialogues ?? [], mod.id, domainSources, collisions);
     mergeDomain("quests", merged.quests, mod.content.quests ?? [], mod.id, domainSources, collisions);
     mergeDomain("items", merged.items, mod.content.items ?? [], mod.id, domainSources, collisions);
     mergeDomain("factions", merged.factions, mod.content.factions ?? [], mod.id, domainSources, collisions);
+    mergeDomain("npcArchetypes", merged.npcArchetypes, mod.content.npcArchetypes ?? [], mod.id, domainSources, collisions);
   }
 
   return { merged, collisions };

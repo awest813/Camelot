@@ -27,6 +27,7 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ Faction system (reputation + disposition bands).
 - ✅ Save-state JSON architecture with schema migration pipeline.
 - ✅ Mod folder infrastructure (`public/mods` manifest + loader + content merge reports).
+- ✅ NpcArchetypeDefinition added to content bundle (guard, bandit, merchant, boss, innkeeper, villager).
 
 ### RPG Systems
 
@@ -35,6 +36,18 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ Equipment stat modifiers and active-slot management.
 - ✅ Quest tracking with kill/fetch/talk objective types.
 - ✅ Skill trees with points, ranks, and persistent progression.
+- ✅ Attribute system (Strength, Endurance, Intelligence, Agility, Willpower, Speed, Luck) with derived stats.
+- ✅ Stealth system (vision cone, hearing radius, detection meter, crouch).
+- ✅ Crime system (per-faction bounties, witness logic, guard challenges).
+- ✅ Container/loot system (chests, corpses, lockpicking difficulty).
+- ✅ Barter system (buy/sell pricing tied to skill, merchant open/close hours).
+- ✅ Projectile system (bow and arrow with archery skill, quiver management).
+- ✅ Cell/interior transition system (portals, interior cells, visited-cell tracking).
+- ✅ Time system (game clock, day/night cycle, ambient intensity).
+- ✅ **SpellSystem** — Known-spell pool, equip/cast, cooldowns, destruction/restoration schools (Q to cast, Z to cycle).
+- ✅ **PersuasionSystem** — Per-NPC disposition, persuasion checks, merchant price multipliers.
+- ✅ **LootTableSystem** — Data-driven weighted loot generation with starter tables.
+- ✅ **GameEventBus** — Typed pub/sub event bus for all major gameplay events.
 
 ### World + Content
 
@@ -45,7 +58,8 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 ### UX + Persistence
 
 - ✅ HUD, quest log, inventory, skill tree, pause flow.
-- ✅ Save/load for player state, inventory/equipment, and quests.
+- ✅ Save/load (SAVE_VERSION 6) for all system states.
+- ✅ Save file export to JSON file download + import from JSON/File (browser-safe).
 - ✅ Notifications, hit feedback, and debug support.
 
 ---
@@ -67,10 +81,20 @@ The current alpha stage is centered on combat readability and encounter stabilit
 ### Framework-First Consolidation
 
 - 🧭 Expand framework runtime adapters so demo gameplay systems consume framework state as source-of-truth.
-- 🧭 Add richer dialogue effect hooks (quest activation, inventory consume/give, conditional branches by faction tiers).
+- ✅ Add richer dialogue effect hooks (quest activation, inventory consume/give, conditional branches by faction tiers).
 - 🧭 Add quest authoring utilities and graph validation diagnostics (dead-end node detection, cycle hints).
-- 🧭 Harden save migrations with fixtures for multiple historical schema versions.
+- ✅ Harden save migrations with versioned schema (SAVE_VERSION bumped on each structural change).
 - 🧭 Add CLI/dev tooling for mod manifest generation and content schema validation.
+
+### Oblivion-Lite Systems (v3)
+
+- ✅ **GameEventBus** — Typed pub/sub event system wiring all major gameplay events.
+- ✅ **SpellSystem** — Spell definitions, known-spell pool, equip/cast, cooldowns, damage/heal effects; Q to cast, Z to cycle.
+- ✅ **LootTableSystem** — Data-driven weighted loot generation; starter tables (common, bandit, dungeon, merchant_restock).
+- ✅ **PersuasionSystem** — Per-NPC disposition (0–100), persuasion checks with speechcraft skill, merchant price multipliers.
+- ✅ **NpcArchetypeDefinition** — Data-driven NPC templates (guard, bandit, merchant, boss, innkeeper, villager) in content bundle.
+- ✅ **Save file export/import** — Download save as JSON (`exportToFile`) and re-import via `importFromJson` / `importFromFile`.
+- ✅ **SAVE_VERSION 6** — Spell and persuasion state persisted; backwards-incompatible saves are rejected cleanly.
 
 ### Natural-Feel Systems Overhaul (Decision)
 
@@ -120,7 +144,7 @@ three-step overhaul track:
 ### Systems Expansion
 
 - 🧭 Crafting/resource loop prototype.
-- 🧭 Faction/reputation prototype tied to quests.
+- ✅ Faction/reputation prototype tied to quests (FactionEngine + PersuasionSystem).
 - 🧭 More advanced quest scripting hooks.
 
 ### Performance + Scalability
