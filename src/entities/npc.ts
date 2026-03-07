@@ -44,6 +44,43 @@ export enum AIState {
  */
 export type DamageType = "physical" | "fire" | "frost" | "shock";
 
+/**
+ * A time-limited damage-over-time (DoT) or debuff applied to an NPC.
+ *
+ * The effect ticks every `tickInterval` seconds for the remainder of
+ * `remainingDuration`, dealing `damagePerTick` of `type` each tick.
+ * Multiple effects of the same type stack independently.
+ */
+export interface StatusEffect {
+  /** Visual/mechanic category of the effect. */
+  type: "burn" | "poison" | "freeze" | "shock";
+  /** Damage applied per tick.  Use 0 for pure debuffs (e.g. freeze slow). */
+  damagePerTick: number;
+  /** Seconds between ticks. */
+  tickInterval: number;
+  /** Seconds until the next tick. */
+  tickTimer: number;
+  /** Remaining total duration in seconds. */
+  remainingDuration: number;
+}
+
+/**
+ * Behavior block used by the NPC daily-schedule system.
+ * An NPC cycles through these blocks based on the in-game hour.
+ */
+export type ScheduleBehaviorType = "sleep" | "work" | "wander" | "patrol";
+
+export interface ScheduleBlock {
+  /** Hour (0-23) at which this block begins. */
+  startHour: number;
+  /** Hour (0-23) at which this block ends (exclusive). */
+  endHour: number;
+  /** What the NPC should be doing during this window. */
+  behavior: ScheduleBehaviorType;
+  /** Fixed position for "work" or "sleep" behaviors.  Ignored for "patrol"/"wander". */
+  anchorPosition?: Vector3;
+}
+
 export class NPC {
   public mesh: Mesh;
   public physicsAggregate: PhysicsAggregate;
@@ -150,6 +187,43 @@ export class NPC {
   public movementResponsiveness: number = 8;
   public xpReward: number = 25;
 
+  // ─── Faction & role ─────────────────────────────────────────────────────────
+
+  /** Faction this NPC belongs to (matches IDs used by CrimeSystem bounties). */
+  public factionId: string | null = null;
+
+  /**
+   * True for NPCs that enforce laws and challenge the player when there is an
+   * active bounty in their faction.  Only guards challenge; witnesses do not.
+   */
+  public isGuard: boolean = false;
+
+  /**
+   * Loot table ID resolved by LootTableSystem on death.
+   * null = no loot drop.
+   */
+  public lootTableId: string | null = null;
+
+  // ─── Status effects (DoT / debuffs) ─────────────────────────────────────────
+
+  /** Currently active status effects on this NPC. */
+  public statusEffects: StatusEffect[] = [];
+
+  // ─── Daily schedule ──────────────────────────────────────────────────────────
+
+  /**
+   * Optional time-of-day schedule.  ScheduleSystem consults this to decide
+   * the NPC's current behavior when not in combat.
+   * Blocks should collectively cover all 24 hours (gaps default to "wander").
+   */
+  public scheduleBlocks: ScheduleBlock[] = [];
+
+  /** Home position used for "sleep" schedule behavior. */
+  public homePosition: Vector3 | null = null;
+
+  /** Work position used for "work" schedule behavior. */
+  public workPosition: Vector3 | null = null;
+
   // ─── Resistances and Weaknesses ─────────────────────────────────────────────
 
   /**
@@ -179,6 +253,56 @@ export class NPC {
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────
+
+  /**
+   * Apply or refresh a status effect.  If an effect of the same type already
+   * exists its duration is refreshed to whichever is longer.
+   */
+  public applyStatusEffect(effect: StatusEffect): void {
+    const existing = this.statusEffects.find((e) => e.type === effect.type);
+    if (existing) {
+      existing.remainingDuration = Math.max(existing.remainingDuration, effect.remainingDuration);
+      existing.damagePerTick = Math.max(existing.damagePerTick, effect.damagePerTick);
+    } else {
+      this.statusEffects.push({ ...effect });
+    }
+  }
+
+  /**
+   * Advance all active status effects by deltaTime seconds.
+   * Deals tick damage, removes expired effects, and returns total damage dealt
+   * this call.
+   */
+  public tickStatusEffects(deltaTime: number): number {
+    if (this.isDead || this.statusEffects.length === 0) return 0;
+
+    let totalDamage = 0;
+    const remaining: StatusEffect[] = [];
+
+    for (const effect of this.statusEffects) {
+      effect.remainingDuration -= deltaTime;
+      effect.tickTimer -= deltaTime;
+
+      if (effect.tickTimer <= 0) {
+        effect.tickTimer += effect.tickInterval;
+        if (effect.damagePerTick > 0) {
+          totalDamage += effect.damagePerTick;
+        }
+      }
+
+      if (effect.remainingDuration > 0) {
+        remaining.push(effect);
+      }
+    }
+
+    this.statusEffects = remaining;
+
+    if (totalDamage > 0) {
+      this.takeDamage(totalDamage);
+    }
+
+    return totalDamage;
+  }
 
   /**
    * Change the NPC's base colour (shown at rest and after hit-flashes).

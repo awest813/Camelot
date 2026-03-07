@@ -53,7 +53,7 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
   {
     id: "flames",
     name: "Flames",
-    description: "A gout of fire that deals 8 fire damage on contact.",
+    description: "A gout of fire that deals 8 fire damage on contact and burns for 3 seconds.",
     school: "destruction",
     delivery: "target",
     magickaCost: 14,
@@ -61,11 +61,12 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     damage: 8,
     damageType: "fire",
     range: 18,
+    duration: 3,
   },
   {
     id: "frostbite",
     name: "Frostbite",
-    description: "A freezing ray dealing 10 frost damage.",
+    description: "A freezing ray dealing 10 frost damage and slowing for 4 seconds.",
     school: "destruction",
     delivery: "target",
     magickaCost: 18,
@@ -73,11 +74,12 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     damage: 10,
     damageType: "frost",
     range: 22,
+    duration: 4,
   },
   {
     id: "spark",
     name: "Spark",
-    description: "A jolt of lightning dealing 12 shock damage.",
+    description: "A jolt of lightning dealing 12 shock damage and shocking for 2 seconds.",
     school: "destruction",
     delivery: "target",
     magickaCost: 22,
@@ -85,6 +87,7 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     damage: 12,
     damageType: "shock",
     range: 25,
+    duration: 2,
   },
   {
     id: "healing",
@@ -110,7 +113,7 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
   {
     id: "fireball",
     name: "Fireball",
-    description: "An explosive ball of fire dealing 35 damage in a 5m radius.",
+    description: "An explosive ball of fire dealing 35 damage in a 5m radius and burning for 5 seconds.",
     school: "destruction",
     delivery: "target",
     magickaCost: 55,
@@ -119,6 +122,29 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     damageType: "fire",
     range: 30,
     aoeRadius: 5,
+    duration: 5,
+  },
+  {
+    id: "poison_touch",
+    name: "Poison Touch",
+    description: "Poisons the target for 8 damage per second over 6 seconds on touch.",
+    school: "destruction",
+    delivery: "touch",
+    magickaCost: 35,
+    cooldown: 1.0,
+    damage: 5,
+    damageType: "poison",
+    duration: 6,
+  },
+  {
+    id: "greater_heal",
+    name: "Greater Heal",
+    description: "Restore 50 HP instantly.",
+    school: "restoration",
+    delivery: "self",
+    magickaCost: 55,
+    cooldown: 3.0,
+    heal: 50,
   },
 ];
 
@@ -323,6 +349,7 @@ export class SpellSystem {
           const dist = Vector3.Distance(npc.mesh.position, impactPoint);
           if (dist <= spell.aoeRadius) {
             npc.takeDamage(baseDamage);
+            this._applySpellDoT(spell, npc);
             hitNpcName = hitNpcName ?? npc.mesh.name;
           }
         }
@@ -331,6 +358,7 @@ export class SpellSystem {
         const target = this._findTargetNpc(playerPos, range);
         if (target) {
           target.takeDamage(baseDamage);
+          this._applySpellDoT(spell, target);
           hitNpcName = target.mesh.name;
         }
       }
@@ -346,6 +374,36 @@ export class SpellSystem {
     }
 
     return { success: true };
+  }
+
+  /**
+   * Apply a damage-over-time status effect to an NPC when the spell has a
+   * `duration` configured.  Each damage type maps to a distinct status effect.
+   */
+  private _applySpellDoT(spell: SpellDefinition, npc: NPC): void {
+    if (!spell.duration || spell.duration <= 0) return;
+    if (!spell.damageType || spell.damageType === "magic") return;
+
+    // Map spell damage type → status effect type
+    const effectTypeMap: Record<string, "burn" | "poison" | "freeze" | "shock"> = {
+      fire:  "burn",
+      frost: "freeze",
+      shock: "shock",
+      poison: "poison",
+    };
+    const effectType = effectTypeMap[spell.damageType];
+    if (!effectType) return;
+
+    const tickInterval = 1.0; // 1 second between ticks
+    const tickDamage = Math.max(1, Math.round((spell.damage ?? 0) * 0.25)); // 25% of hit per tick
+
+    npc.applyStatusEffect({
+      type: effectType,
+      damagePerTick: tickDamage,
+      tickInterval,
+      tickTimer: tickInterval,
+      remainingDuration: spell.duration,
+    });
   }
 
   /** Find the closest live NPC within `range` in front of the player camera. */

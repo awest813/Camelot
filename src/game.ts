@@ -38,6 +38,7 @@ import { SpellSystem } from "./systems/spell-system";
 import { PersuasionSystem } from "./systems/persuasion-system";
 import { GameEventBus } from "./systems/event-bus";
 import { LootTableSystem, STARTER_LOOT_TABLES } from "./systems/loot-table-system";
+import { NpcArchetypeSystem } from "./systems/npc-archetype-system";
 
 export class Game {
   public scene: Scene;
@@ -75,6 +76,7 @@ export class Game {
   public persuasionSystem: PersuasionSystem;
   public eventBus: GameEventBus;
   public lootTableSystem: LootTableSystem;
+  public npcArchetypeSystem: NpcArchetypeSystem;
 
   public isPaused: boolean = false;
 
@@ -181,6 +183,10 @@ export class Game {
     this.lootTableSystem = new LootTableSystem();
     for (const t of STARTER_LOOT_TABLES) this.lootTableSystem.registerTable(t);
 
+    // NPC archetype factory — pre-load archetypes from base content
+    this.npcArchetypeSystem = new NpcArchetypeSystem();
+    this.npcArchetypeSystem.registerAll(frameworkBaseContent.npcArchetypes);
+
     this.spellSystem     = new SpellSystem(this.player, this.scheduleSystem.npcs, this.ui, this.scene);
     // Seed the player with the two starter spells
     this.spellSystem.learnSpell("flames");
@@ -195,13 +201,36 @@ export class Game {
     this.saveSystem.setSpellSystem(this.spellSystem);
     this.saveSystem.setPersuasionSystem(this.persuasionSystem);
 
+    // Wire attribute panel spend callback
+    this.ui.onAttributeSpend = (name) => {
+      const spent = this.attributeSystem.spendPoint(name);
+      if (spent) {
+        // Sync derived stats back to player after spending
+        this.player.maxHealth      = this.attributeSystem.maxHealth;
+        this.player.maxMagicka     = this.attributeSystem.maxMagicka;
+        this.player.maxStamina     = this.attributeSystem.maxStamina;
+        this.player.maxCarryWeight = this.attributeSystem.carryWeight;
+        this.spellSystem.magicDamageBonus = this.attributeSystem.magicDamageBonus;
+        // Refresh the attribute panel display
+        this.ui.refreshAttributePanel(this.attributeSystem);
+      }
+    };
+
     // Level-up awards attribute points
     this.player.onLevelUp = (newLevel) => {
-      this.ui.showNotification(`Level Up! You are now level ${newLevel}!`, 4000);
+      this.ui.showNotification(`Level Up! You are now level ${newLevel}! [U] to spend attributes.`, 4000);
       this.attributeSystem.awardLevelUpPoints(1);
       // Sync magic damage bonus after level-up attribute award
       this.spellSystem.magicDamageBonus = this.attributeSystem.magicDamageBonus;
       this.eventBus.emit("player:levelUp", { newLevel });
+      // Auto-open attribute panel on level-up
+      if (!this.isPaused && !this.ui.isAttributePanelOpen) {
+        this.ui.toggleAttributePanel(true);
+        this.ui.refreshAttributePanel(this.attributeSystem);
+        this.interactionSystem.isBlocked = true;
+        document.exitPointerLock?.();
+        this.player.camera.detachControl?.();
+      }
     };
 
     // Guard crime challenge
@@ -269,12 +298,37 @@ export class Game {
     this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
     // Wire quest event callbacks
-    this.combatSystem.onNPCDeath = (name, xp) => {
+    this.combatSystem.onNPCDeath = (name, xp, npc) => {
         this.questSystem.onKill(name);
         this._applyFrameworkQuestEvent("kill", this._toFrameworkTargetId(name));
         this.player.addExperience(xp);
         this.ui.showNotification(`+${xp} XP`, 2000);
         this.audioSystem.playNPCDeath();
+
+        // Drop loot from the NPC's loot table
+        if (npc.lootTableId) {
+            const drops = this.lootTableSystem.roll(npc.lootTableId);
+            if (drops.length > 0) {
+                const dropPos = npc.mesh.position.clone();
+                dropPos.y += 0.5;
+                for (const drop of drops) {
+                    new Loot(this.scene, dropPos.add(new Vector3(
+                        (Math.random() - 0.5) * 1.2,
+                        0,
+                        (Math.random() - 0.5) * 1.2,
+                    )), {
+                        id: drop.id,
+                        name: drop.name,
+                        description: drop.description ?? "",
+                        stackable: drop.stackable ?? false,
+                        quantity: drop.quantity ?? 1,
+                        weight: drop.weight,
+                        stats: drop.stats,
+                        slot: drop.slot as any,
+                    });
+                }
+            }
+        }
     };
     this.combatSystem.onPlayerHit = () => this.audioSystem.playPlayerHit();
     this.interactionSystem.onLootPickup = (id) => {
@@ -431,6 +485,11 @@ export class Game {
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.ui.isAttributePanelOpen) {
+                    this.ui.toggleAttributePanel(false);
+                    this.interactionSystem.isBlocked = false;
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
                 } else {
                     this.togglePause();
                 }
@@ -451,6 +510,22 @@ export class Game {
                 if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue && !this.questSystem.isLogOpen) {
                     this.skillTreeSystem.toggle();
                     if (this.skillTreeSystem.isOpen) {
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    } else {
+                        this.interactionSystem.isBlocked = false;
+                        this.canvas.requestPointerLock();
+                        this.player.camera.attachControl(this.canvas, true);
+                    }
+                }
+            } else if (kbInfo.event.key === "u" || kbInfo.event.key === "U") {
+                // Toggle Attribute Panel
+                if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue) {
+                    const open = !this.ui.isAttributePanelOpen;
+                    this.ui.toggleAttributePanel(open);
+                    if (open) {
+                        this.ui.refreshAttributePanel(this.attributeSystem);
                         this.interactionSystem.isBlocked = true;
                         document.exitPointerLock();
                         this.player.camera.detachControl();
@@ -727,12 +802,17 @@ export class Game {
       this.player.update(deltaTime);
       this.audioSystem.updateFootsteps(deltaTime, this.player.camera.position);
       this.world.update(this.player.camera.position);
+
+      // v2 system updates (time must update before schedule so hour is current)
+      this.timeSystem.update(deltaTime);
+
+      // Sync in-game hour to ScheduleSystem so NPC daily behaviors are time-aware
+      this.scheduleSystem.currentHour = this.timeSystem.hour;
+
       this.scheduleSystem.update(deltaTime);
       this.combatSystem.updateNPCAI(deltaTime);
       this.interactionSystem.update();
 
-      // v2 system updates
-      this.timeSystem.update(deltaTime);
       this.stealthSystem.update(deltaTime, this.timeSystem.ambientIntensity);
       this.crimeSystem.update(deltaTime);
       this.projectileSystem.update(deltaTime);

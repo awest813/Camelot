@@ -35,6 +35,8 @@ function makeNPC(x = 5, alive = true) {
     isDead: !alive,
     mesh: { name: "Bandit", position: new Vector3(x, 0, 0) },
     takeDamage: vi.fn(),
+    applyStatusEffect: vi.fn(),
+    statusEffects: [],
   } as any;
 }
 

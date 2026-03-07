@@ -76,16 +76,21 @@ export class StealthSystem {
   // ── Crouch toggle ─────────────────────────────────────────────────────────
 
   /**
-   * Toggle crouch state.  Adjusts camera speed accordingly.
+   * Toggle crouch state.  Updates `player.baseSpeed` which Player.update()
+   * then applies (together with any encumbrance modifier) each frame.
+   * Also directly sets `camera.speed` for immediate feedback in frames where
+   * Player.update() has not yet run (e.g. in test environments).
    * Returns the new isCrouching value.
    */
   public toggleCrouch(): boolean {
     this.isCrouching = !this.isCrouching;
     if (this.isCrouching) {
       this.movementMode = "crouching";
+      this._player.baseSpeed = 0.25;
       this._player.camera.speed = 0.25;
     } else {
       this.movementMode = "walking";
+      this._player.baseSpeed = 0.5;
       this._player.camera.speed = 0.5;
     }
     return this.isCrouching;

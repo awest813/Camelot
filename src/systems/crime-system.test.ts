@@ -16,6 +16,8 @@ describe("CrimeSystem", () => {
 
     mockNpc = {
       isDead: false,
+      isGuard: true,
+      factionId: "town_guard",
       aiState: AIState.PATROL,
       mesh: {
         name: "GuardNPC",
