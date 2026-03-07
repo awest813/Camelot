@@ -6,6 +6,7 @@ import { Quest } from "../systems/quest-system";
 import { EquipSlot } from "../systems/equipment-system";
 import { Player } from "../entities/player";
 import type { SkillTree } from "../systems/skill-tree-system";
+import { AttributeSystem, ATTRIBUTE_NAMES, type AttributeName } from "../systems/attribute-system";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -101,6 +102,15 @@ export class UIManager {
   // ── Clock HUD ─────────────────────────────────────────────────────────
   private _clockLabel: TextBlock | null = null;
 
+  // ── Attribute Panel ───────────────────────────────────────────────────────
+  public attributePanel: Rectangle | null = null;
+  private _attributePanelContent: StackPanel | null = null;
+  private _attributePendingLabel: TextBlock | null = null;
+  public isAttributePanelOpen: boolean = false;
+
+  /** Called when the player clicks a "+1" attribute button.  Set by Game. */
+  public onAttributeSpend: ((name: AttributeName) => void) | null = null;
+
   constructor(scene: Scene) {
     this.scene = scene;
     this._initUI();
@@ -111,6 +121,7 @@ export class UIManager {
     this._initDebugOverlay();
     this._initStealthHUD();
     this._initClockHUD();
+    this._initAttributePanel();
   }
 
   // ── Init methods ─────────────────────────────────────────────────────────────
@@ -1178,5 +1189,174 @@ export class UIManager {
   /** Update the in-game clock display (top-right corner). */
   public updateClock(timeString: string): void {
     if (this._clockLabel) this._clockLabel.text = timeString;
+  }
+
+  // ── Attribute Panel ───────────────────────────────────────────────────────
+
+  private _initAttributePanel(): void {
+    const panel = new Rectangle("attributePanel");
+    panel.width = "420px";
+    panel.height = "520px";
+    panel.cornerRadius = 8;
+    panel.color = T.PANEL_BORDER;
+    panel.thickness = 2;
+    panel.background = T.PANEL_BG;
+    panel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    panel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    panel.zIndex = 12;
+    panel.isVisible = false;
+    this._ui.addControl(panel);
+    this.attributePanel = panel;
+
+    // Title
+    const title = new TextBlock("attrTitle");
+    title.text = "Attributes";
+    title.color = T.TITLE;
+    title.fontSize = 22;
+    title.fontWeight = "bold";
+    title.height = "40px";
+    title.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    title.top = "14px";
+    panel.addControl(title);
+
+    // Pending points label
+    const pending = new TextBlock("attrPending");
+    pending.text = "Points available: 0";
+    pending.color = T.GOOD;
+    pending.fontSize = 14;
+    pending.height = "22px";
+    pending.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    pending.top = "54px";
+    panel.addControl(pending);
+    this._attributePendingLabel = pending;
+
+    // Separator
+    const sep = new Rectangle("attrSep");
+    sep.width = "380px";
+    sep.height = "1px";
+    sep.background = T.PANEL_BORDER;
+    sep.thickness = 0;
+    sep.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    sep.top = "82px";
+    panel.addControl(sep);
+
+    // Scrollable content
+    const content = new StackPanel("attrContent");
+    content.isVertical = true;
+    content.width = "390px";
+    content.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    content.top = "92px";
+    panel.addControl(content);
+    this._attributePanelContent = content;
+
+    // Close button
+    const closeBtn = Button.CreateSimpleButton("attrClose", "Close [U]");
+    closeBtn.width = "120px";
+    closeBtn.height = "32px";
+    closeBtn.color = T.TEXT;
+    closeBtn.background = T.BTN_BG;
+    closeBtn.cornerRadius = 4;
+    closeBtn.fontSize = 13;
+    closeBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+    closeBtn.top = "-14px";
+    closeBtn.onPointerUpObservable.add(() => this.toggleAttributePanel(false));
+    panel.addControl(closeBtn);
+  }
+
+  public toggleAttributePanel(visible: boolean): void {
+    if (!this.attributePanel) return;
+    this.isAttributePanelOpen = visible;
+    this.attributePanel.isVisible = visible;
+  }
+
+  /**
+   * Refresh the attribute panel contents with current values and pending points.
+   */
+  public refreshAttributePanel(attributes: AttributeSystem): void {
+    if (!this._attributePanelContent || !this._attributePendingLabel) return;
+
+    this._attributePendingLabel.text = `Points available: ${attributes.pendingPoints}`;
+
+    // Clear existing rows
+    while (this._attributePanelContent.children.length > 0) {
+      this._attributePanelContent.children[0].dispose();
+    }
+
+    const ATTR_DISPLAY_NAMES: Record<AttributeName, string> = {
+      strength:     "Strength",
+      endurance:    "Endurance",
+      intelligence: "Intelligence",
+      agility:      "Agility",
+      willpower:    "Willpower",
+      speed:        "Speed",
+      luck:         "Luck",
+    };
+
+    for (const name of ATTRIBUTE_NAMES) {
+      const row = new StackPanel(`attrRow_${name}`);
+      row.isVertical = false;
+      row.width = "390px";
+      row.height = "46px";
+      row.paddingTop = "4px";
+      row.paddingBottom = "4px";
+      this._attributePanelContent.addControl(row);
+
+      // Attribute name label
+      const nameLabel = new TextBlock(`attrName_${name}`);
+      nameLabel.text = ATTR_DISPLAY_NAMES[name];
+      nameLabel.color = T.TEXT;
+      nameLabel.fontSize = 14;
+      nameLabel.width = "130px";
+      nameLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+      nameLabel.paddingLeft = "8px";
+      row.addControl(nameLabel);
+
+      // Current value
+      const valueLabel = new TextBlock(`attrValue_${name}`);
+      valueLabel.text = String(attributes.get(name));
+      valueLabel.color = T.TITLE;
+      valueLabel.fontSize = 16;
+      valueLabel.fontWeight = "bold";
+      valueLabel.width = "50px";
+      valueLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+      row.addControl(valueLabel);
+
+      // Derived stat hint
+      const hint = this._getAttributeHint(name, attributes);
+      const hintLabel = new TextBlock(`attrHint_${name}`);
+      hintLabel.text = hint;
+      hintLabel.color = T.DIM;
+      hintLabel.fontSize = 12;
+      hintLabel.width = "160px";
+      hintLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+      row.addControl(hintLabel);
+
+      // Spend button
+      const spendBtn = Button.CreateSimpleButton(`attrSpend_${name}`, "+1");
+      spendBtn.width = "40px";
+      spendBtn.height = "28px";
+      spendBtn.color = attributes.pendingPoints > 0 ? T.GOOD : T.DIM;
+      spendBtn.background = T.BTN_BG;
+      spendBtn.cornerRadius = 4;
+      spendBtn.fontSize = 13;
+      spendBtn.isEnabled = attributes.pendingPoints > 0;
+      spendBtn.onPointerUpObservable.add(() => {
+        this.onAttributeSpend?.(name);
+      });
+      row.addControl(spendBtn);
+    }
+  }
+
+  private _getAttributeHint(name: AttributeName, attrs: AttributeSystem): string {
+    switch (name) {
+      case "strength":     return `Dmg +${attrs.meleeDamageBonus.toFixed(1)}`;
+      case "endurance":    return `HP max ${attrs.maxHealth}`;
+      case "intelligence": return `MP max ${attrs.maxMagicka.toFixed(0)}`;
+      case "agility":      return `Speed ×${attrs.speedMultiplier.toFixed(2)}`;
+      case "willpower":    return `MP max ${attrs.maxMagicka.toFixed(0)}`;
+      case "speed":        return `Speed ×${attrs.speedMultiplier.toFixed(2)}`;
+      case "luck":         return `Crit ${(attrs.critChance * 100).toFixed(1)}%`;
+      default:             return "";
+    }
   }
 }

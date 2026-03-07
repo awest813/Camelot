@@ -156,31 +156,55 @@ export class CrimeSystem {
   /**
    * Check for nearby guards and fire `onGuardChallenge` when appropriate.
    * Call every game frame.
+   *
+   * Priority: prefer NPCs that are flagged as guards (`npc.isGuard === true`)
+   * and belong to the faction with the active bounty (`npc.factionId`).
+   * Fallback: if no faction-matched guard is nearby, any non-hostile living NPC
+   * within range can act as an impromptu witness (backward-compatible behaviour).
    */
   public update(deltaTime: number): void {
     this._guardChallengeCooldown = Math.max(0, this._guardChallengeCooldown - deltaTime);
 
     if (this._guardChallengeCooldown > 0 || this.getTotalBounty() <= 0) return;
 
+    // Determine highest-bounty faction
+    let maxBounty  = 0;
+    let maxFaction = "";
+    for (const [faction, bounty] of this._bounties) {
+      if (bounty > maxBounty) { maxBounty = bounty; maxFaction = faction; }
+    }
+    if (!maxFaction || maxBounty <= 0) return;
+
+    // First pass: find a proper faction guard
+    let challenger: typeof this._npcs[0] | null = null;
     for (const npc of this._npcs) {
       if (npc.isDead) continue;
       if (npc.aiState === AIState.ATTACK || npc.aiState === AIState.CHASE) continue;
-
       const dist = Vector3.Distance(this._player.camera.position, npc.mesh.position);
       if (dist > GUARD_ALERT_RADIUS) continue;
-
-      // Find the faction with the highest bounty
-      let maxBounty  = 0;
-      let maxFaction = "";
-      for (const [faction, bounty] of this._bounties) {
-        if (bounty > maxBounty) { maxBounty = bounty; maxFaction = faction; }
+      if (npc.isGuard && npc.factionId === maxFaction) {
+        challenger = npc;
+        break;
       }
+    }
 
-      if (maxFaction && maxBounty > 0) {
-        this._guardChallengeCooldown = GUARD_CHALLENGE_COOLDOWN;
-        this.onGuardChallenge?.(npc, maxFaction, maxBounty);
+    // Second pass: fall back to any nearby living NPC (guards with no factionId set)
+    if (!challenger) {
+      for (const npc of this._npcs) {
+        if (npc.isDead) continue;
+        if (npc.aiState === AIState.ATTACK || npc.aiState === AIState.CHASE) continue;
+        const dist = Vector3.Distance(this._player.camera.position, npc.mesh.position);
+        if (dist > GUARD_ALERT_RADIUS) continue;
+        if (npc.isGuard) {
+          challenger = npc;
+          break;
+        }
       }
-      break; // Only one guard challenges at a time
+    }
+
+    if (challenger) {
+      this._guardChallengeCooldown = GUARD_CHALLENGE_COOLDOWN;
+      this.onGuardChallenge?.(challenger, maxFaction, maxBounty);
     }
   }
 

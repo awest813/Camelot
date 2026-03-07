@@ -56,6 +56,15 @@ export class Player {
     return this.carryWeight > this.maxCarryWeight;
   }
 
+  // Movement speed
+  /**
+   * Base movement speed (BabylonJS camera units per frame).
+   * Other systems (StealthSystem for crouch/run, etc.) should update this field
+   * rather than touching camera.speed directly.  Player.update() recomputes the
+   * effective camera speed from this base plus any active modifiers.
+   */
+  public baseSpeed: number = 0.5;
+
   /** Fired with the new level whenever the player levels up. */
   public onLevelUp: ((newLevel: number) => void) | null = null;
 
@@ -85,6 +94,12 @@ export class Player {
       if (this._staminaRegenDelayRemaining <= 0) {
         this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen * deltaTime);
       }
+
+      // Apply encumbrance movement penalty — half speed when over carry limit.
+      // This is computed every frame so that it reacts immediately to inventory
+      // changes without requiring the caller to manage camera.speed directly.
+      const encumbranceFactor = this.isEncumbered ? 0.5 : 1.0;
+      this.camera.speed = this.baseSpeed * encumbranceFactor;
   }
 
   /** Delay health recovery after receiving combat damage. */

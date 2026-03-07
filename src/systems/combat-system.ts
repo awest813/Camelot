@@ -135,8 +135,8 @@ export class CombatSystem {
   private static readonly _OFFSET_Y1 = new Vector3(0, 1, 0);
   private static readonly _OFFSET_Y2 = new Vector3(0, 2, 0);
 
-  /** Fired with the NPC's mesh name and XP reward whenever an NPC dies. */
-  public onNPCDeath: ((npcName: string, xpReward: number) => void) | null = null;
+  /** Fired with the NPC's mesh name, XP reward, and the NPC reference whenever an NPC dies. */
+  public onNPCDeath: ((npcName: string, xpReward: number, npc: NPC) => void) | null = null;
 
   /** Fired whenever the player takes damage from an NPC. */
   public onPlayerHit: (() => void) | null = null;
@@ -217,7 +217,7 @@ export class CombatSystem {
 
         if (npc.isDead) {
           this._ui.showNotification(`${npc.mesh.name} defeated!`);
-          if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward);
+          if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
         } else {
           // A direct hit skips the ALERT window — immediately give chase.
           // Don't re-transition if already chasing/attacking (would reset path).
@@ -300,7 +300,7 @@ export class CombatSystem {
 
           if (npc.isDead) {
             this._ui.showNotification(`${npc.mesh.name} defeated!`);
-            if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward);
+            if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
           } else if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
             this._transitionTo(npc, AIState.CHASE);
           }
@@ -345,6 +345,13 @@ export class CombatSystem {
 
     for (const npc of this.npcs) {
       if (npc.isDead) continue;
+      // Tick damage-over-time status effects (burn, poison, freeze, shock)
+      npc.tickStatusEffects(deltaTime);
+      // Skip further AI processing if the DoT killed the NPC this frame
+      if (npc.isDead) {
+        if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
+        continue;
+      }
       this._tickNPC(npc, playerPos, deltaTime);
     }
   }

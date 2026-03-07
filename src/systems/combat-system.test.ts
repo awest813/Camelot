@@ -132,7 +132,11 @@ describe('CombatSystem', () => {
             strafeTimer: 0,
             strafeSpeedMultiplier: 0.65,
             movementResponsiveness: 8,
-            moveSpeed: 2
+            moveSpeed: 2,
+            // Status effects (Oblivion-lite v4)
+            statusEffects: [],
+            tickStatusEffects: vi.fn(() => 0),
+            xpReward: 25,
         };
 
         mockNpcs = [mockNpc];
