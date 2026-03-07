@@ -198,7 +198,11 @@ export class CellManager {
   /**
    * Register a simple cave-style interior cell and place an exit portal inside it.
    *
+   * Registers the cell exactly once with a single builder that constructs the
+   * room geometry AND the exit portal so there's no duplicate registration.
+   *
    * @param cellId           ID for the new interior cell.
+   * @param cellName         Display name shown on transition.
    * @param entrancePortalId ID of the entrance portal in the exterior world.
    * @param entrancePosition Portal mesh position in the exterior world.
    * @param returnPosition   Where the player spawns when exiting back to exterior.
@@ -210,87 +214,18 @@ export class CellManager {
     entrancePosition: Vector3,
     returnPosition: Vector3,
   ): void {
-    this.registerCell({
-      id:            cellId,
-      name:          cellName,
-      type:          "interior",
-      spawnPosition: new Vector3(0, 1, 3),
-      build: (scene) => {
-        const meshes: Mesh[] = [];
-        const floorMat = new StandardMaterial("intFloor_" + cellId, scene);
-        floorMat.diffuseColor = new Color3(0.35, 0.30, 0.25);
-        const wallMat = new StandardMaterial("intWall_" + cellId, scene);
-        wallMat.diffuseColor = new Color3(0.30, 0.28, 0.25);
-
-        const floor = MeshBuilder.CreateBox("floor_" + cellId, { width: 12, height: 0.2, depth: 12 }, scene);
-        floor.position.y = 0;
-        floor.material   = floorMat;
-        meshes.push(floor);
-
-        const ceiling = MeshBuilder.CreateBox("ceiling_" + cellId, { width: 12, height: 0.2, depth: 12 }, scene);
-        ceiling.position.y = 3;
-        ceiling.material   = floorMat;
-        meshes.push(ceiling);
-
-        const wallDefs = [
-          { x: 0,  y: 1.5, z:  6,  w: 12, d: 0.3 },
-          { x: 0,  y: 1.5, z: -6,  w: 12, d: 0.3 },
-          { x:  6, y: 1.5, z: 0,   w: 0.3, d: 12 },
-          { x: -6, y: 1.5, z: 0,   w: 0.3, d: 12 },
-        ];
-        for (const wd of wallDefs) {
-          const wall = MeshBuilder.CreateBox("wall_" + cellId, { width: wd.w, height: 3, depth: wd.d }, scene);
-          wall.position = new Vector3(wd.x, wd.y, wd.z);
-          wall.material = wallMat;
-          meshes.push(wall);
-        }
-        return meshes;
-      },
-    });
-
-    // Entrance portal in the exterior
-    this.spawnPortal(entrancePortalId, entrancePosition, cellId, new Vector3(0, 1, 3), "Enter " + cellName);
-
-    // Exit portal inside the interior (registered lazily — spawned when the cell is built)
-    // We pre-register it here so it appears the moment the interior is loaded
     const exitId = `exit_${cellId}`;
+
     this.registerCell({
       id:            cellId,
       name:          cellName,
       type:          "interior",
       spawnPosition: new Vector3(0, 1, 3),
       build: (scene) => {
-        // Re-use same builder logic but also spawn the exit portal
-        const floorMat = new StandardMaterial("intFloor2_" + cellId, scene);
-        floorMat.diffuseColor = new Color3(0.35, 0.30, 0.25);
-        const wallMat = new StandardMaterial("intWall2_" + cellId, scene);
-        wallMat.diffuseColor = new Color3(0.30, 0.28, 0.25);
+        const meshes = this._buildSimpleRoom(cellId, scene);
 
-        const meshes: Mesh[] = [];
-        const floor = MeshBuilder.CreateBox("floor2_" + cellId, { width: 12, height: 0.2, depth: 12 }, scene);
-        floor.position.y = 0;
-        floor.material   = floorMat;
-        meshes.push(floor);
-
-        const ceiling = MeshBuilder.CreateBox("ceiling2_" + cellId, { width: 12, height: 0.2, depth: 12 }, scene);
-        ceiling.position.y = 3;
-        ceiling.material   = floorMat;
-        meshes.push(ceiling);
-
-        const wallDefs = [
-          { x: 0,  y: 1.5, z:  6,  w: 12, d: 0.3 },
-          { x: 0,  y: 1.5, z: -6,  w: 12, d: 0.3 },
-          { x:  6, y: 1.5, z: 0,   w: 0.3, d: 12 },
-          { x: -6, y: 1.5, z: 0,   w: 0.3, d: 12 },
-        ];
-        for (const wd of wallDefs) {
-          const wall = MeshBuilder.CreateBox("wall2_" + cellId, { width: wd.w, height: 3, depth: wd.d }, scene);
-          wall.position = new Vector3(wd.x, wd.y, wd.z);
-          wall.material = wallMat;
-          meshes.push(wall);
-        }
-
-        // Spawn the exit portal inside this cell
+        // Spawn the exit portal inside the cell and include its mesh so it
+        // is disposed when the player leaves.
         const exitPortal = this.spawnPortal(
           exitId,
           new Vector3(0, 1, -5.5),
@@ -302,6 +237,46 @@ export class CellManager {
         return meshes;
       },
     });
+
+    // Entrance portal in the exterior world
+    this.spawnPortal(entrancePortalId, entrancePosition, cellId, new Vector3(0, 1, 3), "Enter " + cellName);
+  }
+
+  /**
+   * Shared room-geometry builder used by `buildSimpleInterior`.
+   * Creates floor, ceiling, and four walls; returns the mesh array.
+   */
+  private _buildSimpleRoom(cellId: string, scene: Scene): Mesh[] {
+    const meshes: Mesh[] = [];
+
+    const floorMat = new StandardMaterial("intFloor_" + cellId, scene);
+    floorMat.diffuseColor = new Color3(0.35, 0.30, 0.25);
+    const wallMat  = new StandardMaterial("intWall_"  + cellId, scene);
+    wallMat.diffuseColor  = new Color3(0.30, 0.28, 0.25);
+
+    const floor = MeshBuilder.CreateBox("floor_" + cellId, { width: 12, height: 0.2, depth: 12 }, scene);
+    floor.position.y = 0;
+    floor.material   = floorMat;
+    meshes.push(floor);
+
+    const ceiling = MeshBuilder.CreateBox("ceiling_" + cellId, { width: 12, height: 0.2, depth: 12 }, scene);
+    ceiling.position.y = 3;
+    ceiling.material   = floorMat;
+    meshes.push(ceiling);
+
+    const wallDefs = [
+      { x:  0,  y: 1.5, z:  6,  w: 12,  d: 0.3 },
+      { x:  0,  y: 1.5, z: -6,  w: 12,  d: 0.3 },
+      { x:  6,  y: 1.5, z:  0,  w: 0.3, d: 12  },
+      { x: -6,  y: 1.5, z:  0,  w: 0.3, d: 12  },
+    ];
+    for (const wd of wallDefs) {
+      const wall = MeshBuilder.CreateBox("wall_" + cellId, { width: wd.w, height: 3, depth: wd.d }, scene);
+      wall.position = new Vector3(wd.x, wd.y, wd.z);
+      wall.material = wallMat;
+      meshes.push(wall);
+    }
+    return meshes;
   }
 
   // ── Persistence ───────────────────────────────────────────────────────────

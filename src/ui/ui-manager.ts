@@ -89,6 +89,18 @@ export class UIManager {
   /** Called when the player clicks a skill upgrade button. Set by Game. */
   public onSkillPurchase: ((treeIndex: number, skillIndex: number) => void) | null = null;
 
+  // ── Debug / Performance Overlay ──────────────────────────────────────────
+  private _debugPanel: Rectangle | null = null;
+  private _debugText: TextBlock | null = null;
+  public isDebugVisible: boolean = false;
+
+  // ── Stealth HUD ────────────────────────────────────────────────────────
+  private _stealthPanel: Rectangle | null = null;
+  private _stealthLabel: TextBlock | null = null;
+
+  // ── Clock HUD ─────────────────────────────────────────────────────────
+  private _clockLabel: TextBlock | null = null;
+
   constructor(scene: Scene) {
     this.scene = scene;
     this._initUI();
@@ -96,6 +108,9 @@ export class UIManager {
     this._initPauseMenu();
     this._initQuestLogUI();
     this._initSkillTreeUI();
+    this._initDebugOverlay();
+    this._initStealthHUD();
+    this._initClockHUD();
   }
 
   // ── Init methods ─────────────────────────────────────────────────────────────
@@ -1035,5 +1050,133 @@ export class UIManager {
         text.dispose();
       }
     });
+  }
+
+  // ── Debug / Performance Overlay ───────────────────────────────────────────
+
+  private _initDebugOverlay(): void {
+    this._debugPanel = new Rectangle("debugPanel");
+    this._debugPanel.width = "320px";
+    this._debugPanel.height = "200px";
+    this._debugPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this._debugPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this._debugPanel.left = "10px";
+    this._debugPanel.top = "10px";
+    this._debugPanel.background = "rgba(0,0,0,0.70)";
+    this._debugPanel.thickness = 1;
+    this._debugPanel.color = "#444";
+    this._debugPanel.isVisible = false;
+    this._ui.addControl(this._debugPanel);
+
+    this._debugText = new TextBlock("debugText");
+    this._debugText.text = "";
+    this._debugText.color = "#88FF88";
+    this._debugText.fontSize = 11;
+    this._debugText.fontFamily = "monospace";
+    this._debugText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this._debugText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this._debugText.paddingLeft = "8px";
+    this._debugText.paddingTop = "8px";
+    this._debugPanel.addControl(this._debugText);
+  }
+
+  /**
+   * Toggle the performance/debug overlay (F3).
+   * Returns the new visibility state.
+   */
+  public toggleDebugOverlay(): boolean {
+    if (!this._debugPanel) return false;
+    this.isDebugVisible = !this.isDebugVisible;
+    this._debugPanel.isVisible = this.isDebugVisible;
+    return this.isDebugVisible;
+  }
+
+  /**
+   * Update the debug overlay with live performance/world metrics.
+   * Call once per second when the overlay is visible.
+   */
+  public updateDebugOverlay(metrics: {
+    fps: number;
+    drawCalls: number;
+    activeMeshes: number;
+    totalVertices: number;
+    playerPos: { x: number; y: number; z: number };
+    carryWeight: number;
+    maxCarryWeight: number;
+    currentCell: string;
+    gameTime: string;
+    stealthLabel: string;
+  }): void {
+    if (!this._debugText || !this.isDebugVisible) return;
+    this._debugText.text = [
+      `FPS:        ${metrics.fps.toFixed(0)}`,
+      `Draw calls: ${metrics.drawCalls}`,
+      `Meshes:     ${metrics.activeMeshes}`,
+      `Vertices:   ${metrics.totalVertices.toLocaleString()}`,
+      `Pos: ${metrics.playerPos.x.toFixed(1)}, ${metrics.playerPos.y.toFixed(1)}, ${metrics.playerPos.z.toFixed(1)}`,
+      `Weight:     ${metrics.carryWeight.toFixed(0)}/${metrics.maxCarryWeight.toFixed(0)}`,
+      `Cell:       ${metrics.currentCell}`,
+      `Time:       ${metrics.gameTime}`,
+      `Stealth:    ${metrics.stealthLabel}`,
+    ].join("\n");
+  }
+
+  // ── Stealth HUD ───────────────────────────────────────────────────────────
+
+  private _initStealthHUD(): void {
+    this._stealthPanel = new Rectangle("stealthPanel");
+    this._stealthPanel.width = "90px";
+    this._stealthPanel.height = "28px";
+    this._stealthPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this._stealthPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+    this._stealthPanel.left = "12px";
+    this._stealthPanel.top = "-80px";
+    this._stealthPanel.background = "rgba(0,0,0,0.65)";
+    this._stealthPanel.thickness = 1;
+    this._stealthPanel.color = "#555";
+    this._stealthPanel.isVisible = false;
+    this._ui.addControl(this._stealthPanel);
+
+    this._stealthLabel = new TextBlock("stealthLabel");
+    this._stealthLabel.text = "Hidden";
+    this._stealthLabel.color = "#88FFAA";
+    this._stealthLabel.fontSize = 13;
+    this._stealthLabel.fontWeight = "bold";
+    this._stealthPanel.addControl(this._stealthLabel);
+  }
+
+  /** Update the stealth eye indicator. Pass null to hide it. */
+  public updateStealthHUD(label: "Hidden" | "Caution" | "Detected" | null): void {
+    if (!this._stealthPanel || !this._stealthLabel) return;
+    if (!label) {
+      this._stealthPanel.isVisible = false;
+      return;
+    }
+    this._stealthPanel.isVisible = true;
+    this._stealthLabel.text = label;
+    this._stealthLabel.color =
+      label === "Hidden"   ? "#88FFAA" :
+      label === "Caution"  ? "#FFDD44" :
+      "#FF4444";
+  }
+
+  // ── Clock HUD ─────────────────────────────────────────────────────────────
+
+  private _initClockHUD(): void {
+    this._clockLabel = new TextBlock("clockLabel");
+    this._clockLabel.text = "08:00";
+    this._clockLabel.color = T.DIM;
+    this._clockLabel.fontSize = 13;
+    this._clockLabel.fontFamily = "monospace";
+    this._clockLabel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+    this._clockLabel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this._clockLabel.left = "-12px";
+    this._clockLabel.top = "12px";
+    this._ui.addControl(this._clockLabel);
+  }
+
+  /** Update the in-game clock display (top-right corner). */
+  public updateClock(timeString: string): void {
+    if (this._clockLabel) this._clockLabel.text = timeString;
   }
 }

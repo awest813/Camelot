@@ -502,6 +502,9 @@ export class Game {
                 if (!this.isPaused) this.saveSystem.save();
             } else if (kbInfo.event.key === "F9") {
                 if (!this.isPaused) this.saveSystem.load();
+            } else if (kbInfo.event.key === "F3") {
+                const shown = this.ui.toggleDebugOverlay();
+                this.ui.showNotification(shown ? "Debug overlay ON" : "Debug overlay OFF", 1200);
             }
         }
     });
@@ -717,6 +720,39 @@ export class Game {
       // (health regen, damage taken, equipment changes) are always current.
       if (this.inventorySystem.isOpen) {
           this.ui.updateStats(this.player);
+      }
+
+      // Update clock display every frame (cheap text update)
+      this.ui.updateClock(this.timeSystem.timeString);
+
+      // Update stealth HUD when crouching
+      if (this.stealthSystem.isCrouching) {
+          this.ui.updateStealthHUD(this.stealthSystem.stealthLabel);
+      } else {
+          this.ui.updateStealthHUD(null);
+      }
+
+      // Update debug overlay (rate-limited to every ~60 frames)
+      if (this.ui.isDebugVisible) {
+          const eng = this.engine;
+          this.ui.updateDebugOverlay({
+              fps:           eng.getFps(),
+              // _drawCalls is a private Babylon.js PerfCounter; no public API
+              // is currently available. This may break on major engine upgrades.
+              drawCalls:     eng._drawCalls?.current ?? 0,
+              activeMeshes:  this.scene.getActiveMeshes().length,
+              totalVertices: this.scene.getTotalVertices(),
+              playerPos: {
+                  x: this.player.camera.position.x,
+                  y: this.player.camera.position.y,
+                  z: this.player.camera.position.z,
+              },
+              carryWeight:    this.player.carryWeight,
+              maxCarryWeight: this.player.maxCarryWeight,
+              currentCell:    this.cellManager.currentCell?.name ?? "exterior",
+              gameTime:       this.timeSystem.timeString,
+              stealthLabel:   this.stealthSystem.stealthLabel,
+          });
       }
   }
 

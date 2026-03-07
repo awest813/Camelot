@@ -16,6 +16,10 @@ const ARROW_STAMINA_COST   = 8;
 const BOW_COOLDOWN         = 0.8;   // seconds between shots
 const MAX_ACTIVE_ARROWS    = 10;    // pool cap
 const ARROW_HIT_RADIUS     = 1.2;   // distance for NPC hit detection
+/** How far forward from the camera the arrow spawns to avoid clipping. */
+const ARROW_SPAWN_FORWARD  = 0.8;
+/** Slight downward eye-level offset so arrows don't clip the top of the FOV. */
+const ARROW_SPAWN_Y_OFFSET = -0.1;
 
 interface ActiveArrow {
   mesh: any;
@@ -116,7 +120,7 @@ export class ProjectileSystem {
     }
 
     const origin  = this._player.camera.position.clone();
-    origin.y -= 0.1; // slight below eye-level
+    origin.y += ARROW_SPAWN_Y_OFFSET; // slight below eye-level
     const forward = this._player.getForwardDirection(1).normalize();
 
     // Spread decreases with archery skill (0 spread at skill 100)
@@ -132,7 +136,7 @@ export class ProjectileSystem {
       { diameter: 0.05, height: 0.6, tessellation: 4 },
       this._scene,
     );
-    mesh.position = origin.add(forward.scale(0.8));
+    mesh.position = origin.add(forward.scale(ARROW_SPAWN_FORWARD));
     mesh.lookAt(mesh.position.add(direction));
 
     const mat = new StandardMaterial(`arrowMat_${Date.now()}`, this._scene);
