@@ -423,4 +423,61 @@ describe('CombatSystem', () => {
         expect(npcB.aiState).toBe('ATTACK');
     });
 
+    it('melee damage is reduced by physical resistance', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        // 50% physical resistance — base damage 10 → 5
+        mockNpcs[0].damageResistances = { physical: 0.5 };
+
+        combatSystem.meleeAttack();
+
+        expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(5);
+    });
+
+    it('melee damage is increased by physical weakness', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        // 50% weakness — base damage 10 → 15
+        mockNpcs[0].damageWeaknesses = { physical: 0.5 };
+
+        combatSystem.meleeAttack();
+
+        expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(15);
+    });
+
+    it('full physical resistance clamps damage to minimum 1', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        // 100% resistance — all physical damage absorbed, floor is 1
+        mockNpcs[0].damageResistances = { physical: 1 };
+
+        combatSystem.meleeAttack();
+
+        expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(1);
+    });
+
+    it('melee attack with no resistance still deals base damage', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        // No resistances or weaknesses set
+        mockNpcs[0].damageResistances = {};
+        mockNpcs[0].damageWeaknesses = {};
+
+        combatSystem.meleeAttack();
+
+        expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(10);
+    });
+
 });

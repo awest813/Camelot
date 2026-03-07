@@ -7,6 +7,8 @@ import {
   QuestRuntimeState,
   QuestSnapshot,
   QuestStatus,
+  QuestValidationIssue,
+  QuestValidationReport,
 } from "./quest-types";
 
 export class QuestGraphEngine {
@@ -133,6 +135,120 @@ export class QuestGraphEngine {
         ),
       });
     }
+  }
+
+  /**
+   * Validates the quest graph for a registered quest.
+   * Checks for dead-end nodes, unreachable nodes, and dependency cycles.
+   */
+  public validateGraph(questId: string): QuestValidationReport {
+    const definition = this._definitions.get(questId);
+    if (!definition) {
+      return {
+        questId,
+        valid: false,
+        issues: [{ type: "unreachable", nodeId: "", detail: `Quest '${questId}' is not registered.` }],
+      };
+    }
+
+    const issues: QuestValidationIssue[] = [];
+    const nodeMap = new Map(definition.nodes.map((n) => [n.id, n]));
+    const startNodeIds = new Set(this._getStartNodeIds(definition));
+    const completionNodeIds = new Set(
+      definition.completionNodeIds && definition.completionNodeIds.length > 0
+        ? definition.completionNodeIds
+        : definition.nodes.map((n) => n.id)
+    );
+
+    /**
+     * Returns all successors of a node for validation purposes, combining:
+     * - Explicit `nextNodeIds` if set, OR
+     * - Nodes that list this node in their `prerequisites` (implicit fallback), AND
+     * - Always includes nodes that declare this node as a prerequisite (implicit activation).
+     *
+     * This mirrors the runtime behaviour of `_getImmediateNextNodeIds` (explicit path)
+     * combined with `_activateImplicitNodes` (prerequisite-based activation).
+     */
+    const getAllSuccessors = (nodeId: string): string[] => {
+      const node = nodeMap.get(nodeId);
+      const explicitNext = node?.nextNodeIds ?? [];
+      // Nodes whose prerequisites list nodeId — activated implicitly by the runtime
+      const implicitNext = definition.nodes
+        .filter((n) => (n.prerequisites ?? []).includes(nodeId))
+        .map((n) => n.id);
+      return [...new Set([...explicitNext, ...implicitNext])];
+    };
+
+    // --- Reachability check (BFS from start nodes, using full successor set) ---
+    const reachable = new Set<string>();
+    const queue = [...startNodeIds];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (reachable.has(current)) continue;
+      reachable.add(current);
+      for (const successor of getAllSuccessors(current)) {
+        if (!reachable.has(successor)) queue.push(successor);
+      }
+    }
+
+    for (const node of definition.nodes) {
+      if (!reachable.has(node.id)) {
+        issues.push({
+          type: "unreachable",
+          nodeId: node.id,
+          detail: `Node '${node.id}' cannot be reached from the quest start nodes.`,
+        });
+      }
+    }
+
+    // --- Dead-end check ---
+    // A node is a dead-end if it is reachable, has no successors, and is not a completion node.
+    for (const node of definition.nodes) {
+      if (!reachable.has(node.id)) continue;
+      if (completionNodeIds.has(node.id)) continue;
+      if (getAllSuccessors(node.id).length === 0) {
+        issues.push({
+          type: "dead_end",
+          nodeId: node.id,
+          detail: `Node '${node.id}' has no successors and is not a completion node.`,
+        });
+      }
+    }
+
+    // --- Cycle detection (DFS with color marking using full successor set) ---
+    const WHITE = 0, GRAY = 1, BLACK = 2;
+    const color = new Map<string, number>(definition.nodes.map((n) => [n.id, WHITE]));
+
+    const dfsCycleCheck = (nodeId: string): boolean => {
+      color.set(nodeId, GRAY);
+      for (const successor of getAllSuccessors(nodeId)) {
+        if (color.get(successor) === GRAY) {
+          issues.push({
+            type: "cycle",
+            nodeId,
+            detail: `Cycle detected: node '${nodeId}' has a path back to '${successor}'.`,
+          });
+          color.set(nodeId, BLACK);
+          return true;
+        }
+        if (color.get(successor) === WHITE) {
+          if (dfsCycleCheck(successor)) {
+            color.set(nodeId, BLACK);
+            return true;
+          }
+        }
+      }
+      color.set(nodeId, BLACK);
+      return false;
+    };
+
+    for (const node of definition.nodes) {
+      if (color.get(node.id) === WHITE) {
+        dfsCycleCheck(node.id);
+      }
+    }
+
+    return { questId, valid: issues.length === 0, issues };
   }
 
   private _createEmptyNodeState(definition: QuestDefinition): Record<string, QuestNodeState> {

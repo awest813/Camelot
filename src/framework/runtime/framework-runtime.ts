@@ -72,6 +72,15 @@ export class FrameworkRuntime {
           this._questEngine.applyEvent(event);
         }
       },
+      activateQuest: (questId) => {
+        this._questEngine.activateQuest(questId);
+      },
+      consumeItem: (itemId, quantity) => {
+        return this._inventoryEngine.removeItem(itemId, quantity).success;
+      },
+      giveItem: (itemId, quantity) => {
+        this._inventoryEngine.addItem(itemId, quantity);
+      },
     };
 
     return this._dialogueEngine.createSession(dialogueId, context);
