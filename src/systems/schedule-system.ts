@@ -219,7 +219,7 @@ export class ScheduleSystem {
 
   /** Generate a random point within WANDER_RADIUS of origin. */
   private _pickRandomWanderPoint(origin: Vector3): Vector3 {
-    const angle  = Math.random() * Math.PI * 2;
+    const angle = Math.random() * Math.PI * 2;
     const radius = Math.random() * WANDER_RADIUS;
     return new Vector3(
       origin.x + Math.cos(angle) * radius,
