@@ -147,7 +147,7 @@ export class QuestGraphEngine {
       return {
         questId,
         valid: false,
-        issues: [{ type: "unreachable", nodeId: "", detail: `Quest '${questId}' is not registered.` }],
+        issues: [{ type: "not_found", nodeId: "", detail: `Quest '${questId}' is not registered.` }],
       };
     }
 

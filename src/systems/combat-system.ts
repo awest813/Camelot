@@ -20,6 +20,10 @@ const MAGIC_DAMAGE = 20;
  *
  * Resistance values are clamped to [0, 1] so that full immunity is the maximum.
  * A missing entry defaults to 0 (no modification).
+ *
+ * **Minimum damage floor**: The result is always at least 1.
+ * Even a fully resistant NPC takes 1 point of damage per hit, ensuring attacks
+ * are never silently ignored and preserving gameplay feedback.
  */
 function applyDamageWithResistance(baseDamage: number, npc: NPC, type: DamageType): number {
   const resistance = Math.min(1, Math.max(0, npc.damageResistances?.[type] ?? 0));

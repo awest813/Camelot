@@ -50,7 +50,7 @@ export interface QuestSnapshot {
   quests: Record<string, QuestRuntimeState>;
 }
 
-export type QuestValidationIssueType = "dead_end" | "unreachable" | "cycle";
+export type QuestValidationIssueType = "dead_end" | "unreachable" | "cycle" | "not_found";
 
 export interface QuestValidationIssue {
   type: QuestValidationIssueType;

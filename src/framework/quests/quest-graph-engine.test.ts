@@ -227,6 +227,7 @@ describe("QuestGraphEngine", () => {
       const report = engine.validateGraph("q_missing");
       expect(report.valid).toBe(false);
       expect(report.questId).toBe("q_missing");
+      expect(report.issues[0].type).toBe("not_found");
     });
   });
 });
