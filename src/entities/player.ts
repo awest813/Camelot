@@ -45,6 +45,17 @@ export class Player {
   public experienceToNextLevel: number = 100;
   public skillPoints: number = 0;
 
+  // Encumbrance
+  /** Current carried weight (sum of item weights in inventory). */
+  public carryWeight: number = 0;
+  /** Maximum carry weight before the player becomes encumbered. */
+  public maxCarryWeight: number = 300;
+
+  /** True when carryWeight > maxCarryWeight; movement speed is halved. */
+  public get isEncumbered(): boolean {
+    return this.carryWeight > this.maxCarryWeight;
+  }
+
   /** Fired with the new level whenever the player levels up. */
   public onLevelUp: ((newLevel: number) => void) | null = null;
 

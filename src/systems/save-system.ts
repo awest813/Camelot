@@ -7,9 +7,15 @@ import { SkillTreeSystem, SkillSaveState } from "./skill-tree-system";
 import { UIManager } from "../ui/ui-manager";
 import { SaveEngine as FrameworkSaveEngine } from "../framework/save/save-engine";
 import type { FrameworkRuntime } from "../framework/runtime/framework-runtime";
+import type { AttributeSystem } from "./attribute-system";
+import type { TimeSystem } from "./time-system";
+import type { CrimeSystem } from "./crime-system";
+import type { ContainerSystem } from "./container-system";
+import type { BarterSystem } from "./barter-system";
+import type { CellManager } from "../world/cell-manager";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 4;
+const SAVE_VERSION = 5;
 
 interface PlayerSaveData {
   position: { x: number; y: number; z: number };
@@ -19,6 +25,8 @@ interface PlayerSaveData {
   level: number;
   experience: number;
   experienceToNextLevel: number;
+  carryWeight?: number;
+  maxCarryWeight?: number;
 }
 
 interface EquipmentEntry {
@@ -36,6 +44,13 @@ export interface SaveData {
   skills?: SkillSaveState[];
   skillPoints?: number;
   framework?: string;
+  // v5 additions
+  attributes?: any;
+  time?: any;
+  crime?: any;
+  containers?: any;
+  barter?: any;
+  cell?: any;
 }
 
 export class SaveSystem {
@@ -47,6 +62,14 @@ export class SaveSystem {
   private _frameworkRuntime: FrameworkRuntime | null = null;
   private _frameworkSaveEngine = new FrameworkSaveEngine();
   private _ui: UIManager;
+
+  // v5 optional systems
+  private _attributes: AttributeSystem | null = null;
+  private _timeSystem: TimeSystem | null = null;
+  private _crimeSystem: CrimeSystem | null = null;
+  private _containerSystem: ContainerSystem | null = null;
+  private _barterSystem: BarterSystem | null = null;
+  private _cellManager: CellManager | null = null;
 
   /** Called after a successful load so Game can clean up world state (e.g. remove already-collected loot). */
   public onAfterLoad: (() => void) | null = null;
@@ -72,6 +95,15 @@ export class SaveSystem {
   public setFrameworkRuntime(runtime: FrameworkRuntime): void {
     this._frameworkRuntime = runtime;
   }
+
+  // ── v5 system injection ───────────────────────────────────────────────────
+
+  public setAttributeSystem(s: AttributeSystem): void { this._attributes = s; }
+  public setTimeSystem(s: TimeSystem): void            { this._timeSystem = s; }
+  public setCrimeSystem(s: CrimeSystem): void          { this._crimeSystem = s; }
+  public setContainerSystem(s: ContainerSystem): void  { this._containerSystem = s; }
+  public setBarterSystem(s: BarterSystem): void        { this._barterSystem = s; }
+  public setCellManager(s: CellManager): void          { this._cellManager = s; }
 
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
@@ -107,6 +139,8 @@ export class SaveSystem {
         level: this._player.level,
         experience: this._player.experience,
         experienceToNextLevel: this._player.experienceToNextLevel,
+        carryWeight: this._player.carryWeight,
+        maxCarryWeight: this._player.maxCarryWeight,
       },
       inventory: [...this._inventory.items],
       equipment: equipmentEntries,
@@ -118,6 +152,12 @@ export class SaveSystem {
     if (this._frameworkRuntime) {
       data.framework = this._frameworkSaveEngine.serialize(this._frameworkRuntime.getSaveSnapshot(), "default");
     }
+    if (this._attributes)       data.attributes  = this._attributes.getSaveState();
+    if (this._timeSystem)       data.time        = this._timeSystem.getSaveState();
+    if (this._crimeSystem)      data.crime       = this._crimeSystem.getSaveState();
+    if (this._containerSystem)  data.containers  = this._containerSystem.getSaveState();
+    if (this._barterSystem)     data.barter      = this._barterSystem.getSaveState();
+    if (this._cellManager)      data.cell        = this._cellManager.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -202,6 +242,21 @@ export class SaveSystem {
         this._ui.showNotification("Framework save data was invalid; loaded legacy state only.", 2500);
       }
     }
+
+    // v5 systems
+    if (this._attributes && data.attributes)   this._attributes.restoreFromSave(data.attributes);
+    if (this._timeSystem && data.time)         this._timeSystem.restoreFromSave(data.time);
+    if (this._crimeSystem && data.crime)       this._crimeSystem.restoreFromSave(data.crime);
+    if (this._containerSystem && data.containers) this._containerSystem.restoreFromSave(data.containers);
+    if (this._barterSystem && data.barter)     this._barterSystem.restoreFromSave(data.barter);
+    if (this._cellManager && data.cell)        this._cellManager.restoreFromSave(data.cell);
+
+    // Restore encumbrance stats
+    if (typeof data.player.maxCarryWeight === "number") {
+      this._player.maxCarryWeight = data.player.maxCarryWeight;
+    }
+    // Recompute carryWeight from restored inventory
+    this._player.carryWeight = this._inventory.totalWeight;
 
     // Sync UI once after all state is restored
     this._equipment.refreshUI();
