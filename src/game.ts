@@ -39,6 +39,7 @@ import { PersuasionSystem } from "./systems/persuasion-system";
 import { GameEventBus } from "./systems/event-bus";
 import { LootTableSystem, STARTER_LOOT_TABLES } from "./systems/loot-table-system";
 import { NpcArchetypeSystem } from "./systems/npc-archetype-system";
+import { FixedStepLoop } from "./systems/fixed-step-loop";
 
 export class Game {
   public scene: Scene;
@@ -79,6 +80,12 @@ export class Game {
   public npcArchetypeSystem: NpcArchetypeSystem;
 
   public isPaused: boolean = false;
+
+  private readonly _gameplayLoop = new FixedStepLoop({
+    fixedDeltaSeconds: 1 / 60,
+    maxSubSteps: 5,
+    maxAccumulatedSeconds: 0.25,
+  });
 
   // Chunk tracking for navmesh rebuild triggers
   private _lastNavChunkX: number = NaN;
@@ -662,6 +669,7 @@ export class Game {
       this.ui.togglePauseMenu(this.isPaused);
 
       if (this.isPaused) {
+          this._gameplayLoop.reset();
           if (this.mapEditorSystem.isEnabled) {
               this.mapEditorSystem.toggle();
           }
@@ -794,11 +802,7 @@ export class Game {
       }
   }
 
-  update(): void {
-      if (this.isPaused) return;
-
-      const deltaTime = this.engine.getDeltaTime() / 1000;
-
+  private _updateGameplayStep(deltaTime: number): void {
       this.player.update(deltaTime);
       this.audioSystem.updateFootsteps(deltaTime, this.player.camera.position);
       this.world.update(this.player.camera.position);
@@ -829,6 +833,15 @@ export class Game {
         this._lastNavChunkZ = cz;
         this.navigationSystem.requestRebuild();
       }
+  }
+
+  update(): void {
+      if (this.isPaused) return;
+
+      const frameDelta = this.engine.getDeltaTime() / 1000;
+      this._gameplayLoop.tick(frameDelta, (deltaTime) => {
+          this._updateGameplayStep(deltaTime);
+      });
 
       // Only update UI bars when values have actually changed
       if (this.player.health !== this._lastHealth) {
