@@ -1360,14 +1360,56 @@ export class UIManager {
       const spendBtn = Button.CreateSimpleButton(`attrSpend_${name}`, "+1");
       spendBtn.width = "40px";
       spendBtn.height = "28px";
-      spendBtn.color = attributes.pendingPoints > 0 ? T.GOOD : T.DIM;
+
+      const canSpend = attributes.pendingPoints > 0;
+      spendBtn.color = canSpend ? T.GOOD : T.DIM;
       spendBtn.background = T.BTN_BG;
       spendBtn.cornerRadius = 4;
       spendBtn.fontSize = 13;
-      spendBtn.isEnabled = attributes.pendingPoints > 0;
-      spendBtn.onPointerUpObservable.add(() => {
-        this.onAttributeSpend?.(name);
+      spendBtn.isEnabled = canSpend;
+      spendBtn.isFocusInvisible = false;
+      spendBtn.tabIndex = 0;
+      spendBtn.accessibilityTag = {
+        description: canSpend ? `Increase ${ATTR_DISPLAY_NAMES[name]}` : `Need points to increase ${ATTR_DISPLAY_NAMES[name]}`
+      };
+
+      const setHoverState = () => {
+        spendBtn.background = T.BTN_HOVER;
+        spendBtn.color = T.TEXT;
+        if (spendBtn.thickness !== 2) spendBtn.thickness = 1;
+      };
+      const setFocusState = () => {
+        spendBtn.background = T.BTN_HOVER;
+        spendBtn.color = T.TEXT;
+        spendBtn.thickness = 2; // Distinct visual indicator for keyboard focus
+      };
+      const setNormalState = () => {
+        spendBtn.background = T.BTN_BG;
+        spendBtn.color = canSpend ? T.GOOD : T.DIM;
+        // Do not reset focus style if the button is still actively focused
+        if (!spendBtn.isFocused) {
+          spendBtn.thickness = 1;
+        }
+      };
+
+      spendBtn.onPointerEnterObservable.add(setHoverState);
+      spendBtn.onPointerOutObservable.add(setNormalState);
+      spendBtn.onFocusObservable.add(setFocusState);
+      spendBtn.onBlurObservable.add(setNormalState);
+
+      // In Babylon.js GUI, buttons need to manually notify pointer up for keyboard interaction.
+      spendBtn.onKeyboardEventProcessedObservable.add((evt) => {
+        if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
+          spendBtn.onPointerUpObservable.notifyObservers(null as any);
+        }
       });
+
+      spendBtn.onPointerUpObservable.add(() => {
+        if (canSpend) {
+          this.onAttributeSpend?.(name);
+        }
+      });
+
       row.addControl(spendBtn);
     }
   }
