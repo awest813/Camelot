@@ -78,6 +78,40 @@ The current alpha stage is centered on combat readability and encounter stabilit
 
 ## Near-Term (Next 1–2 Releases)
 
+### Content Creation GUI Roadmap
+
+To make content creation accessible to non-programmer designers, Camelot will
+add a dedicated GUI layer on top of the existing framework + map editor data
+model.
+
+#### Release A — Authoring UX Foundations
+
+- 🧭 Dockable editor layout (Scene/Hierarchy/Inspector/Validation panes).
+- 🧭 Unified selection model shared by map entities, quest nodes, and dialogue nodes.
+- 🧭 Undo/redo history with grouped actions for transform + property edits.
+- 🧭 Context-aware hotkey/help overlay so editor workflows are discoverable in-app.
+
+#### Release B — Content-Specific Editors
+
+- 🧭 **Quest Graph GUI**: node canvas for objectives, dependencies, fail states, and rewards.
+- 🧭 **Dialogue Tree GUI**: branching conversation editor with condition/effect forms.
+- 🧭 **Loot + Spawn GUI**: weighted table editor, archetype picker, and spawn validation hints.
+- 🧭 Shared property inspectors generated from schema metadata to reduce bespoke UI code.
+
+#### Release C — Validation + Packaging Workflow
+
+- 🧭 Pre-publish validation dashboard aggregating map, quest, dialogue, and mod schema diagnostics.
+- 🧭 One-click content bundle export (map pack + quest/dialogue data + manifest).
+- 🧭 Diff-friendly JSON normalization and deterministic key ordering for source control reviews.
+- 🧭 "Play from here" test harness launchers for rapid iteration on selected content slices.
+
+#### Release D — Collaboration + Scale
+
+- 🧭 Asset/prefab browser with tags, favorites, and dependency previews.
+- 🧭 Layer/stream controls for large worlds (region visibility, lock/hide, author ownership).
+- 🧭 Merge assistant for conflicting content IDs and cross-file references.
+- 🧭 Optional cloud-backed publishing target compatible with local offline workflow.
+
 ### Framework-First Consolidation
 
 - 🧭 Expand framework runtime adapters so demo gameplay systems consume framework state as source-of-truth.
