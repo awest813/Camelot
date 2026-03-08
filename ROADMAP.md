@@ -177,12 +177,12 @@ Camelot will evolve toward a creator-friendly worldbuilding pipeline through a d
 - ✅ Place and configure structures, props, and spawn volumes with property panels — select any placed entity to open the in-editor property panel (label, loot table, spawn template, objective ID, dialogue trigger, structure ID).
 - ✅ Quest marker and dialogue trigger placement helpers with linked objective IDs.
 
-#### Phase 3: Data + Collaboration 🚧
+#### Phase 3: Data + Collaboration ✅
 
 - ✅ Validation tooling baseline shipped (missing patrol refs, short patrol routes, overlap checks).
-- 🧭 Expand validation coverage (unreachable objective hints, invalid cross-system references).
-- 🧭 Serialize maps to portable JSON/asset bundles.
-- 🧭 Import/export map packs for sharing and testing.
+- ✅ Expand validation coverage (orphaned quest-marker hints, duplicate objectiveId detection, invalid cross-system references via optional context: loot tables, spawn templates, known objective IDs).
+- ✅ Serialize maps to portable JSON/asset bundles — `exportToFile()` triggers a browser file download (F4 in editor mode).
+- ✅ Import/export map packs for sharing and testing — `importFromFile(File)` and `importFromJson(string)` re-create a layout from disk; F6 in editor mode opens a file picker.
 
 #### Phase 4: Production-Ready Pipeline
 
@@ -201,8 +201,8 @@ Camelot will evolve toward a creator-friendly worldbuilding pipeline through a d
 
 If you want to contribute now, high-impact areas are:
 
-1. Map editor Phase 2 completions: property panels for placed entities, terrain sculpting.
-2. Map editor Phase 3 expansion: richer validation rules and map-pack workflows.
+1. ~~Map editor Phase 2 completions: property panels for placed entities, terrain sculpting.~~ ✅ Complete
+2. ~~Map editor Phase 3 expansion: richer validation rules and map-pack workflows.~~ ✅ Complete
 3. Framework-first consolidation: wiring framework state as source-of-truth for demo systems.
 4. Quest/content authoring ergonomics.
 5. Save/load robustness and automated tests.

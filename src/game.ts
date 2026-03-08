@@ -631,18 +631,11 @@ export class Game {
                 this.ui.showNotification(`Terrain sculpt step: ${step.toFixed(1)}`, 1200);
             } else if (kbInfo.event.key === "F4") {
                 if (!this.mapEditorSystem.isEnabled) return;
-                const mapData = this.mapEditorSystem.exportMap();
-                const json = JSON.stringify(mapData, null, 2);
-                console.log("[MapEditor] Exported map:", json);
-                try {
-                    navigator.clipboard.writeText(json).then(() => {
-                        this.ui.showNotification("Map exported to clipboard", 2000);
-                    }).catch(() => {
-                        this.ui.showNotification("Map exported (see console)", 2000);
-                    });
-                } catch {
-                    this.ui.showNotification("Map exported (see console)", 2000);
-                }
+                this.mapEditorSystem.exportToFile();
+                this.ui.showNotification("Map exported to file", 2000);
+            } else if (kbInfo.event.key === "F6") {
+                if (!this.mapEditorSystem.isEnabled) return;
+                this._triggerMapImport();
             } else if (kbInfo.event.key === "n" || kbInfo.event.key === "N") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const placeAt = this.player.camera.position.add(this.player.getForwardDirection(8).scale(4));
@@ -948,5 +941,23 @@ export class Game {
           this.dialogueSystem.isInDialogue ||
           this.interactionSystem.isBlocked
       );
+  }
+
+  /** Opens a hidden file-input to let the user choose a map JSON to import. */
+  private _triggerMapImport(): void {
+      if (typeof document === "undefined") return;
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json,application/json";
+      input.style.display = "none";
+      input.addEventListener("change", async () => {
+          const file = input.files?.[0];
+          document.body.removeChild(input);
+          if (!file) return;
+          const ok = await this.mapEditorSystem.importFromFile(file);
+          this.ui.showNotification(ok ? "Map imported successfully" : "Map import failed: invalid file", 2500);
+      });
+      document.body.appendChild(input);
+      input.click();
   }
 }

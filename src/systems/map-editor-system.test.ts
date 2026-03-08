@@ -567,3 +567,156 @@ describe('MapEditorSystem — Phase 2 (selection tracking)', () => {
         expect(fired).toContain(null);
     });
 });
+
+// ─── Phase 3: expanded validation ────────────────────────────────────────────
+
+describe('MapEditorSystem — Phase 3 (expanded validation)', () => {
+    it('detects orphaned quest markers with no objectiveId', () => {
+        const { editor } = makeEditor();
+        editor.placeEntity(new Vector3(0, 1, 0), 'quest-marker'); // no objectiveId
+
+        const report = editor.validateMap();
+
+        expect(report.isValid).toBe(false);
+        expect(report.issues.some(i => i.code === 'orphaned-quest-marker')).toBe(true);
+    });
+
+    it('does not flag quest markers that have an objectiveId', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'quest-marker');
+        const id = mesh.metadata?.editorEntityId as string;
+        editor.setEntityProperties(id, { objectiveId: 'obj.main.001' });
+
+        const report = editor.validateMap();
+
+        expect(report.issues.filter(i => i.code === 'orphaned-quest-marker')).toHaveLength(0);
+    });
+
+    it('detects duplicate objectiveIds across multiple quest markers', () => {
+        const { editor } = makeEditor();
+        const m1 = editor.placeEntity(new Vector3(0, 1, 0), 'quest-marker');
+        const m2 = editor.placeEntity(new Vector3(5, 1, 0), 'quest-marker');
+        editor.setEntityProperties(m1.metadata?.editorEntityId as string, { objectiveId: 'obj.shared' });
+        editor.setEntityProperties(m2.metadata?.editorEntityId as string, { objectiveId: 'obj.shared' });
+
+        const report = editor.validateMap();
+
+        expect(report.isValid).toBe(false);
+        expect(report.issues.some(i => i.code === 'duplicate-objective-id')).toBe(true);
+        const dupIssue = report.issues.find(i => i.code === 'duplicate-objective-id')!;
+        expect(dupIssue.entityIds).toHaveLength(2);
+    });
+
+    it('does not flag quest markers with distinct objectiveIds as duplicates', () => {
+        const { editor } = makeEditor();
+        const m1 = editor.placeEntity(new Vector3(0, 1, 0), 'quest-marker');
+        const m2 = editor.placeEntity(new Vector3(5, 1, 0), 'quest-marker');
+        editor.setEntityProperties(m1.metadata?.editorEntityId as string, { objectiveId: 'obj.alpha' });
+        editor.setEntityProperties(m2.metadata?.editorEntityId as string, { objectiveId: 'obj.beta' });
+
+        const report = editor.validateMap();
+
+        expect(report.issues.some(i => i.code === 'duplicate-objective-id')).toBe(false);
+    });
+
+    it('detects missing loot table reference when context is provided', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'loot');
+        editor.setEntityProperties(mesh.metadata?.editorEntityId as string, { lootTableId: 'unknown_table' });
+
+        const report = editor.validateMap(0.5, { knownLootTableIds: ['common', 'dungeon'] });
+
+        expect(report.isValid).toBe(false);
+        expect(report.issues.some(i => i.code === 'missing-loot-table')).toBe(true);
+    });
+
+    it('does not flag a loot entity whose lootTableId is in the context', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'loot');
+        editor.setEntityProperties(mesh.metadata?.editorEntityId as string, { lootTableId: 'common' });
+
+        const report = editor.validateMap(0.5, { knownLootTableIds: ['common', 'dungeon'] });
+
+        expect(report.issues.some(i => i.code === 'missing-loot-table')).toBe(false);
+    });
+
+    it('detects missing spawn template reference when context is provided', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'npc-spawn');
+        editor.setEntityProperties(mesh.metadata?.editorEntityId as string, { spawnTemplateId: 'ghost_archetype' });
+
+        const report = editor.validateMap(0.5, { knownSpawnTemplateIds: ['guard', 'bandit', 'merchant'] });
+
+        expect(report.isValid).toBe(false);
+        expect(report.issues.some(i => i.code === 'missing-spawn-template')).toBe(true);
+    });
+
+    it('does not flag npc-spawn when spawnTemplateId is in the context', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'npc-spawn');
+        editor.setEntityProperties(mesh.metadata?.editorEntityId as string, { spawnTemplateId: 'guard' });
+
+        const report = editor.validateMap(0.5, { knownSpawnTemplateIds: ['guard', 'bandit'] });
+
+        expect(report.issues.some(i => i.code === 'missing-spawn-template')).toBe(false);
+    });
+
+    it('skips cross-system checks when no context is provided', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'loot');
+        editor.setEntityProperties(mesh.metadata?.editorEntityId as string, { lootTableId: 'nonexistent' });
+
+        // Without context no missing-loot-table or missing-spawn-template issues
+        const report = editor.validateMap();
+
+        expect(report.issues.some(i => i.code === 'missing-loot-table')).toBe(false);
+        expect(report.issues.some(i => i.code === 'missing-spawn-template')).toBe(false);
+    });
+
+    it('detects unknown objectiveId cross-reference when context is provided', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'quest-marker');
+        editor.setEntityProperties(mesh.metadata?.editorEntityId as string, { objectiveId: 'obj.unknown' });
+
+        const report = editor.validateMap(0.5, { knownObjectiveIds: ['obj.main.001', 'obj.main.002'] });
+
+        expect(report.isValid).toBe(false);
+        expect(report.issues.some(i => i.code === 'unknown-objective-id')).toBe(true);
+    });
+});
+
+// ─── Phase 3: importFromJson ──────────────────────────────────────────────────
+
+describe('MapEditorSystem — Phase 3 (importFromJson)', () => {
+    it('returns true and imports valid JSON map data', () => {
+        const { editor: src } = makeEditor();
+        src.placeEntity(new Vector3(2, 1, 5), 'structure');
+        const json = JSON.stringify(src.exportMap());
+
+        const { editor: dst } = makeEditor();
+        const ok = dst.importFromJson(json);
+
+        expect(ok).toBe(true);
+        const data = dst.exportMap();
+        expect(data.entries.length).toBe(1);
+        expect(data.entries[0].type).toBe('structure');
+    });
+
+    it('returns false for invalid JSON', () => {
+        const { editor } = makeEditor();
+
+        expect(editor.importFromJson('not-json')).toBe(false);
+    });
+
+    it('returns false for valid JSON that is not a map export', () => {
+        const { editor } = makeEditor();
+
+        expect(editor.importFromJson('{"foo":"bar"}')).toBe(false);
+    });
+
+    it('returns false for a map with wrong version', () => {
+        const { editor } = makeEditor();
+
+        expect(editor.importFromJson('{"version":2,"entries":[],"patrolRoutes":[]}')).toBe(false);
+    });
+});
