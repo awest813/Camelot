@@ -40,7 +40,15 @@ export interface MapExportData {
 }
 
 export interface MapValidationIssue {
-  code: "missing-patrol-group" | "patrol-route-too-short" | "entity-overlap";
+  code:
+    | "missing-patrol-group"
+    | "patrol-route-too-short"
+    | "entity-overlap"
+    | "orphaned-quest-marker"
+    | "duplicate-objective-id"
+    | "unknown-objective-id"
+    | "missing-loot-table"
+    | "missing-spawn-template";
   message: string;
   entityIds?: string[];
   patrolGroupId?: string;
@@ -49,6 +57,20 @@ export interface MapValidationIssue {
 export interface MapValidationReport {
   isValid: boolean;
   issues: MapValidationIssue[];
+}
+
+/**
+ * Optional cross-system reference tables for deeper validation.
+ * When provided, the validator checks entity property references against
+ * the supplied sets of known IDs.
+ */
+export interface MapValidationContext {
+  /** Set of valid quest objective IDs from the quest system. */
+  knownObjectiveIds?: ReadonlySet<string> | ReadonlyArray<string>;
+  /** Set of valid loot table IDs from the loot table system. */
+  knownLootTableIds?: ReadonlySet<string> | ReadonlyArray<string>;
+  /** Set of valid NPC spawn template / archetype IDs. */
+  knownSpawnTemplateIds?: ReadonlySet<string> | ReadonlyArray<string>;
 }
 
 interface EditorEntity {
@@ -356,12 +378,17 @@ export class MapEditorSystem {
    * - NPC spawns referencing missing patrol groups
    * - Patrol routes that have too few waypoints to form a route
    * - Entity overlap (same/near-identical position)
+   * - Quest markers with no objectiveId set (orphaned)
+   * - Quest markers sharing the same objectiveId (duplicate)
+   * - Loot entities referencing unknown loot table IDs (requires context)
+   * - NPC spawns referencing unknown spawn template IDs (requires context)
    */
-  validateMap(minEntitySpacing: number = 0.5): MapValidationReport {
+  validateMap(minEntitySpacing: number = 0.5, context?: MapValidationContext): MapValidationReport {
     const issues: MapValidationIssue[] = [];
     const data = this.exportMap();
     const patrolGroupIds = new Set(data.patrolRoutes.map((route) => route.id));
 
+    // ── Missing patrol group ───────────────────────────────────────────────
     for (const entry of data.entries) {
       if (entry.type !== "npc-spawn" || !entry.patrolGroupId) continue;
       if (!patrolGroupIds.has(entry.patrolGroupId)) {
@@ -374,6 +401,7 @@ export class MapEditorSystem {
       }
     }
 
+    // ── Patrol route too short ─────────────────────────────────────────────
     for (const route of data.patrolRoutes) {
       if (route.waypoints.length >= 2) continue;
       issues.push({
@@ -383,6 +411,7 @@ export class MapEditorSystem {
       });
     }
 
+    // ── Entity overlap ────────────────────────────────────────────────────
     for (let i = 0; i < data.entries.length; i++) {
       for (let j = i + 1; j < data.entries.length; j++) {
         const a = data.entries[i];
@@ -397,6 +426,77 @@ export class MapEditorSystem {
           message: `Entities '${a.id}' and '${b.id}' overlap (distance ${distance.toFixed(2)}).`,
           entityIds: [a.id, b.id],
         });
+      }
+    }
+
+    // ── Orphaned quest markers (no objectiveId) ────────────────────────────
+    for (const entry of data.entries) {
+      if (entry.type !== "quest-marker") continue;
+      if (!entry.properties?.objectiveId) {
+        issues.push({
+          code: "orphaned-quest-marker",
+          message: `Quest marker '${entry.id}' has no objectiveId set.`,
+          entityIds: [entry.id],
+        });
+      }
+    }
+
+    // ── Duplicate objectiveIds across quest markers ────────────────────────
+    const objectiveIdCount = new Map<string, string[]>();
+    for (const entry of data.entries) {
+      if (entry.type !== "quest-marker" || !entry.properties?.objectiveId) continue;
+      const oid = entry.properties.objectiveId;
+      const existing = objectiveIdCount.get(oid) ?? [];
+      existing.push(entry.id);
+      objectiveIdCount.set(oid, existing);
+    }
+    for (const [oid, ids] of objectiveIdCount) {
+      if (ids.length < 2) continue;
+      issues.push({
+        code: "duplicate-objective-id",
+        message: `ObjectiveId '${oid}' is used by ${ids.length} quest markers: ${ids.join(", ")}.`,
+        entityIds: ids,
+      });
+    }
+
+    if (context) {
+      const knownObjIds   = context.knownObjectiveIds    ? new Set(context.knownObjectiveIds)    : null;
+      const knownLootIds  = context.knownLootTableIds    ? new Set(context.knownLootTableIds)    : null;
+      const knownSpawnIds = context.knownSpawnTemplateIds ? new Set(context.knownSpawnTemplateIds) : null;
+
+      for (const entry of data.entries) {
+        // ── Invalid cross-system: objectiveId ────────────────────────────
+        if (knownObjIds && entry.type === "quest-marker" && entry.properties?.objectiveId) {
+          if (!knownObjIds.has(entry.properties.objectiveId)) {
+            issues.push({
+              code: "unknown-objective-id",
+              message: `Quest marker '${entry.id}' references unknown objectiveId '${entry.properties.objectiveId}'.`,
+              entityIds: [entry.id],
+            });
+          }
+        }
+
+        // ── Invalid cross-system: lootTableId ────────────────────────────
+        if (knownLootIds && entry.type === "loot" && entry.properties?.lootTableId) {
+          if (!knownLootIds.has(entry.properties.lootTableId)) {
+            issues.push({
+              code: "missing-loot-table",
+              message: `Loot entity '${entry.id}' references unknown loot table '${entry.properties.lootTableId}'.`,
+              entityIds: [entry.id],
+            });
+          }
+        }
+
+        // ── Invalid cross-system: spawnTemplateId ─────────────────────────
+        if (knownSpawnIds && entry.type === "npc-spawn" && entry.properties?.spawnTemplateId) {
+          if (!knownSpawnIds.has(entry.properties.spawnTemplateId)) {
+            issues.push({
+              code: "missing-spawn-template",
+              message: `NPC spawn '${entry.id}' references unknown spawn template '${entry.properties.spawnTemplateId}'.`,
+              entityIds: [entry.id],
+            });
+          }
+        }
       }
     }
 
@@ -442,6 +542,62 @@ export class MapEditorSystem {
     }
   }
 
+  /**
+   * Import a map layout from a raw JSON string.
+   * Returns `true` on success, `false` if the string is not valid JSON or not
+   * a recognised MapExportData structure.
+   */
+  importFromJson(json: string): boolean {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(json);
+    } catch {
+      return false;
+    }
+
+    if (!this._isMapExportData(parsed)) return false;
+    this.importMap(parsed as MapExportData);
+    return true;
+  }
+
+  /**
+   * Import a map layout from a browser File object (e.g. from an
+   * `<input type="file">` element).  Returns a Promise that resolves to `true`
+   * on success and `false` on parse / structure errors.
+   */
+  importFromFile(file: File): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        resolve(this.importFromJson(text));
+      };
+      reader.onerror = () => resolve(false);
+      reader.readAsText(file);
+    });
+  }
+
+  /**
+   * Serialize the current editor layout to a JSON file and trigger a browser
+   * download.  No-ops in non-browser (headless / SSR) environments.
+   *
+   * @param filename  Optional filename override (defaults to a timestamped name).
+   */
+  exportToFile(filename?: string): void {
+    if (typeof document === "undefined") return; // headless / SSR guard
+
+    const json = JSON.stringify(this.exportMap(), null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = filename ?? `camelot_map_${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   // ─── Cleanup ────────────────────────────────────────────────────────────────
 
   /** Remove all editor entities and patrol visualizations from the scene. */
@@ -458,6 +614,7 @@ export class MapEditorSystem {
     this._activePatrolGroupId = null;
     this._clearSelection();
   }
+
 
   // ─── Private helpers ────────────────────────────────────────────────────────
 
@@ -559,6 +716,15 @@ export class MapEditorSystem {
     return this._entities.find((entity) => {
       return entity.mesh.metadata?.editorEntityId === entityId;
     });
+  }
+
+  private _isMapExportData(value: unknown): boolean {
+    if (typeof value !== "object" || value === null) return false;
+    const v = value as Record<string, unknown>;
+    if (v["version"] !== 1) return false;
+    if (!Array.isArray(v["entries"])) return false;
+    if (!Array.isArray(v["patrolRoutes"])) return false;
+    return true;
   }
 
   private _createGridMesh(): Mesh {
