@@ -174,7 +174,7 @@ Camelot will evolve toward a creator-friendly worldbuilding pipeline through a d
 - ✅ Patrol route authoring — P key starts a new NPC patrol group; NPC spawn points placed in the same group are connected by a visible route line.
 - ✅ Map export to portable JSON — F4 key serializes all placed entities and patrol routes.
 - ✅ Map import from JSON — re-creates editor entities from a previously exported layout.
-- 🧭 Place and configure structures, props, and spawn volumes with property panels.
+- ✅ Place and configure structures, props, and spawn volumes with property panels — select any placed entity to open the in-editor property panel (label, loot table, spawn template, objective ID, dialogue trigger, structure ID).
 - ✅ Quest marker and dialogue trigger placement helpers with linked objective IDs.
 
 #### Phase 3: Data + Collaboration 🚧

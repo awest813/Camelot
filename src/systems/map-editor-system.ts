@@ -105,6 +105,14 @@ export class MapEditorSystem {
   public terrainTool: EditorTerrainTool = "none";
   public terrainSculptStep: number = 0.5;
 
+  /**
+   * Called whenever the selected entity changes.
+   * Receives `null` when the selection is cleared.
+   */
+  public onEntitySelectionChanged:
+    | ((entityId: string | null) => void)
+    | null = null;
+
   private readonly scene: Scene;
   private readonly gizmoManager: GizmoManager;
   private readonly gridMesh: Mesh;
@@ -114,6 +122,7 @@ export class MapEditorSystem {
   private _patrolGroups: Map<string, PatrolGroup> = new Map();
   private _activePatrolGroupId: string | null = null;
   private _patrolGroupCounter: number = 0;
+  private _selectedEntityId: string | null = null;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -152,9 +161,9 @@ export class MapEditorSystem {
       });
 
       if (pick?.hit && pick.pickedMesh) {
-        this.gizmoManager.attachToMesh(pick.pickedMesh as Mesh);
+        this._selectMesh(pick.pickedMesh as Mesh);
       } else {
-        this.gizmoManager.attachToMesh(null);
+        this._clearSelection();
       }
     });
   }
@@ -165,9 +174,14 @@ export class MapEditorSystem {
     this.isEnabled = !this.isEnabled;
     this.gridMesh.setEnabled(this.isEnabled);
     if (!this.isEnabled) {
-      this.gizmoManager.attachToMesh(null);
+      this._clearSelection();
     }
     return this.isEnabled;
+  }
+
+  /** Returns the editor entity ID of the currently selected entity, or null. */
+  get selectedEntityId(): string | null {
+    return this._selectedEntityId;
   }
 
   cycleGizmoMode(): EditorGizmoMode {
@@ -240,7 +254,7 @@ export class MapEditorSystem {
     mesh.metadata.editorProperties = entity.properties;
 
     this._entities.push(entity);
-    this.gizmoManager.attachToMesh(mesh);
+    this._selectMesh(mesh);
     return mesh;
   }
 
@@ -257,6 +271,25 @@ export class MapEditorSystem {
       ...(entity.mesh.metadata ?? {}),
       editorProperties: entity.properties,
     };
+    return true;
+  }
+
+  /**
+   * Remove the entity with the given ID from the editor, disposing its mesh.
+   * Returns true if the entity was found and removed, false otherwise.
+   */
+  removeEntity(entityId: string): boolean {
+    const idx = this._entities.findIndex(
+      (e) => e.mesh.metadata?.editorEntityId === entityId,
+    );
+    if (idx === -1) return false;
+
+    const entity = this._entities[idx];
+    if (this._selectedEntityId === entityId) {
+      this._clearSelection();
+    }
+    entity.mesh.dispose();
+    this._entities.splice(idx, 1);
     return true;
   }
 
@@ -423,10 +456,27 @@ export class MapEditorSystem {
     }
     this._patrolGroups.clear();
     this._activePatrolGroupId = null;
-    this.gizmoManager.attachToMesh(null);
+    this._clearSelection();
   }
 
   // ─── Private helpers ────────────────────────────────────────────────────────
+
+  private _selectMesh(mesh: Mesh): void {
+    this.gizmoManager.attachToMesh(mesh);
+    const newId = mesh.metadata?.editorEntityId as string | undefined ?? null;
+    if (newId !== this._selectedEntityId) {
+      this._selectedEntityId = newId;
+      this.onEntitySelectionChanged?.(this._selectedEntityId);
+    }
+  }
+
+  private _clearSelection(): void {
+    this.gizmoManager.attachToMesh(null);
+    if (this._selectedEntityId !== null) {
+      this._selectedEntityId = null;
+      this.onEntitySelectionChanged?.(null);
+    }
+  }
 
   private _buildEntityMesh(id: string, position: Vector3, type: EditorPlacementType): Mesh {
     let mesh: Mesh;

@@ -77,11 +77,12 @@ The in-engine **Map Editor** (activated with F2) lets you author world content w
 - Marker placement at the player's view position.
 - Terrain sculpt/paint pass on loaded chunk meshes (press **H** to cycle terrain tool; click to apply).
 
-### Phase 2 — Content Authoring (active)
+### Phase 2 — Content Authoring (complete)
 
 - **Five placement types** selectable with T: `marker`, `loot`, `npc-spawn`, `quest-marker`, `structure` — each with a distinct mesh shape and colour.
 - **Patrol route authoring**: press P to start a new NPC patrol group; each NPC spawn point placed while the group is active is added to the route and connected by a visible overlay line.
 - **Map export / import**: press F4 to serialize the full editor layout (entities + patrol routes) to a portable JSON object (copied to clipboard or printed to console). The JSON can be re-imported to recreate the layout in a fresh session.
+- **Property panel**: select any placed entity to open the in-editor property panel; configure label, loot table ID, spawn template, objective ID, dialogue trigger, or structure ID. Press Apply to commit changes or Delete to remove the entity.
 
 ### Phase 3 — Validation + Data Safety (active)
 

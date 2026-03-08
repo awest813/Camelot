@@ -26,6 +26,7 @@ import { Loot } from "./entities/loot";
 import { FrameworkRuntime } from "./framework/runtime/framework-runtime";
 import { frameworkBaseContent } from "./framework/content/base-content";
 import { MapEditorSystem } from "./systems/map-editor-system";
+import { MapEditorPropertyPanel } from "./ui/map-editor-property-panel";
 import { AttributeSystem } from "./systems/attribute-system";
 import { TimeSystem } from "./systems/time-system";
 import { StealthSystem } from "./systems/stealth-system";
@@ -61,6 +62,7 @@ export class Game {
   public navigationSystem: NavigationSystem;
   public frameworkRuntime: FrameworkRuntime;
   public mapEditorSystem: MapEditorSystem;
+  public mapEditorPropertyPanel: MapEditorPropertyPanel;
 
   // v2 systems (Oblivion-lite)
   public attributeSystem: AttributeSystem;
@@ -169,6 +171,29 @@ export class Game {
     this.dialogueSystem.dialogueSessionProvider = (targetNpc) => this._createFrameworkDialogueSession(targetNpc.mesh.name);
     this._loadFrameworkMods();
     this.mapEditorSystem = new MapEditorSystem(this.scene);
+
+    // ── Map editor property panel ─────────────────────────────────────────────
+    this.mapEditorPropertyPanel = new MapEditorPropertyPanel(this.ui.uiTexture);
+    this.mapEditorPropertyPanel.onApply = (entityId, props) => {
+      this.mapEditorSystem.setEntityProperties(entityId, props);
+      this.ui.showNotification("Properties applied", 1200);
+    };
+    this.mapEditorPropertyPanel.onDelete = (entityId) => {
+      this.mapEditorSystem.removeEntity(entityId);
+      this.ui.showNotification("Entity deleted", 1200);
+    };
+    this.mapEditorSystem.onEntitySelectionChanged = (entityId) => {
+      if (entityId === null) {
+        this.mapEditorPropertyPanel.hide();
+        return;
+      }
+      const entity = this.mapEditorSystem.getEntityProperties(entityId);
+      const mesh = this.scene.getMeshByName(entityId);
+      const type = mesh?.metadata?.editorType;
+      if (type && entity !== null) {
+        this.mapEditorPropertyPanel.show(entityId, type, entity);
+      }
+    };
 
     // ── v2 system wiring ──────────────────────────────────────────────────────
     this.stealthSystem   = new StealthSystem(this.player, this.scheduleSystem.npcs, this.ui);

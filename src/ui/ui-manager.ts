@@ -40,6 +40,8 @@ const clampPercentage = (current: number, max: number): string => {
 
 export class UIManager {
   public scene: Scene;
+  /** The underlying Babylon.js AdvancedDynamicTexture used for all 2-D UI. */
+  public get uiTexture(): AdvancedDynamicTexture { return this._ui; }
   private _ui: AdvancedDynamicTexture;
 
   // Bars

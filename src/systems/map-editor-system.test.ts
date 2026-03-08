@@ -449,3 +449,121 @@ describe('MapEditorSystem — Phase 3 (validation)', () => {
         expect(report.issues.some(issue => issue.code === 'entity-overlap')).toBe(true);
     });
 });
+
+// ─── Phase 2: removeEntity ────────────────────────────────────────────────────
+
+describe('MapEditorSystem — Phase 2 (removeEntity)', () => {
+    it('removes an entity by id and returns true', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'loot');
+        const entityId = mesh.metadata?.editorEntityId as string;
+
+        const removed = editor.removeEntity(entityId);
+
+        expect(removed).toBe(true);
+        const data = editor.exportMap();
+        expect(data.entries.length).toBe(0);
+    });
+
+    it('returns false when entity id does not exist', () => {
+        const { editor } = makeEditor();
+
+        expect(editor.removeEntity('nonexistent')).toBe(false);
+    });
+
+    it('only removes the targeted entity, leaving others intact', () => {
+        const { editor } = makeEditor();
+        const m1 = editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        editor.placeEntity(new Vector3(5, 1, 0), 'loot');
+        const idToRemove = m1.metadata?.editorEntityId as string;
+
+        editor.removeEntity(idToRemove);
+
+        const data = editor.exportMap();
+        expect(data.entries.length).toBe(1);
+        expect(data.entries[0].type).toBe('loot');
+    });
+
+    it('clears selection when the selected entity is removed', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        const entityId = mesh.metadata?.editorEntityId as string;
+
+        expect(editor.selectedEntityId).toBe(entityId);
+
+        editor.removeEntity(entityId);
+
+        expect(editor.selectedEntityId).toBeNull();
+    });
+});
+
+// ─── Phase 2: selection tracking ─────────────────────────────────────────────
+
+describe('MapEditorSystem — Phase 2 (selection tracking)', () => {
+    it('selectedEntityId is set when an entity is placed', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        const entityId = mesh.metadata?.editorEntityId as string;
+
+        expect(editor.selectedEntityId).toBe(entityId);
+    });
+
+    it('selectedEntityId is null initially', () => {
+        const { editor } = makeEditor();
+
+        expect(editor.selectedEntityId).toBeNull();
+    });
+
+    it('selectedEntityId is null after clearAll', () => {
+        const { editor } = makeEditor();
+        editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+
+        editor.clearAll();
+
+        expect(editor.selectedEntityId).toBeNull();
+    });
+
+    it('selectedEntityId is null after toggle off', () => {
+        const { editor } = makeEditor();
+        editor.toggle();
+        editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+
+        editor.toggle(); // off
+
+        expect(editor.selectedEntityId).toBeNull();
+    });
+
+    it('onEntitySelectionChanged fires with entity id when entity is placed', () => {
+        const { editor } = makeEditor();
+        const calls: Array<string | null> = [];
+        editor.onEntitySelectionChanged = (id) => calls.push(id);
+
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        const entityId = mesh.metadata?.editorEntityId as string;
+
+        expect(calls).toContain(entityId);
+    });
+
+    it('onEntitySelectionChanged fires with null after clearAll', () => {
+        const { editor } = makeEditor();
+        const calls: Array<string | null> = [];
+        editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+
+        editor.onEntitySelectionChanged = (id) => calls.push(id);
+        editor.clearAll();
+
+        expect(calls[calls.length - 1]).toBeNull();
+    });
+
+    it('onEntitySelectionChanged fires with null when editor is toggled off', () => {
+        const { editor } = makeEditor();
+        editor.toggle();
+        editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        const fired: Array<string | null> = [];
+        editor.onEntitySelectionChanged = (id) => fired.push(id);
+
+        editor.toggle();
+
+        expect(fired).toContain(null);
+    });
+});
