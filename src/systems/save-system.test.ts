@@ -120,6 +120,36 @@ describe('SaveSystem', () => {
         expect(saveSystem.hasSave()).toBe(false);
     });
 
+
+
+    it('autosave persists once the interval elapses while dirty', () => {
+        saveSystem.setAutosaveInterval(5);
+        saveSystem.markDirty();
+
+        saveSystem.tickAutosave(2);
+        expect(localStorage.setItem).not.toHaveBeenCalled();
+
+        saveSystem.tickAutosave(3);
+        expect(localStorage.setItem).toHaveBeenCalledOnce();
+    });
+
+    it('autosave does not run when state is not dirty', () => {
+        saveSystem.setAutosaveInterval(1);
+        saveSystem.tickAutosave(10);
+        expect(localStorage.setItem).not.toHaveBeenCalled();
+    });
+
+    it('manual save clears dirty autosave state', () => {
+        saveSystem.setAutosaveInterval(1);
+        saveSystem.markDirty();
+        saveSystem.save();
+
+        (localStorage.setItem as any).mockClear();
+        saveSystem.tickAutosave(5);
+        expect(localStorage.setItem).not.toHaveBeenCalled();
+    });
+
+
     // ── load() ──────────────────────────────────────────────────────────────
 
     it('should notify and return false when no save exists', () => {

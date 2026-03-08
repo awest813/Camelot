@@ -99,6 +99,9 @@ export class SaveSystem {
   // v6 optional systems
   private _spellSystem: SpellSystem | null = null;
   private _persuasionSystem: PersuasionSystem | null = null;
+  private _autosaveIntervalSeconds = 30;
+  private _autosaveAccumulator = 0;
+  private _autosaveDirty = false;
 
   /** Called after a successful load so Game can clean up world state (e.g. remove already-collected loot). */
   public onAfterLoad: (() => void) | null = null;
@@ -197,6 +200,41 @@ export class SaveSystem {
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
+    this._autosaveDirty = false;
+    this._autosaveAccumulator = 0;
+  }
+
+  /**
+   * Marks runtime state as dirty so the next autosave window persists changes.
+   * Call this from gameplay systems on meaningful state transitions.
+   */
+  public markDirty(): void {
+    this._autosaveDirty = true;
+  }
+
+  /**
+   * Advances the autosave timer and performs a save when:
+   * - autosave is enabled (interval > 0),
+   * - gameplay state is marked dirty, and
+   * - interval has elapsed.
+   */
+  public tickAutosave(deltaSeconds: number): void {
+    if (this._autosaveIntervalSeconds <= 0) return;
+    if (!this._autosaveDirty) return;
+    if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return;
+
+    this._autosaveAccumulator += deltaSeconds;
+    if (this._autosaveAccumulator < this._autosaveIntervalSeconds) return;
+
+    this.save();
+  }
+
+  /**
+   * Configures autosave cadence in seconds. Set to <= 0 to disable autosave.
+   */
+  public setAutosaveInterval(seconds: number): void {
+    this._autosaveIntervalSeconds = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+    this._autosaveAccumulator = 0;
   }
 
   public load(): boolean {
@@ -320,6 +358,8 @@ export class SaveSystem {
 
   public deleteSave(): void {
     localStorage.removeItem(SAVE_KEY);
+    this._autosaveDirty = false;
+    this._autosaveAccumulator = 0;
   }
 
   // ── File export / import (browser-safe) ───────────────────────────────────
@@ -406,6 +446,8 @@ export class SaveSystem {
     const ok = this.load();
     if (ok) {
       this._ui.showNotification("Save imported successfully!", 2500);
+      this._autosaveDirty = false;
+      this._autosaveAccumulator = 0;
     }
     return ok;
   }

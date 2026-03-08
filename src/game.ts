@@ -825,6 +825,8 @@ export class Game {
       // Tick the navmesh rebuild debounce; request a rebuild whenever the player
       // crosses into a new terrain chunk (new ground meshes may have loaded).
       this.navigationSystem.update(deltaTime);
+      this.saveSystem.markDirty();
+      this.saveSystem.tickAutosave(deltaTime);
       const chunkSize = 50;
       const cx = Math.floor(this.player.camera.position.x / chunkSize);
       const cz = Math.floor(this.player.camera.position.z / chunkSize);
