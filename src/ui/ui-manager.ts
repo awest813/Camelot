@@ -113,6 +113,18 @@ export class UIManager {
   /** Called when the player clicks a "+1" attribute button.  Set by Game. */
   public onAttributeSpend: ((name: AttributeName) => void) | null = null;
 
+  // ── Wait Dialog ───────────────────────────────────────────────────────────
+  private _waitPanel: Rectangle | null = null;
+  private _waitHoursLabel: TextBlock | null = null;
+  private _waitHoursValue: number = 8;
+  public isWaitDialogOpen: boolean = false;
+  /** Called with the chosen hour count when the player confirms the wait. */
+  public onWaitConfirm: ((hours: number) => void) | null = null;
+
+  // ── Compass HUD ────────────────────────────────────────────────────────────
+  private _compassPanel: Rectangle | null = null;
+  private _compassLabel: TextBlock | null = null;
+
   constructor(scene: Scene) {
     this.scene = scene;
     this._initUI();
@@ -124,6 +136,8 @@ export class UIManager {
     this._initStealthHUD();
     this._initClockHUD();
     this._initAttributePanel();
+    this._initWaitDialog();
+    this._initCompassHUD();
   }
 
   // ── Init methods ─────────────────────────────────────────────────────────────
@@ -756,7 +770,8 @@ export class UIManager {
       this.pausePanel.isVisible ||
       this.questLogPanel.isVisible ||
       this.skillTreePanel.isVisible ||
-      !!this.attributePanel?.isVisible;
+      !!this.attributePanel?.isVisible ||
+      this.isWaitDialogOpen;
 
     this.toggleCrosshair(!hasBlockingPanelOpen);
   }
@@ -1449,5 +1464,186 @@ export class UIManager {
       case "luck":         return `Crit ${(attrs.critChance * 100).toFixed(1)}%`;
       default:             return "";
     }
+  }
+
+  // ── Wait Dialog ───────────────────────────────────────────────────────────
+
+  private _initWaitDialog(): void {
+    const panel = new Rectangle("waitPanel");
+    panel.width  = "340px";
+    panel.height = "260px";
+    panel.cornerRadius = 8;
+    panel.color = T.PANEL_BORDER;
+    panel.thickness = 2;
+    panel.background = T.PANEL_BG;
+    panel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    panel.verticalAlignment   = Control.VERTICAL_ALIGNMENT_CENTER;
+    panel.zIndex = 15;
+    panel.isVisible = false;
+    this._ui.addControl(panel);
+    this._waitPanel = panel;
+
+    // Title
+    const title = new TextBlock("waitTitle");
+    title.text   = "Wait";
+    title.color  = T.TITLE;
+    title.fontSize = 20;
+    title.fontWeight = "bold";
+    title.height = "36px";
+    title.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    title.top    = "14px";
+    panel.addControl(title);
+
+    // Subtitle
+    const sub = new TextBlock("waitSub");
+    sub.text   = "How many hours do you wish to wait?";
+    sub.color  = T.DIM;
+    sub.fontSize = 13;
+    sub.height = "24px";
+    sub.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    sub.top    = "50px";
+    panel.addControl(sub);
+
+    // Hour selector row
+    const selectorRow = new StackPanel("waitSelectorRow");
+    selectorRow.isVertical = false;
+    selectorRow.width  = "300px";
+    selectorRow.height = "50px";
+    selectorRow.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    selectorRow.top    = "86px";
+    selectorRow.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    panel.addControl(selectorRow);
+
+    const btnMinus = Button.CreateSimpleButton("waitMinus", "◀");
+    btnMinus.width  = "44px";
+    btnMinus.height = "44px";
+    btnMinus.color  = T.TEXT;
+    btnMinus.background = T.BTN_BG;
+    btnMinus.cornerRadius = 6;
+    btnMinus.fontSize = 18;
+    selectorRow.addControl(btnMinus);
+
+    const hoursLabel = new TextBlock("waitHours");
+    hoursLabel.text  = `${this._waitHoursValue} h`;
+    hoursLabel.color = T.TITLE;
+    hoursLabel.fontSize = 24;
+    hoursLabel.fontWeight = "bold";
+    hoursLabel.width = "110px";
+    hoursLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    selectorRow.addControl(hoursLabel);
+    this._waitHoursLabel = hoursLabel;
+
+    const btnPlus = Button.CreateSimpleButton("waitPlus", "▶");
+    btnPlus.width  = "44px";
+    btnPlus.height = "44px";
+    btnPlus.color  = T.TEXT;
+    btnPlus.background = T.BTN_BG;
+    btnPlus.cornerRadius = 6;
+    btnPlus.fontSize = 18;
+    selectorRow.addControl(btnPlus);
+
+    // Hook: change hour value
+    const clamp = (v: number) => Math.max(1, Math.min(24, v));
+    const refresh = () => {
+      if (this._waitHoursLabel) this._waitHoursLabel.text = `${this._waitHoursValue} h`;
+    };
+    btnMinus.onPointerUpObservable.add(() => { this._waitHoursValue = clamp(this._waitHoursValue - 1); refresh(); });
+    btnPlus.onPointerUpObservable.add(()  => { this._waitHoursValue = clamp(this._waitHoursValue + 1); refresh(); });
+
+    // Confirm / Cancel buttons
+    const btnRow = new StackPanel("waitBtnRow");
+    btnRow.isVertical = false;
+    btnRow.width  = "300px";
+    btnRow.height = "44px";
+    btnRow.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+    btnRow.top    = "-20px";
+    btnRow.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    panel.addControl(btnRow);
+
+    const waitBtn = Button.CreateSimpleButton("waitConfirm", "Wait");
+    waitBtn.width  = "130px";
+    waitBtn.height = "38px";
+    waitBtn.color  = T.GOOD;
+    waitBtn.background = T.BTN_BG;
+    waitBtn.cornerRadius = 4;
+    waitBtn.fontSize = 14;
+    waitBtn.paddingRight = "8px";
+    waitBtn.onPointerUpObservable.add(() => {
+      this.onWaitConfirm?.(this._waitHoursValue);
+      this.toggleWaitDialog(false);
+    });
+    btnRow.addControl(waitBtn);
+
+    const cancelBtn = Button.CreateSimpleButton("waitCancel", "Cancel");
+    cancelBtn.width  = "130px";
+    cancelBtn.height = "38px";
+    cancelBtn.color  = T.TEXT;
+    cancelBtn.background = T.BTN_BG;
+    cancelBtn.cornerRadius = 4;
+    cancelBtn.fontSize = 14;
+    cancelBtn.paddingLeft = "8px";
+    cancelBtn.onPointerUpObservable.add(() => this.toggleWaitDialog(false));
+    btnRow.addControl(cancelBtn);
+  }
+
+  public toggleWaitDialog(visible: boolean): void {
+    if (!this._waitPanel) return;
+    this.isWaitDialogOpen = visible;
+    this._waitPanel.isVisible = visible;
+    this._syncCrosshairVisibility();
+  }
+
+  // ── Compass HUD ───────────────────────────────────────────────────────────
+
+  private _initCompassHUD(): void {
+    // Outer pill container at the top center
+    const panel = new Rectangle("compassPanel");
+    panel.width  = "220px";
+    panel.height = "32px";
+    panel.cornerRadius = 6;
+    panel.color = T.PANEL_BORDER;
+    panel.thickness = 1;
+    panel.background = "rgba(6, 4, 2, 0.72)";
+    panel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    panel.verticalAlignment   = Control.VERTICAL_ALIGNMENT_TOP;
+    panel.top = "6px";
+    panel.zIndex = 5;
+    this._ui.addControl(panel);
+    this._compassPanel = panel;
+
+    const label = new TextBlock("compassLabel");
+    label.text  = "N";
+    label.color = T.TEXT;
+    label.fontSize = 13;
+    label.fontFamily = "monospace";
+    label.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    label.textVerticalAlignment   = Control.VERTICAL_ALIGNMENT_CENTER;
+    panel.addControl(label);
+    this._compassLabel = label;
+  }
+
+  /**
+   * Update the compass strip from the camera's Y-axis rotation.
+   *
+   * @param yawRadians  Camera yaw in radians (camera.rotation.y in Babylon.js).
+   *                    Positive values rotate clockwise (East).
+   */
+  public updateCompass(yawRadians: number): void {
+    if (!this._compassLabel) return;
+
+    // Normalise yaw to [0, 360)
+    const deg = ((yawRadians * (180 / Math.PI)) % 360 + 360) % 360;
+
+    // Map degrees to compass segments (each segment = 45°, centred on its direction)
+    const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+    const idx = Math.round(deg / 45) % 8;
+
+    // Show three visible directions; the current facing direction is wrapped in
+    // angle brackets to visually distinguish it from its neighbours.
+    const prev = directions[(idx + 7) % 8];
+    const curr = directions[idx];
+    const next = directions[(idx + 1) % 8];
+
+    this._compassLabel.text = `${prev}  ‹ ${curr} ›  ${next}`;
   }
 }

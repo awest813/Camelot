@@ -19,9 +19,10 @@ import type { AlchemySystem } from "./alchemy-system";
 import type { EnchantingSystem } from "./enchanting-system";
 import type { WeatherSystem } from "./weather-system";
 import type { QuickSlotSystem } from "./quickslot-system";
+import type { WaitSystem } from "./wait-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 9;
+const SAVE_VERSION = 10;
 /** Oldest save version that can still be loaded (forward-compat window). */
 const SAVE_VERSION_MIN = 5;
 
@@ -59,6 +60,7 @@ interface ParsedSaveData {
   enchanting?: unknown;
   weather?: unknown;
   quickSlots?: unknown;
+  wait?: unknown;
 }
 
 interface EquipmentEntry {
@@ -93,6 +95,8 @@ export interface SaveData {
   // v9 additions
   weather?: any;
   quickSlots?: any;
+  // v10 additions
+  wait?: any;
 }
 
 export class SaveSystem {
@@ -126,6 +130,9 @@ export class SaveSystem {
   // v9 optional systems
   private _weatherSystem: WeatherSystem | null = null;
   private _quickSlotSystem: QuickSlotSystem | null = null;
+
+  // v10 optional systems
+  private _waitSystem: WaitSystem | null = null;
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
   private _autosaveDirty = false;
@@ -181,6 +188,10 @@ export class SaveSystem {
 
   public setWeatherSystem(s: WeatherSystem): void       { this._weatherSystem = s; }
   public setQuickSlotSystem(s: QuickSlotSystem): void   { this._quickSlotSystem = s; }
+
+  // ── v10 system injection ──────────────────────────────────────────────────
+
+  public setWaitSystem(s: WaitSystem): void              { this._waitSystem = s; }
 
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
@@ -241,6 +252,7 @@ export class SaveSystem {
     if (this._enchantingSystem) data.enchanting  = this._enchantingSystem.getSaveState();
     if (this._weatherSystem)    data.weather     = this._weatherSystem.getSaveState();
     if (this._quickSlotSystem)  data.quickSlots  = this._quickSlotSystem.getSaveState();
+    if (this._waitSystem)       data.wait        = this._waitSystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -388,6 +400,8 @@ export class SaveSystem {
     // v9 systems
     if (this._weatherSystem && data.weather)       this._weatherSystem.restoreFromSave(data.weather as any);
     if (this._quickSlotSystem && data.quickSlots)  this._quickSlotSystem.restoreFromSave(data.quickSlots as any);
+    // v10 systems
+    if (this._waitSystem && data.wait)             this._waitSystem.restoreFromSave(data.wait as any);
 
     // Restore encumbrance stats
     if (typeof data.player.maxCarryWeight === "number") {
@@ -545,6 +559,7 @@ export class SaveSystem {
       enchanting: data.enchanting,
       weather: data.weather,
       quickSlots: data.quickSlots,
+      wait: data.wait,
     };
   }
 
