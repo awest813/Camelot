@@ -1,6 +1,40 @@
 import { describe, it, expect } from "vitest";
 import { frameworkBaseContent } from "./content/base-content";
 import { FrameworkRuntime } from "./runtime/framework-runtime";
+import type { RpgContentBundle } from "./content/content-types";
+
+// A minimal content bundle with a skill-gated dialogue choice for testing
+// the skillLevelProvider integration.
+const skillGatedContent: RpgContentBundle = {
+  ...frameworkBaseContent,
+  dialogues: [
+    ...frameworkBaseContent.dialogues,
+    {
+      id: "skill_test_dialogue",
+      startNodeId: "root",
+      nodes: [
+        {
+          id: "root",
+          speaker: "TestNPC",
+          text: "Can you open the magic gate?",
+          choices: [
+            {
+              id: "use_arcana",
+              text: "Let me try. (requires arcana 3)",
+              endsDialogue: true,
+              conditions: [{ type: "skill_min", skillId: "arcana", min: 3 }],
+            },
+            {
+              id: "walk_away",
+              text: "Not today.",
+              endsDialogue: true,
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
 
 describe("FrameworkRuntime integration", () => {
   it("runs dialogue -> faction updates -> quest progression -> save snapshot", () => {
@@ -37,5 +71,48 @@ describe("FrameworkRuntime integration", () => {
     expect(save.state.factionState).toBeTruthy();
     expect(save.state.questState).toBeTruthy();
     expect(save.profileId).toBe("integration_profile");
+  });
+});
+
+describe("FrameworkRuntime — skillLevelProvider", () => {
+  it("blocks skill_min dialogue choice when no provider is configured", () => {
+    const runtime = new FrameworkRuntime(skillGatedContent, { inventoryCapacity: 10 });
+    const session = runtime.createDialogueSession("skill_test_dialogue");
+    const node = session.getCurrentNode()!;
+    const arcanaChoice = node.choices.find(c => c.id === "use_arcana")!;
+    expect(arcanaChoice.isAvailable).toBe(false);
+  });
+
+  it("blocks skill_min dialogue choice when provider returns insufficient rank", () => {
+    const runtime = new FrameworkRuntime(skillGatedContent, {
+      inventoryCapacity: 10,
+      skillLevelProvider: () => 2, // rank 2 < required 3
+    });
+    const session = runtime.createDialogueSession("skill_test_dialogue");
+    const node = session.getCurrentNode()!;
+    const arcanaChoice = node.choices.find(c => c.id === "use_arcana")!;
+    expect(arcanaChoice.isAvailable).toBe(false);
+  });
+
+  it("allows skill_min dialogue choice when provider returns sufficient rank", () => {
+    const runtime = new FrameworkRuntime(skillGatedContent, {
+      inventoryCapacity: 10,
+      skillLevelProvider: (skillId) => skillId === "arcana" ? 3 : 0,
+    });
+    const session = runtime.createDialogueSession("skill_test_dialogue");
+    const node = session.getCurrentNode()!;
+    const arcanaChoice = node.choices.find(c => c.id === "use_arcana")!;
+    expect(arcanaChoice.isAvailable).toBe(true);
+  });
+
+  it("choices without skill conditions remain available regardless of provider", () => {
+    const runtime = new FrameworkRuntime(skillGatedContent, {
+      inventoryCapacity: 10,
+      skillLevelProvider: () => 0,
+    });
+    const session = runtime.createDialogueSession("skill_test_dialogue");
+    const node = session.getCurrentNode()!;
+    const walkAway = node.choices.find(c => c.id === "walk_away")!;
+    expect(walkAway.isAvailable).toBe(true);
   });
 });

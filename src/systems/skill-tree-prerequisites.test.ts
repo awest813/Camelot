@@ -83,3 +83,40 @@ describe("SkillTreeSystem — prerequisites", () => {
     expect(sys.arePrerequisitesMet(2, 2)).toBe(true);
   });
 });
+
+describe("SkillTreeSystem — getSkillRank", () => {
+  let player: any;
+  let ui: any;
+  let sys: SkillTreeSystem;
+
+  beforeEach(() => {
+    player = makePlayer();
+    ui = makeUI();
+    sys = new SkillTreeSystem(player, ui);
+  });
+
+  it("returns 0 for an unknown skill id", () => {
+    expect(sys.getSkillRank("nonexistent_skill")).toBe(0);
+  });
+
+  it("returns 0 for a known but unpurchased skill", () => {
+    expect(sys.getSkillRank("iron_skin")).toBe(0);
+  });
+
+  it("returns current rank after purchasing", () => {
+    sys.purchaseSkill(0, 0); // iron_skin rank 1
+    expect(sys.getSkillRank("iron_skin")).toBe(1);
+  });
+
+  it("returns updated rank after multiple purchases", () => {
+    sys.purchaseSkill(0, 0); // iron_skin rank 1
+    sys.purchaseSkill(0, 0); // iron_skin rank 2
+    expect(sys.getSkillRank("iron_skin")).toBe(2);
+  });
+
+  it("restoreState is reflected in getSkillRank", () => {
+    sys.restoreState([{ id: "arcane_power", rank: 3 }]);
+    expect(sys.getSkillRank("arcane_power")).toBe(3);
+    expect(sys.getSkillRank("iron_skin")).toBe(0); // not in restore
+  });
+});

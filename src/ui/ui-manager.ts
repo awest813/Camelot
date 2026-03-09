@@ -1142,9 +1142,10 @@ export class UIManager {
     currentCell: string;
     gameTime: string;
     stealthLabel: string;
+    lodCulled?: number;
   }): void {
     if (!this._debugText || !this.isDebugVisible) return;
-    this._debugText.text = [
+    const lines = [
       `FPS:        ${metrics.fps.toFixed(0)}`,
       `Draw calls: ${metrics.drawCalls}`,
       `Meshes:     ${metrics.activeMeshes}`,
@@ -1154,7 +1155,11 @@ export class UIManager {
       `Cell:       ${metrics.currentCell}`,
       `Time:       ${metrics.gameTime}`,
       `Stealth:    ${metrics.stealthLabel}`,
-    ].join("\n");
+    ];
+    if (metrics.lodCulled !== undefined) {
+      lines.push(`LOD culled: ${metrics.lodCulled}`);
+    }
+    this._debugText.text = lines.join("\n");
   }
 
   // ── Stealth HUD ───────────────────────────────────────────────────────────

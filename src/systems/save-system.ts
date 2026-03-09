@@ -270,7 +270,7 @@ export class SaveSystem {
       return false;
     }
 
-    if (data.version !== SAVE_VERSION) {
+    if (data.version < SAVE_VERSION_MIN || data.version > SAVE_VERSION) {
       this._ui.showNotification("Incompatible save version.", 2500);
       return false;
     }
@@ -451,7 +451,7 @@ export class SaveSystem {
       return false;
     }
 
-    if (data?.version !== SAVE_VERSION) {
+    if (data?.version === undefined || data.version < SAVE_VERSION_MIN || data.version > SAVE_VERSION) {
       this._ui.showNotification("Import failed: incompatible save version.", 2500);
       return false;
     }
