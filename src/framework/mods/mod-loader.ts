@@ -25,17 +25,30 @@ export class ModLoader {
     const mods: RpgMod[] = [];
     const failures: ModLoadFailure[] = [];
 
-    for (const entry of manifest.mods) {
+    const loadPromises = manifest.mods.map(async (entry) => {
       try {
         const url = resolveUrl(entry.url, manifestUrl);
         const raw = await this._loadJson(url);
         const mod = validateMod(raw, entry.id);
-        mods.push(mod);
+        return { type: "success" as const, mod };
       } catch (error) {
-        failures.push({
-          modId: entry.id,
-          reason: error instanceof Error ? error.message : "Unknown mod load error.",
-        });
+        return {
+          type: "failure" as const,
+          failure: {
+            modId: entry.id,
+            reason: error instanceof Error ? error.message : "Unknown mod load error.",
+          },
+        };
+      }
+    });
+
+    const results = await Promise.all(loadPromises);
+
+    for (const result of results) {
+      if (result.type === "success") {
+        mods.push(result.mod);
+      } else {
+        failures.push(result.failure);
       }
     }
 
