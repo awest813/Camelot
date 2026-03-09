@@ -15,16 +15,10 @@ import type { BarterSystem } from "./barter-system";
 import type { CellManager } from "../world/cell-manager";
 import type { SpellSystem } from "./spell-system";
 import type { PersuasionSystem } from "./persuasion-system";
+import type { AlchemySystem } from "./alchemy-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 6;
-/**
- * Minimum save version that can be loaded without migration.
- * Saves in the range [SAVE_VERSION_MIN, SAVE_VERSION] are accepted; fields
- * introduced in later versions will simply be undefined and handled by each
- * system's optional restore path.
- */
-const SAVE_VERSION_MIN = 5;
+const SAVE_VERSION = 7;
 
 interface PlayerSaveData {
   position: { x: number; y: number; z: number };
@@ -56,6 +50,7 @@ interface ParsedSaveData {
   cell?: unknown;
   spells?: unknown;
   persuasion?: unknown;
+  alchemy?: unknown;
 }
 
 interface EquipmentEntry {
@@ -83,6 +78,8 @@ export interface SaveData {
   // v6 additions
   spells?: any;
   persuasion?: any;
+  // v7 additions
+  alchemy?: any;
 }
 
 export class SaveSystem {
@@ -106,6 +103,9 @@ export class SaveSystem {
   // v6 optional systems
   private _spellSystem: SpellSystem | null = null;
   private _persuasionSystem: PersuasionSystem | null = null;
+
+  // v7 optional systems
+  private _alchemySystem: AlchemySystem | null = null;
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
   private _autosaveDirty = false;
@@ -148,6 +148,10 @@ export class SaveSystem {
 
   public setSpellSystem(s: SpellSystem): void          { this._spellSystem = s; }
   public setPersuasionSystem(s: PersuasionSystem): void { this._persuasionSystem = s; }
+
+  // ── v7 system injection ───────────────────────────────────────────────────
+
+  public setAlchemySystem(s: AlchemySystem): void      { this._alchemySystem = s; }
 
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
@@ -204,6 +208,7 @@ export class SaveSystem {
     if (this._cellManager)      data.cell        = this._cellManager.getSaveState();
     if (this._spellSystem)      data.spells      = this._spellSystem.getSaveState();
     if (this._persuasionSystem) data.persuasion  = this._persuasionSystem.getSaveState();
+    if (this._alchemySystem)    data.alchemy     = this._alchemySystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -341,6 +346,9 @@ export class SaveSystem {
     // v6 systems
     if (this._spellSystem && data.spells)           this._spellSystem.restoreFromSave(data.spells);
     if (this._persuasionSystem && data.persuasion)  this._persuasionSystem.restoreFromSave(data.persuasion);
+
+    // v7 systems
+    if (this._alchemySystem && data.alchemy)        this._alchemySystem.restoreFromSave(data.alchemy);
 
     // Restore encumbrance stats
     if (typeof data.player.maxCarryWeight === "number") {
@@ -494,6 +502,7 @@ export class SaveSystem {
       cell: data.cell,
       spells: data.spells,
       persuasion: data.persuasion,
+      alchemy: data.alchemy,
     };
   }
 
