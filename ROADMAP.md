@@ -53,6 +53,8 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ **EnchantingSystem** — Oblivion-style enchanting: five soul gem tiers (petty → grand) scale effect magnitude; 10 enchantment effects across weapon (fire/frost/shock damage, absorb health, drain magicka) and armor (fortify health/magicka/stamina/strength, resist damage) categories; enchanting skill (0–100) further scales magnitude; items are renamed on enchant and stats applied immediately; save-state persistence (SAVE_VERSION 8). B to open altar.
 - ✅ **WeatherSystem** — Markov-chain atmospheric weather (Clear/Overcast/Foggy/Rain/Storm); smooth fog-density/fog-colour/ambient-light transitions; `forceWeather()` for scripted events; onWeatherChange callback wired to EventBus; weather label in debug overlay (F3); save-state persistence (SAVE_VERSION 9).
 - ✅ **QuickSlotSystem** — Bind consumable items (health/magicka/stamina potions) to hotkeys 7/8/9/0; effects applied directly to player stats; removes one item per use; `onItemConsumed` callback wired to EventBus; save-state persistence (SAVE_VERSION 9).
+- ✅ **WaitSystem** — Oblivion-style wait/rest (T key): choose 1–24 in-game hours, clock advances instantly, Health/Magicka/Stamina restore proportionally (full rest at 24 h); save-state persistence (SAVE_VERSION 10).
+- ✅ **Compass HUD** — Top-center compass strip shows three cardinal labels (e.g. NW · N · NE) that scroll as the player turns; updates every frame from camera yaw with zero runtime cost.
 
 ### World + Content
 
@@ -63,9 +65,11 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 ### UX + Persistence
 
 - ✅ HUD, quest log, inventory, skill tree, pause flow.
-- ✅ Save/load (SAVE_VERSION 9) for all system states.
+- ✅ Save/load (SAVE_VERSION 10) for all system states.
 - ✅ Save file export to JSON file download + import from JSON/File (browser-safe).
 - ✅ Notifications, hit feedback, and debug support.
+- ✅ Compass HUD (top-center) showing cardinal direction from camera heading.
+- ✅ Wait/Rest dialog (T) for time-skipping 1–24 in-game hours with stat restoration.
 
 ---
 

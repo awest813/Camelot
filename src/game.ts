@@ -48,6 +48,7 @@ import { EnchantingUI } from "./ui/enchanting-ui";
 import { LodSystem } from "./systems/lod-system";
 import { WeatherSystem } from "./systems/weather-system";
 import { QuickSlotSystem } from "./systems/quickslot-system";
+import { WaitSystem } from "./systems/wait-system";
 
 export class Game {
   public scene: Scene;
@@ -102,6 +103,9 @@ export class Game {
   // v6 systems (Oblivion atmosphere + hotkeys)
   public weatherSystem: WeatherSystem;
   public quickSlotSystem: QuickSlotSystem;
+
+  // v7 systems (QoL + polish)
+  public waitSystem: WaitSystem;
 
   public isPaused: boolean = false;
 
@@ -335,6 +339,19 @@ export class Game {
       this.saveSystem.markDirty();
     };
     this.saveSystem.setQuickSlotSystem(this.quickSlotSystem);
+
+    // ── v7 system wiring (QoL: Wait + Compass) ────────────────────────────────
+    this.waitSystem = new WaitSystem();
+    this.saveSystem.setWaitSystem(this.waitSystem);
+    // Wire the Wait Dialog confirm callback
+    this.ui.onWaitConfirm = (hours) => {
+      const result = this.waitSystem.wait(hours, this.timeSystem, this.player);
+      if (result.ok) {
+        this.ui.showNotification(result.message, 2800);
+        this.saveSystem.markDirty();
+      }
+    };
+
     this.ui.onAttributeSpend = (name) => {
       const spent = this.attributeSystem.spendPoint(name);
       if (spent) {
@@ -633,6 +650,11 @@ export class Game {
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.ui.isWaitDialogOpen) {
+                    this.ui.toggleWaitDialog(false);
+                    this.interactionSystem.isBlocked = false;
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
                 } else {
                     this.togglePause();
                 }
@@ -705,6 +727,22 @@ export class Game {
             } else if (kbInfo.event.key === "m" || kbInfo.event.key === "M") {
                 this.audioSystem.toggleMute();
                 this.ui.showNotification(this.audioSystem.isMuted ? "Audio muted" : "Audio unmuted", 1500);
+            } else if (kbInfo.event.key === "t" || kbInfo.event.key === "T") {
+                // Wait / Rest dialog  (T = classic Oblivion wait key)
+                if (this.mapEditorSystem.isEnabled) return; // T is reserved for placement type in editor
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue && !this.inventorySystem.isOpen) {
+                    const open = !this.ui.isWaitDialogOpen;
+                    this.ui.toggleWaitDialog(open);
+                    if (open) {
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    } else {
+                        this.interactionSystem.isBlocked = false;
+                        this.canvas.requestPointerLock();
+                        this.player.camera.attachControl(this.canvas, true);
+                    }
+                }
             } else if (kbInfo.event.key === "F2") {
                 const isEnabled = this.mapEditorSystem.toggle();
                 this.interactionSystem.isBlocked = isEnabled;
@@ -1052,6 +1090,9 @@ export class Game {
 
       // Update clock display every frame (cheap text update)
       this.ui.updateClock(this.timeSystem.timeString);
+
+      // Update compass heading from camera yaw
+      this.ui.updateCompass(this.player.camera.rotation.y);
 
       // Update stealth HUD when crouching
       if (this.stealthSystem.isCrouching) {

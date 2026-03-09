@@ -65,6 +65,8 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 - Pause menu with quick save/load actions.
 - Notifications for items, combat, and quest events.
 - Debug inspector and FPS overlay support.
+- **Compass HUD**: top-center strip showing scrolling cardinal direction (N / NE / E …) based on camera heading.
+- **Wait / Rest** (T key): choose 1–24 in-game hours to skip time; clock advances and resources restore proportionally.
 
 ## Map Editor
 
@@ -101,20 +103,22 @@ The in-engine **Map Editor** (activated with F2) lets you author world content w
 | I            | Toggle inventory                    |
 | J            | Toggle quest log                    |
 | K            | Toggle skill tree                   |
+| **T**        | **Wait / Rest (choose 1–24 hours)** |
 | 1 / 2 / 3    | Melee archetype select              |
 | 4 / 5 / 6    | Magic archetype select              |
+| 7 / 8 / 9 / 0 | Quick-slot consumable use         |
 | M            | Toggle audio mute                   |
 | F5           | Quick save                          |
 | F9           | Quick load                          |
 | Esc          | Pause menu                          |
 | **F2**       | **Toggle map editor mode**          |
-| **G**        | **Cycle editor gizmo mode**         |
-| **T**        | **Cycle editor placement type**     |
-| **N**        | **Place entity (current type)**     |
-| **P**        | **Start new NPC patrol group**      |
-| **H**        | **Cycle terrain tool (none/sculpt/paint)** |
-| **[ / ]**    | **Decrease / increase terrain sculpt step** |
-| **F4**       | **Export map to JSON (clipboard)**  |
+| **G**        | **Cycle editor gizmo mode (editor)** |
+| **T**        | **Cycle editor placement type (editor)** |
+| **N**        | **Place entity (editor)**           |
+| **P**        | **Start new NPC patrol group (editor)** |
+| **H**        | **Cycle terrain tool (editor)**     |
+| **[ / ]**    | **Terrain sculpt step (editor)**    |
+| **F4**       | **Export map to JSON (editor)**     |
 
 ## Tech Stack
 

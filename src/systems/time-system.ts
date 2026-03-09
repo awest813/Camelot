@@ -52,6 +52,22 @@ export class TimeSystem {
     }
   }
 
+  /**
+   * Instantly advance the clock by the given number of in-game hours.
+   *
+   * Fires `onHourChange` once with the final hour so dependents (schedules,
+   * ambient light, etc.) can synchronise.  The callback is fired at most once
+   * regardless of how many hours are skipped.
+   */
+  public advanceHours(hours: number): void {
+    this._gameTime = (this._gameTime + hours * 60) % (24 * 60);
+    const hour = Math.floor(this._gameTime / 60);
+    if (hour !== this._lastHour) {
+      this._lastHour = hour;
+      this.onHourChange?.(hour);
+    }
+  }
+
   // ── Getters ───────────────────────────────────────────────────────────────
 
   /** Total in-game minutes since midnight (0 – <1440). */
