@@ -6,11 +6,11 @@ type DomainName = keyof RpgContentBundle;
 
 export const mergeContent = (base: RpgContentBundle, mods: RpgMod[]): ContentMergeResult => {
   const merged: RpgContentBundle = {
-    dialogues: [ ...base.dialogues ],
-    quests: [ ...base.quests ],
-    items: [ ...base.items ],
-    factions: [ ...base.factions ],
-    npcArchetypes: [ ...(base.npcArchetypes ?? []) ],
+    dialogues: base.dialogues.map(clone),
+    quests: base.quests.map(clone),
+    items: base.items.map(clone),
+    factions: base.factions.map(clone),
+    npcArchetypes: (base.npcArchetypes ?? []).map(clone),
   };
   const collisions: ContentCollision[] = [];
 
