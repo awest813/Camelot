@@ -229,7 +229,7 @@ export class AlchemyUI {
     const closeBtn = this._makeBtn("alchClose", "✕", T.BTN_BG, T.BTN_HOVER);
     closeBtn.width  = "32px";
     closeBtn.height = "28px";
-    closeBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_BOTTOM;
+    closeBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
     closeBtn.verticalAlignment   = Control.VERTICAL_ALIGNMENT_BOTTOM;
     closeBtn.top    = "-4px";
     closeBtn.left   = "-14px";

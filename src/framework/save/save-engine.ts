@@ -108,7 +108,7 @@ export class SaveEngine {
     // Verify checksum when present; warn-only (partial recovery) when absent.
     if (typeof obj.checksum === "string") {
       const { checksum: storedChecksum, ...rest } = obj;
-      const stateJson = JSON.stringify((rest as FrameworkSaveFile).state);
+      const stateJson = JSON.stringify((rest as unknown as FrameworkSaveFile).state);
       const actualChecksum = computeChecksum(stateJson);
       if (actualChecksum !== storedChecksum) {
         throw new Error(

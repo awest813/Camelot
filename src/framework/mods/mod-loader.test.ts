@@ -13,6 +13,7 @@ const baseContent: RpgContentBundle = {
   quests: [],
   items: [{ id: "potion", name: "Potion", description: "HP", stackable: true }],
   factions: [{ id: "guard", name: "Guard" }],
+  npcArchetypes: [],
 };
 
 describe("ModLoader", () => {
