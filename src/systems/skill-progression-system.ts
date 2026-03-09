@@ -138,6 +138,19 @@ export class SkillProgressionSystem {
   }
 
   /**
+   * Directly set a skill's level (used by JailSystem to apply skill loss).
+   * Resets accumulated XP so the skill cleanly progresses from the new level.
+   * Clamped to [0, SKILL_MAX_LEVEL].
+   */
+  public setSkillLevel(skillId: ProgressionSkillId, level: number): void {
+    const skill = this._skills.get(skillId);
+    if (!skill) return;
+    skill.level    = Math.max(0, Math.min(SKILL_MAX_LEVEL, Math.round(level)));
+    skill.xp       = 0;
+    skill.xpToNext = xpToNext(skill.level);
+  }
+
+  /**
    * Returns the combat/effect multiplier for a skill in [1.0, 2.0].
    * Level 0 → 1.0 (no bonus), level 100 → 2.0 (+100% bonus).
    */
