@@ -51,8 +51,13 @@ const mergeDomain = <T extends ContentWithId>(
   sourceMap: Map<string, string>,
   collisions: ContentCollision[]
 ): void => {
+  const targetIdMap = new Map<string, number>();
+  for (let i = 0; i < target.length; i++) {
+    targetIdMap.set(target[i].id, i);
+  }
+
   for (const entry of incoming) {
-    const existingIndex = target.findIndex((candidate) => candidate.id === entry.id);
+    const existingIndex = targetIdMap.get(entry.id) ?? -1;
     const sourceKey = key(domain, entry.id);
 
     if (existingIndex >= 0) {
@@ -64,7 +69,8 @@ const mergeDomain = <T extends ContentWithId>(
       });
       target[existingIndex] = clone(entry);
     } else {
-      target.push(clone(entry));
+      const newIndex = target.push(clone(entry)) - 1;
+      targetIdMap.set(entry.id, newIndex);
     }
 
     sourceMap.set(sourceKey, source);
