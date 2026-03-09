@@ -7,6 +7,9 @@ import { QuestDefinition } from "../quests/quest-types";
 
 export type NpcRole = "guard" | "merchant" | "innkeeper" | "villager" | "enemy" | "boss" | "companion";
 
+/** Damage categories matched by the combat system's resistance calculations. */
+export type DamageType = "physical" | "fire" | "frost" | "shock";
+
 /** Data-driven template for spawning and configuring NPCs. */
 export interface NpcArchetypeDefinition {
   id: string;
@@ -35,6 +38,17 @@ export interface NpcArchetypeDefinition {
   patrolGroupId?: string;
   /** If true, the NPC respawns after a configurable delay. */
   respawns?: boolean;
+  /**
+   * Damage resistances per type (0–1 range, 1 = full immunity).
+   * Applied to all spawned instances of this archetype.
+   * Example: `{ physical: 0.3 }` → 30% less physical damage.
+   */
+  damageResistances?: Partial<Record<DamageType, number>>;
+  /**
+   * Damage weaknesses per type (positive multiplier added on top of base).
+   * Example: `{ fire: 0.5 }` → 50% extra fire damage (1.5× total).
+   */
+  damageWeaknesses?: Partial<Record<DamageType, number>>;
 }
 
 // ── Content bundle ────────────────────────────────────────────────────────────

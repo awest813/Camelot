@@ -48,6 +48,8 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ **PersuasionSystem** — Per-NPC disposition, persuasion checks, merchant price multipliers.
 - ✅ **LootTableSystem** — Data-driven weighted loot generation with starter tables.
 - ✅ **GameEventBus** — Typed pub/sub event bus for all major gameplay events.
+- ✅ **AlchemySystem** — Oblivion-style alchemy: ingredient satchel, effect discovery (eat/mix), potion crafting from 2–4 ingredients with shared-effect intersection, skill scaling, and save-state persistence. L to open workbench.
+- ✅ **NPC archetype resistances/weaknesses** — `damageResistances` and `damageWeaknesses` fields added to `NpcArchetypeDefinition`; data-driven per-archetype damage modifiers applied on spawn (bandit chief: physical resist, mage apprentice: elemental resist/physical weak, etc.).
 
 ### World + Content
 
@@ -177,7 +179,8 @@ three-step overhaul track:
 
 ### Systems Expansion
 
-- 🧭 Crafting/resource loop prototype.
+- ✅ Alchemy/potion crafting prototype (AlchemySystem + AlchemyUI).
+- 🧭 Enchanting system (apply magical effects to weapons and armor).
 - ✅ Faction/reputation prototype tied to quests (FactionEngine + PersuasionSystem).
 - 🧭 More advanced quest scripting hooks.
 

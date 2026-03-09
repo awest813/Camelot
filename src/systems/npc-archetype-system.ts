@@ -103,6 +103,14 @@ export class NpcArchetypeSystem {
       npc.attackDamage = 12;
     }
 
+    // Apply archetype-defined resistances and weaknesses
+    if (def.damageResistances) {
+      npc.damageResistances = { ...def.damageResistances };
+    }
+    if (def.damageWeaknesses) {
+      npc.damageWeaknesses = { ...def.damageWeaknesses };
+    }
+
     return npc;
   }
 }

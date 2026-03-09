@@ -41,6 +41,8 @@ import { GameEventBus } from "./systems/event-bus";
 import { LootTableSystem, STARTER_LOOT_TABLES } from "./systems/loot-table-system";
 import { NpcArchetypeSystem } from "./systems/npc-archetype-system";
 import { FixedStepLoop } from "./systems/fixed-step-loop";
+import { AlchemySystem } from "./systems/alchemy-system";
+import { AlchemyUI } from "./ui/alchemy-ui";
 
 export class Game {
   public scene: Scene;
@@ -80,6 +82,10 @@ export class Game {
   public eventBus: GameEventBus;
   public lootTableSystem: LootTableSystem;
   public npcArchetypeSystem: NpcArchetypeSystem;
+
+  // v4 systems (Oblivion-lite: alchemy)
+  public alchemySystem: AlchemySystem;
+  public alchemyUI: AlchemyUI;
 
   public isPaused: boolean = false;
 
@@ -232,6 +238,28 @@ export class Game {
     // Register v3 systems with save
     this.saveSystem.setSpellSystem(this.spellSystem);
     this.saveSystem.setPersuasionSystem(this.persuasionSystem);
+
+    // ── v4 system wiring (Alchemy) ────────────────────────────────────────────
+    this.alchemySystem = new AlchemySystem(this.player, this.ui);
+
+    // Seed the player with a starter set of ingredients
+    this.alchemySystem.addIngredient("aloe_vera_leaves", 5);
+    this.alchemySystem.addIngredient("cairn_bolete_cap", 4);
+    this.alchemySystem.addIngredient("fennel_seeds", 4);
+    this.alchemySystem.addIngredient("dragon_tongue", 3);
+    this.alchemySystem.addIngredient("bergamot_seeds", 3);
+
+    this.alchemyUI = new AlchemyUI(this.ui.uiTexture, this.alchemySystem);
+    this.alchemyUI.onCraft = (ingredientIds) => {
+      this.alchemySystem.craftPotion(ingredientIds);
+      this.alchemyUI.refresh();
+    };
+    this.alchemyUI.onDrink = (potionId) => {
+      this.alchemySystem.drinkPotion(potionId);
+      this.saveSystem.markDirty();
+    };
+
+    this.saveSystem.setAlchemySystem(this.alchemySystem);
 
     // Wire attribute panel spend callback
     this.ui.onAttributeSpend = (name) => {
@@ -522,6 +550,11 @@ export class Game {
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.alchemyUI.isVisible) {
+                    this.alchemyUI.toggle(false);
+                    this.interactionSystem.isBlocked = false;
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
                 } else {
                     this.togglePause();
                 }
@@ -661,6 +694,21 @@ export class Game {
                         const idx = current ? spells.findIndex(s => s.id === current.id) : -1;
                         const next = spells[(idx + 1) % spells.length];
                         this.spellSystem.equipSpell(next.id);
+                    }
+                }
+            } else if (kbInfo.event.key === "l" || kbInfo.event.key === "L") {
+                // Toggle Alchemy workbench
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+                    const open = !this.alchemyUI.isVisible;
+                    this.alchemyUI.toggle(open);
+                    if (open) {
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    } else {
+                        this.interactionSystem.isBlocked = false;
+                        this.canvas.requestPointerLock();
+                        this.player.camera.attachControl(this.canvas, true);
                     }
                 }
             } else if (kbInfo.event.key === "F3") {
