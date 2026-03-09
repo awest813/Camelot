@@ -163,6 +163,29 @@ export class EnchantingUI {
     closeBtn.top    = "-4px";
     (closeBtn.textBlock as TextBlock).color = T.DIM;
     closeBtn.onPointerClickObservable.add(() => this.toggle(false));
+
+    closeBtn.isFocusInvisible = false;
+    closeBtn.tabIndex = 0;
+    closeBtn.accessibilityTag = { description: "Close Enchanting Panel" };
+
+    let isFocused = false;
+    closeBtn.onFocusObservable.add(() => {
+        isFocused = true;
+        closeBtn.thickness = 2;
+    });
+    closeBtn.onBlurObservable.add(() => {
+        isFocused = false;
+        closeBtn.thickness = 1;
+    });
+    closeBtn.onPointerOutObservable.add(() => {
+        if (!isFocused) closeBtn.thickness = 1;
+    });
+    closeBtn.onKeyboardEventProcessedObservable.add((evt) => {
+      if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
+        closeBtn.onPointerClickObservable.notifyObservers(null as any);
+      }
+    });
+
     actionRow.addControl(closeBtn);
   }
 
