@@ -49,6 +49,9 @@ import { LodSystem } from "./systems/lod-system";
 import { WeatherSystem } from "./systems/weather-system";
 import { QuickSlotSystem } from "./systems/quickslot-system";
 import { WaitSystem } from "./systems/wait-system";
+import { SkillProgressionSystem } from "./systems/skill-progression-system";
+import { FastTravelSystem } from "./systems/fast-travel-system";
+import { LevelScalingSystem } from "./systems/level-scaling-system";
 
 export class Game {
   public scene: Scene;
@@ -107,6 +110,11 @@ export class Game {
   // v7 systems (QoL + polish)
   public waitSystem: WaitSystem;
 
+  // v8 systems (Oblivion depth: skill progression, fast travel, level scaling)
+  public skillProgressionSystem: SkillProgressionSystem;
+  public fastTravelSystem: FastTravelSystem;
+  public levelScalingSystem: LevelScalingSystem;
+
   public isPaused: boolean = false;
 
   private readonly _gameplayLoop = new FixedStepLoop({
@@ -164,20 +172,15 @@ export class Game {
 
     // Notify player of location changes; clear LOD registry on cell transition
     // so stale mesh references from the previous cell don't linger.
-    this.cellManager.onCellChanged = (_cellId, cellName) => {
-      this.ui.showNotification(`Entered: ${cellName}`, 2500);
-      this.lodSystem?.clear();
-    };
+    // (onCellChanged is wired fully in the v8 block below once fastTravelSystem is ready)
 
     // Test NPC
     const npc = new NPC(this.scene, new Vector3(10, 2, 10), "Guard");
     npc.patrolPoints = [new Vector3(10, 2, 10), new Vector3(10, 2, 20), new Vector3(20, 2, 20), new Vector3(20, 2, 10)];
     this.scheduleSystem.addNPC(npc);
 
-    // Wire up structure NPC spawning so guards are tracked by schedule & combat
-    this.world.structures.onNPCSpawn = (npc) => {
-      this.scheduleSystem.addNPC(npc);
-    };
+    // Wire up structure NPC spawning so guards are tracked by schedule & combat.
+    // (Full wiring including level scaling is done in the v8 block below.)
 
     this.combatSystem       = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs, this.ui, this.navigationSystem);
     this.dialogueSystem     = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
@@ -352,6 +355,65 @@ export class Game {
       }
     };
 
+    // ── v8 system wiring (Oblivion depth: skill progression, fast travel, level scaling) ──
+    this.skillProgressionSystem = new SkillProgressionSystem();
+    this.skillProgressionSystem.onSkillLevelUp = (skillId, newLevel) => {
+      const skill = this.skillProgressionSystem.getSkill(skillId);
+      const name  = skill?.name ?? skillId;
+      this.ui.showNotification(`${name} skill increased to ${newLevel}!`, 2500);
+      this.eventBus.emit("skill:levelUp" as any, { skillId, newLevel });
+      this.saveSystem.markDirty();
+    };
+    this.saveSystem.setSkillProgressionSystem(this.skillProgressionSystem);
+
+    this.fastTravelSystem = new FastTravelSystem();
+    // Seed the starting village as a discovered location
+    this.fastTravelSystem.discoverLocation("start_village", "Starting Village", new Vector3(0, 2, 0));
+    // Auto-discover locations when the player enters a new cell
+    this.cellManager.onCellChanged = (_cellId, cellName) => {
+      const isNew = this.fastTravelSystem.discoverLocation(
+        _cellId, cellName, this.player.camera.position.clone()
+      );
+      this.ui.showNotification(
+        isNew ? `Discovered: ${cellName}` : `Entered: ${cellName}`, 2500
+      );
+      this.lodSystem?.clear();
+    };
+    this.saveSystem.setFastTravelSystem(this.fastTravelSystem);
+
+    this.levelScalingSystem = new LevelScalingSystem();
+    // Scale the test NPC on spawn
+    this.levelScalingSystem.scaleNPC(
+      this.scheduleSystem.npcs[0],
+      this.player.level,
+    );
+    // Scale newly spawned structure NPCs
+    this.world.structures.onNPCSpawn = (npc) => {
+      this.scheduleSystem.addNPC(npc);
+      this.levelScalingSystem.scaleNPC(npc, this.player.level);
+    };
+
+    // Wire skill XP into spell cast and potion craft callbacks
+    this.alchemySystem.onPotionCrafted = (_potion) => {
+      this.skillProgressionSystem.gainXP("alchemy", 15);
+    };
+    this.spellSystem.onSpellCast = (spell, result) => {
+      // Spell school XP
+      if (result.damage && result.damage > 0) {
+        this.skillProgressionSystem.gainXP("destruction", 10);
+      } else if (result.heal && result.heal > 0) {
+        this.skillProgressionSystem.gainXP("restoration", 10);
+      }
+      this.eventBus.emit("spell:cast", { spellId: spell.id, spellName: spell.name, magickaCost: spell.magickaCost });
+      if (result.hitNpc && result.damage) {
+        this.eventBus.emit("spell:hit", { spellId: spell.id, npcName: result.hitNpc, damage: result.damage });
+      }
+      if (result.heal) {
+        this.eventBus.emit("spell:heal", { spellId: spell.id, amount: result.heal });
+      }
+    };
+
+
     this.ui.onAttributeSpend = (name) => {
       const spent = this.attributeSystem.spendPoint(name);
       if (spent) {
@@ -398,16 +460,6 @@ export class Game {
     };
 
     // Spell cast events forwarded to event bus
-    this.spellSystem.onSpellCast = (spell, result) => {
-      this.eventBus.emit("spell:cast", { spellId: spell.id, spellName: spell.name, magickaCost: spell.magickaCost });
-      if (result.hitNpc && result.damage) {
-        this.eventBus.emit("spell:hit", { spellId: spell.id, npcName: result.hitNpc, damage: result.damage });
-      }
-      if (result.heal) {
-        this.eventBus.emit("spell:heal", { spellId: spell.id, amount: result.heal });
-      }
-    };
-
     // Spawn a test container chest
     this.containerSystem.spawnContainer({
       id: "chest_01",
@@ -490,6 +542,8 @@ export class Game {
     this.dialogueSystem.onTalkStart  = (name)  => {
         this.questSystem.onTalk(name);
         this._applyFrameworkQuestEvent("talk", this._toFrameworkTargetId(name));
+        // Speechcraft XP each time dialogue is initiated
+        this.skillProgressionSystem.gainXP("speechcraft", 8);
     };
 
     // Wire XP callbacks
@@ -602,7 +656,11 @@ export class Game {
         if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
             if (pointerInfo.event.button === 0) { // Left Click
                 const attacked = this.combatSystem.meleeAttack();
-                if (attacked) this.audioSystem.playMeleeAttack();
+                if (attacked) {
+                  this.audioSystem.playMeleeAttack();
+                  // Blade skill XP on every successful swing (hit or miss)
+                  this.skillProgressionSystem.gainXP("blade", 4);
+                }
             } else if (pointerInfo.event.button === 2) { // Right Click
                 pointerInfo.event.preventDefault();
                 const casted = this.combatSystem.magicAttack();
@@ -716,7 +774,22 @@ export class Game {
                 // Fire arrow (bow mode)
                 if (!this._isCombatInputBlocked()) {
                     const fired = this.projectileSystem.fireArrow();
-                    if (fired) this.audioSystem.playMeleeAttack(); // reuse existing SFX placeholder
+                    if (fired) {
+                      this.audioSystem.playMeleeAttack(); // reuse existing SFX placeholder
+                      // Marksman skill XP on arrow fire
+                      this.skillProgressionSystem.gainXP("marksman", 5);
+                    }
+                }
+            } else if (kbInfo.event.key === "y" || kbInfo.event.key === "Y") {
+                // Fast Travel — open location list
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue && !this.inventorySystem.isOpen) {
+                    const locs = this.fastTravelSystem.discoveredLocations;
+                    if (locs.length === 0) {
+                        this.ui.showNotification("No locations discovered yet.", 2000);
+                    } else {
+                        const list = locs.map((l, i) => `[${i + 1}] ${l.name}`).join("  ");
+                        this.ui.showNotification(`Fast Travel: ${list}`, 5000);
+                    }
                 }
             } else if (kbInfo.event.key === "c" || kbInfo.event.key === "C") {
                 // Toggle crouch / stealth
@@ -1021,6 +1094,10 @@ export class Game {
       this.interactionSystem.update();
 
       this.stealthSystem.update(deltaTime, this.timeSystem.ambientIntensity);
+      // Sneak XP: trickle XP while actively sneaking near NPCs
+      if (this.stealthSystem.isCrouching) {
+        this.skillProgressionSystem.gainXP("sneak", deltaTime * 2);
+      }
       this.crimeSystem.update(deltaTime);
       this.projectileSystem.update(deltaTime);
       this.spellSystem.update(deltaTime);
