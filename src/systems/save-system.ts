@@ -17,9 +17,11 @@ import type { SpellSystem } from "./spell-system";
 import type { PersuasionSystem } from "./persuasion-system";
 import type { AlchemySystem } from "./alchemy-system";
 import type { EnchantingSystem } from "./enchanting-system";
+import type { WeatherSystem } from "./weather-system";
+import type { QuickSlotSystem } from "./quickslot-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 8;
+const SAVE_VERSION = 9;
 /** Oldest save version that can still be loaded (forward-compat window). */
 const SAVE_VERSION_MIN = 5;
 
@@ -55,6 +57,8 @@ interface ParsedSaveData {
   persuasion?: unknown;
   alchemy?: unknown;
   enchanting?: unknown;
+  weather?: unknown;
+  quickSlots?: unknown;
 }
 
 interface EquipmentEntry {
@@ -86,6 +90,9 @@ export interface SaveData {
   alchemy?: any;
   // v8 additions
   enchanting?: any;
+  // v9 additions
+  weather?: any;
+  quickSlots?: any;
 }
 
 export class SaveSystem {
@@ -115,6 +122,10 @@ export class SaveSystem {
 
   // v8 optional systems
   private _enchantingSystem: EnchantingSystem | null = null;
+
+  // v9 optional systems
+  private _weatherSystem: WeatherSystem | null = null;
+  private _quickSlotSystem: QuickSlotSystem | null = null;
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
   private _autosaveDirty = false;
@@ -165,6 +176,11 @@ export class SaveSystem {
   // ── v8 system injection ───────────────────────────────────────────────────
 
   public setEnchantingSystem(s: EnchantingSystem): void { this._enchantingSystem = s; }
+
+  // ── v9 system injection ───────────────────────────────────────────────────
+
+  public setWeatherSystem(s: WeatherSystem): void       { this._weatherSystem = s; }
+  public setQuickSlotSystem(s: QuickSlotSystem): void   { this._quickSlotSystem = s; }
 
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
@@ -223,6 +239,8 @@ export class SaveSystem {
     if (this._persuasionSystem) data.persuasion  = this._persuasionSystem.getSaveState();
     if (this._alchemySystem)    data.alchemy     = this._alchemySystem.getSaveState();
     if (this._enchantingSystem) data.enchanting  = this._enchantingSystem.getSaveState();
+    if (this._weatherSystem)    data.weather     = this._weatherSystem.getSaveState();
+    if (this._quickSlotSystem)  data.quickSlots  = this._quickSlotSystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -350,22 +368,26 @@ export class SaveSystem {
     }
 
     // v5 systems
-    if (this._attributes && data.attributes)   this._attributes.restoreFromSave(data.attributes);
-    if (this._timeSystem && data.time)         this._timeSystem.restoreFromSave(data.time);
-    if (this._crimeSystem && data.crime)       this._crimeSystem.restoreFromSave(data.crime);
-    if (this._containerSystem && data.containers) this._containerSystem.restoreFromSave(data.containers);
-    if (this._barterSystem && data.barter)     this._barterSystem.restoreFromSave(data.barter);
-    if (this._cellManager && data.cell)        this._cellManager.restoreFromSave(data.cell);
+    if (this._attributes && data.attributes)   this._attributes.restoreFromSave(data.attributes as any);
+    if (this._timeSystem && data.time)         this._timeSystem.restoreFromSave(data.time as any);
+    if (this._crimeSystem && data.crime)       this._crimeSystem.restoreFromSave(data.crime as any);
+    if (this._containerSystem && data.containers) this._containerSystem.restoreFromSave(data.containers as any);
+    if (this._barterSystem && data.barter)     this._barterSystem.restoreFromSave(data.barter as any);
+    if (this._cellManager && data.cell)        this._cellManager.restoreFromSave(data.cell as any);
 
     // v6 systems
-    if (this._spellSystem && data.spells)           this._spellSystem.restoreFromSave(data.spells);
-    if (this._persuasionSystem && data.persuasion)  this._persuasionSystem.restoreFromSave(data.persuasion);
+    if (this._spellSystem && data.spells)           this._spellSystem.restoreFromSave(data.spells as any);
+    if (this._persuasionSystem && data.persuasion)  this._persuasionSystem.restoreFromSave(data.persuasion as any);
 
     // v7 systems
-    if (this._alchemySystem && data.alchemy)        this._alchemySystem.restoreFromSave(data.alchemy);
+    if (this._alchemySystem && data.alchemy)        this._alchemySystem.restoreFromSave(data.alchemy as any);
 
     // v8 systems
-    if (this._enchantingSystem && data.enchanting)  this._enchantingSystem.restoreFromSave(data.enchanting);
+    if (this._enchantingSystem && data.enchanting)  this._enchantingSystem.restoreFromSave(data.enchanting as any);
+
+    // v9 systems
+    if (this._weatherSystem && data.weather)       this._weatherSystem.restoreFromSave(data.weather as any);
+    if (this._quickSlotSystem && data.quickSlots)  this._quickSlotSystem.restoreFromSave(data.quickSlots as any);
 
     // Restore encumbrance stats
     if (typeof data.player.maxCarryWeight === "number") {
@@ -521,6 +543,8 @@ export class SaveSystem {
       persuasion: data.persuasion,
       alchemy: data.alchemy,
       enchanting: data.enchanting,
+      weather: data.weather,
+      quickSlots: data.quickSlots,
     };
   }
 
