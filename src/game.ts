@@ -142,7 +142,7 @@ export class Game {
     this.ui = new UIManager(this.scene);
     this.world = new WorldManager(this.scene);
     this.navigationSystem = new NavigationSystem(this.scene);
-    this.scheduleSystem = new ScheduleSystem(this.scene);
+    this.scheduleSystem = new ScheduleSystem();
 
     // ── v2 Oblivion-lite systems ──────────────────────────────────────────────
     this.attributeSystem = new AttributeSystem();

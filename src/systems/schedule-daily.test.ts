@@ -33,9 +33,7 @@ describe("ScheduleSystem — currentHour", () => {
   let sys: ScheduleSystem;
 
   beforeEach(() => {
-    // Pass null as scene — schedule system only uses it for context;
-    // the tests don't require real BabylonJS rendering.
-    sys = new ScheduleSystem(null as any);
+    sys = new ScheduleSystem();
     sys.currentHour = -1;
   });
 
