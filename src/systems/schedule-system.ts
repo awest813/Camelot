@@ -1,4 +1,3 @@
-import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { NPC, AIState, ScheduleBehaviorType } from "../entities/npc";
 
@@ -6,7 +5,6 @@ import { NPC, AIState, ScheduleBehaviorType } from "../entities/npc";
 const WANDER_RADIUS = 8;
 
 export class ScheduleSystem {
-  public scene: Scene;
   public npcs: NPC[] = [];
 
   /**
@@ -27,10 +25,6 @@ export class ScheduleSystem {
 
   /** Per-NPC wander destination (refreshed when reached or expired). */
   private _wanderTargets: WeakMap<NPC, Vector3> = new WeakMap();
-
-  constructor(scene: Scene) {
-    this.scene = scene;
-  }
 
   public addNPC(npc: NPC): void {
     this.npcs.push(npc);

@@ -5,8 +5,7 @@ import { NPC, AIState } from '../entities/npc';
 
 describe('ScheduleSystem', () => {
   it('should add an NPC to the schedule system', () => {
-    const mockScene = {} as any;
-    const scheduleSystem = new ScheduleSystem(mockScene);
+    const scheduleSystem = new ScheduleSystem();
     const mockNPC = {} as NPC;
 
     scheduleSystem.addNPC(mockNPC);
@@ -16,8 +15,7 @@ describe('ScheduleSystem', () => {
   });
 
   it('should add multiple NPCs to the schedule system', () => {
-    const mockScene = {} as any;
-    const scheduleSystem = new ScheduleSystem(mockScene);
+    const scheduleSystem = new ScheduleSystem();
 
     const mockNPC1 = { id: 1 } as unknown as NPC;
     const mockNPC2 = { id: 2 } as unknown as NPC;
@@ -34,7 +32,7 @@ describe('ScheduleSystem', () => {
   });
 
   it('should randomize patrol wait time within configured range', () => {
-    const scheduleSystem = new ScheduleSystem({} as any);
+    const scheduleSystem = new ScheduleSystem();
     const setLinearVelocity = vi.fn();
 
     const npc = {
@@ -68,7 +66,7 @@ describe('ScheduleSystem', () => {
   });
 
   it('should preserve vertical velocity while stopping during patrol wait', () => {
-    const scheduleSystem = new ScheduleSystem({} as any);
+    const scheduleSystem = new ScheduleSystem();
     const setLinearVelocity = vi.fn();
 
     const npc = {
