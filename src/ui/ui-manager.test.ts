@@ -135,4 +135,28 @@ describe('UIManager', () => {
             expect(uiManager.xpBar.width).toBe('0%');
         });
     });
+
+    describe('crosshair visibility with overlapping panels', () => {
+        it('keeps crosshair hidden until all blocking panels are closed', () => {
+            uiManager.toggleInventory(true);
+            expect(uiManager.crosshair.isVisible).toBe(false);
+
+            uiManager.toggleQuestLog(true);
+            expect(uiManager.crosshair.isVisible).toBe(false);
+
+            uiManager.toggleInventory(false);
+            expect(uiManager.crosshair.isVisible).toBe(false);
+
+            uiManager.toggleQuestLog(false);
+            expect(uiManager.crosshair.isVisible).toBe(true);
+        });
+
+        it('hides crosshair while attribute panel is open', () => {
+            uiManager.toggleAttributePanel(true);
+            expect(uiManager.crosshair.isVisible).toBe(false);
+
+            uiManager.toggleAttributePanel(false);
+            expect(uiManager.crosshair.isVisible).toBe(true);
+        });
+    });
 });

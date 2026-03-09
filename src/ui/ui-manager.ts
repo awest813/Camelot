@@ -546,7 +546,7 @@ export class UIManager {
 
   public toggleSkillTree(visible: boolean): void {
     this.skillTreePanel.isVisible = visible;
-    this.toggleCrosshair(!visible);
+    this._syncCrosshairVisibility();
   }
 
   public refreshSkillTree(trees: SkillTree[], skillPoints: number): void {
@@ -734,7 +734,7 @@ export class UIManager {
 
   public toggleInventory(visible: boolean): void {
     this.inventoryPanel.isVisible = visible;
-    this.toggleCrosshair(!visible);
+    this._syncCrosshairVisibility();
     if (!visible) {
       this.inventoryDescription.text = "";
     }
@@ -742,12 +742,23 @@ export class UIManager {
 
   public togglePauseMenu(visible: boolean): void {
     this.pausePanel.isVisible = visible;
-    this.toggleCrosshair(!visible);
+    this._syncCrosshairVisibility();
   }
 
   public toggleQuestLog(visible: boolean): void {
     this.questLogPanel.isVisible = visible;
-    this.toggleCrosshair(!visible);
+    this._syncCrosshairVisibility();
+  }
+
+  private _syncCrosshairVisibility(): void {
+    const hasBlockingPanelOpen =
+      this.inventoryPanel.isVisible ||
+      this.pausePanel.isVisible ||
+      this.questLogPanel.isVisible ||
+      this.skillTreePanel.isVisible ||
+      !!this.attributePanel?.isVisible;
+
+    this.toggleCrosshair(!hasBlockingPanelOpen);
   }
 
   public updateQuestLog(quests: Quest[]): void {
@@ -1301,6 +1312,7 @@ export class UIManager {
     if (!this.attributePanel) return;
     this.isAttributePanelOpen = visible;
     this.attributePanel.isVisible = visible;
+    this._syncCrosshairVisibility();
   }
 
   /**
