@@ -1,6 +1,6 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { RecastJSPlugin } from "@babylonjs/core/Navigation/Plugins/recastJSPlugin";
 import { INavMeshParameters } from "@babylonjs/core/Navigation/INavigationEngine";
 
