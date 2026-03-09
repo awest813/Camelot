@@ -127,6 +127,8 @@ export class CombatSystem {
   private _lookAtTarget: Vector3 = new Vector3();
   private _hitPos: Vector3 = new Vector3();
   private _attackReservations: Set<NPC> = new Set();
+  private _topAttackScores = new Float64Array(MAX_CONCURRENT_ATTACKERS);
+  private _topAttackNpcs: (NPC | null)[] = new Array(MAX_CONCURRENT_ATTACKERS).fill(null);
   private _meleeCooldownRemaining: number = 0;
   private _magicCooldownRemaining: number = 0;
   private _meleeArchetype: MeleeArchetype = "soldier";
@@ -362,22 +364,43 @@ export class CombatSystem {
    */
   private _refreshAttackReservations(playerPos: Vector3): void {
     this._attackReservations.clear();
+    this._topAttackScores.fill(Infinity);
+    this._topAttackNpcs.fill(null);
 
-    const candidates = this.npcs
-      .filter((npc) => !npc.isDead && (
-        npc.aiState === AIState.CHASE || npc.aiState === AIState.ATTACK
-      ))
-      .sort((a, b) => {
-        if (a.aiState === AIState.ATTACK && b.aiState !== AIState.ATTACK) return -1;
-        if (b.aiState === AIState.ATTACK && a.aiState !== AIState.ATTACK) return 1;
-        const aDist = Vector3.DistanceSquared(a.mesh.position, playerPos);
-        const bDist = Vector3.DistanceSquared(b.mesh.position, playerPos);
-        return aDist - bDist;
-      });
+    let count = 0;
+    for (let i = 0; i < this.npcs.length; i++) {
+      const npc = this.npcs[i];
+      if (npc.isDead || (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK)) {
+        continue;
+      }
 
-    for (const npc of candidates) {
-      if (this._attackReservations.size >= MAX_CONCURRENT_ATTACKERS) break;
-      this._attackReservations.add(npc);
+      let score = Vector3.DistanceSquared(npc.mesh.position, playerPos);
+      if (npc.aiState !== AIState.ATTACK) {
+        // Large penalty for not being in ATTACK state to prioritize current attackers.
+        // We use an extremely large number to ensure any ATTACK state NPC always wins over a CHASE state NPC,
+        // even in very large scenes where DistanceSquared might exceed 1,000,000.
+        score += 1e12;
+      }
+
+      for (let j = 0; j < MAX_CONCURRENT_ATTACKERS; j++) {
+        if (score < this._topAttackScores[j]) {
+          for (let k = MAX_CONCURRENT_ATTACKERS - 1; k > j; k--) {
+            this._topAttackScores[k] = this._topAttackScores[k - 1];
+            this._topAttackNpcs[k] = this._topAttackNpcs[k - 1];
+          }
+          this._topAttackScores[j] = score;
+          this._topAttackNpcs[j] = npc;
+          if (count < MAX_CONCURRENT_ATTACKERS) count++;
+          break;
+        }
+      }
+    }
+
+    for (let i = 0; i < count; i++) {
+      const topNpc = this._topAttackNpcs[i];
+      if (topNpc) {
+        this._attackReservations.add(topNpc);
+      }
     }
   }
 
