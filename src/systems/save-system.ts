@@ -22,9 +22,12 @@ import type { QuickSlotSystem } from "./quickslot-system";
 import type { WaitSystem } from "./wait-system";
 import type { SkillProgressionSystem } from "./skill-progression-system";
 import type { FastTravelSystem } from "./fast-travel-system";
+import type { FameSystem } from "./fame-system";
+import type { ActiveEffectsSystem } from "./active-effects-system";
+import type { JailSystem } from "./jail-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 11;
+const SAVE_VERSION = 12;
 /** Oldest save version that can still be loaded (forward-compat window). */
 const SAVE_VERSION_MIN = 5;
 
@@ -66,6 +69,10 @@ interface ParsedSaveData {
   // v11 additions
   skillProgression?: unknown;
   fastTravel?: unknown;
+  // v12 additions
+  fame?: unknown;
+  activeEffects?: unknown;
+  jail?: unknown;
 }
 
 interface EquipmentEntry {
@@ -105,6 +112,10 @@ export interface SaveData {
   // v11 additions
   skillProgression?: any;
   fastTravel?: any;
+  // v12 additions
+  fame?: any;
+  activeEffects?: any;
+  jail?: any;
 }
 
 export class SaveSystem {
@@ -145,6 +156,11 @@ export class SaveSystem {
   // v11 optional systems
   private _skillProgressionSystem: SkillProgressionSystem | null = null;
   private _fastTravelSystem: FastTravelSystem | null = null;
+
+  // v12 optional systems
+  private _fameSystem: FameSystem | null = null;
+  private _activeEffectsSystem: ActiveEffectsSystem | null = null;
+  private _jailSystem: JailSystem | null = null;
 
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
@@ -211,6 +227,13 @@ export class SaveSystem {
   public setSkillProgressionSystem(s: SkillProgressionSystem): void { this._skillProgressionSystem = s; }
   public setFastTravelSystem(s: FastTravelSystem): void              { this._fastTravelSystem = s; }
 
+  // ── v12 system injection ──────────────────────────────────────────────────
+
+  public setFameSystem(s: FameSystem): void                { this._fameSystem = s; }
+  public setActiveEffectsSystem(s: ActiveEffectsSystem): void { this._activeEffectsSystem = s; }
+  public setJailSystem(s: JailSystem): void                { this._jailSystem = s; }
+
+
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
     for (const [slot, item] of this._equipment.getEquipped()) {
@@ -273,6 +296,9 @@ export class SaveSystem {
     if (this._waitSystem)       data.wait        = this._waitSystem.getSaveState();
     if (this._skillProgressionSystem) data.skillProgression = this._skillProgressionSystem.getSaveState();
     if (this._fastTravelSystem)       data.fastTravel       = this._fastTravelSystem.getSaveState();
+    if (this._fameSystem)             data.fame             = this._fameSystem.getSaveState();
+    if (this._activeEffectsSystem)    data.activeEffects    = this._activeEffectsSystem.getSaveState();
+    if (this._jailSystem)             data.jail             = this._jailSystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -427,6 +453,13 @@ export class SaveSystem {
       this._skillProgressionSystem.restoreFromSave(data.skillProgression as any);
     if (this._fastTravelSystem && data.fastTravel)
       this._fastTravelSystem.restoreFromSave(data.fastTravel as any);
+    // v12 systems
+    if (this._fameSystem && data.fame)
+      this._fameSystem.restoreFromSave(data.fame as any);
+    if (this._activeEffectsSystem && data.activeEffects)
+      this._activeEffectsSystem.restoreFromSave(data.activeEffects as any);
+    if (this._jailSystem && data.jail)
+      this._jailSystem.restoreFromSave(data.jail as any);
 
     // Restore encumbrance stats
     if (typeof data.player.maxCarryWeight === "number") {
@@ -587,6 +620,9 @@ export class SaveSystem {
       wait: data.wait,
       skillProgression: data.skillProgression,
       fastTravel: data.fastTravel,
+      fame: data.fame,
+      activeEffects: data.activeEffects,
+      jail: data.jail,
     };
   }
 

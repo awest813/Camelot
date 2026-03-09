@@ -58,6 +58,9 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ **SkillProgressionSystem** — Oblivion-style use-based skill leveling (Blade, Destruction, Restoration, Marksman, Sneak, Speechcraft, Alchemy); XP gained from performing actions; `onSkillLevelUp` callback fires skill-up notifications; `multiplier(skill)` returns [1.0–2.0] bonus for other systems; save-state persistence (SAVE_VERSION 11).
 - ✅ **FastTravelSystem** — Discover named locations by visiting them; Y key shows discovered locations; `fastTravelTo()` teleports the player instantly (blocked in combat or while sneaking); auto-discovers cell transitions via `cellManager.onCellChanged`; save-state persistence (SAVE_VERSION 11).
 - ✅ **LevelScalingSystem** — Oblivion-style enemy scaling: NPC health, and XP reward scale with the player's current level (factor = 0.8 + level × 0.1, capped at 3×); applied on NPC spawn; structure NPCs also scaled via `world.structures.onNPCSpawn`.
+- ✅ **FameSystem** — Oblivion-style fame and infamy tracking (0–1000 each); fame gained from quest completions, infamy from crimes; `dispositionModifier` in [−20, +20] affects NPC reactions and future persuasion/barter; tier labels (Unknown → Legendary Hero / Clean → Most Wanted); H key shows current reputation; `onFameChange` callback wired to EventBus; save-state persistence (SAVE_VERSION 12).
+- ✅ **ActiveEffectsSystem** — Tracks all time-limited effects from spells, potions, and enchantments; 12 effect types (health/magicka/stamina restore, fortify stats, resist damage, fire/frost/shock DoT, silence, burden); `update(dt, player)` applies per-second tick and expires finished effects; `onEffectExpired` fires worn-off notifications; infinite-duration enchantment auras supported; H key shows active effect names; save-state persistence (SAVE_VERSION 12).
+- ✅ **JailSystem** — Completes the crime loop: when a guard challenges a player who cannot pay the bounty, `serveJailTime()` converts gold bounty into in-game hours (1 h per 10 g, cap 72 h), advances the clock via TimeSystem, penalises skill levels via SkillProgressionSystem (Blade/Marksman/Sneak/Alchemy/Speechcraft/Destruction/Restoration), and clears all bounties; jail records persisted (SAVE_VERSION 12).
 
 ### World + Content
 
@@ -68,11 +71,12 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 ### UX + Persistence
 
 - ✅ HUD, quest log, inventory, skill tree, pause flow.
-- ✅ Save/load (SAVE_VERSION 11) for all system states.
+- ✅ Save/load (SAVE_VERSION 12) for all system states.
 - ✅ Save file export to JSON file download + import from JSON/File (browser-safe).
 - ✅ Notifications, hit feedback, and debug support.
 - ✅ Compass HUD (top-center) showing cardinal direction from camera heading.
 - ✅ Wait/Rest dialog (T) for time-skipping 1–24 in-game hours with stat restoration.
+- ✅ Fame/Infamy HUD (H key) showing reputation tier, active effects, and jail history.
 
 ---
 

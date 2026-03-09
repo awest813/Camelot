@@ -52,9 +52,14 @@ import { WaitSystem } from "./systems/wait-system";
 import { SkillProgressionSystem } from "./systems/skill-progression-system";
 import { FastTravelSystem } from "./systems/fast-travel-system";
 import { LevelScalingSystem } from "./systems/level-scaling-system";
+import { FameSystem } from "./systems/fame-system";
+import { ActiveEffectsSystem } from "./systems/active-effects-system";
+import { JailSystem } from "./systems/jail-system";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
+/** Inventory item ID used for player gold (bounty payment check). */
+const GOLD_ITEM_ID = "gold_coins";
 
 export class Game {
   public scene: Scene;
@@ -117,6 +122,11 @@ export class Game {
   public skillProgressionSystem: SkillProgressionSystem;
   public fastTravelSystem: FastTravelSystem;
   public levelScalingSystem: LevelScalingSystem;
+
+  // v9 systems (Oblivion parity: fame/infamy, active effects, jail)
+  public fameSystem: FameSystem;
+  public activeEffectsSystem: ActiveEffectsSystem;
+  public jailSystem: JailSystem;
 
   public isPaused: boolean = false;
 
@@ -415,6 +425,54 @@ export class Game {
       }
     };
 
+    // ── v9 system wiring (Oblivion parity: fame, active effects, jail) ─────────
+    this.fameSystem = new FameSystem();
+    this.fameSystem.onFameChange = (fame, infamy) => {
+      this.eventBus.emit("fame:changed" as any, { fame, infamy });
+    };
+    this.saveSystem.setFameSystem(this.fameSystem);
+
+    this.activeEffectsSystem = new ActiveEffectsSystem();
+    this.activeEffectsSystem.onEffectExpired = (effect) => {
+      this.ui.showNotification(`${effect.name} has worn off.`, 1800);
+    };
+    this.saveSystem.setActiveEffectsSystem(this.activeEffectsSystem);
+
+    this.jailSystem = new JailSystem();
+    this.saveSystem.setJailSystem(this.jailSystem);
+
+    // Quest completion awards fame
+    this.questSystem.onQuestComplete = (xp) => {
+      this.player.addExperience(xp);
+      this.fameSystem.addFame(10);
+      this.ui.showNotification(
+        `+${xp} XP  |  Fame: ${this.fameSystem.fame} (${this.fameSystem.fameLabel})`, 3000
+      );
+    };
+
+    // Crime infamy — upgrade the guard challenge to offer a jail option
+    this.crimeSystem.onGuardChallenge = (guardNpc, factionId, bounty) => {
+      this.ui.showNotification(
+        `${guardNpc.mesh.name}: "Stop! You have a ${bounty}g bounty in ${factionId}!"`, 4000
+      );
+      // Auto-jail if player cannot pay — check inventory for gold_coins.
+      // Full Oblivion-style would use a dialogue; for now auto-jail fires when
+      // the player has insufficient gold.
+      const goldEntry = this.inventorySystem.items.find(i => i.id === GOLD_ITEM_ID);
+      const playerGold = goldEntry ? (goldEntry.quantity ?? 0) : 0;
+      if (playerGold < bounty) {
+        const result = this.jailSystem.serveJailTime(
+          bounty, factionId,
+          this.timeSystem,
+          this.skillProgressionSystem,
+          this.crimeSystem,
+          this.timeSystem.gameTime,
+        );
+        this.ui.showNotification(result.message, 4000);
+        this.fameSystem.addInfamy(Math.ceil(bounty / 10));
+      }
+      this.eventBus.emit("crime:committed", { crimeType: "challenge", factionId, bounty });
+    };
 
     this.ui.onAttributeSpend = (name) => {
       const spent = this.attributeSystem.spendPoint(name);
@@ -447,13 +505,7 @@ export class Game {
       }
     };
 
-    // Guard crime challenge
-    this.crimeSystem.onGuardChallenge = (guardNpc, factionId, bounty) => {
-      this.ui.showNotification(
-        `${guardNpc.mesh.name}: "Stop! You have a ${bounty}g bounty in ${factionId}!"`, 4000
-      );
-      this.eventBus.emit("crime:committed", { crimeType: "challenge", factionId, bounty });
-    };
+    // Guard crime challenge is wired in the v9 block above.
 
     // Stealth detection notification
     this.stealthSystem.onDetected = (detectedBy) => {
@@ -548,11 +600,7 @@ export class Game {
         this.skillProgressionSystem.gainXP("speechcraft", 8);
     };
 
-    // Wire XP callbacks
-    this.questSystem.onQuestComplete = (xp) => {
-        this.player.addExperience(xp);
-        this.ui.showNotification(`+${xp} XP`, 2000);
-    };
+    // Quest XP and fame callbacks are wired in the v9 block above.
     // Note: player.onLevelUp is wired above in the v2 system wiring block
 
     // Test Loot
@@ -917,6 +965,21 @@ export class Game {
                         this.player.camera.attachControl(this.canvas, true);
                     }
                 }
+            } else if (kbInfo.event.key === "h" || kbInfo.event.key === "H") {
+                // Show Fame / Infamy status (H = Honours)
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+                    const effects = this.activeEffectsSystem.activeEffects;
+                    const effectStr = effects.length > 0
+                      ? `  Active effects: ${effects.map(e => e.name).join(", ")}`
+                      : "";
+                    this.ui.showNotification(
+                      `Fame: ${this.fameSystem.fame} (${this.fameSystem.fameLabel})` +
+                      `  Infamy: ${this.fameSystem.infamy} (${this.fameSystem.infamyLabel})` +
+                      `  Sentences: ${this.jailSystem.totalSentences}` +
+                      effectStr,
+                      4000,
+                    );
+                }
             } else if (kbInfo.event.key === "F3") {
                 const shown = this.ui.toggleDebugOverlay();
                 this.ui.showNotification(shown ? "Debug overlay ON" : "Debug overlay OFF", 1200);
@@ -1106,6 +1169,9 @@ export class Game {
 
       // v6 atmospheric weather update (fog + light blending)
       this.weatherSystem.update(deltaTime);
+
+      // v9 active effects tick (DoT heals/damage, duration countdown)
+      this.activeEffectsSystem.update(deltaTime, this.player);
 
       // v4 browser optimisation: distance-based LOD culling
       this._lastLodCulled = this.lodSystem.update(this.player.camera.position);
