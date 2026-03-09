@@ -16,9 +16,12 @@ import type { CellManager } from "../world/cell-manager";
 import type { SpellSystem } from "./spell-system";
 import type { PersuasionSystem } from "./persuasion-system";
 import type { AlchemySystem } from "./alchemy-system";
+import type { EnchantingSystem } from "./enchanting-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 7;
+const SAVE_VERSION = 8;
+/** Oldest save version that can still be loaded (forward-compat window). */
+const SAVE_VERSION_MIN = 5;
 
 interface PlayerSaveData {
   position: { x: number; y: number; z: number };
@@ -51,6 +54,7 @@ interface ParsedSaveData {
   spells?: unknown;
   persuasion?: unknown;
   alchemy?: unknown;
+  enchanting?: unknown;
 }
 
 interface EquipmentEntry {
@@ -80,6 +84,8 @@ export interface SaveData {
   persuasion?: any;
   // v7 additions
   alchemy?: any;
+  // v8 additions
+  enchanting?: any;
 }
 
 export class SaveSystem {
@@ -106,6 +112,9 @@ export class SaveSystem {
 
   // v7 optional systems
   private _alchemySystem: AlchemySystem | null = null;
+
+  // v8 optional systems
+  private _enchantingSystem: EnchantingSystem | null = null;
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
   private _autosaveDirty = false;
@@ -152,6 +161,10 @@ export class SaveSystem {
   // ── v7 system injection ───────────────────────────────────────────────────
 
   public setAlchemySystem(s: AlchemySystem): void      { this._alchemySystem = s; }
+
+  // ── v8 system injection ───────────────────────────────────────────────────
+
+  public setEnchantingSystem(s: EnchantingSystem): void { this._enchantingSystem = s; }
 
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
@@ -209,6 +222,7 @@ export class SaveSystem {
     if (this._spellSystem)      data.spells      = this._spellSystem.getSaveState();
     if (this._persuasionSystem) data.persuasion  = this._persuasionSystem.getSaveState();
     if (this._alchemySystem)    data.alchemy     = this._alchemySystem.getSaveState();
+    if (this._enchantingSystem) data.enchanting  = this._enchantingSystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -349,6 +363,9 @@ export class SaveSystem {
 
     // v7 systems
     if (this._alchemySystem && data.alchemy)        this._alchemySystem.restoreFromSave(data.alchemy);
+
+    // v8 systems
+    if (this._enchantingSystem && data.enchanting)  this._enchantingSystem.restoreFromSave(data.enchanting);
 
     // Restore encumbrance stats
     if (typeof data.player.maxCarryWeight === "number") {
@@ -503,6 +520,7 @@ export class SaveSystem {
       spells: data.spells,
       persuasion: data.persuasion,
       alchemy: data.alchemy,
+      enchanting: data.enchanting,
     };
   }
 
