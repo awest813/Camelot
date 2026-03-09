@@ -18,6 +18,13 @@ import type { PersuasionSystem } from "./persuasion-system";
 
 const SAVE_KEY = "camelot_save";
 const SAVE_VERSION = 6;
+/**
+ * Minimum save version that can be loaded without migration.
+ * Saves in the range [SAVE_VERSION_MIN, SAVE_VERSION] are accepted; fields
+ * introduced in later versions will simply be undefined and handled by each
+ * system's optional restore path.
+ */
+const SAVE_VERSION_MIN = 5;
 
 interface PlayerSaveData {
   position: { x: number; y: number; z: number };
@@ -258,7 +265,7 @@ export class SaveSystem {
       return false;
     }
 
-    if (data.version !== SAVE_VERSION) {
+    if (data.version < SAVE_VERSION_MIN || data.version > SAVE_VERSION) {
       this._ui.showNotification("Incompatible save version.", 2500);
       return false;
     }
@@ -436,7 +443,7 @@ export class SaveSystem {
       return false;
     }
 
-    if (data?.version !== SAVE_VERSION) {
+    if (data?.version === undefined || data.version < SAVE_VERSION_MIN || data.version > SAVE_VERSION) {
       this._ui.showNotification("Import failed: incompatible save version.", 2500);
       return false;
     }

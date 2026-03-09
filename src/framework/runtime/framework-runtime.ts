@@ -16,6 +16,14 @@ export interface FrameworkRuntimeOptions {
   storage?: StorageAdapter;
   storageKey?: string;
   fetchImpl?: FetchLike;
+  /**
+   * Optional callback used to evaluate `skill_min` dialogue choice conditions.
+   * Should return the player's current rank for the given skill id (0 if unknown).
+   *
+   * Wire this to `SkillTreeSystem.getSkillRank` in the host game so that
+   * dialogue choices gated by skill level are correctly enabled/disabled.
+   */
+  skillLevelProvider?: (skillId: string) => number;
 }
 
 export class FrameworkRuntime {
@@ -28,9 +36,11 @@ export class FrameworkRuntime {
   private _inventoryEngine: InventoryEngine;
   private _factionEngine: FactionEngine;
   private _modLoader: ModLoader | null = null;
+  private _skillLevelProvider: ((skillId: string) => number) | undefined;
 
   constructor(baseContent: RpgContentBundle, options: FrameworkRuntimeOptions = {}) {
     this.contentRegistry.loadBase(baseContent);
+    this._skillLevelProvider = options.skillLevelProvider;
     this._rebuildEngines(options.inventoryCapacity ?? 20);
     this.saveEngine = new SaveEngine(options.storage, options.storageKey);
     if (options.fetchImpl) {
@@ -66,6 +76,7 @@ export class FrameworkRuntime {
       },
       getQuestStatus: (questId) => this._questEngine.getQuestStatus(questId),
       getInventoryCount: (itemId) => this._inventoryEngine.getItemCount(itemId),
+      getSkillLevel: this._skillLevelProvider,
       emitEvent: (eventId, payload) => {
         const event = this._translateDialogueEvent(eventId, payload);
         if (event) {

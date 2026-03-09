@@ -189,6 +189,15 @@ export class SkillTreeSystem {
     return this._findUnmetPrerequisites(skill.prerequisites).length === 0;
   }
 
+  /**
+   * Return the current rank of a skill by its id.
+   * Returns 0 when the skill does not exist or has not been purchased.
+   * Used by `FrameworkRuntime` to evaluate `skill_min` dialogue conditions.
+   */
+  public getSkillRank(skillId: string): number {
+    return this._findSkillById(skillId)?.currentRank ?? 0;
+  }
+
   /** Search all trees for a skill with the given id. */
   private _findSkillById(skillId: string): Skill | undefined {
     for (const tree of this.trees) {

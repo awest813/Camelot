@@ -264,7 +264,7 @@ describe('SaveSystem', () => {
         expect(mockUI.showNotification).toHaveBeenCalledWith('Import failed: corrupt save structure.', 2500);
     });
 
-    it('should reject saves with a mismatched version', () => {
+    it('should reject saves with a mismatched version (too new)', () => {
         const badData: SaveData = {
             version: 999,
             timestamp: Date.now(),
@@ -277,6 +277,39 @@ describe('SaveSystem', () => {
         const result = saveSystem.load();
         expect(result).toBe(false);
         expect(mockUI.showNotification).toHaveBeenCalledWith('Incompatible save version.', 2500);
+    });
+
+    it('should reject saves with a version below the minimum supported (v4)', () => {
+        const oldData: SaveData = {
+            version: 4,
+            timestamp: Date.now(),
+            player: { position: { x: 0, y: 0, z: 0 }, health: 100, magicka: 100, stamina: 100, level: 1, experience: 0, experienceToNextLevel: 100 },
+            inventory: [],
+            equipment: [],
+            quests: [],
+        };
+        localStorageMock['camelot_save'] = JSON.stringify(oldData);
+        const result = saveSystem.load();
+        expect(result).toBe(false);
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Incompatible save version.', 2500);
+    });
+
+    it('should load a v5 save successfully (backward-compatible with v6)', () => {
+        const v5Data: SaveData = {
+            version: 5,
+            timestamp: Date.now(),
+            player: { position: { x: 1, y: 2, z: 3 }, health: 75, magicka: 50, stamina: 90, level: 2, experience: 50, experienceToNextLevel: 200 },
+            inventory: [],
+            equipment: [],
+            quests: [],
+            // v6 fields (spells/persuasion) absent — should be handled gracefully
+        };
+        localStorageMock['camelot_save'] = JSON.stringify(v5Data);
+        const result = saveSystem.load();
+        expect(result).toBe(true);
+        expect(mockPlayer.health).toBe(75);
+        expect(mockPlayer.stamina).toBe(90);
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Game Loaded!', 2500);
     });
 
     // ── importFromJson() ───────────────────────────────────────────────────

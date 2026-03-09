@@ -41,6 +41,7 @@ import { GameEventBus } from "./systems/event-bus";
 import { LootTableSystem, STARTER_LOOT_TABLES } from "./systems/loot-table-system";
 import { NpcArchetypeSystem } from "./systems/npc-archetype-system";
 import { FixedStepLoop } from "./systems/fixed-step-loop";
+import { LodSystem } from "./systems/lod-system";
 
 export class Game {
   public scene: Scene;
@@ -81,6 +82,9 @@ export class Game {
   public lootTableSystem: LootTableSystem;
   public npcArchetypeSystem: NpcArchetypeSystem;
 
+  // v4 systems (browser optimisation)
+  public lodSystem: LodSystem;
+
   public isPaused: boolean = false;
 
   private readonly _gameplayLoop = new FixedStepLoop({
@@ -99,6 +103,9 @@ export class Game {
   private _lastStamina: number = -1;
   private _lastExperience: number = -1;
   private _lastLevel: number = -1;
+
+  // Last LOD culled count for the debug overlay (updated from lodSystem.update())
+  private _lastLodCulled: number = 0;
 
   // Death feedback: true while health is at 0 so the notification fires once per "death"
   private _playerAtZeroHP: boolean = false;
@@ -133,9 +140,11 @@ export class Game {
     this.player.magicka        = this.player.maxMagicka;
     this.player.stamina        = this.player.maxStamina;
 
-    // Notify player of location changes
+    // Notify player of location changes; clear LOD registry on cell transition
+    // so stale mesh references from the previous cell don't linger.
     this.cellManager.onCellChanged = (_cellId, cellName) => {
       this.ui.showNotification(`Entered: ${cellName}`, 2500);
+      this.lodSystem?.clear();
     };
 
     // Test NPC
@@ -165,6 +174,7 @@ export class Game {
     this.frameworkRuntime   = new FrameworkRuntime(frameworkBaseContent, {
       inventoryCapacity: this.inventorySystem.maxCapacity,
       fetchImpl: (url: string) => fetch(url),
+      skillLevelProvider: (skillId: string) => this.skillTreeSystem.getSkillRank(skillId),
     });
     this.frameworkRuntime.questEngine.activateQuest("quest_guard_resolution");
     this.saveSystem.setFrameworkRuntime(this.frameworkRuntime);
@@ -228,6 +238,11 @@ export class Game {
     this.spellSystem.magicDamageBonus = this.attributeSystem.magicDamageBonus;
 
     this.persuasionSystem = new PersuasionSystem();
+
+    // ── v4 system wiring (browser optimisation) ──────────────────────────────
+    // LOD system: run the visibility pass every 5 frames for performance.
+    // WorldManager and CellManager wire their spawned meshes in via onMeshSpawned.
+    this.lodSystem = new LodSystem(5);
 
     // Register v3 systems with save
     this.saveSystem.setSpellSystem(this.spellSystem);
@@ -840,6 +855,9 @@ export class Game {
       this.projectileSystem.update(deltaTime);
       this.spellSystem.update(deltaTime);
 
+      // v4 browser optimisation: distance-based LOD culling
+      this._lastLodCulled = this.lodSystem.update(this.player.camera.position);
+
       // Tick the navmesh rebuild debounce; request a rebuild whenever the player
       // crosses into a new terrain chunk (new ground meshes may have loaded).
       this.navigationSystem.update(deltaTime);
@@ -927,6 +945,7 @@ export class Game {
               currentCell:    this.cellManager.currentCell?.name ?? "exterior",
               gameTime:       this.timeSystem.timeString,
               stealthLabel:   this.stealthSystem.stealthLabel,
+              lodCulled:      this._lastLodCulled,
           });
       }
   }
