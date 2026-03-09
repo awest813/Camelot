@@ -19,6 +19,7 @@ export interface MerchantDef {
 export interface BarterSaveState {
   merchants: Array<{ id: string; inventory: Item[]; gold: number }>;
   playerGold: number;
+  merchantRapport?: Record<string, number>;
 }
 
 /**
@@ -53,6 +54,9 @@ export class BarterSystem {
   /** Fired after each transaction. */
   public onTransaction: ((type: "buy" | "sell", itemName: string, goldAmount: number) => void) | null = null;
 
+  /** Merchant-specific trust/loyalty from repeated business. */
+  private _merchantRapport: Map<string, number> = new Map();
+
   constructor(inventory: InventorySystem, ui: UIManager) {
     this._inventory = inventory;
     this._ui        = ui;
@@ -62,6 +66,7 @@ export class BarterSystem {
 
   public registerMerchant(def: MerchantDef): void {
     this._merchants.set(def.id, { ...def, inventory: [...def.inventory] });
+    if (!this._merchantRapport.has(def.id)) this._merchantRapport.set(def.id, 0);
   }
 
   // ── Pricing ────────────────────────────────────────────────────────────────
@@ -75,19 +80,22 @@ export class BarterSystem {
     const priceMultiplier = merchant?.priceMultiplier ?? 1.0;
     // Factor: 1.4 at skill 0 → 1.0 at skill 100
     const barterFactor = 1.4 - this.barterSkill / 250;
+    const rapportFactor = 1 - this._getRapport(merchantId) * 0.003;
     const baseValue = item.stats?.value ?? 10;
-    return Math.max(1, Math.round(baseValue * priceMultiplier * barterFactor));
+    return Math.max(1, Math.round(baseValue * priceMultiplier * barterFactor * rapportFactor));
   }
 
   /**
    * Price the player receives when selling one unit of `item`.
    * Improves (increases) as `barterSkill` increases.
    */
-  public getSellPrice(item: Item): number {
+  public getSellPrice(item: Item, merchantId?: string): number {
     // Factor: 0.30 at skill 0 → 0.55 at skill 100
     const barterFactor = 0.30 + this.barterSkill / 400;
+    const rapportFactor = merchantId ? (1 + this._getRapport(merchantId) * 0.0015) : 1;
+    const demandFactor = merchantId ? this._getDemandFactor(merchantId, item.id) : 1;
     const baseValue = item.stats?.value ?? 10;
-    return Math.max(1, Math.round(baseValue * barterFactor));
+    return Math.max(1, Math.round(baseValue * barterFactor * rapportFactor * demandFactor));
   }
 
   // ── Session management ─────────────────────────────────────────────────────
@@ -151,6 +159,7 @@ export class BarterSystem {
     }
 
     this.onTransaction?.("buy", item.name, price);
+    this._adjustRapport(merchantId, 1);
     this._ui.showNotification(`Bought ${item.name} for ${price}g`, 1800);
     return true;
   }
@@ -166,7 +175,7 @@ export class BarterSystem {
     const inventoryItem = this._inventory.items.find((i) => i.id === itemId);
     if (!inventoryItem) return false;
 
-    const sellPrice = this.getSellPrice(inventoryItem);
+    const sellPrice = this.getSellPrice(inventoryItem, merchantId);
     if (merchant.gold < sellPrice) {
       this._ui.showNotification(`Merchant can't afford that (${sellPrice}g)`, 2000);
       return false;
@@ -187,6 +196,7 @@ export class BarterSystem {
     }
 
     this.onTransaction?.("sell", inventoryItem.name, sellPrice);
+    this._adjustRapport(merchantId, 1);
     this._ui.showNotification(`Sold ${inventoryItem.name} for ${sellPrice}g`, 1800);
     return true;
   }
@@ -201,6 +211,10 @@ export class BarterSystem {
     return this._merchants.get(id);
   }
 
+  public getMerchantRapport(merchantId: string): number {
+    return this._getRapport(merchantId);
+  }
+
   // ── Persistence ───────────────────────────────────────────────────────────
 
   public getSaveState(): BarterSaveState {
@@ -208,7 +222,11 @@ export class BarterSystem {
     for (const m of this._merchants.values()) {
       merchants.push({ id: m.id, inventory: [...m.inventory], gold: m.gold });
     }
-    return { merchants, playerGold: this.playerGold };
+    return {
+      merchants,
+      playerGold: this.playerGold,
+      merchantRapport: Object.fromEntries(this._merchantRapport),
+    };
   }
 
   public restoreFromSave(state: BarterSaveState): void {
@@ -222,5 +240,36 @@ export class BarterSystem {
     if (typeof state?.playerGold === "number") {
       this.playerGold = state.playerGold;
     }
+
+    if (state?.merchantRapport) {
+      for (const [merchantId, value] of Object.entries(state.merchantRapport)) {
+        if (this._merchants.has(merchantId)) {
+          this._merchantRapport.set(merchantId, this._clampRapport(value));
+        }
+      }
+    }
+  }
+
+  private _adjustRapport(merchantId: string, delta: number): void {
+    this._merchantRapport.set(merchantId, this._clampRapport(this._getRapport(merchantId) + delta));
+  }
+
+  private _getRapport(merchantId: string): number {
+    return this._merchantRapport.get(merchantId) ?? 0;
+  }
+
+  private _clampRapport(value: number): number {
+    return Math.max(0, Math.min(25, Math.round(value)));
+  }
+
+  private _getDemandFactor(merchantId: string, itemId: string): number {
+    const merchant = this._merchants.get(merchantId);
+    if (!merchant) return 1;
+
+    const totalInStock = merchant.inventory
+      .filter((item) => item.id === itemId)
+      .reduce((acc, item) => acc + Math.max(1, item.quantity || 1), 0);
+
+    return Math.max(0.55, Math.min(1.05, 1 - totalInStock * 0.05));
   }
 }
