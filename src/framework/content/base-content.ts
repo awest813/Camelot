@@ -356,6 +356,8 @@ export const frameworkBaseContent: RpgContentBundle = {
       skills: { "one_handed": 30, "light_armor": 25 },
       disposition: 10,
       respawns: true,
+      // Light leather armor provides minimal physical protection
+      damageResistances: { physical: 0.08 },
     },
     {
       id: "archetype_merchant",
@@ -386,6 +388,9 @@ export const frameworkBaseContent: RpgContentBundle = {
       skills: { "one_handed": 55, "block": 50, "heavy_armor": 55 },
       disposition: 5,
       respawns: false,
+      // Heavy armor grants meaningful physical resistance; fire burns through steel
+      damageResistances: { physical: 0.25 },
+      damageWeaknesses: { fire: 0.2 },
     },
     {
       id: "archetype_innkeeper",
@@ -427,6 +432,10 @@ export const frameworkBaseContent: RpgContentBundle = {
       skills: { "destruction": 45, "alteration": 30 },
       disposition: 40,
       respawns: true,
+      // Arcane training provides partial resistance to magic elements but slight
+      // physical vulnerability (robes offer little protection)
+      damageResistances: { fire: 0.15, frost: 0.15, shock: 0.15 },
+      damageWeaknesses: { physical: 0.1 },
     },
   ],
 };
