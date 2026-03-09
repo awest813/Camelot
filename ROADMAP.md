@@ -55,6 +55,9 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ **QuickSlotSystem** — Bind consumable items (health/magicka/stamina potions) to hotkeys 7/8/9/0; effects applied directly to player stats; removes one item per use; `onItemConsumed` callback wired to EventBus; save-state persistence (SAVE_VERSION 9).
 - ✅ **WaitSystem** — Oblivion-style wait/rest (T key): choose 1–24 in-game hours, clock advances instantly, Health/Magicka/Stamina restore proportionally (full rest at 24 h); save-state persistence (SAVE_VERSION 10).
 - ✅ **Compass HUD** — Top-center compass strip shows three cardinal labels (e.g. NW · N · NE) that scroll as the player turns; updates every frame from camera yaw with zero runtime cost.
+- ✅ **SkillProgressionSystem** — Oblivion-style use-based skill leveling (Blade, Destruction, Restoration, Marksman, Sneak, Speechcraft, Alchemy); XP gained from performing actions; `onSkillLevelUp` callback fires skill-up notifications; `multiplier(skill)` returns [1.0–2.0] bonus for other systems; save-state persistence (SAVE_VERSION 11).
+- ✅ **FastTravelSystem** — Discover named locations by visiting them; Y key shows discovered locations; `fastTravelTo()` teleports the player instantly (blocked in combat or while sneaking); auto-discovers cell transitions via `cellManager.onCellChanged`; save-state persistence (SAVE_VERSION 11).
+- ✅ **LevelScalingSystem** — Oblivion-style enemy scaling: NPC health, and XP reward scale with the player's current level (factor = 0.8 + level × 0.1, capped at 3×); applied on NPC spawn; structure NPCs also scaled via `world.structures.onNPCSpawn`.
 
 ### World + Content
 
@@ -65,7 +68,7 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 ### UX + Persistence
 
 - ✅ HUD, quest log, inventory, skill tree, pause flow.
-- ✅ Save/load (SAVE_VERSION 10) for all system states.
+- ✅ Save/load (SAVE_VERSION 11) for all system states.
 - ✅ Save file export to JSON file download + import from JSON/File (browser-safe).
 - ✅ Notifications, hit feedback, and debug support.
 - ✅ Compass HUD (top-center) showing cardinal direction from camera heading.
