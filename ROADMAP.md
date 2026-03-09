@@ -50,6 +50,7 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ **GameEventBus** — Typed pub/sub event bus for all major gameplay events.
 - ✅ **AlchemySystem** — Oblivion-style alchemy: ingredient satchel, effect discovery (eat/mix), potion crafting from 2–4 ingredients with shared-effect intersection, skill scaling, and save-state persistence. L to open workbench.
 - ✅ **NPC archetype resistances/weaknesses** — `damageResistances` and `damageWeaknesses` fields added to `NpcArchetypeDefinition`; data-driven per-archetype damage modifiers applied on spawn (bandit chief: physical resist, mage apprentice: elemental resist/physical weak, etc.).
+- ✅ **EnchantingSystem** — Oblivion-style enchanting: five soul gem tiers (petty → grand) scale effect magnitude; 10 enchantment effects across weapon (fire/frost/shock damage, absorb health, drain magicka) and armor (fortify health/magicka/stamina/strength, resist damage) categories; enchanting skill (0–100) further scales magnitude; items are renamed on enchant and stats applied immediately; save-state persistence (SAVE_VERSION 8). B to open altar.
 
 ### World + Content
 
@@ -131,6 +132,8 @@ model.
 - ✅ **NpcArchetypeDefinition** — Data-driven NPC templates (guard, bandit, merchant, boss, innkeeper, villager) in content bundle.
 - ✅ **Save file export/import** — Download save as JSON (`exportToFile`) and re-import via `importFromJson` / `importFromFile`.
 - ✅ **SAVE_VERSION 6** — Spell and persuasion state persisted; backwards-incompatible saves are rejected cleanly.
+- ✅ **SAVE_VERSION 7** — Alchemy state persisted.
+- ✅ **SAVE_VERSION 8** — Enchanting system (soul gem inventory + enchanting skill) persisted; SAVE_VERSION_MIN = 5 constant fixes forward-compat boundary.
 
 ### Natural-Feel Systems Overhaul (Decision)
 
@@ -159,7 +162,7 @@ three-step overhaul track:
 ### Combat Feel and Balance
 
 - 🧭 Add weapon archetype tuning passes (speed, stagger, resource cost).
-- 🧭 Add lightweight enemy resistances/weaknesses for build diversity.
+- ✅ Add lightweight enemy resistances/weaknesses for build diversity — per-archetype damage modifiers in NpcArchetypeDefinition.
 - 🧭 Improve telegraph readability for enemy attacks.
 
 ### Stability and Tooling
@@ -180,7 +183,7 @@ three-step overhaul track:
 ### Systems Expansion
 
 - ✅ Alchemy/potion crafting prototype (AlchemySystem + AlchemyUI).
-- 🧭 Enchanting system (apply magical effects to weapons and armor).
+- ✅ Enchanting system (apply magical effects to weapons and armor) — soul gems, 10 enchantment types, skill scaling.
 - ✅ Faction/reputation prototype tied to quests (FactionEngine + PersuasionSystem).
 - 🧭 More advanced quest scripting hooks.
 

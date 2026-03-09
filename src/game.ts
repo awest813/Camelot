@@ -43,6 +43,8 @@ import { NpcArchetypeSystem } from "./systems/npc-archetype-system";
 import { FixedStepLoop } from "./systems/fixed-step-loop";
 import { AlchemySystem } from "./systems/alchemy-system";
 import { AlchemyUI } from "./ui/alchemy-ui";
+import { EnchantingSystem } from "./systems/enchanting-system";
+import { EnchantingUI } from "./ui/enchanting-ui";
 
 export class Game {
   public scene: Scene;
@@ -86,6 +88,10 @@ export class Game {
   // v4 systems (Oblivion-lite: alchemy)
   public alchemySystem: AlchemySystem;
   public alchemyUI: AlchemyUI;
+
+  // v5 systems (Oblivion parity: enchanting)
+  public enchantingSystem: EnchantingSystem;
+  public enchantingUI: EnchantingUI;
 
   public isPaused: boolean = false;
 
@@ -271,6 +277,28 @@ export class Game {
     };
 
     this.saveSystem.setAlchemySystem(this.alchemySystem);
+
+    // ── v5 system wiring (Enchanting) ─────────────────────────────────────────
+    this.enchantingSystem = new EnchantingSystem(
+      this.player,
+      this.inventorySystem,
+      this.equipmentSystem,
+      this.ui,
+    );
+
+    // Seed the player with a starter set of soul gems
+    this.enchantingSystem.addSoulGem("petty", 3);
+    this.enchantingSystem.addSoulGem("lesser", 2);
+    this.enchantingSystem.addSoulGem("common", 1);
+
+    this.enchantingUI = new EnchantingUI(this.ui.uiTexture, this.enchantingSystem);
+    this.enchantingUI.onEnchant = (itemId, effectId, gemType) => {
+      this.enchantingSystem.enchantItem(itemId, effectId, gemType);
+      this.enchantingUI.refresh();
+      this.saveSystem.markDirty();
+    };
+
+    this.saveSystem.setEnchantingSystem(this.enchantingSystem);
 
     // Wire attribute panel spend callback
     this.ui.onAttributeSpend = (name) => {
@@ -566,6 +594,11 @@ export class Game {
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.enchantingUI.isVisible) {
+                    this.enchantingUI.toggle(false);
+                    this.interactionSystem.isBlocked = false;
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
                 } else {
                     this.togglePause();
                 }
@@ -712,6 +745,21 @@ export class Game {
                 if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
                     const open = !this.alchemyUI.isVisible;
                     this.alchemyUI.toggle(open);
+                    if (open) {
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    } else {
+                        this.interactionSystem.isBlocked = false;
+                        this.canvas.requestPointerLock();
+                        this.player.camera.attachControl(this.canvas, true);
+                    }
+                }
+            } else if (kbInfo.event.key === "b" || kbInfo.event.key === "B") {
+                // Toggle Enchanting altar (B = enchanting Bench)
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+                    const open = !this.enchantingUI.isVisible;
+                    this.enchantingUI.toggle(open);
                     if (open) {
                         this.interactionSystem.isBlocked = true;
                         document.exitPointerLock();
