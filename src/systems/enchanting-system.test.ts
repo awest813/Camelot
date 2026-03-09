@@ -300,7 +300,7 @@ describe("EnchantingSystem — save / restore", () => {
 
   it("restoreFromSave ignores unknown gem types", () => {
     const system = new EnchantingSystem(makePlayer(), makeInventory(), makeEquipment(), makeUI());
-    system.restoreFromSave({ soulGems: { "legendary" as any: 5 }, enchantingSkill: 10 });
+    system.restoreFromSave({ soulGems: { legendary: 5 } as any, enchantingSkill: 10 });
     // No crash, and no unknown gem stored
     expect(system.getAvailableSoulGems()).toHaveLength(0);
   });

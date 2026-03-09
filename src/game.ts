@@ -45,6 +45,9 @@ import { AlchemySystem } from "./systems/alchemy-system";
 import { AlchemyUI } from "./ui/alchemy-ui";
 import { EnchantingSystem } from "./systems/enchanting-system";
 import { EnchantingUI } from "./ui/enchanting-ui";
+import { LodSystem } from "./systems/lod-system";
+import { WeatherSystem } from "./systems/weather-system";
+import { QuickSlotSystem } from "./systems/quickslot-system";
 
 export class Game {
   public scene: Scene;
@@ -92,6 +95,13 @@ export class Game {
   // v5 systems (Oblivion parity: enchanting)
   public enchantingSystem: EnchantingSystem;
   public enchantingUI: EnchantingUI;
+
+  // v4 browser optimisation: LOD culling
+  public lodSystem: LodSystem;
+
+  // v6 systems (Oblivion atmosphere + hotkeys)
+  public weatherSystem: WeatherSystem;
+  public quickSlotSystem: QuickSlotSystem;
 
   public isPaused: boolean = false;
 
@@ -300,7 +310,31 @@ export class Game {
 
     this.saveSystem.setEnchantingSystem(this.enchantingSystem);
 
-    // Wire attribute panel spend callback
+    // ── v6 system wiring (Weather + QuickSlots) ────────────────────────────────
+    // WeatherSystem: Markov-chain atmospheric weather with fog/light integration.
+    // Pass scene and light references so it can directly update visuals each tick.
+    this.weatherSystem = new WeatherSystem(
+      "clear",
+      this.scene,
+      this.scene.getLightByName("hLight") as any,
+      this.scene.getLightByName("sun") as any,
+      { ambientBase: 0.55, sunBase: 0.85 },
+    );
+    this.weatherSystem.onWeatherChange = (state) => {
+      this.ui.showNotification(`Weather: ${this.weatherSystem.label}`, 2500);
+      this.eventBus.emit("weather:changed" as any, { state });
+    };
+    this.saveSystem.setWeatherSystem(this.weatherSystem);
+
+    // QuickSlotSystem: bind consumable items to hotkeys 7, 8, 9, 0.
+    this.quickSlotSystem = new QuickSlotSystem(this.inventorySystem, this.player, this.ui);
+    // Seed slot 7 with the starter health potion (if the player has one)
+    this.quickSlotSystem.bindSlot("7", "potion_hp_01");
+    this.quickSlotSystem.onItemConsumed = (item, _key) => {
+      this.eventBus.emit("player:consumeItem" as any, { itemId: item.id });
+      this.saveSystem.markDirty();
+    };
+    this.saveSystem.setQuickSlotSystem(this.quickSlotSystem);
     this.ui.onAttributeSpend = (name) => {
       const spent = this.attributeSystem.spendPoint(name);
       if (spent) {
@@ -773,6 +807,12 @@ export class Game {
             } else if (kbInfo.event.key === "F3") {
                 const shown = this.ui.toggleDebugOverlay();
                 this.ui.showNotification(shown ? "Debug overlay ON" : "Debug overlay OFF", 1200);
+            } else if (kbInfo.event.key === "7" || kbInfo.event.key === "8" ||
+                       kbInfo.event.key === "9" || kbInfo.event.key === "0") {
+                // Quick-slot consumable use
+                if (!this._isCombatInputBlocked()) {
+                    this.quickSlotSystem.useSlot(kbInfo.event.key as "7" | "8" | "9" | "0");
+                }
             }
         }
     });
@@ -947,6 +987,9 @@ export class Game {
       this.projectileSystem.update(deltaTime);
       this.spellSystem.update(deltaTime);
 
+      // v6 atmospheric weather update (fog + light blending)
+      this.weatherSystem.update(deltaTime);
+
       // v4 browser optimisation: distance-based LOD culling
       this._lastLodCulled = this.lodSystem.update(this.player.camera.position);
 
@@ -1038,6 +1081,7 @@ export class Game {
               gameTime:       this.timeSystem.timeString,
               stealthLabel:   this.stealthSystem.stealthLabel,
               lodCulled:      this._lastLodCulled,
+              weather:        this.weatherSystem.label,
           });
       }
   }

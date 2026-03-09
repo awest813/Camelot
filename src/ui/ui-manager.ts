@@ -1143,6 +1143,7 @@ export class UIManager {
     gameTime: string;
     stealthLabel: string;
     lodCulled?: number;
+    weather?: string;
   }): void {
     if (!this._debugText || !this.isDebugVisible) return;
     const lines = [
@@ -1158,6 +1159,9 @@ export class UIManager {
     ];
     if (metrics.lodCulled !== undefined) {
       lines.push(`LOD culled: ${metrics.lodCulled}`);
+    }
+    if (metrics.weather !== undefined) {
+      lines.push(`Weather:    ${metrics.weather}`);
     }
     this._debugText.text = lines.join("\n");
   }
