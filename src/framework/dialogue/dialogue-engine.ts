@@ -12,6 +12,7 @@ import {
 
 export class DialogueEngine {
   private _definitions: Map<string, DialogueDefinition> = new Map();
+  private _nodeMaps: Map<string, Map<string, DialogueNode>> = new Map();
 
   constructor(definitions: DialogueDefinition[] = []) {
     for (const definition of definitions) {
@@ -20,19 +21,21 @@ export class DialogueEngine {
   }
 
   public registerDialogue(definition: DialogueDefinition): void {
-    this._validateDefinition(definition);
+    const nodeMap = this._validateDefinition(definition);
     this._definitions.set(definition.id, definition);
+    this._nodeMaps.set(definition.id, nodeMap);
   }
 
   public createSession(dialogueId: string, context: DialogueContext): DialogueSession {
     const definition = this._definitions.get(dialogueId);
-    if (!definition) {
+    const nodeMap = this._nodeMaps.get(dialogueId);
+    if (!definition || !nodeMap) {
       throw new Error(`Unknown dialogue id '${dialogueId}'.`);
     }
-    return new DialogueSession(definition, context);
+    return new DialogueSession(definition, context, nodeMap);
   }
 
-  private _validateDefinition(definition: DialogueDefinition): void {
+  private _validateDefinition(definition: DialogueDefinition): Map<string, DialogueNode> {
     const nodeMap = new Map<string, DialogueNode>();
     for (const node of definition.nodes) {
       if (nodeMap.has(node.id)) {
@@ -59,6 +62,8 @@ export class DialogueEngine {
         }
       }
     }
+
+    return nodeMap;
   }
 }
 
@@ -69,10 +74,10 @@ export class DialogueSession {
   private _currentNodeId: string | null;
   private _completed = false;
 
-  constructor(definition: DialogueDefinition, context: DialogueContext) {
+  constructor(definition: DialogueDefinition, context: DialogueContext, nodeMap: Map<string, DialogueNode>) {
     this._definition = definition;
     this._context = context;
-    this._nodeMap = new Map(definition.nodes.map((node) => [node.id, node]));
+    this._nodeMap = nodeMap;
     this._currentNodeId = definition.startNodeId;
   }
 
