@@ -1,7 +1,6 @@
 import { Scene } from "@babylonjs/core/scene";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
-import { PhysicsShapeType } from "@babylonjs/core/Physics/";
 
 export class Ground {
   constructor(private scene: Scene) {
@@ -12,7 +11,7 @@ export class Ground {
 
   _createGround(): void {
     const mesh = MeshBuilder.CreateGround("ground", { width: 10, height: 10 }, this.scene);
-    const pa = new PhysicsAggregate(mesh, PhysicsShapeType.BOX, { mass: 0 }, this.scene);
+    const pa = new PhysicsAggregate(mesh, 3, { mass: 0 }, this.scene);
     pa.body.startAsleep = true;
     console.log(pa);
   }
@@ -21,6 +20,6 @@ export class Ground {
     const mesh = MeshBuilder.CreateSphere("sphere", { diameter: 2, segments: 32 }, this.scene);
     mesh.position.y = 4;
 
-    new PhysicsAggregate(mesh, PhysicsShapeType.SPHERE, { mass: 1, restitution: 0.75 }, this.scene);
+    new PhysicsAggregate(mesh, 0, { mass: 1, restitution: 0.75 }, this.scene);
   }
 }
