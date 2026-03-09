@@ -67,6 +67,14 @@ describe("BarterSystem", () => {
     expect(price80).toBeLessThan(price20);
   });
 
+  it("getBuyPrice improves with merchant rapport", () => {
+    const before = barter.getBuyPrice(potion, "merch_01");
+    barter.buyItem("merch_01", "potion_hp");
+    const after = barter.getBuyPrice(potion, "merch_01");
+    expect(after).toBeLessThanOrEqual(before);
+    expect(barter.getMerchantRapport("merch_01")).toBe(1);
+  });
+
   // ── getSellPrice ──────────────────────────────────────────────────────────
 
   it("getSellPrice is a fraction of item value", () => {
@@ -81,6 +89,14 @@ describe("BarterSystem", () => {
     barter.barterSkill = 90;
     const price90 = barter.getSellPrice(potion);
     expect(price90).toBeGreaterThan(price10);
+  });
+
+  it("getSellPrice drops when merchant is saturated with that item", () => {
+    const baseline = barter.getSellPrice(potion, "merch_01");
+    const merch = barter.getMerchant("merch_01")!;
+    merch.inventory.push({ ...potion, quantity: 20 });
+    const saturated = barter.getSellPrice(potion, "merch_01");
+    expect(saturated).toBeLessThan(baseline);
   });
 
   // ── openBarter ────────────────────────────────────────────────────────────
@@ -201,5 +217,25 @@ describe("BarterSystem", () => {
     const merchant = restored.getMerchant("merch_01")!;
     expect(merchant.gold).toBe(barter.getMerchant("merch_01")!.gold);
     expect(restored.playerGold).toBe(barter.playerGold);
+  });
+
+  it("persists merchant rapport", () => {
+    barter.buyItem("merch_01", "potion_hp");
+    const saved = barter.getSaveState();
+
+    const restored = new BarterSystem(mockInventory, mockUI);
+    restored.registerMerchant({
+      id: "merch_01",
+      name: "Trader",
+      factionId: "town",
+      inventory: [{ ...potion }],
+      gold: 500,
+      isOpen: true,
+      openHour: 8,
+      closeHour: 20,
+    });
+    restored.restoreFromSave(saved);
+
+    expect(restored.getMerchantRapport("merch_01")).toBe(1);
   });
 });
