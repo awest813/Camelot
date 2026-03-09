@@ -2,7 +2,6 @@ import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { RecastJSPlugin } from "@babylonjs/core/Navigation/Plugins/recastJSPlugin";
-import { INavMeshParameters } from "@babylonjs/core/Navigation/INavigationEngine";
 
 /**
  * Recast/Detour navmesh parameters tuned for a humanoid-scale RPG world.
@@ -11,7 +10,7 @@ import { INavMeshParameters } from "@babylonjs/core/Navigation/INavigationEngine
  * walkable*  — agent shape / terrain constraints
  * maxEdgeLen — maximum polygon edge length in the simplified mesh
  */
-const NAV_PARAMS: INavMeshParameters = {
+const NAV_PARAMS = {
   cs: 0.3,
   ch: 0.2,
   walkableSlopeAngle: 35,
