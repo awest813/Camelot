@@ -1382,12 +1382,14 @@ export class UIManager {
         description: canSpend ? `Increase ${ATTR_DISPLAY_NAMES[name]}` : `Need points to increase ${ATTR_DISPLAY_NAMES[name]}`
       };
 
+      let isFocused = false;
       const setHoverState = () => {
         spendBtn.background = T.BTN_HOVER;
         spendBtn.color = T.TEXT;
         if (spendBtn.thickness !== 2) spendBtn.thickness = 1;
       };
       const setFocusState = () => {
+        isFocused = true;
         spendBtn.background = T.BTN_HOVER;
         spendBtn.color = T.TEXT;
         spendBtn.thickness = 2; // Distinct visual indicator for keyboard focus
@@ -1396,15 +1398,16 @@ export class UIManager {
         spendBtn.background = T.BTN_BG;
         spendBtn.color = canSpend ? T.GOOD : T.DIM;
         // Do not reset focus style if the button is still actively focused
-        if (!spendBtn.isFocused) {
+        if (!isFocused) {
           spendBtn.thickness = 1;
         }
       };
+      const setBlurState = () => { isFocused = false; setNormalState(); };
 
       spendBtn.onPointerEnterObservable.add(setHoverState);
       spendBtn.onPointerOutObservable.add(setNormalState);
       spendBtn.onFocusObservable.add(setFocusState);
-      spendBtn.onBlurObservable.add(setNormalState);
+      spendBtn.onBlurObservable.add(setBlurState);
 
       // In Babylon.js GUI, buttons need to manually notify pointer up for keyboard interaction.
       spendBtn.onKeyboardEventProcessedObservable.add((evt) => {
