@@ -53,6 +53,9 @@ import { SkillProgressionSystem } from "./systems/skill-progression-system";
 import { FastTravelSystem } from "./systems/fast-travel-system";
 import { LevelScalingSystem } from "./systems/level-scaling-system";
 
+/** XP awarded to the Sneak skill for each second of active sneaking. */
+const SNEAK_XP_PER_SECOND = 2;
+
 export class Game {
   public scene: Scene;
   public canvas: HTMLCanvasElement;
@@ -382,11 +385,10 @@ export class Game {
     this.saveSystem.setFastTravelSystem(this.fastTravelSystem);
 
     this.levelScalingSystem = new LevelScalingSystem();
-    // Scale the test NPC on spawn
-    this.levelScalingSystem.scaleNPC(
-      this.scheduleSystem.npcs[0],
-      this.player.level,
-    );
+    // Scale the test NPC on spawn (guard if the npcs list is unexpectedly empty)
+    if (this.scheduleSystem.npcs[0]) {
+      this.levelScalingSystem.scaleNPC(this.scheduleSystem.npcs[0], this.player.level);
+    }
     // Scale newly spawned structure NPCs
     this.world.structures.onNPCSpawn = (npc) => {
       this.scheduleSystem.addNPC(npc);
@@ -1096,7 +1098,7 @@ export class Game {
       this.stealthSystem.update(deltaTime, this.timeSystem.ambientIntensity);
       // Sneak XP: trickle XP while actively sneaking near NPCs
       if (this.stealthSystem.isCrouching) {
-        this.skillProgressionSystem.gainXP("sneak", deltaTime * 2);
+        this.skillProgressionSystem.gainXP("sneak", deltaTime * SNEAK_XP_PER_SECOND);
       }
       this.crimeSystem.update(deltaTime);
       this.projectileSystem.update(deltaTime);

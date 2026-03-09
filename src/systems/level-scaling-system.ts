@@ -44,7 +44,7 @@ export class LevelScalingSystem {
    * creating an instance.
    */
   public static computeScale(playerLevel: number): number {
-    const raw = BASE_OFFSET + Math.max(1, playerLevel) * SCALE_PER_LEVEL;
+    const raw = BASE_OFFSET + playerLevel * SCALE_PER_LEVEL;
     return Math.max(MIN_SCALE, Math.min(MAX_SCALE, raw));
   }
 

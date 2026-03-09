@@ -46,7 +46,6 @@ function xpToNext(level: number): number {
 function levelToMultiplier(level: number): number {
   return 1 + level / SKILL_MAX_LEVEL;
 }
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ProgressionSkillId =
@@ -140,7 +139,7 @@ export class SkillProgressionSystem {
 
   /**
    * Returns the combat/effect multiplier for a skill in [1.0, 2.0].
-   * Level 0 → 1.0 (no bonus), level 100 → 2.0 (+100 % bonus).
+   * Level 0 → 1.0 (no bonus), level 100 → 2.0 (+100% bonus).
    */
   public multiplier(skillId: ProgressionSkillId): number {
     const skill = this._skills.get(skillId);
