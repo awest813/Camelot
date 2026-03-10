@@ -63,6 +63,7 @@ export class CharacterCreationUI {
       const nameStep = document.createElement("span");
       nameStep.className = "character-create__step-pill is-active";
       nameStep.textContent = "1. Name";
+      nameStep.setAttribute("aria-current", "step");
       stepPills.appendChild(nameStep);
 
       const raceStep = document.createElement("span");
@@ -132,8 +133,13 @@ export class CharacterCreationUI {
         const steps: typeof step[] = ["name", "race", "birthsign", "class"];
         const pills = [nameStep, raceStep, birthsignStep, classStep];
         steps.forEach((s, i) => {
-          if (s === active) pills[i].classList.add("is-active");
-          else pills[i].classList.remove("is-active");
+          if (s === active) {
+            pills[i].classList.add("is-active");
+            pills[i].setAttribute("aria-current", "step");
+          } else {
+            pills[i].classList.remove("is-active");
+            pills[i].removeAttribute("aria-current");
+          }
         });
       };
 
@@ -205,7 +211,9 @@ export class CharacterCreationUI {
           "Name your hero. Choose a name below or type your own — each is inspired by a sign of the medieval zodiac.";
         continueButton.textContent = "Continue";
         continueButton.disabled = enteredName.trim().length === 0;
+        continueButton.setAttribute("aria-disabled", continueButton.disabled.toString());
         backButton.disabled = true;
+        backButton.setAttribute("aria-disabled", "true");
         setAllStepPills("name");
 
         // Text input
@@ -270,7 +278,9 @@ export class CharacterCreationUI {
         for (const race of RACES) {
           const card = document.createElement("button");
           card.className = "character-create__card";
-          if (selectedRace?.id === race.id) card.classList.add("is-selected");
+          const isSelected = selectedRace?.id === race.id;
+          if (isSelected) card.classList.add("is-selected");
+          card.setAttribute("aria-pressed", isSelected.toString());
 
           const cardName = document.createElement("strong");
           cardName.textContent = race.name;
@@ -305,7 +315,9 @@ export class CharacterCreationUI {
         for (const sign of BIRTHSIGNS) {
           const card = document.createElement("button");
           card.className = "character-create__card";
-          if (selectedBirthsign?.id === sign.id) card.classList.add("is-selected");
+          const isSelected = selectedBirthsign?.id === sign.id;
+          if (isSelected) card.classList.add("is-selected");
+          card.setAttribute("aria-pressed", isSelected.toString());
 
           const cardName = document.createElement("strong");
           cardName.textContent = sign.name;
@@ -340,7 +352,9 @@ export class CharacterCreationUI {
         for (const cls of CHARACTER_CLASSES) {
           const card = document.createElement("button");
           card.className = "character-create__card";
-          if (selectedClass?.id === cls.id) card.classList.add("is-selected");
+          const isSelected = selectedClass?.id === cls.id;
+          if (isSelected) card.classList.add("is-selected");
+          card.setAttribute("aria-pressed", isSelected.toString());
 
           const cardName = document.createElement("strong");
           cardName.textContent = cls.name;
