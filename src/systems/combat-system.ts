@@ -13,6 +13,26 @@ import { NavigationSystem } from "./navigation-system";
 const MELEE_DAMAGE = 10;
 const MAGIC_DAMAGE = 20;
 
+// ─── Oblivion-style combat constants ──────────────────────────────────────────
+
+/** Fraction of incoming NPC damage absorbed when the player is blocking. */
+const BLOCK_DAMAGE_REDUCTION = 0.5;
+/** Stamina cost deducted from the player per successfully blocked hit. */
+const BLOCK_STAMINA_COST_PER_HIT = 12;
+/** Damage multiplier applied on a critical hit. */
+const CRIT_DAMAGE_MULTIPLIER = 2.0;
+/** Stamina cost of a power attack is the normal melee cost × this factor. */
+const POWER_ATTACK_STAMINA_MULTIPLIER = 2.5;
+/** Raw damage multiplier for a power attack on top of normal melee scaling. */
+const POWER_ATTACK_DAMAGE_MULTIPLIER = 2.2;
+/** Duration in seconds that an NPC is staggered after being hit by a power attack. */
+const POWER_ATTACK_STAGGER_DURATION = 0.6;
+/**
+ * Minimum fatigue (stamina) multiplier applied to damage output.
+ * At 0 % stamina the player still deals at least this fraction of normal damage.
+ */
+const FATIGUE_DAMAGE_MIN_FACTOR = 0.5;
+
 /**
  * Applies NPC-specific resistance and weakness modifiers to a raw damage amount.
  *
@@ -133,6 +153,8 @@ export class CombatSystem {
   private _magicCooldownRemaining: number = 0;
   private _meleeArchetype: MeleeArchetype = "soldier";
   private _magicArchetype: MagicArchetype = "bolt";
+  /** True while the player is actively holding block. */
+  private _isBlocking: boolean = false;
 
   private static readonly _OFFSET_Y1 = new Vector3(0, 1, 0);
   private static readonly _OFFSET_Y2 = new Vector3(0, 2, 0);
@@ -175,6 +197,30 @@ export class CombatSystem {
     return this._magicArchetype;
   }
 
+  // ─── Blocking ──────────────────────────────────────────────────────────────
+
+  /** True while the player is holding block (right-click held). */
+  public get isBlocking(): boolean {
+    return this._isBlocking;
+  }
+
+  /**
+   * Begin blocking.  Call on right-click POINTERDOWN.
+   * While blocking, 50 % of incoming NPC melee damage is absorbed and each
+   * absorbed hit drains stamina (matching Oblivion's block system).
+   */
+  public beginBlock(): void {
+    this._isBlocking = true;
+    this._ui.showNotification("Blocking…", 600);
+  }
+
+  /**
+   * Stop blocking.  Call on right-click POINTERUP.
+   */
+  public endBlock(): void {
+    this._isBlocking = false;
+  }
+
   // ─── Player actions ────────────────────────────────────────────────────────
 
   public meleeAttack(): boolean {
@@ -187,6 +233,11 @@ export class CombatSystem {
       this._ui.showNotification("Not enough stamina!");
       return false;
     }
+
+    // Sample fatigue BEFORE spending stamina so a near-empty bar doesn't
+    // immediately penalise the swing that drains the last point.
+    const fatigueFactor = this._fatigueFactor();
+
     this.player.stamina -= meleeProfile.staminaCost;
     this._meleeCooldownRemaining = meleeProfile.cooldown;
     (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
@@ -196,9 +247,19 @@ export class CombatSystem {
     if (hit && hit.pickedMesh) {
       const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
       if (npc && !npc.isDead) {
+        // Critical hit check (luck-based, sourced from player.critChance)
+        const critChance = (this.player as unknown as { critChance?: number }).critChance ?? 0;
+        const isCrit = critChance > 0 && Math.random() < critChance;
+        const critMultiplier = isCrit ? CRIT_DAMAGE_MULTIPLIER : 1.0;
+
         const rawMeleeDmg = Math.max(
           1,
-          Math.round((MELEE_DAMAGE + this.player.bonusDamage) * meleeProfile.damageMultiplier)
+          Math.round(
+            (MELEE_DAMAGE + this.player.bonusDamage)
+            * meleeProfile.damageMultiplier
+            * fatigueFactor
+            * critMultiplier
+          )
         );
         const meleeDmg = applyDamageWithResistance(rawMeleeDmg, npc, "physical");
         npc.takeDamage(meleeDmg);
@@ -208,6 +269,10 @@ export class CombatSystem {
           : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos);
         this._ui.showDamageNumber(numberPos, meleeDmg, this.scene);
         this._ui.showHitFlash("rgba(255, 200, 0, 0.25)");
+
+        if (isCrit) {
+          this._ui.showNotification("Critical Hit!", 1000);
+        }
 
         if (npc.physicsAggregate?.body) {
           const forward = this.player.getForwardDirection(1);
@@ -226,6 +291,81 @@ export class CombatSystem {
           if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
             this._transitionTo(npc, AIState.CHASE);
           }
+        }
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Oblivion-style power attack.
+   *
+   * Costs POWER_ATTACK_STAMINA_MULTIPLIER × the current archetype's stamina cost.
+   * Deals POWER_ATTACK_DAMAGE_MULTIPLIER × normal melee damage (before fatigue/crits).
+   * On hit, staggers the target NPC for POWER_ATTACK_STAGGER_DURATION seconds,
+   * interrupting its AI and any ongoing telegraph animation.
+   */
+  public powerAttack(): boolean {
+    const meleeProfile = MELEE_PROFILES[this._meleeArchetype];
+    if (this._meleeCooldownRemaining > 0) {
+      return false;
+    }
+
+    const staminaCost = Math.round(meleeProfile.staminaCost * POWER_ATTACK_STAMINA_MULTIPLIER);
+    if (this.player.stamina < staminaCost) {
+      this._ui.showNotification("Not enough stamina for a power attack!");
+      return false;
+    }
+
+    const fatigueFactor = this._fatigueFactor();
+
+    this.player.stamina -= staminaCost;
+    this._meleeCooldownRemaining = meleeProfile.cooldown * 1.5; // longer recovery after a power swing
+    (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
+      .notifyResourceSpent?.("stamina");
+
+    const hit = this.player.raycastForward(3);
+    if (hit && hit.pickedMesh) {
+      const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
+      if (npc && !npc.isDead) {
+        const rawDmg = Math.max(
+          1,
+          Math.round(
+            (MELEE_DAMAGE + this.player.bonusDamage)
+            * meleeProfile.damageMultiplier
+            * POWER_ATTACK_DAMAGE_MULTIPLIER
+            * fatigueFactor
+          )
+        );
+        const finalDmg = applyDamageWithResistance(rawDmg, npc, "physical");
+        npc.takeDamage(finalDmg);
+
+        // Stagger: cancel current telegraph and freeze the NPC's AI briefly.
+        npc.isStaggered = true;
+        npc.staggerTimer = POWER_ATTACK_STAGGER_DURATION;
+        npc.isAttackTelegraphing = false;
+        npc.attackTelegraphTimer = 0;
+
+        const numberPos = hit.pickedPoint
+          ? hit.pickedPoint.addToRef(CombatSystem._OFFSET_Y1, this._hitPos)
+          : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos);
+        this._ui.showDamageNumber(numberPos, finalDmg, this.scene);
+        this._ui.showHitFlash("rgba(255, 100, 0, 0.45)");
+        this._ui.showNotification("Power Strike!", 1000);
+
+        if (npc.physicsAggregate?.body) {
+          const forward = this.player.getForwardDirection(1);
+          const impulsePoint = hit.pickedPoint
+            ? hit.pickedPoint
+            : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y1, this._hitPos);
+          npc.physicsAggregate.body.applyImpulse(forward.scale(18), impulsePoint);
+        }
+
+        if (npc.isDead) {
+          this._ui.showNotification(`${npc.mesh.name} defeated!`);
+          if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
+        } else if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
+          this._transitionTo(npc, AIState.CHASE);
         }
       }
     }
@@ -412,6 +552,17 @@ export class CombatSystem {
   // ─── State machine implementation ──────────────────────────────────────────
 
   private _tickNPC(npc: NPC, playerPos: Vector3, deltaTime: number): void {
+    // Stagger: briefly freeze the NPC's AI after a player power attack.
+    if (npc.isStaggered) {
+      npc.staggerTimer -= deltaTime;
+      if (npc.staggerTimer <= 0) {
+        npc.isStaggered = false;
+        npc.staggerTimer = 0;
+      }
+      this._stopMovement(npc);
+      return;
+    }
+
     const distSq      = Vector3.DistanceSquared(npc.mesh.position, playerPos);
     const aggroRangeSq  = npc.aggroRange * npc.aggroRange;
     const attackEngageRange = this._getAttackEngageRange(npc);
@@ -648,6 +799,18 @@ export class CombatSystem {
     return Math.max(engage, disengage);
   }
 
+  /**
+   * Returns a [FATIGUE_DAMAGE_MIN_FACTOR, 1.0] multiplier based on the player's
+   * current stamina relative to their maximum.  Used by melee and power attacks
+   * to penalise damage when the player is exhausted — matching Oblivion's
+   * Fatigue system.
+   */
+  private _fatigueFactor(): number {
+    const maxStamina = (this.player as unknown as { maxStamina?: number }).maxStamina ?? 100;
+    if (maxStamina <= 0) return 1.0;
+    return Math.max(FATIGUE_DAMAGE_MIN_FACTOR, this.player.stamina / maxStamina);
+  }
+
   private _beginAttackTelegraph(npc: NPC): void {
     npc.isAttackTelegraphing = true;
     npc.attackTelegraphTimer = Math.max(0.12, npc.attackWindup);
@@ -671,12 +834,27 @@ export class CombatSystem {
       return;
     }
 
-    const dmg = Math.max(1, npc.attackDamage - this.player.bonusArmor);
+    let dmg = Math.max(1, npc.attackDamage - this.player.bonusArmor);
+
+    if (this._isBlocking) {
+      // Oblivion-style block: absorb half the damage, cost some stamina.
+      dmg = Math.max(1, Math.round(dmg * (1 - BLOCK_DAMAGE_REDUCTION)));
+      this.player.stamina = Math.max(
+        0,
+        this.player.stamina - BLOCK_STAMINA_COST_PER_HIT
+      );
+      (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
+        .notifyResourceSpent?.("stamina");
+      this._ui.showNotification(`Blocked! ${dmg} damage taken.`, 1500);
+      this._ui.showHitFlash("rgba(80, 120, 200, 0.35)");
+    } else {
+      this._ui.showHitFlash("rgba(200, 0, 0, 0.4)");
+      this._ui.showNotification(`${npc.mesh.name} attacks you for ${dmg} damage!`, 2000);
+    }
+
     this.player.health = Math.max(0, this.player.health - dmg);
     (this.player as unknown as { notifyDamageTaken?: () => void }).notifyDamageTaken?.();
-    this._ui.showHitFlash("rgba(200, 0, 0, 0.4)");
     if (this.onPlayerHit) this.onPlayerHit();
-    this._ui.showNotification(`${npc.mesh.name} attacks you for ${dmg} damage!`, 2000);
   }
 
   private _updateAttackReposition(npc: NPC, playerPos: Vector3, distSq: number, deltaTime: number): void {

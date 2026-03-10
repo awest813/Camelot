@@ -2,7 +2,7 @@ import type { MapValidationReport } from "../systems/map-editor-system";
 
 const BASE_CONTROLS: readonly string[] = [
   "WASD: Move · Mouse: Look",
-  "Left/Right Click: Attack / Magic",
+  "Left Click: Attack · Right Click (hold): Block · E: Power Attack",
   "I: Inventory · J: Quest Log · K: Skills · U: Attributes",
   "Q: Cast Spell · Z: Cycle Spells · L: Alchemy · B: Enchanting · T: Wait",
   "V: Racial Power · H: Fame / Status · Y: Fast Travel",

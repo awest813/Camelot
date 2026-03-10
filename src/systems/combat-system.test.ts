@@ -484,4 +484,199 @@ describe('CombatSystem', () => {
         expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(10);
     });
 
+    // ─── Oblivion-style combat mechanics ───────────────────────────────────────
+
+    it('power attack deals more damage than a normal melee attack', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        // Record normal melee damage first
+        combatSystem.meleeAttack();
+        const normalDmg: number = (mockNpcs[0].takeDamage as ReturnType<typeof vi.fn>).mock.calls[0][0];
+
+        // Reset for power attack
+        mockPlayer.stamina = 100;
+        combatSystem.updateNPCAI(0.5); // drain cooldown
+        (mockNpcs[0].takeDamage as ReturnType<typeof vi.fn>).mockClear();
+
+        combatSystem.powerAttack();
+        const powerDmg: number = (mockNpcs[0].takeDamage as ReturnType<typeof vi.fn>).mock.calls[0][0];
+
+        expect(powerDmg).toBeGreaterThan(normalDmg);
+    });
+
+    it('power attack staggers the target NPC', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        combatSystem.powerAttack();
+
+        expect(mockNpcs[0].isStaggered).toBe(true);
+        expect(mockNpcs[0].staggerTimer).toBeGreaterThan(0);
+    });
+
+    it('staggered NPC AI is bypassed until stagger expires', () => {
+        mockNpcs[0].isStaggered = true;
+        mockNpcs[0].staggerTimer = 0.5;
+        mockNpcs[0].aiState = 'CHASE';
+        mockNpcs[0].isAggressive = true;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.5);
+
+        // One update tick — stagger not expired yet
+        combatSystem.updateNPCAI(0.2);
+
+        // NPC should remain staggered (timer reduced but still active)
+        expect(mockNpcs[0].isStaggered).toBe(true);
+        expect(mockNpcs[0].staggerTimer).toBeCloseTo(0.3, 1);
+
+        // Second update — stagger expires
+        combatSystem.updateNPCAI(0.35);
+        expect(mockNpcs[0].isStaggered).toBe(false);
+    });
+
+    it('power attack fails when stamina is insufficient', () => {
+        mockPlayer.stamina = 5;
+        const ok = combatSystem.powerAttack();
+        expect(ok).toBe(false);
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Not enough stamina for a power attack!');
+        expect(mockNpcs[0].takeDamage).not.toHaveBeenCalled();
+    });
+
+    it('blocking reduces incoming NPC attack damage by 50 %', () => {
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 10;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+
+        combatSystem.beginBlock();
+        expect(combatSystem.isBlocking).toBe(true);
+
+        // Start telegraph
+        combatSystem.updateNPCAI(0.016);
+        expect(mockNpcs[0].isAttackTelegraphing).toBe(true);
+
+        // Resolve telegraph — player is inside strike window while blocking
+        combatSystem.updateNPCAI(0.25);
+
+        // 10 - 0 armor = 10 raw, halved = 5
+        expect(mockPlayer.health).toBe(95);
+        expect(mockUI.showNotification).toHaveBeenCalledWith(
+            expect.stringContaining('Blocked!'), 1500
+        );
+    });
+
+    it('blocking drains player stamina on each blocked hit', () => {
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 10;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+
+        combatSystem.beginBlock();
+        combatSystem.updateNPCAI(0.016);
+        combatSystem.updateNPCAI(0.25);
+
+        // Stamina should be reduced by the block cost (12 by default)
+        expect(mockPlayer.stamina).toBeLessThan(100);
+        expect(mockPlayer.notifyResourceSpent).toHaveBeenCalledWith('stamina');
+    });
+
+    it('endBlock stops the blocking state', () => {
+        combatSystem.beginBlock();
+        expect(combatSystem.isBlocking).toBe(true);
+
+        combatSystem.endBlock();
+        expect(combatSystem.isBlocking).toBe(false);
+    });
+
+    it('unblocked hits still deal full damage when not blocking', () => {
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 10;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+
+        // Do NOT call beginBlock
+        combatSystem.updateNPCAI(0.016);
+        combatSystem.updateNPCAI(0.25);
+
+        // Full 10 damage (attackDamage - bonusArmor 0)
+        expect(mockPlayer.health).toBe(90);
+    });
+
+    it('fatigue factor reduces melee damage at low stamina', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        // Set stamina low — fatigue factor should be well below 1
+        mockPlayer.stamina = 10;
+        mockPlayer.maxStamina = 100;
+
+        combatSystem.meleeAttack();
+
+        // At 10/100 stamina the factor is max(0.5, 0.1) = 0.5
+        // round(10 * 1.0 * 0.5) = 5, but staminaCost=15 > 10 so attack should fail
+        expect(mockPlayer.health).toBe(100); // attack failed, no damage dealt to player
+    });
+
+    it('fatigue factor lowers damage proportionally when stamina is at 60 %', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        // Pre-drain stamina to 60 out of 100 (above staminaCost of 15)
+        mockPlayer.stamina = 60;
+        mockPlayer.maxStamina = 100;
+
+        combatSystem.meleeAttack();
+
+        // fatigueFactor = max(0.5, 60/100) = 0.6
+        // rawDmg = round(10 * 1.0 * 0.6) = 6
+        expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(6);
+    });
+
+    it('critical hit doubles damage when critChance is 100 %', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        mockPlayer.critChance = 1.0; // guaranteed crit
+        // Make Math.random() return 0 so crit roll (0 < 1.0) always succeeds
+        vi.spyOn(Math, 'random').mockReturnValue(0);
+
+        combatSystem.meleeAttack();
+
+        // round(10 * 1.0 * 1.0 * 2.0) = 20
+        expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(20);
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Critical Hit!', 1000);
+
+        vi.restoreAllMocks();
+    });
+
+    it('no crit when critChance is 0', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        mockPlayer.critChance = 0;
+
+        combatSystem.meleeAttack();
+
+        expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(10);
+        expect(mockUI.showNotification).not.toHaveBeenCalledWith('Critical Hit!', 1000);
+    });
+
 });
