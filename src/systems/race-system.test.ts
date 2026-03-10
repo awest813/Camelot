@@ -276,7 +276,7 @@ describe("RaceSystem", () => {
 
   it("activatePower fires onPowerActivated callback with the correct power", () => {
     system.chooseRace("khajiit");
-    const cb = vi.fn<[RacePower], void>();
+    const cb = vi.fn();
     system.onPowerActivated = cb;
     system.activatePower(0);
     expect(cb).toHaveBeenCalledOnce();
