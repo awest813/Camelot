@@ -62,6 +62,7 @@ import { BirthsignSystem } from "./systems/birthsign-system";
 import { ClassSystem } from "./systems/class-system";
 import { RaceSystem } from "./systems/race-system";
 import { CharacterCreationUI } from "./ui/character-creation-ui";
+import { buildHelpOverlayLines, summarizeValidationReport } from "./ui/editor-help-overlay";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -169,6 +170,8 @@ export class Game {
 
   // Death feedback: true while health is at 0 so the notification fires once per "death"
   private _playerAtZeroHP: boolean = false;
+  private _helpOverlayEl: HTMLDivElement | null = null;
+  private _helpOverlayVisible: boolean = false;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
     this.scene = scene;
@@ -176,6 +179,46 @@ export class Game {
     this.engine = engine;
 
     this.init();
+  }
+
+
+  private _toggleHelpOverlay(): void {
+    if (!this._helpOverlayEl) {
+      const panel = document.createElement("div");
+      panel.style.position = "fixed";
+      panel.style.top = "12px";
+      panel.style.left = "12px";
+      panel.style.maxWidth = "420px";
+      panel.style.padding = "10px 12px";
+      panel.style.borderRadius = "8px";
+      panel.style.background = "rgba(16, 22, 30, 0.86)";
+      panel.style.color = "#dbe9ff";
+      panel.style.fontFamily = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+      panel.style.fontSize = "12px";
+      panel.style.lineHeight = "1.4";
+      panel.style.whiteSpace = "pre-wrap";
+      panel.style.zIndex = "2200";
+      panel.style.border = "1px solid rgba(170, 205, 255, 0.2)";
+      panel.style.pointerEvents = "none";
+      panel.style.display = "none";
+      document.body.appendChild(panel);
+      this._helpOverlayEl = panel;
+    }
+
+    this._helpOverlayVisible = !this._helpOverlayVisible;
+    if (!this._helpOverlayEl) return;
+
+    if (this._helpOverlayVisible) {
+      this._helpOverlayEl.textContent = buildHelpOverlayLines(this.mapEditorSystem.isEnabled).join("\n");
+      this._helpOverlayEl.style.display = "block";
+    } else {
+      this._helpOverlayEl.style.display = "none";
+    }
+  }
+
+  private _refreshHelpOverlayIfVisible(): void {
+    if (!this._helpOverlayVisible || !this._helpOverlayEl) return;
+    this._helpOverlayEl.textContent = buildHelpOverlayLines(this.mapEditorSystem.isEnabled).join("\n");
   }
 
   init(): void {
@@ -991,6 +1034,7 @@ export class Game {
                     this.player.camera.attachControl(this.canvas, true);
                 }
                 this.ui.showNotification(isEnabled ? "Map editor mode enabled" : "Map editor mode disabled", 1800);
+                this._refreshHelpOverlayIfVisible();
             } else if (kbInfo.event.key === "g" || kbInfo.event.key === "G") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const mode = this.mapEditorSystem.cycleGizmoMode();
@@ -1022,6 +1066,30 @@ export class Game {
             } else if (kbInfo.event.key === "F6") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 this._triggerMapImport();
+            } else if (kbInfo.event.key === "F7") {
+                if (!this.mapEditorSystem.isEnabled) return;
+                const validation = this.mapEditorSystem.validateMap(0.5, {
+                  knownLootTableIds: this.lootTableSystem.getTableIds(),
+                });
+                this.ui.showNotification(summarizeValidationReport(validation), 3200);
+                if (!validation.isValid) {
+                  console.warn("[MapEditorValidation]", validation.issues);
+                }
+            } else if (kbInfo.event.key === "F8") {
+                const reports = frameworkBaseContent.quests.map((quest) => {
+                  return this.frameworkRuntime.questEngine.validateGraph(quest.id);
+                });
+                const totalIssues = reports.reduce((sum, report) => sum + report.issues.length, 0);
+                const invalidGraphs = reports.filter((report) => !report.valid).length;
+                this.ui.showNotification(
+                  totalIssues === 0
+                    ? `Quest graph validation passed (${reports.length} graphs).`
+                    : `Quest graph validation: ${invalidGraphs} invalid graph(s), ${totalIssues} issue(s).`,
+                  3200,
+                );
+                if (totalIssues > 0) {
+                  console.warn("[QuestGraphValidation]", reports);
+                }
             } else if (kbInfo.event.key === "n" || kbInfo.event.key === "N") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const placeAt = this.player.camera.position.add(this.player.getForwardDirection(8).scale(4));
@@ -1126,6 +1194,8 @@ export class Game {
             } else if (kbInfo.event.key === "F3") {
                 const shown = this.ui.toggleDebugOverlay();
                 this.ui.showNotification(shown ? "Debug overlay ON" : "Debug overlay OFF", 1200);
+            } else if (kbInfo.event.key === "F1") {
+                this._toggleHelpOverlay();
             } else if (kbInfo.event.key === "7" || kbInfo.event.key === "8" ||
                        kbInfo.event.key === "9" || kbInfo.event.key === "0") {
                 // Quick-slot consumable use
