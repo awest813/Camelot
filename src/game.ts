@@ -60,6 +60,7 @@ import { RespawnSystem } from "./systems/respawn-system";
 import { MerchantRestockSystem } from "./systems/merchant-restock-system";
 import { BirthsignSystem } from "./systems/birthsign-system";
 import { ClassSystem } from "./systems/class-system";
+import { RaceSystem } from "./systems/race-system";
 import { CharacterCreationUI } from "./ui/character-creation-ui";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
@@ -142,6 +143,7 @@ export class Game {
   // v11 systems (Oblivion depth: character creation — birthsign and class)
   public birthsignSystem: BirthsignSystem;
   public classSystem: ClassSystem;
+  public raceSystem: RaceSystem;
 
   public isPaused: boolean = false;
 
@@ -496,6 +498,21 @@ export class Game {
     this.saveSystem.setMerchantRestockSystem(this.merchantRestockSystem);
 
     // ── v11 systems (Oblivion depth: character creation) ────────────────────
+    this.raceSystem = new RaceSystem();
+    this.raceSystem.onRaceChosen = (race) => {
+      this.ui.showNotification(
+        `Race chosen: ${race.name} (${race.heritage})${race.power ? ` — Power: ${race.power.name}` : ""}`,
+        3000,
+      );
+      // Sync derived stats after race attribute bonuses have been applied
+      this.player.maxHealth      = this.attributeSystem.maxHealth;
+      this.player.maxMagicka     = this.attributeSystem.maxMagicka;
+      this.player.maxStamina     = this.attributeSystem.maxStamina;
+      this.player.maxCarryWeight = this.attributeSystem.carryWeight;
+      this.saveSystem.markDirty();
+    };
+    this.saveSystem.setRaceSystem(this.raceSystem);
+
     this.birthsignSystem = new BirthsignSystem();
     this.birthsignSystem.onBirthsignChosen = (birthsign) => {
       this.ui.showNotification(
@@ -1175,6 +1192,14 @@ export class Game {
     const creator = new CharacterCreationUI();
     const selection = await creator.open();
 
+    // Apply player name
+    this.player.name = selection.name;
+
+    const raceApplied = this.raceSystem.chooseRace(
+      selection.raceId,
+      this.attributeSystem,
+      this.skillProgressionSystem,
+    );
     const birthsignApplied = this.birthsignSystem.chooseBirthsign(
       selection.birthsignId,
       this.attributeSystem,
@@ -1186,11 +1211,11 @@ export class Game {
       this.skillProgressionSystem,
     );
 
-    if (!birthsignApplied || !classApplied) {
+    if (!raceApplied || !birthsignApplied || !classApplied) {
       this._applyDefaultCharacterCreation();
     }
 
-    this.ui.showNotification("Character creation complete.", 2200);
+    this.ui.showNotification(`Welcome, ${this.player.name}! Character creation complete.`, 2800);
     this.interactionSystem.isBlocked = false;
     this.isPaused = false;
     this.canvas.requestPointerLock();
@@ -1198,6 +1223,11 @@ export class Game {
   }
 
   private _applyDefaultCharacterCreation(): void {
+    this.raceSystem.chooseRace(
+      "nord",
+      this.attributeSystem,
+      this.skillProgressionSystem,
+    );
     this.birthsignSystem.chooseBirthsign(
       "warrior",
       this.attributeSystem,

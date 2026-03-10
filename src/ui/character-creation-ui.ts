@@ -1,13 +1,40 @@
 import { BIRTHSIGNS, type BirthsignDefinition } from "../systems/birthsign-system";
 import { CHARACTER_CLASSES, type CharacterClass } from "../systems/class-system";
+import { RACES, type RaceDefinition } from "../systems/race-system";
 
 interface CharacterCreationResult {
+  name: string;
+  raceId: string;
   birthsignId: string;
   classId: string;
 }
 
+/**
+ * Twelve zodiac-inspired medieval name suggestions presented on the Name step.
+ * Each entry pairs a zodiac sign with a medieval-sounding given name and a
+ * gender-neutral descriptor drawn from medieval heraldic tradition.
+ */
+const ZODIAC_NAME_SUGGESTIONS: ReadonlyArray<{ sign: string; name: string }> = [
+  { sign: "Aries",       name: "Arion"    },
+  { sign: "Taurus",      name: "Toberon"  },
+  { sign: "Gemini",      name: "Geminus"  },
+  { sign: "Cancer",      name: "Caelan"   },
+  { sign: "Leo",         name: "Leoric"   },
+  { sign: "Virgo",       name: "Virael"   },
+  { sign: "Libra",       name: "Liberon"  },
+  { sign: "Scorpio",     name: "Scorian"  },
+  { sign: "Sagittarius", name: "Sagitta"  },
+  { sign: "Capricorn",   name: "Caprian"  },
+  { sign: "Aquarius",    name: "Aquilan"  },
+  { sign: "Pisces",      name: "Pisceon"  },
+];
+
 const guardianLabel = (guardian: BirthsignDefinition["guardian"]): string => {
   return guardian.charAt(0).toUpperCase() + guardian.slice(1);
+};
+
+const heritageLabel = (heritage: RaceDefinition["heritage"]): string => {
+  return heritage.charAt(0).toUpperCase() + heritage.slice(1);
 };
 
 export class CharacterCreationUI {
@@ -33,14 +60,24 @@ export class CharacterCreationUI {
       stepPills.className = "character-create__steps";
       panel.appendChild(stepPills);
 
+      const nameStep = document.createElement("span");
+      nameStep.className = "character-create__step-pill is-active";
+      nameStep.textContent = "1. Name";
+      stepPills.appendChild(nameStep);
+
+      const raceStep = document.createElement("span");
+      raceStep.className = "character-create__step-pill";
+      raceStep.textContent = "2. Race";
+      stepPills.appendChild(raceStep);
+
       const birthsignStep = document.createElement("span");
-      birthsignStep.className = "character-create__step-pill is-active";
-      birthsignStep.textContent = "1. Birthsign";
+      birthsignStep.className = "character-create__step-pill";
+      birthsignStep.textContent = "3. Birthsign";
       stepPills.appendChild(birthsignStep);
 
       const classStep = document.createElement("span");
       classStep.className = "character-create__step-pill";
-      classStep.textContent = "2. Class";
+      classStep.textContent = "4. Class";
       stepPills.appendChild(classStep);
 
       const cards = document.createElement("div");
@@ -81,7 +118,9 @@ export class CharacterCreationUI {
 
       document.body.appendChild(root);
 
-      let step: "birthsign" | "class" = "birthsign";
+      let step: "name" | "race" | "birthsign" | "class" = "name";
+      let enteredName: string = "";
+      let selectedRace: RaceDefinition | null = null;
       let selectedBirthsign: BirthsignDefinition | null = null;
       let selectedClass: CharacterClass | null = null;
 
@@ -89,7 +128,16 @@ export class CharacterCreationUI {
         while (cards.firstChild) cards.removeChild(cards.firstChild);
       };
 
-      const setDetails = (entry: BirthsignDefinition | CharacterClass | null) => {
+      const setAllStepPills = (active: typeof step) => {
+        const steps: typeof step[] = ["name", "race", "birthsign", "class"];
+        const pills = [nameStep, raceStep, birthsignStep, classStep];
+        steps.forEach((s, i) => {
+          if (s === active) pills[i].classList.add("is-active");
+          else pills[i].classList.remove("is-active");
+        });
+      };
+
+      const setDetails = (entry: RaceDefinition | BirthsignDefinition | CharacterClass | null) => {
         detailsMeta.innerHTML = "";
         if (!entry) {
           detailsTitle.textContent = "Choose an option";
@@ -100,7 +148,30 @@ export class CharacterCreationUI {
         detailsTitle.textContent = entry.name;
         detailsBody.textContent = entry.description;
 
-        if ("guardian" in entry) {
+        if ("heritage" in entry) {
+          // RaceDefinition
+          const heritage = document.createElement("li");
+          heritage.textContent = `Heritage: ${heritageLabel(entry.heritage)}`;
+          detailsMeta.appendChild(heritage);
+
+          if (entry.power) {
+            const power = document.createElement("li");
+            power.textContent = `Power: ${entry.power.name}`;
+            detailsMeta.appendChild(power);
+          }
+
+          if (entry.attributeBonus) {
+            const bonusParts = Object.entries(entry.attributeBonus)
+              .filter(([, v]) => v !== 0)
+              .map(([k, v]) => `${k} ${v! > 0 ? "+" : ""}${v}`);
+            if (bonusParts.length) {
+              const attrLi = document.createElement("li");
+              attrLi.textContent = `Attributes: ${bonusParts.join(", ")}`;
+              detailsMeta.appendChild(attrLi);
+            }
+          }
+        } else if ("guardian" in entry) {
+          // BirthsignDefinition
           const guardian = document.createElement("li");
           guardian.textContent = `Guardian: ${guardianLabel(entry.guardian)}`;
           detailsMeta.appendChild(guardian);
@@ -111,6 +182,7 @@ export class CharacterCreationUI {
             detailsMeta.appendChild(power);
           }
         } else {
+          // CharacterClass
           const spec = document.createElement("li");
           spec.textContent = `Specialization: ${entry.specialization}`;
           detailsMeta.appendChild(spec);
@@ -125,14 +197,110 @@ export class CharacterCreationUI {
         }
       };
 
+      // ── Step: Name ─────────────────────────────────────────────────────────
+
+      const renderName = () => {
+        clearCards();
+        subtitle.textContent =
+          "Name your hero.  Choose a name below or type your own — each is inspired by a sign of the medieval zodiac.";
+        continueButton.textContent = "Continue";
+        continueButton.disabled = enteredName.trim().length === 0;
+        backButton.disabled = true;
+        setAllStepPills("name");
+
+        // Text input
+        const inputWrap = document.createElement("div");
+        inputWrap.className = "character-create__name-wrap";
+        cards.appendChild(inputWrap);
+
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.className = "character-create__name-input";
+        nameInput.placeholder = "Enter your name…";
+        nameInput.maxLength = 30;
+        nameInput.value = enteredName;
+        inputWrap.appendChild(nameInput);
+
+        nameInput.addEventListener("input", () => {
+          enteredName = nameInput.value;
+          continueButton.disabled = enteredName.trim().length === 0;
+        });
+
+        // Zodiac name suggestions
+        const suggestLabel = document.createElement("p");
+        suggestLabel.className = "character-create__suggest-label";
+        suggestLabel.textContent = "Zodiac-inspired suggestions:";
+        cards.appendChild(suggestLabel);
+
+        const suggestGrid = document.createElement("div");
+        suggestGrid.className = "character-create__suggest-grid";
+        cards.appendChild(suggestGrid);
+
+        for (const { sign, name } of ZODIAC_NAME_SUGGESTIONS) {
+          const btn = document.createElement("button");
+          btn.className = "character-create__suggest-btn";
+          btn.title = sign;
+          btn.textContent = name;
+          btn.addEventListener("click", () => {
+            enteredName = name;
+            nameInput.value = name;
+            continueButton.disabled = false;
+          });
+          suggestGrid.appendChild(btn);
+        }
+
+        // Show the zodiac sign as a tooltip hint
+        detailsTitle.textContent = "Your Name";
+        detailsBody.textContent =
+          "Your name will be known across the realm.  " +
+          "Pick a zodiac-sign name for a touch of destiny, or forge your own legend.";
+        detailsMeta.innerHTML = "";
+      };
+
+      // ── Step: Race ─────────────────────────────────────────────────────────
+
+      const renderRaces = () => {
+        clearCards();
+        subtitle.textContent = "Choose your race to define your heritage, innate talents, and appearance.";
+        continueButton.textContent = "Continue";
+        continueButton.disabled = !selectedRace;
+        backButton.disabled = false;
+        setAllStepPills("race");
+
+        for (const race of RACES) {
+          const card = document.createElement("button");
+          card.className = "character-create__card";
+          if (selectedRace?.id === race.id) card.classList.add("is-selected");
+
+          const cardName = document.createElement("strong");
+          cardName.textContent = race.name;
+          card.appendChild(cardName);
+
+          const cardTag = document.createElement("span");
+          cardTag.className = "character-create__tag";
+          cardTag.textContent = heritageLabel(race.heritage);
+          card.appendChild(cardTag);
+
+          card.addEventListener("click", () => {
+            selectedRace = race;
+            setDetails(race);
+            renderRaces();
+          });
+          cards.appendChild(card);
+        }
+
+        setDetails(selectedRace);
+      };
+
+      // ── Step: Birthsign ────────────────────────────────────────────────────
+
       const renderBirthsigns = () => {
         clearCards();
         subtitle.textContent = "Pick your birthsign to define innate gifts and unique powers.";
         continueButton.textContent = "Continue";
         continueButton.disabled = !selectedBirthsign;
-        backButton.disabled = true;
-        birthsignStep.classList.add("is-active");
-        classStep.classList.remove("is-active");
+        backButton.disabled = false;
+        setAllStepPills("birthsign");
 
         for (const sign of BIRTHSIGNS) {
           const card = document.createElement("button");
@@ -159,14 +327,15 @@ export class CharacterCreationUI {
         setDetails(selectedBirthsign);
       };
 
+      // ── Step: Class ────────────────────────────────────────────────────────
+
       const renderClasses = () => {
         clearCards();
         subtitle.textContent = "Select a class to shape your early skill growth and combat style.";
         continueButton.textContent = "Begin Adventure";
         continueButton.disabled = !selectedClass;
         backButton.disabled = false;
-        birthsignStep.classList.remove("is-active");
-        classStep.classList.add("is-active");
+        setAllStepPills("class");
 
         for (const cls of CHARACTER_CLASSES) {
           const card = document.createElement("button");
@@ -194,11 +363,31 @@ export class CharacterCreationUI {
       };
 
       backButton.addEventListener("click", () => {
-        step = "birthsign";
-        renderBirthsigns();
+        if (step === "race") {
+          step = "name";
+          renderName();
+        } else if (step === "birthsign") {
+          step = "race";
+          renderRaces();
+        } else if (step === "class") {
+          step = "birthsign";
+          renderBirthsigns();
+        }
       });
 
       continueButton.addEventListener("click", () => {
+        if (step === "name") {
+          if (!enteredName.trim()) return;
+          step = "race";
+          renderRaces();
+          return;
+        }
+        if (step === "race") {
+          if (!selectedRace) return;
+          step = "birthsign";
+          renderBirthsigns();
+          return;
+        }
         if (step === "birthsign") {
           if (!selectedBirthsign) return;
           step = "class";
@@ -206,12 +395,17 @@ export class CharacterCreationUI {
           return;
         }
 
-        if (!selectedBirthsign || !selectedClass) return;
+        if (!enteredName.trim() || !selectedRace || !selectedBirthsign || !selectedClass) return;
         root.remove();
-        resolve({ birthsignId: selectedBirthsign.id, classId: selectedClass.id });
+        resolve({
+          name: enteredName.trim(),
+          raceId: selectedRace.id,
+          birthsignId: selectedBirthsign.id,
+          classId: selectedClass.id,
+        });
       });
 
-      renderBirthsigns();
+      renderName();
     });
   }
 }
