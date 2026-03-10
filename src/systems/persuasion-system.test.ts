@@ -166,6 +166,62 @@ describe("PersuasionSystem", () => {
     expect(["failure", "critical_failure"]).toContain(resultLow.outcome);
   });
 
+
+
+  // ── Oblivion-style action affinity checks ─────────────────────────────────
+
+  it("getActionAffinity is deterministic per npc/action", () => {
+    const a = ps.getActionAffinity("npc_affinity", "admire");
+    const b = ps.getActionAffinity("npc_affinity", "admire");
+    expect(a).toBe(b);
+  });
+
+  it("attemptPersuasionAction returns action metadata", () => {
+    ps.setDisposition("npc", 50);
+    const result = ps.attemptPersuasionAction("npc", 50, "joke", 0.4);
+    expect(result.action).toBe("joke");
+    expect(result.npcAffinity).toBeGreaterThanOrEqual(-2);
+    expect(result.npcAffinity).toBeLessThanOrEqual(2);
+    expect(result.chance).toBeGreaterThanOrEqual(0.05);
+    expect(result.chance).toBeLessThanOrEqual(0.95);
+  });
+
+  it("liked actions are easier than disliked actions for same npc", () => {
+    ps.setDisposition("npc_personality", 50);
+    const baseChance = ps.getPersuasionChance("npc_personality", 50);
+
+    const admireAffinity = ps.getActionAffinity("npc_personality", "admire");
+    const coerceAffinity = ps.getActionAffinity("npc_personality", "coerce");
+
+    const admireChance = Math.max(0.05, Math.min(0.95, baseChance + admireAffinity * 0.06));
+    const coerceChance = Math.max(0.05, Math.min(0.95, baseChance + coerceAffinity * 0.06));
+
+    if (admireAffinity > coerceAffinity) {
+      expect(admireChance).toBeGreaterThan(coerceChance);
+    } else if (admireAffinity < coerceAffinity) {
+      expect(admireChance).toBeLessThan(coerceChance);
+    } else {
+      expect(admireChance).toBe(coerceChance);
+    }
+  });
+
+  it("positive affinity amplifies success gains", () => {
+    ps.setDisposition("npc_gain", 50);
+    const base = ps.attemptPersuade("npc_gain", 50, 0.2);
+
+    ps.setDisposition("npc_gain", 50);
+    const action = ps.attemptPersuasionAction("npc_gain", 50, "admire", 0.2);
+
+    const affinity = ps.getActionAffinity("npc_gain", "admire");
+    if (affinity > 0) {
+      expect(action.dispositionDelta).toBeGreaterThan(base.dispositionDelta);
+    } else if (affinity < 0) {
+      expect(action.dispositionDelta).toBeLessThanOrEqual(base.dispositionDelta);
+    } else {
+      expect(action.dispositionDelta).toBe(base.dispositionDelta);
+    }
+  });
+
   // ── Merchant price multiplier ─────────────────────────────────────────────
 
   it("getMerchantPriceMultiplier returns 1.0 for neutral NPC", () => {
