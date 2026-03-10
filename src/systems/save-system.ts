@@ -28,9 +28,11 @@ import type { JailSystem } from "./jail-system";
 import type { SpellMakingSystem } from "./spell-making-system";
 import type { RespawnSystem } from "./respawn-system";
 import type { MerchantRestockSystem } from "./merchant-restock-system";
+import type { BirthsignSystem } from "./birthsign-system";
+import type { ClassSystem } from "./class-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 13;
+const SAVE_VERSION = 14;
 /** Oldest save version that can still be loaded (forward-compat window). */
 const SAVE_VERSION_MIN = 5;
 
@@ -80,6 +82,9 @@ interface ParsedSaveData {
   spellMaking?: unknown;
   respawn?: unknown;
   merchantRestock?: unknown;
+  // v14 additions
+  birthsign?: unknown;
+  characterClass?: unknown;
 }
 
 interface EquipmentEntry {
@@ -127,6 +132,9 @@ export interface SaveData {
   spellMaking?: any;
   respawn?: any;
   merchantRestock?: any;
+  // v14 additions
+  birthsign?: any;
+  characterClass?: any;
 }
 
 export class SaveSystem {
@@ -177,6 +185,10 @@ export class SaveSystem {
   private _spellMakingSystem: SpellMakingSystem | null = null;
   private _respawnSystem: RespawnSystem | null = null;
   private _merchantRestockSystem: MerchantRestockSystem | null = null;
+
+  // v14 optional systems
+  private _birthsignSystem: BirthsignSystem | null = null;
+  private _classSystem: ClassSystem | null = null;
 
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
@@ -255,6 +267,11 @@ export class SaveSystem {
   public setRespawnSystem(s: RespawnSystem): void               { this._respawnSystem = s; }
   public setMerchantRestockSystem(s: MerchantRestockSystem): void { this._merchantRestockSystem = s; }
 
+  // ── v14 system injection ──────────────────────────────────────────────────
+
+  public setBirthsignSystem(s: BirthsignSystem): void           { this._birthsignSystem = s; }
+  public setClassSystem(s: ClassSystem): void                   { this._classSystem = s; }
+
 
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
@@ -324,6 +341,8 @@ export class SaveSystem {
     if (this._spellMakingSystem)      data.spellMaking      = this._spellMakingSystem.getSaveState();
     if (this._respawnSystem)          data.respawn          = this._respawnSystem.getSaveState();
     if (this._merchantRestockSystem)  data.merchantRestock  = this._merchantRestockSystem.getSaveState();
+    if (this._birthsignSystem)        data.birthsign        = this._birthsignSystem.getSaveState();
+    if (this._classSystem)            data.characterClass   = this._classSystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -492,6 +511,11 @@ export class SaveSystem {
       this._respawnSystem.restoreFromSave(data.respawn as any);
     if (this._merchantRestockSystem && data.merchantRestock)
       this._merchantRestockSystem.restoreFromSave(data.merchantRestock as any);
+    // v14 systems
+    if (this._birthsignSystem && data.birthsign)
+      this._birthsignSystem.restoreFromSave(data.birthsign as any);
+    if (this._classSystem && data.characterClass)
+      this._classSystem.restoreFromSave(data.characterClass as any);
 
     // Restore encumbrance stats
     if (typeof data.player.maxCarryWeight === "number") {
@@ -658,6 +682,8 @@ export class SaveSystem {
       spellMaking: data.spellMaking,
       respawn: data.respawn,
       merchantRestock: data.merchantRestock,
+      birthsign: data.birthsign,
+      characterClass: data.characterClass,
     };
   }
 

@@ -64,6 +64,8 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ **SpellMakingSystem** — Oblivion-style Altar of Spellmaking: combine 1–2 effect components (damage/heal/restore/silence/burden) from any school to forge a named custom spell; gold cost scales with magnitude and duration (MIN 50 g → MAX 2000 g); forged spell is registered into SpellSystem and learned immediately; `onSpellForged` callback awards Destruction XP; X key triggers a demo forge; duplicate-name guard and insufficient-gold guard; save-state persistence (SAVE_VERSION 13).
 - ✅ **RespawnSystem** — Oblivion-style encounter zone respawning: register zones with a configurable game-hour window (default 72 h = 3 in-game days); `markCleared(zoneId, gameTime)` starts the countdown; `update(gameTime)` fires `onZoneRespawn` when the window elapses and resets the pending flag; multiple zones tracked simultaneously; save-state persistence (SAVE_VERSION 13).
 - ✅ **MerchantRestockSystem** — Timed merchant inventory and gold restocking: register merchant templates (inventory + gold snapshot); `update(gameTime, barterSystem)` resets the live BarterSystem merchant record when the interval elapses (default 72 h); advances the next-restock deadline across multiple elapsed cycles; `onRestock` callback fires a UI notification; save-state persistence (SAVE_VERSION 13).
+- ✅ **BirthsignSystem** — Oblivion's 13 birthsigns (Warrior, Mage, Thief, Lady, Lord, Steed, Ritual, Apprentice, Atronach, Shadow, Lover, Serpent, etc.) chosen once at character creation; each sign permanently boosts attributes or max stats, and most grant a once-per-24h rechargeable special power (Mara's Gift, Moonshadow, Lover's Kiss, Serpent's Spell, Blood of the North, …); `stunted` flag suppresses magicka regeneration for the Atronach; `fireWeakness` for the Lord; flat max-stat bonuses (maxMagicka +50/+100/+150) for Mage/Apprentice/Atronach; power cooldown tracked in in-game hours; `onBirthsignChosen` + `onPowerActivated` callbacks; save-state persistence (SAVE_VERSION 14).
+- ✅ **ClassSystem** — Oblivion-style character classes (Warrior, Knight, Barbarian, Mage, Sorcerer, Healer, Thief, Scout, Rogue, Battlemage); each class defines a specialization (combat/magic/stealth), two favored attributes (+10 each), five major skills (starting +25 levels, 1.5× XP), and five minor skills (starting +10 levels, 1.25× XP); specialization group grants +5 to all related skills; `xpMultiplierFor(skillId)` scales all in-game XP awards so major-skill users progress faster; `onClassChosen` callback syncs derived stats; save-state persistence (SAVE_VERSION 14).
 
 ### World + Content
 
@@ -74,7 +76,7 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 ### UX + Persistence
 
 - ✅ HUD, quest log, inventory, skill tree, pause flow.
-- ✅ Save/load (SAVE_VERSION 13) for all system states.
+- ✅ Save/load (SAVE_VERSION 14) for all system states.
 - ✅ Save file export to JSON file download + import from JSON/File (browser-safe).
 - ✅ Notifications, hit feedback, and debug support.
 - ✅ Compass HUD (top-center) showing cardinal direction from camera heading.
@@ -151,6 +153,7 @@ model.
 - ✅ **SAVE_VERSION 7** — Alchemy state persisted.
 - ✅ **SAVE_VERSION 8** — Enchanting system (soul gem inventory + enchanting skill) persisted; SAVE_VERSION_MIN = 5 constant fixes forward-compat boundary.
 - ✅ **SAVE_VERSION 13** — SpellMakingSystem, RespawnSystem, and MerchantRestockSystem state persisted.
+- ✅ **SAVE_VERSION 14** — BirthsignSystem and ClassSystem state persisted.
 
 ### Natural-Feel Systems Overhaul (Decision)
 
