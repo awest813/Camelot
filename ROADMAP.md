@@ -46,7 +46,7 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ Time system (game clock, day/night cycle, ambient intensity).
 - ✅ **SpellSystem** — Known-spell pool, equip/cast, cooldowns, destruction/restoration schools (Q to cast, Z to cycle).
 - ✅ **PersuasionSystem** — Per-NPC disposition, persuasion checks, merchant price multipliers.
-- ✅ **LootTableSystem** — Data-driven weighted loot generation with starter tables.
+- ✅ **LootTableSystem** — Data-driven weighted loot generation with starter tables; overhauled with conditional entries (`minLevel`/`maxLevel`/`requiredFlags`), guaranteed drops (`guarantee`), sub-table chaining (`subTableId`), and sparse-roll `noneWeight`; new `boss_loot` and `treasure_chest` tables; `rollTable()` / `rollTables()` accept `LootContext` for level-scaled loot.
 - ✅ **GameEventBus** — Typed pub/sub event bus for all major gameplay events.
 - ✅ **AlchemySystem** — Oblivion-style alchemy: ingredient satchel, effect discovery (eat/mix), potion crafting from 2–4 ingredients with shared-effect intersection, skill scaling, and save-state persistence. L to open workbench.
 - ✅ **NPC archetype resistances/weaknesses** — `damageResistances` and `damageWeaknesses` fields added to `NpcArchetypeDefinition`; data-driven per-archetype damage modifiers applied on spawn (bandit chief: physical resist, mage apprentice: elemental resist/physical weak, etc.).
@@ -147,7 +147,7 @@ model.
 
 - ✅ **GameEventBus** — Typed pub/sub event system wiring all major gameplay events.
 - ✅ **SpellSystem** — Spell definitions, known-spell pool, equip/cast, cooldowns, damage/heal effects; Q to cast, Z to cycle.
-- ✅ **LootTableSystem** — Data-driven weighted loot generation; starter tables (common, bandit, dungeon, merchant_restock).
+- ✅ **LootTableSystem** — Data-driven weighted loot generation; overhauled with conditional entries, guaranteed drops, sub-table chaining, sparse-roll `noneWeight`, and `LootContext` for level-scaled loot; starter tables extended with `boss_loot` and `treasure_chest`.
 - ✅ **PersuasionSystem** — Per-NPC disposition (0–100), persuasion checks with speechcraft skill, merchant price multipliers.
 - ✅ **NpcArchetypeDefinition** — Data-driven NPC templates (guard, bandit, merchant, boss, innkeeper, villager) in content bundle.
 - ✅ **Save file export/import** — Download save as JSON (`exportToFile`) and re-import via `importFromJson` / `importFromFile`.
@@ -211,6 +211,8 @@ three-step overhaul track:
 
 ### Performance + Scalability
 
+- ✅ **LodSystem** — Multi-level LOD with `registerLevels()`: supports high/medium/low detail mesh swapping based on player distance; previous binary visible/hidden culling preserved via `register()`; `update()` culled-count includes level-group hidden meshes; disposed-mesh pruning handles level groups; `unregisterLevels()` / `clear()` restore all LOD mesh visibilities.
+- ✅ **ObjectPool\<T\>** — Generic reusable object pool eliminating GC-pressure allocation spikes for frequently created/destroyed game objects (loot meshes, projectiles, hit particles); `acquire()` / `release()` / `prewarm()` / `clear()`; `size` / `totalAllocated` accessors for profiling; configurable `maxSize` overflow disposal.
 - 🧭 Optimize chunk streaming and object pooling.
 - 🧭 Profile heavy combat scenes and UI redraw paths.
 
