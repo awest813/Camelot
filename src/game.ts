@@ -60,6 +60,7 @@ import { RespawnSystem } from "./systems/respawn-system";
 import { MerchantRestockSystem } from "./systems/merchant-restock-system";
 import { BirthsignSystem } from "./systems/birthsign-system";
 import { ClassSystem } from "./systems/class-system";
+import { CharacterCreationUI } from "./ui/character-creation-ui";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -530,18 +531,14 @@ export class Game {
     };
     this.saveSystem.setClassSystem(this.classSystem);
 
-    // Default character creation: warrior birthsign + warrior class
-    // (applied only on fresh start — save/load will restore choices from disk)
-    this.birthsignSystem.chooseBirthsign(
-      "warrior",
-      this.attributeSystem,
-      this.skillProgressionSystem,
-    );
-    this.classSystem.chooseClass(
-      "warrior",
-      this.attributeSystem,
-      this.skillProgressionSystem,
-    );
+    this._runCharacterCreation().catch((error: unknown) => {
+      console.error("Character creation failed; applying defaults", error);
+      this._applyDefaultCharacterCreation();
+      this.interactionSystem.isBlocked = false;
+      this.isPaused = false;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    });
     this.questSystem.onQuestComplete = (xp) => {
       this.player.addExperience(xp);
       this.fameSystem.addFame(10);
@@ -1167,6 +1164,50 @@ export class Game {
           this.canvas.requestPointerLock();
           this.player.camera.attachControl(this.canvas, true);
       }
+  }
+
+  private async _runCharacterCreation(): Promise<void> {
+    this.isPaused = true;
+    this.interactionSystem.isBlocked = true;
+    document.exitPointerLock();
+    this.player.camera.detachControl();
+
+    const creator = new CharacterCreationUI();
+    const selection = await creator.open();
+
+    const birthsignApplied = this.birthsignSystem.chooseBirthsign(
+      selection.birthsignId,
+      this.attributeSystem,
+      this.skillProgressionSystem,
+    );
+    const classApplied = this.classSystem.chooseClass(
+      selection.classId,
+      this.attributeSystem,
+      this.skillProgressionSystem,
+    );
+
+    if (!birthsignApplied || !classApplied) {
+      this._applyDefaultCharacterCreation();
+    }
+
+    this.ui.showNotification("Character creation complete.", 2200);
+    this.interactionSystem.isBlocked = false;
+    this.isPaused = false;
+    this.canvas.requestPointerLock();
+    this.player.camera.attachControl(this.canvas, true);
+  }
+
+  private _applyDefaultCharacterCreation(): void {
+    this.birthsignSystem.chooseBirthsign(
+      "warrior",
+      this.attributeSystem,
+      this.skillProgressionSystem,
+    );
+    this.classSystem.chooseClass(
+      "warrior",
+      this.attributeSystem,
+      this.skillProgressionSystem,
+    );
   }
 
   _setLight(): void {
