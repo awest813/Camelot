@@ -202,7 +202,7 @@ export class CharacterCreationUI {
       const renderName = () => {
         clearCards();
         subtitle.textContent =
-          "Name your hero.  Choose a name below or type your own — each is inspired by a sign of the medieval zodiac.";
+          "Name your hero. Choose a name below or type your own — each is inspired by a sign of the medieval zodiac.";
         continueButton.textContent = "Continue";
         continueButton.disabled = enteredName.trim().length === 0;
         backButton.disabled = true;
