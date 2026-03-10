@@ -33,7 +33,7 @@ import type { ClassSystem } from "./class-system";
 import type { RaceSystem } from "./race-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 15;
+const SAVE_VERSION = 16;
 /** Oldest save version that can still be loaded (forward-compat window). */
 const SAVE_VERSION_MIN = 5;
 
@@ -90,6 +90,7 @@ interface ParsedSaveData {
   characterClass?: unknown;
   // v15 additions
   race?: unknown;
+  // v16 additions (race power cooldown baked into race save state)
 }
 
 interface EquipmentEntry {
@@ -142,6 +143,7 @@ export interface SaveData {
   characterClass?: any;
   // v15 additions
   race?: any;
+  // v16: race power cooldown baked into race save state — no new top-level field
 }
 
 export class SaveSystem {

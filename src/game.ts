@@ -555,6 +555,10 @@ export class Game {
       this.saveSystem.markDirty();
     };
     this.saveSystem.setRaceSystem(this.raceSystem);
+    this.raceSystem.onPowerActivated = (power) => {
+      this.ui.showNotification(`${power.name}: ${power.description}`, 3000);
+      this.saveSystem.markDirty();
+    };
 
     this.birthsignSystem = new BirthsignSystem();
     this.birthsignSystem.onBirthsignChosen = (birthsign) => {
@@ -1171,6 +1175,22 @@ export class Game {
                             reasonMsg[result.reason ?? ""] ?? `Cannot forge spell: ${result.reason}`,
                             2500,
                         );
+                    }
+                }
+            } else if (kbInfo.event.key === "v" || kbInfo.event.key === "V") {
+                // Activate racial power (V = racial Virtue)
+                if (!this._isCombatInputBlocked()) {
+                    const race = this.raceSystem.chosenRace;
+                    if (!race?.power) {
+                        this.ui.showNotification("No racial power available.", 2000);
+                    } else if (!this.raceSystem.canActivatePower(this.timeSystem.gameTime)) {
+                        const mins = Math.ceil(this.raceSystem.powerCooldownRemaining(this.timeSystem.gameTime));
+                        this.ui.showNotification(
+                            `${race.power.name} is recharging (${mins} game-minutes remaining).`,
+                            2500,
+                        );
+                    } else {
+                        this.raceSystem.activatePower(this.timeSystem.gameTime, this.activeEffectsSystem);
                     }
                 }
             } else if (kbInfo.event.key === "h" || kbInfo.event.key === "H") {
