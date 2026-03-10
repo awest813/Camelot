@@ -1,11 +1,18 @@
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type PersuasionOutcome = "success" | "failure" | "critical_success" | "critical_failure";
+export type PersuasionAction = "admire" | "boast" | "joke" | "coerce";
 
 export interface PersuasionAttemptResult {
   outcome: PersuasionOutcome;
   dispositionDelta: number;
   newDisposition: number;
+}
+
+export interface PersuasionActionResult extends PersuasionAttemptResult {
+  action: PersuasionAction;
+  npcAffinity: number;
+  chance: number;
 }
 
 export interface PersuasionSaveState {
@@ -43,34 +50,17 @@ const DELTA_CRIT_FAIL = -15;
 /** Min speechcraft needed to attempt persuasion at all. */
 const MIN_SPEECH_TO_ATTEMPT = 5;
 
+/**
+ * Oblivion-style action affinity modifier:
+ * -2 strongly dislikes, +2 strongly likes.
+ */
+const ACTION_AFFINITY_MODIFIER = 0.06;
+
+/** Action-specific disposition adjustment. */
+const ACTION_DELTA_MULTIPLIER = 0.4;
+
 // ── PersuasionSystem ──────────────────────────────────────────────────────────
 
-/**
- * Tracks per-NPC disposition and handles persuasion mechanics.
- *
- * Disposition model:
- *   - Each NPC starts at a configurable default disposition [0-100].
- *   - Faction changes, dialogue choices, and crime events feed into it.
- *   - Disposition bands drive dialogue/merchant availability:
- *       [0,  25) → hostile
- *       [25, 45) → unfriendly
- *       [45, 65) → neutral
- *       [65, 85) → friendly
- *       [85,100] → allied
- *
- * Persuasion mini-game:
- *   `attemptPersuade(npcId, speechcraftSkill)` rolls a success check
- *   influenced by the player's speechcraft skill and the NPC's current
- *   disposition.  On success the disposition goes up; on failure it goes down.
- *
- * Usage:
- * ```ts
- * const ps = new PersuasionSystem();
- * ps.setDisposition("merchant_01", 55);
- * const result = ps.attemptPersuade("merchant_01", playerSpeechSkill);
- * console.log(result.outcome, result.newDisposition);
- * ```
- */
 export class PersuasionSystem {
   private _dispositions: Map<string, number> = new Map();
   /** Default starting disposition for any NPC not explicitly set. */
@@ -135,64 +125,68 @@ export class PersuasionSystem {
   }
 
   /**
-   * Attempt a persuasion check on the given NPC.
-   *
-   * Success probability:
-   *   P = BASE (0.5) + (skill − 50) × SKILL_WEIGHT + (disposition − 50) × DISPOSITION_WEIGHT
-   *   Clamped to [0.05, 0.95].
-   *
-   * @param npcId             NPC identifier.
-   * @param speechcraftSkill  Player's current speechcraft skill [1–100].
-   * @param randomRoll        Override the random roll [0,1) for deterministic tests.
+   * Baseline persuasion check.
    */
   public attemptPersuade(
     npcId: string,
     speechcraftSkill: number,
     randomRoll?: number,
   ): PersuasionAttemptResult {
-    const disposition = this.getDisposition(npcId);
+    const chance = this.getPersuasionChance(npcId, speechcraftSkill);
+    return this._resolveCheck(npcId, chance, randomRoll);
+  }
 
-    const chance = Math.min(0.95, Math.max(0.05,
+  /**
+   * Deeper Oblivion-style check with action affinity.
+   *
+   * Each NPC has deterministic per-action affinity in [-2, 2] based on npcId.
+   * Actions they like are easier and reward larger disposition gains.
+   */
+  public attemptPersuasionAction(
+    npcId: string,
+    speechcraftSkill: number,
+    action: PersuasionAction,
+    randomRoll?: number,
+  ): PersuasionActionResult {
+    const affinity = this.getActionAffinity(npcId, action);
+    const baseChance = this.getPersuasionChance(npcId, speechcraftSkill);
+    const chance = this._clamp01(baseChance + affinity * ACTION_AFFINITY_MODIFIER, 0.05, 0.95);
+
+    const baseResult = this._resolveCheck(npcId, chance, randomRoll, (delta) => {
+      const modifier = Math.round(affinity * ACTION_DELTA_MULTIPLIER * Math.abs(delta));
+      return delta >= 0 ? delta + modifier : delta - modifier;
+    });
+
+    return {
+      ...baseResult,
+      action,
+      npcAffinity: affinity,
+      chance,
+    };
+  }
+
+  /**
+   * Deterministic action affinity in [-2, 2] to emulate NPC personality.
+   */
+  public getActionAffinity(npcId: string, action: PersuasionAction): number {
+    const seed = this._hash(`${npcId}:${action}`);
+    return (seed % 5) - 2;
+  }
+
+  /** Returns success chance (without action modifiers), clamped to [0.05, 0.95]. */
+  public getPersuasionChance(npcId: string, speechcraftSkill: number): number {
+    const disposition = this.getDisposition(npcId);
+    return this._clamp01(
       BASE_SUCCEED_CHANCE
       + (speechcraftSkill - 50) * SKILL_WEIGHT
-      + (disposition - DISPOSITION_NEUTRAL) * DISPOSITION_WEIGHT
-    ));
-
-    const roll = randomRoll !== undefined ? randomRoll : Math.random();
-
-    let outcome: PersuasionOutcome;
-    let delta: number;
-
-    if (roll <= 0.05) {
-      outcome = "critical_success";
-      delta   = DELTA_CRIT_SUCCESS;
-    } else if (roll >= 0.95) {
-      outcome = "critical_failure";
-      delta   = DELTA_CRIT_FAIL;
-    } else if (roll <= chance) {
-      outcome = "success";
-      delta   = DELTA_SUCCESS;
-    } else {
-      outcome = "failure";
-      delta   = DELTA_FAILURE;
-    }
-
-    const newDisposition = this.adjustDisposition(npcId, delta);
-    return { outcome, dispositionDelta: delta, newDisposition };
+      + (disposition - DISPOSITION_NEUTRAL) * DISPOSITION_WEIGHT,
+      0.05,
+      0.95,
+    );
   }
 
   // ── Merchant pricing integration ──────────────────────────────────────────
 
-  /**
-   * Returns a price multiplier based on NPC disposition.
-   * A hostile NPC charges 40% more; an allied NPC gives 20% off.
-   *
-   *   hostile    → 1.40
-   *   unfriendly → 1.20
-   *   neutral    → 1.00
-   *   friendly   → 0.90
-   *   allied     → 0.80
-   */
   public getMerchantPriceMultiplier(npcId: string): number {
     const band = this.getDispositionBand(npcId);
     const multipliers: Record<string, number> = {
@@ -221,7 +215,50 @@ export class PersuasionSystem {
 
   // ── Private helpers ───────────────────────────────────────────────────────
 
+  private _resolveCheck(
+    npcId: string,
+    chance: number,
+    randomRoll?: number,
+    deltaTransform?: (delta: number) => number,
+  ): PersuasionAttemptResult {
+    const roll = randomRoll !== undefined ? randomRoll : Math.random();
+
+    let outcome: PersuasionOutcome;
+    let delta: number;
+
+    if (roll <= 0.05) {
+      outcome = "critical_success";
+      delta   = DELTA_CRIT_SUCCESS;
+    } else if (roll >= 0.95) {
+      outcome = "critical_failure";
+      delta   = DELTA_CRIT_FAIL;
+    } else if (roll <= chance) {
+      outcome = "success";
+      delta   = DELTA_SUCCESS;
+    } else {
+      outcome = "failure";
+      delta   = DELTA_FAILURE;
+    }
+
+    const adjustedDelta = deltaTransform ? deltaTransform(delta) : delta;
+    const newDisposition = this.adjustDisposition(npcId, adjustedDelta);
+    return { outcome, dispositionDelta: adjustedDelta, newDisposition };
+  }
+
+  private _hash(text: string): number {
+    let hash = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return Math.abs(hash);
+  }
+
   private _clamp(value: number): number {
     return Math.min(DISPOSITION_MAX, Math.max(DISPOSITION_MIN, value));
+  }
+
+  private _clamp01(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
   }
 }
