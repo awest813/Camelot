@@ -865,17 +865,20 @@ export class Game {
         if (this._isCombatInputBlocked()) return;
 
         if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
-            if (pointerInfo.event.button === 0) { // Left Click
+            if (pointerInfo.event.button === 0) { // Left Click — melee attack
                 const attacked = this.combatSystem.meleeAttack();
                 if (attacked) {
                   this.audioSystem.playMeleeAttack();
                   // Blade skill XP on every successful swing (hit or miss)
                   this.skillProgressionSystem.gainXP("blade", 4 * this.classSystem.xpMultiplierFor("blade"));
                 }
-            } else if (pointerInfo.event.button === 2) { // Right Click
+            } else if (pointerInfo.event.button === 2) { // Right Click held — begin block
                 pointerInfo.event.preventDefault();
-                const casted = this.combatSystem.magicAttack();
-                if (casted) this.audioSystem.playMagicAttack();
+                this.combatSystem.beginBlock();
+            }
+        } else if (pointerInfo.type === PointerEventTypes.POINTERUP) {
+            if (pointerInfo.event.button === 2) { // Right Click released — stop blocking
+                this.combatSystem.endBlock();
             }
         }
     });
@@ -981,6 +984,15 @@ export class Game {
                 if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMagicArchetype("bolt");
             } else if (kbInfo.event.key === "6") {
                 if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMagicArchetype("surge");
+            } else if (kbInfo.event.key === "e" || kbInfo.event.key === "E") {
+                // Power attack (Oblivion-style — costs more stamina, staggers enemies)
+                if (!this._isCombatInputBlocked()) {
+                    const powered = this.combatSystem.powerAttack();
+                    if (powered) {
+                        this.audioSystem.playMeleeAttack();
+                        this.skillProgressionSystem.gainXP("blade", 6 * this.classSystem.xpMultiplierFor("blade"));
+                    }
+                }
             } else if (kbInfo.event.key === "r" || kbInfo.event.key === "R") {
                 // Fire arrow (bow mode)
                 if (!this._isCombatInputBlocked()) {

@@ -42,6 +42,13 @@ export class Player {
   public bonusArmor: number = 0;
   public bonusMagicDamage: number = 0;
 
+  /**
+   * Critical-hit probability in [0, 1].
+   * Boosted by the Luck attribute via AttributeSystem.applyDerivedStats().
+   * Default 0 → no crits until the attribute system sets this.
+   */
+  public critChance: number = 0;
+
   // Level & experience
   public level: number = 1;
   public experience: number = 0;

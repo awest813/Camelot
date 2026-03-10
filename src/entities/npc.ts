@@ -187,6 +187,13 @@ export class NPC {
   public movementResponsiveness: number = 8;
   public xpReward: number = 25;
 
+  // ─── Stagger (power-attack interrupt) ───────────────────────────────────────
+
+  /** True while the NPC is briefly staggered after a player power attack. */
+  public isStaggered: boolean = false;
+  /** Remaining seconds of the current stagger. */
+  public staggerTimer: number = 0;
+
   // ─── Faction & role ─────────────────────────────────────────────────────────
 
   /** Faction this NPC belongs to (matches IDs used by CrimeSystem bounties). */
