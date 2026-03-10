@@ -124,6 +124,19 @@ describe("FastTravelSystem", () => {
     expect(fts.discoveredLocations).toHaveLength(0);
   });
 
+  it("restoreFromSave skips entries with missing position y or z", () => {
+    fts.restoreFromSave({
+      discoveredIds: [],
+      locations: [
+        { id: "loc_no_y", name: "No Y", position: { x: 10, z: 5 } } as any,
+        { id: "loc_no_z", name: "No Z", position: { x: 10, y: 3 } } as any,
+        { id: "loc_ok",   name: "Good", position: { x: 10, y: 3, z: 5 } } as any,
+      ],
+    });
+    expect(fts.discoveredLocations).toHaveLength(1);
+    expect(fts.discoveredLocations[0].id).toBe("loc_ok");
+  });
+
   it("full round-trip save/restore preserves position", () => {
     fts.discoverLocation("dungeon", "Dungeon", new Vector3(77, 3, 88));
     const state = fts.getSaveState();
