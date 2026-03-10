@@ -4,8 +4,9 @@ const BASE_CONTROLS: readonly string[] = [
   "WASD: Move · Mouse: Look",
   "Left/Right Click: Attack / Magic",
   "I: Inventory · J: Quest Log · K: Skills · U: Attributes",
-  "L: Alchemy · B: Enchanting · T: Wait",
-  "F5/F9: Save/Load · F3: Debug Overlay",
+  "Q: Cast Spell · Z: Cycle Spells · L: Alchemy · B: Enchanting · T: Wait",
+  "V: Racial Power · H: Fame / Status · Y: Fast Travel",
+  "7/8/9/0: Quick Slots · F5/F9: Save/Load · F3: Debug Overlay",
 ];
 
 const EDITOR_CONTROLS: readonly string[] = [

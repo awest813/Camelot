@@ -66,6 +66,7 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ **MerchantRestockSystem** — Timed merchant inventory and gold restocking: register merchant templates (inventory + gold snapshot); `update(gameTime, barterSystem)` resets the live BarterSystem merchant record when the interval elapses (default 72 h); advances the next-restock deadline across multiple elapsed cycles; `onRestock` callback fires a UI notification; save-state persistence (SAVE_VERSION 13).
 - ✅ **BirthsignSystem** — Oblivion's 13 birthsigns (Warrior, Mage, Thief, Lady, Lord, Steed, Ritual, Apprentice, Atronach, Shadow, Lover, Serpent, etc.) chosen once at character creation; each sign permanently boosts attributes or max stats, and most grant a once-per-24h rechargeable special power (Mara's Gift, Moonshadow, Lover's Kiss, Serpent's Spell, Blood of the North, …); `stunted` flag suppresses magicka regeneration for the Atronach; `fireWeakness` for the Lord; flat max-stat bonuses (maxMagicka +50/+100/+150) for Mage/Apprentice/Atronach; power cooldown tracked in in-game hours; `onBirthsignChosen` + `onPowerActivated` callbacks; save-state persistence (SAVE_VERSION 14).
 - ✅ **ClassSystem** — Oblivion-style character classes (Warrior, Knight, Barbarian, Mage, Sorcerer, Healer, Thief, Scout, Rogue, Battlemage); each class defines a specialization (combat/magic/stealth), two favored attributes (+10 each), five major skills (starting +25 levels, 1.5× XP), and five minor skills (starting +10 levels, 1.25× XP); specialization group grants +5 to all related skills; `xpMultiplierFor(skillId)` scales all in-game XP awards so major-skill users progress faster; `onClassChosen` callback syncs derived stats; save-state persistence (SAVE_VERSION 14).
+- ✅ **RaceSystem** (fully activated powers) — Oblivion-depth racial powers for all 10 races (Nord, Imperial, Breton, Redguard, High Elf, Dark Elf, Wood Elf, Orc, Khajiit, Argonian); each race now grants a genuine once-per-24h rechargeable power that dispatches real `ActiveEffect` entries (health/magicka/stamina restore, fortify strength, resist damage, etc.); `activatePower(gameTime, activeEffectsSystem)` dispatches all power effects, `canActivatePower()` enforces the cooldown, `powerCooldownRemaining()` reports minutes left; `onPowerActivated` callback fires HUD notification; V key activates the power in-game; power cooldown persisted (SAVE_VERSION 16).
 
 ### World + Content
 
@@ -76,12 +77,13 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 ### UX + Persistence
 
 - ✅ HUD, quest log, inventory, skill tree, pause flow.
-- ✅ Save/load (SAVE_VERSION 14) for all system states.
+- ✅ Save/load (SAVE_VERSION 16) for all system states.
 - ✅ Save file export to JSON file download + import from JSON/File (browser-safe).
 - ✅ Notifications, hit feedback, and debug support.
 - ✅ Compass HUD (top-center) showing cardinal direction from camera heading.
 - ✅ Wait/Rest dialog (T) for time-skipping 1–24 in-game hours with stat restoration.
 - ✅ Fame/Infamy HUD (H key) showing reputation tier, active effects, and jail history.
+- ✅ Racial Power (V key) — activate the chosen race's once-per-day power; HUD notification shows name + description; cooldown status message when on recharge.
 
 ---
 

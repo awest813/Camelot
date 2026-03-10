@@ -4,9 +4,11 @@ import {
   RACES,
   RACE_ATTRIBUTE_BONUS,
   RACE_SKILL_BONUS,
+  type RacePower,
 } from "./race-system";
 import { AttributeSystem } from "./attribute-system";
 import { SkillProgressionSystem } from "./skill-progression-system";
+import { ActiveEffectsSystem } from "./active-effects-system";
 
 describe("RaceSystem", () => {
   let system: RaceSystem;
@@ -175,54 +177,196 @@ describe("RaceSystem", () => {
 
   // ── Power data ────────────────────────────────────────────────────────────
 
-  it("all 10 races have a racial power", () => {
+  it("all 10 races have a power with a name, description, cooldownHours, and effects", () => {
     for (const race of RACES) {
       expect(race.power).toBeDefined();
-      expect(race.power!.id.length).toBeGreaterThan(0);
       expect(race.power!.name.length).toBeGreaterThan(0);
       expect(race.power!.description.length).toBeGreaterThan(0);
+      expect(race.power!.cooldownHours).toBeGreaterThan(0);
+      expect(race.power!.effects.length).toBeGreaterThan(0);
     }
   });
 
-  // ── Persistence ───────────────────────────────────────────────────────────
+  it("every power effect has a valid name, magnitude, and positive duration", () => {
+    for (const race of RACES) {
+      for (const eff of race.power!.effects) {
+        expect(eff.name.length).toBeGreaterThan(0);
+        expect(eff.magnitude).toBeGreaterThan(0);
+        expect(eff.duration).toBeGreaterThan(0);
+        expect(typeof eff.effectType).toBe("string");
+      }
+    }
+  });
 
-  it("getSaveState returns the chosen race id", () => {
+  // ── canActivatePower ──────────────────────────────────────────────────────
+
+  it("canActivatePower returns false when no race chosen", () => {
+    expect(system.canActivatePower(0)).toBe(false);
+  });
+
+  it("canActivatePower returns true on first use after race chosen", () => {
+    system.chooseRace("nord");
+    expect(system.canActivatePower(0)).toBe(true);
+  });
+
+  it("canActivatePower returns false while on cooldown", () => {
+    system.chooseRace("nord");
+    system.activatePower(0);
+    // Immediately after use — still within cooldown window
+    expect(system.canActivatePower(1)).toBe(false);
+  });
+
+  it("canActivatePower returns true after cooldown has elapsed", () => {
+    system.chooseRace("nord"); // cooldownHours=24
+    const t0 = 0;
+    system.activatePower(t0);
+    // 24 h * 60 min = 1440 minutes later
+    expect(system.canActivatePower(t0 + 1440)).toBe(true);
+  });
+
+  it("canActivatePower returns false just before cooldown expires", () => {
+    system.chooseRace("nord");
+    const t0 = 100;
+    system.activatePower(t0);
+    // 1439 minutes is just short of 24 h
+    expect(system.canActivatePower(t0 + 1439)).toBe(false);
+  });
+
+  // ── activatePower ─────────────────────────────────────────────────────────
+
+  it("activatePower returns false when no race chosen", () => {
+    expect(system.activatePower(0)).toBe(false);
+  });
+
+  it("activatePower returns true on first use", () => {
     system.chooseRace("argonian");
-    expect(system.getSaveState().chosenId).toBe("argonian");
+    expect(system.activatePower(0)).toBe(true);
   });
 
-  it("getSaveState returns null when no race chosen", () => {
-    expect(system.getSaveState().chosenId).toBeNull();
+  it("activatePower returns false on second immediate use (on cooldown)", () => {
+    system.chooseRace("argonian");
+    system.activatePower(0);
+    expect(system.activatePower(1)).toBe(false);
   });
 
-  it("restoreFromSave re-populates the chosen race", () => {
-    const fresh = new RaceSystem();
-    fresh.restoreFromSave({ chosenId: "dunmer" });
-    expect(fresh.chosenRace!.id).toBe("dunmer");
-    expect(fresh.chosenRace!.name).toBe("Dark Elf");
+  it("activatePower dispatches effects to ActiveEffectsSystem", () => {
+    system.chooseRace("argonian"); // power: histskin → health_restore
+    const effects = new ActiveEffectsSystem();
+    system.activatePower(0, effects);
+    const active = effects.activeEffects;
+    expect(active.length).toBeGreaterThan(0);
+    expect(active.some(e => e.effectType === "health_restore")).toBe(true);
   });
 
-  it("restoreFromSave ignores unknown race ids", () => {
-    system.restoreFromSave({ chosenId: "unknown_race" });
-    expect(system.chosenRace).toBeNull();
+  it("activatePower dispatches multiple effects for multi-effect powers", () => {
+    system.chooseRace("orsimer"); // berserk: fortify_strength + resist_damage
+    const effects = new ActiveEffectsSystem();
+    system.activatePower(0, effects);
+    const active = effects.activeEffects;
+    expect(active.some(e => e.effectType === "fortify_strength")).toBe(true);
+    expect(active.some(e => e.effectType === "resist_damage")).toBe(true);
   });
 
-  it("restoreFromSave handles null state gracefully", () => {
-    expect(() => system.restoreFromSave(null as any)).not.toThrow();
-    expect(system.chosenRace).toBeNull();
+  it("activatePower works without an ActiveEffectsSystem (no-op effects path)", () => {
+    system.chooseRace("nord");
+    // Should not throw; power still activates (cooldown consumed)
+    expect(() => system.activatePower(0)).not.toThrow();
+    expect(system.canActivatePower(1)).toBe(false);
   });
 
-  it("restoreFromSave handles null chosenId gracefully", () => {
-    system.restoreFromSave({ chosenId: null });
-    expect(system.chosenRace).toBeNull();
-  });
-
-  it("full round-trip save/restore preserves state", () => {
+  it("activatePower fires onPowerActivated callback with the correct power", () => {
     system.chooseRace("khajiit");
+    const cb = vi.fn<[RacePower], void>();
+    system.onPowerActivated = cb;
+    system.activatePower(0);
+    expect(cb).toHaveBeenCalledOnce();
+    expect(cb.mock.calls[0][0].id).toBe("eye_of_fear");
+  });
+
+  it("onPowerActivated is not called when activation fails (cooldown)", () => {
+    system.chooseRace("khajiit");
+    const cb = vi.fn();
+    system.onPowerActivated = cb;
+    system.activatePower(0); // success
+    system.activatePower(1); // fails — on cooldown
+    expect(cb).toHaveBeenCalledOnce();
+  });
+
+  // ── powerCooldownRemaining ────────────────────────────────────────────────
+
+  it("powerCooldownRemaining returns 0 when no race chosen", () => {
+    expect(system.powerCooldownRemaining(0)).toBe(0);
+  });
+
+  it("powerCooldownRemaining returns 0 before first use", () => {
+    system.chooseRace("nord");
+    expect(system.powerCooldownRemaining(500)).toBe(0);
+  });
+
+  it("powerCooldownRemaining returns remaining minutes after activation", () => {
+    system.chooseRace("nord"); // 24h cooldown = 1440 min
+    const t0 = 0;
+    system.activatePower(t0);
+    expect(system.powerCooldownRemaining(t0 + 700)).toBe(740);
+  });
+
+  it("powerCooldownRemaining returns 0 once cooldown has fully elapsed", () => {
+    system.chooseRace("nord");
+    const t0 = 0;
+    system.activatePower(t0);
+    expect(system.powerCooldownRemaining(t0 + 1440)).toBe(0);
+  });
+
+  // ── Persistence (with lastPowerUseTime) ───────────────────────────────────
+
+  it("getSaveState includes lastPowerUseTime as null before any use", () => {
+    system.chooseRace("argonian");
+    expect(system.getSaveState().lastPowerUseTime).toBeNull();
+  });
+
+  it("getSaveState includes lastPowerUseTime after activation", () => {
+    system.chooseRace("argonian");
+    system.activatePower(500);
+    expect(system.getSaveState().lastPowerUseTime).toBe(500);
+  });
+
+  it("restoreFromSave round-trips lastPowerUseTime", () => {
+    system.chooseRace("nord");
+    system.activatePower(300);
     const state = system.getSaveState();
+
+    const fresh = new RaceSystem();
+    fresh.restoreFromSave(state);
+    expect(fresh.chosenRace!.id).toBe("nord");
+    // After restoring, power should still be on cooldown
+    expect(fresh.canActivatePower(301)).toBe(false);
+    expect(fresh.powerCooldownRemaining(301)).toBeGreaterThan(0);
+  });
+
+  it("restoreFromSave handles missing lastPowerUseTime (legacy saves)", () => {
+    const fresh = new RaceSystem();
+    // Simulate old save that has no lastPowerUseTime field
+    fresh.restoreFromSave({ chosenId: "dunmer" } as any);
+    expect(fresh.chosenRace!.id).toBe("dunmer");
+    expect(fresh.canActivatePower(0)).toBe(true); // Power ready since no usage recorded
+  });
+
+  it("restoreFromSave ignores non-finite lastPowerUseTime values", () => {
+    const fresh = new RaceSystem();
+    fresh.restoreFromSave({ chosenId: "bosmer", lastPowerUseTime: Infinity });
+    expect(fresh.canActivatePower(0)).toBe(true);
+  });
+
+  it("full round-trip save/restore preserves race and cooldown state", () => {
+    system.chooseRace("khajiit");
+    system.activatePower(1000);
+    const state = system.getSaveState();
+
     const fresh = new RaceSystem();
     fresh.restoreFromSave(state);
     expect(fresh.chosenRace!.id).toBe("khajiit");
     expect(fresh.chosenRace!.heritage).toBe("beast");
+    expect(fresh.canActivatePower(1001)).toBe(false);
+    expect(fresh.powerCooldownRemaining(1001)).toBeGreaterThan(0);
   });
 });

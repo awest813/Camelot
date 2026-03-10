@@ -3,23 +3,32 @@
  *
  * At character creation the player selects one of ten races.  Each race
  * applies permanent passive bonuses to base attributes and starting skill
- * levels, and some races carry a one-off special power or resistance flag.
+ * levels, and all races carry a once-per-day rechargeable special power.
  *
  * Integration points:
  *   - `chooseRace(id, attributeSystem?, skillSystem?)` applies all passive
  *     bonuses immediately and stores the selection for save/load.
- *   - `getSaveState()` / `restoreFromSave()` round-trip the chosen race id.
+ *   - `activatePower(currentGameTimeMinutes, activeEffectsSystem?)` uses the
+ *     racial power if it is off cooldown; dispatches real ActiveEffects.
+ *   - `canActivatePower(currentGameTimeMinutes)` checks whether the power is
+ *     ready to use (once per in-game day by default).
+ *   - `powerCooldownRemaining(currentGameTimeMinutes)` returns minutes left.
+ *   - `getSaveState()` / `restoreFromSave()` round-trip the chosen race id
+ *     and power cooldown timestamp.
  *
  * Wire-up example (game.ts):
  * ```ts
  * this.raceSystem = new RaceSystem();
  * // At character creation:
  * this.raceSystem.chooseRace("nord", this.attributeSystem, this.skillProgressionSystem);
+ * // V key — activate racial power:
+ * this.raceSystem.activatePower(this.timeSystem.gameTime, this.activeEffectsSystem);
  * ```
  */
 
 import type { AttributeSystem, AttributeName } from "./attribute-system";
 import type { SkillProgressionSystem, ProgressionSkillId } from "./skill-progression-system";
+import type { ActiveEffectsSystem, ActiveEffectType } from "./active-effects-system";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -28,6 +37,46 @@ export type RaceAttributeBonus = Partial<Record<AttributeName, number>>;
 
 /** Base skill bonus applied at character creation. */
 export type RaceSkillBonus = Partial<Record<ProgressionSkillId, number>>;
+
+/**
+ * A single active effect dispatched when a racial power is activated.
+ * The `effectType` maps directly to `ActiveEffectType` from ActiveEffectsSystem.
+ */
+export interface RacePowerEffect {
+  /** Display label shown in the HUD while the effect is active. */
+  name: string;
+  /** Category; must match an `ActiveEffectType`. */
+  effectType: ActiveEffectType;
+  /**
+   * Effect strength.  Interpretation follows `ActiveEffect.magnitude`:
+   *   restore types  → units per second
+   *   fortify types  → flat bonus amount
+   *   resist_damage  → damage reduction percentage (0–100)
+   */
+  magnitude: number;
+  /** Duration in real-time seconds. */
+  duration: number;
+}
+
+/** Rechargeable special power granted to every race. */
+export interface RacePower {
+  /** Unique identifier (used as a prefix for ActiveEffect ids). */
+  id: string;
+  /** Display name shown in the HUD when activated. */
+  name: string;
+  /** Short description of what the power does. */
+  description: string;
+  /**
+   * Recharge time in in-game hours.
+   * Default: 24 (once per in-game day), matching Oblivion's racial powers.
+   */
+  cooldownHours: number;
+  /**
+   * The actual `ActiveEffect` entries dispatched to `ActiveEffectsSystem`
+   * when this power is activated.
+   */
+  effects: RacePowerEffect[];
+}
 
 /** A playable race definition. */
 export interface RaceDefinition {
@@ -51,15 +100,8 @@ export interface RaceDefinition {
   skillBonus?: RaceSkillBonus;
   /** Flat bonus added to max Magicka (independent of intelligence/willpower). */
   maxMagickaBonus?: number;
-  /**
-   * Identifier of a special racial power (informational).
-   * The actual effect is described in `power.description`.
-   */
-  power?: {
-    id: string;
-    name: string;
-    description: string;
-  };
+  /** Rechargeable racial power (once per in-game day by default). */
+  power?: RacePower;
   /**
    * Elemental damage resistances / weaknesses expressed as a fraction in
    * [-1, 1].  Negative = weakness; positive = resistance.
@@ -77,6 +119,8 @@ export interface RaceDefinition {
 export interface RaceSaveState {
   /** Chosen race id, or null if none chosen. */
   chosenId: string | null;
+  /** Game time (minutes) when the power was last used, or null if never used. */
+  lastPowerUseTime: number | null;
 }
 
 // ── Race attribute/skill starting bonus magnitudes ────────────────────────────
@@ -108,7 +152,12 @@ export const RACES: ReadonlyArray<RaceDefinition> = [
     power: {
       id: "nords_fury",
       name: "Nord's Fury",
-      description: "Channel Nordic rage to boost strength for a brief duration.",
+      description: "Channel Nordic rage to boost strength and stamina recovery for 60 seconds.",
+      cooldownHours: 24,
+      effects: [
+        { name: "Nordic Strength",   effectType: "fortify_strength", magnitude: 20, duration: 60 },
+        { name: "Nordic Endurance",  effectType: "stamina_restore",  magnitude: 5,  duration: 60 },
+      ],
     },
   },
   {
@@ -124,7 +173,12 @@ export const RACES: ReadonlyArray<RaceDefinition> = [
     power: {
       id: "voice_of_the_emperor",
       name: "Voice of the Emperor",
-      description: "Calm nearby enemies with a commanding imperial presence.",
+      description: "Project commanding authority, reducing incoming damage and restoring health for 30 seconds.",
+      cooldownHours: 24,
+      effects: [
+        { name: "Imperial Authority", effectType: "resist_damage",   magnitude: 25, duration: 30 },
+        { name: "Imperial Resolve",   effectType: "health_restore",  magnitude: 5,  duration: 30 },
+      ],
     },
   },
   {
@@ -142,7 +196,12 @@ export const RACES: ReadonlyArray<RaceDefinition> = [
     power: {
       id: "spell_absorption",
       name: "Spell Absorption",
-      description: "Briefly absorb incoming magic, converting it to Magicka.",
+      description: "Absorb ambient magic, rapidly restoring Magicka and fortifying the Magicka pool for 30 seconds.",
+      cooldownHours: 24,
+      effects: [
+        { name: "Spell Absorption",  effectType: "magicka_restore",  magnitude: 20, duration: 15 },
+        { name: "Fortified Magicka", effectType: "fortify_magicka",  magnitude: 30, duration: 30 },
+      ],
     },
   },
   {
@@ -159,7 +218,12 @@ export const RACES: ReadonlyArray<RaceDefinition> = [
     power: {
       id: "adrenaline_rush",
       name: "Adrenaline Rush",
-      description: "Temporarily boost speed, strength, and stamina recovery.",
+      description: "Surge with adrenaline, boosting strength and rapidly restoring stamina for 60 seconds.",
+      cooldownHours: 24,
+      effects: [
+        { name: "Adrenaline Strength", effectType: "fortify_strength", magnitude: 15, duration: 60 },
+        { name: "Adrenaline Rush",     effectType: "stamina_restore",  magnitude: 4,  duration: 60 },
+      ],
     },
   },
   // ── Elven races ───────────────────────────────────────────────────────────
@@ -178,7 +242,12 @@ export const RACES: ReadonlyArray<RaceDefinition> = [
     power: {
       id: "highborn",
       name: "Highborn",
-      description: "Rapidly regenerate Magicka for a short time.",
+      description: "Channel elven heritage to rapidly regenerate Magicka and fortify the Magicka pool for 15 seconds.",
+      cooldownHours: 24,
+      effects: [
+        { name: "Highborn Regeneration", effectType: "magicka_restore",  magnitude: 25, duration: 15 },
+        { name: "Highborn Fortitude",    effectType: "fortify_magicka",   magnitude: 20, duration: 30 },
+      ],
     },
   },
   {
@@ -195,7 +264,12 @@ export const RACES: ReadonlyArray<RaceDefinition> = [
     power: {
       id: "ancestors_wrath",
       name: "Ancestor's Wrath",
-      description: "Surround yourself with fire, damaging nearby attackers.",
+      description: "Invoke ancestral fury, shrouding yourself in fire and reducing incoming damage for 30 seconds.",
+      cooldownHours: 24,
+      effects: [
+        { name: "Ancestor's Ward",     effectType: "resist_damage",   magnitude: 30, duration: 30 },
+        { name: "Ancestor's Wrath",    effectType: "stamina_restore", magnitude: 4,  duration: 30 },
+      ],
     },
   },
   {
@@ -212,7 +286,12 @@ export const RACES: ReadonlyArray<RaceDefinition> = [
     power: {
       id: "beast_tongue",
       name: "Beast Tongue",
-      description: "Command animals to fight for you briefly.",
+      description: "Commune with the wild, fortifying strength and restoring stamina for 45 seconds.",
+      cooldownHours: 24,
+      effects: [
+        { name: "Beast Strength",   effectType: "fortify_strength", magnitude: 10, duration: 45 },
+        { name: "Beast Endurance",  effectType: "stamina_restore",  magnitude: 3,  duration: 45 },
+      ],
     },
   },
   // ── Beast races ───────────────────────────────────────────────────────────
@@ -230,7 +309,12 @@ export const RACES: ReadonlyArray<RaceDefinition> = [
     power: {
       id: "berserk",
       name: "Berserk",
-      description: "Enter a berserk state, greatly increasing strength and reducing taken damage.",
+      description: "Enter a berserker fury, greatly increasing strength and reducing incoming damage for 60 seconds.",
+      cooldownHours: 24,
+      effects: [
+        { name: "Berserker Fury",    effectType: "fortify_strength", magnitude: 30, duration: 60 },
+        { name: "Berserker Defense", effectType: "resist_damage",    magnitude: 25, duration: 60 },
+      ],
     },
   },
   {
@@ -246,7 +330,11 @@ export const RACES: ReadonlyArray<RaceDefinition> = [
     power: {
       id: "eye_of_fear",
       name: "Eye of Fear",
-      description: "Paralyse a target momentarily with a terrifying feline stare.",
+      description: "Project primal terror, greatly reducing incoming damage for 20 seconds.",
+      cooldownHours: 24,
+      effects: [
+        { name: "Fearsome Aspect", effectType: "resist_damage", magnitude: 50, duration: 20 },
+      ],
     },
   },
   {
@@ -263,7 +351,11 @@ export const RACES: ReadonlyArray<RaceDefinition> = [
     power: {
       id: "histskin",
       name: "Histskin",
-      description: "Invoke the power of the Hist to rapidly regenerate health.",
+      description: "Invoke the power of the Hist to rapidly regenerate health for 15 seconds.",
+      cooldownHours: 24,
+      effects: [
+        { name: "Histskin", effectType: "health_restore", magnitude: 20, duration: 15 },
+      ],
     },
   },
 ];
@@ -272,6 +364,7 @@ export const RACES: ReadonlyArray<RaceDefinition> = [
 
 export class RaceSystem {
   private _chosenId: string | null = null;
+  private _lastPowerUseTime: number | null = null;
 
   /** Quick-lookup map built from the catalogue. */
   private static readonly _catalogue: ReadonlyMap<string, RaceDefinition> = new Map(
@@ -283,6 +376,12 @@ export class RaceSystem {
    * @param race  The chosen RaceDefinition.
    */
   public onRaceChosen: ((race: RaceDefinition) => void) | null = null;
+
+  /**
+   * Fired whenever the racial power is successfully activated.
+   * @param power  The power that was activated.
+   */
+  public onPowerActivated: ((power: RacePower) => void) | null = null;
 
   // ── Catalogue queries ─────────────────────────────────────────────────────
 
@@ -351,10 +450,81 @@ export class RaceSystem {
     return true;
   }
 
+  // ── Racial power ──────────────────────────────────────────────────────────
+
+  /**
+   * Returns `true` when the racial power is available (not on cooldown).
+   * Also returns `false` when no race has been chosen or the race has no power.
+   *
+   * @param currentGameTimeMinutes  Current game time from `TimeSystem.gameTime`.
+   */
+  public canActivatePower(currentGameTimeMinutes: number): boolean {
+    const def = this.chosenRace;
+    if (!def?.power) return false;
+    if (this._lastPowerUseTime === null) return true;
+    const cooldownMinutes = def.power.cooldownHours * 60;
+    return (currentGameTimeMinutes - this._lastPowerUseTime) >= cooldownMinutes;
+  }
+
+  /**
+   * Activate the racial power if it is not on cooldown.
+   *
+   * Dispatches each `RacePowerEffect` from the power definition as a timed
+   * `ActiveEffect` into `activeEffectsSystem` (when provided), then fires the
+   * `onPowerActivated` callback.
+   *
+   * @param currentGameTimeMinutes  Current game time from `TimeSystem.gameTime`.
+   * @param activeEffectsSystem     Optional: system that receives the dispatched effects.
+   * @returns `true` if the power was activated; `false` if on cooldown or no power.
+   */
+  public activatePower(
+    currentGameTimeMinutes: number,
+    activeEffectsSystem?: ActiveEffectsSystem,
+  ): boolean {
+    if (!this.canActivatePower(currentGameTimeMinutes)) return false;
+
+    const def = this.chosenRace!;
+    const power = def.power!;
+
+    this._lastPowerUseTime = currentGameTimeMinutes;
+
+    if (activeEffectsSystem) {
+      for (const eff of power.effects) {
+        activeEffectsSystem.addEffect({
+          id:        `racial_${power.id}_${eff.effectType}`,
+          name:      eff.name,
+          effectType: eff.effectType,
+          magnitude: eff.magnitude,
+          duration:  eff.duration,
+        });
+      }
+    }
+
+    this.onPowerActivated?.(power);
+    return true;
+  }
+
+  /**
+   * Remaining cooldown in minutes before the racial power can be used again.
+   * Returns 0 when the power is ready.
+   *
+   * @param currentGameTimeMinutes  Current game time from `TimeSystem.gameTime`.
+   */
+  public powerCooldownRemaining(currentGameTimeMinutes: number): number {
+    const def = this.chosenRace;
+    if (!def?.power || this._lastPowerUseTime === null) return 0;
+    const cooldownMinutes = def.power.cooldownHours * 60;
+    const elapsed = currentGameTimeMinutes - this._lastPowerUseTime;
+    return Math.max(0, cooldownMinutes - elapsed);
+  }
+
   // ── Persistence ───────────────────────────────────────────────────────────
 
   public getSaveState(): RaceSaveState {
-    return { chosenId: this._chosenId };
+    return {
+      chosenId: this._chosenId,
+      lastPowerUseTime: this._lastPowerUseTime,
+    };
   }
 
   /**
@@ -368,6 +538,11 @@ export class RaceSystem {
       this._chosenId = id;
     } else {
       this._chosenId = null;
+    }
+    if (typeof state.lastPowerUseTime === "number" && Number.isFinite(state.lastPowerUseTime)) {
+      this._lastPowerUseTime = state.lastPowerUseTime;
+    } else {
+      this._lastPowerUseTime = null;
     }
   }
 }
