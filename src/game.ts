@@ -55,6 +55,9 @@ import { LevelScalingSystem } from "./systems/level-scaling-system";
 import { FameSystem } from "./systems/fame-system";
 import { ActiveEffectsSystem } from "./systems/active-effects-system";
 import { JailSystem } from "./systems/jail-system";
+import { SpellMakingSystem } from "./systems/spell-making-system";
+import { RespawnSystem } from "./systems/respawn-system";
+import { MerchantRestockSystem } from "./systems/merchant-restock-system";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -127,6 +130,11 @@ export class Game {
   public fameSystem: FameSystem;
   public activeEffectsSystem: ActiveEffectsSystem;
   public jailSystem: JailSystem;
+
+  // v10 systems (Oblivion depth: spell making, respawn, merchant restock)
+  public spellMakingSystem: SpellMakingSystem;
+  public respawnSystem: RespawnSystem;
+  public merchantRestockSystem: MerchantRestockSystem;
 
   public isPaused: boolean = false;
 
@@ -440,6 +448,45 @@ export class Game {
 
     this.jailSystem = new JailSystem();
     this.saveSystem.setJailSystem(this.jailSystem);
+
+    // ── v10 system wiring (Oblivion depth: spell making, respawn, merchant restock) ──
+    this.spellMakingSystem = new SpellMakingSystem(this.spellSystem);
+    this.spellMakingSystem.onSpellForged = (spell, goldCost) => {
+      this.ui.showNotification(`Spell forged: "${spell.name}" (${goldCost}g)`, 3000);
+      this.skillProgressionSystem.gainXP("destruction", 20);
+      this.saveSystem.markDirty();
+    };
+    this.saveSystem.setSpellMakingSystem(this.spellMakingSystem);
+
+    // RespawnSystem — register the test cave as a respawnable zone (72 game-hours)
+    this.respawnSystem = new RespawnSystem();
+    this.respawnSystem.registerZone("cave_01", 72);
+    this.respawnSystem.onZoneRespawn = (zoneId) => {
+      this.ui.showNotification(`${zoneId} has respawned — new dangers await!`, 2500);
+      this.eventBus.emit("zone:respawned" as any, { zoneId });
+    };
+    this.saveSystem.setRespawnSystem(this.respawnSystem);
+
+    // MerchantRestockSystem — restock the starter merchant every 72 game-hours
+    this.merchantRestockSystem = new MerchantRestockSystem();
+    const merchantTemplate = [
+      { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 5, weight: 0.3, stats: { value: 25 } },
+      { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 3, weight: 1, stats: { value: 15 } },
+    ];
+    this.merchantRestockSystem.registerMerchant(
+      "merchant_01",
+      merchantTemplate,
+      500,
+      72,
+      this.timeSystem.gameTime,
+    );
+    this.merchantRestockSystem.onRestock = (merchantId) => {
+      const merchant = this.barterSystem.getMerchant(merchantId);
+      const name = merchant?.name ?? merchantId;
+      this.ui.showNotification(`${name} has restocked their wares.`, 2000);
+      this.saveSystem.markDirty();
+    };
+    this.saveSystem.setMerchantRestockSystem(this.merchantRestockSystem);
 
     // Quest completion awards fame
     this.questSystem.onQuestComplete = (xp) => {
@@ -965,6 +1012,32 @@ export class Game {
                         this.player.camera.attachControl(this.canvas, true);
                     }
                 }
+            } else if (kbInfo.event.key === "x" || kbInfo.event.key === "X") {
+                // Spell Making — forge a sample custom spell (X = eXperimental magic)
+                // A full UI would present a form; here we demonstrate the system with a
+                // hardcoded sample so the feature is exercisable from the keyboard.
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+                    const result = this.spellMakingSystem.forgeSpell(
+                        `Custom Bolt ${this.spellMakingSystem.customSpells.length + 1}`,
+                        [{ effectType: "damage", school: "destruction", magnitude: 15, duration: 4, damageType: "shock" }],
+                        this.barterSystem,
+                    );
+                    if (result.ok) {
+                        this.ui.showNotification(
+                            `Spell forged: "${result.spell!.name}" — ${result.goldCost}g spent.  Z to cycle spells.`,
+                            3500,
+                        );
+                    } else {
+                        const reasonMsg: Record<string, string> = {
+                            insufficient_gold: "Not enough gold to forge a spell.",
+                            duplicate_name:    "A spell with that name already exists.",
+                        };
+                        this.ui.showNotification(
+                            reasonMsg[result.reason ?? ""] ?? `Cannot forge spell: ${result.reason}`,
+                            2500,
+                        );
+                    }
+                }
             } else if (kbInfo.event.key === "h" || kbInfo.event.key === "H") {
                 // Show Fame / Infamy status (H = Honours)
                 if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
@@ -972,11 +1045,14 @@ export class Game {
                     const effectStr = effects.length > 0
                       ? `  Active effects: ${effects.map(e => e.name).join(", ")}`
                       : "";
+                    const customSpellCount = this.spellMakingSystem.customSpells.length;
+                    const spellStr = customSpellCount > 0 ? `  Custom spells: ${customSpellCount}` : "";
                     this.ui.showNotification(
                       `Fame: ${this.fameSystem.fame} (${this.fameSystem.fameLabel})` +
                       `  Infamy: ${this.fameSystem.infamy} (${this.fameSystem.infamyLabel})` +
                       `  Sentences: ${this.jailSystem.totalSentences}` +
-                      effectStr,
+                      effectStr +
+                      spellStr,
                       4000,
                     );
                 }
@@ -1172,6 +1248,11 @@ export class Game {
 
       // v9 active effects tick (DoT heals/damage, duration countdown)
       this.activeEffectsSystem.update(deltaTime, this.player);
+
+      // v10 respawn and merchant restock checks (low-frequency, time-comparison only)
+      const currentGameTime = this.timeSystem.gameTime;
+      this.respawnSystem.update(currentGameTime);
+      this.merchantRestockSystem.update(currentGameTime, this.barterSystem);
 
       // v4 browser optimisation: distance-based LOD culling
       this._lastLodCulled = this.lodSystem.update(this.player.camera.position);

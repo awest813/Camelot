@@ -25,9 +25,12 @@ import type { FastTravelSystem } from "./fast-travel-system";
 import type { FameSystem } from "./fame-system";
 import type { ActiveEffectsSystem } from "./active-effects-system";
 import type { JailSystem } from "./jail-system";
+import type { SpellMakingSystem } from "./spell-making-system";
+import type { RespawnSystem } from "./respawn-system";
+import type { MerchantRestockSystem } from "./merchant-restock-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 12;
+const SAVE_VERSION = 13;
 /** Oldest save version that can still be loaded (forward-compat window). */
 const SAVE_VERSION_MIN = 5;
 
@@ -73,6 +76,10 @@ interface ParsedSaveData {
   fame?: unknown;
   activeEffects?: unknown;
   jail?: unknown;
+  // v13 additions
+  spellMaking?: unknown;
+  respawn?: unknown;
+  merchantRestock?: unknown;
 }
 
 interface EquipmentEntry {
@@ -116,6 +123,10 @@ export interface SaveData {
   fame?: any;
   activeEffects?: any;
   jail?: any;
+  // v13 additions
+  spellMaking?: any;
+  respawn?: any;
+  merchantRestock?: any;
 }
 
 export class SaveSystem {
@@ -161,6 +172,11 @@ export class SaveSystem {
   private _fameSystem: FameSystem | null = null;
   private _activeEffectsSystem: ActiveEffectsSystem | null = null;
   private _jailSystem: JailSystem | null = null;
+
+  // v13 optional systems
+  private _spellMakingSystem: SpellMakingSystem | null = null;
+  private _respawnSystem: RespawnSystem | null = null;
+  private _merchantRestockSystem: MerchantRestockSystem | null = null;
 
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
@@ -233,6 +249,12 @@ export class SaveSystem {
   public setActiveEffectsSystem(s: ActiveEffectsSystem): void { this._activeEffectsSystem = s; }
   public setJailSystem(s: JailSystem): void                { this._jailSystem = s; }
 
+  // ── v13 system injection ──────────────────────────────────────────────────
+
+  public setSpellMakingSystem(s: SpellMakingSystem): void       { this._spellMakingSystem = s; }
+  public setRespawnSystem(s: RespawnSystem): void               { this._respawnSystem = s; }
+  public setMerchantRestockSystem(s: MerchantRestockSystem): void { this._merchantRestockSystem = s; }
+
 
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
@@ -299,6 +321,9 @@ export class SaveSystem {
     if (this._fameSystem)             data.fame             = this._fameSystem.getSaveState();
     if (this._activeEffectsSystem)    data.activeEffects    = this._activeEffectsSystem.getSaveState();
     if (this._jailSystem)             data.jail             = this._jailSystem.getSaveState();
+    if (this._spellMakingSystem)      data.spellMaking      = this._spellMakingSystem.getSaveState();
+    if (this._respawnSystem)          data.respawn          = this._respawnSystem.getSaveState();
+    if (this._merchantRestockSystem)  data.merchantRestock  = this._merchantRestockSystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -460,6 +485,13 @@ export class SaveSystem {
       this._activeEffectsSystem.restoreFromSave(data.activeEffects as any);
     if (this._jailSystem && data.jail)
       this._jailSystem.restoreFromSave(data.jail as any);
+    // v13 systems
+    if (this._spellMakingSystem && data.spellMaking)
+      this._spellMakingSystem.restoreFromSave(data.spellMaking as any);
+    if (this._respawnSystem && data.respawn)
+      this._respawnSystem.restoreFromSave(data.respawn as any);
+    if (this._merchantRestockSystem && data.merchantRestock)
+      this._merchantRestockSystem.restoreFromSave(data.merchantRestock as any);
 
     // Restore encumbrance stats
     if (typeof data.player.maxCarryWeight === "number") {
@@ -623,6 +655,9 @@ export class SaveSystem {
       fame: data.fame,
       activeEffects: data.activeEffects,
       jail: data.jail,
+      spellMaking: data.spellMaking,
+      respawn: data.respawn,
+      merchantRestock: data.merchantRestock,
     };
   }
 

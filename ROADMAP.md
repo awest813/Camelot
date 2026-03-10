@@ -61,6 +61,9 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ **FameSystem** — Oblivion-style fame and infamy tracking (0–1000 each); fame gained from quest completions, infamy from crimes; `dispositionModifier` in [−20, +20] affects NPC reactions and future persuasion/barter; tier labels (Unknown → Legendary Hero / Clean → Most Wanted); H key shows current reputation; `onFameChange` callback wired to EventBus; save-state persistence (SAVE_VERSION 12).
 - ✅ **ActiveEffectsSystem** — Tracks all time-limited effects from spells, potions, and enchantments; 12 effect types (health/magicka/stamina restore, fortify stats, resist damage, fire/frost/shock DoT, silence, burden); `update(dt, player)` applies per-second tick and expires finished effects; `onEffectExpired` fires worn-off notifications; infinite-duration enchantment auras supported; H key shows active effect names; save-state persistence (SAVE_VERSION 12).
 - ✅ **JailSystem** — Completes the crime loop: when a guard challenges a player who cannot pay the bounty, `serveJailTime()` converts gold bounty into in-game hours (1 h per 10 g, cap 72 h), advances the clock via TimeSystem, penalises skill levels via SkillProgressionSystem (Blade/Marksman/Sneak/Alchemy/Speechcraft/Destruction/Restoration), and clears all bounties; jail records persisted (SAVE_VERSION 12).
+- ✅ **SpellMakingSystem** — Oblivion-style Altar of Spellmaking: combine 1–2 effect components (damage/heal/restore/silence/burden) from any school to forge a named custom spell; gold cost scales with magnitude and duration (MIN 50 g → MAX 2000 g); forged spell is registered into SpellSystem and learned immediately; `onSpellForged` callback awards Destruction XP; X key triggers a demo forge; duplicate-name guard and insufficient-gold guard; save-state persistence (SAVE_VERSION 13).
+- ✅ **RespawnSystem** — Oblivion-style encounter zone respawning: register zones with a configurable game-hour window (default 72 h = 3 in-game days); `markCleared(zoneId, gameTime)` starts the countdown; `update(gameTime)` fires `onZoneRespawn` when the window elapses and resets the pending flag; multiple zones tracked simultaneously; save-state persistence (SAVE_VERSION 13).
+- ✅ **MerchantRestockSystem** — Timed merchant inventory and gold restocking: register merchant templates (inventory + gold snapshot); `update(gameTime, barterSystem)` resets the live BarterSystem merchant record when the interval elapses (default 72 h); advances the next-restock deadline across multiple elapsed cycles; `onRestock` callback fires a UI notification; save-state persistence (SAVE_VERSION 13).
 
 ### World + Content
 
@@ -71,7 +74,7 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 ### UX + Persistence
 
 - ✅ HUD, quest log, inventory, skill tree, pause flow.
-- ✅ Save/load (SAVE_VERSION 12) for all system states.
+- ✅ Save/load (SAVE_VERSION 13) for all system states.
 - ✅ Save file export to JSON file download + import from JSON/File (browser-safe).
 - ✅ Notifications, hit feedback, and debug support.
 - ✅ Compass HUD (top-center) showing cardinal direction from camera heading.
@@ -147,6 +150,7 @@ model.
 - ✅ **SAVE_VERSION 6** — Spell and persuasion state persisted; backwards-incompatible saves are rejected cleanly.
 - ✅ **SAVE_VERSION 7** — Alchemy state persisted.
 - ✅ **SAVE_VERSION 8** — Enchanting system (soul gem inventory + enchanting skill) persisted; SAVE_VERSION_MIN = 5 constant fixes forward-compat boundary.
+- ✅ **SAVE_VERSION 13** — SpellMakingSystem, RespawnSystem, and MerchantRestockSystem state persisted.
 
 ### Natural-Feel Systems Overhaul (Decision)
 
