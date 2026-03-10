@@ -728,7 +728,8 @@ export class Game {
 
         // Drop loot from the NPC's loot table
         if (npc.lootTableId) {
-            const drops = this.lootTableSystem.rollTable(npc.lootTableId).items;
+            const lootContext = { playerLevel: this.player.level };
+            const drops = this.lootTableSystem.rollTable(npc.lootTableId, undefined, lootContext).items;
             if (drops.length > 0) {
                 const dropPos = npc.mesh.position.clone();
                 dropPos.y += 0.5;

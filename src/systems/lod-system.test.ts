@@ -163,4 +163,194 @@ describe("LodSystem", () => {
     expect(medium.isVisible).toBe(true);  //  80 < 100
     expect(far.isVisible).toBe(false);    // 150 > 100
   });
+
+  // ── Multi-level LOD ───────────────────────────────────────────────────────
+
+  it("registerLevels() counts all level meshes in entryCount", () => {
+    const hi  = makeMesh(10, 0, 0);
+    const med = makeMesh(10, 0, 0);
+    const lo  = makeMesh(10, 0, 0);
+    lod.registerLevels([
+      { mesh: hi,  maxDistance: 50  },
+      { mesh: med, maxDistance: 100 },
+      { mesh: lo,  maxDistance: 200 },
+    ]);
+    expect(lod.entryCount).toBe(3);
+  });
+
+  it("registerLevels() shows highest-detail mesh when close", () => {
+    const hi  = makeMesh(10, 0, 0);
+    const med = makeMesh(10, 0, 0);
+    const lo  = makeMesh(10, 0, 0);
+    lod.registerLevels([
+      { mesh: hi,  maxDistance: 50  },
+      { mesh: med, maxDistance: 100 },
+      { mesh: lo,  maxDistance: 200 },
+    ]);
+    // Player at origin; meshes at x=10 → distance 10
+    lod.update(PLAYER_ORIGIN);
+    expect(hi.isVisible).toBe(true);   // 10 ≤ 50 → show hi
+    expect(med.isVisible).toBe(false); // hi already chosen
+    expect(lo.isVisible).toBe(false);
+  });
+
+  it("registerLevels() shows medium mesh when mid-range", () => {
+    const hi  = makeMesh(70, 0, 0);
+    const med = makeMesh(70, 0, 0);
+    const lo  = makeMesh(70, 0, 0);
+    lod.registerLevels([
+      { mesh: hi,  maxDistance: 50  },
+      { mesh: med, maxDistance: 100 },
+      { mesh: lo,  maxDistance: 200 },
+    ]);
+    // distance = 70 → beyond hi(50) but within med(100)
+    lod.update(PLAYER_ORIGIN);
+    expect(hi.isVisible).toBe(false);  // 70 > 50
+    expect(med.isVisible).toBe(true);  // 70 ≤ 100
+    expect(lo.isVisible).toBe(false);
+  });
+
+  it("registerLevels() shows lowest mesh when far away", () => {
+    const hi  = makeMesh(150, 0, 0);
+    const med = makeMesh(150, 0, 0);
+    const lo  = makeMesh(150, 0, 0);
+    lod.registerLevels([
+      { mesh: hi,  maxDistance: 50  },
+      { mesh: med, maxDistance: 100 },
+      { mesh: lo,  maxDistance: 200 },
+    ]);
+    // distance = 150 → beyond hi and med, within lo(200)
+    lod.update(PLAYER_ORIGIN);
+    expect(hi.isVisible).toBe(false);
+    expect(med.isVisible).toBe(false);
+    expect(lo.isVisible).toBe(true);   // 150 ≤ 200
+  });
+
+  it("registerLevels() hides all meshes when beyond max LOD distance", () => {
+    const hi  = makeMesh(300, 0, 0);
+    const med = makeMesh(300, 0, 0);
+    const lo  = makeMesh(300, 0, 0);
+    lod.registerLevels([
+      { mesh: hi,  maxDistance: 50  },
+      { mesh: med, maxDistance: 100 },
+      { mesh: lo,  maxDistance: 200 },
+    ]);
+    // distance = 300 → beyond all levels
+    lod.update(PLAYER_ORIGIN);
+    expect(hi.isVisible).toBe(false);
+    expect(med.isVisible).toBe(false);
+    expect(lo.isVisible).toBe(false);
+  });
+
+  it("registerLevels() switches levels as player moves", () => {
+    const hi  = makeMesh(10, 0, 0);
+    const med = makeMesh(10, 0, 0);
+    const lo  = makeMesh(10, 0, 0);
+    lod.registerLevels([
+      { mesh: hi,  maxDistance: 30  },
+      { mesh: med, maxDistance: 80  },
+      { mesh: lo,  maxDistance: 150 },
+    ]);
+
+    // Close — hi visible
+    lod.update(new Vector3(0, 0, 0));
+    expect(hi.isVisible).toBe(true);
+    expect(med.isVisible).toBe(false);
+    expect(lo.isVisible).toBe(false);
+
+    // Move player back to x=-50 → distance 60 → med visible
+    lod.update(new Vector3(-50, 0, 0));
+    expect(hi.isVisible).toBe(false);
+    expect(med.isVisible).toBe(true);
+    expect(lo.isVisible).toBe(false);
+
+    // Move further → x=-130 → distance 140 → lo visible
+    lod.update(new Vector3(-130, 0, 0));
+    expect(hi.isVisible).toBe(false);
+    expect(med.isVisible).toBe(false);
+    expect(lo.isVisible).toBe(true);
+
+    // Move very far → x=-200 → distance 210 → all hidden
+    lod.update(new Vector3(-200, 0, 0));
+    expect(hi.isVisible).toBe(false);
+    expect(med.isVisible).toBe(false);
+    expect(lo.isVisible).toBe(false);
+  });
+
+  it("unregisterLevels() restores visibility and removes the group", () => {
+    const hi  = makeMesh(200, 0, 0);
+    const lo  = makeMesh(200, 0, 0);
+    lod.registerLevels([
+      { mesh: hi, maxDistance: 50  },
+      { mesh: lo, maxDistance: 150 },
+    ]);
+    lod.update(PLAYER_ORIGIN); // both culled at distance 200
+
+    lod.unregisterLevels(hi);
+    expect(lod.entryCount).toBe(0);
+    expect(hi.isVisible).toBe(true);
+    expect(lo.isVisible).toBe(true);
+  });
+
+  it("unregisterLevels() is safe for unknown mesh", () => {
+    const mesh = makeMesh(0, 0, 0);
+    expect(() => lod.unregisterLevels(mesh)).not.toThrow();
+  });
+
+  it("clear() removes level groups and restores their visibility", () => {
+    const hi = makeMesh(300, 0, 0);
+    const lo = makeMesh(300, 0, 0);
+    lod.registerLevels([
+      { mesh: hi, maxDistance: 50  },
+      { mesh: lo, maxDistance: 150 },
+    ]);
+    lod.update(PLAYER_ORIGIN); // all hidden
+    expect(hi.isVisible).toBe(false);
+    expect(lo.isVisible).toBe(false);
+
+    lod.clear();
+    expect(lod.entryCount).toBe(0);
+    expect(hi.isVisible).toBe(true);
+    expect(lo.isVisible).toBe(true);
+  });
+
+  it("registerLevels() prunes disposed mesh levels on update", () => {
+    const hi  = makeMesh(10, 0, 0);
+    const med = makeMesh(10, 0, 0);
+    lod.registerLevels([
+      { mesh: hi,  maxDistance: 50  },
+      { mesh: med, maxDistance: 100 },
+    ]);
+    hi.dispose();
+    med.dispose();
+
+    expect(() => lod.update(PLAYER_ORIGIN)).not.toThrow();
+    expect(lod.entryCount).toBe(0);
+  });
+
+  it("registerLevels() ignores duplicate group registration", () => {
+    const hi  = makeMesh(10, 0, 0);
+    const med = makeMesh(10, 0, 0);
+    const levels = [
+      { mesh: hi,  maxDistance: 50  },
+      { mesh: med, maxDistance: 100 },
+    ];
+    lod.registerLevels(levels);
+    lod.registerLevels(levels); // same first mesh reference
+    expect(lod.entryCount).toBe(2); // not 4
+  });
+
+  it("update() culled count includes hidden level meshes", () => {
+    const hi  = makeMesh(300, 0, 0);
+    const med = makeMesh(300, 0, 0);
+    const lo  = makeMesh(300, 0, 0);
+    lod.registerLevels([
+      { mesh: hi,  maxDistance: 50  },
+      { mesh: med, maxDistance: 100 },
+      { mesh: lo,  maxDistance: 200 },
+    ]);
+    const culled = lod.update(PLAYER_ORIGIN);
+    // All 3 level meshes are beyond their maxDistance → all hidden
+    expect(culled).toBe(3);
+  });
 });
