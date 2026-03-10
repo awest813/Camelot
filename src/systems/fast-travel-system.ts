@@ -134,7 +134,9 @@ export class FastTravelSystem {
       if (
         typeof loc?.id === "string" &&
         typeof loc.name === "string" &&
-        typeof loc.position?.x === "number"
+        typeof loc.position?.x === "number" &&
+        typeof loc.position?.y === "number" &&
+        typeof loc.position?.z === "number"
       ) {
         this._locations.set(loc.id, loc);
       }

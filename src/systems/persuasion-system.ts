@@ -166,12 +166,12 @@ export class PersuasionSystem {
     if (roll <= 0.05) {
       outcome = "critical_success";
       delta   = DELTA_CRIT_SUCCESS;
-    } else if (roll <= chance) {
-      outcome = "success";
-      delta   = DELTA_SUCCESS;
     } else if (roll >= 0.95) {
       outcome = "critical_failure";
       delta   = DELTA_CRIT_FAIL;
+    } else if (roll <= chance) {
+      outcome = "success";
+      delta   = DELTA_SUCCESS;
     } else {
       outcome = "failure";
       delta   = DELTA_FAILURE;

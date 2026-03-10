@@ -144,6 +144,16 @@ describe("PersuasionSystem", () => {
     expect(result.newDisposition).toBe(35);
   });
 
+  it("critical_failure fires even when chance is at maximum (0.95)", () => {
+    // Very high speechcraft + high disposition caps chance at 0.95.
+    // A roll of exactly 0.95 must still be treated as critical_failure,
+    // not shadowed by the success branch.
+    ps.setDisposition("npc", 100);
+    const result = ps.attemptPersuade("npc", 200, 0.95);
+    expect(result.outcome).toBe("critical_failure");
+    expect(result.dispositionDelta).toBe(-15);
+  });
+
   it("higher speechcraft increases success chance (capped at 0.95)", () => {
     ps.setDisposition("npc", 50);
     // skill 100 → chance = 0.5 + (100-50)*0.005 = 0.75
