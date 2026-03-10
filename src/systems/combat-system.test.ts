@@ -764,4 +764,254 @@ describe('CombatSystem', () => {
         expect(dealt).toBe(expectedDamage);
     });
 
+    // ─── Oblivion-style: hit chance (blade skill below 50) ──────────────────
+
+    it('melee attack misses when hit-chance roll fails at low blade skill', () => {
+        const attrs = new AttributeSystem({ agility: 40 });
+        const skills = new SkillProgressionSystem();
+        skills.setSkillLevel("blade", 0); // ~55% hit chance
+
+        const npc = {
+            ...mockNpcs[0],
+            mesh: { ...mockNpcs[0].mesh, position: new Vector3(0, 0, 2) },
+            takeDamage: vi.fn(),
+            isDead: false,
+            damageResistances: {},
+            damageWeaknesses: {},
+            armorRating: 0,
+        };
+
+        const lowSkillCombat = new CombatSystem(
+            mockScene, mockPlayer, [npc as any], mockUI,
+            undefined, { skillSystem: skills, attributeSystem: attrs }
+        );
+
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: npc.mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+        mockPlayer.stamina = 100;
+        mockPlayer.maxStamina = 100;
+
+        // Force a miss: Math.random() returns 0.99, which is >= hitChance (~0.55)
+        vi.spyOn(Math, 'random').mockReturnValue(0.99);
+
+        const ok = lowSkillCombat.meleeAttack();
+        expect(ok).toBe(true);                // attack was attempted (stamina/cooldown consumed)
+        expect(npc.takeDamage).not.toHaveBeenCalled(); // but the swing missed
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Miss!', 600);
+
+        vi.restoreAllMocks();
+    });
+
+    it('melee attack always hits at blade skill >= 50 regardless of random roll', () => {
+        const attrs = new AttributeSystem({ agility: 40 });
+        const skills = new SkillProgressionSystem();
+        skills.setSkillLevel("blade", 50); // hit chance = 1.0
+
+        const npc = {
+            ...mockNpcs[0],
+            mesh: { ...mockNpcs[0].mesh, position: new Vector3(0, 0, 2) },
+            takeDamage: vi.fn(),
+            isDead: false,
+            damageResistances: {},
+            damageWeaknesses: {},
+            armorRating: 0,
+        };
+
+        const skilledCombat = new CombatSystem(
+            mockScene, mockPlayer, [npc as any], mockUI,
+            undefined, { skillSystem: skills, attributeSystem: attrs }
+        );
+
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: npc.mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+        mockPlayer.stamina = 200;
+        mockPlayer.maxStamina = 200;
+
+        // Even with a high random value, at blade 50 hit chance is 1.0 (never misses)
+        vi.spyOn(Math, 'random').mockReturnValue(0.99);
+
+        expect(skilledCombat.meleeAttack()).toBe(true);
+        expect(npc.takeDamage).toHaveBeenCalled();
+
+        vi.restoreAllMocks();
+    });
+
+    it('hit chance falls back to 1.0 when no systems are attached', () => {
+        // Default combatSystem has no skill/attribute system → always hits
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        vi.spyOn(Math, 'random').mockReturnValue(0.99);
+
+        const ok = combatSystem.meleeAttack();
+        expect(ok).toBe(true);
+        expect(mockNpcs[0].takeDamage).toHaveBeenCalled(); // no miss without systems
+
+        vi.restoreAllMocks();
+    });
+
+    // ─── Oblivion-style: block skill scales block effectiveness ─────────────
+
+    it('block damage reduction scales up with block skill', () => {
+        const skills = new SkillProgressionSystem();
+        skills.setSkillLevel("block", 100); // max block skill → BLOCK_SKILL_REDUCTION_MAX = 0.8
+
+        const skilledBlock = new CombatSystem(
+            mockScene, mockPlayer, [mockNpcs[0] as any], mockUI,
+            undefined, { skillSystem: skills }
+        );
+
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 10;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+
+        skilledBlock.beginBlock();
+        skilledBlock.updateNPCAI(0.016);
+        skilledBlock.updateNPCAI(0.25);
+
+        // With 80% block reduction: round(10 * (1 - 0.80)) = round(2.0) = 2 damage
+        expect(mockPlayer.health).toBe(98);
+    });
+
+    it('block stamina cost is reduced at high block skill', () => {
+        const skills = new SkillProgressionSystem();
+        skills.setSkillLevel("block", 100); // min cost = 4
+
+        const skilledBlock = new CombatSystem(
+            mockScene, mockPlayer, [mockNpcs[0] as any], mockUI,
+            undefined, { skillSystem: skills }
+        );
+
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 10;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+        mockPlayer.stamina = 100;
+
+        skilledBlock.beginBlock();
+        skilledBlock.updateNPCAI(0.016);
+        skilledBlock.updateNPCAI(0.25);
+
+        // Block skill 100 → stamina cost = 4 → 100 - 4 = 96
+        expect(mockPlayer.stamina).toBe(96);
+    });
+
+    it('onBlockSuccess callback fires when a hit is successfully blocked', () => {
+        const onBlockSuccess = vi.fn();
+        combatSystem.onBlockSuccess = onBlockSuccess;
+
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 10;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+
+        combatSystem.beginBlock();
+        combatSystem.updateNPCAI(0.016);
+        combatSystem.updateNPCAI(0.25);
+
+        expect(onBlockSuccess).toHaveBeenCalledOnce();
+    });
+
+    it('onBlockSuccess does not fire when hit lands without blocking', () => {
+        const onBlockSuccess = vi.fn();
+        combatSystem.onBlockSuccess = onBlockSuccess;
+
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 10;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+
+        // Do NOT call beginBlock
+        combatSystem.updateNPCAI(0.016);
+        combatSystem.updateNPCAI(0.25);
+
+        expect(onBlockSuccess).not.toHaveBeenCalled();
+    });
+
+    // ─── Oblivion-style: NPC armor rating ──────────────────────────────────
+
+    it('NPC armor rating reduces player physical melee damage', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        mockNpcs[0].damageResistances = {};
+        mockNpcs[0].damageWeaknesses = {};
+        mockNpcs[0].armorRating = 100; // 50% physical reduction: 100/(100+100)
+
+        combatSystem.meleeAttack();
+
+        // round(10 * 100/200) = round(5) = 5
+        expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(5);
+    });
+
+    it('NPC armor rating does not affect magic (fire) damage', () => {
+        mockNpcs[0].damageResistances = {};
+        mockNpcs[0].damageWeaknesses = {};
+        mockNpcs[0].armorRating = 100;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 0.5); // inside projectile hit range
+
+        combatSystem.magicAttack();
+
+        const addedObserver = mockScene.onBeforeRenderObservable.add.mock.calls[0][0];
+        mockScene.getEngine.mockReturnValue({ getDeltaTime: () => 16.6 });
+        addedObserver();
+        addedObserver();
+
+        // Magic damage is NOT reduced by armor rating; base MAGIC_DAMAGE = 20
+        expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(20);
+    });
+
+    it('NPC with zero armor rating takes full physical damage', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        mockNpcs[0].damageResistances = {};
+        mockNpcs[0].damageWeaknesses = {};
+        mockNpcs[0].armorRating = 0;
+
+        combatSystem.meleeAttack();
+
+        // AR 0 → no reduction → base 10 damage
+        expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(10);
+    });
+
+    // ─── Oblivion-style: player armor rating (bonusArmor) ──────────────────
+
+    it('player bonusArmor provides armor-rating-style reduction against NPC attacks', () => {
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 10;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+
+        // Set player armor — acts as AR 100 (50 % reduction)
+        mockPlayer.bonusArmor = 100;
+
+        combatSystem.updateNPCAI(0.016);
+        combatSystem.updateNPCAI(0.25);
+
+        // round(10 * 100/(100+100)) = round(5) = 5  → player takes 5 damage
+        expect(mockPlayer.health).toBe(95);
+    });
+
 });

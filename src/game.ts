@@ -752,6 +752,9 @@ export class Game {
         }
     };
     this.combatSystem.onPlayerHit = () => this.audioSystem.playPlayerHit();
+    this.combatSystem.onBlockSuccess = () => {
+        this.skillProgressionSystem.gainXP("block", 5 * this.classSystem.xpMultiplierFor("block"));
+    };
     this.interactionSystem.onLootPickup = (id) => {
         this.questSystem.onPickup(id);
         this._applyFrameworkQuestEvent("pickup", id);
@@ -791,21 +794,21 @@ export class Game {
     new Loot(this.scene, new Vector3(6, 1, 7), {
         id: "leather_chest_01",
         name: "Leather Chest",
-        description: "Light armor. +3 Armor.",
+        description: "Light armor. +15 Armor Rating.",
         stackable: false,
         quantity: 1,
         slot: "chest",
-        stats: { armor: 3 }
+        stats: { armor: 15 }
     });
 
     new Loot(this.scene, new Vector3(8, 1, 7), {
         id: "iron_helm_01",
         name: "Iron Helm",
-        description: "A sturdy iron helmet. +2 Armor.",
+        description: "A sturdy iron helmet. +12 Armor Rating.",
         stackable: false,
         quantity: 1,
         slot: "head",
-        stats: { armor: 2 }
+        stats: { armor: 12 }
     });
 
     // Test Quests
