@@ -44,6 +44,7 @@ export type ClassSpecialization = "combat" | "magic" | "stealth";
 /** All seven progression skill ids in a stable order. */
 const ALL_SKILL_IDS: ReadonlyArray<ProgressionSkillId> = [
   "blade",
+  "block",
   "destruction",
   "restoration",
   "marksman",
@@ -117,7 +118,7 @@ export const CHARACTER_CLASSES: ReadonlyArray<CharacterClass> = [
       "Fearless and heavily armoured, Warriors excel in close-quarters combat. " +
       "Their strength and endurance make them difficult to put down.",
     favoredAttributes: ["strength", "endurance"],
-    majorSkills: ["blade", "marksman", "sneak"],
+    majorSkills: ["blade", "block", "marksman"],
   },
   {
     id: "knight",
@@ -127,7 +128,7 @@ export const CHARACTER_CLASSES: ReadonlyArray<CharacterClass> = [
       "Knights are warriors bound by a chivalric code. They balance swordsmanship " +
       "with persuasion and a touch of restoration magic.",
     favoredAttributes: ["strength", "endurance"],
-    majorSkills: ["blade", "restoration", "speechcraft"],
+    majorSkills: ["blade", "block", "restoration", "speechcraft"],
   },
   {
     id: "barbarian",
@@ -222,7 +223,7 @@ export const CHARACTER_CLASSES: ReadonlyArray<CharacterClass> = [
  * the original groupings.
  */
 const SPECIALIZATION_SKILLS: Record<ClassSpecialization, ReadonlySet<ProgressionSkillId>> = {
-  combat:  new Set(["blade", "marksman", "sneak"]),
+  combat:  new Set(["blade", "block", "marksman"]),
   magic:   new Set(["destruction", "restoration", "alchemy"]),
   stealth: new Set(["sneak", "speechcraft", "marksman"]),
 };

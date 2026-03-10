@@ -50,6 +50,7 @@ function levelToMultiplier(level: number): number {
 
 export type ProgressionSkillId =
   | "blade"
+  | "block"
   | "destruction"
   | "restoration"
   | "marksman"
@@ -89,6 +90,7 @@ export class SkillProgressionSystem {
     this._skills = new Map<ProgressionSkillId, ProgressionSkill>();
     const definitions: Array<{ id: ProgressionSkillId; name: string }> = [
       { id: "blade",       name: "Blade" },
+      { id: "block",       name: "Block" },
       { id: "destruction", name: "Destruction" },
       { id: "restoration", name: "Restoration" },
       { id: "marksman",    name: "Marksman" },

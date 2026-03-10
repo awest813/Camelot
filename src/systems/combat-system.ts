@@ -17,28 +17,46 @@ const MAGIC_DAMAGE = 20;
 
 // ─── Oblivion-style combat constants ──────────────────────────────────────────
 
-/** Fraction of incoming NPC damage absorbed when the player is blocking. */
+/** Fraction of incoming NPC damage absorbed when the player is blocking (no block skill). */
 const BLOCK_DAMAGE_REDUCTION = 0.5;
-/** Stamina cost deducted from the player per successfully blocked hit. */
+/** Block damage reduction fraction at block skill 0 (matches BLOCK_DAMAGE_REDUCTION for backward compat). */
+const BLOCK_SKILL_REDUCTION_BASE = 0.5;
+/** Maximum block damage reduction fraction (at block skill 100). */
+const BLOCK_SKILL_REDUCTION_MAX = 0.8;
+/** Stamina cost deducted from the player per successfully blocked hit (no block skill). */
 const BLOCK_STAMINA_COST_PER_HIT = 12;
+/** Minimum block stamina cost per hit (at block skill 100). */
+const BLOCK_STAMINA_COST_MIN = 4;
 /** Damage multiplier applied on a critical hit. */
 const CRIT_DAMAGE_MULTIPLIER = 2.0;
 /** Stamina cost of a power attack is the normal melee cost × this factor. */
 const POWER_ATTACK_STAMINA_MULTIPLIER = 2.5;
 /** Raw damage multiplier for a power attack on top of normal melee scaling. */
 const POWER_ATTACK_DAMAGE_MULTIPLIER = 2.2;
-/** Duration in seconds that an NPC is staggered after being hit by a power attack. */
+/** Duration in seconds that an NPC is staggered after being hit by a player power attack. */
 const POWER_ATTACK_STAGGER_DURATION = 0.6;
 /**
  * Minimum fatigue (stamina) multiplier applied to damage output.
  * At 0 % stamina the player still deals at least this fraction of normal damage.
  */
 const FATIGUE_DAMAGE_MIN_FACTOR = 0.5;
+/**
+ * Base hit-chance at blade skill 0 (55 %).  Linearly increases to 100 % at skill 50,
+ * capped at HIT_CHANCE_MAX above that.  Only applied when both skill and attribute
+ * systems are attached (preserves backward-compatible behaviour in tests / bare combats).
+ */
+const HIT_CHANCE_BASE = 0.55;
+/** Hard floor so that a very-low-agility, exhausted player still connects sometimes. */
+const HIT_CHANCE_MIN = 0.25;
 
 /**
- * Applies NPC-specific resistance and weakness modifiers to a raw damage amount.
+ * Applies NPC-specific resistance, weakness, and armor rating to a raw damage amount.
  *
- * Final damage = baseDamage × max(0, 1 − resistance + weakness)
+ * Resistance/weakness pass:
+ *   damage = baseDamage × max(0, 1 − resistance + weakness)
+ *
+ * Armor rating pass (physical damage only — Oblivion-style):
+ *   damage = damage × 100 / (100 + armorRating)
  *
  * Resistance values are clamped to [0, 1] so that full immunity is the maximum.
  * A missing entry defaults to 0 (no modification).
@@ -50,7 +68,14 @@ const FATIGUE_DAMAGE_MIN_FACTOR = 0.5;
 function applyDamageWithResistance(baseDamage: number, npc: NPC, type: DamageType): number {
   const resistance = Math.min(1, Math.max(0, npc.damageResistances?.[type] ?? 0));
   const weakness = Math.max(0, npc.damageWeaknesses?.[type] ?? 0);
-  return Math.max(1, Math.round(baseDamage * (1 - resistance + weakness)));
+  let damage = baseDamage * (1 - resistance + weakness);
+
+  // Oblivion-style armor rating: higher AR means proportionally less physical damage.
+  if (type === "physical" && npc.armorRating > 0) {
+    damage *= 100 / (100 + npc.armorRating);
+  }
+
+  return Math.max(1, Math.round(damage));
 }
 
 export type MeleeArchetype = "duelist" | "soldier" | "bruiser";
@@ -169,6 +194,9 @@ export class CombatSystem {
   /** Fired whenever the player takes damage from an NPC. */
   public onPlayerHit: (() => void) | null = null;
 
+  /** Fired whenever the player successfully blocks an NPC attack. */
+  public onBlockSuccess: (() => void) | null = null;
+
   constructor(
     scene: Scene,
     player: Player,
@@ -262,6 +290,14 @@ export class CombatSystem {
     this._meleeCooldownRemaining = this._scaledMeleeCooldown(meleeProfile.cooldown);
     (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
       .notifyResourceSpent?.("stamina");
+
+    // Oblivion-style hit chance: low blade skill / agility / fatigue can cause a miss.
+    // Only active when skill and attribute systems are wired up (backward-compatible).
+    const hitChance = this._hitChance();
+    if (hitChance < 1.0 && Math.random() >= hitChance) {
+      this._ui.showNotification("Miss!", 600);
+      return true;
+    }
 
     const hit = this.player.raycastForward(3);
     if (hit && hit.pickedMesh) {
@@ -844,6 +880,10 @@ export class CombatSystem {
     return this._skillSystem?.multiplier("blade") ?? 1;
   }
 
+  private _blockSkillMultiplier(): number {
+    return this._skillSystem?.multiplier("block") ?? 1;
+  }
+
   private _destructionMultiplier(): number {
     return this._skillSystem?.multiplier("destruction") ?? 1;
   }
@@ -854,6 +894,57 @@ export class CombatSystem {
 
   private _magicBonus(): number {
     return this._attributeSystem?.magicDamageBonus ?? 0;
+  }
+
+  /**
+   * Block damage reduction fraction scaled by the player's block skill.
+   * When no skill system is attached the base value equals BLOCK_DAMAGE_REDUCTION (0.5),
+   * preserving backward-compatible behaviour.
+   *
+   * At block skill 0   → BLOCK_SKILL_REDUCTION_BASE (0.5)
+   * At block skill 100 → BLOCK_SKILL_REDUCTION_MAX (0.8)
+   */
+  private _blockDamageReduction(): number {
+    const mult = this._blockSkillMultiplier(); // 1.0 at skill 0, 2.0 at skill 100
+    const t = Math.min(1, mult - 1.0);
+    return BLOCK_SKILL_REDUCTION_BASE + t * (BLOCK_SKILL_REDUCTION_MAX - BLOCK_SKILL_REDUCTION_BASE);
+  }
+
+  /**
+   * Stamina cost per blocked hit, scaled down by block skill.
+   * When no skill system is attached the cost equals BLOCK_STAMINA_COST_PER_HIT (12).
+   *
+   * At block skill 0   → BLOCK_STAMINA_COST_PER_HIT (12)
+   * At block skill 100 → BLOCK_STAMINA_COST_MIN (4)
+   */
+  private _blockStaminaCost(): number {
+    const mult = this._blockSkillMultiplier();
+    const t = Math.min(1, mult - 1.0);
+    return Math.max(BLOCK_STAMINA_COST_MIN, Math.round(BLOCK_STAMINA_COST_PER_HIT - t * (BLOCK_STAMINA_COST_PER_HIT - BLOCK_STAMINA_COST_MIN)));
+  }
+
+  /**
+   * Oblivion-style hit-chance for the player's melee swing.
+   *
+   * Returns 1.0 (guaranteed hit) when:
+   *   - No skill or attribute systems are wired (backward-compatible default), OR
+   *   - Blade skill is ≥ 50 (experienced fighters rarely miss).
+   *
+   * Below blade skill 50 the chance scales linearly from HIT_CHANCE_BASE (55 %) at
+   * skill 0 up to 100 % at skill 50, further adjusted by the player's agility
+   * attribute and fatigue.
+   */
+  private _hitChance(): number {
+    if (!this._skillSystem || !this._attributeSystem) return 1.0;
+    const bladeLevel = this._skillSystem.getSkill("blade")?.level ?? 0;
+    if (bladeLevel >= 50) return 1.0;
+
+    const agility = this._attributeSystem.get("agility");
+    const fatigue = this._fatigueFactor();
+    // Linear interpolation: HIT_CHANCE_BASE at skill 0, 1.0 at skill 50.
+    const baseChance = HIT_CHANCE_BASE + (bladeLevel / 50) * (1 - HIT_CHANCE_BASE);
+    const agilityMod = (agility - 40) * 0.002;
+    return Math.max(HIT_CHANCE_MIN, Math.min(1.0, (baseChance + agilityMod) * fatigue));
   }
 
   private _meleeCadenceMultiplier(): number {
@@ -909,19 +1000,22 @@ export class CombatSystem {
       return;
     }
 
-    let dmg = Math.max(1, npc.attackDamage - this.player.bonusArmor);
+    // Oblivion-style armor rating: player's bonusArmor acts as an armor rating value.
+    // Formula: damage × 100 / (100 + armorRating) — provides diminishing-return protection.
+    const playerAR = Math.max(0, this.player.bonusArmor);
+    let dmg = Math.max(1, Math.round(npc.attackDamage * 100 / (100 + playerAR)));
 
     if (this._isBlocking) {
-      // Oblivion-style block: absorb half the damage, cost some stamina.
-      dmg = Math.max(1, Math.round(dmg * (1 - BLOCK_DAMAGE_REDUCTION)));
-      this.player.stamina = Math.max(
-        0,
-        this.player.stamina - BLOCK_STAMINA_COST_PER_HIT
-      );
+      // Oblivion-style block: scale damage reduction with block skill.
+      const blockReduction = this._blockDamageReduction();
+      const blockCost = this._blockStaminaCost();
+      dmg = Math.max(1, Math.round(dmg * (1 - blockReduction)));
+      this.player.stamina = Math.max(0, this.player.stamina - blockCost);
       (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
         .notifyResourceSpent?.("stamina");
       this._ui.showNotification(`Blocked! ${dmg} damage taken.`, 1500);
       this._ui.showHitFlash("rgba(80, 120, 200, 0.35)");
+      if (this.onBlockSuccess) this.onBlockSuccess();
       if (this.player.stamina <= 0) {
         this._isBlocking = false;
         this._ui.showNotification("Block broken!", 1200);

@@ -246,6 +246,16 @@ export class NPC {
    */
   public damageWeaknesses: Partial<Record<DamageType, number>> = {};
 
+  /**
+   * Oblivion-style armor rating. Reduces incoming physical damage multiplicatively.
+   * Formula: `damage × 100 / (100 + armorRating)`
+   * - AR 0   → no reduction (default)
+   * - AR 100 → 50 % reduction
+   * - AR 200 → 33 % reduction
+   * Does not affect magical damage types (fire, frost, shock).
+   */
+  public armorRating: number = 0;
+
   // ─── Visuals ────────────────────────────────────────────────────────────────
 
   /** Current "resting" diffuse colour — restored after a hit-flash. */
