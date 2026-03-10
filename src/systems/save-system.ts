@@ -30,9 +30,10 @@ import type { RespawnSystem } from "./respawn-system";
 import type { MerchantRestockSystem } from "./merchant-restock-system";
 import type { BirthsignSystem } from "./birthsign-system";
 import type { ClassSystem } from "./class-system";
+import type { RaceSystem } from "./race-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 14;
+const SAVE_VERSION = 15;
 /** Oldest save version that can still be loaded (forward-compat window). */
 const SAVE_VERSION_MIN = 5;
 
@@ -46,6 +47,8 @@ interface PlayerSaveData {
   experienceToNextLevel: number;
   carryWeight?: number;
   maxCarryWeight?: number;
+  /** Player character name (added in v15). */
+  name?: string;
 }
 
 interface ParsedSaveData {
@@ -85,6 +88,8 @@ interface ParsedSaveData {
   // v14 additions
   birthsign?: unknown;
   characterClass?: unknown;
+  // v15 additions
+  race?: unknown;
 }
 
 interface EquipmentEntry {
@@ -135,6 +140,8 @@ export interface SaveData {
   // v14 additions
   birthsign?: any;
   characterClass?: any;
+  // v15 additions
+  race?: any;
 }
 
 export class SaveSystem {
@@ -189,6 +196,9 @@ export class SaveSystem {
   // v14 optional systems
   private _birthsignSystem: BirthsignSystem | null = null;
   private _classSystem: ClassSystem | null = null;
+
+  // v15 optional systems
+  private _raceSystem: RaceSystem | null = null;
 
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
@@ -272,6 +282,10 @@ export class SaveSystem {
   public setBirthsignSystem(s: BirthsignSystem): void           { this._birthsignSystem = s; }
   public setClassSystem(s: ClassSystem): void                   { this._classSystem = s; }
 
+  // ── v15 system injection ──────────────────────────────────────────────────
+
+  public setRaceSystem(s: RaceSystem): void                     { this._raceSystem = s; }
+
 
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
@@ -309,6 +323,7 @@ export class SaveSystem {
         experienceToNextLevel: this._player.experienceToNextLevel,
         carryWeight: this._player.carryWeight,
         maxCarryWeight: this._player.maxCarryWeight,
+        name: this._player.name,
       },
       inventory: [...this._inventory.items],
       equipment: equipmentEntries,
@@ -343,6 +358,7 @@ export class SaveSystem {
     if (this._merchantRestockSystem)  data.merchantRestock  = this._merchantRestockSystem.getSaveState();
     if (this._birthsignSystem)        data.birthsign        = this._birthsignSystem.getSaveState();
     if (this._classSystem)            data.characterClass   = this._classSystem.getSaveState();
+    if (this._raceSystem)             data.race             = this._raceSystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -516,6 +532,14 @@ export class SaveSystem {
       this._birthsignSystem.restoreFromSave(data.birthsign as any);
     if (this._classSystem && data.characterClass)
       this._classSystem.restoreFromSave(data.characterClass as any);
+    // v15 systems
+    if (this._raceSystem && data.race)
+      this._raceSystem.restoreFromSave(data.race as any);
+
+    // Restore player name (v15+; keep default "Hero" for older saves)
+    if (typeof data.player.name === "string" && data.player.name.trim()) {
+      this._player.name = data.player.name;
+    }
 
     // Restore encumbrance stats
     if (typeof data.player.maxCarryWeight === "number") {

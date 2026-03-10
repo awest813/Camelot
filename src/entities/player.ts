@@ -12,6 +12,9 @@ export class Player {
   private canvas: HTMLCanvasElement;
   private physicsAggregate: PhysicsAggregate;
 
+  /** The player character's name as entered at character creation. */
+  public name: string = "Hero";
+
   // Stats
   public health: number;
   public maxHealth: number = 100;
