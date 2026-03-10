@@ -211,7 +211,7 @@ export class CombatSystem {
    */
   public beginBlock(): void {
     this._isBlocking = true;
-    this._ui.showNotification("Blocking…", 600);
+    this._ui.showNotification("Blocking...", 600);
   }
 
   /**
