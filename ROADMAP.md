@@ -110,7 +110,7 @@ model.
 - 🧭 Dockable editor layout (Scene/Hierarchy/Inspector/Validation panes).
 - 🧭 Unified selection model shared by map entities, quest nodes, and dialogue nodes.
 - 🧭 Undo/redo history with grouped actions for transform + property edits.
-- 🧭 Context-aware hotkey/help overlay so editor workflows are discoverable in-app.
+- ✅ Context-aware hotkey/help overlay so editor workflows are discoverable in-app (F1 toggles gameplay/editor key cheat sheet).
 
 #### Release B — Content-Specific Editors
 
@@ -137,7 +137,7 @@ model.
 
 - 🧭 Expand framework runtime adapters so demo gameplay systems consume framework state as source-of-truth.
 - ✅ Add richer dialogue effect hooks (quest activation, inventory consume/give, conditional branches by faction tiers).
-- 🧭 Add quest authoring utilities and graph validation diagnostics (dead-end node detection, cycle hints).
+- ✅ Add quest authoring utilities and graph validation diagnostics (dead-end node detection, cycle hints) with in-game validation hotkey (F8).
 - ✅ Harden save migrations with versioned schema (SAVE_VERSION bumped on each structural change).
 - 🧭 Add CLI/dev tooling for mod manifest generation and content schema validation.
 
