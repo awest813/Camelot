@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CombatSystem } from './combat-system';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Ray } from '@babylonjs/core/Culling/ray';
+import { SkillProgressionSystem } from './skill-progression-system';
+import { AttributeSystem } from './attribute-system';
 
 // Mock BabylonJS core features to avoid complex initialization
 vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
@@ -677,6 +679,89 @@ describe('CombatSystem', () => {
 
         expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(10);
         expect(mockUI.showNotification).not.toHaveBeenCalledWith('Critical Hit!', 1000);
+    });
+
+    it('scales melee damage and swing cadence with blade skill and strength', () => {
+        const attrs = new AttributeSystem({ strength: 60 });
+        const skills = new SkillProgressionSystem();
+        skills.setSkillLevel("blade", 50);
+
+        const npc = {
+            ...mockNpcs[0],
+            mesh: { ...mockNpcs[0].mesh, position: new Vector3(0, 0, 2) },
+            takeDamage: vi.fn(),
+            isDead: false,
+            damageResistances: {},
+            damageWeaknesses: {},
+        };
+
+        const skilledCombat = new CombatSystem(
+            mockScene,
+            mockPlayer,
+            [npc as any],
+            mockUI,
+            undefined,
+            { skillSystem: skills, attributeSystem: attrs }
+        );
+
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: npc.mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+        mockPlayer.stamina = 200;
+        mockPlayer.maxStamina = 200;
+
+        expect(skilledCombat.meleeAttack()).toBe(true);
+        const dealt = (npc.takeDamage as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0];
+        expect(dealt).toBe(33);
+
+        // Cooldown is shortened by blade skill, but still enforces cadence.
+        expect(skilledCombat.meleeAttack()).toBe(false);
+        skilledCombat.updateNPCAI(0.34);
+        expect(skilledCombat.meleeAttack()).toBe(false);
+        skilledCombat.updateNPCAI(0.02);
+        expect(skilledCombat.meleeAttack()).toBe(true);
+    });
+
+    it('reduces magicka cost and boosts damage with destruction skill and attributes', () => {
+        const attrs = new AttributeSystem({ intelligence: 60, willpower: 60 });
+        const skills = new SkillProgressionSystem();
+        skills.setSkillLevel("destruction", 60);
+
+        const npc = {
+            ...mockNpcs[0],
+            mesh: { ...mockNpcs[0].mesh, position: new Vector3(0, 0, 2) },
+            takeDamage: vi.fn(),
+            isDead: false,
+            damageResistances: {},
+            damageWeaknesses: {},
+        };
+
+        const destructionCombat = new CombatSystem(
+            mockScene,
+            mockPlayer,
+            [npc as any],
+            mockUI,
+            undefined,
+            { skillSystem: skills, attributeSystem: attrs }
+        );
+
+        mockPlayer.magicka = 100;
+        mockScene.onBeforeRenderObservable.add.mockClear();
+
+        const ok = destructionCombat.magicAttack();
+        expect(ok).toBe(true);
+        const expectedCost = Math.round(20 / (1 + (skills.multiplier("destruction") - 1) * 0.6));
+        expect(mockPlayer.magicka).toBe(100 - expectedCost);
+
+        const addedObserver = mockScene.onBeforeRenderObservable.add.mock.calls[0][0];
+        mockScene.getEngine.mockReturnValue({ getDeltaTime: () => 16.6 });
+        addedObserver();
+        addedObserver();
+
+        const dealt = (npc.takeDamage as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0];
+        const expectedDamage = Math.round((20 + attrs.magicDamageBonus) * skills.multiplier("destruction"));
+        expect(dealt).toBe(expectedDamage);
     });
 
 });

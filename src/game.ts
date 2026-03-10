@@ -438,6 +438,10 @@ export class Game {
       this.saveSystem.markDirty();
     };
     this.saveSystem.setSkillProgressionSystem(this.skillProgressionSystem);
+    this.combatSystem.setScalingSystems({
+      skillSystem: this.skillProgressionSystem,
+      attributeSystem: this.attributeSystem,
+    });
 
     this.fastTravelSystem = new FastTravelSystem();
     // Seed the starting village as a discovered location
