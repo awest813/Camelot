@@ -58,6 +58,8 @@ import { JailSystem } from "./systems/jail-system";
 import { SpellMakingSystem } from "./systems/spell-making-system";
 import { RespawnSystem } from "./systems/respawn-system";
 import { MerchantRestockSystem } from "./systems/merchant-restock-system";
+import { BirthsignSystem } from "./systems/birthsign-system";
+import { ClassSystem } from "./systems/class-system";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -135,6 +137,10 @@ export class Game {
   public spellMakingSystem: SpellMakingSystem;
   public respawnSystem: RespawnSystem;
   public merchantRestockSystem: MerchantRestockSystem;
+
+  // v11 systems (Oblivion depth: character creation — birthsign and class)
+  public birthsignSystem: BirthsignSystem;
+  public classSystem: ClassSystem;
 
   public isPaused: boolean = false;
 
@@ -415,14 +421,14 @@ export class Game {
 
     // Wire skill XP into spell cast and potion craft callbacks
     this.alchemySystem.onPotionCrafted = (_potion) => {
-      this.skillProgressionSystem.gainXP("alchemy", 15);
+      this.skillProgressionSystem.gainXP("alchemy", 15 * this.classSystem.xpMultiplierFor("alchemy"));
     };
     this.spellSystem.onSpellCast = (spell, result) => {
       // Spell school XP
       if (result.damage && result.damage > 0) {
-        this.skillProgressionSystem.gainXP("destruction", 10);
+        this.skillProgressionSystem.gainXP("destruction", 10 * this.classSystem.xpMultiplierFor("destruction"));
       } else if (result.heal && result.heal > 0) {
-        this.skillProgressionSystem.gainXP("restoration", 10);
+        this.skillProgressionSystem.gainXP("restoration", 10 * this.classSystem.xpMultiplierFor("restoration"));
       }
       this.eventBus.emit("spell:cast", { spellId: spell.id, spellName: spell.name, magickaCost: spell.magickaCost });
       if (result.hitNpc && result.damage) {
@@ -453,7 +459,7 @@ export class Game {
     this.spellMakingSystem = new SpellMakingSystem(this.spellSystem);
     this.spellMakingSystem.onSpellForged = (spell, goldCost) => {
       this.ui.showNotification(`Spell forged: "${spell.name}" (${goldCost}g)`, 3000);
-      this.skillProgressionSystem.gainXP("destruction", 20);
+      this.skillProgressionSystem.gainXP("destruction", 20 * this.classSystem.xpMultiplierFor("destruction"));
       this.saveSystem.markDirty();
     };
     this.saveSystem.setSpellMakingSystem(this.spellMakingSystem);
@@ -488,7 +494,54 @@ export class Game {
     };
     this.saveSystem.setMerchantRestockSystem(this.merchantRestockSystem);
 
-    // Quest completion awards fame
+    // ── v11 systems (Oblivion depth: character creation) ────────────────────
+    this.birthsignSystem = new BirthsignSystem();
+    this.birthsignSystem.onBirthsignChosen = (birthsign) => {
+      this.ui.showNotification(
+        `Birthsign chosen: ${birthsign.name}${birthsign.power ? ` — Power: ${birthsign.power.name}` : ""}`,
+        3000,
+      );
+      // Apply any max-stat bonuses from the birthsign
+      const bonuses = this.birthsignSystem.getStatBonuses();
+      this.player.maxHealth  += bonuses.maxHealth;
+      this.player.maxMagicka += bonuses.maxMagicka;
+      this.player.maxStamina += bonuses.maxStamina;
+      this.player.maxCarryWeight += bonuses.carryWeight;
+      this.saveSystem.markDirty();
+    };
+    this.birthsignSystem.onPowerActivated = (power) => {
+      this.ui.showNotification(`${power.name}: ${power.description}`, 3000);
+      this.saveSystem.markDirty();
+    };
+    this.saveSystem.setBirthsignSystem(this.birthsignSystem);
+
+    this.classSystem = new ClassSystem();
+    this.classSystem.onClassChosen = (cls) => {
+      this.ui.showNotification(
+        `Class chosen: ${cls.name} (${cls.specialization}) — Major skills: ${cls.majorSkills.join(", ")}`,
+        4000,
+      );
+      // Sync derived stats now that attributes may have changed
+      this.player.maxHealth      = this.attributeSystem.maxHealth;
+      this.player.maxMagicka     = this.attributeSystem.maxMagicka;
+      this.player.maxStamina     = this.attributeSystem.maxStamina;
+      this.player.maxCarryWeight = this.attributeSystem.carryWeight;
+      this.saveSystem.markDirty();
+    };
+    this.saveSystem.setClassSystem(this.classSystem);
+
+    // Default character creation: warrior birthsign + warrior class
+    // (applied only on fresh start — save/load will restore choices from disk)
+    this.birthsignSystem.chooseBirthsign(
+      "warrior",
+      this.attributeSystem,
+      this.skillProgressionSystem,
+    );
+    this.classSystem.chooseClass(
+      "warrior",
+      this.attributeSystem,
+      this.skillProgressionSystem,
+    );
     this.questSystem.onQuestComplete = (xp) => {
       this.player.addExperience(xp);
       this.fameSystem.addFame(10);
@@ -644,7 +697,7 @@ export class Game {
         this.questSystem.onTalk(name);
         this._applyFrameworkQuestEvent("talk", this._toFrameworkTargetId(name));
         // Speechcraft XP each time dialogue is initiated
-        this.skillProgressionSystem.gainXP("speechcraft", 8);
+        this.skillProgressionSystem.gainXP("speechcraft", 8 * this.classSystem.xpMultiplierFor("speechcraft"));
     };
 
     // Quest XP and fame callbacks are wired in the v9 block above.
@@ -756,7 +809,7 @@ export class Game {
                 if (attacked) {
                   this.audioSystem.playMeleeAttack();
                   // Blade skill XP on every successful swing (hit or miss)
-                  this.skillProgressionSystem.gainXP("blade", 4);
+                  this.skillProgressionSystem.gainXP("blade", 4 * this.classSystem.xpMultiplierFor("blade"));
                 }
             } else if (pointerInfo.event.button === 2) { // Right Click
                 pointerInfo.event.preventDefault();
@@ -874,7 +927,7 @@ export class Game {
                     if (fired) {
                       this.audioSystem.playMeleeAttack(); // reuse existing SFX placeholder
                       // Marksman skill XP on arrow fire
-                      this.skillProgressionSystem.gainXP("marksman", 5);
+                      this.skillProgressionSystem.gainXP("marksman", 5 * this.classSystem.xpMultiplierFor("marksman"));
                     }
                 }
             } else if (kbInfo.event.key === "y" || kbInfo.event.key === "Y") {
@@ -1237,7 +1290,10 @@ export class Game {
       this.stealthSystem.update(deltaTime, this.timeSystem.ambientIntensity);
       // Sneak XP: trickle XP while actively sneaking near NPCs
       if (this.stealthSystem.isCrouching) {
-        this.skillProgressionSystem.gainXP("sneak", deltaTime * SNEAK_XP_PER_SECOND);
+        this.skillProgressionSystem.gainXP(
+          "sneak",
+          deltaTime * SNEAK_XP_PER_SECOND * this.classSystem.xpMultiplierFor("sneak"),
+        );
       }
       this.crimeSystem.update(deltaTime);
       this.projectileSystem.update(deltaTime);

@@ -58,6 +58,8 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 - Equipment slots with stat modifiers.
 - Quest log with objective tracking (Kill / Fetch / Talk).
 - Skill trees (Combat / Magic / Survival) with persistent rank progression.
+- **Birthsign System**: choose one of 13 birthsigns at character creation for permanent attribute/stat bonuses and a once-per-day special power (Mara's Gift, Moonshadow, Lover's Kiss, …).
+- **Class System**: choose a character class (Warrior, Mage, Thief, Battlemage, etc.) that defines two favored attributes, five major skills (1.5× XP, start higher), and five minor skills (1.25× XP).
 
 ### UI + Quality of Life
 
