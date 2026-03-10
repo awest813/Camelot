@@ -9,6 +9,8 @@ import { UIManager } from "../ui/ui-manager";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { NavigationSystem } from "./navigation-system";
+import { SkillProgressionSystem } from "./skill-progression-system";
+import { AttributeSystem } from "./attribute-system";
 
 const MELEE_DAMAGE = 10;
 const MAGIC_DAMAGE = 20;
@@ -136,6 +138,8 @@ export class CombatSystem {
   public npcs: NPC[];
   private _ui: UIManager;
   private _nav: NavigationSystem | null;
+  private _skillSystem: SkillProgressionSystem | null;
+  private _attributeSystem: AttributeSystem | null;
 
   // Scratch vectors — reused every frame to avoid GC pressure
   private _currentVel: Vector3 = new Vector3();
@@ -170,13 +174,28 @@ export class CombatSystem {
     player: Player,
     npcs: NPC[],
     ui: UIManager,
-    nav?: NavigationSystem
+    nav?: NavigationSystem,
+    opts?: {
+      skillSystem?: SkillProgressionSystem | null;
+      attributeSystem?: AttributeSystem | null;
+    }
   ) {
     this.scene = scene;
     this.player = player;
     this.npcs = npcs;
     this._ui = ui;
     this._nav = nav ?? null;
+    this._skillSystem = opts?.skillSystem ?? null;
+    this._attributeSystem = opts?.attributeSystem ?? null;
+  }
+
+  public setScalingSystems(opts: { skillSystem?: SkillProgressionSystem | null; attributeSystem?: AttributeSystem | null }): void {
+    if (opts.skillSystem !== undefined) {
+      this._skillSystem = opts.skillSystem;
+    }
+    if (opts.attributeSystem !== undefined) {
+      this._attributeSystem = opts.attributeSystem;
+    }
   }
 
   public setMeleeArchetype(archetype: MeleeArchetype): void {
@@ -229,7 +248,8 @@ export class CombatSystem {
       return false;
     }
 
-    if (this.player.stamina < meleeProfile.staminaCost) {
+    const staminaCost = this._scaledMeleeStaminaCost(meleeProfile.staminaCost);
+    if (this.player.stamina < staminaCost) {
       this._ui.showNotification("Not enough stamina!");
       return false;
     }
@@ -238,8 +258,8 @@ export class CombatSystem {
     // immediately penalise the swing that drains the last point.
     const fatigueFactor = this._fatigueFactor();
 
-    this.player.stamina -= meleeProfile.staminaCost;
-    this._meleeCooldownRemaining = meleeProfile.cooldown;
+    this.player.stamina -= staminaCost;
+    this._meleeCooldownRemaining = this._scaledMeleeCooldown(meleeProfile.cooldown);
     (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
       .notifyResourceSpent?.("stamina");
 
@@ -255,10 +275,11 @@ export class CombatSystem {
         const rawMeleeDmg = Math.max(
           1,
           Math.round(
-            (MELEE_DAMAGE + this.player.bonusDamage)
+            (MELEE_DAMAGE + this.player.bonusDamage + this._strengthBonus())
             * meleeProfile.damageMultiplier
             * fatigueFactor
             * critMultiplier
+            * this._bladeMultiplier()
           )
         );
         const meleeDmg = applyDamageWithResistance(rawMeleeDmg, npc, "physical");
@@ -311,7 +332,9 @@ export class CombatSystem {
       return false;
     }
 
-    const staminaCost = Math.round(meleeProfile.staminaCost * POWER_ATTACK_STAMINA_MULTIPLIER);
+    const staminaCost = this._scaledMeleeStaminaCost(
+      meleeProfile.staminaCost * POWER_ATTACK_STAMINA_MULTIPLIER
+    );
     if (this.player.stamina < staminaCost) {
       this._ui.showNotification("Not enough stamina for a power attack!");
       return false;
@@ -320,7 +343,7 @@ export class CombatSystem {
     const fatigueFactor = this._fatigueFactor();
 
     this.player.stamina -= staminaCost;
-    this._meleeCooldownRemaining = meleeProfile.cooldown * 1.5; // longer recovery after a power swing
+    this._meleeCooldownRemaining = this._scaledMeleeCooldown(meleeProfile.cooldown * 1.5); // longer recovery after a power swing
     (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
       .notifyResourceSpent?.("stamina");
 
@@ -331,10 +354,11 @@ export class CombatSystem {
         const rawDmg = Math.max(
           1,
           Math.round(
-            (MELEE_DAMAGE + this.player.bonusDamage)
+            (MELEE_DAMAGE + this.player.bonusDamage + this._strengthBonus())
             * meleeProfile.damageMultiplier
             * POWER_ATTACK_DAMAGE_MULTIPLIER
             * fatigueFactor
+            * this._bladeMultiplier()
           )
         );
         const finalDmg = applyDamageWithResistance(rawDmg, npc, "physical");
@@ -379,12 +403,13 @@ export class CombatSystem {
       return false;
     }
 
-    if (this.player.magicka < magicProfile.magickaCost) {
+    const magickaCost = this._scaledMagicCost(magicProfile.magickaCost);
+    if (this.player.magicka < magickaCost) {
       this._ui.showNotification("Not enough magicka!");
       return false;
     }
-    this.player.magicka -= magicProfile.magickaCost;
-    this._magicCooldownRemaining = magicProfile.cooldown;
+    this.player.magicka -= magickaCost;
+    this._magicCooldownRemaining = this._scaledMagicCooldown(magicProfile.cooldown);
     (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
       .notifyResourceSpent?.("magicka");
 
@@ -429,7 +454,11 @@ export class CombatSystem {
         if (Vector3.DistanceSquared(projPos, npc.mesh.position) <= 1.44) {
           const rawMagicDmg = Math.max(
             1,
-            Math.round((MAGIC_DAMAGE + this.player.bonusMagicDamage) * magicProfile.damageMultiplier)
+            Math.round(
+              (MAGIC_DAMAGE + this.player.bonusMagicDamage + this._magicBonus())
+              * magicProfile.damageMultiplier
+              * this._destructionMultiplier()
+            )
           );
           const magicDmg = applyDamageWithResistance(rawMagicDmg, npc, magicDamageType);
           npc.takeDamage(magicDmg);
@@ -811,6 +840,52 @@ export class CombatSystem {
     return Math.max(FATIGUE_DAMAGE_MIN_FACTOR, this.player.stamina / maxStamina);
   }
 
+  private _bladeMultiplier(): number {
+    return this._skillSystem?.multiplier("blade") ?? 1;
+  }
+
+  private _destructionMultiplier(): number {
+    return this._skillSystem?.multiplier("destruction") ?? 1;
+  }
+
+  private _strengthBonus(): number {
+    return this._attributeSystem?.meleeDamageBonus ?? 0;
+  }
+
+  private _magicBonus(): number {
+    return this._attributeSystem?.magicDamageBonus ?? 0;
+  }
+
+  private _meleeCadenceMultiplier(): number {
+    const blade = this._bladeMultiplier();
+    return 1 + (blade - 1) * 0.6;
+  }
+
+  private _magicCadenceMultiplier(): number {
+    const destruction = this._destructionMultiplier();
+    return 1 + (destruction - 1) * 0.6;
+  }
+
+  private _scaledMeleeStaminaCost(baseCost: number): number {
+    const scaled = baseCost / this._meleeCadenceMultiplier();
+    return Math.max(1, Math.round(scaled));
+  }
+
+  private _scaledMeleeCooldown(baseCooldown: number): number {
+    const scaled = baseCooldown / this._meleeCadenceMultiplier();
+    return Math.max(baseCooldown * 0.45, scaled);
+  }
+
+  private _scaledMagicCost(baseCost: number): number {
+    const scaled = baseCost / this._magicCadenceMultiplier();
+    return Math.max(1, Math.round(scaled));
+  }
+
+  private _scaledMagicCooldown(baseCooldown: number): number {
+    const scaled = baseCooldown / this._magicCadenceMultiplier();
+    return Math.max(baseCooldown * 0.5, scaled);
+  }
+
   private _beginAttackTelegraph(npc: NPC): void {
     npc.isAttackTelegraphing = true;
     npc.attackTelegraphTimer = Math.max(0.12, npc.attackWindup);
@@ -847,6 +922,10 @@ export class CombatSystem {
         .notifyResourceSpent?.("stamina");
       this._ui.showNotification(`Blocked! ${dmg} damage taken.`, 1500);
       this._ui.showHitFlash("rgba(80, 120, 200, 0.35)");
+      if (this.player.stamina <= 0) {
+        this._isBlocking = false;
+        this._ui.showNotification("Block broken!", 1200);
+      }
     } else {
       this._ui.showHitFlash("rgba(200, 0, 0, 0.4)");
       this._ui.showNotification(`${npc.mesh.name} attacks you for ${dmg} damage!`, 2000);
