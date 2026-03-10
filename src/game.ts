@@ -62,6 +62,8 @@ import { BirthsignSystem } from "./systems/birthsign-system";
 import { ClassSystem } from "./systems/class-system";
 import { RaceSystem } from "./systems/race-system";
 import { CharacterCreationUI } from "./ui/character-creation-ui";
+import { QuestCreatorSystem } from "./systems/quest-creator-system";
+import { QuestCreatorUI } from "./ui/quest-creator-ui";
 import { buildHelpOverlayLines, summarizeValidationReport } from "./ui/editor-help-overlay";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
@@ -90,6 +92,8 @@ export class Game {
   public frameworkRuntime: FrameworkRuntime;
   public mapEditorSystem: MapEditorSystem;
   public mapEditorPropertyPanel: MapEditorPropertyPanel;
+  public questCreatorSystem: QuestCreatorSystem;
+  public questCreatorUI: QuestCreatorUI;
 
   // v2 systems (Oblivion-lite)
   public attributeSystem: AttributeSystem;
@@ -301,6 +305,13 @@ export class Game {
       if (type && entity !== null) {
         this.mapEditorPropertyPanel.show(entityId, type, entity);
       }
+    };
+
+    // ── Quest Creator ──────────────────────────────────────────────────────────
+    this.questCreatorSystem = new QuestCreatorSystem();
+    this.questCreatorUI = new QuestCreatorUI(this.questCreatorSystem);
+    this.questCreatorUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
     };
 
     // ── v2 system wiring ──────────────────────────────────────────────────────
@@ -930,6 +941,10 @@ export class Game {
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.questCreatorUI.isVisible) {
+                    this.questCreatorUI.close();
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
                 } else if (this.ui.isWaitDialogOpen) {
                     this.ui.toggleWaitDialog(false);
                     this.interactionSystem.isBlocked = false;
@@ -1113,6 +1128,15 @@ export class Game {
                 );
                 if (totalIssues > 0) {
                   console.warn("[QuestGraphValidation]", reports);
+                }
+            } else if (kbInfo.event.key === "F10") {
+                if (this.questCreatorUI.isVisible) {
+                    this.questCreatorUI.close();
+                } else {
+                    this.questCreatorUI.open();
+                    this.interactionSystem.isBlocked = true;
+                    document.exitPointerLock();
+                    this.player.camera.detachControl();
                 }
             } else if (kbInfo.event.key === "n" || kbInfo.event.key === "N") {
                 if (!this.mapEditorSystem.isEnabled) return;

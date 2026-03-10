@@ -14,6 +14,7 @@ describe("buildHelpOverlayLines", () => {
     expect(lines[0]).toBe("Editor Controls");
     expect(lines.join("\n")).toContain("F7: Validate Map");
     expect(lines.join("\n")).toContain("F8: Validate Framework Quest Graphs");
+    expect(lines.join("\n")).toContain("F10: Open Quest Creator");
   });
 });
 

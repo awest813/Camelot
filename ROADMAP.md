@@ -250,6 +250,8 @@ Camelot will evolve toward a creator-friendly worldbuilding pipeline through a d
 
 #### Phase 4: Production-Ready Pipeline
 
+- ✅ **QuestCreatorSystem** — Headless quest-authoring layer: `setMeta()`, `addNode()`, `updateNode()`, `removeNode()`, `validate()` (via `QuestGraphEngine`), `toQuestDefinition()`, `exportToJson()` / `exportToFile()` (browser download), `importFromJson()` / `importFromFile()`. Orphaned-prerequisite pruning on `removeNode()`.
+- ✅ **Quest Creator UI** — HTML overlay panel (`QuestCreatorUI`): quest metadata form (id / name / description / XP reward), live node list with per-node trigger type selector, target-ID and count inputs, description and prerequisites fields, validate / export-JSON / import-JSON / reset actions; opens/closes with **F10** (also dismissable with **Esc**).
 - 🧭 Prefab/palette libraries for rapid kitbashing.
 - 🧭 Layer-based editing (terrain, encounters, narrative, lighting).
 - 🧭 Optional standalone editor shell for non-programmer content creators.
@@ -268,5 +270,5 @@ If you want to contribute now, high-impact areas are:
 1. ~~Map editor Phase 2 completions: property panels for placed entities, terrain sculpting.~~ ✅ Complete
 2. ~~Map editor Phase 3 expansion: richer validation rules and map-pack workflows.~~ ✅ Complete
 3. Framework-first consolidation: wiring framework state as source-of-truth for demo systems.
-4. Quest/content authoring ergonomics.
+4. ~~Quest/content authoring ergonomics.~~ ✅ Complete — `QuestCreatorSystem` + `QuestCreatorUI` (F10).
 5. Save/load robustness and automated tests.

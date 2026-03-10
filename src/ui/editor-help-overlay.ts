@@ -17,6 +17,7 @@ const EDITOR_CONTROLS: readonly string[] = [
   "H: Cycle Terrain Tool · [ / ]: Sculpt Step",
   "F4: Export Map · F6: Import Map · F7: Validate Map",
   "F8: Validate Framework Quest Graphs",
+  "F10: Open Quest Creator",
   "Esc: Exit Editor",
 ];
 
