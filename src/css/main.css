@@ -410,6 +410,181 @@ body {
   font-style: italic;
 }
 
+/* ── Spell Making ─────────────────────────────────────────────────────────── */
+
+.spell-making {
+  position: fixed;
+  inset: 0;
+  z-index: 24;
+  background: radial-gradient(circle at top, rgba(26, 16, 8, 0.95), rgba(8, 5, 2, 0.97));
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.spell-making__panel {
+  width: min(780px, 96vw);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(214, 156, 73, 0.45);
+  background: rgba(18, 12, 7, 0.97);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.spell-making__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.spell-making__title {
+  margin: 0;
+  color: #e9b86f;
+  font-size: 22px;
+}
+
+.spell-making__subtitle {
+  margin: 4px 0 0;
+  color: #b89b75;
+  font-size: 13px;
+}
+
+.spell-making__close-btn {
+  border: 1px solid rgba(214, 156, 73, 0.5);
+  border-radius: 7px;
+  background: rgba(36, 24, 12, 0.95);
+  color: #f0d2a5;
+  width: 34px;
+  height: 30px;
+  cursor: pointer;
+}
+
+.spell-making__body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.spell-making__component {
+  border: 1px solid rgba(214, 156, 73, 0.25);
+  border-radius: 9px;
+  background: rgba(26, 18, 11, 0.9);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.spell-making__component-title {
+  margin: 0;
+  color: #ddb77f;
+  font-size: 14px;
+}
+
+.spell-making__component-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.spell-making__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.spell-making__label {
+  font-size: 11px;
+  color: #9f8a6f;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.spell-making__input,
+.spell-making__select {
+  border: 1px solid rgba(214, 156, 73, 0.28);
+  border-radius: 6px;
+  background: rgba(34, 24, 15, 0.95);
+  color: #efdfc7;
+  padding: 6px 8px;
+  font-size: 13px;
+  outline: none;
+}
+
+.spell-making__input:focus,
+.spell-making__select:focus {
+  border-color: rgba(233, 184, 111, 0.88);
+}
+
+.spell-making__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #cdb089;
+  font-size: 13px;
+}
+
+.spell-making__check input {
+  accent-color: #d69c49;
+}
+
+.spell-making__cost {
+  margin: 0;
+  color: #dfc18d;
+  font-size: 13px;
+}
+
+.spell-making__status {
+  margin: 0;
+  color: #a79377;
+  font-size: 13px;
+}
+
+.spell-making__status--ok {
+  color: #6bd49a;
+}
+
+.spell-making__status--error {
+  color: #e48672;
+}
+
+.spell-making__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.spell-making__btn {
+  border: 1px solid rgba(214, 156, 73, 0.5);
+  border-radius: 8px;
+  background: rgba(36, 24, 12, 0.95);
+  color: #edd7b6;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.spell-making__btn--primary {
+  background: linear-gradient(180deg, rgba(133, 84, 30, 0.94), rgba(96, 56, 18, 0.98));
+  border-color: rgba(233, 184, 111, 0.72);
+}
+
+.spell-making__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.is-hidden {
+  display: none !important;
+}
+
 /* ── Quest Creator ──────────────────────────────────────────────────────────── */
 
 .quest-creator {

@@ -79,6 +79,7 @@ import { LootTableCreatorUI } from "./ui/loot-table-creator-ui";
 import { EditorHubUI } from "./ui/editor-hub-ui";
 import { buildHelpOverlayLines, summarizeValidationReport } from "./ui/editor-help-overlay";
 import { FastTravelUI } from "./ui/fast-travel-ui";
+import { SpellMakingUI } from "./ui/spell-making-ui";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -122,6 +123,7 @@ export class Game {
   public lootTableCreatorUI: LootTableCreatorUI;
   public editorHubUI: EditorHubUI;
   public fastTravelUI: FastTravelUI;
+  public spellMakingUI: SpellMakingUI;
 
   // v2 systems (Oblivion-lite)
   public attributeSystem: AttributeSystem;
@@ -670,6 +672,34 @@ export class Game {
     };
     this.saveSystem.setSpellMakingSystem(this.spellMakingSystem);
 
+    this.spellMakingUI = new SpellMakingUI((components) => this.spellMakingSystem.computeCost(components));
+    this.spellMakingUI.onForge = ({ name, components }) => {
+      const result = this.spellMakingSystem.forgeSpell(name, components, this.barterSystem);
+      if (result.ok) {
+        this.spellMakingUI.showStatus(
+          `Forged "${result.spell!.name}" for ${result.goldCost} gold. Press Z to cycle spells.`,
+        );
+      } else {
+        const reasonMsg: Record<string, string> = {
+          insufficient_gold: "Not enough gold to forge this spell.",
+          duplicate_name: "A custom spell with that name already exists.",
+          no_components: "Add at least one spell component.",
+          too_many_components: "You can only combine up to two components.",
+          invalid_name: "Enter a valid spell name.",
+        };
+        this.spellMakingUI.showStatus(
+          reasonMsg[result.reason ?? ""] ?? `Cannot forge spell (${result.reason ?? "unknown"}).`,
+          true,
+        );
+      }
+    };
+    this.spellMakingUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
+
     // RespawnSystem — register the test cave as a respawnable zone (72 game-hours)
     this.respawnSystem = new RespawnSystem();
     this.respawnSystem.registerZone("cave_01", 72);
@@ -1088,6 +1118,8 @@ export class Game {
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.spellMakingUI.isVisible) {
+                    this.spellMakingUI.close();
                 } else if (this.fastTravelUI.isVisible) {
                     this.fastTravelUI.close();
                 } else if (this.questCreatorUI.isVisible) {
@@ -1485,29 +1517,14 @@ export class Game {
                     }
                 }
             } else if (kbInfo.event.key === "x" || kbInfo.event.key === "X") {
-                // Spell Making — forge a sample custom spell (X = eXperimental magic)
-                // A full UI would present a form; here we demonstrate the system with a
-                // hardcoded sample so the feature is exercisable from the keyboard.
                 if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
-                    const result = this.spellMakingSystem.forgeSpell(
-                        `Custom Bolt ${this.spellMakingSystem.customSpells.length + 1}`,
-                        [{ effectType: "damage", school: "destruction", magnitude: 15, duration: 4, damageType: "shock" }],
-                        this.barterSystem,
-                    );
-                    if (result.ok) {
-                        this.ui.showNotification(
-                            `Spell forged: "${result.spell!.name}" — ${result.goldCost}g spent.  Z to cycle spells.`,
-                            3500,
-                        );
+                    if (this.spellMakingUI.isVisible) {
+                        this.spellMakingUI.close();
                     } else {
-                        const reasonMsg: Record<string, string> = {
-                            insufficient_gold: "Not enough gold to forge a spell.",
-                            duplicate_name:    "A spell with that name already exists.",
-                        };
-                        this.ui.showNotification(
-                            reasonMsg[result.reason ?? ""] ?? `Cannot forge spell: ${result.reason}`,
-                            2500,
-                        );
+                        this.spellMakingUI.open();
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
                     }
                 }
             } else if (kbInfo.event.key === "v" || kbInfo.event.key === "V") {
@@ -1949,6 +1966,7 @@ export class Game {
           this.inventorySystem.isOpen ||
           this.questSystem.isLogOpen ||
           this.skillTreeSystem.isOpen ||
+          this.spellMakingUI.isVisible ||
           this.fastTravelUI.isVisible ||
           this.dialogueSystem.isInDialogue ||
           this.interactionSystem.isBlocked
