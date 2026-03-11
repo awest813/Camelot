@@ -58,6 +58,7 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 - Equipment slots with stat modifiers.
 - Quest log with objective tracking (Kill / Fetch / Talk).
 - Skill trees (Combat / Magic / Survival) with persistent rank progression.
+- **Guard Challenge Modal**: when guards confront you over bounty, choose to pay fine, serve jail time, resist arrest, or attempt persuasion.
 - **Birthsign System**: choose one of 13 birthsigns at character creation for permanent attribute/stat bonuses and a once-per-day special power (Mara's Gift, Moonshadow, Lover's Kiss, …).
 - **Class System**: choose a character class (Warrior, Mage, Thief, Battlemage, etc.) that defines two favored attributes, five major skills (1.5× XP, start higher), and five minor skills (1.25× XP).
 
@@ -69,6 +70,8 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 - Debug inspector and FPS overlay support.
 - **Compass HUD**: top-center strip showing scrolling cardinal direction (N / NE / E …) based on camera heading.
 - **Wait / Rest** (T key): choose 1–24 in-game hours to skip time; clock advances and resources restore proportionally.
+- **Fast Travel Menu** (Y): choose discovered destinations with estimated travel time; world clock advances on arrival.
+- **Spellmaking Altar** (X): forge custom spells from configurable effect components with live gold-cost preview.
 
 ## Map Editor
 
@@ -106,9 +109,11 @@ The in-engine **Map Editor** (activated with F2) lets you author world content w
 | J            | Toggle quest log                    |
 | K            | Toggle skill tree                   |
 | **T**        | **Wait / Rest (choose 1–24 hours)** |
+| **X**        | **Open Spellmaking Altar**          |
 | 1 / 2 / 3    | Melee archetype select              |
 | 4 / 5 / 6    | Magic archetype select              |
 | 7 / 8 / 9 / 0 | Quick-slot consumable use         |
+| Y            | Open fast travel menu               |
 | M            | Toggle audio mute                   |
 | F5           | Quick save                          |
 | F9           | Quick load                          |
