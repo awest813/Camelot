@@ -1559,6 +1559,545 @@ body {
   }
 }
 
+/* ── Faction Creator ─────────────────────────────────────────────────────────── */
+
+.faction-creator {
+  position: fixed;
+  inset: 0;
+  z-index: 22;
+  background: rgba(2, 2, 6, 0.82);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.faction-creator__panel {
+  width: min(820px, 96vw);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(244, 114, 182, 0.35);
+  background: rgba(15, 15, 25, 0.97);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.faction-creator__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(244, 114, 182, 0.2);
+}
+
+.faction-creator__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f472b6;
+}
+
+.faction-creator__close-btn {
+  background: transparent;
+  border: none;
+  color: #8b8ca0;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.faction-creator__close-btn:hover {
+  color: #f472b6;
+  background: rgba(244, 114, 182, 0.12);
+}
+
+.faction-creator__body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-bottom: 1px solid rgba(244, 114, 182, 0.15);
+}
+
+.faction-creator__section {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-right: 1px solid rgba(244, 114, 182, 0.1);
+}
+
+.faction-creator__section:last-child {
+  border-right: none;
+}
+
+.faction-creator__section-title {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #f472b6;
+  opacity: 0.9;
+}
+
+.faction-creator__blurb {
+  margin: 0 0 4px;
+  font-size: 0.76rem;
+  color: #8b8ca0;
+  line-height: 1.5;
+}
+
+.faction-creator__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.faction-creator__label {
+  font-size: 0.76rem;
+  color: #9ca3af;
+  font-weight: 600;
+}
+
+.faction-creator__label--sm {
+  font-size: 0.72rem;
+}
+
+.faction-creator__input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(244, 114, 182, 0.25);
+  border-radius: 6px;
+  color: #e5e7eb;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.faction-creator__input:focus {
+  border-color: #f472b6;
+}
+
+.faction-creator__input--sm {
+  padding: 4px 8px;
+  font-size: 0.78rem;
+}
+
+.faction-creator__select {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(244, 114, 182, 0.25);
+  border-radius: 6px;
+  color: #e5e7eb;
+  padding: 5px 8px;
+  font-size: 0.82rem;
+  outline: none;
+  cursor: pointer;
+}
+
+.faction-creator__select:focus {
+  border-color: #f472b6;
+}
+
+.faction-creator__preview-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.faction-creator__thresh-preview {
+  background: rgba(244, 114, 182, 0.07);
+  border: 1px solid rgba(244, 114, 182, 0.18);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  line-height: 1.6;
+}
+
+.faction-creator__relations-section {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(244, 114, 182, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.faction-creator__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.faction-creator__rel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.faction-creator__rel-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(244, 114, 182, 0.12);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.faction-creator__control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.faction-creator__empty {
+  font-size: 0.8rem;
+  color: #5c5d78;
+  font-style: italic;
+  margin: 0;
+  padding: 12px 0;
+}
+
+.faction-creator__footer {
+  padding: 14px 20px;
+  border-top: 1px solid rgba(244, 114, 182, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.faction-creator__status {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  white-space: pre-wrap;
+  min-height: 1.4em;
+  margin: 0;
+}
+
+.faction-creator__status--ok    { color: #34d399; }
+.faction-creator__status--error { color: #f87171; }
+
+.faction-creator__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.faction-creator__btn {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e5e7eb;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.faction-creator__btn:hover { background: rgba(255, 255, 255, 0.12); }
+
+.faction-creator__btn--sm {
+  padding: 4px 10px;
+  font-size: 0.76rem;
+}
+
+.faction-creator__btn--primary {
+  background: rgba(244, 114, 182, 0.15);
+  border-color: rgba(244, 114, 182, 0.5);
+  color: #f9a8d4;
+}
+
+.faction-creator__btn--primary:hover {
+  background: rgba(244, 114, 182, 0.25);
+}
+
+.faction-creator__btn--danger {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+
+.faction-creator__btn--danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+@media (max-width: 640px) {
+  .faction-creator__body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Loot Table Creator ───────────────────────────────────────────────────────── */
+
+.loot-table-creator {
+  position: fixed;
+  inset: 0;
+  z-index: 22;
+  background: rgba(2, 2, 6, 0.82);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.loot-table-creator__panel {
+  width: min(900px, 96vw);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(15, 15, 25, 0.97);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.loot-table-creator__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.loot-table-creator__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fbbf24;
+}
+
+.loot-table-creator__close-btn {
+  background: transparent;
+  border: none;
+  color: #8b8ca0;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.loot-table-creator__close-btn:hover {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+}
+
+.loot-table-creator__body {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 0;
+  border-bottom: 1px solid rgba(251, 191, 36, 0.15);
+}
+
+.loot-table-creator__section {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-right: 1px solid rgba(251, 191, 36, 0.1);
+}
+
+.loot-table-creator__section:last-child {
+  border-right: none;
+}
+
+.loot-table-creator__section--entries {
+  min-width: 0;
+}
+
+.loot-table-creator__section-title {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #fbbf24;
+  opacity: 0.9;
+}
+
+.loot-table-creator__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.loot-table-creator__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.loot-table-creator__field--check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.loot-table-creator__label {
+  font-size: 0.76rem;
+  color: #9ca3af;
+  font-weight: 600;
+}
+
+.loot-table-creator__label--sm {
+  font-size: 0.72rem;
+}
+
+.loot-table-creator__input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: 6px;
+  color: #e5e7eb;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.loot-table-creator__input:focus {
+  border-color: #fbbf24;
+}
+
+.loot-table-creator__input--sm {
+  padding: 4px 8px;
+  font-size: 0.78rem;
+}
+
+.loot-table-creator__entry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.loot-table-creator__entry-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(251, 191, 36, 0.15);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.loot-table-creator__entry-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.loot-table-creator__entry-row--fields {
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.loot-table-creator__entry-key {
+  font-size: 0.75rem;
+  color: #fbbf24;
+  font-weight: 600;
+  opacity: 0.8;
+  flex: 1;
+}
+
+.loot-table-creator__control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.loot-table-creator__empty {
+  font-size: 0.8rem;
+  color: #5c5d78;
+  font-style: italic;
+  margin: 0;
+  padding: 12px 0;
+}
+
+.loot-table-creator__footer {
+  padding: 14px 20px;
+  border-top: 1px solid rgba(251, 191, 36, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.loot-table-creator__status {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  white-space: pre-wrap;
+  min-height: 1.4em;
+  margin: 0;
+}
+
+.loot-table-creator__status--ok    { color: #34d399; }
+.loot-table-creator__status--error { color: #f87171; }
+
+.loot-table-creator__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.loot-table-creator__btn {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e5e7eb;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.loot-table-creator__btn:hover { background: rgba(255, 255, 255, 0.12); }
+
+.loot-table-creator__btn--sm {
+  padding: 4px 10px;
+  font-size: 0.76rem;
+}
+
+.loot-table-creator__btn--primary {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.5);
+  color: #fde68a;
+}
+
+.loot-table-creator__btn--primary:hover {
+  background: rgba(251, 191, 36, 0.25);
+}
+
+.loot-table-creator__btn--danger {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+
+.loot-table-creator__btn--danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+@media (max-width: 640px) {
+  .loot-table-creator__body {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Editor Hub ──────────────────────────────────────────────────────────────── */
 
 .editor-hub {

@@ -72,6 +72,10 @@ import { NpcCreatorSystem } from "./systems/npc-creator-system";
 import { NpcCreatorUI } from "./ui/npc-creator-ui";
 import { ItemCreatorSystem } from "./systems/item-creator-system";
 import { ItemCreatorUI } from "./ui/item-creator-ui";
+import { FactionCreatorSystem } from "./systems/faction-creator-system";
+import { FactionCreatorUI } from "./ui/faction-creator-ui";
+import { LootTableCreatorSystem } from "./systems/loot-table-creator-system";
+import { LootTableCreatorUI } from "./ui/loot-table-creator-ui";
 import { EditorHubUI } from "./ui/editor-hub-ui";
 import { buildHelpOverlayLines, summarizeValidationReport } from "./ui/editor-help-overlay";
 
@@ -111,6 +115,10 @@ export class Game {
   public npcCreatorUI: NpcCreatorUI;
   public itemCreatorSystem: ItemCreatorSystem;
   public itemCreatorUI: ItemCreatorUI;
+  public factionCreatorSystem: FactionCreatorSystem;
+  public factionCreatorUI: FactionCreatorUI;
+  public lootTableCreatorSystem: LootTableCreatorSystem;
+  public lootTableCreatorUI: LootTableCreatorUI;
   public editorHubUI: EditorHubUI;
 
   // v2 systems (Oblivion-lite)
@@ -383,6 +391,20 @@ export class Game {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
     };
 
+    // ── Faction Creator ────────────────────────────────────────────────────────
+    this.factionCreatorSystem = new FactionCreatorSystem();
+    this.factionCreatorUI = new FactionCreatorUI(this.factionCreatorSystem);
+    this.factionCreatorUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+    };
+
+    // ── Loot Table Creator ─────────────────────────────────────────────────────
+    this.lootTableCreatorSystem = new LootTableCreatorSystem();
+    this.lootTableCreatorUI = new LootTableCreatorUI(this.lootTableCreatorSystem);
+    this.lootTableCreatorUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+    };
+
     // ── Editor Hub ─────────────────────────────────────────────────────────────
     this.editorHubUI = new EditorHubUI({
       onOpen: (tool) => {
@@ -411,6 +433,12 @@ export class Game {
             break;
           case "item":
             this.itemCreatorUI.open();
+            break;
+          case "faction":
+            this.factionCreatorUI.open();
+            break;
+          case "lootTable":
+            this.lootTableCreatorUI.open();
             break;
         }
       },
@@ -1064,6 +1092,14 @@ export class Game {
                     this.itemCreatorUI.close();
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.factionCreatorUI.isVisible) {
+                    this.factionCreatorUI.close();
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
+                } else if (this.lootTableCreatorUI.isVisible) {
+                    this.lootTableCreatorUI.close();
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
                 } else if (this.editorHubUI.isVisible) {
                     this.editorHubUI.close();
                     this.canvas.requestPointerLock();
@@ -1267,19 +1303,32 @@ export class Game {
                   console.warn("[MapEditorValidation]", validation.issues);
                 }
             } else if (kbInfo.event.key === "F8") {
-                const reports = frameworkBaseContent.quests.map((quest) => {
-                  return this.frameworkRuntime.questEngine.validateGraph(quest.id);
-                });
-                const totalIssues = reports.reduce((sum, report) => sum + report.issues.length, 0);
-                const invalidGraphs = reports.filter((report) => !report.valid).length;
-                this.ui.showNotification(
-                  totalIssues === 0
-                    ? `Quest graph validation passed (${reports.length} graphs).`
-                    : `Quest graph validation: ${invalidGraphs} invalid graph(s), ${totalIssues} issue(s).`,
-                  3200,
-                );
-                if (totalIssues > 0) {
-                  console.warn("[QuestGraphValidation]", reports);
+                if (kbInfo.event.shiftKey) {
+                    // Shift+F8 → Loot Table Creator
+                    if (this.lootTableCreatorUI.isVisible) {
+                        this.lootTableCreatorUI.close();
+                    } else {
+                        this.lootTableCreatorUI.open();
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    }
+                } else {
+                    // F8 → Framework quest graph validation
+                    const reports = frameworkBaseContent.quests.map((quest) => {
+                      return this.frameworkRuntime.questEngine.validateGraph(quest.id);
+                    });
+                    const totalIssues = reports.reduce((sum, report) => sum + report.issues.length, 0);
+                    const invalidGraphs = reports.filter((report) => !report.valid).length;
+                    this.ui.showNotification(
+                      totalIssues === 0
+                        ? `Quest graph validation passed (${reports.length} graphs).`
+                        : `Quest graph validation: ${invalidGraphs} invalid graph(s), ${totalIssues} issue(s).`,
+                      3200,
+                    );
+                    if (totalIssues > 0) {
+                      console.warn("[QuestGraphValidation]", reports);
+                    }
                 }
             } else if (kbInfo.event.key === "F10") {
                 if (kbInfo.event.shiftKey) {
@@ -1347,7 +1396,20 @@ export class Game {
             } else if (kbInfo.event.key === "F5") {
                 if (!this.isPaused) this.saveSystem.save();
             } else if (kbInfo.event.key === "F9") {
-                if (!this.isPaused) this.saveSystem.load();
+                if (kbInfo.event.shiftKey) {
+                    // Shift+F9 → Faction Creator
+                    if (this.factionCreatorUI.isVisible) {
+                        this.factionCreatorUI.close();
+                    } else {
+                        this.factionCreatorUI.open();
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    }
+                } else {
+                    // F9 → Load game
+                    if (!this.isPaused) this.saveSystem.load();
+                }
             } else if (kbInfo.event.key === "q" || kbInfo.event.key === "Q") {
                 // Cast equipped spell
                 if (!this._isCombatInputBlocked()) {

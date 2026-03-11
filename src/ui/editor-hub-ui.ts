@@ -22,7 +22,9 @@ export type EditorToolId =
   | "quest"
   | "dialogue"
   | "npc"
-  | "item";
+  | "item"
+  | "faction"
+  | "lootTable";
 
 export interface EditorHubCallbacks {
   /** Called when the user clicks a tool button. */
@@ -78,6 +80,22 @@ const TOOLS: ToolEntry[] = [
     description: "Create item definitions with equip slots, stackable quantities, tags (weapon / armor / consumable…), and JSON export for the content registry.",
     shortcut:    "Shift+F12",
     accentVar:   "#fb923c",
+  },
+  {
+    id:          "faction",
+    label:       "Faction Creator",
+    icon:        "🏰",
+    description: "Define factions with reputation thresholds (hostile / neutral / friendly / allied), default standing, and inter-faction relationship records.",
+    shortcut:    "Shift+F9",
+    accentVar:   "#f472b6",
+  },
+  {
+    id:          "lootTable",
+    label:       "Loot Table Creator",
+    icon:        "💰",
+    description: "Build weighted loot tables with multi-roll support, guaranteed drops, sub-table chaining, level-range conditions, and empty-roll probability.",
+    shortcut:    "Shift+F8",
+    accentVar:   "#fbbf24",
   },
 ];
 

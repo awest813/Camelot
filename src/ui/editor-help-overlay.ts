@@ -19,6 +19,11 @@ const EDITOR_CONTROLS: readonly string[] = [
   "F4: Export Map · F6: Import Map · F7: Validate Map",
   "F8: Validate Framework Quest Graphs",
   "F10: Open Quest Creator",
+  "Shift+F10: Open NPC Creator",
+  "F12: Open Dialogue Creator",
+  "Shift+F12: Open Item Creator",
+  "Shift+F9: Open Faction Creator",
+  "Shift+F8: Open Loot Table Creator",
   "Esc: Exit Editor",
 ];
 
