@@ -257,6 +257,35 @@ export class MapEditorSystem {
     return this._selectedEntityId;
   }
 
+  /** Total number of entities currently placed in the editor. */
+  get entityCount(): number {
+    return this._entities.length;
+  }
+
+  /**
+   * Returns a lightweight summary of every placed entity: `{ id, type }`.
+   * Useful for hierarchy panels that only need to list names without reading
+   * full property data.
+   */
+  listEntitySummaries(): Array<{ id: string; type: EditorPlacementType }> {
+    return this._entities.map((e) => ({
+      id: e.mesh.metadata?.editorEntityId ?? e.mesh.name,
+      type: e.type,
+    }));
+  }
+
+  /**
+   * Programmatically select an entity by its editor entity ID.
+   * Fires `onEntitySelectionChanged` if the selection changes.
+   * Returns `true` if the entity was found and selected, `false` otherwise.
+   */
+  selectEntityById(entityId: string): boolean {
+    const entity = this._findEntityById(entityId);
+    if (!entity) return false;
+    this._selectMesh(entity.mesh);
+    return true;
+  }
+
   // ─── Undo / redo ────────────────────────────────────────────────────────────
 
   /** Whether there are commands available to undo. */
@@ -304,6 +333,14 @@ export class MapEditorSystem {
     this.gizmoManager.rotationGizmoEnabled = this._mode === "rotation";
     this.gizmoManager.scaleGizmoEnabled    = this._mode === "scale";
     return this._mode;
+  }
+
+  /** Directly set the gizmo mode without cycling through intermediate states. */
+  setGizmoMode(mode: EditorGizmoMode): void {
+    this._mode = mode;
+    this.gizmoManager.positionGizmoEnabled = mode === "position";
+    this.gizmoManager.rotationGizmoEnabled = mode === "rotation";
+    this.gizmoManager.scaleGizmoEnabled    = mode === "scale";
   }
 
   get mode(): EditorGizmoMode {
