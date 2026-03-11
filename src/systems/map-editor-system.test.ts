@@ -720,3 +720,213 @@ describe('MapEditorSystem — Phase 3 (importFromJson)', () => {
         expect(editor.importFromJson('{"version":2,"entries":[],"patrolRoutes":[]}')).toBe(false);
     });
 });
+
+// ─── Undo / redo ────────────────────────────────────────────────────────────
+
+describe('MapEditorSystem — undo/redo (place)', () => {
+    it('canUndo is false initially and canRedo is false initially', () => {
+        const { editor } = makeEditor();
+        expect(editor.canUndo).toBe(false);
+        expect(editor.canRedo).toBe(false);
+    });
+
+    it('historySize starts at { undo: 0, redo: 0 }', () => {
+        const { editor } = makeEditor();
+        expect(editor.historySize).toEqual({ undo: 0, redo: 0 });
+    });
+
+    it('canUndo becomes true after placing an entity', () => {
+        const { editor } = makeEditor();
+        editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        expect(editor.canUndo).toBe(true);
+    });
+
+    it('undo returns false when stack is empty', () => {
+        const { editor } = makeEditor();
+        expect(editor.undo()).toBe(false);
+    });
+
+    it('redo returns false when redo stack is empty', () => {
+        const { editor } = makeEditor();
+        expect(editor.redo()).toBe(false);
+    });
+
+    it('undo removes a placed entity from the map', () => {
+        const { editor } = makeEditor();
+        editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        expect(editor.exportMap().entries).toHaveLength(1);
+
+        const result = editor.undo();
+
+        expect(result).toBe(true);
+        expect(editor.exportMap().entries).toHaveLength(0);
+    });
+
+    it('canRedo becomes true after undoing a place', () => {
+        const { editor } = makeEditor();
+        editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        editor.undo();
+        expect(editor.canRedo).toBe(true);
+    });
+
+    it('redo restores a placed entity after undo', () => {
+        const { editor } = makeEditor();
+        editor.placeEntity(new Vector3(2, 1, 3), 'loot');
+        editor.undo();
+        expect(editor.exportMap().entries).toHaveLength(0);
+
+        const result = editor.redo();
+
+        expect(result).toBe(true);
+        expect(editor.exportMap().entries).toHaveLength(1);
+        expect(editor.exportMap().entries[0].type).toBe('loot');
+    });
+
+    it('new action clears redo stack', () => {
+        const { editor } = makeEditor();
+        editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        editor.undo();
+        expect(editor.canRedo).toBe(true);
+
+        editor.placeEntity(new Vector3(1, 1, 1), 'loot');
+        expect(editor.canRedo).toBe(false);
+    });
+
+    it('undo/redo multiple places in sequence', () => {
+        const { editor } = makeEditor();
+        editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        editor.placeEntity(new Vector3(1, 1, 0), 'loot');
+        editor.placeEntity(new Vector3(2, 1, 0), 'structure');
+
+        editor.undo();
+        expect(editor.exportMap().entries).toHaveLength(2);
+        editor.undo();
+        expect(editor.exportMap().entries).toHaveLength(1);
+        editor.undo();
+        expect(editor.exportMap().entries).toHaveLength(0);
+
+        editor.redo();
+        expect(editor.exportMap().entries).toHaveLength(1);
+        editor.redo();
+        expect(editor.exportMap().entries).toHaveLength(2);
+    });
+
+    it('clearAll resets both undo and redo stacks', () => {
+        const { editor } = makeEditor();
+        editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        editor.placeEntity(new Vector3(1, 1, 0), 'loot');
+        editor.undo();
+
+        editor.clearAll();
+
+        expect(editor.historySize).toEqual({ undo: 0, redo: 0 });
+    });
+});
+
+describe('MapEditorSystem — undo/redo (remove)', () => {
+    it('undo re-inserts a removed entity', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(3, 1, 3), 'structure');
+        const entityId = mesh.metadata?.editorEntityId as string;
+        editor.removeEntity(entityId);
+        expect(editor.exportMap().entries).toHaveLength(0);
+
+        editor.undo(); // undo remove → entity comes back
+
+        const entries = editor.exportMap().entries;
+        expect(entries).toHaveLength(1);
+        expect(entries[0].type).toBe('structure');
+    });
+
+    it('redo re-removes an entity after undo of remove', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(3, 1, 3), 'structure');
+        const entityId = mesh.metadata?.editorEntityId as string;
+        editor.removeEntity(entityId);
+        editor.undo(); // entity restored
+        expect(editor.exportMap().entries).toHaveLength(1);
+
+        editor.redo(); // remove again
+
+        expect(editor.exportMap().entries).toHaveLength(0);
+    });
+});
+
+describe('MapEditorSystem — undo/redo (set-properties)', () => {
+    it('undo reverts a property change', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'quest-marker');
+        const entityId = mesh.metadata?.editorEntityId as string;
+        editor.setEntityProperties(entityId, { objectiveId: 'obj.001' });
+
+        editor.undo(); // undo setProperties
+
+        expect(editor.getEntityProperties(entityId)?.objectiveId).toBeUndefined();
+    });
+
+    it('redo re-applies a reverted property change', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'quest-marker');
+        const entityId = mesh.metadata?.editorEntityId as string;
+        editor.setEntityProperties(entityId, { objectiveId: 'obj.001' });
+        editor.undo();
+        expect(editor.getEntityProperties(entityId)?.objectiveId).toBeUndefined();
+
+        editor.redo(); // redo setProperties
+
+        expect(editor.getEntityProperties(entityId)?.objectiveId).toBe('obj.001');
+    });
+
+    it('multiple property edits stack independently', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'quest-marker');
+        const entityId = mesh.metadata?.editorEntityId as string;
+        editor.setEntityProperties(entityId, { objectiveId: 'obj.001' });
+        editor.setEntityProperties(entityId, { label: 'Main Gate' });
+
+        editor.undo(); // undo label change
+        expect(editor.getEntityProperties(entityId)?.label).toBeUndefined();
+        expect(editor.getEntityProperties(entityId)?.objectiveId).toBe('obj.001');
+
+        editor.undo(); // undo objectiveId change
+        expect(editor.getEntityProperties(entityId)?.objectiveId).toBeUndefined();
+    });
+});
+
+describe('MapEditorSystem — undo/redo (move)', () => {
+    it('records a move command via recordMove and undo restores the previous position', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        const entityId = mesh.metadata?.editorEntityId as string;
+
+        editor.recordMove(
+            entityId,
+            { position: { x: 0, y: 1, z: 0 }, rotation: { x: 0, y: 0, z: 0 } },
+            { position: { x: 5, y: 1, z: 5 }, rotation: { x: 0, y: 0, z: 0 } },
+        );
+        mesh.position.set(5, 1, 5);
+
+        editor.undo(); // undo move
+
+        expect(mesh.position.x).toBeCloseTo(0);
+        expect(mesh.position.z).toBeCloseTo(0);
+    });
+
+    it('redo re-applies the move after undo', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        const entityId = mesh.metadata?.editorEntityId as string;
+
+        editor.recordMove(
+            entityId,
+            { position: { x: 0, y: 1, z: 0 }, rotation: { x: 0, y: 0, z: 0 } },
+            { position: { x: 5, y: 1, z: 5 }, rotation: { x: 0, y: 0, z: 0 } },
+        );
+        mesh.position.set(5, 1, 5);
+        editor.undo();
+        editor.redo(); // re-apply move
+
+        expect(mesh.position.x).toBeCloseTo(5);
+        expect(mesh.position.z).toBeCloseTo(5);
+    });
+});

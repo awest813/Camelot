@@ -1102,6 +1102,17 @@ export class Game {
                 if (!this.mapEditorSystem.isEnabled) return;
                 this.mapEditorSystem.exportToFile();
                 this.ui.showNotification("Map exported to file", 2000);
+            } else if (kbInfo.event.key === "z" && (kbInfo.event.ctrlKey || kbInfo.event.metaKey) && !kbInfo.event.shiftKey) {
+                if (!this.mapEditorSystem.isEnabled) return;
+                const undone = this.mapEditorSystem.undo();
+                this.ui.showNotification(undone ? "Undo" : "Nothing to undo", 1000);
+            } else if (
+                (kbInfo.event.key === "y" && (kbInfo.event.ctrlKey || kbInfo.event.metaKey)) ||
+                (kbInfo.event.key === "z" && (kbInfo.event.ctrlKey || kbInfo.event.metaKey) && kbInfo.event.shiftKey)
+            ) {
+                if (!this.mapEditorSystem.isEnabled) return;
+                const redone = this.mapEditorSystem.redo();
+                this.ui.showNotification(redone ? "Redo" : "Nothing to redo", 1000);
             } else if (kbInfo.event.key === "F6") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 this._triggerMapImport();
