@@ -63,6 +63,7 @@ import { MerchantRestockSystem } from "./systems/merchant-restock-system";
 import { BirthsignSystem } from "./systems/birthsign-system";
 import { ClassSystem } from "./systems/class-system";
 import { RaceSystem } from "./systems/race-system";
+import { PlayerLevelSystem } from "./systems/player-level-system";
 import { CharacterCreationUI } from "./ui/character-creation-ui";
 import { QuestCreatorSystem } from "./systems/quest-creator-system";
 import { QuestCreatorUI } from "./ui/quest-creator-ui";
@@ -181,6 +182,9 @@ export class Game {
   public birthsignSystem: BirthsignSystem;
   public classSystem: ClassSystem;
   public raceSystem: RaceSystem;
+
+  // v12 systems (Oblivion depth: character progression — skill-based level-up)
+  public playerLevelSystem: PlayerLevelSystem;
 
   public isPaused: boolean = false;
 
@@ -598,6 +602,8 @@ export class Game {
       const name  = skill?.name ?? skillId;
       this.ui.showNotification(`${name} skill increased to ${newLevel}!`, 2500);
       this.eventBus.emit("skill:levelUp" as any, { skillId, newLevel });
+      // Notify PlayerLevelSystem so it can track major-skill level-ups.
+      this.playerLevelSystem?.handleSkillLevelUp(skillId);
       this.saveSystem.markDirty();
     };
     this.saveSystem.setSkillProgressionSystem(this.skillProgressionSystem);
@@ -790,6 +796,31 @@ export class Game {
       this.saveSystem.markDirty();
     };
     this.saveSystem.setClassSystem(this.classSystem);
+
+    // ── v12 system wiring (Oblivion depth: skill-based character progression) ──
+    this.playerLevelSystem = new PlayerLevelSystem();
+    this.playerLevelSystem.attachToClassSystem(this.classSystem);
+    this.playerLevelSystem.attachToAttributeSystem(this.attributeSystem);
+    this.playerLevelSystem.onLevelUpReady = (bonuses) => {
+      const [primary, sec1, sec2] = this.playerLevelSystem.suggestedAttributes;
+      const p = bonuses[primary], s1 = bonuses[sec1], s2 = bonuses[sec2];
+      this.ui.showNotification(
+        `Character Level Up ready! Applying +${p} ${primary}, +${s1} ${sec1}, +${s2} ${sec2}.`,
+        5000,
+      );
+      // Auto-apply the three highest-bonus attributes immediately.
+      this.playerLevelSystem.confirmLevelUp(primary, sec1, sec2);
+    };
+    this.playerLevelSystem.onLevelUpComplete = (newLevel) => {
+      // Sync derived stats after attribute bonuses have been applied.
+      this.player.maxHealth      = this.attributeSystem.maxHealth;
+      this.player.maxMagicka     = this.attributeSystem.maxMagicka;
+      this.player.maxStamina     = this.attributeSystem.maxStamina;
+      this.player.maxCarryWeight = this.attributeSystem.carryWeight;
+      this.eventBus.emit("player:levelUp", { newLevel });
+      this.saveSystem.markDirty();
+    };
+    this.saveSystem.setPlayerLevelSystem(this.playerLevelSystem);
 
     this._runCharacterCreation().catch((error: unknown) => {
       console.error("Character creation failed; applying defaults", error);

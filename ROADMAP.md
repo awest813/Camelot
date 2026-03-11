@@ -67,6 +67,7 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ **BirthsignSystem** — Oblivion's 13 birthsigns (Warrior, Mage, Thief, Lady, Lord, Steed, Ritual, Apprentice, Atronach, Shadow, Lover, Serpent, etc.) chosen once at character creation; each sign permanently boosts attributes or max stats, and most grant a once-per-24h rechargeable special power (Mara's Gift, Moonshadow, Lover's Kiss, Serpent's Spell, Blood of the North, …); `stunted` flag suppresses magicka regeneration for the Atronach; `fireWeakness` for the Lord; flat max-stat bonuses (maxMagicka +50/+100/+150) for Mage/Apprentice/Atronach; power cooldown tracked in in-game hours; `onBirthsignChosen` + `onPowerActivated` callbacks; save-state persistence (SAVE_VERSION 14).
 - ✅ **ClassSystem** — Oblivion-style character classes (Warrior, Knight, Barbarian, Mage, Sorcerer, Healer, Thief, Scout, Rogue, Battlemage); each class defines a specialization (combat/magic/stealth), two favored attributes (+10 each), five major skills (starting +25 levels, 1.5× XP), and five minor skills (starting +10 levels, 1.25× XP); specialization group grants +5 to all related skills; `xpMultiplierFor(skillId)` scales all in-game XP awards so major-skill users progress faster; `onClassChosen` callback syncs derived stats; save-state persistence (SAVE_VERSION 14).
 - ✅ **RaceSystem** (fully activated powers) — Oblivion-depth racial powers for all 10 races (Nord, Imperial, Breton, Redguard, High Elf, Dark Elf, Wood Elf, Orc, Khajiit, Argonian); each race now grants a genuine once-per-24h rechargeable power that dispatches real `ActiveEffect` entries (health/magicka/stamina restore, fortify strength, resist damage, etc.); `activatePower(gameTime, activeEffectsSystem)` dispatches all power effects, `canActivatePower()` enforces the cooldown, `powerCooldownRemaining()` reports minutes left; `onPowerActivated` callback fires HUD notification; V key activates the power in-game; power cooldown persisted (SAVE_VERSION 16).
+- ✅ **PlayerLevelSystem** — Oblivion-style skill-based character leveling: accumulate 10 major-skill level-ups (as defined by the chosen ClassSystem) to trigger a character level-up; each attribute's bonus (+1 to +5) follows the Oblivion multiplier table (1–4 level-ups → +2, 5–7 → +3, 8–9 → +4, 10+ → +5) based on how many governing skills were leveled that character level; `confirmLevelUp(primary, sec1, sec2)` applies bonuses for three distinct chosen attributes and advances `characterLevel`; `suggestedAttributes` convenience property returns the three highest-bonus attributes for auto-apply; `onLevelUpReady` fires with the available bonuses when the threshold is reached; `onLevelUpComplete(newLevel)` fires after bonuses are applied; skill → attribute mapping mirrors Oblivion (blade → Strength, block → Endurance, destruction/restoration → Willpower, marksman → Agility, sneak → Speed, speechcraft → Luck, alchemy → Intelligence); attribute bonuses immediately sync `maxHealth`/`maxMagicka`/`maxStamina`/`maxCarryWeight`; save-state persistence (SAVE_VERSION 17).
 
 ### World + Content
 
@@ -77,7 +78,7 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 ### UX + Persistence
 
 - ✅ HUD, quest log, inventory, skill tree, pause flow.
-- ✅ Save/load (SAVE_VERSION 16) for all system states.
+- ✅ Save/load (SAVE_VERSION 17) for all system states.
 - ✅ Save file export to JSON file download + import from JSON/File (browser-safe).
 - ✅ Notifications, hit feedback, and debug support.
 - ✅ Compass HUD (top-center) showing cardinal direction from camera heading.
@@ -156,8 +157,15 @@ model.
 - ✅ **SAVE_VERSION 8** — Enchanting system (soul gem inventory + enchanting skill) persisted; SAVE_VERSION_MIN = 5 constant fixes forward-compat boundary.
 - ✅ **SAVE_VERSION 13** — SpellMakingSystem, RespawnSystem, and MerchantRestockSystem state persisted.
 - ✅ **SAVE_VERSION 14** — BirthsignSystem and ClassSystem state persisted.
+- ✅ **SAVE_VERSION 17** — PlayerLevelSystem (skill-based character level-up) state persisted.
 
-### Natural-Feel Systems Overhaul (Decision)
+### Character Progression Depth (Next)
+
+- 🧭 **Character Level-Up UI** — Dedicated level-up dialog showing available attribute bonuses per attribute, letting the player manually choose 3 attributes to increase instead of auto-applying the top 3; triggered by `PlayerLevelSystem.onLevelUpReady`; dismissable once confirmed.
+- 🧭 **DailyScheduleSystem** — NPC daily activity schedules (work, eat, sleep); NPCs follow timed waypoint sequences driven by in-game time; sleep state makes NPCs non-interactive and moves them to bed markers; integrates with `ScheduleSystem` and `TimeSystem`.
+- 🧭 **HorseSystem / Mount System** — Rideable horse companions; separate speed/stamina pool; dismount on combat; stable NPCs for purchase; horse inventory slot for saddlebags.
+
+
 
 To make combat and interaction loops feel less mechanical, Camelot will follow a
 three-step overhaul track:
