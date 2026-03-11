@@ -111,7 +111,7 @@ model.
 
 - 🧭 Dockable editor layout (Scene/Hierarchy/Inspector/Validation panes).
 - 🧭 Unified selection model shared by map entities, quest nodes, and dialogue nodes.
-- 🧭 Undo/redo history with grouped actions for transform + property edits.
+- ✅ Undo/redo history with grouped actions for transform + property edits (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z).
 - ✅ Context-aware hotkey/help overlay so editor workflows are discoverable in-app (F1 toggles gameplay/editor key cheat sheet).
 
 #### Release B — Content-Specific Editors

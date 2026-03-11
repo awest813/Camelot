@@ -12,6 +12,36 @@ export type EditorGizmoMode = "position" | "rotation" | "scale";
 export type EditorPlacementType = "marker" | "loot" | "npc-spawn" | "quest-marker" | "structure";
 export type EditorTerrainTool = "none" | "sculpt" | "paint";
 
+// ── Undo/redo command types ──────────────────────────────────────────────────
+
+interface PlaceEntityCommand {
+  type: "place";
+  entry: MapExportEntry;
+  patrolGroupId?: string;
+}
+
+interface RemoveEntityCommand {
+  type: "remove";
+  entry: MapExportEntry;
+  patrolGroupId?: string;
+}
+
+interface SetPropertiesCommand {
+  type: "set-properties";
+  entityId: string;
+  before: EditorEntityProperties;
+  after: EditorEntityProperties;
+}
+
+interface MoveEntityCommand {
+  type: "move";
+  entityId: string;
+  before: { position: { x: number; y: number; z: number }; rotation: { x: number; y: number; z: number } };
+  after: { position: { x: number; y: number; z: number }; rotation: { x: number; y: number; z: number } };
+}
+
+type EditorCommand = PlaceEntityCommand | RemoveEntityCommand | SetPropertiesCommand | MoveEntityCommand;
+
 export interface MapExportEntry {
   id: string;
   type: EditorPlacementType;
@@ -146,6 +176,13 @@ export class MapEditorSystem {
   private _patrolGroupCounter: number = 0;
   private _selectedEntityId: string | null = null;
 
+  // ── Undo/redo stacks ─────────────────────────────────────────────────────
+  private _undoStack: EditorCommand[] = [];
+  private _redoStack: EditorCommand[] = [];
+  private static readonly MAX_HISTORY = 100;
+  /** Snapshot of the selected mesh position/rotation taken at drag-start. */
+  private _preDragSnapshot: { position: Vector3; rotation: Vector3 } | null = null;
+
   constructor(scene: Scene) {
     this.scene = scene;
     this.gizmoManager = new GizmoManager(scene);
@@ -163,7 +200,21 @@ export class MapEditorSystem {
       this.gizmoManager.gizmos.scaleGizmo?.zGizmo,
     ];
     for (const ax of snapAxes) {
-      ax?.dragBehavior.onDragEndObservable.add(() => this._snapAttachedMesh());
+      ax?.dragBehavior.onDragStartObservable.add(() => this._captureDragSnapshot());
+      ax?.dragBehavior.onDragEndObservable.add(() => {
+        this._snapAttachedMesh();
+        this._commitDragCommand();
+      });
+    }
+
+    const rotAxes = [
+      this.gizmoManager.gizmos.rotationGizmo?.xGizmo,
+      this.gizmoManager.gizmos.rotationGizmo?.yGizmo,
+      this.gizmoManager.gizmos.rotationGizmo?.zGizmo,
+    ];
+    for (const ax of rotAxes) {
+      ax?.dragBehavior.onDragStartObservable.add(() => this._captureDragSnapshot());
+      ax?.dragBehavior.onDragEndObservable.add(() => this._commitDragCommand());
     }
 
     this.gridMesh = this._createGridMesh();
@@ -204,6 +255,47 @@ export class MapEditorSystem {
   /** Returns the editor entity ID of the currently selected entity, or null. */
   get selectedEntityId(): string | null {
     return this._selectedEntityId;
+  }
+
+  // ─── Undo / redo ────────────────────────────────────────────────────────────
+
+  /** Whether there are commands available to undo. */
+  get canUndo(): boolean {
+    return this._undoStack.length > 0;
+  }
+
+  /** Whether there are commands available to redo. */
+  get canRedo(): boolean {
+    return this._redoStack.length > 0;
+  }
+
+  /** Number of commands in each stack (`{ undo, redo }`). */
+  get historySize(): { undo: number; redo: number } {
+    return { undo: this._undoStack.length, redo: this._redoStack.length };
+  }
+
+  /**
+   * Undo the most recent recorded editor command.
+   * Returns `true` if a command was undone, `false` if the stack was empty.
+   */
+  undo(): boolean {
+    const cmd = this._undoStack.pop();
+    if (!cmd) return false;
+    this._applyUndo(cmd);
+    this._redoStack.push(cmd);
+    return true;
+  }
+
+  /**
+   * Redo the most recently undone editor command.
+   * Returns `true` if a command was redone, `false` if the stack was empty.
+   */
+  redo(): boolean {
+    const cmd = this._redoStack.pop();
+    if (!cmd) return false;
+    this._applyRedo(cmd);
+    this._undoStack.push(cmd);
+    return true;
   }
 
   cycleGizmoMode(): EditorGizmoMode {
@@ -277,6 +369,18 @@ export class MapEditorSystem {
 
     this._entities.push(entity);
     this._selectMesh(mesh);
+
+    this._pushCommand({
+      type: "place",
+      entry: {
+        id,
+        type,
+        position: { x: snapped.x, y: snapped.y, z: snapped.z },
+        rotation: { x: 0, y: 0, z: 0 },
+      },
+      patrolGroupId: entity.patrolGroupId,
+    });
+
     return mesh;
   }
 
@@ -288,11 +392,20 @@ export class MapEditorSystem {
     const entity = this._findEntityById(entityId);
     if (!entity) return false;
 
+    const before = { ...entity.properties };
     entity.properties = { ...entity.properties, ...properties };
     entity.mesh.metadata = {
       ...(entity.mesh.metadata ?? {}),
       editorProperties: entity.properties,
     };
+
+    this._pushCommand({
+      type: "set-properties",
+      entityId,
+      before,
+      after: { ...entity.properties },
+    });
+
     return true;
   }
 
@@ -307,9 +420,25 @@ export class MapEditorSystem {
     if (idx === -1) return false;
 
     const entity = this._entities[idx];
+    const { x: px, y: py, z: pz } = entity.mesh.position;
+    const { x: rx, y: ry, z: rz } = entity.mesh.rotation;
+
     if (this._selectedEntityId === entityId) {
       this._clearSelection();
     }
+
+    this._pushCommand({
+      type: "remove",
+      entry: {
+        id: entityId,
+        type: entity.type,
+        position: { x: px, y: py, z: pz },
+        rotation: { x: rx, y: ry, z: rz },
+        ...(Object.keys(entity.properties).length > 0 ? { properties: { ...entity.properties } } : {}),
+      },
+      patrolGroupId: entity.patrolGroupId,
+    });
+
     entity.mesh.dispose();
     this._entities.splice(idx, 1);
     return true;
@@ -342,6 +471,20 @@ export class MapEditorSystem {
 
   get activePatrolGroupId(): string | null {
     return this._activePatrolGroupId;
+  }
+
+  /**
+   * Record a move command explicitly (useful when transforms are applied
+   * programmatically rather than via gizmo drag).
+   * The caller is responsible for updating the mesh position/rotation to match
+   * `after` before or after calling this.
+   */
+  recordMove(
+    entityId: string,
+    before: { position: { x: number; y: number; z: number }; rotation: { x: number; y: number; z: number } },
+    after: { position: { x: number; y: number; z: number }; rotation: { x: number; y: number; z: number } },
+  ): void {
+    this._pushCommand({ type: "move", entityId, before, after });
   }
 
   // ─── Serialization ──────────────────────────────────────────────────────────
@@ -613,6 +756,8 @@ export class MapEditorSystem {
     this._patrolGroups.clear();
     this._activePatrolGroupId = null;
     this._clearSelection();
+    this._undoStack = [];
+    this._redoStack = [];
   }
 
 
@@ -725,6 +870,143 @@ export class MapEditorSystem {
     if (!Array.isArray(v["entries"])) return false;
     if (!Array.isArray(v["patrolRoutes"])) return false;
     return true;
+  }
+
+  // ── Undo/redo internals ──────────────────────────────────────────────────
+
+  private _pushCommand(cmd: EditorCommand): void {
+    this._undoStack.push(cmd);
+    if (this._undoStack.length > MapEditorSystem.MAX_HISTORY) {
+      this._undoStack.shift();
+    }
+    this._redoStack = [];
+  }
+
+  private _captureDragSnapshot(): void {
+    const attached = this.gizmoManager.attachedMesh;
+    if (!attached) return;
+    this._preDragSnapshot = {
+      position: attached.position.clone(),
+      rotation: attached.rotation.clone(),
+    };
+  }
+
+  private _commitDragCommand(): void {
+    const attached = this.gizmoManager.attachedMesh;
+    if (!attached || !this._preDragSnapshot) return;
+    const entityId = attached.metadata?.editorEntityId as string | undefined;
+    if (!entityId) return;
+
+    const before = this._preDragSnapshot;
+    const after = {
+      position: attached.position.clone(),
+      rotation: attached.rotation.clone(),
+    };
+    this._preDragSnapshot = null;
+
+    const posChanged =
+      Math.abs(before.position.x - after.position.x) > 1e-6 ||
+      Math.abs(before.position.y - after.position.y) > 1e-6 ||
+      Math.abs(before.position.z - after.position.z) > 1e-6;
+    const rotChanged =
+      Math.abs(before.rotation.x - after.rotation.x) > 1e-6 ||
+      Math.abs(before.rotation.y - after.rotation.y) > 1e-6 ||
+      Math.abs(before.rotation.z - after.rotation.z) > 1e-6;
+
+    if (!posChanged && !rotChanged) return;
+
+    this._pushCommand({
+      type: "move",
+      entityId,
+      before: {
+        position: { x: before.position.x, y: before.position.y, z: before.position.z },
+        rotation: { x: before.rotation.x, y: before.rotation.y, z: before.rotation.z },
+      },
+      after: {
+        position: { x: after.position.x, y: after.position.y, z: after.position.z },
+        rotation: { x: after.rotation.x, y: after.rotation.y, z: after.rotation.z },
+      },
+    });
+  }
+
+  private _applyUndo(cmd: EditorCommand): void {
+    switch (cmd.type) {
+      case "place":
+        this._removeEntityById(cmd.entry.id);
+        break;
+      case "remove":
+        this._restoreEntity(cmd.entry, cmd.patrolGroupId);
+        break;
+      case "set-properties": {
+        const entity = this._findEntityById(cmd.entityId);
+        if (!entity) break;
+        entity.properties = { ...cmd.before };
+        entity.mesh.metadata = { ...(entity.mesh.metadata ?? {}), editorProperties: entity.properties };
+        break;
+      }
+      case "move": {
+        const entity = this._findEntityById(cmd.entityId);
+        if (!entity) break;
+        entity.mesh.position.set(cmd.before.position.x, cmd.before.position.y, cmd.before.position.z);
+        entity.mesh.rotation.set(cmd.before.rotation.x, cmd.before.rotation.y, cmd.before.rotation.z);
+        break;
+      }
+    }
+  }
+
+  private _applyRedo(cmd: EditorCommand): void {
+    switch (cmd.type) {
+      case "place":
+        this._restoreEntity(cmd.entry, cmd.patrolGroupId);
+        break;
+      case "remove":
+        this._removeEntityById(cmd.entry.id);
+        break;
+      case "set-properties": {
+        const entity = this._findEntityById(cmd.entityId);
+        if (!entity) break;
+        entity.properties = { ...cmd.after };
+        entity.mesh.metadata = { ...(entity.mesh.metadata ?? {}), editorProperties: entity.properties };
+        break;
+      }
+      case "move": {
+        const entity = this._findEntityById(cmd.entityId);
+        if (!entity) break;
+        entity.mesh.position.set(cmd.after.position.x, cmd.after.position.y, cmd.after.position.z);
+        entity.mesh.rotation.set(cmd.after.rotation.x, cmd.after.rotation.y, cmd.after.rotation.z);
+        break;
+      }
+    }
+  }
+
+  private _removeEntityById(entityId: string): void {
+    const idx = this._entities.findIndex(
+      (e) => e.mesh.metadata?.editorEntityId === entityId,
+    );
+    if (idx === -1) return;
+    const entity = this._entities[idx];
+    if (this._selectedEntityId === entityId) this._clearSelection();
+    entity.mesh.dispose();
+    this._entities.splice(idx, 1);
+  }
+
+  private _restoreEntity(entry: MapExportEntry, patrolGroupId?: string): void {
+    const pos = new Vector3(entry.position.x, entry.position.y, entry.position.z);
+    const mesh = this._buildEntityMesh(entry.id, pos, entry.type);
+    mesh.rotation.set(entry.rotation.x, entry.rotation.y, entry.rotation.z);
+    mesh.metadata = {
+      editable: true,
+      editorEntityId: entry.id,
+      editorType: entry.type,
+      ...(patrolGroupId !== undefined ? { patrolGroupId } : {}),
+      ...(entry.properties !== undefined ? { editorProperties: { ...entry.properties } } : {}),
+    };
+    this._entities.push({
+      mesh,
+      type: entry.type,
+      patrolGroupId,
+      properties: { ...(entry.properties ?? {}) },
+    });
   }
 
   private _createGridMesh(): Mesh {

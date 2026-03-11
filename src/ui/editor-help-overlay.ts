@@ -15,6 +15,7 @@ const EDITOR_CONTROLS: readonly string[] = [
   "G: Cycle Gizmo (Position/Rotation/Scale)",
   "P: New Patrol Group",
   "H: Cycle Terrain Tool · [ / ]: Sculpt Step",
+  "Ctrl+Z: Undo · Ctrl+Y: Redo",
   "F4: Export Map · F6: Import Map · F7: Validate Map",
   "F8: Validate Framework Quest Graphs",
   "F10: Open Quest Creator",
