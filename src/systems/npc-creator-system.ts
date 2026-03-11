@@ -94,13 +94,13 @@ export class NpcCreatorSystem {
     const boolFields = ["isHostile", "isMerchant", "respawns"] as const;
 
     for (const f of strFields) {
-      if (fields[f] !== undefined) (this._draft as Record<string, unknown>)[f] = (fields[f] as string).trim();
+      if (fields[f] !== undefined) (this._draft as unknown as Record<string, unknown>)[f] = (fields[f] as string).trim();
     }
     for (const f of numFields) {
-      if (fields[f] !== undefined) (this._draft as Record<string, unknown>)[f] = Math.max(0, fields[f] as number);
+      if (fields[f] !== undefined) (this._draft as unknown as Record<string, unknown>)[f] = Math.max(0, fields[f] as number);
     }
     for (const f of boolFields) {
-      if (fields[f] !== undefined) (this._draft as Record<string, unknown>)[f] = fields[f];
+      if (fields[f] !== undefined) (this._draft as unknown as Record<string, unknown>)[f] = fields[f];
     }
     if (fields.role !== undefined) this._draft.role = fields.role;
   }
