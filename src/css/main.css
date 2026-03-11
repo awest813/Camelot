@@ -585,6 +585,95 @@ body {
   display: none !important;
 }
 
+/* ── Guard Encounter ──────────────────────────────────────────────────────── */
+
+.guard-encounter {
+  position: fixed;
+  inset: 0;
+  z-index: 26;
+  background: radial-gradient(circle at top, rgba(22, 8, 8, 0.95), rgba(8, 2, 2, 0.97));
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.guard-encounter__panel {
+  width: min(560px, 96vw);
+  border-radius: 12px;
+  border: 1px solid rgba(214, 92, 92, 0.45);
+  background: rgba(24, 10, 10, 0.96);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guard-encounter__title {
+  margin: 0;
+  color: #ef9f9f;
+  font-size: 20px;
+}
+
+.guard-encounter__line {
+  margin: 0;
+  color: #f2d7d7;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.guard-encounter__meta {
+  margin: 0;
+  color: #bf9f9f;
+  font-size: 13px;
+}
+
+.guard-encounter__status {
+  margin: 0;
+  color: #b48d8d;
+  font-size: 13px;
+}
+
+.guard-encounter__status--ok {
+  color: #79cf9e;
+}
+
+.guard-encounter__status--error {
+  color: #e58686;
+}
+
+.guard-encounter__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.guard-encounter__btn {
+  border: 1px solid rgba(214, 92, 92, 0.45);
+  border-radius: 8px;
+  background: rgba(40, 16, 16, 0.95);
+  color: #f0caca;
+  padding: 8px 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.guard-encounter__btn--primary {
+  border-color: rgba(123, 214, 163, 0.6);
+  background: linear-gradient(180deg, rgba(32, 88, 61, 0.94), rgba(18, 58, 40, 0.97));
+  color: #d7f4e4;
+}
+
+.guard-encounter__btn--danger {
+  border-color: rgba(226, 103, 103, 0.7);
+  background: linear-gradient(180deg, rgba(124, 40, 40, 0.95), rgba(86, 24, 24, 0.98));
+}
+
+.guard-encounter__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ── Quest Creator ──────────────────────────────────────────────────────────── */
 
 .quest-creator {
