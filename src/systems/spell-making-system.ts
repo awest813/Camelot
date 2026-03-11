@@ -52,6 +52,31 @@ export type SpellComponentEffect =
   | "silence"
   | "burden";
 
+export const SPELL_COMPONENT_EFFECTS: readonly SpellComponentEffect[] = [
+  "damage",
+  "heal",
+  "restore_magicka",
+  "restore_stamina",
+  "silence",
+  "burden",
+];
+
+export const SPELL_COMPONENT_SCHOOLS: readonly SpellSchool[] = [
+  "destruction",
+  "restoration",
+  "illusion",
+  "conjuration",
+  "alteration",
+];
+
+export const SPELL_COMPONENT_DAMAGE_TYPES: readonly DamageType[] = [
+  "fire",
+  "frost",
+  "shock",
+  "magic",
+  "poison",
+];
+
 export interface SpellComponent {
   /** Category of this effect. */
   effectType: SpellComponentEffect;

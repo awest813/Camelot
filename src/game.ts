@@ -8,7 +8,7 @@ import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { Player } from "./entities/player";
 import { UIManager } from "./ui/ui-manager";
 import { WorldManager } from "./world/world-manager";
-import { NPC } from "./entities/npc";
+import { NPC, AIState } from "./entities/npc";
 import { ScheduleSystem } from "./systems/schedule-system";
 import { CombatSystem } from "./systems/combat-system";
 import { DialogueSystem } from "./systems/dialogue-system";
@@ -78,6 +78,9 @@ import { LootTableCreatorSystem } from "./systems/loot-table-creator-system";
 import { LootTableCreatorUI } from "./ui/loot-table-creator-ui";
 import { EditorHubUI } from "./ui/editor-hub-ui";
 import { buildHelpOverlayLines, summarizeValidationReport } from "./ui/editor-help-overlay";
+import { FastTravelUI } from "./ui/fast-travel-ui";
+import { SpellMakingUI } from "./ui/spell-making-ui";
+import { GuardEncounterUI, type GuardEncounterAction } from "./ui/guard-encounter-ui";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -120,6 +123,9 @@ export class Game {
   public lootTableCreatorSystem: LootTableCreatorSystem;
   public lootTableCreatorUI: LootTableCreatorUI;
   public editorHubUI: EditorHubUI;
+  public fastTravelUI: FastTravelUI;
+  public spellMakingUI: SpellMakingUI;
+  public guardEncounterUI: GuardEncounterUI;
 
   // v2 systems (Oblivion-lite)
   public attributeSystem: AttributeSystem;
@@ -202,6 +208,7 @@ export class Game {
   private _playerAtZeroHP: boolean = false;
   private _helpOverlayEl: HTMLDivElement | null = null;
   private _helpOverlayVisible: boolean = false;
+  private _activeGuardChallenge: { guard: NPC; factionId: string; bounty: number } | null = null;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
     this.scene = scene;
@@ -447,6 +454,18 @@ export class Game {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
     };
 
+    // ── Fast Travel UI ────────────────────────────────────────────────────────
+    this.fastTravelUI = new FastTravelUI();
+    this.fastTravelUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
+
+    this.guardEncounterUI = new GuardEncounterUI();
+    this.guardEncounterUI.onResolve = (action) => this._resolveGuardEncounter(action);
+
     // ── v2 system wiring ──────────────────────────────────────────────────────
     this.stealthSystem   = new StealthSystem(this.player, this.scheduleSystem.npcs, this.ui);
     this.crimeSystem     = new CrimeSystem(this.player, this.scheduleSystem.npcs, this.ui);
@@ -601,6 +620,7 @@ export class Game {
       this.lodSystem?.clear();
     };
     this.saveSystem.setFastTravelSystem(this.fastTravelSystem);
+    this.fastTravelUI.onTravel = (locationId) => this._attemptFastTravel(locationId);
 
     this.levelScalingSystem = new LevelScalingSystem();
     // Scale the test NPC on spawn (guard if the npcs list is unexpectedly empty)
@@ -657,6 +677,34 @@ export class Game {
       this.saveSystem.markDirty();
     };
     this.saveSystem.setSpellMakingSystem(this.spellMakingSystem);
+
+    this.spellMakingUI = new SpellMakingUI((components) => this.spellMakingSystem.computeCost(components));
+    this.spellMakingUI.onForge = ({ name, components }) => {
+      const result = this.spellMakingSystem.forgeSpell(name, components, this.barterSystem);
+      if (result.ok) {
+        this.spellMakingUI.showStatus(
+          `Forged "${result.spell!.name}" for ${result.goldCost} gold. Press Z to cycle spells.`,
+        );
+      } else {
+        const reasonMsg: Record<string, string> = {
+          insufficient_gold: "Not enough gold to forge this spell.",
+          duplicate_name: "A custom spell with that name already exists.",
+          no_components: "Add at least one spell component.",
+          too_many_components: "You can only combine up to two components.",
+          invalid_name: "Enter a valid spell name.",
+        };
+        this.spellMakingUI.showStatus(
+          reasonMsg[result.reason ?? ""] ?? `Cannot forge spell (${result.reason ?? "unknown"}).`,
+          true,
+        );
+      }
+    };
+    this.spellMakingUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
 
     // RespawnSystem — register the test cave as a respawnable zone (72 game-hours)
     this.respawnSystem = new RespawnSystem();
@@ -759,27 +807,20 @@ export class Game {
       );
     };
 
-    // Crime infamy — upgrade the guard challenge to offer a jail option
+    // Crime encounter: present an interactive guard challenge modal.
     this.crimeSystem.onGuardChallenge = (guardNpc, factionId, bounty) => {
-      this.ui.showNotification(
-        `${guardNpc.mesh.name}: "Stop! You have a ${bounty}g bounty in ${factionId}!"`, 4000
-      );
-      // Auto-jail if player cannot pay — check inventory for gold_coins.
-      // Full Oblivion-style would use a dialogue; for now auto-jail fires when
-      // the player has insufficient gold.
-      const goldEntry = this.inventorySystem.items.find(i => i.id === GOLD_ITEM_ID);
-      const playerGold = goldEntry ? (goldEntry.quantity ?? 0) : 0;
-      if (playerGold < bounty) {
-        const result = this.jailSystem.serveJailTime(
-          bounty, factionId,
-          this.timeSystem,
-          this.skillProgressionSystem,
-          this.crimeSystem,
-          this.timeSystem.gameTime,
-        );
-        this.ui.showNotification(result.message, 4000);
-        this.fameSystem.addInfamy(Math.ceil(bounty / 10));
-      }
+      this._activeGuardChallenge = { guard: guardNpc, factionId, bounty };
+      const speechLevel = this.skillProgressionSystem.getSkill("speechcraft")?.level ?? 0;
+      this.guardEncounterUI.open({
+        guardName: guardNpc.mesh.name,
+        factionId,
+        bounty,
+        playerGold: this._getInventoryGold(),
+        canPersuade: this.persuasionSystem.canAttemptPersuasion(guardNpc.mesh.name, speechLevel),
+      });
+      this.interactionSystem.isBlocked = true;
+      document.exitPointerLock();
+      this.player.camera.detachControl();
       this.eventBus.emit("crime:committed", { crimeType: "challenge", factionId, bounty });
     };
 
@@ -1041,7 +1082,9 @@ export class Game {
             if (kbInfo.event.key === "Escape") {
                 if (this.dialogueSystem.isInDialogue) return;
 
-                if (this.mapEditorSystem.isEnabled) {
+                if (this.guardEncounterUI.isVisible) {
+                    this._resolveGuardEncounter("resist_arrest");
+                } else if (this.mapEditorSystem.isEnabled) {
                     this.mapEditorSystem.toggle();
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
@@ -1076,6 +1119,10 @@ export class Game {
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.spellMakingUI.isVisible) {
+                    this.spellMakingUI.close();
+                } else if (this.fastTravelUI.isVisible) {
+                    this.fastTravelUI.close();
                 } else if (this.questCreatorUI.isVisible) {
                     this.questCreatorUI.close();
                     this.canvas.requestPointerLock();
@@ -1185,15 +1232,29 @@ export class Game {
                       this.skillProgressionSystem.gainXP("marksman", 5 * this.classSystem.xpMultiplierFor("marksman"));
                     }
                 }
-            } else if (kbInfo.event.key === "y" || kbInfo.event.key === "Y") {
-                // Fast Travel — open location list
-                if (!this.isPaused && !this.dialogueSystem.isInDialogue && !this.inventorySystem.isOpen) {
+            } else if ((kbInfo.event.key === "y" || kbInfo.event.key === "Y")
+                    && !kbInfo.event.ctrlKey
+                    && !kbInfo.event.metaKey) {
+                // Fast Travel — open destination picker
+                if (this.fastTravelUI.isVisible) {
+                    this.fastTravelUI.close();
+                    return;
+                }
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue && !this.inventorySystem.isOpen && !this.mapEditorSystem.isEnabled) {
                     const locs = this.fastTravelSystem.discoveredLocations;
                     if (locs.length === 0) {
                         this.ui.showNotification("No locations discovered yet.", 2000);
                     } else {
-                        const list = locs.map((l, i) => `[${i + 1}] ${l.name}`).join("  ");
-                        this.ui.showNotification(`Fast Travel: ${list}`, 5000);
+                        this.fastTravelUI.open(
+                            locs.map((loc) => ({
+                                id: loc.id,
+                                name: loc.name,
+                                estimatedHours: this.fastTravelSystem.estimateTravelHours(this.player.camera.position, loc.id) ?? 1,
+                            })),
+                        );
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
                     }
                 }
             } else if (kbInfo.event.key === "c" || kbInfo.event.key === "C") {
@@ -1457,29 +1518,14 @@ export class Game {
                     }
                 }
             } else if (kbInfo.event.key === "x" || kbInfo.event.key === "X") {
-                // Spell Making — forge a sample custom spell (X = eXperimental magic)
-                // A full UI would present a form; here we demonstrate the system with a
-                // hardcoded sample so the feature is exercisable from the keyboard.
                 if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
-                    const result = this.spellMakingSystem.forgeSpell(
-                        `Custom Bolt ${this.spellMakingSystem.customSpells.length + 1}`,
-                        [{ effectType: "damage", school: "destruction", magnitude: 15, duration: 4, damageType: "shock" }],
-                        this.barterSystem,
-                    );
-                    if (result.ok) {
-                        this.ui.showNotification(
-                            `Spell forged: "${result.spell!.name}" — ${result.goldCost}g spent.  Z to cycle spells.`,
-                            3500,
-                        );
+                    if (this.spellMakingUI.isVisible) {
+                        this.spellMakingUI.close();
                     } else {
-                        const reasonMsg: Record<string, string> = {
-                            insufficient_gold: "Not enough gold to forge a spell.",
-                            duplicate_name:    "A spell with that name already exists.",
-                        };
-                        this.ui.showNotification(
-                            reasonMsg[result.reason ?? ""] ?? `Cannot forge spell: ${result.reason}`,
-                            2500,
-                        );
+                        this.spellMakingUI.open();
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
                     }
                 }
             } else if (kbInfo.event.key === "v" || kbInfo.event.key === "V") {
@@ -1875,6 +1921,198 @@ export class Game {
       }
   }
 
+  private _isPlayerInCombat(): boolean {
+      return this.scheduleSystem.npcs.some((npc) =>
+          !npc.isDead &&
+          (npc.aiState === AIState.ALERT ||
+           npc.aiState === AIState.INVESTIGATE ||
+           npc.aiState === AIState.CHASE ||
+           npc.aiState === AIState.ATTACK)
+      );
+  }
+
+  private _attemptFastTravel(locationId: string): void {
+      const hours = this.fastTravelSystem.estimateTravelHours(this.player.camera.position, locationId);
+      if (hours === null) {
+          this.ui.showNotification("Unknown destination.", 2000);
+          return;
+      }
+
+      const result = this.fastTravelSystem.fastTravelTo(
+          locationId,
+          this.player,
+          this._isPlayerInCombat(),
+          this.stealthSystem.isCrouching,
+      );
+      if (!result.ok) {
+          this.ui.showNotification(result.message, 2200);
+          return;
+      }
+
+      this.timeSystem.advanceHours(hours);
+      this.respawnSystem.update(this.timeSystem.gameTime);
+      this.merchantRestockSystem.update(this.timeSystem.gameTime, this.barterSystem);
+      this.ui.showNotification(
+          `${result.message} (${hours.toFixed(1)}h passed) — ${this.timeSystem.timeString}`,
+          3200,
+      );
+      this.fastTravelUI.close();
+      this.saveSystem.markDirty();
+  }
+
+  private _getInventoryGold(): number {
+      const goldEntry = this.inventorySystem.items.find((item) => item.id === GOLD_ITEM_ID);
+      return goldEntry?.quantity ?? 0;
+  }
+
+  private _consumeInventoryGold(amount: number): boolean {
+      if (amount <= 0) return true;
+      const available = this._getInventoryGold();
+      if (available < amount) return false;
+      return this.inventorySystem.removeItem(GOLD_ITEM_ID, amount);
+  }
+
+  private _refreshGuardEncounterView(statusMessage?: string, isError: boolean = false): void {
+      const challenge = this._activeGuardChallenge;
+      if (!challenge) return;
+      const speechLevel = this.skillProgressionSystem.getSkill("speechcraft")?.level ?? 0;
+      this.guardEncounterUI.open({
+          guardName: challenge.guard.mesh.name,
+          factionId: challenge.factionId,
+          bounty: challenge.bounty,
+          playerGold: this._getInventoryGold(),
+          canPersuade: this.persuasionSystem.canAttemptPersuasion(challenge.guard.mesh.name, speechLevel),
+      });
+      if (statusMessage) this.guardEncounterUI.showStatus(statusMessage, isError);
+  }
+
+  private _closeGuardEncounter(): void {
+      this.guardEncounterUI.close();
+      this._activeGuardChallenge = null;
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+  }
+
+  private _engageGuardCombat(guard: NPC): void {
+      guard.isAggressive = true;
+      guard.aiState = AIState.CHASE;
+      guard.lastKnownPlayerPos = this.player.camera.position.clone();
+      this.ui.showNotification(`${guard.mesh.name} attacks!`, 2500);
+  }
+
+  private _resolveGuardEncounter(action: GuardEncounterAction): void {
+      const challenge = this._activeGuardChallenge;
+      if (!challenge) return;
+
+      const speechLevel = this.skillProgressionSystem.getSkill("speechcraft")?.level ?? 0;
+      const speechMultiplier = this.classSystem.xpMultiplierFor("speechcraft");
+
+      switch (action) {
+          case "pay_fine": {
+              const playerGold = this._getInventoryGold();
+              const paid = this.crimeSystem.payBounty(challenge.factionId, playerGold);
+              if (paid <= 0 || !this._consumeInventoryGold(paid)) {
+                  this._refreshGuardEncounterView("You do not have enough gold to pay the fine.", true);
+                  return;
+              }
+              this.ui.showNotification(`Fine paid (${paid}g). You are free to go.`, 2500);
+              this.skillProgressionSystem.gainXP("speechcraft", 4 * speechMultiplier);
+              this.saveSystem.markDirty();
+              this._closeGuardEncounter();
+              return;
+          }
+          case "go_to_jail": {
+              const result = this.jailSystem.serveJailTime(
+                  challenge.bounty,
+                  challenge.factionId,
+                  this.timeSystem,
+                  this.skillProgressionSystem,
+                  this.crimeSystem,
+                  this.timeSystem.gameTime,
+              );
+              this.fameSystem.addInfamy(Math.ceil(challenge.bounty / 12));
+              this.ui.showNotification(result.message, 4200);
+              this.saveSystem.markDirty();
+              this._closeGuardEncounter();
+              return;
+          }
+          case "resist_arrest": {
+              const surcharge = Math.max(10, Math.ceil(challenge.bounty * 0.25));
+              challenge.bounty = this.crimeSystem.adjustBounty(challenge.factionId, surcharge);
+              this.fameSystem.addInfamy(Math.ceil(surcharge / 5));
+              this._engageGuardCombat(challenge.guard);
+              this.saveSystem.markDirty();
+              this._closeGuardEncounter();
+              return;
+          }
+          case "persuade": {
+              if (!this.persuasionSystem.canAttemptPersuasion(challenge.guard.mesh.name, speechLevel)) {
+                  this._refreshGuardEncounterView("Your Speechcraft is too low to attempt persuasion.", true);
+                  return;
+              }
+
+              const oldDisposition = this.persuasionSystem.getDisposition(challenge.guard.mesh.name);
+              const persuasionAction = challenge.bounty >= 300 ? "coerce" : "boast";
+              const result = this.persuasionSystem.attemptPersuasionAction(
+                  challenge.guard.mesh.name,
+                  speechLevel,
+                  persuasionAction,
+              );
+              this.eventBus.emit("disposition:changed", {
+                  npcId: challenge.guard.mesh.name,
+                  oldValue: oldDisposition,
+                  newValue: result.newDisposition,
+              });
+
+              if (result.outcome === "critical_success") {
+                  this.crimeSystem.clearBounty(challenge.factionId);
+                  this.fameSystem.addFame(2);
+                  this.skillProgressionSystem.gainXP("speechcraft", 18 * speechMultiplier);
+                  this.ui.showNotification(`${challenge.guard.mesh.name} withdraws the charges.`, 2800);
+                  this.saveSystem.markDirty();
+                  this._closeGuardEncounter();
+                  return;
+              }
+
+              if (result.outcome === "success") {
+                  challenge.bounty = this.crimeSystem.setBounty(challenge.factionId, Math.floor(challenge.bounty * 0.5));
+                  this.skillProgressionSystem.gainXP("speechcraft", 12 * speechMultiplier);
+                  if (challenge.bounty <= 0) {
+                      this.ui.showNotification("Persuasion successful. Your bounty has been cleared.", 2800);
+                      this.saveSystem.markDirty();
+                      this._closeGuardEncounter();
+                  } else {
+                      this._refreshGuardEncounterView(`Persuasion worked. Reduced bounty to ${challenge.bounty}g.`);
+                      this.saveSystem.markDirty();
+                  }
+                  return;
+              }
+
+              if (result.outcome === "critical_failure") {
+                  const surcharge = Math.max(20, Math.ceil(challenge.bounty * 0.3));
+                  challenge.bounty = this.crimeSystem.adjustBounty(challenge.factionId, surcharge);
+                  this.fameSystem.addInfamy(3);
+                  this.skillProgressionSystem.gainXP("speechcraft", 3 * speechMultiplier);
+                  this.ui.showNotification("Persuasion backfired!", 2200);
+                  this._engageGuardCombat(challenge.guard);
+                  this.saveSystem.markDirty();
+                  this._closeGuardEncounter();
+                  return;
+              }
+
+              // Normal failure
+              const surcharge = Math.max(5, Math.ceil(challenge.bounty * 0.1));
+              challenge.bounty = this.crimeSystem.adjustBounty(challenge.factionId, surcharge);
+              this.skillProgressionSystem.gainXP("speechcraft", 5 * speechMultiplier);
+              this._refreshGuardEncounterView(`Persuasion failed. Bounty increased to ${challenge.bounty}g.`, true);
+              this.saveSystem.markDirty();
+              return;
+          }
+      }
+  }
+
   private _isCombatInputBlocked(): boolean {
       return (
           this.isPaused ||
@@ -1882,6 +2120,9 @@ export class Game {
           this.inventorySystem.isOpen ||
           this.questSystem.isLogOpen ||
           this.skillTreeSystem.isOpen ||
+          this.guardEncounterUI.isVisible ||
+          this.spellMakingUI.isVisible ||
+          this.fastTravelUI.isVisible ||
           this.dialogueSystem.isInDialogue ||
           this.interactionSystem.isBlocked
       );

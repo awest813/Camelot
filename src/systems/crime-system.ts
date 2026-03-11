@@ -124,6 +124,25 @@ export class CrimeSystem {
     return this._bounties.get(factionId) ?? 0;
   }
 
+  /** Force-set a faction bounty (clamped to 0+). Returns the new value. */
+  public setBounty(factionId: string, value: number): number {
+    const next = Math.max(0, Math.round(value));
+    this._bounties.set(factionId, next);
+    return next;
+  }
+
+  /** Adjust a faction bounty by a delta. Returns the new value. */
+  public adjustBounty(factionId: string, delta: number): number {
+    return this.setBounty(factionId, this.getBounty(factionId) + delta);
+  }
+
+  /** Clears a single faction bounty and returns the amount removed. */
+  public clearBounty(factionId: string): number {
+    const removed = this.getBounty(factionId);
+    this._bounties.set(factionId, 0);
+    return removed;
+  }
+
   public getTotalBounty(): number {
     let total = 0;
     for (const v of this._bounties.values()) total += v;

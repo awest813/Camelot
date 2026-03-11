@@ -89,6 +89,26 @@ describe("CrimeSystem", () => {
     expect(crimeSystem.getTotalBounty()).toBe(0);
   });
 
+  it("setBounty overwrites faction bounty", () => {
+    crimeSystem.setBounty("town_guard", 77);
+    expect(crimeSystem.getBounty("town_guard")).toBe(77);
+  });
+
+  it("adjustBounty applies positive and negative deltas", () => {
+    crimeSystem.setBounty("town_guard", 50);
+    expect(crimeSystem.adjustBounty("town_guard", 20)).toBe(70);
+    expect(crimeSystem.adjustBounty("town_guard", -30)).toBe(40);
+  });
+
+  it("clearBounty clears one faction only", () => {
+    crimeSystem.setBounty("town_guard", 60);
+    crimeSystem.setBounty("mage_guild", 90);
+    const removed = crimeSystem.clearBounty("town_guard");
+    expect(removed).toBe(60);
+    expect(crimeSystem.getBounty("town_guard")).toBe(0);
+    expect(crimeSystem.getBounty("mage_guild")).toBe(90);
+  });
+
   it("update triggers onGuardChallenge when player is near guard with bounty", () => {
     const spy = vi.fn();
     crimeSystem.onGuardChallenge = spy;
