@@ -8,7 +8,7 @@ import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { Player } from "./entities/player";
 import { UIManager } from "./ui/ui-manager";
 import { WorldManager } from "./world/world-manager";
-import { NPC } from "./entities/npc";
+import { NPC, AIState } from "./entities/npc";
 import { ScheduleSystem } from "./systems/schedule-system";
 import { CombatSystem } from "./systems/combat-system";
 import { DialogueSystem } from "./systems/dialogue-system";
@@ -78,6 +78,7 @@ import { LootTableCreatorSystem } from "./systems/loot-table-creator-system";
 import { LootTableCreatorUI } from "./ui/loot-table-creator-ui";
 import { EditorHubUI } from "./ui/editor-hub-ui";
 import { buildHelpOverlayLines, summarizeValidationReport } from "./ui/editor-help-overlay";
+import { FastTravelUI } from "./ui/fast-travel-ui";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -120,6 +121,7 @@ export class Game {
   public lootTableCreatorSystem: LootTableCreatorSystem;
   public lootTableCreatorUI: LootTableCreatorUI;
   public editorHubUI: EditorHubUI;
+  public fastTravelUI: FastTravelUI;
 
   // v2 systems (Oblivion-lite)
   public attributeSystem: AttributeSystem;
@@ -447,6 +449,15 @@ export class Game {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
     };
 
+    // ── Fast Travel UI ────────────────────────────────────────────────────────
+    this.fastTravelUI = new FastTravelUI();
+    this.fastTravelUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
+
     // ── v2 system wiring ──────────────────────────────────────────────────────
     this.stealthSystem   = new StealthSystem(this.player, this.scheduleSystem.npcs, this.ui);
     this.crimeSystem     = new CrimeSystem(this.player, this.scheduleSystem.npcs, this.ui);
@@ -601,6 +612,7 @@ export class Game {
       this.lodSystem?.clear();
     };
     this.saveSystem.setFastTravelSystem(this.fastTravelSystem);
+    this.fastTravelUI.onTravel = (locationId) => this._attemptFastTravel(locationId);
 
     this.levelScalingSystem = new LevelScalingSystem();
     // Scale the test NPC on spawn (guard if the npcs list is unexpectedly empty)
@@ -1076,6 +1088,8 @@ export class Game {
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.fastTravelUI.isVisible) {
+                    this.fastTravelUI.close();
                 } else if (this.questCreatorUI.isVisible) {
                     this.questCreatorUI.close();
                     this.canvas.requestPointerLock();
@@ -1185,15 +1199,29 @@ export class Game {
                       this.skillProgressionSystem.gainXP("marksman", 5 * this.classSystem.xpMultiplierFor("marksman"));
                     }
                 }
-            } else if (kbInfo.event.key === "y" || kbInfo.event.key === "Y") {
-                // Fast Travel — open location list
-                if (!this.isPaused && !this.dialogueSystem.isInDialogue && !this.inventorySystem.isOpen) {
+            } else if ((kbInfo.event.key === "y" || kbInfo.event.key === "Y")
+                    && !kbInfo.event.ctrlKey
+                    && !kbInfo.event.metaKey) {
+                // Fast Travel — open destination picker
+                if (this.fastTravelUI.isVisible) {
+                    this.fastTravelUI.close();
+                    return;
+                }
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue && !this.inventorySystem.isOpen && !this.mapEditorSystem.isEnabled) {
                     const locs = this.fastTravelSystem.discoveredLocations;
                     if (locs.length === 0) {
                         this.ui.showNotification("No locations discovered yet.", 2000);
                     } else {
-                        const list = locs.map((l, i) => `[${i + 1}] ${l.name}`).join("  ");
-                        this.ui.showNotification(`Fast Travel: ${list}`, 5000);
+                        this.fastTravelUI.open(
+                            locs.map((loc) => ({
+                                id: loc.id,
+                                name: loc.name,
+                                estimatedHours: this.fastTravelSystem.estimateTravelHours(this.player.camera.position, loc.id) ?? 1,
+                            })),
+                        );
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
                     }
                 }
             } else if (kbInfo.event.key === "c" || kbInfo.event.key === "C") {
@@ -1875,6 +1903,45 @@ export class Game {
       }
   }
 
+  private _isPlayerInCombat(): boolean {
+      return this.scheduleSystem.npcs.some((npc) =>
+          !npc.isDead &&
+          (npc.aiState === AIState.ALERT ||
+           npc.aiState === AIState.INVESTIGATE ||
+           npc.aiState === AIState.CHASE ||
+           npc.aiState === AIState.ATTACK)
+      );
+  }
+
+  private _attemptFastTravel(locationId: string): void {
+      const hours = this.fastTravelSystem.estimateTravelHours(this.player.camera.position, locationId);
+      if (hours === null) {
+          this.ui.showNotification("Unknown destination.", 2000);
+          return;
+      }
+
+      const result = this.fastTravelSystem.fastTravelTo(
+          locationId,
+          this.player,
+          this._isPlayerInCombat(),
+          this.stealthSystem.isCrouching,
+      );
+      if (!result.ok) {
+          this.ui.showNotification(result.message, 2200);
+          return;
+      }
+
+      this.timeSystem.advanceHours(hours);
+      this.respawnSystem.update(this.timeSystem.gameTime);
+      this.merchantRestockSystem.update(this.timeSystem.gameTime, this.barterSystem);
+      this.ui.showNotification(
+          `${result.message} (${hours.toFixed(1)}h passed) — ${this.timeSystem.timeString}`,
+          3200,
+      );
+      this.fastTravelUI.close();
+      this.saveSystem.markDirty();
+  }
+
   private _isCombatInputBlocked(): boolean {
       return (
           this.isPaused ||
@@ -1882,6 +1949,7 @@ export class Game {
           this.inventorySystem.isOpen ||
           this.questSystem.isLogOpen ||
           this.skillTreeSystem.isOpen ||
+          this.fastTravelUI.isVisible ||
           this.dialogueSystem.isInDialogue ||
           this.interactionSystem.isBlocked
       );

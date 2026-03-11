@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { FastTravelSystem } from "./fast-travel-system";
+import {
+  FastTravelSystem,
+  FAST_TRAVEL_MIN_HOURS,
+  FAST_TRAVEL_MAX_HOURS,
+} from "./fast-travel-system";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
 // ── Minimal Player stub ───────────────────────────────────────────────────────
@@ -50,6 +54,11 @@ describe("FastTravelSystem", () => {
     expect(fts.isDiscovered("nowhere")).toBe(false);
   });
 
+  it("getLocation returns discovered location metadata", () => {
+    fts.discoverLocation("city", "Great City", new Vector3(1, 2, 3));
+    expect(fts.getLocation("city")?.name).toBe("Great City");
+  });
+
   it("accepts plain vector objects (not just Vector3 instances)", () => {
     fts.discoverLocation("plain_vec", "Plain", { x: 1, y: 2, z: 3 });
     expect(fts.isDiscovered("plain_vec")).toBe(true);
@@ -84,6 +93,30 @@ describe("FastTravelSystem", () => {
     const result = fts.fastTravelTo("town_d", makePlayer(), false, true);
     expect(result.ok).toBe(false);
     expect(result.message).toMatch(/sneak/i);
+  });
+
+  it("estimateTravelHours returns null for unknown locations", () => {
+    expect(fts.estimateTravelHours(new Vector3(0, 0, 0), "unknown")).toBeNull();
+  });
+
+  it("estimateTravelHours applies minimum travel time clamp", () => {
+    fts.discoverLocation("nearby", "Nearby", new Vector3(0.1, 0, 0.1));
+    const hours = fts.estimateTravelHours(new Vector3(0, 0, 0), "nearby");
+    expect(hours).toBe(FAST_TRAVEL_MIN_HOURS);
+  });
+
+  it("estimateTravelHours applies maximum travel time clamp", () => {
+    fts.discoverLocation("far", "Far Away", new Vector3(99999, 0, 0));
+    const hours = fts.estimateTravelHours(new Vector3(0, 0, 0), "far");
+    expect(hours).toBe(FAST_TRAVEL_MAX_HOURS);
+  });
+
+  it("estimateTravelHours scales with distance", () => {
+    fts.discoverLocation("close", "Close", new Vector3(100, 0, 0));
+    fts.discoverLocation("farther", "Farther", new Vector3(500, 0, 0));
+    const close = fts.estimateTravelHours(new Vector3(0, 0, 0), "close")!;
+    const farther = fts.estimateTravelHours(new Vector3(0, 0, 0), "farther")!;
+    expect(farther).toBeGreaterThan(close);
   });
 
   it("combat check takes priority over sneak check", () => {
