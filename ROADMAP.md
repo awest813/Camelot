@@ -161,7 +161,7 @@ model.
 
 ### Character Progression Depth (Next)
 
-- 🧭 **Character Level-Up UI** — Dedicated level-up dialog showing available attribute bonuses per attribute, letting the player manually choose 3 attributes to increase instead of auto-applying the top 3; triggered by `PlayerLevelSystem.onLevelUpReady`; dismissable once confirmed.
+- ✅ **Character Level-Up UI** — Dedicated level-up dialog (`LevelUpUI`) showing available attribute bonuses (+1 to +5) per attribute with governing-skill annotations, letting the player manually choose 3 attributes to increase; selection requires exactly 3 distinct attributes; confirm button enables only when 3 are chosen; triggered by `PlayerLevelSystem.onLevelUpReady`; modal (Escape blocked until confirmed); pointer lock and camera control restored on confirm; `onLevelUpComplete` notification fires after bonuses are applied.
 - 🧭 **DailyScheduleSystem** — NPC daily activity schedules (work, eat, sleep); NPCs follow timed waypoint sequences driven by in-game time; sleep state makes NPCs non-interactive and moves them to bed markers; integrates with `ScheduleSystem` and `TimeSystem`.
 - 🧭 **HorseSystem / Mount System** — Rideable horse companions; separate speed/stamina pool; dismount on combat; stable NPCs for purchase; horse inventory slot for saddlebags.
 

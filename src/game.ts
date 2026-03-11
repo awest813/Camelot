@@ -82,6 +82,7 @@ import { buildHelpOverlayLines, summarizeValidationReport } from "./ui/editor-he
 import { FastTravelUI } from "./ui/fast-travel-ui";
 import { SpellMakingUI } from "./ui/spell-making-ui";
 import { GuardEncounterUI, type GuardEncounterAction } from "./ui/guard-encounter-ui";
+import { LevelUpUI } from "./ui/level-up-ui";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -127,6 +128,7 @@ export class Game {
   public fastTravelUI: FastTravelUI;
   public spellMakingUI: SpellMakingUI;
   public guardEncounterUI: GuardEncounterUI;
+  public levelUpUI: LevelUpUI;
 
   // v2 systems (Oblivion-lite)
   public attributeSystem: AttributeSystem;
@@ -470,6 +472,14 @@ export class Game {
     this.guardEncounterUI = new GuardEncounterUI();
     this.guardEncounterUI.onResolve = (action) => this._resolveGuardEncounter(action);
 
+    this.levelUpUI = new LevelUpUI();
+    this.levelUpUI.onConfirm = (primary, sec1, sec2) => {
+      this.playerLevelSystem.confirmLevelUp(primary, sec1, sec2);
+      this.interactionSystem.isBlocked = false;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
+
     // ── v2 system wiring ──────────────────────────────────────────────────────
     this.stealthSystem   = new StealthSystem(this.player, this.scheduleSystem.npcs, this.ui);
     this.crimeSystem     = new CrimeSystem(this.player, this.scheduleSystem.npcs, this.ui);
@@ -802,14 +812,11 @@ export class Game {
     this.playerLevelSystem.attachToClassSystem(this.classSystem);
     this.playerLevelSystem.attachToAttributeSystem(this.attributeSystem);
     this.playerLevelSystem.onLevelUpReady = (bonuses) => {
-      const [primary, sec1, sec2] = this.playerLevelSystem.suggestedAttributes;
-      const p = bonuses[primary], s1 = bonuses[sec1], s2 = bonuses[sec2];
-      this.ui.showNotification(
-        `Character Level Up ready! Applying +${p} ${primary}, +${s1} ${sec1}, +${s2} ${sec2}.`,
-        5000,
-      );
-      // Auto-apply the three highest-bonus attributes immediately.
-      this.playerLevelSystem.confirmLevelUp(primary, sec1, sec2);
+      // Open the interactive level-up dialog so the player can choose 3 attributes.
+      this.interactionSystem.isBlocked = true;
+      document.exitPointerLock();
+      this.player.camera.detachControl();
+      this.levelUpUI.open(this.playerLevelSystem.characterLevel + 1, bonuses);
     };
     this.playerLevelSystem.onLevelUpComplete = (newLevel) => {
       // Sync derived stats after attribute bonuses have been applied.
@@ -817,6 +824,7 @@ export class Game {
       this.player.maxMagicka     = this.attributeSystem.maxMagicka;
       this.player.maxStamina     = this.attributeSystem.maxStamina;
       this.player.maxCarryWeight = this.attributeSystem.carryWeight;
+      this.ui.showNotification(`Character Level ${newLevel}!`, 4000);
       this.eventBus.emit("player:levelUp", { newLevel });
       this.saveSystem.markDirty();
     };
@@ -1113,7 +1121,10 @@ export class Game {
             if (kbInfo.event.key === "Escape") {
                 if (this.dialogueSystem.isInDialogue) return;
 
-                if (this.guardEncounterUI.isVisible) {
+                if (this.levelUpUI.isVisible) {
+                    // Level-up is a mandatory choice — Escape is intentionally blocked.
+                    return;
+                } else if (this.guardEncounterUI.isVisible) {
                     this._resolveGuardEncounter("resist_arrest");
                 } else if (this.mapEditorSystem.isEnabled) {
                     this.mapEditorSystem.toggle();
@@ -2151,6 +2162,7 @@ export class Game {
           this.inventorySystem.isOpen ||
           this.questSystem.isLogOpen ||
           this.skillTreeSystem.isOpen ||
+          this.levelUpUI.isVisible ||
           this.guardEncounterUI.isVisible ||
           this.spellMakingUI.isVisible ||
           this.fastTravelUI.isVisible ||
