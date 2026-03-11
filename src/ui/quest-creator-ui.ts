@@ -234,7 +234,7 @@ export class QuestCreatorUI {
     if (nodes.length === 0) {
       const empty = document.createElement("p");
       empty.className = "quest-creator__empty";
-      empty.textContent = "No nodes yet. Click "+ Add Node" to begin.";
+      empty.textContent = "No nodes yet. Click \"+ Add Node\" to begin.";
       this._nodeListEl.appendChild(empty);
       return;
     }

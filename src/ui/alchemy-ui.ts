@@ -234,29 +234,8 @@ export class AlchemyUI {
     closeBtn.top    = "-4px";
     closeBtn.left   = "-14px";
     (closeBtn.textBlock as TextBlock).color = T.DIM;
-    closeBtn.onPointerClickObservable.add(() => this.toggle(false));
-
-    closeBtn.isFocusInvisible = false;
-    closeBtn.tabIndex = 0;
     closeBtn.accessibilityTag = { description: "Close Alchemy Panel" };
-
-    let isFocused = false;
-    closeBtn.onFocusObservable.add(() => {
-        isFocused = true;
-        closeBtn.thickness = 2;
-    });
-    closeBtn.onBlurObservable.add(() => {
-        isFocused = false;
-        closeBtn.thickness = 1;
-    });
-    closeBtn.onPointerOutObservable.add(() => {
-        if (!isFocused) closeBtn.thickness = 1;
-    });
-    closeBtn.onKeyboardEventProcessedObservable.add((evt) => {
-      if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
-        closeBtn.onPointerClickObservable.notifyObservers(null as any);
-      }
-    });
+    closeBtn.onPointerClickObservable.add(() => this.toggle(false));
 
     this._panel.addControl(closeBtn);
   }
@@ -481,7 +460,30 @@ export class AlchemyUI {
     btn.thickness     = 1;
     if (btn.textBlock) btn.textBlock.color = T.TEXT;
     btn.onPointerEnterObservable.add(() => { btn.background = hover; });
-    btn.onPointerOutObservable.add(()   => { btn.background = bg; });
+
+    btn.isFocusInvisible = false;
+    btn.tabIndex = 0;
+    btn.accessibilityTag = { description: label };
+
+    let isFocused = false;
+    btn.onFocusObservable.add(() => {
+      isFocused = true;
+      btn.thickness = 2;
+    });
+    btn.onBlurObservable.add(() => {
+      isFocused = false;
+      btn.thickness = 1;
+    });
+    btn.onPointerOutObservable.add(() => {
+      btn.background = bg;
+      if (!isFocused) btn.thickness = 1;
+    });
+    btn.onKeyboardEventProcessedObservable.add((evt) => {
+      if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
+        btn.onPointerClickObservable.notifyObservers(null as any);
+      }
+    });
+
     return btn;
   }
 }
