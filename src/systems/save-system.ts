@@ -31,9 +31,10 @@ import type { MerchantRestockSystem } from "./merchant-restock-system";
 import type { BirthsignSystem } from "./birthsign-system";
 import type { ClassSystem } from "./class-system";
 import type { RaceSystem } from "./race-system";
+import type { PlayerLevelSystem } from "./player-level-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 16;
+const SAVE_VERSION = 17;
 /** Oldest save version that can still be loaded (forward-compat window). */
 const SAVE_VERSION_MIN = 5;
 
@@ -91,6 +92,8 @@ interface ParsedSaveData {
   // v15 additions
   race?: unknown;
   // v16 additions (race power cooldown baked into race save state)
+  // v17 additions
+  playerLevel?: unknown;
 }
 
 interface EquipmentEntry {
@@ -144,6 +147,8 @@ export interface SaveData {
   // v15 additions
   race?: any;
   // v16: race power cooldown baked into race save state — no new top-level field
+  // v17 additions
+  playerLevel?: any;
 }
 
 export class SaveSystem {
@@ -201,6 +206,9 @@ export class SaveSystem {
 
   // v15 optional systems
   private _raceSystem: RaceSystem | null = null;
+
+  // v17 optional systems
+  private _playerLevelSystem: PlayerLevelSystem | null = null;
 
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
@@ -288,6 +296,10 @@ export class SaveSystem {
 
   public setRaceSystem(s: RaceSystem): void                     { this._raceSystem = s; }
 
+  // ── v17 system injection ──────────────────────────────────────────────────
+
+  public setPlayerLevelSystem(s: PlayerLevelSystem): void       { this._playerLevelSystem = s; }
+
 
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
@@ -361,6 +373,7 @@ export class SaveSystem {
     if (this._birthsignSystem)        data.birthsign        = this._birthsignSystem.getSaveState();
     if (this._classSystem)            data.characterClass   = this._classSystem.getSaveState();
     if (this._raceSystem)             data.race             = this._raceSystem.getSaveState();
+    if (this._playerLevelSystem)      data.playerLevel      = this._playerLevelSystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -537,6 +550,10 @@ export class SaveSystem {
     // v15 systems
     if (this._raceSystem && data.race)
       this._raceSystem.restoreFromSave(data.race as any);
+
+    // v17 systems
+    if (this._playerLevelSystem && data.playerLevel)
+      this._playerLevelSystem.restoreFromSave(data.playerLevel as any);
 
     // Restore player name (v15+; keep default "Hero" for older saves)
     if (typeof data.player.name === "string" && data.player.name.trim()) {
