@@ -66,6 +66,13 @@ import { RaceSystem } from "./systems/race-system";
 import { CharacterCreationUI } from "./ui/character-creation-ui";
 import { QuestCreatorSystem } from "./systems/quest-creator-system";
 import { QuestCreatorUI } from "./ui/quest-creator-ui";
+import { DialogueCreatorSystem } from "./systems/dialogue-creator-system";
+import { DialogueCreatorUI } from "./ui/dialogue-creator-ui";
+import { NpcCreatorSystem } from "./systems/npc-creator-system";
+import { NpcCreatorUI } from "./ui/npc-creator-ui";
+import { ItemCreatorSystem } from "./systems/item-creator-system";
+import { ItemCreatorUI } from "./ui/item-creator-ui";
+import { EditorHubUI } from "./ui/editor-hub-ui";
 import { buildHelpOverlayLines, summarizeValidationReport } from "./ui/editor-help-overlay";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
@@ -98,6 +105,13 @@ export class Game {
   public mapEditorHierarchyPanel: MapEditorHierarchyPanel;
   public questCreatorSystem: QuestCreatorSystem;
   public questCreatorUI: QuestCreatorUI;
+  public dialogueCreatorSystem: DialogueCreatorSystem;
+  public dialogueCreatorUI: DialogueCreatorUI;
+  public npcCreatorSystem: NpcCreatorSystem;
+  public npcCreatorUI: NpcCreatorUI;
+  public itemCreatorSystem: ItemCreatorSystem;
+  public itemCreatorUI: ItemCreatorUI;
+  public editorHubUI: EditorHubUI;
 
   // v2 systems (Oblivion-lite)
   public attributeSystem: AttributeSystem;
@@ -345,6 +359,63 @@ export class Game {
     this.questCreatorSystem = new QuestCreatorSystem();
     this.questCreatorUI = new QuestCreatorUI(this.questCreatorSystem);
     this.questCreatorUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+    };
+
+    // ── Dialogue Creator ───────────────────────────────────────────────────────
+    this.dialogueCreatorSystem = new DialogueCreatorSystem();
+    this.dialogueCreatorUI = new DialogueCreatorUI(this.dialogueCreatorSystem);
+    this.dialogueCreatorUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+    };
+
+    // ── NPC Creator ────────────────────────────────────────────────────────────
+    this.npcCreatorSystem = new NpcCreatorSystem();
+    this.npcCreatorUI = new NpcCreatorUI(this.npcCreatorSystem);
+    this.npcCreatorUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+    };
+
+    // ── Item Creator ───────────────────────────────────────────────────────────
+    this.itemCreatorSystem = new ItemCreatorSystem();
+    this.itemCreatorUI = new ItemCreatorUI(this.itemCreatorSystem);
+    this.itemCreatorUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+    };
+
+    // ── Editor Hub ─────────────────────────────────────────────────────────────
+    this.editorHubUI = new EditorHubUI({
+      onOpen: (tool) => {
+        this.interactionSystem.isBlocked = true;
+        document.exitPointerLock();
+        this.player.camera.detachControl();
+        switch (tool) {
+          case "map":
+            if (!this.mapEditorSystem.isEnabled) {
+              this.mapEditorSystem.toggle();
+              this.mapEditorToolbar.show();
+              this.mapEditorHierarchyPanel.show();
+              this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+              this._refreshEditorToolbar();
+              this.ui.showNotification("Map Editor enabled (F2 to exit)", 2500);
+            }
+            break;
+          case "quest":
+            this.questCreatorUI.open();
+            break;
+          case "dialogue":
+            this.dialogueCreatorUI.open();
+            break;
+          case "npc":
+            this.npcCreatorUI.open();
+            break;
+          case "item":
+            this.itemCreatorUI.open();
+            break;
+        }
+      },
+    });
+    this.editorHubUI.onClose = () => {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
     };
 
@@ -981,6 +1052,22 @@ export class Game {
                     this.questCreatorUI.close();
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.dialogueCreatorUI.isVisible) {
+                    this.dialogueCreatorUI.close();
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
+                } else if (this.npcCreatorUI.isVisible) {
+                    this.npcCreatorUI.close();
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
+                } else if (this.itemCreatorUI.isVisible) {
+                    this.itemCreatorUI.close();
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
+                } else if (this.editorHubUI.isVisible) {
+                    this.editorHubUI.close();
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
                 } else if (this.ui.isWaitDialogOpen) {
                     this.ui.toggleWaitDialog(false);
                     this.interactionSystem.isBlocked = false;
@@ -1195,13 +1282,58 @@ export class Game {
                   console.warn("[QuestGraphValidation]", reports);
                 }
             } else if (kbInfo.event.key === "F10") {
-                if (this.questCreatorUI.isVisible) {
-                    this.questCreatorUI.close();
+                if (kbInfo.event.shiftKey) {
+                    // Shift+F10 → NPC Creator
+                    if (this.npcCreatorUI.isVisible) {
+                        this.npcCreatorUI.close();
+                    } else {
+                        this.npcCreatorUI.open();
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    }
                 } else {
-                    this.questCreatorUI.open();
+                    // F10 → Quest Creator
+                    if (this.questCreatorUI.isVisible) {
+                        this.questCreatorUI.close();
+                    } else {
+                        this.questCreatorUI.open();
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    }
+                }
+            } else if (kbInfo.event.key === "F11") {
+                // F11 → Editor Hub
+                const isNowOpen = this.editorHubUI.toggle();
+                if (isNowOpen) {
                     this.interactionSystem.isBlocked = true;
                     document.exitPointerLock();
                     this.player.camera.detachControl();
+                } else {
+                    this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+                }
+            } else if (kbInfo.event.key === "F12") {
+                if (kbInfo.event.shiftKey) {
+                    // Shift+F12 → Item Creator
+                    if (this.itemCreatorUI.isVisible) {
+                        this.itemCreatorUI.close();
+                    } else {
+                        this.itemCreatorUI.open();
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    }
+                } else {
+                    // F12 → Dialogue Creator
+                    if (this.dialogueCreatorUI.isVisible) {
+                        this.dialogueCreatorUI.close();
+                    } else {
+                        this.dialogueCreatorUI.open();
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    }
                 }
             } else if (kbInfo.event.key === "n" || kbInfo.event.key === "N") {
                 if (!this.mapEditorSystem.isEnabled) return;
