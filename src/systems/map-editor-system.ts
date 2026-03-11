@@ -377,7 +377,6 @@ export class MapEditorSystem {
         type,
         position: { x: snapped.x, y: snapped.y, z: snapped.z },
         rotation: { x: 0, y: 0, z: 0 },
-        ...(entity.patrolGroupId !== undefined ? { patrolGroupId: entity.patrolGroupId } : {}),
       },
       patrolGroupId: entity.patrolGroupId,
     });
@@ -435,7 +434,6 @@ export class MapEditorSystem {
         type: entity.type,
         position: { x: px, y: py, z: pz },
         rotation: { x: rx, y: ry, z: rz },
-        ...(entity.patrolGroupId !== undefined ? { patrolGroupId: entity.patrolGroupId } : {}),
         ...(Object.keys(entity.properties).length > 0 ? { properties: { ...entity.properties } } : {}),
       },
       patrolGroupId: entity.patrolGroupId,
