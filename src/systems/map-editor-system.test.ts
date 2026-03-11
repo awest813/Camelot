@@ -930,3 +930,103 @@ describe('MapEditorSystem — undo/redo (move)', () => {
         expect(mesh.position.z).toBeCloseTo(5);
     });
 });
+
+// ─── New public API: entityCount, listEntitySummaries, selectEntityById ───────
+
+describe('MapEditorSystem — entityCount and listEntitySummaries', () => {
+    it('entityCount is 0 initially', () => {
+        const { editor } = makeEditor();
+        expect(editor.entityCount).toBe(0);
+    });
+
+    it('entityCount increments after placing entities', () => {
+        const { editor } = makeEditor();
+        editor.placeEntity(new Vector3(0, 0, 0), 'marker');
+        editor.placeEntity(new Vector3(2, 0, 0), 'loot');
+        expect(editor.entityCount).toBe(2);
+    });
+
+    it('entityCount decrements after removing an entity', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 0, 0), 'marker');
+        const id = mesh.metadata?.editorEntityId as string;
+        editor.removeEntity(id);
+        expect(editor.entityCount).toBe(0);
+    });
+
+    it('listEntitySummaries returns empty array initially', () => {
+        const { editor } = makeEditor();
+        expect(editor.listEntitySummaries()).toEqual([]);
+    });
+
+    it('listEntitySummaries returns correct id and type for each placed entity', () => {
+        const { editor } = makeEditor();
+        const m1 = editor.placeEntity(new Vector3(0, 0, 0), 'marker');
+        const m2 = editor.placeEntity(new Vector3(2, 0, 0), 'loot');
+
+        const summaries = editor.listEntitySummaries();
+        expect(summaries.length).toBe(2);
+
+        const ids = summaries.map(s => s.id);
+        expect(ids).toContain(m1.metadata?.editorEntityId);
+        expect(ids).toContain(m2.metadata?.editorEntityId);
+
+        const types = Object.fromEntries(summaries.map(s => [s.id, s.type]));
+        expect(types[m1.metadata?.editorEntityId]).toBe('marker');
+        expect(types[m2.metadata?.editorEntityId]).toBe('loot');
+    });
+
+    it('listEntitySummaries does not include removed entities', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 0, 0), 'marker');
+        const id = mesh.metadata?.editorEntityId as string;
+        editor.placeEntity(new Vector3(2, 0, 0), 'loot');
+        editor.removeEntity(id);
+
+        const summaries = editor.listEntitySummaries();
+        expect(summaries.length).toBe(1);
+        expect(summaries[0].type).toBe('loot');
+    });
+});
+
+describe('MapEditorSystem — selectEntityById', () => {
+    it('returns false when the entity does not exist', () => {
+        const { editor } = makeEditor();
+        expect(editor.selectEntityById('nonexistent_id')).toBe(false);
+    });
+
+    it('returns true when the entity exists', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 0, 0), 'marker');
+        const id = mesh.metadata?.editorEntityId as string;
+        // clear selection first so we can verify it re-selects
+        editor.toggle(); // enable editor to allow selection
+        expect(editor.selectEntityById(id)).toBe(true);
+    });
+
+    it('fires onEntitySelectionChanged when selecting an existing entity', () => {
+        const { editor } = makeEditor();
+        editor.toggle(); // enable editor
+        const mesh = editor.placeEntity(new Vector3(0, 0, 0), 'npc-spawn');
+        const id = mesh.metadata?.editorEntityId as string;
+        // Place a second entity to change selection away from the first
+        editor.placeEntity(new Vector3(5, 0, 0), 'marker');
+
+        const fired: Array<string | null> = [];
+        editor.onEntitySelectionChanged = (eid) => fired.push(eid);
+
+        // Now select the first entity: this should change selection and fire the callback
+        editor.selectEntityById(id);
+        expect(fired).toContain(id);
+    });
+
+    it('updates selectedEntityId after selectEntityById', () => {
+        const { editor } = makeEditor();
+        editor.toggle(); // enable editor
+        const mesh = editor.placeEntity(new Vector3(0, 0, 0), 'loot');
+        const id = mesh.metadata?.editorEntityId as string;
+
+        editor.selectEntityById(id);
+        expect(editor.selectedEntityId).toBe(id);
+    });
+});

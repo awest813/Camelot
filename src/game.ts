@@ -27,6 +27,8 @@ import { FrameworkRuntime } from "./framework/runtime/framework-runtime";
 import { frameworkBaseContent } from "./framework/content/base-content";
 import { MapEditorSystem } from "./systems/map-editor-system";
 import { MapEditorPropertyPanel } from "./ui/map-editor-property-panel";
+import { MapEditorToolbar } from "./ui/map-editor-toolbar";
+import { MapEditorHierarchyPanel } from "./ui/map-editor-hierarchy-panel";
 import { AttributeSystem } from "./systems/attribute-system";
 import { TimeSystem } from "./systems/time-system";
 import { StealthSystem } from "./systems/stealth-system";
@@ -92,6 +94,8 @@ export class Game {
   public frameworkRuntime: FrameworkRuntime;
   public mapEditorSystem: MapEditorSystem;
   public mapEditorPropertyPanel: MapEditorPropertyPanel;
+  public mapEditorToolbar: MapEditorToolbar;
+  public mapEditorHierarchyPanel: MapEditorHierarchyPanel;
   public questCreatorSystem: QuestCreatorSystem;
   public questCreatorUI: QuestCreatorUI;
 
@@ -225,6 +229,16 @@ export class Game {
     this._helpOverlayEl.textContent = buildHelpOverlayLines(this.mapEditorSystem.isEnabled).join("\n");
   }
 
+  private _refreshEditorToolbar(): void {
+    this.mapEditorToolbar.update({
+      placementType:      this.mapEditorSystem.currentPlacementType,
+      gizmoMode:          this.mapEditorSystem.mode,
+      terrainTool:        this.mapEditorSystem.terrainTool,
+      entityCount:        this.mapEditorSystem.entityCount,
+      activePatrolGroupId: this.mapEditorSystem.activePatrolGroupId,
+    });
+  }
+
   init(): void {
     this._setLight();
     this.player = new Player(this.scene, this.canvas);
@@ -293,10 +307,12 @@ export class Game {
     this.mapEditorPropertyPanel.onDelete = (entityId) => {
       this.mapEditorSystem.removeEntity(entityId);
       this.ui.showNotification("Entity deleted", 1200);
+      this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
     };
     this.mapEditorSystem.onEntitySelectionChanged = (entityId) => {
       if (entityId === null) {
         this.mapEditorPropertyPanel.hide();
+        this.mapEditorHierarchyPanel.setSelection(null);
         return;
       }
       const entity = this.mapEditorSystem.getEntityProperties(entityId);
@@ -305,6 +321,24 @@ export class Game {
       if (type && entity !== null) {
         this.mapEditorPropertyPanel.show(entityId, type, entity);
       }
+      this.mapEditorHierarchyPanel.setSelection(entityId);
+    };
+
+    // ── Map editor toolbar ────────────────────────────────────────────────────
+    this.mapEditorToolbar = new MapEditorToolbar(this.ui.uiTexture);
+    this.mapEditorToolbar.onPlacementTypeChange = (ptype) => {
+      this.mapEditorSystem.currentPlacementType = ptype;
+      this._refreshEditorToolbar();
+    };
+    this.mapEditorToolbar.onGizmoModeChange = (gmode) => {
+      this.mapEditorSystem.setGizmoMode(gmode);
+      this._refreshEditorToolbar();
+    };
+
+    // ── Map editor hierarchy panel ────────────────────────────────────────────
+    this.mapEditorHierarchyPanel = new MapEditorHierarchyPanel(this.ui.uiTexture);
+    this.mapEditorHierarchyPanel.onEntityClick = (entityId) => {
+      this.mapEditorSystem.selectEntityById(entityId);
     };
 
     // ── Quest Creator ──────────────────────────────────────────────────────────
@@ -913,6 +947,8 @@ export class Game {
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                    this.mapEditorToolbar.hide();
+                    this.mapEditorHierarchyPanel.hide();
                     this.ui.showNotification("Map editor mode disabled", 1800);
                 } else if (this.inventorySystem.isOpen) {
                     this.inventorySystem.toggleInventory();
@@ -1068,9 +1104,15 @@ export class Game {
                 if (isEnabled) {
                     document.exitPointerLock();
                     this.player.camera.detachControl();
+                    this.mapEditorToolbar.show();
+                    this.mapEditorHierarchyPanel.show();
+                    this._refreshEditorToolbar();
+                    this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
                 } else {
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                    this.mapEditorToolbar.hide();
+                    this.mapEditorHierarchyPanel.hide();
                 }
                 this.ui.showNotification(isEnabled ? "Map editor mode enabled" : "Map editor mode disabled", 1800);
                 this._refreshHelpOverlayIfVisible();
@@ -1078,18 +1120,22 @@ export class Game {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const mode = this.mapEditorSystem.cycleGizmoMode();
                 this.ui.showNotification(`Editor gizmo: ${mode}`, 1400);
+                this._refreshEditorToolbar();
             } else if (kbInfo.event.key === "t" || kbInfo.event.key === "T") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const ptype = this.mapEditorSystem.cyclePlacementType();
                 this.ui.showNotification(`Place type: ${ptype}`, 1400);
+                this._refreshEditorToolbar();
             } else if (kbInfo.event.key === "p" || kbInfo.event.key === "P") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const groupId = this.mapEditorSystem.startNewPatrolGroup();
                 this.ui.showNotification(`New patrol group: ${groupId}`, 1600);
+                this._refreshEditorToolbar();
             } else if (kbInfo.event.key === "h" || kbInfo.event.key === "H") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const terrainTool = this.mapEditorSystem.cycleTerrainTool();
                 this.ui.showNotification(`Terrain tool: ${terrainTool}`, 1600);
+                this._refreshEditorToolbar();
             } else if (kbInfo.event.key === "[") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const step = this.mapEditorSystem.adjustTerrainSculptStep(-0.1);
@@ -1106,6 +1152,10 @@ export class Game {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const undone = this.mapEditorSystem.undo();
                 this.ui.showNotification(undone ? "Undo" : "Nothing to undo", 1000);
+                if (undone) {
+                    this._refreshEditorToolbar();
+                    this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+                }
             } else if (
                 (kbInfo.event.key === "y" && (kbInfo.event.ctrlKey || kbInfo.event.metaKey)) ||
                 (kbInfo.event.key === "z" && (kbInfo.event.ctrlKey || kbInfo.event.metaKey) && kbInfo.event.shiftKey)
@@ -1113,6 +1163,10 @@ export class Game {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const redone = this.mapEditorSystem.redo();
                 this.ui.showNotification(redone ? "Redo" : "Nothing to redo", 1000);
+                if (redone) {
+                    this._refreshEditorToolbar();
+                    this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+                }
             } else if (kbInfo.event.key === "F6") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 this._triggerMapImport();
@@ -1156,6 +1210,8 @@ export class Game {
                 this.mapEditorSystem.placeEntity(placeAt);
                 const ptype = this.mapEditorSystem.currentPlacementType;
                 this.ui.showNotification(`Placed: ${ptype}`, 1200);
+                this._refreshEditorToolbar();
+                this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
             } else if (kbInfo.event.key === "F5") {
                 if (!this.isPaused) this.saveSystem.save();
             } else if (kbInfo.event.key === "F9") {
@@ -1650,6 +1706,10 @@ export class Game {
           if (!file) return;
           const ok = await this.mapEditorSystem.importFromFile(file);
           this.ui.showNotification(ok ? "Map imported successfully" : "Map import failed: invalid file", 2500);
+          if (ok) {
+              this._refreshEditorToolbar();
+              this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+          }
       });
       document.body.appendChild(input);
       input.click();
