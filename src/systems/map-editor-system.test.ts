@@ -1030,3 +1030,144 @@ describe('MapEditorSystem — selectEntityById', () => {
         expect(editor.selectedEntityId).toBe(id);
     });
 });
+
+// ─── duplicateEntity ─────────────────────────────────────────────────────────
+
+describe('MapEditorSystem — duplicateEntity', () => {
+    it('returns null when the entity id does not exist', () => {
+        const { editor } = makeEditor();
+        expect(editor.duplicateEntity('nonexistent')).toBeNull();
+    });
+
+    it('returns a new Mesh on success', () => {
+        const { editor } = makeEditor();
+        const original = editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        const originalId = original.metadata?.editorEntityId as string;
+
+        const copy = editor.duplicateEntity(originalId);
+
+        expect(copy).not.toBeNull();
+        expect(copy).toBeInstanceOf(Mesh);
+    });
+
+    it('increases entityCount by 1', () => {
+        const { editor } = makeEditor();
+        const original = editor.placeEntity(new Vector3(0, 1, 0), 'loot');
+        const originalId = original.metadata?.editorEntityId as string;
+        expect(editor.entityCount).toBe(1);
+
+        editor.duplicateEntity(originalId);
+
+        expect(editor.entityCount).toBe(2);
+    });
+
+    it('duplicate entity has the same type as the original', () => {
+        const { editor } = makeEditor();
+        const original = editor.placeEntity(new Vector3(0, 1, 0), 'quest-marker');
+        const originalId = original.metadata?.editorEntityId as string;
+
+        const copy = editor.duplicateEntity(originalId);
+        const copyId = copy!.metadata?.editorEntityId as string;
+
+        const summaries = editor.listEntitySummaries();
+        const copyEntry = summaries.find(s => s.id === copyId);
+        expect(copyEntry?.type).toBe('quest-marker');
+    });
+
+    it('duplicate entity is placed offset from the original', () => {
+        const { editor } = makeEditor();
+        editor.snapSize = 2;
+        const original = editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        const originalId = original.metadata?.editorEntityId as string;
+
+        const copy = editor.duplicateEntity(originalId)!;
+
+        // offset = snapSize (2) along X axis
+        expect(copy.position.x).toBe(2);
+        expect(copy.position.y).toBe(original.position.y);
+        expect(copy.position.z).toBe(original.position.z);
+    });
+
+    it('duplicate entity copies entity properties', () => {
+        const { editor } = makeEditor();
+        const original = editor.placeEntity(new Vector3(0, 1, 0), 'loot');
+        const originalId = original.metadata?.editorEntityId as string;
+        editor.setEntityProperties(originalId, { label: 'Treasure', lootTableId: 'dungeon_loot' });
+
+        const copy = editor.duplicateEntity(originalId)!;
+        const copyId = copy.metadata?.editorEntityId as string;
+
+        const props = editor.getEntityProperties(copyId);
+        expect(props?.label).toBe('Treasure');
+        expect(props?.lootTableId).toBe('dungeon_loot');
+    });
+
+    it('duplicate entity has a different id from the original', () => {
+        const { editor } = makeEditor();
+        const original = editor.placeEntity(new Vector3(0, 1, 0), 'structure');
+        const originalId = original.metadata?.editorEntityId as string;
+
+        const copy = editor.duplicateEntity(originalId)!;
+        const copyId = copy.metadata?.editorEntityId as string;
+
+        expect(copyId).not.toBe(originalId);
+    });
+
+    it('duplicate selects the new entity', () => {
+        const { editor } = makeEditor();
+        const original = editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        const originalId = original.metadata?.editorEntityId as string;
+
+        const copy = editor.duplicateEntity(originalId)!;
+        const copyId = copy.metadata?.editorEntityId as string;
+
+        expect(editor.selectedEntityId).toBe(copyId);
+    });
+
+    it('duplicate pushes commands to the undo stack', () => {
+        const { editor } = makeEditor();
+        const original = editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        const originalId = original.metadata?.editorEntityId as string;
+        const undoBefore = editor.historySize.undo;
+
+        editor.duplicateEntity(originalId);
+
+        // At least one new command on the undo stack (place, and optionally set-properties)
+        expect(editor.historySize.undo).toBeGreaterThan(undoBefore);
+    });
+});
+
+// ─── listEntitySummaries with label ─────────────────────────────────────────
+
+describe('MapEditorSystem — listEntitySummaries (label)', () => {
+    it('includes label in summaries when entity has a label property', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        const id = mesh.metadata?.editorEntityId as string;
+        editor.setEntityProperties(id, { label: 'Gate Marker' });
+
+        const summaries = editor.listEntitySummaries();
+
+        expect(summaries[0].label).toBe('Gate Marker');
+    });
+
+    it('omits label from summaries when entity has no label property', () => {
+        const { editor } = makeEditor();
+        editor.placeEntity(new Vector3(0, 1, 0), 'loot');
+
+        const summaries = editor.listEntitySummaries();
+
+        expect(summaries[0].label).toBeUndefined();
+    });
+
+    it('label in summaries updates after setEntityProperties', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'structure');
+        const id = mesh.metadata?.editorEntityId as string;
+
+        editor.setEntityProperties(id, { label: 'Castle Wall' });
+        const summaries = editor.listEntitySummaries();
+
+        expect(summaries.find(s => s.id === id)?.label).toBe('Castle Wall');
+    });
+});

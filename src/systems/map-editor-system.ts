@@ -263,14 +263,16 @@ export class MapEditorSystem {
   }
 
   /**
-   * Returns a lightweight summary of every placed entity: `{ id, type }`.
+   * Returns a lightweight summary of every placed entity: `{ id, type, label? }`.
+   * `label` is included when the entity has a non-empty label property set.
    * Useful for hierarchy panels that only need to list names without reading
    * full property data.
    */
-  listEntitySummaries(): Array<{ id: string; type: EditorPlacementType }> {
+  listEntitySummaries(): Array<{ id: string; type: EditorPlacementType; label?: string }> {
     return this._entities.map((e) => ({
       id: e.mesh.metadata?.editorEntityId ?? e.mesh.name,
       type: e.type,
+      ...(e.properties.label ? { label: e.properties.label } : {}),
     }));
   }
 
@@ -479,6 +481,29 @@ export class MapEditorSystem {
     entity.mesh.dispose();
     this._entities.splice(idx, 1);
     return true;
+  }
+
+  /**
+   * Duplicate an existing entity, placing the copy at an offset of `snapSize`
+   * units along the X axis from the original.  Properties are copied verbatim.
+   *
+   * Returns the new `Mesh` on success, or `null` when the entity is not found.
+   * Both the new placement and the copied properties are pushed onto the undo
+   * stack as independent commands so each can be undone separately.
+   */
+  duplicateEntity(entityId: string): Mesh | null {
+    const entity = this._findEntityById(entityId);
+    if (!entity) return null;
+
+    const offset = new Vector3(this.snapSize, 0, 0);
+    const newMesh = this.placeEntity(entity.mesh.position.clone().add(offset), entity.type);
+
+    if (Object.keys(entity.properties).length > 0) {
+      const newId = newMesh.metadata?.editorEntityId as string;
+      this.setEntityProperties(newId, { ...entity.properties });
+    }
+
+    return newMesh;
   }
 
   // ─── Patrol route authoring ─────────────────────────────────────────────────

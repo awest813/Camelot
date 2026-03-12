@@ -44,6 +44,8 @@ const TYPE_COLORS: Record<EditorPlacementType, string> = {
 export interface HierarchyEntitySummary {
   id: string;
   type: EditorPlacementType;
+  /** Optional human-readable label from entity properties, shown alongside the ID. */
+  label?: string;
 }
 
 /**
@@ -77,7 +79,7 @@ export class MapEditorHierarchyPanel {
     this._panel.height = "380px";
     this._panel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     this._panel.verticalAlignment   = Control.VERTICAL_ALIGNMENT_TOP;
-    this._panel.top  = "92px";  // below the toolbar
+    this._panel.top  = "120px";  // below the toolbar (now 4 rows)
     this._panel.left = "4px";
     this._panel.background  = T.PANEL_BG;
     this._panel.color       = T.PANEL_BORDER;
@@ -160,8 +162,8 @@ export class MapEditorHierarchyPanel {
     this._listStack.clearControls();
     this._rowMap.clear();
 
-    for (const { id, type } of entities) {
-      const row = this._buildRow(id, type);
+    for (const { id, type, label } of entities) {
+      const row = this._buildRow(id, type, label);
       this._listStack.addControl(row);
       this._rowMap.set(id, row);
     }
@@ -193,7 +195,7 @@ export class MapEditorHierarchyPanel {
 
   // ── Private helpers ───────────────────────────────────────────────────────
 
-  private _buildRow(id: string, type: EditorPlacementType): Rectangle {
+  private _buildRow(id: string, type: EditorPlacementType, label?: string): Rectangle {
     const row = new Rectangle(`editorHRow_${id}`);
     row.width           = "200px";
     row.height          = "26px";
@@ -218,14 +220,15 @@ export class MapEditorHierarchyPanel {
     icon.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
     inner.addControl(icon);
 
-    // ID (truncated to fit)
-    const label = new TextBlock(`editorHLabel_${id}`, this._truncateId(id));
-    label.color    = T.TEXT;
-    label.fontSize = 11;
-    label.width    = "170px";
-    label.height   = "26px";
-    label.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    inner.addControl(label);
+    // Display text: prefer label when set, fall back to truncated ID
+    const displayText = label ? this._truncateId(label) : this._truncateId(id);
+    const displayBlock = new TextBlock(`editorHLabel_${id}`, displayText);
+    displayBlock.color    = label ? T.TEXT : T.DIM;
+    displayBlock.fontSize = 11;
+    displayBlock.width    = "170px";
+    displayBlock.height   = "26px";
+    displayBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    inner.addControl(displayBlock);
 
     // Hover / click behaviour
     row.onPointerEnterObservable.add(() => {
