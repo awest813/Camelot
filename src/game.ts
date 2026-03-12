@@ -1760,10 +1760,11 @@ export class Game {
     shadows.blurKernel = 16;
     this.shadowGenerator = shadows;
 
-    // Atmospheric distance fog
+    // Atmospheric distance fog — initial values match WeatherSystem's "clear"
+    // state so the first frame is consistent before WeatherSystem takes over.
     this.scene.fogMode    = Scene.FOGMODE_EXP2;
-    this.scene.fogDensity = 0.005;
-    this.scene.fogColor   = new Color3(0.58, 0.68, 0.80);
+    this.scene.fogDensity = 0.006;
+    this.scene.fogColor   = new Color3(0.50, 0.60, 0.72);
   }
 
   /**
@@ -1774,6 +1775,8 @@ export class Game {
     // ── Procedural sky dome ──────────────────────────────────────────────────
     const skybox = MeshBuilder.CreateBox("skyBox", { size: 1000 }, this.scene);
     skybox.infiniteDistance = true;
+    // Disable picking so raycasts pass through the sky dome and hit world geometry.
+    skybox.isPickable = false;
 
     const skyMat = new SkyMaterial("skyMat", this.scene);
     skyMat.backFaceCulling = false;

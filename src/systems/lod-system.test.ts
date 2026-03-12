@@ -60,6 +60,28 @@ describe("LodSystem", () => {
     expect(mesh.isVisible).toBe(true);
   });
 
+  it("register() clamps NaN cullDistance to 1", () => {
+    const mesh = makeMesh(0, 0, 0);
+    lod.register(mesh, NaN);
+    lod.update(PLAYER_ORIGIN); // distance = 0 ≤ 1 → visible
+    expect(mesh.isVisible).toBe(true);
+  });
+
+  it("register() clamps Infinity cullDistance to 1", () => {
+    // Infinity is not a finite number, so should be clamped to 1.
+    const mesh = makeMesh(200, 0, 0); // 200 units away
+    lod.register(mesh, Infinity);
+    lod.update(PLAYER_ORIGIN); // distance 200 > 1 → culled
+    expect(mesh.isVisible).toBe(false);
+  });
+
+  it("register() clamps zero cullDistance to 1", () => {
+    const mesh = makeMesh(0, 0, 0);
+    lod.register(mesh, 0); // 0 is not > 0, should clamp to 1
+    lod.update(PLAYER_ORIGIN); // distance = 0 ≤ 1 → visible
+    expect(mesh.isVisible).toBe(true);
+  });
+
   it("keeps a mesh visible when inside cull distance", () => {
     const mesh = makeMesh(10, 0, 0); // 10 units away
     lod.register(mesh, 50);
