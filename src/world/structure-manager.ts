@@ -14,6 +14,8 @@ import { BiomeType } from "./world-manager";
 interface StructureSpawn {
   meshes: Mesh[];
   loot: Loot[];
+  /** Physics aggregates created for this structure; disposed before their meshes on unload. */
+  bodies: PhysicsAggregate[];
 }
 
 /**
@@ -25,6 +27,12 @@ export class StructureManager {
   private _scene: Scene;
   /** Maps chunk key ("cx,cz") to the structure spawned there. */
   private _chunkStructures: Map<string, StructureSpawn> = new Map();
+
+  /**
+   * Shared material pool — one material per structural type rather than one
+   * per chunk instance.  Reduces GPU material count from O(chunks) to O(1).
+   */
+  private readonly _sharedMaterials: Map<string, StandardMaterial> = new Map();
 
   /** Called for each NPC spawned as part of a structure so the caller can
    *  register it with ScheduleSystem / CombatSystem. */
@@ -57,7 +65,7 @@ export class StructureManager {
     if (this._chunkStructures.has(key)) return;
 
     if (!this.hasStructureAt(chunkX, chunkZ)) {
-      this._chunkStructures.set(key, { meshes: [], loot: [] });
+      this._chunkStructures.set(key, { meshes: [], loot: [], bodies: [] });
       return;
     }
 
@@ -87,7 +95,7 @@ export class StructureManager {
   }
 
   /**
-   * Dispose all meshes and loot for an unloading chunk.
+   * Dispose all meshes, physics, and loot for an unloading chunk.
    * NPCs are intentionally kept alive — they remain active once spawned.
    */
   public disposeChunk(chunkX: number, chunkZ: number): void {
@@ -95,7 +103,10 @@ export class StructureManager {
     const spawn = this._chunkStructures.get(key);
     if (!spawn) return;
 
-    for (const m of spawn.meshes) m.dispose(false, true);
+    // Dispose physics bodies BEFORE their meshes to avoid dangling references
+    for (const body of spawn.bodies) body.dispose();
+    // Materials are shared across all structure instances — preserve them
+    for (const m of spawn.meshes) m.dispose(false, false);
     for (const l of spawn.loot) l.dispose();
     this._chunkStructures.delete(key);
   }
@@ -109,9 +120,10 @@ export class StructureManager {
   private _buildRuins(cx: number, cz: number, origin: Vector3): StructureSpawn {
     const meshes: Mesh[] = [];
     const loot: Loot[] = [];
+    const bodies: PhysicsAggregate[] = [];
     // Aged limestone — slightly warm grey with subtle specular for weathered stone
     const mat = this._mat(
-      `ruins_stone_${cx}_${cz}`,
+      "ruins_stone",
       new Color3(0.52, 0.47, 0.40),
       new Color3(0.12, 0.10, 0.08),
       20,
@@ -129,7 +141,7 @@ export class StructureManager {
       const wall = MeshBuilder.CreateBox(`ruins_wall_${cx}_${cz}_${i}`, { width: w, height: h, depth: d }, this._scene);
       wall.position.set(origin.x + dx, h / 2, origin.z + dz);
       wall.material = mat;
-      new PhysicsAggregate(wall, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
+      bodies.push(new PhysicsAggregate(wall, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
       meshes.push(this._shadow(wall));
     }
 
@@ -150,7 +162,9 @@ export class StructureManager {
     }
 
     // Loot chest at the center
-    meshes.push(this._addChest(`ruins_chest_${cx}_${cz}`, new Vector3(origin.x, 0, origin.z), loot, cx, cz, 0));
+    const { mesh: chestMesh, body: chestBody } = this._addChest(`ruins_chest_${cx}_${cz}`, new Vector3(origin.x, 0, origin.z), loot, cx, cz, 0);
+    meshes.push(chestMesh);
+    bodies.push(chestBody);
 
     // Hostile guard NPC
     const guard = new NPC(this._scene, new Vector3(origin.x + 2, 2, origin.z + 2), `RuinGuard_${cx}_${cz}`);
@@ -163,7 +177,7 @@ export class StructureManager {
     ];
     if (this.onNPCSpawn) this.onNPCSpawn(guard);
 
-    return { meshes, loot };
+    return { meshes, loot, bodies };
   }
 
   /**
@@ -173,16 +187,17 @@ export class StructureManager {
   private _buildDesertShrine(cx: number, cz: number, origin: Vector3): StructureSpawn {
     const meshes: Mesh[] = [];
     const loot: Loot[] = [];
+    const bodies: PhysicsAggregate[] = [];
     // Sun-bleached sandstone platform
     const stoneMat = this._mat(
-      `shrine_stone_${cx}_${cz}`,
+      "shrine_stone",
       new Color3(0.76, 0.62, 0.36),
       new Color3(0.20, 0.15, 0.06),
       28,
     );
     // Golden altar stone with a slight glow
     const altarMat = this._mat(
-      `shrine_altar_${cx}_${cz}`,
+      "shrine_altar",
       new Color3(0.88, 0.72, 0.28),
       new Color3(0.30, 0.22, 0.06),
       40,
@@ -192,7 +207,7 @@ export class StructureManager {
     const platform = MeshBuilder.CreateBox(`shrine_platform_${cx}_${cz}`, { width: 5, height: 0.4, depth: 5 }, this._scene);
     platform.position.set(origin.x, 0.2, origin.z);
     platform.material = stoneMat;
-    new PhysicsAggregate(platform, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
+    bodies.push(new PhysicsAggregate(platform, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
     meshes.push(this._shadow(platform));
 
     // Altar block
@@ -209,7 +224,7 @@ export class StructureManager {
       const pillar = MeshBuilder.CreateBox(`shrine_pillar_${cx}_${cz}_${i}`, { width: 0.6, height: ph, depth: 0.6 }, this._scene);
       pillar.position.set(origin.x + px, ph / 2, origin.z + pz);
       pillar.material = stoneMat;
-      new PhysicsAggregate(pillar, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
+      bodies.push(new PhysicsAggregate(pillar, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
       meshes.push(this._shadow(pillar));
     }
 
@@ -225,7 +240,7 @@ export class StructureManager {
     });
     loot.push(relic);
 
-    return { meshes, loot };
+    return { meshes, loot, bodies };
   }
 
   /**
@@ -235,16 +250,17 @@ export class StructureManager {
   private _buildWatchtower(cx: number, cz: number, origin: Vector3): StructureSpawn {
     const meshes: Mesh[] = [];
     const loot: Loot[] = [];
+    const bodies: PhysicsAggregate[] = [];
     // Cold granite stone — blue-grey tint with reflective highlights
     const stoneMat = this._mat(
-      `tower_stone_${cx}_${cz}`,
+      "tower_stone",
       new Color3(0.52, 0.50, 0.52),
       new Color3(0.15, 0.15, 0.18),
       32,
     );
     // Weathered dark timber
     const woodMat = this._mat(
-      `tower_wood_${cx}_${cz}`,
+      "tower_wood",
       new Color3(0.38, 0.26, 0.14),
       new Color3(0.06, 0.04, 0.02),
       10,
@@ -258,7 +274,7 @@ export class StructureManager {
     const nWall = MeshBuilder.CreateBox(`tower_N_${cx}_${cz}`, { width: tW, height: tH, depth: wT }, this._scene);
     nWall.position.set(origin.x, tH / 2, origin.z + tW / 2);
     nWall.material = stoneMat;
-    new PhysicsAggregate(nWall, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
+    bodies.push(new PhysicsAggregate(nWall, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
     meshes.push(this._shadow(nWall));
 
     // South wall — two pillar segments flanking a 1.6 m doorway
@@ -266,7 +282,7 @@ export class StructureManager {
       const pillar = MeshBuilder.CreateBox(`tower_Spillar${side}_${cx}_${cz}`, { width: 1.0, height: tH, depth: wT }, this._scene);
       pillar.position.set(origin.x + side * 1.5, tH / 2, origin.z - tW / 2);
       pillar.material = stoneMat;
-      new PhysicsAggregate(pillar, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
+      bodies.push(new PhysicsAggregate(pillar, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
       meshes.push(this._shadow(pillar));
     }
 
@@ -275,32 +291,34 @@ export class StructureManager {
     const lintel = MeshBuilder.CreateBox(`tower_lintel_${cx}_${cz}`, { width: 1.8, height: lintelH, depth: wT }, this._scene);
     lintel.position.set(origin.x, tH - lintelH / 2, origin.z - tW / 2);
     lintel.material = stoneMat;
-    new PhysicsAggregate(lintel, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
+    bodies.push(new PhysicsAggregate(lintel, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
     meshes.push(this._shadow(lintel));
 
     // East wall
     const eWall = MeshBuilder.CreateBox(`tower_E_${cx}_${cz}`, { width: wT, height: tH, depth: tW }, this._scene);
     eWall.position.set(origin.x + tW / 2, tH / 2, origin.z);
     eWall.material = stoneMat;
-    new PhysicsAggregate(eWall, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
+    bodies.push(new PhysicsAggregate(eWall, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
     meshes.push(this._shadow(eWall));
 
     // West wall
     const wWall = MeshBuilder.CreateBox(`tower_W_${cx}_${cz}`, { width: wT, height: tH, depth: tW }, this._scene);
     wWall.position.set(origin.x - tW / 2, tH / 2, origin.z);
     wWall.material = stoneMat;
-    new PhysicsAggregate(wWall, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
+    bodies.push(new PhysicsAggregate(wWall, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
     meshes.push(this._shadow(wWall));
 
     // Wooden roof platform
     const roof = MeshBuilder.CreateBox(`tower_roof_${cx}_${cz}`, { width: tW - wT, height: 0.2, depth: tW - wT }, this._scene);
     roof.position.set(origin.x, tH + 0.1, origin.z);
     roof.material = woodMat;
-    new PhysicsAggregate(roof, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
+    bodies.push(new PhysicsAggregate(roof, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
     meshes.push(this._shadow(roof));
 
     // Chest inside tower base
-    meshes.push(this._addChest(`tower_chest_${cx}_${cz}`, new Vector3(origin.x + 1, 0, origin.z + 1), loot, cx, cz, 60));
+    const { mesh: chestMesh, body: chestBody } = this._addChest(`tower_chest_${cx}_${cz}`, new Vector3(origin.x + 1, 0, origin.z + 1), loot, cx, cz, 60);
+    meshes.push(chestMesh);
+    bodies.push(chestBody);
 
     // Guard NPC positioned in front of the doorway
     const guard = new NPC(this._scene, new Vector3(origin.x, 2, origin.z - tW / 2 - 2), `TowerGuard_${cx}_${cz}`);
@@ -313,15 +331,15 @@ export class StructureManager {
     ];
     if (this.onNPCSpawn) this.onNPCSpawn(guard);
 
-    return { meshes, loot };
+    return { meshes, loot, bodies };
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
   /** Spawn a wooden chest mesh and a gold-coin loot item beside it. */
-  private _addChest(name: string, position: Vector3, lootArr: Loot[], cx: number, cz: number, slot: number): Mesh {
+  private _addChest(name: string, position: Vector3, lootArr: Loot[], cx: number, cz: number, slot: number): { mesh: Mesh; body: PhysicsAggregate } {
     const mat = this._mat(
-      `${name}_mat`,
+      "chest_wood",
       new Color3(0.48, 0.30, 0.10),
       new Color3(0.10, 0.06, 0.02),
       12,
@@ -329,7 +347,7 @@ export class StructureManager {
     const chest = MeshBuilder.CreateBox(name, { width: 0.8, height: 0.5, depth: 0.5 }, this._scene);
     chest.position.set(position.x, 0.25, position.z);
     chest.material = mat;
-    new PhysicsAggregate(chest, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
+    const body = new PhysicsAggregate(chest, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
     this._shadow(chest);
 
     const coins = new Loot(this._scene, new Vector3(position.x + 0.6, 1.0, position.z), {
@@ -341,7 +359,7 @@ export class StructureManager {
       stats: {},
     });
     lootArr.push(coins);
-    return chest;
+    return { mesh: chest, body };
   }
 
   /** Register a mesh as a shadow caster and enable it to receive shadows. */
@@ -351,12 +369,21 @@ export class StructureManager {
     return mesh;
   }
 
+  /**
+   * Return a cached shared material for a given structural type.
+   * Materials are keyed by `name` so each unique type is created only once,
+   * reducing GPU material count from O(loaded structures) to O(structure types).
+   */
   private _mat(name: string, diffuse: Color3, specular = new Color3(0.10, 0.10, 0.10), specularPower = 24): StandardMaterial {
-    const mat = new StandardMaterial(name, this._scene);
-    mat.diffuseColor  = diffuse;
-    mat.specularColor = specular;
-    mat.specularPower = specularPower;
-    mat.freeze();
+    let mat = this._sharedMaterials.get(name);
+    if (!mat) {
+      mat = new StandardMaterial(name, this._scene);
+      mat.diffuseColor  = diffuse;
+      mat.specularColor = specular;
+      mat.specularPower = specularPower;
+      mat.freeze();
+      this._sharedMaterials.set(name, mat);
+    }
     return mat;
   }
 

@@ -1,9 +1,97 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { StructureManager } from './structure-manager';
+import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
 
-// StructureManager only needs the scene for mesh creation; hasStructureAt and
-// disposeChunk (on unknown chunks) don't touch the scene at all.
+// ── Hoisted mocks ─────────────────────────────────────────────────────────────
+
+const { mockMeshDispose, mockBodyDispose, standardMaterialInstances } = vi.hoisted(() => ({
+  mockMeshDispose: vi.fn(),
+  mockBodyDispose: vi.fn(),
+  standardMaterialInstances: [] as Array<{ name: string }>,
+}));
+
+// ── Babylon mocks ─────────────────────────────────────────────────────────────
+
+vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
+  MeshBuilder: {
+    CreateBox: vi.fn(() => ({
+      position: { set: vi.fn(), x: 0, y: 0, z: 0 },
+      rotation: { y: 0 },
+      material: null,
+      receiveShadows: false,
+      dispose: mockMeshDispose,
+    })),
+    CreateGround: vi.fn(() => ({
+      position: { x: 0, z: 0 },
+      checkCollisions: false,
+      receiveShadows: false,
+      material: null,
+      dispose: mockMeshDispose,
+    })),
+    CreateCylinder: vi.fn(() => ({
+      position: { set: vi.fn(), x: 0, y: 0, z: 0 },
+      rotation: { z: 0 },
+      material: null,
+      receiveShadows: false,
+      dispose: mockMeshDispose,
+    })),
+  },
+}));
+
+vi.mock('@babylonjs/core/Physics/v2/physicsAggregate', () => ({
+  // Use a regular function (not arrow function) so it can be called with `new`
+  PhysicsAggregate: function PhysicsAggregate() {
+    return { dispose: mockBodyDispose };
+  },
+}));
+
+vi.mock('@babylonjs/core/Physics', () => ({
+  PhysicsShapeType: { BOX: 'BOX' },
+}));
+
+vi.mock('@babylonjs/core/Materials/standardMaterial', () => ({
+  StandardMaterial: class {
+    name: string;
+    diffuseColor: any = null;
+    specularColor: any = null;
+    specularPower: number = 1;
+    freeze = vi.fn();
+    constructor(name: string, _scene: any) {
+      this.name = name;
+      standardMaterialInstances.push({ name });
+    }
+  },
+}));
+
+vi.mock('@babylonjs/core/Maths/math.color', () => ({
+  Color3: class {
+    constructor(public r = 0, public g = 0, public b = 0) {}
+  },
+}));
+
+vi.mock('../entities/npc', () => ({
+  NPC: class {
+    aggroRange = 0;
+    attackDamage = 0;
+    xpReward = 0;
+    patrolPoints: any[] = [];
+    constructor(_scene: any, _pos: any, _name: string) {}
+  },
+}));
+
+vi.mock('../entities/loot', () => ({
+  Loot: class {
+    dispose = vi.fn();
+    constructor(_scene: any, _pos: any, _def: any) {}
+  },
+}));
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 const mockScene = {} as any;
+
+// ── Test suites ───────────────────────────────────────────────────────────────
 
 describe('StructureManager.hasStructureAt', () => {
   it('is deterministic — same chunk always returns the same value', () => {
@@ -49,6 +137,11 @@ describe('StructureManager.hasStructureAt', () => {
 });
 
 describe('StructureManager.disposeChunk', () => {
+  beforeEach(() => {
+    mockMeshDispose.mockClear();
+    mockBodyDispose.mockClear();
+  });
+
   it('does not throw for a chunk that was never loaded', () => {
     const sm = new StructureManager(mockScene);
     expect(() => sm.disposeChunk(0, 0)).not.toThrow();
@@ -61,5 +154,142 @@ describe('StructureManager.disposeChunk', () => {
       sm.disposeChunk(5, 5);
       sm.disposeChunk(5, 5);
     }).not.toThrow();
+  });
+});
+
+describe('StructureManager.trySpawnForChunk — physics disposal', () => {
+  beforeEach(() => {
+    mockMeshDispose.mockClear();
+    mockBodyDispose.mockClear();
+  });
+
+  it('disposeChunk disposes all physics bodies for a spawned structure', () => {
+    const sm = new StructureManager(mockScene);
+
+    // Find a chunk that has a structure (plains/forest → ruins)
+    let structureChunk: [number, number] | null = null;
+    for (let x = 0; x < 20 && !structureChunk; x++) {
+      for (let z = 0; z < 20 && !structureChunk; z++) {
+        if (sm.hasStructureAt(x, z)) structureChunk = [x, z];
+      }
+    }
+    expect(structureChunk).not.toBeNull();
+    const [cx, cz] = structureChunk!;
+
+    sm.trySpawnForChunk(cx, cz, 'plains', 50);
+    mockBodyDispose.mockClear(); // ignore aggregates created during spawning
+
+    sm.disposeChunk(cx, cz);
+    // Ruins create 4 wall aggregates + 1 chest aggregate = 5 bodies
+    expect(mockBodyDispose).toHaveBeenCalled();
+  });
+
+  it('disposeChunk disposes physics bodies before meshes', () => {
+    const callOrder: string[] = [];
+    mockBodyDispose.mockImplementation(() => callOrder.push('body'));
+    mockMeshDispose.mockImplementation(() => callOrder.push('mesh'));
+
+    const sm = new StructureManager(mockScene);
+    let cx = 0, cz = 0;
+    let found = false;
+    for (let x = 0; x < 20 && !found; x++) {
+      for (let z = 0; z < 20 && !found; z++) {
+        if (sm.hasStructureAt(x, z)) { cx = x; cz = z; found = true; }
+      }
+    }
+
+    sm.trySpawnForChunk(cx, cz, 'plains', 50);
+    callOrder.length = 0; // reset after spawn
+    sm.disposeChunk(cx, cz);
+
+    // First disposal call must be a body, not a mesh
+    expect(callOrder[0]).toBe('body');
+  });
+
+  it('trySpawnForChunk is a no-op for an already-processed chunk', () => {
+    vi.mocked(MeshBuilder.CreateBox).mockClear();
+
+    const sm = new StructureManager(mockScene);
+    let cx = 0, cz = 0;
+    let found = false;
+    for (let x = 0; x < 20 && !found; x++) {
+      for (let z = 0; z < 20 && !found; z++) {
+        if (sm.hasStructureAt(x, z)) { cx = x; cz = z; found = true; }
+      }
+    }
+
+    sm.trySpawnForChunk(cx, cz, 'plains', 50);
+    const countAfterFirst = vi.mocked(MeshBuilder.CreateBox).mock.calls.length;
+    sm.trySpawnForChunk(cx, cz, 'plains', 50); // should be a no-op
+    expect(vi.mocked(MeshBuilder.CreateBox).mock.calls.length).toBe(countAfterFirst);
+  });
+
+  it('disposeChunk for non-structure chunk does not call dispose', () => {
+    const sm = new StructureManager(mockScene);
+
+    // Find a chunk with no structure
+    let noStructChunk: [number, number] | null = null;
+    for (let x = 0; x < 20 && !noStructChunk; x++) {
+      for (let z = 0; z < 20 && !noStructChunk; z++) {
+        if (!sm.hasStructureAt(x, z)) noStructChunk = [x, z];
+      }
+    }
+    expect(noStructChunk).not.toBeNull();
+    const [cx, cz] = noStructChunk!;
+
+    sm.trySpawnForChunk(cx, cz, 'plains', 50);
+    sm.disposeChunk(cx, cz);
+
+    // No meshes or bodies should have been disposed (structure was empty)
+    expect(mockMeshDispose).not.toHaveBeenCalled();
+    expect(mockBodyDispose).not.toHaveBeenCalled();
+  });
+});
+
+describe('StructureManager shared material pool', () => {
+  beforeEach(() => {
+    standardMaterialInstances.length = 0;
+  });
+
+  it('reuses the same material for the same structure type across different chunks', () => {
+    const sm = new StructureManager(mockScene);
+
+    // Spawn ruins at two different plains chunks
+    const ruinChunks: Array<[number, number]> = [];
+    for (let x = 0; x < 30 && ruinChunks.length < 2; x++) {
+      for (let z = 0; z < 30 && ruinChunks.length < 2; z++) {
+        if (sm.hasStructureAt(x, z)) ruinChunks.push([x, z]);
+      }
+    }
+    expect(ruinChunks.length).toBeGreaterThanOrEqual(2);
+
+    sm.trySpawnForChunk(ruinChunks[0][0], ruinChunks[0][1], 'plains', 50);
+    const matsAfterFirst = standardMaterialInstances.length;
+
+    sm.trySpawnForChunk(ruinChunks[1][0], ruinChunks[1][1], 'plains', 50);
+    const matsAfterSecond = standardMaterialInstances.length;
+
+    // Second ruins spawn must reuse existing materials — no new ones created
+    expect(matsAfterSecond).toBe(matsAfterFirst);
+  });
+
+  it('uses at most 6 unique material types for all three structure types combined', () => {
+    // expected: ruins_stone, shrine_stone, shrine_altar, tower_stone, tower_wood, chest_wood
+    const MAX_STRUCTURE_MATERIAL_TYPES = 6;
+    const sm = new StructureManager(mockScene);
+
+    const biomesNeeded: Array<'plains' | 'desert' | 'tundra'> = ['plains', 'desert', 'tundra'];
+    for (const biome of biomesNeeded) {
+      for (let x = 0; x < 30; x++) {
+        for (let z = 0; z < 30; z++) {
+          if (sm.hasStructureAt(x, z)) {
+            sm.trySpawnForChunk(x, z, biome, 50);
+          }
+        }
+      }
+    }
+
+    const uniqueMatNames = new Set(standardMaterialInstances.map(m => m.name));
+    expect(uniqueMatNames.size).toBeLessThanOrEqual(MAX_STRUCTURE_MATERIAL_TYPES);
   });
 });
