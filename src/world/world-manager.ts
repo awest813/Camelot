@@ -143,11 +143,13 @@ export class WorldManager {
     for (let i = 0; i < budget; i++) {
       const entry = this._loadQueue.shift()!;
       this._enqueuedKeys.delete(entry.key);
-      // Skip if the player has moved far enough that this chunk is no longer needed
-      if (
-        Math.abs(entry.cx - this._lastPlayerChunkX) > this.loadDistance ||
-        Math.abs(entry.cz - this._lastPlayerChunkZ) > this.loadDistance
-      ) {
+      // Skip if the player has moved far enough that this chunk is no longer needed.
+      // Use Chebyshev distance (max of abs-differences) to match the sort metric.
+      const chebyshev = Math.max(
+        Math.abs(entry.cx - this._lastPlayerChunkX),
+        Math.abs(entry.cz - this._lastPlayerChunkZ),
+      );
+      if (chebyshev > this.loadDistance) {
         continue;
       }
       if (!this.loadedChunks.has(entry.key)) {

@@ -191,9 +191,10 @@ describe('StructureManager.trySpawnForChunk — physics disposal', () => {
 
     const sm = new StructureManager(mockScene);
     let cx = 0, cz = 0;
-    outer: for (let x = 0; x < 20; x++) {
-      for (let z = 0; z < 20; z++) {
-        if (sm.hasStructureAt(x, z)) { cx = x; cz = z; break outer; }
+    let found = false;
+    for (let x = 0; x < 20 && !found; x++) {
+      for (let z = 0; z < 20 && !found; z++) {
+        if (sm.hasStructureAt(x, z)) { cx = x; cz = z; found = true; }
       }
     }
 
@@ -210,9 +211,10 @@ describe('StructureManager.trySpawnForChunk — physics disposal', () => {
 
     const sm = new StructureManager(mockScene);
     let cx = 0, cz = 0;
-    outer: for (let x = 0; x < 20; x++) {
-      for (let z = 0; z < 20; z++) {
-        if (sm.hasStructureAt(x, z)) { cx = x; cz = z; break outer; }
+    let found = false;
+    for (let x = 0; x < 20 && !found; x++) {
+      for (let z = 0; z < 20 && !found; z++) {
+        if (sm.hasStructureAt(x, z)) { cx = x; cz = z; found = true; }
       }
     }
 
