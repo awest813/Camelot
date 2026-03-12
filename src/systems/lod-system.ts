@@ -207,13 +207,13 @@ export class LodSystem {
       if (!originMesh) continue;
 
       const distSq = Vector3.DistanceSquared(originMesh.mesh.position, playerPosition);
-      const dist   = Math.sqrt(distSq);
 
-      // Find the first level whose maxDistance >= dist — show it, hide others
+      // Find the first level whose maxDistance >= sqrt(distSq) — show it, hide
+      // others.  Compare using squared values to avoid an expensive sqrt.
       let chosen = false;
       for (const level of group.levels) {
         if (level.mesh.isDisposed()) continue;
-        if (!chosen && dist <= level.maxDistance) {
+        if (!chosen && distSq <= level.maxDistance * level.maxDistance) {
           level.mesh.isVisible = true;
           chosen = true;
         } else {

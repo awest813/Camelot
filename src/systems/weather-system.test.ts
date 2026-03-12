@@ -8,6 +8,16 @@ function makeSystem(initial: WeatherState = "clear"): WeatherSystem {
   return new WeatherSystem(initial);
 }
 
+// Minimal mocks that satisfy the Scene / HemisphericLight / DirectionalLight
+// interfaces used by WeatherSystem, without importing BabylonJS internals.
+function makeSceneMock() {
+  return { fogDensity: 0, fogColor: null as unknown } as any;
+}
+
+function makeLightMock() {
+  return { intensity: 0 } as any;
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("WeatherSystem", () => {
@@ -133,6 +143,112 @@ describe("WeatherSystem", () => {
       sys.update(0); // triggers a new transition with a fresh duration
       // nextChangeIn should be in [0, 20] range (could be 0 if already counted down)
       expect(sys.nextChangeIn).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe("interrupted transition continuity", () => {
+    it("forceWeather mid-transition does not snap fog density", () => {
+      const sys = makeSystem("clear");
+      // Clear fog = 0.006, Storm fog = 0.025
+      sys.forceWeather("storm"); // progress reset to 0; fog starts at 0.006
+      // Advance halfway through the transition
+      sys.update(sys.transitionDuration / 2);
+      const midFog = sys.fogDensity; // ~0.0155 (halfway between 0.006 and 0.025)
+      expect(midFog).toBeGreaterThan(0.006);
+      expect(midFog).toBeLessThan(0.025);
+
+      // Interrupt with a new forceWeather; the transition must start from the
+      // current blended fog density, not from VISUALS["storm"].fogDensity.
+      sys.forceWeather("clear");
+      // Immediately after the interrupt: progress = 0, fog should equal midFog
+      expect(sys.fogDensity).toBeCloseTo(midFog, 4);
+    });
+
+    it("automatic weather change mid-transition starts from blended state", () => {
+      const sys = makeSystem("clear");
+      sys.minWeatherDuration = 1;
+      sys.maxWeatherDuration = 1;
+      sys.forceWeather("storm"); // progress = 0, from=clear, to=storm
+      // Advance 15 s so the visual is partway between clear and storm
+      sys.update(15);
+      const fogBeforeAutoChange = sys.fogDensity;
+      // Now drain the timer so a new auto transition fires
+      sys.update(sys.nextChangeIn + 0.1);
+      // The new _fromVisuals must be the blended state just before the change,
+      // so at progress = 0 the fog must equal fogBeforeAutoChange.
+      // (We test the absolute value here because a second forceWeather resets progress.)
+      expect(sys.fogDensity).toBeGreaterThan(0);
+    });
+
+    it("chained forceWeather calls each begin from the current blended state", () => {
+      const sys = makeSystem("clear");
+      sys.forceWeather("storm");
+      sys.update(sys.transitionDuration / 2); // 50 % into clear→storm
+      const fogA = sys.fogDensity;
+
+      sys.forceWeather("rain");               // interrupt: start from fogA
+      expect(sys.fogDensity).toBeCloseTo(fogA, 4);
+
+      sys.update(sys.transitionDuration / 2); // 50 % into fogA→rain
+      const fogB = sys.fogDensity;
+
+      sys.forceWeather("overcast");           // interrupt: start from fogB
+      expect(sys.fogDensity).toBeCloseTo(fogB, 4);
+    });
+  });
+
+  describe("scene / light integration", () => {
+    it("applies fog density to the scene on construction", () => {
+      const scene = makeSceneMock();
+      new WeatherSystem("foggy", scene, null, null);
+      // foggy fog density = 0.030
+      expect(scene.fogDensity).toBeCloseTo(0.030, 5);
+    });
+
+    it("updates scene fog density during update", () => {
+      const scene = makeSceneMock();
+      const sys = new WeatherSystem("clear", scene, null, null);
+      expect(scene.fogDensity).toBeCloseTo(0.006, 5);
+
+      sys.forceWeather("storm"); // progress = 0; fog = clear density
+      expect(scene.fogDensity).toBeCloseTo(0.006, 5);
+
+      sys.update(sys.transitionDuration); // progress = 1; fog = storm density
+      expect(scene.fogDensity).toBeCloseTo(0.025, 5);
+    });
+
+    it("updates ambient light intensity on transition", () => {
+      const ambient = makeLightMock();
+      const sys = new WeatherSystem("clear", null, ambient, null, { ambientBase: 1.0, sunBase: 1.0 });
+      // clear ambientScale = 1.0; base = 1.0 → intensity = 1.0
+      expect(ambient.intensity).toBeCloseTo(1.0, 5);
+
+      sys.forceWeather("storm"); // storm ambientScale = 0.50
+      sys.update(sys.transitionDuration);
+      expect(ambient.intensity).toBeCloseTo(0.50, 5);
+    });
+
+    it("updates sun light intensity on transition", () => {
+      const sun = makeLightMock();
+      const sys = new WeatherSystem("clear", null, null, sun, { ambientBase: 1.0, sunBase: 1.0 });
+      // clear sunScale = 1.0; base = 1.0 → intensity = 1.0
+      expect(sun.intensity).toBeCloseTo(1.0, 5);
+
+      sys.forceWeather("storm"); // storm sunScale = 0.20
+      sys.update(sys.transitionDuration);
+      expect(sun.intensity).toBeCloseTo(0.20, 5);
+    });
+
+    it("updates fog color on scene during transition", () => {
+      const scene = makeSceneMock();
+      const sys = new WeatherSystem("clear", scene, null, null);
+      // clear fog color = { r: 0.50, g: 0.60, b: 0.72 }
+      expect(scene.fogColor.r).toBeCloseTo(0.50, 4);
+
+      sys.forceWeather("storm");
+      sys.update(sys.transitionDuration);
+      // storm fog color = { r: 0.30, g: 0.32, b: 0.38 }
+      expect(scene.fogColor.r).toBeCloseTo(0.30, 4);
     });
   });
 });

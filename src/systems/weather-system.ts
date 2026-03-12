@@ -240,8 +240,29 @@ export class WeatherSystem {
 
   // ── Private helpers ───────────────────────────────────────────────────────
 
+  /**
+   * Capture the currently blended visuals so that an interrupted transition
+   * starts from the actual on-screen state rather than snapping to the
+   * previous target state's values.
+   */
+  private _currentBlendedVisuals(): WeatherVisuals {
+    const t = this._transitionProgress;
+    return {
+      fogDensity: lerp(this._fromVisuals.fogDensity, this._toVisuals.fogDensity, t),
+      fogColor: {
+        r: lerp(this._fromVisuals.fogColor.r, this._toVisuals.fogColor.r, t),
+        g: lerp(this._fromVisuals.fogColor.g, this._toVisuals.fogColor.g, t),
+        b: lerp(this._fromVisuals.fogColor.b, this._toVisuals.fogColor.b, t),
+      },
+      ambientScale: lerp(this._fromVisuals.ambientScale, this._toVisuals.ambientScale, t),
+      sunScale:     lerp(this._fromVisuals.sunScale,     this._toVisuals.sunScale,     t),
+    };
+  }
+
   private _beginTransition(next: WeatherState): void {
-    this._fromVisuals        = VISUALS[this._state];
+    // Start from the current blended state so interrupted transitions do not
+    // snap visuals back to the previous target's values.
+    this._fromVisuals        = this._currentBlendedVisuals();
     this._toVisuals          = VISUALS[next];
     this._state              = next;
     this._transitionProgress = 0;
