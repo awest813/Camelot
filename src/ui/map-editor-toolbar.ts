@@ -49,10 +49,11 @@ const TERRAIN_LABELS: Record<EditorTerrainTool, string> = {
  * Persistent status bar for the map editor.
  *
  * Shows the current placement type, gizmo mode, terrain tool, entity count,
- * and active patrol group whenever the map editor is enabled.
+ * snap grid size, and active patrol group whenever the map editor is enabled.
  *
- * Placement-type chips are clickable to change the active type.
- * Gizmo-mode chips are clickable to cycle modes.
+ * Placement-type chips, gizmo-mode chips, and terrain-tool chips are all
+ * clickable to change the active selection.  Snap-size ± buttons allow
+ * adjusting the grid increment directly from the toolbar.
  */
 export class MapEditorToolbar {
   /** Fired when the user clicks a placement-type chip. */
@@ -60,6 +61,15 @@ export class MapEditorToolbar {
 
   /** Fired when the user clicks a gizmo-mode chip. */
   public onGizmoModeChange: ((mode: EditorGizmoMode) => void) | null = null;
+
+  /** Fired when the user clicks a terrain-tool chip. */
+  public onTerrainToolChange: ((tool: EditorTerrainTool) => void) | null = null;
+
+  /**
+   * Fired when the user clicks the snap-size decrement (−1) or increment (+1)
+   * button.  The argument is the requested delta (−1 or +1).
+   */
+  public onSnapSizeChange: ((delta: number) => void) | null = null;
 
   private readonly _ui: AdvancedDynamicTexture;
   private readonly _panel: Rectangle;
@@ -70,10 +80,13 @@ export class MapEditorToolbar {
   // Gizmo-mode chip references
   private readonly _gizmoChips: Map<EditorGizmoMode, Button> = new Map();
 
+  // Terrain-tool chip references
+  private readonly _terrainChips: Map<EditorTerrainTool, Button> = new Map();
+
   // Dynamic labels
   private readonly _entityCountLabel: TextBlock;
   private readonly _patrolLabel: TextBlock;
-  private readonly _terrainLabel: TextBlock;
+  private readonly _snapLabel: TextBlock;
 
   constructor(ui: AdvancedDynamicTexture) {
     this._ui = ui;
@@ -103,7 +116,7 @@ export class MapEditorToolbar {
     inner.width = "668px";
     this._panel.addControl(inner);
 
-    // ── Row 1: Title + entity count + patrol group ────────────────────────
+    // ── Row 1: Title + entity count + patrol group + snap size ───────────────
     const row1 = new StackPanel("editorToolbarRow1");
     row1.isVertical = false;
     row1.height     = "22px";
@@ -151,21 +164,49 @@ export class MapEditorToolbar {
     this._patrolLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     row1.addControl(this._patrolLabel);
 
-    const terrainPre = new TextBlock("editorToolbarTerrainPre", "Terrain:");
-    terrainPre.color    = T.DIM;
-    terrainPre.fontSize = 12;
-    terrainPre.width    = "56px";
-    terrainPre.height   = "22px";
-    terrainPre.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    row1.addControl(terrainPre);
+    // ── Snap size controls ────────────────────────────────────────────────────
+    const snapPre = new TextBlock("editorToolbarSnapPre", "Snap:");
+    snapPre.color    = T.DIM;
+    snapPre.fontSize = 12;
+    snapPre.width    = "42px";
+    snapPre.height   = "22px";
+    snapPre.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    row1.addControl(snapPre);
 
-    this._terrainLabel = new TextBlock("editorToolbarTerrain", "None");
-    this._terrainLabel.color    = T.TEXT;
-    this._terrainLabel.fontSize = 12;
-    this._terrainLabel.width    = "80px";
-    this._terrainLabel.height   = "22px";
-    this._terrainLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    row1.addControl(this._terrainLabel);
+    const snapDec = Button.CreateSimpleButton("editorToolbarSnapDec", "−");
+    snapDec.width        = "20px";
+    snapDec.height       = "18px";
+    snapDec.fontSize     = 13;
+    snapDec.color        = T.TEXT;
+    snapDec.background   = T.CHIP_BG;
+    snapDec.cornerRadius = 3;
+    snapDec.thickness    = 1;
+    snapDec.onPointerEnterObservable.add(() => { snapDec.background = T.CHIP_HOVER; });
+    snapDec.onPointerOutObservable.add(() => { snapDec.background = T.CHIP_BG; });
+    snapDec.onPointerUpObservable.add(() => this.onSnapSizeChange?.(-1));
+    row1.addControl(snapDec);
+
+    this._snapLabel = new TextBlock("editorToolbarSnapVal", "1");
+    this._snapLabel.color    = T.ACCENT;
+    this._snapLabel.fontSize = 12;
+    this._snapLabel.fontStyle = "bold";
+    this._snapLabel.width    = "26px";
+    this._snapLabel.height   = "22px";
+    this._snapLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    row1.addControl(this._snapLabel);
+
+    const snapInc = Button.CreateSimpleButton("editorToolbarSnapInc", "+");
+    snapInc.width        = "20px";
+    snapInc.height       = "18px";
+    snapInc.fontSize     = 13;
+    snapInc.color        = T.TEXT;
+    snapInc.background   = T.CHIP_BG;
+    snapInc.cornerRadius = 3;
+    snapInc.thickness    = 1;
+    snapInc.onPointerEnterObservable.add(() => { snapInc.background = T.CHIP_HOVER; });
+    snapInc.onPointerOutObservable.add(() => { snapInc.background = T.CHIP_BG; });
+    snapInc.onPointerUpObservable.add(() => this.onSnapSizeChange?.(+1));
+    row1.addControl(snapInc);
 
     // ── Thin separator ────────────────────────────────────────────────────
     const sep = new Rectangle("editorToolbarSep");
@@ -269,9 +310,55 @@ export class MapEditorToolbar {
       row3.addControl(gap);
     }
 
+    // ── Row 4: Terrain-tool chips ─────────────────────────────────────────
+    const row4 = new StackPanel("editorToolbarRow4");
+    row4.isVertical = false;
+    row4.height     = "28px";
+    row4.paddingTop = "2px";
+    inner.addControl(row4);
+
+    const terrainLbl = new TextBlock("editorToolbarTerrainLbl", "Terrain:");
+    terrainLbl.color    = T.DIM;
+    terrainLbl.fontSize = 11;
+    terrainLbl.width    = "54px";
+    terrainLbl.height   = "24px";
+    terrainLbl.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    row4.addControl(terrainLbl);
+
+    const terrainTools: EditorTerrainTool[] = ["none", "sculpt", "paint"];
+    for (const ttool of terrainTools) {
+      const chip = Button.CreateSimpleButton(`editorTerrainChip_${ttool}`, TERRAIN_LABELS[ttool]);
+      chip.width        = "58px";
+      chip.height       = "22px";
+      chip.fontSize     = 11;
+      chip.color        = T.TEXT;
+      chip.background   = T.CHIP_BG;
+      chip.cornerRadius = 3;
+      chip.thickness    = 1;
+      chip.paddingLeft  = "2px";
+      chip.paddingRight = "2px";
+      chip.onPointerEnterObservable.add(() => {
+        if (chip.background !== T.CHIP_ACTIVE) chip.background = T.CHIP_HOVER;
+      });
+      chip.onPointerOutObservable.add(() => {
+        if (chip.background !== T.CHIP_ACTIVE) chip.background = T.CHIP_BG;
+      });
+      chip.onPointerUpObservable.add(() => this.onTerrainToolChange?.(ttool));
+      row4.addControl(chip);
+      this._terrainChips.set(ttool, chip);
+
+      const gap = new Rectangle(`editorTerrainGap_${ttool}`);
+      gap.width     = "4px";
+      gap.height    = "22px";
+      gap.thickness = 0;
+      gap.background = "transparent";
+      row4.addControl(gap);
+    }
+
     // Initialize active state to defaults
     this._highlightTypeChip("marker");
     this._highlightGizmoChip("position");
+    this._highlightTerrainChip("none");
   }
 
   // ── Public API ───────────────────────────────────────────────────────────────
@@ -293,7 +380,7 @@ export class MapEditorToolbar {
   /**
    * Refresh all dynamic labels from current editor state.
    * Call this whenever the editor mode, placement type, gizmo mode, terrain
-   * tool, entity count, or patrol group changes.
+   * tool, entity count, patrol group, or snap size changes.
    */
   update(state: {
     placementType: EditorPlacementType;
@@ -301,14 +388,11 @@ export class MapEditorToolbar {
     terrainTool:   EditorTerrainTool;
     entityCount:   number;
     activePatrolGroupId: string | null;
+    snapSize?: number;
   }): void {
     this._highlightTypeChip(state.placementType);
     this._highlightGizmoChip(state.gizmoMode);
-
-    this._terrainLabel.text =
-      state.terrainTool === "none" ? "None" : TERRAIN_LABELS[state.terrainTool];
-    this._terrainLabel.color =
-      state.terrainTool === "none" ? T.DIM : T.WARN;
+    this._highlightTerrainChip(state.terrainTool);
 
     this._entityCountLabel.text = String(state.entityCount);
 
@@ -316,6 +400,10 @@ export class MapEditorToolbar {
       state.activePatrolGroupId !== null ? state.activePatrolGroupId : "—";
     this._patrolLabel.color =
       state.activePatrolGroupId !== null ? T.ACCENT : T.DIM;
+
+    if (state.snapSize !== undefined) {
+      this._snapLabel.text = String(state.snapSize);
+    }
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
@@ -331,6 +419,13 @@ export class MapEditorToolbar {
     for (const [gmode, chip] of this._gizmoChips) {
       chip.background = gmode === active ? T.CHIP_ACTIVE : T.CHIP_BG;
       chip.thickness  = gmode === active ? 2 : 1;
+    }
+  }
+
+  private _highlightTerrainChip(active: EditorTerrainTool): void {
+    for (const [ttool, chip] of this._terrainChips) {
+      chip.background = ttool === active ? T.CHIP_ACTIVE : T.CHIP_BG;
+      chip.thickness  = ttool === active ? 2 : 1;
     }
   }
 }

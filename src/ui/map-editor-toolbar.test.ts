@@ -159,6 +159,77 @@ describe('MapEditorToolbar — onGizmoModeChange callback', () => {
     });
 });
 
+describe('MapEditorToolbar — onTerrainToolChange callback', () => {
+    it('fires onTerrainToolChange when a terrain chip is clicked', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        const received: string[] = [];
+        toolbar.onTerrainToolChange = (t) => received.push(t);
+
+        toolbar.onTerrainToolChange?.('sculpt');
+        expect(received).toContain('sculpt');
+    });
+
+    it('does not throw when onTerrainToolChange is null', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        toolbar.onTerrainToolChange = null;
+        expect(() => toolbar.onTerrainToolChange?.('paint')).not.toThrow();
+    });
+
+    it('has terrain chip references for none, sculpt and paint', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        const chips = (toolbar as any)._terrainChips as Map<string, unknown>;
+        expect(chips.has('none')).toBe(true);
+        expect(chips.has('sculpt')).toBe(true);
+        expect(chips.has('paint')).toBe(true);
+    });
+
+    it('update() does not throw with all terrain tool values', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        const base = { placementType: 'marker' as const, gizmoMode: 'position' as const, entityCount: 0, activePatrolGroupId: null };
+        expect(() => toolbar.update({ ...base, terrainTool: 'none' })).not.toThrow();
+        expect(() => toolbar.update({ ...base, terrainTool: 'sculpt' })).not.toThrow();
+        expect(() => toolbar.update({ ...base, terrainTool: 'paint' })).not.toThrow();
+    });
+});
+
+describe('MapEditorToolbar — onSnapSizeChange callback', () => {
+    it('fires onSnapSizeChange with -1 for decrement', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        const deltas: number[] = [];
+        toolbar.onSnapSizeChange = (d) => deltas.push(d);
+
+        toolbar.onSnapSizeChange?.(-1);
+        expect(deltas).toContain(-1);
+    });
+
+    it('fires onSnapSizeChange with +1 for increment', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        const deltas: number[] = [];
+        toolbar.onSnapSizeChange = (d) => deltas.push(d);
+
+        toolbar.onSnapSizeChange?.(+1);
+        expect(deltas).toContain(1);
+    });
+
+    it('does not throw when onSnapSizeChange is null', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        toolbar.onSnapSizeChange = null;
+        expect(() => toolbar.onSnapSizeChange?.(-1)).not.toThrow();
+    });
+
+    it('update() with snapSize does not throw', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        expect(() => toolbar.update({
+            placementType: 'marker',
+            gizmoMode: 'position',
+            terrainTool: 'none',
+            entityCount: 5,
+            activePatrolGroupId: null,
+            snapSize: 2,
+        })).not.toThrow();
+    });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MapEditorHierarchyPanel
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -267,5 +338,26 @@ describe('MapEditorHierarchyPanel — onEntityClick callback', () => {
         panel.onEntityClick = null;
         panel.refresh([{ id: 'editor_entity_0', type: 'marker' }]);
         expect(() => panel.onEntityClick?.('editor_entity_0')).not.toThrow();
+    });
+});
+
+describe('MapEditorHierarchyPanel — refresh() with label', () => {
+    it('does not throw when entities include an optional label', () => {
+        const panel = new MapEditorHierarchyPanel(makeMockUi());
+        expect(() => panel.refresh([
+            { id: 'editor_entity_0', type: 'marker', label: 'Gate Entrance' },
+            { id: 'editor_entity_1', type: 'loot' },
+        ])).not.toThrow();
+    });
+
+    it('builds row entries for entities with and without labels', () => {
+        const panel = new MapEditorHierarchyPanel(makeMockUi());
+        panel.refresh([
+            { id: 'editor_entity_0', type: 'quest-marker', label: 'Main Quest' },
+            { id: 'editor_entity_1', type: 'structure' },
+        ]);
+        const rowMap = (panel as any)._rowMap as Map<string, unknown>;
+        expect(rowMap.has('editor_entity_0')).toBe(true);
+        expect(rowMap.has('editor_entity_1')).toBe(true);
     });
 });
