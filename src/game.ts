@@ -5,6 +5,10 @@ import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
+import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
+import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { SkyMaterial } from "@babylonjs/materials/sky/skyMaterial";
 import { Player } from "./entities/player";
 import { UIManager } from "./ui/ui-manager";
 import { WorldManager } from "./world/world-manager";
@@ -96,6 +100,9 @@ export class Game {
   public player: Player;
   public ui: UIManager;
   public world: WorldManager;
+
+  /** Shadow generator driven by the directional sun light. */
+  public shadowGenerator: ShadowGenerator | null = null;
   public scheduleSystem: ScheduleSystem;
   public combatSystem: CombatSystem;
   public dialogueSystem: DialogueSystem;
@@ -277,8 +284,10 @@ export class Game {
   init(): void {
     this._setLight();
     this.player = new Player(this.scene, this.canvas);
+    // Post-processing and skybox require the camera, so initialise after Player.
+    this._initPostProcessing();
     this.ui = new UIManager(this.scene);
-    this.world = new WorldManager(this.scene);
+    this.world = new WorldManager(this.scene, this.shadowGenerator);
     this.navigationSystem = new NavigationSystem(this.scene);
     this.scheduleSystem = new ScheduleSystem();
 
@@ -575,7 +584,7 @@ export class Game {
       this.scene,
       this.scene.getLightByName("hLight") as any,
       this.scene.getLightByName("sun") as any,
-      { ambientBase: 0.55, sunBase: 0.85 },
+      { ambientBase: 0.60, sunBase: 1.05 },
     );
     this.weatherSystem.onWeatherChange = (state) => {
       this.ui.showNotification(`Weather: ${this.weatherSystem.label}`, 2500);
@@ -1724,26 +1733,91 @@ export class Game {
   }
 
   _setLight(): void {
-    // Sky-blue clear color
+    // Transparent clear colour — the procedural sky dome covers the background.
     this.scene.clearColor = new Color4(0.42, 0.55, 0.72, 1.0);
 
-    // Ambient hemisphere light — warm sky, cool ground
+    // Ambient hemisphere light — warm sky tones above, cool earthy tones below
     const hLight = new HemisphericLight("hLight", new Vector3(0, 1, 0), this.scene);
-    hLight.intensity = 0.55;
-    hLight.diffuse    = new Color3(0.95, 0.90, 0.78);
-    hLight.groundColor = new Color3(0.28, 0.22, 0.16);
-    hLight.specular   = new Color3(0, 0, 0);
+    hLight.intensity   = 0.60;
+    hLight.diffuse     = new Color3(0.95, 0.90, 0.78);
+    hLight.groundColor = new Color3(0.22, 0.18, 0.12);
+    hLight.specular    = new Color3(0.05, 0.04, 0.03);
 
-    // Directional sun light for depth-shading
-    const sun = new DirectionalLight("sun", new Vector3(-1.4, -2.2, -1.0).normalize(), this.scene);
-    sun.intensity = 0.85;
-    sun.diffuse   = new Color3(1.0, 0.96, 0.82);
-    sun.specular  = new Color3(0.18, 0.16, 0.10);
+    // Directional sun light — warm golden angle for rich shadows
+    const sun = new DirectionalLight("sun", new Vector3(-1.2, -2.8, -0.8).normalize(), this.scene);
+    sun.intensity = 1.05;
+    sun.diffuse   = new Color3(1.0, 0.94, 0.78);
+    sun.specular  = new Color3(0.35, 0.30, 0.20);
+    // Position the light far away so the shadow frustum covers the visible world.
+    sun.position  = new Vector3(60, 100, 40);
+
+    // Shadow generator — soft PCF shadows cast by the directional sun
+    const shadows = new ShadowGenerator(1024, sun);
+    shadows.useBlurExponentialShadowMap = true;
+    shadows.blurKernel = 16;
+    this.shadowGenerator = shadows;
 
     // Atmospheric distance fog
     this.scene.fogMode    = Scene.FOGMODE_EXP2;
-    this.scene.fogDensity = 0.006;
-    this.scene.fogColor   = new Color3(0.50, 0.60, 0.72);
+    this.scene.fogDensity = 0.005;
+    this.scene.fogColor   = new Color3(0.58, 0.68, 0.80);
+  }
+
+  /**
+   * Initialise post-processing effects and the procedural sky dome.
+   * Must be called after `Player` is created so its camera is available.
+   */
+  private _initPostProcessing(): void {
+    // ── Procedural sky dome ──────────────────────────────────────────────────
+    const skybox = MeshBuilder.CreateBox("skyBox", { size: 1000 }, this.scene);
+    skybox.infiniteDistance = true;
+
+    const skyMat = new SkyMaterial("skyMat", this.scene);
+    skyMat.backFaceCulling = false;
+    // Atmospheric parameters — clear mid-morning look
+    skyMat.turbidity      = 6;
+    skyMat.luminance      = 0.98;
+    skyMat.rayleigh       = 2.2;
+    skyMat.mieCoefficient = 0.006;
+    skyMat.mieDirectionalG = 0.82;
+    skyMat.inclination    = 0.30;   // sun angle above horizon
+    skyMat.azimuth        = 0.25;
+    skybox.material = skyMat;
+
+    // ── DefaultRenderingPipeline ─────────────────────────────────────────────
+    // Skip on WebGPU to avoid driver-level incompatibilities at startup.
+    if (this.engine.name !== "WebGPU") {
+      const pipeline = new DefaultRenderingPipeline(
+        "defaultPipeline",
+        true,              // HDR
+        this.scene,
+        [this.player.camera],
+      );
+
+      // Bloom — subtle glow on bright surfaces (emissive torches, highlights)
+      pipeline.bloomEnabled  = true;
+      pipeline.bloomThreshold = 0.72;
+      pipeline.bloomWeight    = 0.22;
+      pipeline.bloomKernel    = 48;
+      pipeline.bloomScale     = 0.55;
+
+      // FXAA — smooth jagged edges
+      pipeline.fxaaEnabled = true;
+
+      // Sharpen — recover detail that FXAA softens
+      pipeline.sharpenEnabled = true;
+      pipeline.sharpen.edgeAmount = 0.25;
+
+      // Image processing — filmic tone mapping + slight colour grading
+      pipeline.imageProcessingEnabled = true;
+      pipeline.imageProcessing.toneMappingEnabled = true;
+      pipeline.imageProcessing.toneMappingType = 1; // ACES filmic
+      pipeline.imageProcessing.exposure  = 1.05;
+      pipeline.imageProcessing.contrast  = 1.10;
+      pipeline.imageProcessing.vignetteEnabled = true;
+      pipeline.imageProcessing.vignetteWeight  = 2.5;
+      pipeline.imageProcessing.vignetteBlendMode = 1;
+    }
   }
 
   /** Remove world loot objects whose item IDs are now in inventory or equipment (called after load). */

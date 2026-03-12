@@ -6,6 +6,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType } from "@babylonjs/core/Physics";
+import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { NPC } from "../entities/npc";
 import { Loot } from "../entities/loot";
 import { BiomeType } from "./world-manager";
@@ -29,8 +30,12 @@ export class StructureManager {
    *  register it with ScheduleSystem / CombatSystem. */
   public onNPCSpawn: ((npc: NPC) => void) | null = null;
 
-  constructor(scene: Scene) {
+  /** Optional shadow generator — structure meshes are registered as casters. */
+  private readonly _shadows: ShadowGenerator | null;
+
+  constructor(scene: Scene, shadowGenerator: ShadowGenerator | null = null) {
     this._scene = scene;
+    this._shadows = shadowGenerator;
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────
@@ -104,7 +109,13 @@ export class StructureManager {
   private _buildRuins(cx: number, cz: number, origin: Vector3): StructureSpawn {
     const meshes: Mesh[] = [];
     const loot: Loot[] = [];
-    const mat = this._mat(`ruins_stone_${cx}_${cz}`, new Color3(0.5, 0.45, 0.4));
+    // Aged limestone — slightly warm grey with subtle specular for weathered stone
+    const mat = this._mat(
+      `ruins_stone_${cx}_${cz}`,
+      new Color3(0.52, 0.47, 0.40),
+      new Color3(0.12, 0.10, 0.08),
+      20,
+    );
 
     // Four partial walls at varying heights for a crumbled look
     const walls: Array<{ dx: number; dz: number; w: number; h: number; d: number }> = [
@@ -119,7 +130,7 @@ export class StructureManager {
       wall.position.set(origin.x + dx, h / 2, origin.z + dz);
       wall.material = mat;
       new PhysicsAggregate(wall, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
-      meshes.push(wall);
+      meshes.push(this._shadow(wall));
     }
 
     // Scattered rubble blocks inside
@@ -135,7 +146,7 @@ export class StructureManager {
       );
       rubble.rotation.y = this._rand(cx, cz, i + 22) * Math.PI;
       rubble.material = mat;
-      meshes.push(rubble);
+      meshes.push(this._shadow(rubble));
     }
 
     // Loot chest at the center
@@ -162,21 +173,33 @@ export class StructureManager {
   private _buildDesertShrine(cx: number, cz: number, origin: Vector3): StructureSpawn {
     const meshes: Mesh[] = [];
     const loot: Loot[] = [];
-    const stoneMat = this._mat(`shrine_stone_${cx}_${cz}`, new Color3(0.72, 0.60, 0.38));
-    const altarMat = this._mat(`shrine_altar_${cx}_${cz}`, new Color3(0.82, 0.70, 0.30));
+    // Sun-bleached sandstone platform
+    const stoneMat = this._mat(
+      `shrine_stone_${cx}_${cz}`,
+      new Color3(0.76, 0.62, 0.36),
+      new Color3(0.20, 0.15, 0.06),
+      28,
+    );
+    // Golden altar stone with a slight glow
+    const altarMat = this._mat(
+      `shrine_altar_${cx}_${cz}`,
+      new Color3(0.88, 0.72, 0.28),
+      new Color3(0.30, 0.22, 0.06),
+      40,
+    );
 
     // Raised platform
     const platform = MeshBuilder.CreateBox(`shrine_platform_${cx}_${cz}`, { width: 5, height: 0.4, depth: 5 }, this._scene);
     platform.position.set(origin.x, 0.2, origin.z);
     platform.material = stoneMat;
     new PhysicsAggregate(platform, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
-    meshes.push(platform);
+    meshes.push(this._shadow(platform));
 
     // Altar block
     const altar = MeshBuilder.CreateBox(`shrine_altarBlock_${cx}_${cz}`, { width: 1.5, height: 0.8, depth: 0.9 }, this._scene);
     altar.position.set(origin.x, 0.8, origin.z);
     altar.material = altarMat;
-    meshes.push(altar);
+    meshes.push(this._shadow(altar));
 
     // Four corner pillars at varying heights
     const corners: [number, number][] = [[-2.5, -2.5], [2.5, -2.5], [-2.5, 2.5], [2.5, 2.5]];
@@ -187,7 +210,7 @@ export class StructureManager {
       pillar.position.set(origin.x + px, ph / 2, origin.z + pz);
       pillar.material = stoneMat;
       new PhysicsAggregate(pillar, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
-      meshes.push(pillar);
+      meshes.push(this._shadow(pillar));
     }
 
     // Ancient relic on the altar — equippable off-hand talisman
@@ -212,8 +235,20 @@ export class StructureManager {
   private _buildWatchtower(cx: number, cz: number, origin: Vector3): StructureSpawn {
     const meshes: Mesh[] = [];
     const loot: Loot[] = [];
-    const stoneMat = this._mat(`tower_stone_${cx}_${cz}`, new Color3(0.55, 0.52, 0.50));
-    const woodMat  = this._mat(`tower_wood_${cx}_${cz}`,  new Color3(0.42, 0.30, 0.18));
+    // Cold granite stone — blue-grey tint with reflective highlights
+    const stoneMat = this._mat(
+      `tower_stone_${cx}_${cz}`,
+      new Color3(0.52, 0.50, 0.52),
+      new Color3(0.15, 0.15, 0.18),
+      32,
+    );
+    // Weathered dark timber
+    const woodMat = this._mat(
+      `tower_wood_${cx}_${cz}`,
+      new Color3(0.38, 0.26, 0.14),
+      new Color3(0.06, 0.04, 0.02),
+      10,
+    );
 
     const tW = 4;   // exterior width
     const tH = 8;   // wall height
@@ -224,7 +259,7 @@ export class StructureManager {
     nWall.position.set(origin.x, tH / 2, origin.z + tW / 2);
     nWall.material = stoneMat;
     new PhysicsAggregate(nWall, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
-    meshes.push(nWall);
+    meshes.push(this._shadow(nWall));
 
     // South wall — two pillar segments flanking a 1.6 m doorway
     for (const side of [-1, 1]) {
@@ -232,7 +267,7 @@ export class StructureManager {
       pillar.position.set(origin.x + side * 1.5, tH / 2, origin.z - tW / 2);
       pillar.material = stoneMat;
       new PhysicsAggregate(pillar, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
-      meshes.push(pillar);
+      meshes.push(this._shadow(pillar));
     }
 
     // Lintel above doorway
@@ -241,28 +276,28 @@ export class StructureManager {
     lintel.position.set(origin.x, tH - lintelH / 2, origin.z - tW / 2);
     lintel.material = stoneMat;
     new PhysicsAggregate(lintel, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
-    meshes.push(lintel);
+    meshes.push(this._shadow(lintel));
 
     // East wall
     const eWall = MeshBuilder.CreateBox(`tower_E_${cx}_${cz}`, { width: wT, height: tH, depth: tW }, this._scene);
     eWall.position.set(origin.x + tW / 2, tH / 2, origin.z);
     eWall.material = stoneMat;
     new PhysicsAggregate(eWall, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
-    meshes.push(eWall);
+    meshes.push(this._shadow(eWall));
 
     // West wall
     const wWall = MeshBuilder.CreateBox(`tower_W_${cx}_${cz}`, { width: wT, height: tH, depth: tW }, this._scene);
     wWall.position.set(origin.x - tW / 2, tH / 2, origin.z);
     wWall.material = stoneMat;
     new PhysicsAggregate(wWall, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
-    meshes.push(wWall);
+    meshes.push(this._shadow(wWall));
 
     // Wooden roof platform
     const roof = MeshBuilder.CreateBox(`tower_roof_${cx}_${cz}`, { width: tW - wT, height: 0.2, depth: tW - wT }, this._scene);
     roof.position.set(origin.x, tH + 0.1, origin.z);
     roof.material = woodMat;
     new PhysicsAggregate(roof, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
-    meshes.push(roof);
+    meshes.push(this._shadow(roof));
 
     // Chest inside tower base
     meshes.push(this._addChest(`tower_chest_${cx}_${cz}`, new Vector3(origin.x + 1, 0, origin.z + 1), loot, cx, cz, 60));
@@ -285,11 +320,17 @@ export class StructureManager {
 
   /** Spawn a wooden chest mesh and a gold-coin loot item beside it. */
   private _addChest(name: string, position: Vector3, lootArr: Loot[], cx: number, cz: number, slot: number): Mesh {
-    const mat = this._mat(`${name}_mat`, new Color3(0.50, 0.32, 0.10));
+    const mat = this._mat(
+      `${name}_mat`,
+      new Color3(0.48, 0.30, 0.10),
+      new Color3(0.10, 0.06, 0.02),
+      12,
+    );
     const chest = MeshBuilder.CreateBox(name, { width: 0.8, height: 0.5, depth: 0.5 }, this._scene);
     chest.position.set(position.x, 0.25, position.z);
     chest.material = mat;
     new PhysicsAggregate(chest, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
+    this._shadow(chest);
 
     const coins = new Loot(this._scene, new Vector3(position.x + 0.6, 1.0, position.z), {
       id: `chest_gold_${cx}_${cz}_${slot}`,
@@ -303,9 +344,18 @@ export class StructureManager {
     return chest;
   }
 
-  private _mat(name: string, color: Color3): StandardMaterial {
+  /** Register a mesh as a shadow caster and enable it to receive shadows. */
+  private _shadow(mesh: Mesh): Mesh {
+    this._shadows?.addShadowCaster(mesh, false);
+    mesh.receiveShadows = true;
+    return mesh;
+  }
+
+  private _mat(name: string, diffuse: Color3, specular = new Color3(0.10, 0.10, 0.10), specularPower = 24): StandardMaterial {
     const mat = new StandardMaterial(name, this._scene);
-    mat.diffuseColor = color;
+    mat.diffuseColor  = diffuse;
+    mat.specularColor = specular;
+    mat.specularPower = specularPower;
     mat.freeze();
     return mat;
   }

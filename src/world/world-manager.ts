@@ -6,6 +6,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType } from "@babylonjs/core/Physics";
+import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { StructureManager } from "./structure-manager";
 
 export type BiomeType = "plains" | "forest" | "desert" | "tundra";
@@ -30,9 +31,13 @@ export class WorldManager {
   private cactusMaterial?: StandardMaterial;
   private iceMaterial?: StandardMaterial;
 
-  constructor(scene: Scene) {
+  /** Optional shadow generator — meshes added as shadow casters when provided. */
+  private readonly _shadows: ShadowGenerator | null;
+
+  constructor(scene: Scene, shadowGenerator: ShadowGenerator | null = null) {
     this.scene = scene;
-    this.structures = new StructureManager(scene);
+    this._shadows = shadowGenerator;
+    this.structures = new StructureManager(scene, shadowGenerator);
   }
 
   /**
@@ -93,7 +98,7 @@ export class WorldManager {
     const biome = this.getBiome(x, z);
 
     // Create ground for this chunk
-    const chunkMesh = MeshBuilder.CreateGround(`chunk_${key}`, { width: this.chunkSize, height: this.chunkSize }, this.scene);
+    const chunkMesh = MeshBuilder.CreateGround(`chunk_${key}`, { width: this.chunkSize, height: this.chunkSize, subdivisions: 4 }, this.scene);
     // Position is center of mesh, so offset by half size
     chunkMesh.position.x = x * this.chunkSize;
     chunkMesh.position.z = z * this.chunkSize;
@@ -104,8 +109,10 @@ export class WorldManager {
     // Add physics
     new PhysicsAggregate(chunkMesh, PhysicsShapeType.BOX, { mass: 0 }, this.scene);
 
-    // Biome-specific terrain color
+    // Biome-specific terrain material with specular
     chunkMesh.material = this._getBiomeMaterial(biome);
+    // Ground receives but does not cast shadows
+    chunkMesh.receiveShadows = true;
 
     this.loadedChunks.set(key, { mesh: chunkMesh, cx: x, cz: z });
 
@@ -119,20 +126,40 @@ export class WorldManager {
     this.structures.trySpawnForChunk(x, z, biome, this.chunkSize);
   }
 
-  private _getBiomeColor(biome: BiomeType): Color3 {
+  /** Returns per-biome diffuse and specular colours for richer, more saturated terrain. */
+  private _getBiomeColors(biome: BiomeType): { diffuse: Color3; specular: Color3; specularPower: number } {
     switch (biome) {
-      case "plains": return new Color3(0.35, 0.65, 0.25);
-      case "forest": return new Color3(0.15, 0.45, 0.15);
-      case "desert": return new Color3(0.80, 0.72, 0.45);
-      case "tundra": return new Color3(0.82, 0.88, 0.92);
+      case "plains": return {
+        diffuse:       new Color3(0.32, 0.60, 0.20),
+        specular:      new Color3(0.06, 0.12, 0.04),
+        specularPower: 16,
+      };
+      case "forest": return {
+        diffuse:       new Color3(0.12, 0.38, 0.10),
+        specular:      new Color3(0.04, 0.08, 0.03),
+        specularPower: 12,
+      };
+      case "desert": return {
+        diffuse:       new Color3(0.84, 0.72, 0.42),
+        specular:      new Color3(0.18, 0.14, 0.06),
+        specularPower: 32,
+      };
+      case "tundra": return {
+        diffuse:       new Color3(0.88, 0.92, 0.96),
+        specular:      new Color3(0.35, 0.40, 0.48),
+        specularPower: 64,
+      };
     }
   }
 
   private _getBiomeMaterial(biome: BiomeType): StandardMaterial {
     let material = this.biomeMaterials.get(biome);
     if (!material) {
+      const cols = this._getBiomeColors(biome);
       material = new StandardMaterial(`mat_${biome}`, this.scene);
-      material.diffuseColor = this._getBiomeColor(biome);
+      material.diffuseColor  = cols.diffuse;
+      material.specularColor = cols.specular;
+      material.specularPower = cols.specularPower;
       material.freeze();
       this.biomeMaterials.set(biome, material);
     }
@@ -143,7 +170,9 @@ export class WorldManager {
   private _getTreeTrunkMaterial(): StandardMaterial {
     if (!this.treeTrunkMaterial) {
       this.treeTrunkMaterial = new StandardMaterial("tree_trunk_mat", this.scene);
-      this.treeTrunkMaterial.diffuseColor = new Color3(0.4, 0.25, 0.1);
+      this.treeTrunkMaterial.diffuseColor  = new Color3(0.38, 0.22, 0.08);
+      this.treeTrunkMaterial.specularColor = new Color3(0.05, 0.03, 0.01);
+      this.treeTrunkMaterial.specularPower = 8;
       this.treeTrunkMaterial.freeze();
     }
 
@@ -155,8 +184,11 @@ export class WorldManager {
     const bucket = Math.round(scale * 4);
     let material = this.treeCrownMaterials.get(bucket);
     if (!material) {
+      const greenShift = bucket / 4;
       material = new StandardMaterial(`tree_crown_mat_${bucket}`, this.scene);
-      material.diffuseColor = new Color3(0.1, 0.45 + (bucket / 4) * 0.25, 0.1);
+      material.diffuseColor  = new Color3(0.06 + greenShift * 0.06, 0.38 + greenShift * 0.22, 0.06 + greenShift * 0.04);
+      material.specularColor = new Color3(0.04, 0.08, 0.03);
+      material.specularPower = 12;
       material.freeze();
       this.treeCrownMaterials.set(bucket, material);
     }
@@ -167,7 +199,9 @@ export class WorldManager {
   private _getCactusMaterial(): StandardMaterial {
     if (!this.cactusMaterial) {
       this.cactusMaterial = new StandardMaterial("cactus_mat", this.scene);
-      this.cactusMaterial.diffuseColor = new Color3(0.2, 0.55, 0.2);
+      this.cactusMaterial.diffuseColor  = new Color3(0.18, 0.50, 0.18);
+      this.cactusMaterial.specularColor = new Color3(0.08, 0.20, 0.06);
+      this.cactusMaterial.specularPower = 20;
       this.cactusMaterial.freeze();
     }
 
@@ -177,12 +211,21 @@ export class WorldManager {
   private _getIceMaterial(): StandardMaterial {
     if (!this.iceMaterial) {
       this.iceMaterial = new StandardMaterial("ice_mat", this.scene);
-      this.iceMaterial.diffuseColor = new Color3(0.7, 0.85, 1.0);
-      this.iceMaterial.alpha = 0.85;
+      this.iceMaterial.diffuseColor  = new Color3(0.60, 0.80, 1.0);
+      this.iceMaterial.specularColor = new Color3(0.70, 0.85, 1.0);
+      this.iceMaterial.specularPower = 128;
+      this.iceMaterial.emissiveColor = new Color3(0.05, 0.10, 0.18);
+      this.iceMaterial.alpha = 0.80;
       this.iceMaterial.freeze();
     }
 
     return this.iceMaterial;
+  }
+
+  /** Register a mesh as a shadow caster if a shadow generator is available. */
+  private _addShadowCaster(mesh: Mesh): void {
+    this._shadows?.addShadowCaster(mesh, false);
+    mesh.receiveShadows = true;
   }
 
   private _spawnVegetation(chunkX: number, chunkZ: number, biome: BiomeType): Mesh[] {
@@ -225,75 +268,108 @@ export class WorldManager {
     return meshes;
   }
 
-  /** Spawn a simple tree: cylindrical trunk + spherical crown. */
+  /** Spawn a tree: cylindrical trunk + conical foliage crown for a stylised pine look. */
   private _spawnTree(x: number, z: number, name: string, scale: number): Mesh[] {
-    const trunkHeight = 2 + scale * 2; // 2–4 m
+    const trunkHeight = 2.5 + scale * 2.5; // 2.5–5 m
 
     const trunk = MeshBuilder.CreateCylinder(
       `${name}_trunk`,
-      { height: trunkHeight, diameterTop: 0.3, diameterBottom: 0.5 },
+      { height: trunkHeight, diameterTop: 0.25, diameterBottom: 0.55, tessellation: 8 },
       this.scene
     );
     trunk.position.set(x, trunkHeight / 2, z);
     trunk.material = this._getTreeTrunkMaterial();
+    this._addShadowCaster(trunk);
 
-    const crownR = 1.2 + scale * 0.8; // 1.2–2 m radius
-    const crown = MeshBuilder.CreateSphere(
-      `${name}_crown`,
-      { diameter: crownR * 2 },
+    // Two-tier cone foliage for a pine/fir silhouette
+    const crownBase = 1.6 + scale * 1.0; // 1.6–2.6 m radius at bottom tier
+    const lowerCrown = MeshBuilder.CreateCylinder(
+      `${name}_lower`,
+      { height: crownBase * 1.6, diameterTop: 0, diameterBottom: crownBase * 2, tessellation: 8 },
       this.scene
     );
-    crown.position.set(x, trunkHeight + crownR * 0.7, z);
-    crown.material = this._getTreeCrownMaterial(scale);
+    lowerCrown.position.set(x, trunkHeight + crownBase * 0.5, z);
+    lowerCrown.material = this._getTreeCrownMaterial(scale * 0.5);
+    this._addShadowCaster(lowerCrown);
 
-    return [trunk, crown];
+    const upperCrown = MeshBuilder.CreateCylinder(
+      `${name}_upper`,
+      { height: crownBase * 1.2, diameterTop: 0, diameterBottom: crownBase * 1.4, tessellation: 8 },
+      this.scene
+    );
+    upperCrown.position.set(x, trunkHeight + crownBase * 1.4, z);
+    upperCrown.material = this._getTreeCrownMaterial(Math.min(1, scale + 0.3));
+    this._addShadowCaster(upperCrown);
+
+    return [trunk, lowerCrown, upperCrown];
   }
 
-  /** Spawn a stylised cactus: body + two arms. */
+  /** Spawn a stylised cactus: ribbed body + two arms. */
   private _spawnCactus(x: number, z: number, name: string): Mesh[] {
     const mat = this._getCactusMaterial();
 
     const body = MeshBuilder.CreateCylinder(
       `${name}_body`,
-      { height: 2.5, diameterTop: 0.35, diameterBottom: 0.4 },
+      { height: 2.8, diameterTop: 0.38, diameterBottom: 0.44, tessellation: 10 },
       this.scene
     );
-    body.position.set(x, 1.25, z);
+    body.position.set(x, 1.4, z);
     body.material = mat;
+    this._addShadowCaster(body);
 
     const armL = MeshBuilder.CreateCylinder(
       `${name}_armL`,
-      { height: 1.0, diameterTop: 0.2, diameterBottom: 0.25 },
+      { height: 1.1, diameterTop: 0.22, diameterBottom: 0.28, tessellation: 8 },
       this.scene
     );
-    armL.rotation.z = Math.PI / 2.5;
-    armL.position.set(x - 0.6, 1.8, z);
+    armL.rotation.z = Math.PI / 2.3;
+    armL.position.set(x - 0.65, 1.9, z);
     armL.material = mat;
+    this._addShadowCaster(armL);
 
     const armR = MeshBuilder.CreateCylinder(
       `${name}_armR`,
-      { height: 1.0, diameterTop: 0.2, diameterBottom: 0.25 },
+      { height: 1.1, diameterTop: 0.22, diameterBottom: 0.28, tessellation: 8 },
       this.scene
     );
-    armR.rotation.z = -Math.PI / 2.5;
-    armR.position.set(x + 0.6, 1.8, z);
+    armR.rotation.z = -Math.PI / 2.3;
+    armR.position.set(x + 0.65, 1.9, z);
     armR.material = mat;
+    this._addShadowCaster(armR);
 
     return [body, armL, armR];
   }
 
-  /** Spawn a translucent hexagonal ice crystal. */
+  /** Spawn a translucent hexagonal ice crystal cluster. */
   private _spawnIceCrystal(x: number, z: number, name: string, scale: number): Mesh[] {
-    const height = 0.8 + scale * 1.4; // 0.8–2.2 m
+    const height = 1.0 + scale * 1.6; // 1.0–2.6 m
+    const meshes: Mesh[] = [];
 
+    // Main crystal
     const crystal = MeshBuilder.CreateCylinder(
       `${name}_crystal`,
-      { height, diameterTop: 0, diameterBottom: 0.4 + scale * 0.3, tessellation: 6 },
+      { height, diameterTop: 0.05, diameterBottom: 0.45 + scale * 0.30, tessellation: 6 },
       this.scene
     );
     crystal.position.set(x, height / 2, z);
     crystal.material = this._getIceMaterial();
+    this._addShadowCaster(crystal);
+    meshes.push(crystal);
 
-    return [crystal];
+    // Small satellite shard for visual interest
+    const shardH = height * 0.55;
+    const shard = MeshBuilder.CreateCylinder(
+      `${name}_shard`,
+      { height: shardH, diameterTop: 0.02, diameterBottom: 0.22, tessellation: 6 },
+      this.scene
+    );
+    shard.rotation.z = 0.35;
+    shard.position.set(x + 0.30, shardH / 2 + 0.1, z + 0.15);
+    shard.material = this._getIceMaterial();
+    this._addShadowCaster(shard);
+    meshes.push(shard);
+
+    return meshes;
   }
 }
+
