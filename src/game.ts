@@ -7,6 +7,7 @@ import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
+import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { SkyMaterial } from "@babylonjs/materials/sky/skyMaterial";
 import { Player } from "./entities/player";
@@ -1733,7 +1734,9 @@ export class Game {
   }
 
   _setLight(): void {
-    // Transparent clear colour — the procedural sky dome covers the background.
+    // The sky dome covers the entire background, so the clear colour is used
+    // only for pixels not covered by any geometry.  Keep a sky-blue fallback
+    // for the very first frame before the skybox is initialised.
     this.scene.clearColor = new Color4(0.42, 0.55, 0.72, 1.0);
 
     // Ambient hemisphere light — warm sky tones above, cool earthy tones below
@@ -1811,12 +1814,12 @@ export class Game {
       // Image processing — filmic tone mapping + slight colour grading
       pipeline.imageProcessingEnabled = true;
       pipeline.imageProcessing.toneMappingEnabled = true;
-      pipeline.imageProcessing.toneMappingType = 1; // ACES filmic
+      pipeline.imageProcessing.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
       pipeline.imageProcessing.exposure  = 1.05;
       pipeline.imageProcessing.contrast  = 1.10;
       pipeline.imageProcessing.vignetteEnabled = true;
       pipeline.imageProcessing.vignetteWeight  = 2.5;
-      pipeline.imageProcessing.vignetteBlendMode = 1;
+      pipeline.imageProcessing.vignetteBlendMode = ImageProcessingConfiguration.VIGNETTEMODE_MULTIPLY;
     }
   }
 
