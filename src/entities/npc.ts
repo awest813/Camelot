@@ -259,7 +259,7 @@ export class NPC {
   // ─── Visuals ────────────────────────────────────────────────────────────────
 
   /** Current "resting" diffuse colour — restored after a hit-flash. */
-  private _baseColor: Color3 = Color3.Yellow();
+  private _baseColor: Color3 = new Color3(0.82, 0.64, 0.38);
 
   // ───────────────────────────────────────────────────────────────────────────
 
@@ -376,8 +376,12 @@ export class NPC {
     this.mesh.position = position;
 
     const material = new StandardMaterial(`${name}_mat`, this.scene);
-    material.diffuseColor = Color3.Yellow();
+    // Warm tan skin tone with subtle specular for a more organic look
+    material.diffuseColor  = new Color3(0.82, 0.64, 0.38);
+    material.specularColor = new Color3(0.12, 0.09, 0.05);
+    material.specularPower = 24;
     this.mesh.material = material;
+    this.mesh.receiveShadows = true;
 
     this.physicsAggregate = new PhysicsAggregate(
       this.mesh, PhysicsShapeType.CAPSULE, { mass: 1, restitution: 0 }, this.scene

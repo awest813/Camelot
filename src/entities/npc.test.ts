@@ -124,9 +124,9 @@ describe('NPC', () => {
             expect(npc.mesh.position).toEqual(new Vector3(1, 2, 3));
             expect(npc.mesh.material).toBeDefined();
             const mat = npc.mesh.material as any;
-            expect(mat.diffuseColor.r).toBe(1);
-            expect(mat.diffuseColor.g).toBe(1);
-            expect(mat.diffuseColor.b).toBe(0);
+            expect(mat.diffuseColor.r).toBeCloseTo(0.82);
+            expect(mat.diffuseColor.g).toBeCloseTo(0.64);
+            expect(mat.diffuseColor.b).toBeCloseTo(0.38);
 
             // Verify physics properties
             expect(npc.physicsAggregate.body.setMotionType).toHaveBeenCalledWith(PhysicsMotionType.DYNAMIC);
@@ -165,10 +165,10 @@ describe('NPC', () => {
             // Fast forward time to pass the 150ms timeout
             vi.advanceTimersByTime(150);
 
-            // Should be back to base color (yellow)
-            expect(mat.diffuseColor.r).toBe(1);
-            expect(mat.diffuseColor.g).toBe(1);
-            expect(mat.diffuseColor.b).toBe(0);
+            // Should be back to base color (warm skin tone)
+            expect(mat.diffuseColor.r).toBeCloseTo(0.82);
+            expect(mat.diffuseColor.g).toBeCloseTo(0.64);
+            expect(mat.diffuseColor.b).toBeCloseTo(0.38);
         });
 
         it('should die when health reaches 0', () => {
