@@ -14,17 +14,32 @@ export type BiomeType = "plains" | "forest" | "desert" | "tundra";
 export class WorldManager {
   private scene: Scene;
   private chunkSize: number = 50;
-  private loadedChunks: Map<string, { mesh: Mesh; cx: number; cz: number }> = new Map();
+  private loadedChunks: Map<string, { mesh: Mesh; body: PhysicsAggregate; cx: number; cz: number }> = new Map();
   private chunkVegetation: Map<string, Mesh[]> = new Map();
-  private loadDistance: number = 2; // Radius of chunks to load
-  private unloadDistance: number = 4; // Chunks beyond this radius are disposed
+  private loadDistance: number = 2; // Chebyshev radius of chunks to load
+  private unloadDistance: number = 4; // Chunks beyond this Chebyshev distance are disposed
 
   /** Manages procedural structures (ruins, shrines, towers) per chunk. */
   public structures: StructureManager;
 
-  // Throttle: only run chunk logic every N frames
+  // Throttle: only run the chunk management sweep every N frames
   private _frameCounter: number = 0;
   private _updateInterval: number = 10;
+
+  /**
+   * Load queue: chunks waiting to be created, sorted closest-first.
+   * Drained at most `_loadBudgetPerFrame` entries per `update()` call so that
+   * entering a new area does not spike all chunk geometry into a single frame.
+   */
+  private _loadQueue: Array<{ cx: number; cz: number; key: string }> = [];
+  /** Keys already present in `_loadQueue` — prevents duplicate enqueue. */
+  private _enqueuedKeys: Set<string> = new Set();
+  /** Maximum chunks created per `update()` call to cap per-frame build cost. */
+  private readonly _loadBudgetPerFrame: number = 2;
+  /** Last player chunk position; used by `_processLoadQueue` to skip stale entries. */
+  private _lastPlayerChunkX: number = 0;
+  private _lastPlayerChunkZ: number = 0;
+
   private readonly biomeMaterials: Map<BiomeType, StandardMaterial> = new Map();
   private treeTrunkMaterial?: StandardMaterial;
   private readonly treeCrownMaterials: Map<number, StandardMaterial> = new Map();
@@ -38,6 +53,18 @@ export class WorldManager {
     this.scene = scene;
     this._shadows = shadowGenerator;
     this.structures = new StructureManager(scene, shadowGenerator);
+  }
+
+  // ── Debug / test accessors ─────────────────────────────────────────────────
+
+  /** Number of chunks currently loaded and visible. */
+  public get loadedChunkCount(): number {
+    return this.loadedChunks.size;
+  }
+
+  /** Number of chunks waiting in the deferred load queue. */
+  public get loadQueueLength(): number {
+    return this._loadQueue.length;
   }
 
   /**
@@ -54,24 +81,41 @@ export class WorldManager {
   }
 
   public update(playerPosition: Vector3): void {
-    // Run chunk management every _updateInterval frames instead of every frame
+    // Always drain the load queue (bounded work every frame regardless of interval)
+    this._processLoadQueue();
+
+    // Run the chunk management sweep every _updateInterval frames
     if (++this._frameCounter % this._updateInterval !== 0) return;
 
     const chunkX = Math.floor(playerPosition.x / this.chunkSize);
     const chunkZ = Math.floor(playerPosition.z / this.chunkSize);
+    this._lastPlayerChunkX = chunkX;
+    this._lastPlayerChunkZ = chunkZ;
 
-    // Load chunks around the player
+    // Enqueue chunks that are needed but not yet loaded, sorted by
+    // Chebyshev distance so the closest tiles arrive first.
+    const toEnqueue: Array<{ cx: number; cz: number; key: string; dist: number }> = [];
     for (let x = chunkX - this.loadDistance; x <= chunkX + this.loadDistance; x++) {
       for (let z = chunkZ - this.loadDistance; z <= chunkZ + this.loadDistance; z++) {
-        this._loadChunk(x, z);
+        const key = `${x},${z}`;
+        if (!this.loadedChunks.has(key) && !this._enqueuedKeys.has(key)) {
+          const dist = Math.max(Math.abs(x - chunkX), Math.abs(z - chunkZ));
+          toEnqueue.push({ cx: x, cz: z, key, dist });
+        }
       }
+    }
+    toEnqueue.sort((a, b) => a.dist - b.dist);
+    for (const entry of toEnqueue) {
+      this._enqueuedKeys.add(entry.key);
+      this._loadQueue.push(entry);
     }
 
     // Unload chunks that are too far from the player
-    for (const [key, { mesh, cx, cz }] of this.loadedChunks) {
+    for (const [key, { mesh, body, cx, cz }] of this.loadedChunks) {
       if (Math.abs(cx - chunkX) > this.unloadDistance || Math.abs(cz - chunkZ) > this.unloadDistance) {
-        // Dispose geometry only — biome materials are shared across chunks of the same biome
-        // and must not be destroyed here.
+        // Dispose physics body BEFORE the mesh to avoid dangling references
+        body.dispose();
+        // Dispose geometry only — biome materials are shared and must not be destroyed here
         mesh.dispose(false, false);
         this.loadedChunks.delete(key);
 
@@ -83,8 +127,31 @@ export class WorldManager {
           this.chunkVegetation.delete(key);
         }
 
-        // Dispose structure meshes and loot for this chunk
+        // Dispose structure meshes, physics, and loot for this chunk
         this.structures.disposeChunk(cx, cz);
+      }
+    }
+  }
+
+  /**
+   * Drain up to `_loadBudgetPerFrame` entries from the load queue.
+   * Called every frame so chunk creation is spread across many frames
+   * rather than concentrated in a single update sweep.
+   */
+  private _processLoadQueue(): void {
+    const budget = Math.min(this._loadBudgetPerFrame, this._loadQueue.length);
+    for (let i = 0; i < budget; i++) {
+      const entry = this._loadQueue.shift()!;
+      this._enqueuedKeys.delete(entry.key);
+      // Skip if the player has moved far enough that this chunk is no longer needed
+      if (
+        Math.abs(entry.cx - this._lastPlayerChunkX) > this.loadDistance ||
+        Math.abs(entry.cz - this._lastPlayerChunkZ) > this.loadDistance
+      ) {
+        continue;
+      }
+      if (!this.loadedChunks.has(entry.key)) {
+        this._loadChunk(entry.cx, entry.cz);
       }
     }
   }
@@ -106,15 +173,15 @@ export class WorldManager {
     // Enable collisions for camera
     chunkMesh.checkCollisions = true;
 
-    // Add physics
-    new PhysicsAggregate(chunkMesh, PhysicsShapeType.BOX, { mass: 0 }, this.scene);
+    // Store the aggregate so it can be explicitly disposed when the chunk unloads
+    const body = new PhysicsAggregate(chunkMesh, PhysicsShapeType.BOX, { mass: 0 }, this.scene);
 
     // Biome-specific terrain material with specular
     chunkMesh.material = this._getBiomeMaterial(biome);
     // Ground receives but does not cast shadows
     chunkMesh.receiveShadows = true;
 
-    this.loadedChunks.set(key, { mesh: chunkMesh, cx: x, cz: z });
+    this.loadedChunks.set(key, { mesh: chunkMesh, body, cx: x, cz: z });
 
     // Spawn vegetation for this chunk
     const vegMeshes = this._spawnVegetation(x, z, biome);
