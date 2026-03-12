@@ -5,11 +5,25 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
-  background: #000;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(90, 64, 18, 0.22), transparent 42%),
+    radial-gradient(circle at 82% 8%, rgba(40, 72, 110, 0.2), transparent 44%),
+    #050505;
   color: #EEE0C0;
   font-family: Inter, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.02) 0%, transparent 20%, rgba(255, 255, 255, 0.015) 40%, transparent 60%, rgba(255, 255, 255, 0.01) 100%),
+    radial-gradient(circle at center, transparent 0%, rgba(0, 0, 0, 0.3) 75%);
 }
 
 * {
@@ -58,7 +72,7 @@ body {
   border-radius: 14px;
   border: 1px solid rgba(212, 160, 23, 0.4);
   background: rgba(8, 6, 4, 0.95);
-  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 222, 152, 0.08);
   padding: 20px;
   scrollbar-width: thin;
   scrollbar-color: rgba(212, 160, 23, 0.6) rgba(25, 19, 12, 0.9);
@@ -67,6 +81,8 @@ body {
 .character-create__title {
   margin: 0;
   color: #D4A017;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 18px rgba(212, 160, 23, 0.26);
 }
 
 .character-create__subtitle {
@@ -165,7 +181,7 @@ body {
   color: #eee0c0;
   padding: 11px;
   cursor: pointer;
-  transition: transform 110ms ease, border-color 120ms ease, background-color 120ms ease;
+  transition: transform 110ms ease, border-color 120ms ease, background-color 120ms ease, box-shadow 130ms ease;
 }
 
 .character-create__card:hover,
@@ -173,6 +189,7 @@ body {
   border-color: rgba(212, 160, 23, 0.95);
   background: rgba(46, 34, 14, 0.98);
   transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.26);
 }
 
 .character-create__card.is-selected {
@@ -228,13 +245,14 @@ body {
   padding: 8px 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: filter 120ms ease, transform 100ms ease;
+  transition: filter 120ms ease, transform 100ms ease, box-shadow 120ms ease;
 }
 
 .character-create__button:hover:enabled,
 .character-create__button:focus-visible:enabled {
   filter: brightness(1.08);
   transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(212, 160, 23, 0.24);
 }
 
 .character-create__button--secondary {
@@ -294,7 +312,7 @@ body {
   border-radius: 12px;
   border: 1px solid rgba(115, 166, 238, 0.4);
   background: rgba(8, 12, 22, 0.96);
-  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(190, 220, 255, 0.08);
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -312,6 +330,7 @@ body {
   margin: 0;
   color: #8ec5ff;
   font-size: 22px;
+  text-shadow: 0 0 22px rgba(142, 197, 255, 0.35);
 }
 
 .fast-travel__subtitle {
@@ -349,12 +368,15 @@ body {
   text-align: left;
   padding: 9px 11px;
   cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, transform 110ms ease, box-shadow 130ms ease;
 }
 
 .fast-travel__row:hover,
 .fast-travel__row:focus-visible {
   border-color: rgba(115, 166, 238, 0.72);
   background: rgba(28, 40, 66, 0.98);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(8, 14, 30, 0.4);
 }
 
 .fast-travel__row.is-selected {
@@ -392,6 +414,14 @@ body {
   padding: 8px 13px;
   cursor: pointer;
   font-weight: 600;
+  transition: filter 120ms ease, transform 100ms ease, box-shadow 120ms ease;
+}
+
+.fast-travel__btn:hover:enabled,
+.fast-travel__btn:focus-visible:enabled {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(48, 88, 140, 0.28);
 }
 
 .fast-travel__btn--primary {
@@ -429,7 +459,7 @@ body {
   border-radius: 12px;
   border: 1px solid rgba(214, 156, 73, 0.45);
   background: rgba(18, 12, 7, 0.97);
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 226, 172, 0.08);
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -447,6 +477,18 @@ body {
   margin: 0;
   color: #e9b86f;
   font-size: 22px;
+  text-shadow: 0 0 20px rgba(233, 184, 111, 0.28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .spell-making__subtitle {
