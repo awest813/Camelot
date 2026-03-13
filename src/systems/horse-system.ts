@@ -231,7 +231,8 @@ export class HorseSystem {
     const bag = this._saddlebags.get(horseId);
     if (!horse || !bag) return false;
 
-    const itemCount = bag.reduce((sum, i) => sum + (i.stackable ? 1 : i.quantity), 0);
+    // Each unique item entry (stack or single) occupies one slot.
+    const itemCount = bag.length;
     if (itemCount >= horse.saddlebagCapacity) return false;
 
     const existing = item.stackable ? bag.find(i => i.id === item.id) : null;

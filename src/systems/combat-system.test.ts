@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CombatSystem } from './combat-system';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Ray } from '@babylonjs/core/Culling/ray';
@@ -150,6 +150,13 @@ describe('CombatSystem', () => {
         };
 
         combatSystem = new CombatSystem(mockScene, mockPlayer, mockNpcs, mockUI);
+        // Default: Math.random() returns 0.99 so random rolls (crit, miss, strafe)
+        // are predictable. Individual tests that need specific values override this.
+        vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     it('meleeAttack should fail if stamina is too low', () => {

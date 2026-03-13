@@ -1072,8 +1072,8 @@ export class CombatSystem {
   }
 
   private _meleeCadenceMultiplier(): number {
-    const weapon = this._weaponSkillMultiplier();
-    return 1 + (weapon - 1) * 0.6;
+    const weaponSkillMult = this._weaponSkillMultiplier();
+    return 1 + (weaponSkillMult - 1) * 0.6;
   }
 
   private _magicCadenceMultiplier(): number {
