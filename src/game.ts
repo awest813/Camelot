@@ -306,6 +306,7 @@ export class Game {
       terrainTool:        this.mapEditorSystem.terrainTool,
       entityCount:        this.mapEditorSystem.entityCount,
       activePatrolGroupId: this.mapEditorSystem.activePatrolGroupId,
+      snapSize:           this.mapEditorSystem.snapSize,
       undoCount:          undo,
       redoCount:          redo,
       typeCounts:         this.mapEditorSystem.getTypeCounts(),
@@ -421,6 +422,12 @@ export class Game {
       this.mapEditorSystem.setGizmoMode(gmode);
       this._refreshEditorToolbar();
     };
+    this.mapEditorToolbar.onSnapSizeChange = (delta) => {
+      const SNAP_MIN = 0.25;
+      const SNAP_MAX = 16;
+      this.mapEditorSystem.snapSize = Math.min(SNAP_MAX, Math.max(SNAP_MIN, this.mapEditorSystem.snapSize + delta));
+      this._refreshEditorToolbar();
+    };
 
     // ── Map editor hierarchy panel ────────────────────────────────────────────
     this.mapEditorHierarchyPanel = new MapEditorHierarchyPanel(this.ui.uiTexture);
@@ -487,6 +494,12 @@ export class Game {
     // ── Map editor property panel: copy ID + position ─────────────────────────
     this.mapEditorPropertyPanel.onCopyId = (entityId) => {
       this.ui.showNotification(`Copied: ${entityId}`, 1200);
+    };
+
+    // ── Map editor system: entity moved (gizmo drag-end) ──────────────────────
+    this.mapEditorSystem.onEntityMoved = (entityId, position) => {
+      this.mapEditorPropertyPanel.updatePosition(position);
+      this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
     };
 
     // ── Map editor layer panel ────────────────────────────────────────────────

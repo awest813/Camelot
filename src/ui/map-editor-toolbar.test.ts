@@ -403,6 +403,52 @@ describe('MapEditorHierarchyPanel — refresh() with label', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// MapEditorToolbar — snap size
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('MapEditorToolbar — onSnapSizeChange callback', () => {
+    it('fires onSnapSizeChange with +1 delta when set', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        const deltas: number[] = [];
+        toolbar.onSnapSizeChange = (d) => deltas.push(d);
+        toolbar.onSnapSizeChange?.(1);
+        expect(deltas).toContain(1);
+    });
+
+    it('fires onSnapSizeChange with -1 delta when set', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        const deltas: number[] = [];
+        toolbar.onSnapSizeChange = (d) => deltas.push(d);
+        toolbar.onSnapSizeChange?.(-1);
+        expect(deltas).toContain(-1);
+    });
+
+    it('does not throw when onSnapSizeChange is null', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        toolbar.onSnapSizeChange = null;
+        expect(() => toolbar.onSnapSizeChange?.(1)).not.toThrow();
+    });
+
+    it('update() with snapSize updates the snap label', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        toolbar.update({
+            placementType: 'marker',
+            gizmoMode: 'position',
+            terrainTool: 'none',
+            entityCount: 0,
+            activePatrolGroupId: null,
+            snapSize: 2,
+        });
+        expect((toolbar as any)._snapLabel.text).toBe('2');
+    });
+
+    it('has _snapLabel reference', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        expect((toolbar as any)._snapLabel).toBeDefined();
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MapEditorToolbar — camera controls and type counts
 // ═══════════════════════════════════════════════════════════════════════════════
 

@@ -203,6 +203,15 @@ export class MapEditorSystem {
    */
   public onLayerChanged: ((layer: EditorLayer) => void) | null = null;
 
+  /**
+   * Called after a gizmo drag completes and the entity position/rotation has
+   * been committed to the undo stack.  Receives the entity ID and its updated
+   * world position so the UI can refresh position readouts.
+   */
+  public onEntityMoved:
+    | ((entityId: string, position: { x: number; y: number; z: number }) => void)
+    | null = null;
+
   private readonly scene: Scene;
   private readonly gizmoManager: GizmoManager;
   private readonly gridMesh: Mesh;
@@ -245,6 +254,7 @@ export class MapEditorSystem {
       ax?.dragBehavior.onDragEndObservable.add(() => {
         this._snapAttachedMesh();
         this._commitDragCommand();
+        this._fireEntityMoved();
       });
     }
 
@@ -255,7 +265,10 @@ export class MapEditorSystem {
     ];
     for (const ax of rotAxes) {
       ax?.dragBehavior.onDragStartObservable.add(() => this._captureDragSnapshot());
-      ax?.dragBehavior.onDragEndObservable.add(() => this._commitDragCommand());
+      ax?.dragBehavior.onDragEndObservable.add(() => {
+        this._commitDragCommand();
+        this._fireEntityMoved();
+      });
     }
 
     this.gridMesh = this._createGridMesh();
@@ -1106,6 +1119,19 @@ export class MapEditorSystem {
     const attached = this.gizmoManager.attachedMesh;
     if (!attached) return;
     attached.position = this._snapVector(attached.position);
+  }
+
+  /** Fire `onEntityMoved` for the currently attached mesh (after a drag ends). */
+  private _fireEntityMoved(): void {
+    const attached = this.gizmoManager.attachedMesh;
+    if (!attached || !this.onEntityMoved) return;
+    const entityId = attached.metadata?.editorEntityId as string | undefined;
+    if (!entityId) return;
+    this.onEntityMoved(entityId, {
+      x: attached.position.x,
+      y: attached.position.y,
+      z: attached.position.z,
+    });
   }
 
   private _snapVector(value: Vector3): Vector3 {
