@@ -11,12 +11,12 @@ const BASE_CONTROLS: readonly string[] = [
 
 const EDITOR_CONTROLS: readonly string[] = [
   "F2: Toggle Map Editor",
-  "N: Place Entity · T: Cycle Placement Type",
+  "N: Place Entity · T: Cycle Placement Type · D: Duplicate Selected",
   "G: Cycle Gizmo (Position/Rotation/Scale)",
   "P: New Patrol Group",
   "H: Cycle Terrain Tool · [ / ]: Sculpt Step",
   "Ctrl+Z: Undo · Ctrl+Y: Redo",
-  "F4: Export Map · F6: Import Map · F7: Validate Map",
+  "F4: Export Map · F6: Import Map · F7: Toggle Validation Panel",
   "F8: Validate Framework Quest Graphs",
   "F10: Open Quest Creator",
   "Shift+F10: Open NPC Creator",
