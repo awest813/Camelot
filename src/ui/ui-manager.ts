@@ -1468,6 +1468,22 @@ export class UIManager {
 
   // ── Wait Dialog ───────────────────────────────────────────────────────────
 
+
+  private _applyA11y(btn: Button, desc: string): void {
+    btn.isFocusInvisible = false;
+    btn.tabIndex = 0;
+    btn.accessibilityTag = { description: desc };
+    let focused = false;
+    btn.onFocusObservable.add(() => { focused = true; btn.thickness = 2; });
+    btn.onBlurObservable.add(() => { focused = false; btn.thickness = 1; });
+    btn.onPointerOutObservable.add(() => { if (!focused) btn.thickness = 1; });
+    btn.onKeyboardEventProcessedObservable.add((e) => {
+      if (e.type === "keyup" && (e.key === "Enter" || e.key === " ")) {
+        btn.onPointerUpObservable.notifyObservers(null as any);
+      }
+    });
+  }
+
   private _initWaitDialog(): void {
     const panel = new Rectangle("waitPanel");
     panel.width  = "340px";
@@ -1521,6 +1537,8 @@ export class UIManager {
     btnMinus.background = T.BTN_BG;
     btnMinus.cornerRadius = 6;
     btnMinus.fontSize = 18;
+
+    this._applyA11y(btnMinus, "Decrease wait time");
     selectorRow.addControl(btnMinus);
 
     const hoursLabel = new TextBlock("waitHours");
@@ -1540,6 +1558,8 @@ export class UIManager {
     btnPlus.background = T.BTN_BG;
     btnPlus.cornerRadius = 6;
     btnPlus.fontSize = 18;
+
+    this._applyA11y(btnPlus, "Increase wait time");
     selectorRow.addControl(btnPlus);
 
     // Hook: change hour value
@@ -1572,6 +1592,8 @@ export class UIManager {
       this.onWaitConfirm?.(this._waitHoursValue);
       this.toggleWaitDialog(false);
     });
+
+    this._applyA11y(waitBtn, "Confirm wait");
     btnRow.addControl(waitBtn);
 
     const cancelBtn = Button.CreateSimpleButton("waitCancel", "Cancel");
@@ -1583,6 +1605,8 @@ export class UIManager {
     cancelBtn.fontSize = 14;
     cancelBtn.paddingLeft = "8px";
     cancelBtn.onPointerUpObservable.add(() => this.toggleWaitDialog(false));
+
+    this._applyA11y(cancelBtn, "Cancel wait");
     btnRow.addControl(cancelBtn);
   }
 
