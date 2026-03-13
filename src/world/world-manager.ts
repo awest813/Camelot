@@ -81,16 +81,18 @@ export class WorldManager {
   }
 
   public update(playerPosition: Vector3): void {
+    // Always track the player's current chunk so the stale-entry filter in
+    // _processLoadQueue uses the most up-to-date position every frame.
+    const chunkX = Math.floor(playerPosition.x / this.chunkSize);
+    const chunkZ = Math.floor(playerPosition.z / this.chunkSize);
+    this._lastPlayerChunkX = chunkX;
+    this._lastPlayerChunkZ = chunkZ;
+
     // Always drain the load queue (bounded work every frame regardless of interval)
     this._processLoadQueue();
 
     // Run the chunk management sweep every _updateInterval frames
     if (++this._frameCounter % this._updateInterval !== 0) return;
-
-    const chunkX = Math.floor(playerPosition.x / this.chunkSize);
-    const chunkZ = Math.floor(playerPosition.z / this.chunkSize);
-    this._lastPlayerChunkX = chunkX;
-    this._lastPlayerChunkZ = chunkZ;
 
     // Enqueue chunks that are needed but not yet loaded, sorted by
     // Chebyshev distance so the closest tiles arrive first.
@@ -131,6 +133,32 @@ export class WorldManager {
         this.structures.disposeChunk(cx, cz);
       }
     }
+  }
+
+  /**
+   * Dispose all loaded chunks, vegetation, queued entries, and structures.
+   * Call this when tearing down the scene to release GPU and physics resources.
+   */
+  public dispose(): void {
+    // Drain the load queue without spawning anything
+    this._loadQueue.length = 0;
+    this._enqueuedKeys.clear();
+
+    // Dispose all loaded chunks (physics then mesh)
+    for (const [key, { mesh, body, cx, cz }] of this.loadedChunks) {
+      body.dispose();
+      mesh.dispose(false, false);
+
+      const veg = this.chunkVegetation.get(key);
+      if (veg) {
+        for (const m of veg) m.dispose(false, false);
+        this.chunkVegetation.delete(key);
+      }
+
+      this.structures.disposeChunk(cx, cz);
+    }
+    this.loadedChunks.clear();
+    this.chunkVegetation.clear();
   }
 
   /**

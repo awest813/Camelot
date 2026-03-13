@@ -95,6 +95,19 @@ export class StructureManager {
   }
 
   /**
+   * Dispose all spawned structures across every tracked chunk.
+   * Call this when tearing down the scene entirely.
+   */
+  public dispose(): void {
+    for (const [, spawn] of this._chunkStructures) {
+      for (const body of spawn.bodies) body.dispose();
+      for (const m of spawn.meshes) m.dispose(false, false);
+      for (const l of spawn.loot) l.dispose();
+    }
+    this._chunkStructures.clear();
+  }
+
+  /**
    * Dispose all meshes, physics, and loot for an unloading chunk.
    * NPCs are intentionally kept alive — they remain active once spawned.
    */
