@@ -92,6 +92,7 @@ import { FastTravelUI } from "./ui/fast-travel-ui";
 import { SpellMakingUI } from "./ui/spell-making-ui";
 import { GuardEncounterUI, type GuardEncounterAction } from "./ui/guard-encounter-ui";
 import { LevelUpUI } from "./ui/level-up-ui";
+import { DailyScheduleSystem } from "./systems/daily-schedule-system";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -209,6 +210,9 @@ export class Game {
 
   // v12 systems (Oblivion depth: character progression — skill-based level-up)
   public playerLevelSystem: PlayerLevelSystem;
+
+  // v18 systems
+  public dailyScheduleSystem: DailyScheduleSystem;
 
   public isPaused: boolean = false;
 
@@ -911,6 +915,24 @@ export class Game {
       this.saveSystem.markDirty();
     };
     this.saveSystem.setPlayerLevelSystem(this.playerLevelSystem);
+
+    // ── v18 DailyScheduleSystem ───────────────────────────────────────────────
+    // Connects TimeSystem → ScheduleSystem so NPC daily behaviours are driven
+    // automatically by the in-game clock.  Also enforces non-interactivity for
+    // sleeping NPCs by clearing their mesh.metadata during sleep windows.
+    this.dailyScheduleSystem = new DailyScheduleSystem(
+      this.scheduleSystem,
+      this.timeSystem,
+    );
+    this.dailyScheduleSystem.onNPCSleep = (npc) => {
+      this.ui.showNotification(`${npc.mesh.name} has gone to sleep.`, 2000);
+      this.saveSystem.markDirty();
+    };
+    this.dailyScheduleSystem.onNPCWake = (npc) => {
+      this.ui.showNotification(`${npc.mesh.name} has woken up.`, 2000);
+      this.saveSystem.markDirty();
+    };
+    this.saveSystem.setDailyScheduleSystem(this.dailyScheduleSystem);
 
     this._runCharacterCreation().catch((error: unknown) => {
       console.error("Character creation failed; applying defaults", error);
@@ -2018,8 +2040,8 @@ export class Game {
       // v2 system updates (time must update before schedule so hour is current)
       this.timeSystem.update(deltaTime);
 
-      // Sync in-game hour to ScheduleSystem so NPC daily behaviors are time-aware
-      this.scheduleSystem.currentHour = this.timeSystem.hour;
+      // DailyScheduleSystem syncs ScheduleSystem.currentHour automatically via
+      // TimeSystem.onHourChange — no manual per-frame assignment needed here.
 
       this.scheduleSystem.update(deltaTime);
       this.combatSystem.updateNPCAI(deltaTime);

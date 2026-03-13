@@ -78,7 +78,7 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 ### UX + Persistence
 
 - ✅ HUD, quest log, inventory, skill tree, pause flow.
-- ✅ Save/load (SAVE_VERSION 17) for all system states.
+- ✅ Save/load (SAVE_VERSION 18) for all system states.
 - ✅ Save file export to JSON file download + import from JSON/File (browser-safe).
 - ✅ Notifications, hit feedback, and debug support.
 - ✅ Compass HUD (top-center) showing cardinal direction from camera heading.
@@ -158,11 +158,12 @@ model.
 - ✅ **SAVE_VERSION 13** — SpellMakingSystem, RespawnSystem, and MerchantRestockSystem state persisted.
 - ✅ **SAVE_VERSION 14** — BirthsignSystem and ClassSystem state persisted.
 - ✅ **SAVE_VERSION 17** — PlayerLevelSystem (skill-based character level-up) state persisted.
+- ✅ **SAVE_VERSION 18** — DailyScheduleSystem state persisted; `race` and `playerLevel` fields now correctly propagated through save validation.
 
 ### Character Progression Depth (Next)
 
 - ✅ **Character Level-Up UI** — Dedicated level-up dialog (`LevelUpUI`) showing available attribute bonuses (+1 to +5) per attribute with governing-skill annotations, letting the player manually choose 3 attributes to increase; selection requires exactly 3 distinct attributes; confirm button enables only when 3 are chosen; triggered by `PlayerLevelSystem.onLevelUpReady`; modal (Escape blocked until confirmed); pointer lock and camera control restored on confirm; `onLevelUpComplete` notification fires after bonuses are applied.
-- 🧭 **DailyScheduleSystem** — NPC daily activity schedules (work, eat, sleep); NPCs follow timed waypoint sequences driven by in-game time; sleep state makes NPCs non-interactive and moves them to bed markers; integrates with `ScheduleSystem` and `TimeSystem`.
+- ✅ **DailyScheduleSystem** — NPC daily activity schedules (work, eat, sleep); `DailyScheduleSystem` wraps `ScheduleSystem` and connects it to `TimeSystem` via the `onHourChange` hook for fully automatic time-of-day NPC behaviour switching (no per-frame manual sync required); sleeping NPCs have their `mesh.metadata` cleared so they cannot be targeted for interaction or dialogue; metadata is restored on wake-up; `onNPCSleep` / `onNPCWake` callbacks fire HUD notifications; `isSleeping(name)` / `getActiveBehavior(npc)` query helpers; save-state persistence (SAVE_VERSION 18) re-derives sleep state from restored game time so the flag is never stale.
 - 🧭 **HorseSystem / Mount System** — Rideable horse companions; separate speed/stamina pool; dismount on combat; stable NPCs for purchase; horse inventory slot for saddlebags.
 
 
@@ -289,3 +290,28 @@ If you want to contribute now, high-impact areas are:
 3. Framework-first consolidation: wiring framework state as source-of-truth for demo systems.
 4. ~~Quest/content authoring ergonomics.~~ ✅ Complete — `QuestCreatorSystem` + `QuestCreatorUI` (F10).
 5. Save/load robustness and automated tests.
+
+---
+
+## Next Steps (Planned After DailyScheduleSystem)
+
+### HorseSystem / Mount System
+The natural next milestone in Character Progression Depth. Key design points:
+
+- **Horse entity** — Dedicated `Horse` class (capsule mesh, dedicated physics body, separate `maxSpeed`/`stamina` pool).
+- **Mounting / dismounting** — Interact with a horse to mount; dismount via `F` key or on entering combat.
+- **Mounted movement** — While mounted, player movement is redirected to the horse; camera stays first-person.
+- **Stable NPCs** — Innkeepers and stable merchants offer horse purchase (gold-gated, one horse at a time).
+- **Saddlebag inventory** — Horse carries an additional carry-weight slot unlocked on purchase.
+- **Save state** — SAVE_VERSION 19: horse position, health, and equipped saddlebag items persisted.
+
+### Weapon Archetype Tuning Pass
+- Sword (Blade) — faster swing cadence, lower stamina cost, medium stagger.
+- Axe (Blade) — slower swing, higher damage, ignores 10% of armor rating.
+- Mace (Blunt) — low speed, high stagger chance, bonus vs. heavy armor.
+- Bow (Marksman) — already implemented; tune draw-speed multiplier per arrow type.
+- Staff (Destruction) — replaces Q-cast with a slower, higher-damage charge attack.
+
+### Content GUI — Release A (Dockable Editor Layout)
+- Dockable editor layout (Scene / Hierarchy / Inspector / Validation panes).
+- Unified selection model shared by map entities, quest nodes, and dialogue nodes.

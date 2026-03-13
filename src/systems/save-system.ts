@@ -32,9 +32,10 @@ import type { BirthsignSystem } from "./birthsign-system";
 import type { ClassSystem } from "./class-system";
 import type { RaceSystem } from "./race-system";
 import type { PlayerLevelSystem } from "./player-level-system";
+import type { DailyScheduleSystem } from "./daily-schedule-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 17;
+const SAVE_VERSION = 18;
 /** Oldest save version that can still be loaded (forward-compat window). */
 const SAVE_VERSION_MIN = 5;
 
@@ -94,6 +95,8 @@ interface ParsedSaveData {
   // v16 additions (race power cooldown baked into race save state)
   // v17 additions
   playerLevel?: unknown;
+  // v18 additions
+  dailySchedule?: unknown;
 }
 
 interface EquipmentEntry {
@@ -149,6 +152,8 @@ export interface SaveData {
   // v16: race power cooldown baked into race save state — no new top-level field
   // v17 additions
   playerLevel?: any;
+  // v18 additions
+  dailySchedule?: any;
 }
 
 export class SaveSystem {
@@ -209,6 +214,9 @@ export class SaveSystem {
 
   // v17 optional systems
   private _playerLevelSystem: PlayerLevelSystem | null = null;
+
+  // v18 optional systems
+  private _dailyScheduleSystem: DailyScheduleSystem | null = null;
 
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
@@ -300,6 +308,10 @@ export class SaveSystem {
 
   public setPlayerLevelSystem(s: PlayerLevelSystem): void       { this._playerLevelSystem = s; }
 
+  // ── v18 system injection ──────────────────────────────────────────────────
+
+  public setDailyScheduleSystem(s: DailyScheduleSystem): void  { this._dailyScheduleSystem = s; }
+
 
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
@@ -374,6 +386,7 @@ export class SaveSystem {
     if (this._classSystem)            data.characterClass   = this._classSystem.getSaveState();
     if (this._raceSystem)             data.race             = this._raceSystem.getSaveState();
     if (this._playerLevelSystem)      data.playerLevel      = this._playerLevelSystem.getSaveState();
+    if (this._dailyScheduleSystem)    data.dailySchedule    = this._dailyScheduleSystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -555,6 +568,10 @@ export class SaveSystem {
     if (this._playerLevelSystem && data.playerLevel)
       this._playerLevelSystem.restoreFromSave(data.playerLevel as any);
 
+    // v18 systems
+    if (this._dailyScheduleSystem && data.dailySchedule)
+      this._dailyScheduleSystem.restoreFromSave(data.dailySchedule as any);
+
     // Restore player name (v15+; keep default "Hero" for older saves)
     if (typeof data.player.name === "string" && data.player.name.trim()) {
       this._player.name = data.player.name;
@@ -727,6 +744,9 @@ export class SaveSystem {
       merchantRestock: data.merchantRestock,
       birthsign: data.birthsign,
       characterClass: data.characterClass,
+      race: data.race,
+      playerLevel: data.playerLevel,
+      dailySchedule: data.dailySchedule,
     };
   }
 
