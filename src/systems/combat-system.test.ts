@@ -667,18 +667,22 @@ describe('CombatSystem', () => {
         vi.restoreAllMocks();
     });
 
-    it('no crit when critChance is 0', () => {
+    it('no crit when effective crit chance is below random roll', () => {
         mockScene.pickWithRay.mockReturnValue({
             pickedMesh: mockNpcs[0].mesh,
             pickedPoint: new Vector3(0, 0, 1)
         });
 
         mockPlayer.critChance = 0;
+        // Force Math.random() above any weapon crit bonus so no crit fires.
+        vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
         combatSystem.meleeAttack();
 
         expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(10);
         expect(mockUI.showNotification).not.toHaveBeenCalledWith('Critical Hit!', 1000);
+
+        vi.restoreAllMocks();
     });
 
     it('scales melee damage and swing cadence with blade skill and strength', () => {

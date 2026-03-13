@@ -56,7 +56,8 @@ const HIT_CHANCE_MIN = 0.25;
  *   damage = baseDamage × max(0, 1 − resistance + weakness)
  *
  * Armor rating pass (physical damage only — Oblivion-style):
- *   damage = damage × 100 / (100 + armorRating)
+ *   effectiveAR = armorRating × (1 − armorPenFraction)
+ *   damage = damage × 100 / (100 + effectiveAR)
  *
  * Resistance values are clamped to [0, 1] so that full immunity is the maximum.
  * A missing entry defaults to 0 (no modification).
@@ -65,14 +66,22 @@ const HIT_CHANCE_MIN = 0.25;
  * Even a fully resistant NPC takes 1 point of damage per hit, ensuring attacks
  * are never silently ignored and preserving gameplay feedback.
  */
-function applyDamageWithResistance(baseDamage: number, npc: NPC, type: DamageType): number {
+function applyDamageWithResistance(
+  baseDamage: number,
+  npc: NPC,
+  type: DamageType,
+  armorPenFraction: number = 0,
+): number {
   const resistance = Math.min(1, Math.max(0, npc.damageResistances?.[type] ?? 0));
   const weakness = Math.max(0, npc.damageWeaknesses?.[type] ?? 0);
   let damage = baseDamage * (1 - resistance + weakness);
 
   // Oblivion-style armor rating: higher AR means proportionally less physical damage.
+  // armorPenFraction [0,1] reduces the effective armor rating before this calculation.
   if (type === "physical" && npc.armorRating > 0) {
-    damage *= 100 / (100 + npc.armorRating);
+    const penClamped = Math.min(1, Math.max(0, armorPenFraction));
+    const effectiveAR = npc.armorRating * (1 - penClamped);
+    damage *= 100 / (100 + effectiveAR);
   }
 
   return Math.max(1, Math.round(damage));
@@ -80,6 +89,86 @@ function applyDamageWithResistance(baseDamage: number, npc: NPC, type: DamageTyp
 
 export type MeleeArchetype = "duelist" | "soldier" | "bruiser";
 export type MagicArchetype = "spark" | "bolt" | "surge";
+
+/**
+ * Weapon-type archetypes used for per-weapon stat differentiation.
+ *
+ * These are independent of the combat stance (MeleeArchetype) — the stance
+ * controls rhythm (speed vs. power), while the weapon archetype controls the
+ * type of physical attack (blade, impact, ranged, etc.).
+ */
+export type WeaponArchetype = "sword" | "axe" | "mace" | "bow" | "staff";
+
+interface WeaponProfile {
+  /** Multiplier applied to the base melee damage value (MELEE_DAMAGE). */
+  damageMultiplier: number;
+  /** Flat crit-chance bonus added on top of the player's base critChance. */
+  critChanceBonus: number;
+  /**
+   * Fraction [0,1] of the target's armor rating that is bypassed.
+   * 0 = no penetration (full armor applies), 1 = complete armor bypass.
+   */
+  armorPenFraction: number;
+  /** Forward raycast distance in metres used for melee hit detection. */
+  attackRange: number;
+  /** Skill ID governing proficiency scaling for this weapon type. */
+  skillId: string;
+  /** Human-readable display name. */
+  label: string;
+}
+
+/**
+ * Per-weapon-type combat profiles.
+ *
+ * Design intent:
+ *  sword  — fast, balanced; strong crit, light armor pen
+ *  axe    — harder-hitting; better armor pen, reduced crit window
+ *  mace   — heaviest strikes; excellent armor pen, almost no crit (blunt trauma)
+ *  bow    — long-range precision; best crit chance, minimal armor pen
+ *  staff  — hybrid caster tool; weak melee damage, governed by destruction skill
+ */
+const WEAPON_PROFILES: Record<WeaponArchetype, WeaponProfile> = {
+  sword: {
+    damageMultiplier: 1.0,
+    critChanceBonus: 0.10,
+    armorPenFraction: 0.10,
+    attackRange: 3.0,
+    skillId: "blade",
+    label: "Sword",
+  },
+  axe: {
+    damageMultiplier: 1.20,
+    critChanceBonus: 0.05,
+    armorPenFraction: 0.25,
+    attackRange: 2.8,
+    skillId: "blade",
+    label: "Axe",
+  },
+  mace: {
+    damageMultiplier: 1.45,
+    critChanceBonus: 0.02,
+    armorPenFraction: 0.50,
+    attackRange: 2.5,
+    skillId: "blunt",
+    label: "Mace",
+  },
+  bow: {
+    damageMultiplier: 0.85,
+    critChanceBonus: 0.15,
+    armorPenFraction: 0.05,
+    attackRange: 25.0,
+    skillId: "marksman",
+    label: "Bow",
+  },
+  staff: {
+    damageMultiplier: 0.60,
+    critChanceBonus: 0.02,
+    armorPenFraction: 0.00,
+    attackRange: 3.0,
+    skillId: "destruction",
+    label: "Staff",
+  },
+};
 
 interface MeleeProfile {
   staminaCost: number;
@@ -182,6 +271,8 @@ export class CombatSystem {
   private _magicCooldownRemaining: number = 0;
   private _meleeArchetype: MeleeArchetype = "soldier";
   private _magicArchetype: MagicArchetype = "bolt";
+  /** Active weapon type; drives per-weapon damage, range, and skill multipliers. */
+  private _weaponArchetype: WeaponArchetype = "sword";
   /** True while the player is actively holding block. */
   private _isBlocking: boolean = false;
 
@@ -236,12 +327,27 @@ export class CombatSystem {
     this._ui.showNotification(`${MAGIC_PROFILES[archetype].label} selected`, 1400);
   }
 
+  /**
+   * Switch the active weapon archetype.
+   *
+   * This affects per-attack damage scaling, armor penetration, crit chance bonus,
+   * attack range, and which skill governs proficiency scaling.
+   */
+  public setWeaponArchetype(archetype: WeaponArchetype): void {
+    this._weaponArchetype = archetype;
+    this._ui.showNotification(`${WEAPON_PROFILES[archetype].label} equipped`, 1400);
+  }
+
   public get activeMeleeArchetype(): MeleeArchetype {
     return this._meleeArchetype;
   }
 
   public get activeMagicArchetype(): MagicArchetype {
     return this._magicArchetype;
+  }
+
+  public get activeWeaponArchetype(): WeaponArchetype {
+    return this._weaponArchetype;
   }
 
   // ─── Blocking ──────────────────────────────────────────────────────────────
@@ -291,7 +397,7 @@ export class CombatSystem {
     (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
       .notifyResourceSpent?.("stamina");
 
-    // Oblivion-style hit chance: low blade skill / agility / fatigue can cause a miss.
+    // Oblivion-style hit chance: low weapon skill / agility / fatigue can cause a miss.
     // Only active when skill and attribute systems are wired up (backward-compatible).
     const hitChance = this._hitChance();
     if (hitChance < 1.0 && Math.random() >= hitChance) {
@@ -299,13 +405,15 @@ export class CombatSystem {
       return true;
     }
 
-    const hit = this.player.raycastForward(3);
+    const weaponProfile = WEAPON_PROFILES[this._weaponArchetype];
+    const hit = this.player.raycastForward(weaponProfile.attackRange);
     if (hit && hit.pickedMesh) {
       const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
       if (npc && !npc.isDead) {
-        // Critical hit check (luck-based, sourced from player.critChance)
-        const critChance = (this.player as unknown as { critChance?: number }).critChance ?? 0;
-        const isCrit = critChance > 0 && Math.random() < critChance;
+        // Critical hit: combine base player critChance with weapon's bonus.
+        const baseCritChance = (this.player as unknown as { critChance?: number }).critChance ?? 0;
+        const effectiveCritChance = baseCritChance + weaponProfile.critChanceBonus;
+        const isCrit = effectiveCritChance > 0 && Math.random() < effectiveCritChance;
         const critMultiplier = isCrit ? CRIT_DAMAGE_MULTIPLIER : 1.0;
 
         const rawMeleeDmg = Math.max(
@@ -313,12 +421,13 @@ export class CombatSystem {
           Math.round(
             (MELEE_DAMAGE + this.player.bonusDamage + this._strengthBonus())
             * meleeProfile.damageMultiplier
+            * weaponProfile.damageMultiplier
             * fatigueFactor
             * critMultiplier
-            * this._bladeMultiplier()
+            * this._weaponSkillMultiplier()
           )
         );
-        const meleeDmg = applyDamageWithResistance(rawMeleeDmg, npc, "physical");
+        const meleeDmg = applyDamageWithResistance(rawMeleeDmg, npc, "physical", weaponProfile.armorPenFraction);
         npc.takeDamage(meleeDmg);
 
         const numberPos = hit.pickedPoint
@@ -383,7 +492,8 @@ export class CombatSystem {
     (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
       .notifyResourceSpent?.("stamina");
 
-    const hit = this.player.raycastForward(3);
+    const weaponProfile = WEAPON_PROFILES[this._weaponArchetype];
+    const hit = this.player.raycastForward(weaponProfile.attackRange);
     if (hit && hit.pickedMesh) {
       const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
       if (npc && !npc.isDead) {
@@ -392,12 +502,13 @@ export class CombatSystem {
           Math.round(
             (MELEE_DAMAGE + this.player.bonusDamage + this._strengthBonus())
             * meleeProfile.damageMultiplier
+            * weaponProfile.damageMultiplier
             * POWER_ATTACK_DAMAGE_MULTIPLIER
             * fatigueFactor
-            * this._bladeMultiplier()
+            * this._weaponSkillMultiplier()
           )
         );
-        const finalDmg = applyDamageWithResistance(rawDmg, npc, "physical");
+        const finalDmg = applyDamageWithResistance(rawDmg, npc, "physical", weaponProfile.armorPenFraction);
         npc.takeDamage(finalDmg);
 
         // Stagger: cancel current telegraph and freeze the NPC's AI briefly.
@@ -880,6 +991,17 @@ export class CombatSystem {
     return this._skillSystem?.multiplier("blade") ?? 1;
   }
 
+  /**
+   * Returns the skill multiplier for the currently equipped weapon archetype.
+   * Routes to the appropriate skill (blade, blunt, marksman, or destruction)
+   * based on the active WeaponArchetype.  Falls back to 1.0 when no skill
+   * system is wired (backward-compatible).
+   */
+  private _weaponSkillMultiplier(): number {
+    const skillId = WEAPON_PROFILES[this._weaponArchetype].skillId;
+    return this._skillSystem?.multiplier(skillId) ?? 1;
+  }
+
   private _blockSkillMultiplier(): number {
     return this._skillSystem?.multiplier("block") ?? 1;
   }
@@ -928,28 +1050,30 @@ export class CombatSystem {
    *
    * Returns 1.0 (guaranteed hit) when:
    *   - No skill or attribute systems are wired (backward-compatible default), OR
-   *   - Blade skill is ≥ 50 (experienced fighters rarely miss).
+   *   - Weapon skill is ≥ 50 (experienced fighters rarely miss).
    *
-   * Below blade skill 50 the chance scales linearly from HIT_CHANCE_BASE (55 %) at
+   * Below skill 50 the chance scales linearly from HIT_CHANCE_BASE (55 %) at
    * skill 0 up to 100 % at skill 50, further adjusted by the player's agility
-   * attribute and fatigue.
+   * attribute and fatigue.  The governing skill is determined by the active
+   * weapon archetype (blade, blunt, marksman, or destruction).
    */
   private _hitChance(): number {
     if (!this._skillSystem || !this._attributeSystem) return 1.0;
-    const bladeLevel = this._skillSystem.getSkill("blade")?.level ?? 0;
-    if (bladeLevel >= 50) return 1.0;
+    const weaponSkillId = WEAPON_PROFILES[this._weaponArchetype].skillId;
+    const weaponLevel = this._skillSystem.getSkill(weaponSkillId)?.level ?? 0;
+    if (weaponLevel >= 50) return 1.0;
 
     const agility = this._attributeSystem.get("agility");
     const fatigue = this._fatigueFactor();
     // Linear interpolation: HIT_CHANCE_BASE at skill 0, 1.0 at skill 50.
-    const baseChance = HIT_CHANCE_BASE + (bladeLevel / 50) * (1 - HIT_CHANCE_BASE);
+    const baseChance = HIT_CHANCE_BASE + (weaponLevel / 50) * (1 - HIT_CHANCE_BASE);
     const agilityMod = (agility - 40) * 0.002;
     return Math.max(HIT_CHANCE_MIN, Math.min(1.0, (baseChance + agilityMod) * fatigue));
   }
 
   private _meleeCadenceMultiplier(): number {
-    const blade = this._bladeMultiplier();
-    return 1 + (blade - 1) * 0.6;
+    const weapon = this._weaponSkillMultiplier();
+    return 1 + (weapon - 1) * 0.6;
   }
 
   private _magicCadenceMultiplier(): number {

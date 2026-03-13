@@ -93,6 +93,7 @@ import { SpellMakingUI } from "./ui/spell-making-ui";
 import { GuardEncounterUI, type GuardEncounterAction } from "./ui/guard-encounter-ui";
 import { LevelUpUI } from "./ui/level-up-ui";
 import { DailyScheduleSystem } from "./systems/daily-schedule-system";
+import { HorseSystem } from "./systems/horse-system";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -213,6 +214,9 @@ export class Game {
 
   // v18 systems
   public dailyScheduleSystem: DailyScheduleSystem;
+
+  // v19 systems
+  public horseSystem: HorseSystem;
 
   public isPaused: boolean = false;
 
@@ -933,6 +937,33 @@ export class Game {
       this.saveSystem.markDirty();
     };
     this.saveSystem.setDailyScheduleSystem(this.dailyScheduleSystem);
+
+    // ── v19: Horse system ──────────────────────────────────────────────────
+    this.horseSystem = new HorseSystem();
+    // Register starter horses available at world stables
+    this.horseSystem.registerHorse({ id: "bay_mare", name: "Bay Mare", speed: 1.8, saddlebagCapacity: 8, stableId: "starter_stable" });
+    this.horseSystem.registerHorse({ id: "black_stallion", name: "Black Stallion", speed: 2.2, saddlebagCapacity: 6, stableId: "starter_stable" });
+    this.horseSystem.registerHorse({ id: "grey_gelding", name: "Grey Gelding", speed: 2.0, saddlebagCapacity: 10, stableId: "starter_stable" });
+    this.horseSystem.registerStableNPC({
+      npcName: "Stable Master",
+      availableHorseIds: ["bay_mare", "black_stallion", "grey_gelding"],
+      prices: { bay_mare: 500, black_stallion: 1000, grey_gelding: 750 },
+    });
+    this.horseSystem.onMount = (horse, speed) => {
+      (this.player as unknown as { moveSpeedMultiplier?: number }).moveSpeedMultiplier = speed;
+      this.ui.showNotification(`Mounted ${horse.name}`, 1800);
+      this.saveSystem.markDirty();
+    };
+    this.horseSystem.onDismount = (horse) => {
+      (this.player as unknown as { moveSpeedMultiplier?: number }).moveSpeedMultiplier = 1;
+      this.ui.showNotification(`Dismounted ${horse.name}`, 1800);
+      this.saveSystem.markDirty();
+    };
+    this.horseSystem.onHorsePurchased = (horse) => {
+      this.ui.showNotification(`Purchased ${horse.name}!`, 2500);
+      this.saveSystem.markDirty();
+    };
+    this.saveSystem.setHorseSystem(this.horseSystem);
 
     this._runCharacterCreation().catch((error: unknown) => {
       console.error("Character creation failed; applying defaults", error);
