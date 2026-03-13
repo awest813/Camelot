@@ -87,6 +87,8 @@ export class MapEditorToolbar {
   private readonly _entityCountLabel: TextBlock;
   private readonly _patrolLabel: TextBlock;
   private readonly _snapLabel: TextBlock;
+  private readonly _undoLabel: TextBlock;
+  private readonly _redoLabel: TextBlock;
 
   constructor(ui: AdvancedDynamicTexture) {
     this._ui = ui;
@@ -355,6 +357,55 @@ export class MapEditorToolbar {
       row4.addControl(gap);
     }
 
+    // ── Row 5: Undo/redo history indicators ────────────────────────────────
+    const row5 = new StackPanel("editorToolbarRow5");
+    row5.isVertical = false;
+    row5.height     = "22px";
+    row5.paddingTop = "2px";
+    inner.addControl(row5);
+
+    const historyPre = new TextBlock("editorToolbarHistoryPre", "History:");
+    historyPre.color    = T.DIM;
+    historyPre.fontSize = 11;
+    historyPre.width    = "54px";
+    historyPre.height   = "22px";
+    historyPre.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    row5.addControl(historyPre);
+
+    const undoPre = new TextBlock("editorToolbarUndoPre", "Undo:");
+    undoPre.color    = T.DIM;
+    undoPre.fontSize = 11;
+    undoPre.width    = "38px";
+    undoPre.height   = "22px";
+    undoPre.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    row5.addControl(undoPre);
+
+    this._undoLabel = new TextBlock("editorToolbarUndoVal", "0");
+    this._undoLabel.color    = T.ACCENT;
+    this._undoLabel.fontSize = 11;
+    this._undoLabel.fontStyle = "bold";
+    this._undoLabel.width    = "26px";
+    this._undoLabel.height   = "22px";
+    this._undoLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    row5.addControl(this._undoLabel);
+
+    const redoPre = new TextBlock("editorToolbarRedoPre", "Redo:");
+    redoPre.color    = T.DIM;
+    redoPre.fontSize = 11;
+    redoPre.width    = "38px";
+    redoPre.height   = "22px";
+    redoPre.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    row5.addControl(redoPre);
+
+    this._redoLabel = new TextBlock("editorToolbarRedoVal", "0");
+    this._redoLabel.color    = T.DIM;
+    this._redoLabel.fontSize = 11;
+    this._redoLabel.fontStyle = "bold";
+    this._redoLabel.width    = "26px";
+    this._redoLabel.height   = "22px";
+    this._redoLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    row5.addControl(this._redoLabel);
+
     // Initialize active state to defaults
     this._highlightTypeChip("marker");
     this._highlightGizmoChip("position");
@@ -380,7 +431,7 @@ export class MapEditorToolbar {
   /**
    * Refresh all dynamic labels from current editor state.
    * Call this whenever the editor mode, placement type, gizmo mode, terrain
-   * tool, entity count, patrol group, or snap size changes.
+   * tool, entity count, patrol group, snap size, or history stack changes.
    */
   update(state: {
     placementType: EditorPlacementType;
@@ -389,6 +440,8 @@ export class MapEditorToolbar {
     entityCount:   number;
     activePatrolGroupId: string | null;
     snapSize?: number;
+    undoCount?: number;
+    redoCount?: number;
   }): void {
     this._highlightTypeChip(state.placementType);
     this._highlightGizmoChip(state.gizmoMode);
@@ -403,6 +456,16 @@ export class MapEditorToolbar {
 
     if (state.snapSize !== undefined) {
       this._snapLabel.text = String(state.snapSize);
+    }
+
+    if (state.undoCount !== undefined) {
+      this._undoLabel.text  = String(state.undoCount);
+      this._undoLabel.color = state.undoCount > 0 ? T.ACCENT : T.DIM;
+    }
+
+    if (state.redoCount !== undefined) {
+      this._redoLabel.text  = String(state.redoCount);
+      this._redoLabel.color = state.redoCount > 0 ? T.WARN : T.DIM;
     }
   }
 

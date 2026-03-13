@@ -12,11 +12,12 @@ describe("buildHelpOverlayLines", () => {
   it("returns editor-focused controls when editor is enabled", () => {
     const lines = buildHelpOverlayLines(true);
     expect(lines[0]).toBe("Editor Controls");
-    expect(lines.join("\n")).toContain("F7: Validate Map");
+    expect(lines.join("\n")).toContain("F7: Toggle Validation Panel");
     expect(lines.join("\n")).toContain("F8: Validate Framework Quest Graphs");
     expect(lines.join("\n")).toContain("F10: Open Quest Creator");
     expect(lines.join("\n")).toContain("Ctrl+Z: Undo");
     expect(lines.join("\n")).toContain("Ctrl+Y: Redo");
+    expect(lines.join("\n")).toContain("D: Duplicate Selected");
   });
 });
 

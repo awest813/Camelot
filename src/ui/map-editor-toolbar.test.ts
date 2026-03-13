@@ -230,6 +230,40 @@ describe('MapEditorToolbar — onSnapSizeChange callback', () => {
     });
 });
 
+describe('MapEditorToolbar — undo/redo history display', () => {
+    it('update() with undoCount and redoCount does not throw', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        expect(() => toolbar.update({
+            placementType: 'marker',
+            gizmoMode: 'position',
+            terrainTool: 'none',
+            entityCount: 3,
+            activePatrolGroupId: null,
+            undoCount: 4,
+            redoCount: 2,
+        })).not.toThrow();
+    });
+
+    it('update() with zero undo/redo does not throw', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        expect(() => toolbar.update({
+            placementType: 'loot',
+            gizmoMode: 'rotation',
+            terrainTool: 'sculpt',
+            entityCount: 0,
+            activePatrolGroupId: null,
+            undoCount: 0,
+            redoCount: 0,
+        })).not.toThrow();
+    });
+
+    it('has _undoLabel and _redoLabel TextBlock references', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        expect((toolbar as any)._undoLabel).toBeDefined();
+        expect((toolbar as any)._redoLabel).toBeDefined();
+    });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MapEditorHierarchyPanel
 // ═══════════════════════════════════════════════════════════════════════════════
