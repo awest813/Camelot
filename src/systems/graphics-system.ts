@@ -118,35 +118,35 @@ export interface LightingConfig {
 
 /** Default shadow map configuration used by the game. */
 export const DEFAULT_SHADOW: ShadowConfig = {
-  mapSize:    1024,
-  blurKernel: 16,
+  mapSize:    2048,
+  blurKernel: 32,
 };
 
 /** Default post-processing preset (clear mid-morning, WebGL renderer). */
 export const DEFAULT_POST_PROCESS: PostProcessConfig = {
   bloom: {
     enabled:   true,
-    threshold: 0.72,
-    weight:    0.22,
-    kernel:    48,
-    scale:     0.55,
+    threshold: 0.55,
+    weight:    0.35,
+    kernel:    64,
+    scale:     0.65,
   },
   fxaa:              true,
-  sharpenEdgeAmount: 0.25,
+  sharpenEdgeAmount: 0.40,
   toneMappingType:   "aces",
-  exposure:          1.05,
-  contrast:          1.10,
-  vignetteWeight:    2.5,
+  exposure:          1.10,
+  contrast:          1.18,
+  vignetteWeight:    3.2,
 };
 
-/** Default sky-dome parameters for a clear mid-morning atmosphere. */
+/** Default sky-dome parameters for a vivid clear-day atmosphere. */
 export const DEFAULT_SKY: SkyConfig = {
-  turbidity:       6,
-  luminance:       0.98,
-  rayleigh:        2.2,
-  mieCoefficient:  0.006,
-  mieDirectionalG: 0.82,
-  inclination:     0.30,
+  turbidity:       3.5,
+  luminance:       1.0,
+  rayleigh:        3.0,
+  mieCoefficient:  0.004,
+  mieDirectionalG: 0.92,
+  inclination:     0.38,
   azimuth:         0.25,
 };
 
@@ -166,8 +166,8 @@ export const DEFAULT_FOG: FogConfig = {
  * They match the values set on the lights in game.ts `_setLight()`.
  */
 export const DEFAULT_LIGHTING: LightingConfig = {
-  ambientBase: 0.60,
-  sunBase:     1.05,
+  ambientBase: 0.65,
+  sunBase:     1.25,
 };
 
 // ── Validation ────────────────────────────────────────────────────────────────

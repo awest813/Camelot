@@ -227,24 +227,24 @@ export class WorldManager {
   private _getBiomeColors(biome: BiomeType): { diffuse: Color3; specular: Color3; specularPower: number } {
     switch (biome) {
       case "plains": return {
-        diffuse:       new Color3(0.32, 0.60, 0.20),
-        specular:      new Color3(0.06, 0.12, 0.04),
-        specularPower: 16,
+        diffuse:       new Color3(0.30, 0.58, 0.18),
+        specular:      new Color3(0.08, 0.14, 0.05),
+        specularPower: 24,
       };
       case "forest": return {
-        diffuse:       new Color3(0.12, 0.38, 0.10),
-        specular:      new Color3(0.04, 0.08, 0.03),
-        specularPower: 12,
+        diffuse:       new Color3(0.10, 0.34, 0.08),
+        specular:      new Color3(0.05, 0.10, 0.04),
+        specularPower: 18,
       };
       case "desert": return {
-        diffuse:       new Color3(0.84, 0.72, 0.42),
-        specular:      new Color3(0.18, 0.14, 0.06),
-        specularPower: 32,
+        diffuse:       new Color3(0.88, 0.74, 0.40),
+        specular:      new Color3(0.22, 0.16, 0.06),
+        specularPower: 48,
       };
       case "tundra": return {
-        diffuse:       new Color3(0.88, 0.92, 0.96),
-        specular:      new Color3(0.35, 0.40, 0.48),
-        specularPower: 64,
+        diffuse:       new Color3(0.90, 0.94, 0.98),
+        specular:      new Color3(0.45, 0.52, 0.60),
+        specularPower: 96,
       };
     }
   }
@@ -267,9 +267,9 @@ export class WorldManager {
   private _getTreeTrunkMaterial(): StandardMaterial {
     if (!this.treeTrunkMaterial) {
       this.treeTrunkMaterial = new StandardMaterial("tree_trunk_mat", this.scene);
-      this.treeTrunkMaterial.diffuseColor  = new Color3(0.38, 0.22, 0.08);
-      this.treeTrunkMaterial.specularColor = new Color3(0.05, 0.03, 0.01);
-      this.treeTrunkMaterial.specularPower = 8;
+      this.treeTrunkMaterial.diffuseColor  = new Color3(0.34, 0.19, 0.06);
+      this.treeTrunkMaterial.specularColor = new Color3(0.06, 0.04, 0.01);
+      this.treeTrunkMaterial.specularPower = 12;
       this.treeTrunkMaterial.freeze();
     }
 
@@ -283,9 +283,9 @@ export class WorldManager {
     if (!material) {
       const greenShift = bucket / 4;
       material = new StandardMaterial(`tree_crown_mat_${bucket}`, this.scene);
-      material.diffuseColor  = new Color3(0.06 + greenShift * 0.06, 0.38 + greenShift * 0.22, 0.06 + greenShift * 0.04);
-      material.specularColor = new Color3(0.04, 0.08, 0.03);
-      material.specularPower = 12;
+      material.diffuseColor  = new Color3(0.05 + greenShift * 0.06, 0.36 + greenShift * 0.24, 0.04 + greenShift * 0.04);
+      material.specularColor = new Color3(0.05, 0.10, 0.04);
+      material.specularPower = 18;
       material.freeze();
       this.treeCrownMaterials.set(bucket, material);
     }
@@ -296,9 +296,9 @@ export class WorldManager {
   private _getCactusMaterial(): StandardMaterial {
     if (!this.cactusMaterial) {
       this.cactusMaterial = new StandardMaterial("cactus_mat", this.scene);
-      this.cactusMaterial.diffuseColor  = new Color3(0.18, 0.50, 0.18);
-      this.cactusMaterial.specularColor = new Color3(0.08, 0.20, 0.06);
-      this.cactusMaterial.specularPower = 20;
+      this.cactusMaterial.diffuseColor  = new Color3(0.14, 0.48, 0.14);
+      this.cactusMaterial.specularColor = new Color3(0.10, 0.22, 0.08);
+      this.cactusMaterial.specularPower = 28;
       this.cactusMaterial.freeze();
     }
 
@@ -308,11 +308,11 @@ export class WorldManager {
   private _getIceMaterial(): StandardMaterial {
     if (!this.iceMaterial) {
       this.iceMaterial = new StandardMaterial("ice_mat", this.scene);
-      this.iceMaterial.diffuseColor  = new Color3(0.60, 0.80, 1.0);
-      this.iceMaterial.specularColor = new Color3(0.70, 0.85, 1.0);
-      this.iceMaterial.specularPower = 128;
-      this.iceMaterial.emissiveColor = new Color3(0.05, 0.10, 0.18);
-      this.iceMaterial.alpha = 0.80;
+      this.iceMaterial.diffuseColor  = new Color3(0.62, 0.82, 1.0);
+      this.iceMaterial.specularColor = new Color3(0.80, 0.90, 1.0);
+      this.iceMaterial.specularPower = 192;
+      this.iceMaterial.emissiveColor = new Color3(0.06, 0.12, 0.22);
+      this.iceMaterial.alpha = 0.78;
       this.iceMaterial.freeze();
     }
 
