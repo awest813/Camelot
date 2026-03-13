@@ -29,10 +29,15 @@ vi.mock('@babylonjs/gui/2D', () => {
         isVertical: boolean = false;
         isPointerBlocker: boolean = false;
         textWrapping: boolean = false;
+        placeholderText: string = '';
+        focusedBackground: string = '';
+        focusedColor: string = '';
+        textHorizontalAlignment: number = 0;
 
         onPointerEnterObservable = { add: vi.fn() };
         onPointerOutObservable   = { add: vi.fn() };
         onPointerUpObservable    = { add: vi.fn() };
+        onKeyboardEventProcessedObservable = { add: vi.fn() };
 
         children: any[] = [];
 
@@ -65,7 +70,9 @@ vi.mock('@babylonjs/gui/2D', () => {
 
 import { MapEditorValidationPanel } from './map-editor-validation-panel';
 import { MapEditorPalettePanel } from './map-editor-palette-panel';
-import type { MapValidationReport } from '../systems/map-editor-system';
+import { MapEditorLayerPanel } from './map-editor-layer-panel';
+import { MapEditorNotesPanel } from './map-editor-notes-panel';
+import type { MapValidationReport, EditorLayer } from '../systems/map-editor-system';
 
 function makeMockUi(): any {
     return { addControl: vi.fn() };
@@ -310,5 +317,170 @@ describe('MapEditorPalettePanel — onDuplicate / onDelete callbacks', () => {
         const panel = new MapEditorPalettePanel(makeMockUi());
         panel.onDelete = null;
         expect(() => panel.onDelete?.()).not.toThrow();
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MapEditorLayerPanel
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function makeDefaultLayers(): EditorLayer[] {
+    return [
+        { name: 'terrain',  label: 'Terrain',  isVisible: true,  isLocked: false },
+        { name: 'objects',  label: 'Objects',  isVisible: true,  isLocked: false },
+        { name: 'events',   label: 'Events',   isVisible: false, isLocked: false },
+        { name: 'npcs',     label: 'NPCs',     isVisible: true,  isLocked: true  },
+        { name: 'triggers', label: 'Triggers', isVisible: true,  isLocked: false },
+    ];
+}
+
+describe('MapEditorLayerPanel — construction', () => {
+    it('adds the root panel control to the UI texture', () => {
+        const mockUi = makeMockUi();
+        new MapEditorLayerPanel(mockUi);
+        expect(mockUi.addControl).toHaveBeenCalledTimes(1);
+    });
+
+    it('starts as not visible', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        expect(panel.isVisible).toBe(false);
+    });
+});
+
+describe('MapEditorLayerPanel — show / hide', () => {
+    it('becomes visible after show()', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        panel.show();
+        expect(panel.isVisible).toBe(true);
+    });
+
+    it('becomes hidden after hide()', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        panel.show();
+        panel.hide();
+        expect(panel.isVisible).toBe(false);
+    });
+});
+
+describe('MapEditorLayerPanel — refresh()', () => {
+    it('does not throw when refreshed with default layers', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        const counts = { terrain: 2, objects: 3, events: 0, npcs: 1, triggers: 0 };
+        expect(() => panel.refresh(makeDefaultLayers(), counts)).not.toThrow();
+    });
+
+    it('does not throw when refreshed with all-hidden layers', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        const layers = makeDefaultLayers().map((l) => ({ ...l, isVisible: false }));
+        const counts = { terrain: 0, objects: 0, events: 0, npcs: 0, triggers: 0 };
+        expect(() => panel.refresh(layers, counts)).not.toThrow();
+    });
+
+    it('does not throw when refreshed with all-locked layers', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        const layers = makeDefaultLayers().map((l) => ({ ...l, isLocked: true }));
+        const counts = { terrain: 1, objects: 1, events: 1, npcs: 1, triggers: 1 };
+        expect(() => panel.refresh(layers, counts)).not.toThrow();
+    });
+});
+
+describe('MapEditorLayerPanel — onLayerVisibilityChange callback', () => {
+    it('fires onLayerVisibilityChange when set', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        const received: Array<{ name: string; visible: boolean }> = [];
+        panel.onLayerVisibilityChange = (name, visible) => received.push({ name, visible });
+        panel.onLayerVisibilityChange?.('terrain', false);
+        expect(received).toHaveLength(1);
+        expect(received[0]).toEqual({ name: 'terrain', visible: false });
+    });
+
+    it('does not throw when onLayerVisibilityChange is null', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        panel.onLayerVisibilityChange = null;
+        expect(() => panel.onLayerVisibilityChange?.('objects', true)).not.toThrow();
+    });
+});
+
+describe('MapEditorLayerPanel — onLayerLockChange callback', () => {
+    it('fires onLayerLockChange when set', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        const received: Array<{ name: string; locked: boolean }> = [];
+        panel.onLayerLockChange = (name, locked) => received.push({ name, locked });
+        panel.onLayerLockChange?.('npcs', true);
+        expect(received).toHaveLength(1);
+        expect(received[0]).toEqual({ name: 'npcs', locked: true });
+    });
+
+    it('does not throw when onLayerLockChange is null', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        panel.onLayerLockChange = null;
+        expect(() => panel.onLayerLockChange?.('events', false)).not.toThrow();
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MapEditorNotesPanel
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('MapEditorNotesPanel — construction', () => {
+    it('adds the root panel control to the UI texture', () => {
+        const mockUi = makeMockUi();
+        new MapEditorNotesPanel(mockUi);
+        expect(mockUi.addControl).toHaveBeenCalledTimes(1);
+    });
+
+    it('starts as not visible', () => {
+        const panel = new MapEditorNotesPanel(makeMockUi());
+        expect(panel.isVisible).toBe(false);
+    });
+});
+
+describe('MapEditorNotesPanel — show / hide', () => {
+    it('becomes visible after show()', () => {
+        const panel = new MapEditorNotesPanel(makeMockUi());
+        panel.show();
+        expect(panel.isVisible).toBe(true);
+    });
+
+    it('becomes visible after show() with notes text', () => {
+        const panel = new MapEditorNotesPanel(makeMockUi());
+        panel.show('This is a test note.');
+        expect(panel.isVisible).toBe(true);
+    });
+
+    it('becomes hidden after hide()', () => {
+        const panel = new MapEditorNotesPanel(makeMockUi());
+        panel.show('test');
+        panel.hide();
+        expect(panel.isVisible).toBe(false);
+    });
+});
+
+describe('MapEditorNotesPanel — setNotes()', () => {
+    it('does not throw when setNotes() is called while hidden', () => {
+        const panel = new MapEditorNotesPanel(makeMockUi());
+        expect(() => panel.setNotes('Some notes here')).not.toThrow();
+    });
+
+    it('does not throw when setNotes() is called while visible', () => {
+        const panel = new MapEditorNotesPanel(makeMockUi());
+        panel.show('');
+        expect(() => panel.setNotes('Updated notes')).not.toThrow();
+    });
+});
+
+describe('MapEditorNotesPanel — onSave callback', () => {
+    it('fires onSave when set', () => {
+        const panel = new MapEditorNotesPanel(makeMockUi());
+        const saved: string[] = [];
+        panel.onSave = (text) => saved.push(text);
+        panel.onSave?.('my notes');
+        expect(saved).toContain('my notes');
+    });
+
+    it('does not throw when onSave is null', () => {
+        const panel = new MapEditorNotesPanel(makeMockUi());
+        panel.onSave = null;
+        expect(() => panel.onSave?.('notes')).not.toThrow();
     });
 });

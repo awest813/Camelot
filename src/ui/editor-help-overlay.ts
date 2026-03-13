@@ -15,6 +15,8 @@ const EDITOR_CONTROLS: readonly string[] = [
   "G: Cycle Gizmo (Position/Rotation/Scale)",
   "P: New Patrol Group",
   "H: Cycle Terrain Tool · [ / ]: Sculpt Step",
+  "F: Frame Selected · Shift+F: Frame All",
+  "L: Toggle Layers Panel · Ctrl+M: Scene Notes",
   "Ctrl+Z: Undo · Ctrl+Y: Redo",
   "F4: Export Map · F6: Import Map · F7: Toggle Validation Panel",
   "F8: Validate Framework Quest Graphs",
