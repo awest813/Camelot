@@ -54,6 +54,9 @@ const TERRAIN_LABELS: Record<EditorTerrainTool, string> = {
  * Placement-type chips, gizmo-mode chips, and terrain-tool chips are all
  * clickable to change the active selection.  Snap-size ± buttons allow
  * adjusting the grid increment directly from the toolbar.
+ *
+ * Camera control buttons ("Frame Selected", "Frame All") trigger viewport
+ * framing via the `onFrameSelected` / `onFrameAll` callbacks.
  */
 export class MapEditorToolbar {
   /** Fired when the user clicks a placement-type chip. */
@@ -70,6 +73,12 @@ export class MapEditorToolbar {
    * button.  The argument is the requested delta (−1 or +1).
    */
   public onSnapSizeChange: ((delta: number) => void) | null = null;
+
+  /** Fired when the user clicks "Frame Selected". */
+  public onFrameSelected: (() => void) | null = null;
+
+  /** Fired when the user clicks "Frame All". */
+  public onFrameAll: (() => void) | null = null;
 
   private readonly _ui: AdvancedDynamicTexture;
   private readonly _panel: Rectangle;
@@ -89,6 +98,7 @@ export class MapEditorToolbar {
   private readonly _snapLabel: TextBlock;
   private readonly _undoLabel: TextBlock;
   private readonly _redoLabel: TextBlock;
+  private readonly _typeCountLabel: TextBlock;
 
   constructor(ui: AdvancedDynamicTexture) {
     this._ui = ui;
@@ -406,13 +416,74 @@ export class MapEditorToolbar {
     this._redoLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     row5.addControl(this._redoLabel);
 
+    // ── Row 6: Camera controls + entity type count breakdown ──────────────────
+    const row6 = new StackPanel("editorToolbarRow6");
+    row6.isVertical = false;
+    row6.height     = "26px";
+    row6.paddingTop = "2px";
+    inner.addControl(row6);
+
+    const viewPre = new TextBlock("editorToolbarViewPre", "View:");
+    viewPre.color    = T.DIM;
+    viewPre.fontSize = 11;
+    viewPre.width    = "38px";
+    viewPre.height   = "22px";
+    viewPre.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    row6.addControl(viewPre);
+
+    const frameSelBtn = Button.CreateSimpleButton("editorToolbarFrameSel", "⊕ Frame Sel");
+    frameSelBtn.width        = "84px";
+    frameSelBtn.height       = "20px";
+    frameSelBtn.fontSize     = 10;
+    frameSelBtn.color        = T.ACCENT;
+    frameSelBtn.background   = T.CHIP_BG;
+    frameSelBtn.cornerRadius = 3;
+    frameSelBtn.thickness    = 1;
+    frameSelBtn.onPointerEnterObservable.add(() => { frameSelBtn.background = T.CHIP_HOVER; });
+    frameSelBtn.onPointerOutObservable.add(() => { frameSelBtn.background = T.CHIP_BG; });
+    frameSelBtn.onPointerUpObservable.add(() => this.onFrameSelected?.());
+    row6.addControl(frameSelBtn);
+
+    const frameGap = new Rectangle("editorToolbarFrameGap");
+    frameGap.width     = "4px";
+    frameGap.height    = "20px";
+    frameGap.thickness = 0;
+    frameGap.background = "transparent";
+    row6.addControl(frameGap);
+
+    const frameAllBtn = Button.CreateSimpleButton("editorToolbarFrameAll", "⊞ Frame All");
+    frameAllBtn.width        = "84px";
+    frameAllBtn.height       = "20px";
+    frameAllBtn.fontSize     = 10;
+    frameAllBtn.color        = T.TEXT;
+    frameAllBtn.background   = T.CHIP_BG;
+    frameAllBtn.cornerRadius = 3;
+    frameAllBtn.thickness    = 1;
+    frameAllBtn.onPointerEnterObservable.add(() => { frameAllBtn.background = T.CHIP_HOVER; });
+    frameAllBtn.onPointerOutObservable.add(() => { frameAllBtn.background = T.CHIP_BG; });
+    frameAllBtn.onPointerUpObservable.add(() => this.onFrameAll?.());
+    row6.addControl(frameAllBtn);
+
+    const typeCountGap = new Rectangle("editorToolbarTypeCountGap");
+    typeCountGap.width     = "8px";
+    typeCountGap.height    = "20px";
+    typeCountGap.thickness = 0;
+    typeCountGap.background = "transparent";
+    row6.addControl(typeCountGap);
+
+    this._typeCountLabel = new TextBlock("editorToolbarTypeCounts", "");
+    this._typeCountLabel.color    = T.DIM;
+    this._typeCountLabel.fontSize = 9;
+    this._typeCountLabel.width    = "160px";
+    this._typeCountLabel.height   = "22px";
+    this._typeCountLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    row6.addControl(this._typeCountLabel);
+
     // Initialize active state to defaults
     this._highlightTypeChip("marker");
     this._highlightGizmoChip("position");
     this._highlightTerrainChip("none");
   }
-
-  // ── Public API ───────────────────────────────────────────────────────────────
 
   get isVisible(): boolean {
     return this._panel.isVisible;
@@ -442,6 +513,8 @@ export class MapEditorToolbar {
     snapSize?: number;
     undoCount?: number;
     redoCount?: number;
+    /** Optional per-type entity counts for the type breakdown display. */
+    typeCounts?: Partial<Record<EditorPlacementType, number>>;
   }): void {
     this._highlightTypeChip(state.placementType);
     this._highlightGizmoChip(state.gizmoMode);
@@ -467,6 +540,10 @@ export class MapEditorToolbar {
       this._redoLabel.text  = String(state.redoCount);
       this._redoLabel.color = state.redoCount > 0 ? T.WARN : T.DIM;
     }
+
+    if (state.typeCounts !== undefined) {
+      this._typeCountLabel.text = this._buildTypeCountText(state.typeCounts);
+    }
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
@@ -490,5 +567,22 @@ export class MapEditorToolbar {
       chip.background = ttool === active ? T.CHIP_ACTIVE : T.CHIP_BG;
       chip.thickness  = ttool === active ? 2 : 1;
     }
+  }
+
+  /** Build a compact type count string e.g. "◆2 ✦1 ⬡3" */
+  private _buildTypeCountText(counts: Partial<Record<EditorPlacementType, number>>): string {
+    const parts: string[] = [];
+    const typeIcons: Array<[EditorPlacementType, string]> = [
+      ["marker",         "◆"],
+      ["loot",           "✦"],
+      ["npc-spawn",      "⬡"],
+      ["quest-marker",   "◎"],
+      ["structure",      "▣"],
+    ];
+    for (const [type, icon] of typeIcons) {
+      const n = counts[type] ?? 0;
+      if (n > 0) parts.push(`${icon}${n}`);
+    }
+    return parts.join("  ");
   }
 }

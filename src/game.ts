@@ -37,6 +37,8 @@ import { MapEditorToolbar } from "./ui/map-editor-toolbar";
 import { MapEditorHierarchyPanel } from "./ui/map-editor-hierarchy-panel";
 import { MapEditorValidationPanel } from "./ui/map-editor-validation-panel";
 import { MapEditorPalettePanel } from "./ui/map-editor-palette-panel";
+import { MapEditorLayerPanel } from "./ui/map-editor-layer-panel";
+import { MapEditorNotesPanel } from "./ui/map-editor-notes-panel";
 import { AttributeSystem } from "./systems/attribute-system";
 import { TimeSystem } from "./systems/time-system";
 import { StealthSystem } from "./systems/stealth-system";
@@ -136,6 +138,8 @@ export class Game {
   public mapEditorHierarchyPanel: MapEditorHierarchyPanel;
   public mapEditorValidationPanel: MapEditorValidationPanel;
   public mapEditorPalettePanel: MapEditorPalettePanel;
+  public mapEditorLayerPanel: MapEditorLayerPanel;
+  public mapEditorNotesPanel: MapEditorNotesPanel;
   public questCreatorSystem: QuestCreatorSystem;
   public questCreatorUI: QuestCreatorUI;
   public dialogueCreatorSystem: DialogueCreatorSystem;
@@ -304,8 +308,17 @@ export class Game {
       activePatrolGroupId: this.mapEditorSystem.activePatrolGroupId,
       undoCount:          undo,
       redoCount:          redo,
+      typeCounts:         this.mapEditorSystem.getTypeCounts(),
     });
     this.mapEditorPalettePanel.setActivePlacementType(this.mapEditorSystem.currentPlacementType);
+  }
+
+  /** Refresh the layer panel after any layer or entity change. */
+  private _refreshLayerPanel(): void {
+    this.mapEditorLayerPanel.refresh(
+      this.mapEditorSystem.getLayers(),
+      this.mapEditorSystem.getLayerEntityCounts(),
+    );
   }
 
   init(): void {
@@ -379,6 +392,8 @@ export class Game {
       this.mapEditorSystem.removeEntity(entityId);
       this.ui.showNotification("Entity deleted", 1200);
       this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+      this._refreshLayerPanel();
+      this._refreshEditorToolbar();
     };
     this.mapEditorSystem.onEntitySelectionChanged = (entityId) => {
       if (entityId === null) {
@@ -389,8 +404,9 @@ export class Game {
       const entity = this.mapEditorSystem.getEntityProperties(entityId);
       const mesh = this.scene.getMeshByName(entityId);
       const type = mesh?.metadata?.editorType;
+      const position = this.mapEditorSystem.getEntityPosition(entityId) ?? undefined;
       if (type && entity !== null) {
-        this.mapEditorPropertyPanel.show(entityId, type, entity);
+        this.mapEditorPropertyPanel.show(entityId, type, entity, position);
       }
       this.mapEditorHierarchyPanel.setSelection(entityId);
     };
@@ -439,6 +455,7 @@ export class Game {
       this.ui.showNotification(`Placed: ${ptype}`, 1200);
       this._refreshEditorToolbar();
       this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+      this._refreshLayerPanel();
     };
     this.mapEditorPalettePanel.onDuplicate = () => {
       const selId = this.mapEditorSystem.selectedEntityId;
@@ -451,6 +468,7 @@ export class Game {
         this.ui.showNotification("Entity duplicated", 1200);
         this._refreshEditorToolbar();
         this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+        this._refreshLayerPanel();
       }
     };
     this.mapEditorPalettePanel.onDelete = () => {
@@ -463,6 +481,55 @@ export class Game {
       this.ui.showNotification("Entity deleted", 1200);
       this._refreshEditorToolbar();
       this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+      this._refreshLayerPanel();
+    };
+
+    // ── Map editor property panel: copy ID + position ─────────────────────────
+    this.mapEditorPropertyPanel.onCopyId = (entityId) => {
+      this.ui.showNotification(`Copied: ${entityId}`, 1200);
+    };
+
+    // ── Map editor layer panel ────────────────────────────────────────────────
+    this.mapEditorLayerPanel = new MapEditorLayerPanel(this.ui.uiTexture);
+    this.mapEditorLayerPanel.onLayerVisibilityChange = (name, visible) => {
+      this.mapEditorSystem.setLayerVisible(name, visible);
+      this._refreshLayerPanel();
+    };
+    this.mapEditorLayerPanel.onLayerLockChange = (name, locked) => {
+      this.mapEditorSystem.setLayerLocked(name, locked);
+      this._refreshLayerPanel();
+      const msg = locked ? `Layer "${name}" locked` : `Layer "${name}" unlocked`;
+      this.ui.showNotification(msg, 1200);
+    };
+    this.mapEditorSystem.onLayerChanged = () => {
+      this._refreshLayerPanel();
+    };
+
+    // ── Map editor notes panel ────────────────────────────────────────────────
+    this.mapEditorNotesPanel = new MapEditorNotesPanel(this.ui.uiTexture);
+    this.mapEditorNotesPanel.onSave = (text) => {
+      this.mapEditorSystem.notes = text;
+      this.ui.showNotification("Scene notes saved", 1200);
+    };
+
+    // ── Toolbar: camera frame callbacks ──────────────────────────────────────
+    this.mapEditorToolbar.onFrameSelected = () => {
+      const selId = this.mapEditorSystem.selectedEntityId;
+      if (!selId) { this.ui.showNotification("No entity selected", 1000); return; }
+      const pos = this.mapEditorSystem.getEntityPosition(selId);
+      if (pos) {
+        this.player.camera.target.set(pos.x, pos.y, pos.z);
+        this.ui.showNotification("Framed selected entity", 1000);
+      }
+    };
+    this.mapEditorToolbar.onFrameAll = () => {
+      const summaries = this.mapEditorSystem.listEntitySummaries();
+      if (summaries.length === 0) { this.ui.showNotification("No entities to frame", 1000); return; }
+      let cx = 0, cy = 0, cz = 0;
+      for (const s of summaries) { cx += s.position.x; cy += s.position.y; cz += s.position.z; }
+      cx /= summaries.length; cy /= summaries.length; cz /= summaries.length;
+      this.player.camera.target.set(cx, cy, cz);
+      this.ui.showNotification(`Framed ${summaries.length} entities`, 1000);
     };
 
     // ── Quest Creator ──────────────────────────────────────────────────────────
@@ -520,8 +587,10 @@ export class Game {
               this.mapEditorToolbar.show();
               this.mapEditorHierarchyPanel.show();
               this.mapEditorPalettePanel.show();
+              this.mapEditorLayerPanel.show();
               this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
               this._refreshEditorToolbar();
+              this._refreshLayerPanel();
               this.ui.showNotification("Map Editor enabled (F2 to exit)", 2500);
             }
             break;
@@ -1271,6 +1340,8 @@ export class Game {
                     this.mapEditorHierarchyPanel.hide();
                     this.mapEditorPalettePanel.hide();
                     this.mapEditorValidationPanel.hide();
+                    this.mapEditorLayerPanel.hide();
+                    this.mapEditorNotesPanel.hide();
                     this.ui.showNotification("Map editor mode disabled", 1800);
                 } else if (this.inventorySystem.isOpen) {
                     this.inventorySystem.toggleInventory();
@@ -1470,8 +1541,10 @@ export class Game {
                     this.mapEditorToolbar.show();
                     this.mapEditorHierarchyPanel.show();
                     this.mapEditorPalettePanel.show();
+                    this.mapEditorLayerPanel.show();
                     this._refreshEditorToolbar();
                     this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+                    this._refreshLayerPanel();
                 } else {
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
@@ -1479,9 +1552,48 @@ export class Game {
                     this.mapEditorHierarchyPanel.hide();
                     this.mapEditorPalettePanel.hide();
                     this.mapEditorValidationPanel.hide();
+                    this.mapEditorLayerPanel.hide();
+                    this.mapEditorNotesPanel.hide();
                 }
                 this.ui.showNotification(isEnabled ? "Map editor mode enabled" : "Map editor mode disabled", 1800);
                 this._refreshHelpOverlayIfVisible();
+            } else if (kbInfo.event.key === "f" || kbInfo.event.key === "F") {
+                if (!this.mapEditorSystem.isEnabled) return;
+                if (kbInfo.event.shiftKey) {
+                    // Shift+F: Frame All
+                    const summaries = this.mapEditorSystem.listEntitySummaries();
+                    if (summaries.length === 0) { this.ui.showNotification("No entities to frame", 1000); return; }
+                    let cx = 0, cy = 0, cz = 0;
+                    for (const s of summaries) { cx += s.position.x; cy += s.position.y; cz += s.position.z; }
+                    cx /= summaries.length; cy /= summaries.length; cz /= summaries.length;
+                    this.player.camera.target.set(cx, cy, cz);
+                    this.ui.showNotification(`Framed ${summaries.length} entities`, 1000);
+                } else {
+                    // F: Frame Selected
+                    const selId = this.mapEditorSystem.selectedEntityId;
+                    if (!selId) { this.ui.showNotification("No entity selected to frame", 1000); return; }
+                    const pos = this.mapEditorSystem.getEntityPosition(selId);
+                    if (pos) {
+                        this.player.camera.target.set(pos.x, pos.y, pos.z);
+                        this.ui.showNotification("Framed selected entity", 1000);
+                    }
+                }
+            } else if (kbInfo.event.key === "l" || kbInfo.event.key === "L") {
+                if (!this.mapEditorSystem.isEnabled) return;
+                if (this.mapEditorLayerPanel.isVisible) {
+                    this.mapEditorLayerPanel.hide();
+                } else {
+                    this._refreshLayerPanel();
+                    this.mapEditorLayerPanel.show();
+                    this.ui.showNotification("Layers panel opened", 1000);
+                }
+            } else if ((kbInfo.event.key === "m" || kbInfo.event.key === "M") && (kbInfo.event.ctrlKey || kbInfo.event.metaKey)) {
+                if (!this.mapEditorSystem.isEnabled) return;
+                if (this.mapEditorNotesPanel.isVisible) {
+                    this.mapEditorNotesPanel.hide();
+                } else {
+                    this.mapEditorNotesPanel.show(this.mapEditorSystem.notes);
+                }
             } else if (kbInfo.event.key === "g" || kbInfo.event.key === "G") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const mode = this.mapEditorSystem.cycleGizmoMode();
@@ -1521,6 +1633,7 @@ export class Game {
                 if (undone) {
                     this._refreshEditorToolbar();
                     this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+                    this._refreshLayerPanel();
                 }
             } else if (
                 (kbInfo.event.key === "y" && (kbInfo.event.ctrlKey || kbInfo.event.metaKey)) ||
@@ -1532,6 +1645,7 @@ export class Game {
                 if (redone) {
                     this._refreshEditorToolbar();
                     this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+                    this._refreshLayerPanel();
                 }
             } else if (kbInfo.event.key === "F6") {
                 if (!this.mapEditorSystem.isEnabled) return;
@@ -1640,6 +1754,7 @@ export class Game {
                 this.ui.showNotification(`Placed: ${ptype}`, 1200);
                 this._refreshEditorToolbar();
                 this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+                this._refreshLayerPanel();
             } else if (kbInfo.event.key === "d" || kbInfo.event.key === "D") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const selId = this.mapEditorSystem.selectedEntityId;
@@ -1652,6 +1767,7 @@ export class Game {
                     this.ui.showNotification("Entity duplicated", 1200);
                     this._refreshEditorToolbar();
                     this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+                    this._refreshLayerPanel();
                 }
             } else if (kbInfo.event.key === "F5") {
                 if (!this.isPaused) this.saveSystem.save();

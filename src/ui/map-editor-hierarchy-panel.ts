@@ -6,8 +6,9 @@ import {
   TextBlock,
   Button,
   ScrollViewer,
+  InputText,
 } from "@babylonjs/gui/2D";
-import type { EditorPlacementType } from "../systems/map-editor-system";
+import type { EditorPlacementType, EditorLayerName } from "../systems/map-editor-system";
 
 // ── Design tokens (aligned with MapEditorPropertyPanel) ──────────────────────
 const T = {
@@ -46,6 +47,10 @@ export interface HierarchyEntitySummary {
   type: EditorPlacementType;
   /** Optional human-readable label from entity properties, shown alongside the ID. */
   label?: string;
+  /** Layer this entity is assigned to. */
+  layerName?: EditorLayerName;
+  /** World position for tooltip display. */
+  position?: { x: number; y: number; z: number };
 }
 
 /**
@@ -67,8 +72,12 @@ export class MapEditorHierarchyPanel {
   private readonly _panel: Rectangle;
   private readonly _listStack: StackPanel;
   private readonly _countLabel: TextBlock;
+  private readonly _filterInput: InputText;
+  private readonly _filterCountLabel: TextBlock;
   private readonly _rowMap: Map<string, Rectangle> = new Map();
   private _selectedEntityId: string | null = null;
+  private _allEntities: ReadonlyArray<HierarchyEntitySummary> = [];
+  private _filterText: string = "";
 
   constructor(ui: AdvancedDynamicTexture) {
     this._ui = ui;
@@ -76,7 +85,7 @@ export class MapEditorHierarchyPanel {
     // ── Outer panel ──────────────────────────────────────────────────────────
     this._panel = new Rectangle("editorHierarchyPanel");
     this._panel.width  = "210px";
-    this._panel.height = "380px";
+    this._panel.height = "420px";
     this._panel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     this._panel.verticalAlignment   = Control.VERTICAL_ALIGNMENT_TOP;
     this._panel.top  = "120px";  // below the toolbar (now 4 rows)
@@ -115,6 +124,60 @@ export class MapEditorHierarchyPanel {
     this._countLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
     headerRow.addControl(this._countLabel);
 
+    // ── Search filter row ─────────────────────────────────────────────────
+    const filterRow = new StackPanel("editorHierarchyFilterRow");
+    filterRow.isVertical = false;
+    filterRow.height     = "26px";
+    filterRow.paddingLeft  = "6px";
+    filterRow.paddingRight = "6px";
+    this._panel.addControl(filterRow);
+
+    const searchIcon = new TextBlock("editorHierarchySearchIcon", "🔍");
+    searchIcon.color    = T.DIM;
+    searchIcon.fontSize = 11;
+    searchIcon.width    = "16px";
+    searchIcon.height   = "22px";
+    searchIcon.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    filterRow.addControl(searchIcon);
+
+    this._filterInput = new InputText("editorHierarchyFilter", "");
+    this._filterInput.width          = "148px";
+    this._filterInput.height         = "20px";
+    this._filterInput.color          = T.TEXT;
+    this._filterInput.background     = T.BTN_BG;
+    this._filterInput.focusedBackground = T.BTN_BG;
+    this._filterInput.placeholderText = "Filter entities…";
+    this._filterInput.fontSize       = 10;
+    this._filterInput.thickness      = 1;
+    this._filterInput.onKeyboardEventProcessedObservable?.add(() => {
+      this._filterText = this._filterInput.text.toLowerCase();
+      this._applyFilter();
+    });
+    filterRow.addControl(this._filterInput);
+
+    const clearBtn = Button.CreateSimpleButton("editorHierarchyClearFilter", "✕");
+    clearBtn.width        = "18px";
+    clearBtn.height       = "18px";
+    clearBtn.fontSize     = 10;
+    clearBtn.color        = T.DIM;
+    clearBtn.background   = T.BTN_BG;
+    clearBtn.cornerRadius = 3;
+    clearBtn.thickness    = 1;
+    clearBtn.onPointerUpObservable.add(() => {
+      this._filterInput.text = "";
+      this._filterText = "";
+      this._applyFilter();
+    });
+    filterRow.addControl(clearBtn);
+
+    this._filterCountLabel = new TextBlock("editorHierarchyFilterCount", "");
+    this._filterCountLabel.color    = T.DIM;
+    this._filterCountLabel.fontSize = 9;
+    this._filterCountLabel.width    = "18px";
+    this._filterCountLabel.height   = "22px";
+    this._filterCountLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+    filterRow.addControl(this._filterCountLabel);
+
     // ── Thin separator ────────────────────────────────────────────────────
     const sep = new Rectangle("editorHierarchySep");
     sep.height     = "1px";
@@ -126,7 +189,7 @@ export class MapEditorHierarchyPanel {
     // ── Scroll viewer ─────────────────────────────────────────────────────
     const scroll = new ScrollViewer("editorHierarchyScroll");
     scroll.width   = "100%";
-    scroll.height  = "340px";
+    scroll.height  = "360px";
     scroll.barSize = 6;
     scroll.thickness = 0;
     this._panel.addControl(scroll);
@@ -159,21 +222,18 @@ export class MapEditorHierarchyPanel {
    * Call this after any place / remove / undo / redo operation.
    */
   refresh(entities: ReadonlyArray<HierarchyEntitySummary>): void {
-    this._listStack.clearControls();
-    this._rowMap.clear();
-
-    for (const { id, type, label } of entities) {
-      const row = this._buildRow(id, type, label);
-      this._listStack.addControl(row);
-      this._rowMap.set(id, row);
-    }
-
+    this._allEntities = entities;
     this._countLabel.text = `(${entities.length})`;
+    this._applyFilter();
+  }
 
-    // Re-apply highlight for the currently selected entity (if still present)
-    if (this._selectedEntityId !== null) {
-      this._applyRowHighlight(this._selectedEntityId);
-    }
+  /**
+   * Clear the search filter and show all entities.
+   */
+  clearFilter(): void {
+    this._filterInput.text = "";
+    this._filterText = "";
+    this._applyFilter();
   }
 
   /**
@@ -194,6 +254,42 @@ export class MapEditorHierarchyPanel {
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
+
+  /** Filter entities by the current filter text and rebuild the displayed list. */
+  private _applyFilter(): void {
+    this._listStack.clearControls();
+    this._rowMap.clear();
+
+    const filter = this._filterText.trim();
+    const filtered = filter
+      ? this._allEntities.filter(({ id, type, label }) => {
+          return (
+            id.toLowerCase().includes(filter) ||
+            type.toLowerCase().includes(filter) ||
+            (label?.toLowerCase().includes(filter) ?? false)
+          );
+        })
+      : this._allEntities;
+
+    for (const { id, type, label } of filtered) {
+      const row = this._buildRow(id, type, label);
+      this._listStack.addControl(row);
+      this._rowMap.set(id, row);
+    }
+
+    // Show match count when filtering
+    if (filter) {
+      this._filterCountLabel.text  = `${filtered.length}`;
+      this._filterCountLabel.color = filtered.length === 0 ? "#E05050" : T.DIM;
+    } else {
+      this._filterCountLabel.text = "";
+    }
+
+    // Re-apply selection highlight if still present
+    if (this._selectedEntityId !== null) {
+      this._applyRowHighlight(this._selectedEntityId);
+    }
+  }
 
   private _buildRow(id: string, type: EditorPlacementType, label?: string): Rectangle {
     const row = new Rectangle(`editorHRow_${id}`);

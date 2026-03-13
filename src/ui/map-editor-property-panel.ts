@@ -44,10 +44,14 @@ export class MapEditorPropertyPanel {
   /** Fired when the user clicks Delete with the entity ID to remove. */
   public onDelete: ((entityId: string) => void) | null = null;
 
+  /** Fired when the user clicks "Copy ID" — passes the entity ID string. */
+  public onCopyId: ((entityId: string) => void) | null = null;
+
   private readonly _ui: AdvancedDynamicTexture;
   private readonly _panel: Rectangle;
   private readonly _titleText: TextBlock;
   private readonly _idText: TextBlock;
+  private readonly _positionText: TextBlock;
   private readonly _fieldsStack: StackPanel;
   private readonly _applyBtn: Button;
   private readonly _deleteBtn: Button;
@@ -84,24 +88,67 @@ export class MapEditorPropertyPanel {
     inner.width = "260px";
     this._panel.addControl(inner);
 
+    // ── Title + Copy ID row ───────────────────────────────────────────────────
+    const titleRow = new StackPanel("editorPropTitleRow");
+    titleRow.isVertical = false;
+    titleRow.height     = "22px";
+    inner.addControl(titleRow);
+
     // ── Title ─────────────────────────────────────────────────────────────────
     this._titleText = new TextBlock("editorPropTitle", "Entity Properties");
     this._titleText.color  = P.TITLE;
     this._titleText.height = "22px";
+    this._titleText.width  = "180px";
     this._titleText.fontSize = 13;
     this._titleText.fontStyle = "bold";
     this._titleText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     this._titleText.paddingLeft = "8px";
-    inner.addControl(this._titleText);
+    titleRow.addControl(this._titleText);
+
+    const copyIdBtn = Button.CreateSimpleButton("editorPropCopyId", "⎘ ID");
+    copyIdBtn.width        = "50px";
+    copyIdBtn.height       = "18px";
+    copyIdBtn.fontSize     = 9;
+    copyIdBtn.color        = P.DIM;
+    copyIdBtn.background   = "rgba(28, 20, 6, 0.9)";
+    copyIdBtn.cornerRadius = 3;
+    copyIdBtn.thickness    = 1;
+    copyIdBtn.onPointerEnterObservable.add(() => {
+      copyIdBtn.background = P.BTN_HOVER;
+      copyIdBtn.color      = P.TEXT;
+    });
+    copyIdBtn.onPointerOutObservable.add(() => {
+      copyIdBtn.background = "rgba(28, 20, 6, 0.9)";
+      copyIdBtn.color      = P.DIM;
+    });
+    copyIdBtn.onPointerUpObservable.add(() => {
+      if (this._currentEntityId) {
+        this.onCopyId?.(this._currentEntityId);
+        // Best-effort clipboard copy; guard for environments without clipboard API
+        if (typeof navigator !== "undefined" && navigator.clipboard) {
+          navigator.clipboard.writeText(this._currentEntityId).catch(() => { /* ignore */ });
+        }
+      }
+    });
+    titleRow.addControl(copyIdBtn);
 
     // ── Entity ID line ────────────────────────────────────────────────────────
     this._idText = new TextBlock("editorPropId", "");
     this._idText.color  = P.DIM;
-    this._idText.height = "18px";
-    this._idText.fontSize = 11;
+    this._idText.height = "16px";
+    this._idText.fontSize = 10;
     this._idText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     this._idText.paddingLeft = "8px";
     inner.addControl(this._idText);
+
+    // ── Position readout ──────────────────────────────────────────────────────
+    this._positionText = new TextBlock("editorPropPos", "");
+    this._positionText.color  = P.DIM;
+    this._positionText.height = "16px";
+    this._positionText.fontSize = 10;
+    this._positionText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this._positionText.paddingLeft = "8px";
+    inner.addControl(this._positionText);
 
     // ── Divider ───────────────────────────────────────────────────────────────
     const divider = new Rectangle("editorPropDiv");
@@ -181,15 +228,29 @@ export class MapEditorPropertyPanel {
     entityId: string,
     entityType: EditorPlacementType,
     properties: Readonly<EditorEntityProperties>,
+    position?: { x: number; y: number; z: number },
   ): void {
     this._currentEntityId = entityId;
     this._currentType     = entityType;
 
     this._titleText.text = `[${entityType}]`;
     this._idText.text    = `id: ${entityId}`;
+    this._positionText.text = position
+      ? `pos: (${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)})`
+      : "";
 
     this._rebuildFields(entityType, properties);
     this._panel.isVisible = true;
+  }
+
+  /**
+   * Update the position readout for the currently displayed entity.
+   * Call this on every gizmo drag-end event (e.g. from `GizmoManager`'s
+   * `onDragEndObservable`) to keep the displayed coordinates up to date.
+   */
+  updatePosition(position: { x: number; y: number; z: number }): void {
+    this._positionText.text =
+      `pos: (${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)})`;
   }
 
   /** Hide the panel and clear internal state. */

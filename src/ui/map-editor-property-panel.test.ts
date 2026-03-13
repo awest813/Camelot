@@ -228,3 +228,47 @@ describe('MapEditorPropertyPanel — field rendering', () => {
         expect((panel as any)._inputMap.has('structureId')).toBe(true);
     });
 });
+
+// ─── Position display ─────────────────────────────────────────────────────────
+
+describe('MapEditorPropertyPanel — position display', () => {
+    it('show() with position does not throw', () => {
+        const { panel } = makePanel();
+        expect(() => panel.show('e0', 'marker', {}, { x: 1.5, y: 0, z: -3.2 })).not.toThrow();
+    });
+
+    it('show() without position does not throw', () => {
+        const { panel } = makePanel();
+        expect(() => panel.show('e0', 'loot', {})).not.toThrow();
+    });
+
+    it('updatePosition() does not throw when called after show()', () => {
+        const { panel } = makePanel();
+        panel.show('e0', 'structure', {});
+        expect(() => panel.updatePosition({ x: 2, y: 1, z: 0 })).not.toThrow();
+    });
+
+    it('has _positionText reference', () => {
+        const { panel } = makePanel();
+        expect((panel as any)._positionText).toBeDefined();
+    });
+});
+
+// ─── onCopyId callback ────────────────────────────────────────────────────────
+
+describe('MapEditorPropertyPanel — onCopyId', () => {
+    it('fires onCopyId with the entity ID', () => {
+        const { panel } = makePanel();
+        const received: string[] = [];
+        panel.onCopyId = (id) => received.push(id);
+        panel.show('entity_42', 'marker', {});
+        panel.onCopyId?.('entity_42');
+        expect(received).toContain('entity_42');
+    });
+
+    it('does not throw when onCopyId is null', () => {
+        const { panel } = makePanel();
+        panel.onCopyId = null;
+        expect(() => panel.onCopyId?.('entity_0')).not.toThrow();
+    });
+});

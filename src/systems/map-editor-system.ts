@@ -11,6 +11,31 @@ import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 export type EditorGizmoMode = "position" | "rotation" | "scale";
 export type EditorPlacementType = "marker" | "loot" | "npc-spawn" | "quest-marker" | "structure";
 export type EditorTerrainTool = "none" | "sculpt" | "paint";
+export type EditorLayerName = "terrain" | "objects" | "events" | "npcs" | "triggers";
+
+export interface EditorLayer {
+  name: EditorLayerName;
+  label: string;
+  isVisible: boolean;
+  isLocked: boolean;
+}
+
+/** Default layer assignment per placement type. */
+const TYPE_DEFAULT_LAYER: Record<EditorPlacementType, EditorLayerName> = {
+  marker:         "objects",
+  loot:           "objects",
+  "npc-spawn":    "npcs",
+  "quest-marker": "events",
+  structure:      "terrain",
+};
+
+const DEFAULT_LAYERS: EditorLayer[] = [
+  { name: "terrain",  label: "Terrain",  isVisible: true, isLocked: false },
+  { name: "objects",  label: "Objects",  isVisible: true, isLocked: false },
+  { name: "events",   label: "Events",   isVisible: true, isLocked: false },
+  { name: "npcs",     label: "NPCs",     isVisible: true, isLocked: false },
+  { name: "triggers", label: "Triggers", isVisible: true, isLocked: false },
+];
 
 // ── Undo/redo command types ──────────────────────────────────────────────────
 
@@ -48,6 +73,7 @@ export interface MapExportEntry {
   position: { x: number; y: number; z: number };
   rotation: { x: number; y: number; z: number };
   patrolGroupId?: string;
+  layerName?: EditorLayerName;
   properties?: EditorEntityProperties;
 }
 
@@ -67,6 +93,10 @@ export interface MapExportData {
     id: string;
     waypoints: Array<{ x: number; y: number; z: number }>;
   }>;
+  /** Optional map-level author notes or description. */
+  notes?: string;
+  /** Persisted layer visibility/lock states. */
+  layers?: Array<{ name: EditorLayerName; isVisible: boolean; isLocked: boolean }>;
 }
 
 export interface MapValidationIssue {
@@ -107,6 +137,7 @@ interface EditorEntity {
   mesh: Mesh;
   type: EditorPlacementType;
   patrolGroupId?: string;
+  layerName: EditorLayerName;
   properties: EditorEntityProperties;
 }
 
@@ -156,6 +187,8 @@ export class MapEditorSystem {
   public currentPlacementType: EditorPlacementType = "marker";
   public terrainTool: EditorTerrainTool = "none";
   public terrainSculptStep: number = 0.5;
+  /** Scene-level notes / description (persisted in map export). */
+  public notes: string = "";
 
   /**
    * Called whenever the selected entity changes.
@@ -164,6 +197,11 @@ export class MapEditorSystem {
   public onEntitySelectionChanged:
     | ((entityId: string | null) => void)
     | null = null;
+
+  /**
+   * Called whenever a layer's visibility or lock state changes.
+   */
+  public onLayerChanged: ((layer: EditorLayer) => void) | null = null;
 
   private readonly scene: Scene;
   private readonly gizmoManager: GizmoManager;
@@ -175,6 +213,9 @@ export class MapEditorSystem {
   private _activePatrolGroupId: string | null = null;
   private _patrolGroupCounter: number = 0;
   private _selectedEntityId: string | null = null;
+  private _layers: Map<EditorLayerName, EditorLayer> = new Map(
+    DEFAULT_LAYERS.map((l) => [l.name, { ...l }]),
+  );
 
   // ── Undo/redo stacks ─────────────────────────────────────────────────────
   private _undoStack: EditorCommand[] = [];
@@ -241,6 +282,104 @@ export class MapEditorSystem {
     });
   }
 
+  // ─── Layer management ────────────────────────────────────────────────────────
+
+  /**
+   * Returns a copy of all editor layers with their current state.
+   */
+  getLayers(): EditorLayer[] {
+    return Array.from(this._layers.values()).map((l) => ({ ...l }));
+  }
+
+  /**
+   * Returns the current state of a single layer, or null if not found.
+   */
+  getLayer(name: EditorLayerName): EditorLayer | null {
+    const l = this._layers.get(name);
+    return l ? { ...l } : null;
+  }
+
+  /**
+   * Show or hide all entities on the given layer.
+   * Also updates the layer state and fires `onLayerChanged`.
+   */
+  setLayerVisible(name: EditorLayerName, visible: boolean): void {
+    const layer = this._layers.get(name);
+    if (!layer) return;
+    layer.isVisible = visible;
+    for (const e of this._entities) {
+      if (e.layerName === name) {
+        e.mesh.setEnabled(visible);
+      }
+    }
+    this.onLayerChanged?.({ ...layer });
+  }
+
+  /**
+   * Lock or unlock the given layer.
+   * Locked layers' entities are not pickable by the editor pointer.
+   * Also fires `onLayerChanged`.
+   */
+  setLayerLocked(name: EditorLayerName, locked: boolean): void {
+    const layer = this._layers.get(name);
+    if (!layer) return;
+    layer.isLocked = locked;
+    for (const e of this._entities) {
+      if (e.layerName === name) {
+        e.mesh.isPickable = !locked;
+        e.mesh.metadata = { ...(e.mesh.metadata ?? {}), editable: !locked };
+      }
+    }
+    this.onLayerChanged?.({ ...layer });
+  }
+
+  /**
+   * Returns the number of entities currently assigned to the given layer.
+   */
+  getLayerEntityCount(name: EditorLayerName): number {
+    return this._entities.filter((e) => e.layerName === name).length;
+  }
+
+  /**
+   * Returns a map of entity counts per layer.
+   */
+  getLayerEntityCounts(): Record<EditorLayerName, number> {
+    const counts: Record<EditorLayerName, number> = {
+      terrain: 0, objects: 0, events: 0, npcs: 0, triggers: 0,
+    };
+    for (const e of this._entities) {
+      counts[e.layerName] = (counts[e.layerName] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /**
+   * Returns the entity count for each placement type.
+   * Useful for the toolbar type-count display.
+   */
+  getTypeCounts(): Record<EditorPlacementType, number> {
+    const counts: Record<EditorPlacementType, number> = {
+      marker: 0, loot: 0, "npc-spawn": 0, "quest-marker": 0, structure: 0,
+    };
+    for (const e of this._entities) {
+      counts[e.type] = (counts[e.type] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  /**
+   * Returns the world-space position of the given entity, or null if not found.
+   */
+  getEntityPosition(entityId: string): { x: number; y: number; z: number } | null {
+    const entity = this._findEntityById(entityId);
+    if (!entity) return null;
+    return {
+      x: entity.mesh.position.x,
+      y: entity.mesh.position.y,
+      z: entity.mesh.position.z,
+    };
+  }
+
   // ─── Mode / toggle ──────────────────────────────────────────────────────────
 
   toggle(): boolean {
@@ -263,15 +402,21 @@ export class MapEditorSystem {
   }
 
   /**
-   * Returns a lightweight summary of every placed entity: `{ id, type, label? }`.
+   * Returns a lightweight summary of every placed entity: `{ id, type, label?, layerName, position }`.
    * `label` is included when the entity has a non-empty label property set.
    * Useful for hierarchy panels that only need to list names without reading
    * full property data.
    */
-  listEntitySummaries(): Array<{ id: string; type: EditorPlacementType; label?: string }> {
+  listEntitySummaries(): Array<{ id: string; type: EditorPlacementType; label?: string; layerName: EditorLayerName; position: { x: number; y: number; z: number } }> {
     return this._entities.map((e) => ({
       id: e.mesh.metadata?.editorEntityId ?? e.mesh.name,
       type: e.type,
+      layerName: e.layerName,
+      position: {
+        x: e.mesh.position.x,
+        y: e.mesh.position.y,
+        z: e.mesh.position.z,
+      },
       ...(e.properties.label ? { label: e.properties.label } : {}),
     }));
   }
@@ -389,14 +534,21 @@ export class MapEditorSystem {
     const id = `editor_entity_${this._entityCounter++}`;
 
     const mesh = this._buildEntityMesh(id, snapped, type);
+    const layerName: EditorLayerName = TYPE_DEFAULT_LAYER[type];
+    const layer = this._layers.get(layerName);
     mesh.metadata = {
       ...(mesh.metadata ?? {}),
-      editable: true,
+      editable: layer ? !layer.isLocked : true,
       editorEntityId: id,
       editorType: type,
+      editorLayerName: layerName,
     };
+    if (layer) {
+      mesh.setEnabled(layer.isVisible);
+      mesh.isPickable = !layer.isLocked;
+    }
 
-    const entity: EditorEntity = { mesh, type, properties: {} };
+    const entity: EditorEntity = { mesh, type, layerName, properties: {} };
 
     if (type === "npc-spawn" && this._activePatrolGroupId !== null) {
       entity.patrolGroupId = this._activePatrolGroupId;
@@ -416,6 +568,7 @@ export class MapEditorSystem {
         type,
         position: { x: snapped.x, y: snapped.y, z: snapped.z },
         rotation: { x: 0, y: 0, z: 0 },
+        layerName,
       },
       patrolGroupId: entity.patrolGroupId,
     });
@@ -473,6 +626,7 @@ export class MapEditorSystem {
         type: entity.type,
         position: { x: px, y: py, z: pz },
         rotation: { x: rx, y: ry, z: rz },
+        layerName: entity.layerName,
         ...(Object.keys(entity.properties).length > 0 ? { properties: { ...entity.properties } } : {}),
       },
       patrolGroupId: entity.patrolGroupId,
@@ -567,6 +721,7 @@ export class MapEditorSystem {
         z: e.mesh.rotation.z,
       },
       ...(e.patrolGroupId !== undefined ? { patrolGroupId: e.patrolGroupId } : {}),
+      layerName: e.layerName,
       ...(Object.keys(e.properties).length > 0 ? { properties: { ...e.properties } } : {}),
     }));
 
@@ -575,7 +730,15 @@ export class MapEditorSystem {
       waypoints: g.waypoints.map((w) => ({ x: w.x, y: w.y, z: w.z })),
     }));
 
-    return { version: 1, entries, patrolRoutes };
+    const layers = Array.from(this._layers.values()).map((l) => ({
+      name: l.name,
+      isVisible: l.isVisible,
+      isLocked: l.isLocked,
+    }));
+
+    const data: MapExportData = { version: 1, entries, patrolRoutes, layers };
+    if (this.notes.trim()) data.notes = this.notes;
+    return data;
   }
 
   /**
@@ -718,22 +881,45 @@ export class MapEditorSystem {
   importMap(data: MapExportData): void {
     const existingIds = new Set(this._entities.map((e) => e.mesh.metadata?.editorEntityId));
 
+    // Restore notes if present
+    if (data.notes !== undefined) {
+      this.notes = data.notes;
+    }
+
+    // Restore layer states if present
+    if (data.layers) {
+      for (const saved of data.layers) {
+        const layer = this._layers.get(saved.name);
+        if (!layer) continue;
+        layer.isVisible = saved.isVisible;
+        layer.isLocked  = saved.isLocked;
+      }
+    }
+
     for (const entry of data.entries) {
       if (existingIds.has(entry.id)) continue;
       const pos = new Vector3(entry.position.x, entry.position.y, entry.position.z);
       const mesh = this._buildEntityMesh(entry.id, pos, entry.type);
       mesh.rotation.set(entry.rotation.x, entry.rotation.y, entry.rotation.z);
+      const layerName = this._resolveLayerName(entry.type, entry.layerName);
+      const layer = this._layers.get(layerName);
       mesh.metadata = {
-        editable: true,
+        editable: layer ? !layer.isLocked : true,
         editorEntityId: entry.id,
         editorType: entry.type,
+        editorLayerName: layerName,
         ...(entry.patrolGroupId !== undefined ? { patrolGroupId: entry.patrolGroupId } : {}),
         ...(entry.properties !== undefined ? { editorProperties: { ...entry.properties } } : {}),
       };
+      if (layer) {
+        mesh.setEnabled(layer.isVisible);
+        mesh.isPickable = !layer.isLocked;
+      }
       this._entities.push({
         mesh,
         type: entry.type,
         patrolGroupId: entry.patrolGroupId,
+        layerName,
         properties: { ...(entry.properties ?? {}) },
       });
     }
@@ -820,10 +1006,22 @@ export class MapEditorSystem {
     this._clearSelection();
     this._undoStack = [];
     this._redoStack = [];
+    // Reset layer states
+    for (const layer of this._layers.values()) {
+      layer.isVisible = true;
+      layer.isLocked  = false;
+    }
+    this.notes = "";
   }
 
 
   // ─── Private helpers ────────────────────────────────────────────────────────
+
+  /** Returns the layer name for a given type/entry, falling back to type default. */
+  private _resolveLayerName(type: EditorPlacementType, layerName?: EditorLayerName): EditorLayerName {
+    if (layerName && this._layers.has(layerName)) return layerName;
+    return TYPE_DEFAULT_LAYER[type];
+  }
 
   private _selectMesh(mesh: Mesh): void {
     this.gizmoManager.attachToMesh(mesh);
@@ -1056,17 +1254,25 @@ export class MapEditorSystem {
     const pos = new Vector3(entry.position.x, entry.position.y, entry.position.z);
     const mesh = this._buildEntityMesh(entry.id, pos, entry.type);
     mesh.rotation.set(entry.rotation.x, entry.rotation.y, entry.rotation.z);
+    const layerName = this._resolveLayerName(entry.type, entry.layerName);
+    const layer = this._layers.get(layerName);
     mesh.metadata = {
-      editable: true,
+      editable: layer ? !layer.isLocked : true,
       editorEntityId: entry.id,
       editorType: entry.type,
+      editorLayerName: layerName,
       ...(patrolGroupId !== undefined ? { patrolGroupId } : {}),
       ...(entry.properties !== undefined ? { editorProperties: { ...entry.properties } } : {}),
     };
+    if (layer) {
+      mesh.setEnabled(layer.isVisible);
+      mesh.isPickable = !layer.isLocked;
+    }
     this._entities.push({
       mesh,
       type: entry.type,
       patrolGroupId,
+      layerName,
       properties: { ...(entry.properties ?? {}) },
     });
   }

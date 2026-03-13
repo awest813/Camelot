@@ -26,10 +26,16 @@ vi.mock('@babylonjs/gui/2D', () => {
         fontStyle: string = '';
         isVertical: boolean = false;
         isPointerBlocker: boolean = false;
+        placeholderText: string = '';
+        focusedBackground: string = '';
+        focusedColor: string = '';
+        textHorizontalAlignment: number = 0;
+        textWrapping: boolean = false;
 
         onPointerEnterObservable = { add: vi.fn() };
         onPointerOutObservable   = { add: vi.fn() };
         onPointerUpObservable    = { add: vi.fn() };
+        onKeyboardEventProcessedObservable = { add: vi.fn() };
 
         children: any[] = [];
 
@@ -393,5 +399,106 @@ describe('MapEditorHierarchyPanel — refresh() with label', () => {
         const rowMap = (panel as any)._rowMap as Map<string, unknown>;
         expect(rowMap.has('editor_entity_0')).toBe(true);
         expect(rowMap.has('editor_entity_1')).toBe(true);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MapEditorToolbar — camera controls and type counts
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('MapEditorToolbar — onFrameSelected / onFrameAll callbacks', () => {
+    it('fires onFrameSelected when set', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        let called = false;
+        toolbar.onFrameSelected = () => { called = true; };
+        toolbar.onFrameSelected?.();
+        expect(called).toBe(true);
+    });
+
+    it('fires onFrameAll when set', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        let called = false;
+        toolbar.onFrameAll = () => { called = true; };
+        toolbar.onFrameAll?.();
+        expect(called).toBe(true);
+    });
+
+    it('does not throw when onFrameSelected is null', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        toolbar.onFrameSelected = null;
+        expect(() => toolbar.onFrameSelected?.()).not.toThrow();
+    });
+
+    it('does not throw when onFrameAll is null', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        toolbar.onFrameAll = null;
+        expect(() => toolbar.onFrameAll?.()).not.toThrow();
+    });
+});
+
+describe('MapEditorToolbar — typeCounts in update()', () => {
+    it('update() with typeCounts does not throw', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        expect(() => toolbar.update({
+            placementType: 'marker',
+            gizmoMode: 'position',
+            terrainTool: 'none',
+            entityCount: 6,
+            activePatrolGroupId: null,
+            typeCounts: { marker: 2, loot: 1, 'npc-spawn': 3 },
+        })).not.toThrow();
+    });
+
+    it('update() with empty typeCounts does not throw', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        expect(() => toolbar.update({
+            placementType: 'structure',
+            gizmoMode: 'scale',
+            terrainTool: 'paint',
+            entityCount: 0,
+            activePatrolGroupId: null,
+            typeCounts: {},
+        })).not.toThrow();
+    });
+
+    it('has _typeCountLabel reference', () => {
+        const toolbar = new MapEditorToolbar(makeMockUi());
+        expect((toolbar as any)._typeCountLabel).toBeDefined();
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MapEditorHierarchyPanel — search filter
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('MapEditorHierarchyPanel — search filter', () => {
+    it('has _filterInput reference', () => {
+        const panel = new MapEditorHierarchyPanel(makeMockUi());
+        expect((panel as any)._filterInput).toBeDefined();
+    });
+
+    it('clearFilter() does not throw', () => {
+        const panel = new MapEditorHierarchyPanel(makeMockUi());
+        panel.refresh([
+            { id: 'entity_0', type: 'marker', layerName: 'objects', position: { x: 0, y: 0, z: 0 } },
+        ]);
+        expect(() => panel.clearFilter()).not.toThrow();
+    });
+
+    it('refresh() with layerName in summary does not throw', () => {
+        const panel = new MapEditorHierarchyPanel(makeMockUi());
+        expect(() => panel.refresh([
+            { id: 'entity_0', type: 'npc-spawn', layerName: 'npcs', position: { x: 5, y: 0, z: 3 } },
+            { id: 'entity_1', type: 'loot',      layerName: 'objects', position: { x: 1, y: 0, z: 1 } },
+        ])).not.toThrow();
+    });
+
+    it('refresh() builds rows for entities including layerName', () => {
+        const panel = new MapEditorHierarchyPanel(makeMockUi());
+        panel.refresh([
+            { id: 'entity_0', type: 'structure', layerName: 'terrain', position: { x: 0, y: 0, z: 0 } },
+        ]);
+        const rowMap = (panel as any)._rowMap as Map<string, unknown>;
+        expect(rowMap.has('entity_0')).toBe(true);
     });
 });
