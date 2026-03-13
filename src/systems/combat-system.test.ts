@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CombatSystem } from './combat-system';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Ray } from '@babylonjs/core/Culling/ray';
@@ -150,6 +150,13 @@ describe('CombatSystem', () => {
         };
 
         combatSystem = new CombatSystem(mockScene, mockPlayer, mockNpcs, mockUI);
+        // Default: Math.random() returns 0.99 so random rolls (crit, miss, strafe)
+        // are predictable. Individual tests that need specific values override this.
+        vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     it('meleeAttack should fail if stamina is too low', () => {
@@ -667,18 +674,22 @@ describe('CombatSystem', () => {
         vi.restoreAllMocks();
     });
 
-    it('no crit when critChance is 0', () => {
+    it('no crit when effective crit chance is below random roll', () => {
         mockScene.pickWithRay.mockReturnValue({
             pickedMesh: mockNpcs[0].mesh,
             pickedPoint: new Vector3(0, 0, 1)
         });
 
         mockPlayer.critChance = 0;
+        // Force Math.random() above any weapon crit bonus so no crit fires.
+        vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
         combatSystem.meleeAttack();
 
         expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(10);
         expect(mockUI.showNotification).not.toHaveBeenCalledWith('Critical Hit!', 1000);
+
+        vi.restoreAllMocks();
     });
 
     it('scales melee damage and swing cadence with blade skill and strength', () => {
