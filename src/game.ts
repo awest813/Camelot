@@ -9,6 +9,7 @@ import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator"
 import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
 import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { SkyMaterial } from "@babylonjs/materials/sky/skyMaterial";
 import { Player } from "./entities/player";
 import { UIManager } from "./ui/ui-manager";
@@ -56,6 +57,7 @@ import { EnchantingSystem } from "./systems/enchanting-system";
 import { EnchantingUI } from "./ui/enchanting-ui";
 import { LodSystem } from "./systems/lod-system";
 import { WeatherSystem } from "./systems/weather-system";
+import { GraphicsSystem } from "./systems/graphics-system";
 import { QuickSlotSystem } from "./systems/quickslot-system";
 import { WaitSystem } from "./systems/wait-system";
 import { SkillProgressionSystem } from "./systems/skill-progression-system";
@@ -106,6 +108,14 @@ export class Game {
 
   /** Shadow generator driven by the directional sun light. */
   public shadowGenerator: ShadowGenerator | null = null;
+  /** Rendering configuration preset (lighting, sky, post-processing, fog). */
+  public readonly graphics: GraphicsSystem = new GraphicsSystem();
+  /** Procedural sky-dome mesh (skybox).  Null before _initPostProcessing() runs. */
+  public skyDome: Mesh | null = null;
+  /** Procedural sky-dome material.  Null before _initPostProcessing() runs. */
+  public skyMaterial: SkyMaterial | null = null;
+  /** DefaultRenderingPipeline (bloom, FXAA, sharpen, tone-mapping, vignette). */
+  public renderingPipeline: DefaultRenderingPipeline | null = null;
   public scheduleSystem: ScheduleSystem;
   public combatSystem: CombatSystem;
   public dialogueSystem: DialogueSystem;
@@ -647,7 +657,7 @@ export class Game {
       this.scene,
       this.scene.getLightByName("hLight") as any,
       this.scene.getLightByName("sun") as any,
-      { ambientBase: 0.60, sunBase: 1.05 },
+      { ambientBase: this.graphics.lighting.ambientBase, sunBase: this.graphics.lighting.sunBase },
     );
     this.weatherSystem.onWeatherChange = (state) => {
       this.ui.showNotification(`Weather: ${this.weatherSystem.label}`, 2500);
@@ -1817,7 +1827,7 @@ export class Game {
     );
   }
 
-  _setLight(): void {
+  private _setLight(): void {
     // The sky dome covers the entire background, so the clear colour is used
     // only for pixels not covered by any geometry.  Keep a sky-blue fallback
     // for the very first frame before the skybox is initialised.
@@ -1825,30 +1835,34 @@ export class Game {
 
     // Ambient hemisphere light — warm sky tones above, cool earthy tones below
     const hLight = new HemisphericLight("hLight", new Vector3(0, 1, 0), this.scene);
-    hLight.intensity   = 0.60;
+    hLight.intensity   = this.graphics.lighting.ambientBase;
     hLight.diffuse     = new Color3(0.95, 0.90, 0.78);
     hLight.groundColor = new Color3(0.22, 0.18, 0.12);
     hLight.specular    = new Color3(0.05, 0.04, 0.03);
 
     // Directional sun light — warm golden angle for rich shadows
     const sun = new DirectionalLight("sun", new Vector3(-1.2, -2.8, -0.8).normalize(), this.scene);
-    sun.intensity = 1.05;
+    sun.intensity = this.graphics.lighting.sunBase;
     sun.diffuse   = new Color3(1.0, 0.94, 0.78);
     sun.specular  = new Color3(0.35, 0.30, 0.20);
     // Position the light far away so the shadow frustum covers the visible world.
     sun.position  = new Vector3(60, 100, 40);
 
     // Shadow generator — soft PCF shadows cast by the directional sun
-    const shadows = new ShadowGenerator(1024, sun);
+    const shadows = new ShadowGenerator(this.graphics.shadow.mapSize, sun);
     shadows.useBlurExponentialShadowMap = true;
-    shadows.blurKernel = 16;
+    shadows.blurKernel = this.graphics.shadow.blurKernel;
     this.shadowGenerator = shadows;
 
     // Atmospheric distance fog — initial values match WeatherSystem's "clear"
     // state so the first frame is consistent before WeatherSystem takes over.
     this.scene.fogMode    = Scene.FOGMODE_EXP2;
-    this.scene.fogDensity = 0.006;
-    this.scene.fogColor   = new Color3(0.50, 0.60, 0.72);
+    this.scene.fogDensity = this.graphics.fog.density;
+    this.scene.fogColor   = new Color3(
+      this.graphics.fog.color.r,
+      this.graphics.fog.color.g,
+      this.graphics.fog.color.b,
+    );
   }
 
   /**
@@ -1861,22 +1875,26 @@ export class Game {
     skybox.infiniteDistance = true;
     // Disable picking so raycasts pass through the sky dome and hit world geometry.
     skybox.isPickable = false;
+    this.skyDome = skybox;
 
     const skyMat = new SkyMaterial("skyMat", this.scene);
     skyMat.backFaceCulling = false;
     // Atmospheric parameters — clear mid-morning look
-    skyMat.turbidity      = 6;
-    skyMat.luminance      = 0.98;
-    skyMat.rayleigh       = 2.2;
-    skyMat.mieCoefficient = 0.006;
-    skyMat.mieDirectionalG = 0.82;
-    skyMat.inclination    = 0.30;   // sun angle above horizon
-    skyMat.azimuth        = 0.25;
+    const sky = this.graphics.sky;
+    skyMat.turbidity       = sky.turbidity;
+    skyMat.luminance       = sky.luminance;
+    skyMat.rayleigh        = sky.rayleigh;
+    skyMat.mieCoefficient  = sky.mieCoefficient;
+    skyMat.mieDirectionalG = sky.mieDirectionalG;
+    skyMat.inclination     = sky.inclination;
+    skyMat.azimuth         = sky.azimuth;
     skybox.material = skyMat;
+    this.skyMaterial = skyMat;
 
     // ── DefaultRenderingPipeline ─────────────────────────────────────────────
     // Skip on WebGPU to avoid driver-level incompatibilities at startup.
     if (this.engine.name !== "WebGPU") {
+      const pp = this.graphics.postProcess;
       const pipeline = new DefaultRenderingPipeline(
         "defaultPipeline",
         true,              // HDR
@@ -1885,28 +1903,30 @@ export class Game {
       );
 
       // Bloom — subtle glow on bright surfaces (emissive torches, highlights)
-      pipeline.bloomEnabled  = true;
-      pipeline.bloomThreshold = 0.72;
-      pipeline.bloomWeight    = 0.22;
-      pipeline.bloomKernel    = 48;
-      pipeline.bloomScale     = 0.55;
+      pipeline.bloomEnabled   = pp.bloom.enabled;
+      pipeline.bloomThreshold = pp.bloom.threshold;
+      pipeline.bloomWeight    = pp.bloom.weight;
+      pipeline.bloomKernel    = pp.bloom.kernel;
+      pipeline.bloomScale     = pp.bloom.scale;
 
       // FXAA — smooth jagged edges
-      pipeline.fxaaEnabled = true;
+      pipeline.fxaaEnabled = pp.fxaa;
 
       // Sharpen — recover detail that FXAA softens
       pipeline.sharpenEnabled = true;
-      pipeline.sharpen.edgeAmount = 0.25;
+      pipeline.sharpen.edgeAmount = pp.sharpenEdgeAmount;
 
       // Image processing — filmic tone mapping + slight colour grading
       pipeline.imageProcessingEnabled = true;
-      pipeline.imageProcessing.toneMappingEnabled = true;
+      pipeline.imageProcessing.toneMappingEnabled = pp.toneMappingType !== "none";
       pipeline.imageProcessing.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
-      pipeline.imageProcessing.exposure  = 1.05;
-      pipeline.imageProcessing.contrast  = 1.10;
+      pipeline.imageProcessing.exposure  = pp.exposure;
+      pipeline.imageProcessing.contrast  = pp.contrast;
       pipeline.imageProcessing.vignetteEnabled = true;
-      pipeline.imageProcessing.vignetteWeight  = 2.5;
+      pipeline.imageProcessing.vignetteWeight  = pp.vignetteWeight;
       pipeline.imageProcessing.vignetteBlendMode = ImageProcessingConfiguration.VIGNETTEMODE_MULTIPLY;
+
+      this.renderingPipeline = pipeline;
     }
   }
 

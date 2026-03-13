@@ -224,6 +224,10 @@ three-step overhaul track:
 - 🧭 Optimize chunk streaming and object pooling.
 - 🧭 Profile heavy combat scenes and UI redraw paths.
 
+### Rendering + Visual Quality
+
+- ✅ **GraphicsSystem** — Centralised, validated rendering configuration (no BabylonJS engine dependency): typed interfaces for `ShadowConfig` (power-of-two map size, blur kernel), `BloomConfig` (threshold, weight, kernel, scale), `PostProcessConfig` (FXAA, sharpen, ACES tone mapping, exposure, contrast, vignette), `SkyConfig` (turbidity, luminance, Rayleigh/Mie scattering, inclination, azimuth), `FogConfig` (density, colour), and `LightingConfig` (ambient + sun base intensities). `DEFAULT_*` presets document the in-game settings; `validate()` / `isValid` surface invalid values (non-power-of-two shadow maps, out-of-range bloom params, etc.) before they silently corrupt rendering. `game.ts` reads all configurable rendering values from `GraphicsSystem` instead of hardcoded magic numbers; sky-dome mesh, sky material, and `DefaultRenderingPipeline` are stored as `Game.skyDome`, `Game.skyMaterial`, and `Game.renderingPipeline` for lifecycle management; `_setLight()` now correctly private.
+
 ---
 
 ## Long-Term Vision
