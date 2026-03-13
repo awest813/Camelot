@@ -245,7 +245,8 @@ export class MapEditorPropertyPanel {
 
   /**
    * Update the position readout for the currently displayed entity.
-   * Call this on every gizmo drag-end to keep the position up to date.
+   * Call this on every gizmo drag-end event (e.g. from `GizmoManager`'s
+   * `onDragEndObservable`) to keep the displayed coordinates up to date.
    */
   updatePosition(position: { x: number; y: number; z: number }): void {
     this._positionText.text =

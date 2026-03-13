@@ -23,6 +23,9 @@ const N = {
   CLOSE_HOVER:   "rgba(80, 56, 10, 0.98)",
 };
 
+/** Maximum length (characters) enforced on saved notes. */
+const NOTES_MAX_CHARS = 500;
+
 /**
  * Scene notes panel — a simple text panel for authoring map-level notes,
  * descriptions, and developer remarks.  Inspired by RPG Maker's map notes.
@@ -149,13 +152,13 @@ export class MapEditorNotesPanel {
     this._input.background     = N.INPUT_BG;
     this._input.focusedBackground = N.INPUT_BG;
     this._input.focusedColor   = N.INPUT_FOCUS;
-    this._input.placeholderText = "Enter map notes here...";
+    this._input.placeholderText = `Enter map notes here (max ${NOTES_MAX_CHARS} chars)...`;
     this._input.fontSize       = 11;
     this._input.thickness      = 1;
     inner.addControl(this._input);
 
     // ── Character count ───────────────────────────────────────────────────────
-    this._charCount = new TextBlock("editorNotesCharCount", "0 / 500");
+    this._charCount = new TextBlock("editorNotesCharCount", `0 / ${NOTES_MAX_CHARS}`);
     this._charCount.color    = N.DIM;
     this._charCount.fontSize = 10;
     this._charCount.height   = "18px";
@@ -199,8 +202,7 @@ export class MapEditorNotesPanel {
   // ── Private helpers ───────────────────────────────────────────────────────
 
   private _handleSave(): void {
-    const MAX = 500;
-    const text = this._input.text.slice(0, MAX);
+    const text = this._input.text.slice(0, NOTES_MAX_CHARS);
     this._input.text = text;
     this._updateCharCount();
     this.onSave?.(text);
@@ -209,7 +211,7 @@ export class MapEditorNotesPanel {
 
   private _updateCharCount(): void {
     const len = this._input.text.length;
-    this._charCount.text = `${len} / 500`;
-    this._charCount.color = len > 480 ? "#E05050" : N.DIM;
+    this._charCount.text = `${len} / ${NOTES_MAX_CHARS}`;
+    this._charCount.color = len > NOTES_MAX_CHARS * 0.96 ? "#E05050" : N.DIM;
   }
 }

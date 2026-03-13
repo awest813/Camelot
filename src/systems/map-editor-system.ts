@@ -901,7 +901,7 @@ export class MapEditorSystem {
       const pos = new Vector3(entry.position.x, entry.position.y, entry.position.z);
       const mesh = this._buildEntityMesh(entry.id, pos, entry.type);
       mesh.rotation.set(entry.rotation.x, entry.rotation.y, entry.rotation.z);
-      const layerName: EditorLayerName = (entry.layerName ?? TYPE_DEFAULT_LAYER[entry.type]) as EditorLayerName;
+      const layerName = this._resolveLayerName(entry.type, entry.layerName);
       const layer = this._layers.get(layerName);
       mesh.metadata = {
         editable: layer ? !layer.isLocked : true,
@@ -1016,6 +1016,12 @@ export class MapEditorSystem {
 
 
   // ─── Private helpers ────────────────────────────────────────────────────────
+
+  /** Returns the layer name for a given type/entry, falling back to type default. */
+  private _resolveLayerName(type: EditorPlacementType, layerName?: EditorLayerName): EditorLayerName {
+    if (layerName && this._layers.has(layerName)) return layerName;
+    return TYPE_DEFAULT_LAYER[type];
+  }
 
   private _selectMesh(mesh: Mesh): void {
     this.gizmoManager.attachToMesh(mesh);
@@ -1248,7 +1254,7 @@ export class MapEditorSystem {
     const pos = new Vector3(entry.position.x, entry.position.y, entry.position.z);
     const mesh = this._buildEntityMesh(entry.id, pos, entry.type);
     mesh.rotation.set(entry.rotation.x, entry.rotation.y, entry.rotation.z);
-    const layerName: EditorLayerName = (entry.layerName ?? TYPE_DEFAULT_LAYER[entry.type]) as EditorLayerName;
+    const layerName = this._resolveLayerName(entry.type, entry.layerName);
     const layer = this._layers.get(layerName);
     mesh.metadata = {
       editable: layer ? !layer.isLocked : true,
