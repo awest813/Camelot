@@ -575,6 +575,7 @@ export class Game {
     this.crimeSystem     = new CrimeSystem(this.player, this.scheduleSystem.npcs, this.ui);
     this.containerSystem = new ContainerSystem(this.scene, this.player, this.inventorySystem, this.ui);
     this.projectileSystem = new ProjectileSystem(this.scene, this.player, this.scheduleSystem.npcs, this.ui);
+    this.projectileSystem.stealthSystem = this.stealthSystem;
     this.barterSystem    = new BarterSystem(this.inventorySystem, this.ui);
 
     // Register v2 systems with save
@@ -1402,13 +1403,12 @@ export class Game {
                     }
                 }
             } else if (kbInfo.event.key === "r" || kbInfo.event.key === "R") {
-                // Fire arrow (bow mode)
+                // Begin drawing bow (draw-time mechanic; arrow fires on key-up)
                 if (!this._isCombatInputBlocked()) {
-                    const fired = this.projectileSystem.fireArrow();
-                    if (fired) {
-                      this.audioSystem.playMeleeAttack(); // reuse existing SFX placeholder
-                      // Marksman skill XP on arrow fire
-                      this.skillProgressionSystem.gainXP("marksman", 5 * this.classSystem.xpMultiplierFor("marksman"));
+                    const drawing = this.projectileSystem.beginDraw();
+                    if (drawing) {
+                        // Push a noise spike for drawing the string
+                        this.stealthSystem.pushNoise(0.4);
                     }
                 }
             } else if ((kbInfo.event.key === "y" || kbInfo.event.key === "Y")
@@ -1773,6 +1773,17 @@ export class Game {
                     this.quickSlotSystem.useSlot(kbInfo.event.key as "7" | "8" | "9" | "0");
                 }
             }
+        } else if (kbInfo.type === KeyboardEventTypes.KEYUP) {
+            // Release drawn arrow when the bow key is released
+            if (kbInfo.event.key === "r" || kbInfo.event.key === "R") {
+                if (this.projectileSystem.isDrawing) {
+                    const fired = this.projectileSystem.releaseArrow();
+                    if (fired) {
+                        this.audioSystem.playMeleeAttack(); // reuse existing SFX placeholder
+                        this.skillProgressionSystem.gainXP("marksman", 5 * this.classSystem.xpMultiplierFor("marksman"));
+                    }
+                }
+            }
         }
     });
 
@@ -2083,6 +2094,7 @@ export class Game {
       this.combatSystem.updateNPCAI(deltaTime);
       this.interactionSystem.update();
 
+      this.stealthSystem.shadowFactor = this.timeSystem.ambientIntensity;
       this.stealthSystem.update(deltaTime, this.timeSystem.ambientIntensity);
       // Sneak XP: trickle XP while actively sneaking near NPCs
       if (this.stealthSystem.isCrouching) {

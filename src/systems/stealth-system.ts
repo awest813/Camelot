@@ -25,6 +25,12 @@ const SIGHT_DETECTION_RATE = 60;
 const HEAR_DETECTION_RATE = 40;
 /** How fast detection decays (units per second) when undetectable. */
 const DETECTION_DECAY_RATE = 30;
+/** How fast a transient noise level decays per second (linear). */
+const NOISE_DECAY_RATE = 1.5;
+/** Maximum hearing-range multiplier added by full noise (noiseLevel = 1). */
+const NOISE_HEAR_RANGE_BONUS = 8;
+/** Detection level below which a sneak attack against an NPC is valid. */
+const SNEAK_ATTACK_MAX_DETECTION = 30;
 
 /**
  * Manages player stealth, NPC detection cones/hearing, and sneaking feedback.
@@ -32,8 +38,12 @@ const DETECTION_DECAY_RATE = 30;
  * Detection model:
  *   - Each living NPC has a vision cone (72°) and a hearing radius.
  *   - Night / low ambient light reduces sight range proportionally.
+ *   - `shadowFactor` [0-1] further reduces NPC sight range independently of
+ *     ambient intensity (e.g., player standing in a shadow or bush).
  *   - Crouching halves visual detection range and uses the smaller hearing radius.
  *   - Running enlarges the hearing radius.
+ *   - A transient `noiseLevel` [0-1] (raised by `pushNoise()`) temporarily
+ *     widens the hearing radius — useful for events like drawing a bow.
  *   - `detectionLevel` [0-100] per NPC builds when the player is in detection zone.
  *   - When detectionLevel reaches 100 the NPC transitions to ALERT.
  *   - Levels decay once the player leaves the detection zone.
@@ -43,6 +53,8 @@ const DETECTION_DECAY_RATE = 30;
  *   2. Call `toggleCrouch()` when the player presses the crouch key.
  *   3. Set `movementMode` to "running" while the player is sprinting.
  *   4. Read `overallDetection` and `stealthLabel` to drive the HUD eye icon.
+ *   5. Call `pushNoise(level, duration)` when the player makes an audible action.
+ *   6. Set `shadowFactor` each frame to reflect how well-lit the player's position is.
  */
 export class StealthSystem {
   private _player: Player;
@@ -53,6 +65,16 @@ export class StealthSystem {
   public movementMode: MovementMode = "walking";
 
   private _detectionLevels: Map<NPC, number> = new Map();
+
+  /**
+   * Shadow coverage of the player's position [0-1].
+   * 0 = fully in shadow (reduced NPC sight range), 1 = fully illuminated.
+   * Update every frame from the environment (lighting, time of day, cover).
+   */
+  public shadowFactor: number = 1.0;
+
+  /** Current transient noise level [0-1].  Decays automatically each update. */
+  private _noiseLevel: number = 0;
 
   /** Fired once when an NPC's detection level first reaches 100. */
   public onDetected: ((npc: NPC) => void) | null = null;
@@ -71,6 +93,26 @@ export class StealthSystem {
 
   public set npcs(value: NPC[]) {
     this._npcs = value;
+  }
+
+  // ── Noise ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Temporarily raise the noise level, widening NPC hearing ranges.
+   * Multiple calls keep the highest value (never below current level).
+   * The noise level decays automatically at NOISE_DECAY_RATE per second
+   * during `update()` — the `_duration` parameter is reserved for future use.
+   * @param level     Noise intensity [0-1].
+   * @param _duration Reserved for a future explicit duration-based decay path.
+   *                  Currently unused; noise always decays by NOISE_DECAY_RATE.
+   */
+  public pushNoise(level: number, _duration?: number): void {
+    this._noiseLevel = Math.min(1, Math.max(this._noiseLevel, level));
+  }
+
+  /** Read-only access to the current transient noise level [0-1]. */
+  public get noiseLevel(): number {
+    return this._noiseLevel;
   }
 
   // ── Crouch toggle ─────────────────────────────────────────────────────────
@@ -123,6 +165,9 @@ export class StealthSystem {
    * @param ambientIntensity World ambient intensity [0-1] from TimeSystem.
    */
   public update(deltaTime: number, ambientIntensity: number = 1.0): void {
+    // Decay transient noise level
+    this._noiseLevel = Math.max(0, this._noiseLevel - NOISE_DECAY_RATE * deltaTime);
+
     for (const npc of this._npcs) {
       // Skip NPCs already in full combat — they're aware of the player
       if (npc.isDead || npc.aiState === AIState.ATTACK || npc.aiState === AIState.CHASE) {
@@ -164,8 +209,11 @@ export class StealthSystem {
     const toPlayer  = playerPos.subtract(npcPos);
     const dist      = toPlayer.length();
 
-    // Scale detection range by ambient light; crouching halves it
-    let sightRange = BASE_SIGHT_RANGE * Math.max(0.1, ambientIntensity);
+    // Scale detection range by ambient light, shadow cover, and crouch stance
+    const shadowClamped = Math.max(0, Math.min(1, this.shadowFactor));
+    let sightRange = BASE_SIGHT_RANGE
+      * Math.max(0.1, ambientIntensity)
+      * Math.max(0.1, shadowClamped);
     if (this.isCrouching) sightRange *= 0.5;
 
     if (dist > sightRange) return false;
@@ -186,10 +234,13 @@ export class StealthSystem {
 
     const dist = Vector3.Distance(this._player.camera.position, npc.mesh.position);
 
-    const hearRange =
+    const baseHearRange =
       this.movementMode === "running"   ? HEAR_RANGE_RUNNING :
       this.movementMode === "crouching" ? HEAR_RANGE_CROUCHING :
       HEAR_RANGE_WALKING;
+
+    // Transient noise widens the effective hearing range
+    const hearRange = baseHearRange + this._noiseLevel * NOISE_HEAR_RANGE_BONUS;
 
     return dist <= hearRange;
   }
@@ -199,6 +250,21 @@ export class StealthSystem {
   /** Current detection level for a specific NPC, 0-100. */
   public getDetectionLevel(npc: NPC): number {
     return this._detectionLevels.get(npc) ?? 0;
+  }
+
+  /**
+   * Returns true if the player can perform a sneak attack against `npc`.
+   *
+   * Conditions:
+   *   - Player is crouching.
+   *   - NPC is alive and not already in combat (ATTACK / CHASE).
+   *   - NPC's detection level is below SNEAK_ATTACK_MAX_DETECTION (< 30).
+   */
+  public canSneakAttack(npc: NPC): boolean {
+    if (!this.isCrouching) return false;
+    if (npc.isDead) return false;
+    if (npc.aiState === AIState.ATTACK || npc.aiState === AIState.CHASE) return false;
+    return this.getDetectionLevel(npc) < SNEAK_ATTACK_MAX_DETECTION;
   }
 
   // ── Persistence ───────────────────────────────────────────────────────────
