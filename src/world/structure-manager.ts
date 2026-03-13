@@ -134,12 +134,12 @@ export class StructureManager {
     const meshes: Mesh[] = [];
     const loot: Loot[] = [];
     const bodies: PhysicsAggregate[] = [];
-    // Aged limestone — slightly warm grey with subtle specular for weathered stone
+    // Aged limestone — warm earthy grey with subtle specular for weathered stone
     const mat = this._mat(
       "ruins_stone",
-      new Color3(0.52, 0.47, 0.40),
-      new Color3(0.12, 0.10, 0.08),
-      20,
+      new Color3(0.50, 0.44, 0.36),
+      new Color3(0.14, 0.12, 0.09),
+      28,
     );
 
     // Four partial walls at varying heights for a crumbled look
@@ -204,16 +204,16 @@ export class StructureManager {
     // Sun-bleached sandstone platform
     const stoneMat = this._mat(
       "shrine_stone",
-      new Color3(0.76, 0.62, 0.36),
-      new Color3(0.20, 0.15, 0.06),
-      28,
+      new Color3(0.80, 0.64, 0.34),
+      new Color3(0.24, 0.18, 0.07),
+      36,
     );
-    // Golden altar stone with a slight glow
+    // Golden altar stone with a warm glow
     const altarMat = this._mat(
       "shrine_altar",
-      new Color3(0.88, 0.72, 0.28),
-      new Color3(0.30, 0.22, 0.06),
-      40,
+      new Color3(0.90, 0.74, 0.26),
+      new Color3(0.38, 0.28, 0.08),
+      52,
     );
 
     // Raised platform
@@ -267,16 +267,16 @@ export class StructureManager {
     // Cold granite stone — blue-grey tint with reflective highlights
     const stoneMat = this._mat(
       "tower_stone",
-      new Color3(0.52, 0.50, 0.52),
-      new Color3(0.15, 0.15, 0.18),
-      32,
+      new Color3(0.50, 0.48, 0.50),
+      new Color3(0.18, 0.18, 0.22),
+      42,
     );
     // Weathered dark timber
     const woodMat = this._mat(
       "tower_wood",
-      new Color3(0.38, 0.26, 0.14),
-      new Color3(0.06, 0.04, 0.02),
-      10,
+      new Color3(0.36, 0.24, 0.12),
+      new Color3(0.08, 0.05, 0.02),
+      14,
     );
 
     const tW = 4;   // exterior width
@@ -353,9 +353,9 @@ export class StructureManager {
   private _addChest(name: string, position: Vector3, lootArr: Loot[], cx: number, cz: number, slot: number): { mesh: Mesh; body: PhysicsAggregate } {
     const mat = this._mat(
       "chest_wood",
-      new Color3(0.48, 0.30, 0.10),
-      new Color3(0.10, 0.06, 0.02),
-      12,
+      new Color3(0.44, 0.28, 0.09),
+      new Color3(0.12, 0.08, 0.02),
+      16,
     );
     const chest = MeshBuilder.CreateBox(name, { width: 0.8, height: 0.5, depth: 0.5 }, this._scene);
     chest.position.set(position.x, 0.25, position.z);

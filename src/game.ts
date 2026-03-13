@@ -1882,29 +1882,30 @@ export class Game {
 
   private _setLight(): void {
     // The sky dome covers the entire background, so the clear colour is used
-    // only for pixels not covered by any geometry.  Keep a sky-blue fallback
+    // only for pixels not covered by any geometry.  Keep a deep sky-blue fallback
     // for the very first frame before the skybox is initialised.
-    this.scene.clearColor = new Color4(0.42, 0.55, 0.72, 1.0);
+    this.scene.clearColor = new Color4(0.28, 0.46, 0.74, 1.0);
 
-    // Ambient hemisphere light — warm sky tones above, cool earthy tones below
+    // Ambient hemisphere light — rich warm sunlit sky above, deep earthy tones below
     const hLight = new HemisphericLight("hLight", new Vector3(0, 1, 0), this.scene);
     hLight.intensity   = this.graphics.lighting.ambientBase;
-    hLight.diffuse     = new Color3(0.95, 0.90, 0.78);
-    hLight.groundColor = new Color3(0.22, 0.18, 0.12);
-    hLight.specular    = new Color3(0.05, 0.04, 0.03);
+    hLight.diffuse     = new Color3(0.92, 0.88, 0.72);
+    hLight.groundColor = new Color3(0.18, 0.14, 0.08);
+    hLight.specular    = new Color3(0.08, 0.07, 0.05);
 
-    // Directional sun light — warm golden angle for rich shadows
-    const sun = new DirectionalLight("sun", new Vector3(-1.2, -2.8, -0.8).normalize(), this.scene);
+    // Directional sun light — warm golden angle with deep shadow contrast
+    const sun = new DirectionalLight("sun", new Vector3(-1.0, -2.5, -0.6).normalize(), this.scene);
     sun.intensity = this.graphics.lighting.sunBase;
-    sun.diffuse   = new Color3(1.0, 0.94, 0.78);
-    sun.specular  = new Color3(0.35, 0.30, 0.20);
+    sun.diffuse   = new Color3(1.0, 0.92, 0.72);
+    sun.specular  = new Color3(0.55, 0.48, 0.30);
     // Position the light far away so the shadow frustum covers the visible world.
-    sun.position  = new Vector3(60, 100, 40);
+    sun.position  = new Vector3(80, 120, 50);
 
-    // Shadow generator — soft PCF shadows cast by the directional sun
+    // Shadow generator — high-quality PCSS soft shadows cast by the directional sun
     const shadows = new ShadowGenerator(this.graphics.shadow.mapSize, sun);
     shadows.useBlurExponentialShadowMap = true;
     shadows.blurKernel = this.graphics.shadow.blurKernel;
+    shadows.bias = 0.0005;
     this.shadowGenerator = shadows;
 
     // Atmospheric distance fog — initial values match WeatherSystem's "clear"
@@ -1924,7 +1925,7 @@ export class Game {
    */
   private _initPostProcessing(): void {
     // ── Procedural sky dome ──────────────────────────────────────────────────
-    const skybox = MeshBuilder.CreateBox("skyBox", { size: 1000 }, this.scene);
+    const skybox = MeshBuilder.CreateBox("skyBox", { size: 2000 }, this.scene);
     skybox.infiniteDistance = true;
     // Disable picking so raycasts pass through the sky dome and hit world geometry.
     skybox.isPickable = false;
@@ -1932,7 +1933,7 @@ export class Game {
 
     const skyMat = new SkyMaterial("skyMat", this.scene);
     skyMat.backFaceCulling = false;
-    // Atmospheric parameters — clear mid-morning look
+    // Atmospheric parameters — vivid clear-day atmosphere
     const sky = this.graphics.sky;
     skyMat.turbidity       = sky.turbidity;
     skyMat.luminance       = sky.luminance;
@@ -1955,7 +1956,7 @@ export class Game {
         [this.player.camera],
       );
 
-      // Bloom — subtle glow on bright surfaces (emissive torches, highlights)
+      // Bloom — cinematic glow on bright surfaces (sun highlights, emissive torches)
       pipeline.bloomEnabled   = pp.bloom.enabled;
       pipeline.bloomThreshold = pp.bloom.threshold;
       pipeline.bloomWeight    = pp.bloom.weight;
@@ -1965,11 +1966,14 @@ export class Game {
       // FXAA — smooth jagged edges
       pipeline.fxaaEnabled = pp.fxaa;
 
-      // Sharpen — recover detail that FXAA softens
+      // Sharpen — recover crisp detail that FXAA softens
       pipeline.sharpenEnabled = true;
       pipeline.sharpen.edgeAmount = pp.sharpenEdgeAmount;
 
-      // Image processing — filmic tone mapping + slight colour grading
+      // Depth of field — subtle focus falloff for cinematic depth
+      pipeline.depthOfFieldEnabled = false; // disabled by default; enable per-scene as needed
+
+      // Image processing — ACES filmic tone mapping + colour grading
       pipeline.imageProcessingEnabled = true;
       pipeline.imageProcessing.toneMappingEnabled = pp.toneMappingType !== "none";
       pipeline.imageProcessing.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
@@ -1978,6 +1982,7 @@ export class Game {
       pipeline.imageProcessing.vignetteEnabled = true;
       pipeline.imageProcessing.vignetteWeight  = pp.vignetteWeight;
       pipeline.imageProcessing.vignetteBlendMode = ImageProcessingConfiguration.VIGNETTEMODE_MULTIPLY;
+      pipeline.imageProcessing.colorCurvesEnabled = true;
 
       this.renderingPipeline = pipeline;
     }
