@@ -293,3 +293,60 @@ describe('StructureManager shared material pool', () => {
     expect(uniqueMatNames.size).toBeLessThanOrEqual(MAX_STRUCTURE_MATERIAL_TYPES);
   });
 });
+
+describe('StructureManager.dispose', () => {
+  beforeEach(() => {
+    mockMeshDispose.mockClear();
+    mockBodyDispose.mockClear();
+  });
+
+  it('dispose() releases meshes and physics bodies for all tracked structures', () => {
+    const sm = new StructureManager(mockScene);
+
+    // Spawn structures across several chunks
+    for (let x = 0; x < 10; x++) {
+      for (let z = 0; z < 10; z++) {
+        sm.trySpawnForChunk(x, z, 'plains', 50);
+      }
+    }
+
+    sm.dispose();
+
+    // All bodies and meshes from spawned structures should have been disposed
+    expect(mockBodyDispose).toHaveBeenCalled();
+    expect(mockMeshDispose).toHaveBeenCalled();
+  });
+
+  it('dispose() releases physics bodies before meshes', () => {
+    const callOrder: string[] = [];
+    mockBodyDispose.mockImplementation(() => callOrder.push('body'));
+    mockMeshDispose.mockImplementation(() => callOrder.push('mesh'));
+
+    const sm = new StructureManager(mockScene);
+    // Find a chunk that has a structure so bodies/meshes are actually created
+    let structCx = -1, structCz = -1;
+    outer:
+    for (let x = 0; x < 20; x++) {
+      for (let z = 0; z < 20; z++) {
+        if (sm.hasStructureAt(x, z)) { structCx = x; structCz = z; break outer; }
+      }
+    }
+    sm.trySpawnForChunk(structCx, structCz, 'plains', 50);
+
+    callOrder.length = 0;
+    sm.dispose();
+
+    const firstBody = callOrder.indexOf('body');
+    const firstMesh = callOrder.indexOf('mesh');
+    expect(firstBody).toBeGreaterThanOrEqual(0);
+    expect(firstMesh).toBeGreaterThan(firstBody);
+  });
+
+  it('dispose() is idempotent — calling it twice does not throw', () => {
+    const sm = new StructureManager(mockScene);
+    for (let x = 0; x < 5; x++) {
+      sm.trySpawnForChunk(x, x, 'plains', 50);
+    }
+    expect(() => { sm.dispose(); sm.dispose(); }).not.toThrow();
+  });
+});

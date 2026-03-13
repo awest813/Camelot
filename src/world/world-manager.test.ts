@@ -199,6 +199,93 @@ describe('WorldManager chunk load queue', () => {
     // Origin chunks should not pile up — total loaded should be bounded
     expect(wm.loadedChunkCount).toBeLessThan(50);
   });
+
+  it('stale check uses current-frame player position, not just last sweep position', () => {
+    const wm = new WorldManager(mockScene);
+    // Trigger first sweep at origin — 25 chunks are enqueued
+    advanceFrames(wm, 10);
+    expect(wm.loadQueueLength).toBeGreaterThan(0);
+
+    // Move far away on the very next frame; _lastPlayerChunk must update immediately
+    // so _processLoadQueue skips every origin-area entry rather than loading them.
+    const farPos = new Vector3(100 * 50, 0, 100 * 50);
+    wm.update(farPos);
+
+    // With the fix, no origin chunk should have been loaded
+    expect(wm.loadedChunkCount).toBe(0);
+  });
+});
+
+describe('WorldManager chunk reloading', () => {
+  beforeEach(() => {
+    mockMeshDispose.mockClear();
+    mockBodyDispose.mockClear();
+  });
+
+  it('a chunk unloaded due to distance can be reloaded when the player returns', () => {
+    const wm = new WorldManager(mockScene);
+    const origin = new Vector3(0, 0, 0);
+
+    // Load all 25 origin chunks
+    advanceFrames(wm, 10 + 25, origin);
+    expect(wm.loadedChunkCount).toBe(25);
+
+    // Move far enough to trigger unloads
+    const farPos = new Vector3(400, 0, 400); // chunkX=8, chunkZ=8 — origin is 8 chunks away
+    advanceFrames(wm, 10, farPos);
+    expect(wm.loadedChunkCount).toBeLessThan(25);
+
+    // Return to origin — sweep re-enqueues origin chunks, drain finishes loading
+    advanceFrames(wm, 10 + 25, origin);
+    expect(wm.loadedChunkCount).toBe(25);
+  });
+});
+
+describe('WorldManager.dispose', () => {
+  beforeEach(() => {
+    mockMeshDispose.mockClear();
+    mockBodyDispose.mockClear();
+  });
+
+  it('dispose() releases all chunk physics bodies and meshes', () => {
+    const wm = new WorldManager(mockScene);
+    advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
+    expect(wm.loadedChunkCount).toBe(25);
+
+    wm.dispose();
+
+    expect(mockBodyDispose).toHaveBeenCalled();
+    expect(mockMeshDispose).toHaveBeenCalled();
+    expect(wm.loadedChunkCount).toBe(0);
+  });
+
+  it('dispose() empties the load queue', () => {
+    const wm = new WorldManager(mockScene);
+    // Trigger sweep to populate the queue
+    advanceFrames(wm, 10);
+    expect(wm.loadQueueLength).toBeGreaterThan(0);
+
+    wm.dispose();
+
+    expect(wm.loadQueueLength).toBe(0);
+  });
+
+  it('dispose() releases physics bodies before meshes', () => {
+    const callOrder: string[] = [];
+    mockBodyDispose.mockImplementation(() => callOrder.push('body'));
+    mockMeshDispose.mockImplementation(() => callOrder.push('mesh'));
+
+    const wm = new WorldManager(mockScene);
+    advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
+
+    callOrder.length = 0;
+    wm.dispose();
+
+    const firstBody = callOrder.indexOf('body');
+    const firstMesh = callOrder.indexOf('mesh');
+    expect(firstBody).toBeGreaterThanOrEqual(0);
+    expect(firstMesh).toBeGreaterThan(firstBody);
+  });
 });
 
 describe('WorldManager chunk physics disposal', () => {
