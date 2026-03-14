@@ -49,24 +49,3 @@ describe("summarizeValidationReport", () => {
     expect(summary).toContain("entity-overlap (2)");
   });
 });
-
-
-describe("summarizeValidationReport", () => {
-  it("returns pass summary for valid map", () => {
-    expect(summarizeValidationReport({ isValid: true, issues: [] })).toContain("passed");
-  });
-
-  it("returns grouped summary for invalid map", () => {
-    const summary = summarizeValidationReport({
-      isValid: false,
-      issues: [
-        { code: "entity-overlap", message: "x" },
-        { code: "entity-overlap", message: "y" },
-        { code: "orphaned-quest-marker", message: "z" },
-      ],
-    });
-
-    expect(summary).toContain("3 issue");
-    expect(summary).toContain("entity-overlap (2)");
-  });
-});
