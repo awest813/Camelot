@@ -94,6 +94,8 @@ import { FastTravelUI } from "./ui/fast-travel-ui";
 import { SpellMakingUI } from "./ui/spell-making-ui";
 import { GuardEncounterUI, type GuardEncounterAction } from "./ui/guard-encounter-ui";
 import { LevelUpUI } from "./ui/level-up-ui";
+import { StableUI } from "./ui/stable-ui";
+import { SaddlebagUI } from "./ui/saddlebag-ui";
 import { DailyScheduleSystem } from "./systems/daily-schedule-system";
 import { HorseSystem } from "./systems/horse-system";
 
@@ -157,6 +159,8 @@ export class Game {
   public spellMakingUI: SpellMakingUI;
   public guardEncounterUI: GuardEncounterUI;
   public levelUpUI: LevelUpUI;
+  public stableUI: StableUI;
+  public saddlebagUI: SaddlebagUI;
 
   // v2 systems (Oblivion-lite)
   public attributeSystem: AttributeSystem;
@@ -1048,6 +1052,55 @@ export class Game {
     };
     this.saveSystem.setHorseSystem(this.horseSystem);
 
+    // ── Stable UI ─────────────────────────────────────────────────────────
+    this.stableUI = new StableUI();
+    this.stableUI.onClose = () => {
+      this.interactionSystem.isBlocked = false;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
+    this.stableUI.onPurchase = (horseId) => {
+      const stable = this.horseSystem.getStableNPC("Stable Master");
+      if (!stable) return;
+      const playerGold = this._getInventoryGold();
+      const price = this.horseSystem.purchaseHorse("Stable Master", horseId, playerGold);
+      if (price === -2) {
+        this.stableUI.showStatus("You already own this horse.", true);
+      } else if (price < 0) {
+        this.stableUI.showStatus("Unable to complete the purchase.", true);
+      } else {
+        this._consumeInventoryGold(price);
+        this.stableUI.markOwned(horseId);
+        this.stableUI.setPlayerGold(this._getInventoryGold());
+        this.stableUI.showStatus(`You purchased a horse for ${price}g.`);
+      }
+    };
+
+    // ── Saddlebag UI ───────────────────────────────────────────────────────
+    this.saddlebagUI = new SaddlebagUI();
+    this.saddlebagUI.onClose = () => {
+      this.interactionSystem.isBlocked = false;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
+    this.saddlebagUI.onRemoveItem = (itemId) => {
+      const horse = this.horseSystem.currentHorse;
+      if (!horse) return;
+      const bag = this.horseSystem.getSaddlebag(horse.id);
+      const entry = bag?.find(i => i.id === itemId);
+      if (!entry) return;
+      if (this.horseSystem.saddlebagRemoveItem(horse.id, itemId)) {
+        this.inventorySystem.addItem({ ...entry, quantity: 1 });
+        const updatedBag = this.horseSystem.getSaddlebag(horse.id) ?? [];
+        this.saddlebagUI.refresh(
+          updatedBag.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, stackable: i.stackable })),
+          updatedBag.length,
+          horse.saddlebagCapacity,
+        );
+        this.saddlebagUI.showStatus(`Took ${entry.name}.`);
+      }
+    };
+
     this._runCharacterCreation().catch((error: unknown) => {
       console.error("Character creation failed; applying defaults", error);
       this._applyDefaultCharacterCreation();
@@ -1387,6 +1440,10 @@ export class Game {
                     this.spellMakingUI.close();
                 } else if (this.fastTravelUI.isVisible) {
                     this.fastTravelUI.close();
+                } else if (this.stableUI.isVisible) {
+                    this.stableUI.close();
+                } else if (this.saddlebagUI.isVisible) {
+                    this.saddlebagUI.close();
                 } else if (this.questCreatorUI.isVisible) {
                     this.questCreatorUI.close();
                     this.canvas.requestPointerLock();
@@ -1889,6 +1946,67 @@ export class Game {
                       spellStr,
                       4000,
                     );
+                }
+            } else if (kbInfo.event.key === "o" || kbInfo.event.key === "O") {
+                // O: Mount/Dismount · Shift+O: Stable (unmounted) or Saddlebag (mounted)
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+                    if (kbInfo.event.shiftKey) {
+                        if (this.horseSystem.isMounted) {
+                            // Shift+O while mounted — toggle saddlebag
+                            const horse = this.horseSystem.currentHorse!;
+                            if (this.saddlebagUI.isVisible) {
+                                this.saddlebagUI.close();
+                            } else {
+                                const bag = this.horseSystem.getSaddlebag(horse.id) ?? [];
+                                this.saddlebagUI.open(
+                                    horse.name,
+                                    bag.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, stackable: i.stackable })),
+                                    bag.length,
+                                    horse.saddlebagCapacity,
+                                );
+                                this.interactionSystem.isBlocked = true;
+                                document.exitPointerLock();
+                                this.player.camera.detachControl();
+                            }
+                        } else {
+                            // Shift+O while unmounted — toggle stable dialog
+                            if (this.stableUI.isVisible) {
+                                this.stableUI.close();
+                            } else {
+                                const stable = this.horseSystem.getStableNPC("Stable Master");
+                                if (stable) {
+                                    const horses = stable.availableHorseIds.map(id => {
+                                        const h = this.horseSystem.getHorse(id)!;
+                                        return {
+                                            id: h.id,
+                                            name: h.name,
+                                            speed: h.speed,
+                                            saddlebagCapacity: h.saddlebagCapacity,
+                                            price: stable.prices[id] ?? 0,
+                                            isOwned: h.isOwned,
+                                        };
+                                    });
+                                    this.stableUI.open("Stable Master", horses, this._getInventoryGold());
+                                    this.interactionSystem.isBlocked = true;
+                                    document.exitPointerLock();
+                                    this.player.camera.detachControl();
+                                } else {
+                                    this.ui.showNotification("No stable nearby.", 1500);
+                                }
+                            }
+                        }
+                    } else if (this.horseSystem.isMounted) {
+                        // O while mounted — dismount
+                        this.horseSystem.dismountHorse();
+                    } else {
+                        // O while unmounted — mount the first owned horse
+                        const owned = this.horseSystem.ownedHorses;
+                        if (owned.length === 0) {
+                            this.ui.showNotification("You don't own a horse. Visit a stable (Shift+O).", 2500);
+                        } else {
+                            this.horseSystem.mountHorse(owned[0].id);
+                        }
+                    }
                 }
             } else if (kbInfo.event.key === "F3") {
                 const shown = this.ui.toggleDebugOverlay();
@@ -2549,6 +2667,8 @@ export class Game {
           this.guardEncounterUI.isVisible ||
           this.spellMakingUI.isVisible ||
           this.fastTravelUI.isVisible ||
+          this.stableUI.isVisible ||
+          this.saddlebagUI.isVisible ||
           this.dialogueSystem.isInDialogue ||
           this.interactionSystem.isBlocked
       );
