@@ -9,6 +9,15 @@ describe("buildHelpOverlayLines", () => {
     expect(lines.join("\n")).toContain("F1: Toggle this help overlay");
   });
 
+  it("includes horse mount/dismount controls in gameplay overlay", () => {
+    const lines = buildHelpOverlayLines(false);
+    const joined = lines.join("\n");
+    expect(joined).toContain("O: Mount / Dismount");
+    expect(joined).toContain("Shift+O");
+    expect(joined).toContain("Stable");
+    expect(joined).toContain("Saddlebag");
+  });
+
   it("returns editor-focused controls when editor is enabled", () => {
     const lines = buildHelpOverlayLines(true);
     expect(lines[0]).toBe("Editor Controls");

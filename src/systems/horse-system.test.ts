@@ -250,4 +250,15 @@ describe("HorseSystem", () => {
     expect(state2.horses.find(h => h.id === "shadowmere")?.isOwned).toBe(true);
     expect(state2.horses.find(h => h.id === "shadowmere")?.saddlebag).toHaveLength(1);
   });
+
+  it("getStableNPC returns the registered NPC", () => {
+    const stable = hs.getStableNPC("Skulvar");
+    expect(stable).not.toBeNull();
+    expect(stable!.npcName).toBe("Skulvar");
+    expect(stable!.availableHorseIds).toContain("shadowmere");
+  });
+
+  it("getStableNPC returns null for unknown NPC", () => {
+    expect(hs.getStableNPC("unknown_npc")).toBeNull();
+  });
 });

@@ -147,6 +147,11 @@ export class HorseSystem {
     });
   }
 
+  /** Returns the StableNPC record for the given NPC name, or null if not found. */
+  public getStableNPC(npcName: string): StableNPC | null {
+    return this._stableNpcs.get(npcName) ?? null;
+  }
+
   /**
    * Attempt to purchase a horse from a stable NPC.
    * Returns the price on success, -1 if the NPC/horse is unknown,
