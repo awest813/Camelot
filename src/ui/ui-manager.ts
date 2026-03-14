@@ -658,12 +658,14 @@ export class UIManager {
         const defaultBg = isMax ? "rgba(10,40,10,0.65)" : (canBuy ? "rgba(60,40,0,0.85)" : "rgba(18,12,2,0.55)");
         const focusBg   = isMax ? "rgba(20,60,20,0.85)" : (canBuy ? "rgba(100,70,0,0.95)" : "rgba(30,20,10,0.75)");
 
+        let isFocused = false;
         const setHoverState = () => {
           buyBtn.background = focusBg;
           buyBtn.color = T.TEXT;
           if (buyBtn.thickness !== 2) buyBtn.thickness = 1;
         };
         const setFocusState = () => {
+          isFocused = true;
           buyBtn.background = focusBg;
           buyBtn.color = T.TEXT;
           buyBtn.thickness = 2;
@@ -671,13 +673,19 @@ export class UIManager {
         const setNormalState = () => {
           buyBtn.background = defaultBg;
           buyBtn.color = isMax ? T.GOOD : (canBuy ? T.TITLE : T.DIM);
-          buyBtn.thickness = 1;
+          if (!isFocused) {
+            buyBtn.thickness = 1;
+          }
+        };
+        const setBlurState = () => {
+          isFocused = false;
+          setNormalState();
         };
 
         buyBtn.onPointerEnterObservable.add(setHoverState);
         buyBtn.onPointerOutObservable.add(setNormalState);
         buyBtn.onFocusObservable.add(setFocusState);
-        buyBtn.onBlurObservable.add(setNormalState);
+        buyBtn.onBlurObservable.add(setBlurState);
 
         if (canBuy) {
           const triggerPurchase = () => {
@@ -715,12 +723,14 @@ export class UIManager {
     button.tabIndex = 0;
     button.accessibilityTag = { description: text };
 
+    let isFocused = false;
     const setHover = () => {
       button.background = T.BTN_HOVER;
       button.color = T.TITLE;
       if (button.thickness !== 2) button.thickness = 1;
     };
     const setFocus = () => {
+      isFocused = true;
       button.background = T.BTN_HOVER;
       button.color = T.TITLE;
       button.thickness = 2; // Distinct visual indicator for keyboard focus
@@ -728,13 +738,19 @@ export class UIManager {
     const setNormal = () => {
       button.background = T.BTN_BG;
       button.color = T.TEXT;
-      button.thickness = 1;
+      if (!isFocused) {
+        button.thickness = 1;
+      }
+    };
+    const setBlur = () => {
+      isFocused = false;
+      setNormal();
     };
 
     button.onPointerEnterObservable.add(setHover);
     button.onPointerOutObservable.add(setNormal);
     button.onFocusObservable.add(setFocus);
-    button.onBlurObservable.add(setNormal);
+    button.onBlurObservable.add(setBlur);
 
     button.onKeyboardEventProcessedObservable.add((evt) => {
       if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
@@ -895,6 +911,7 @@ export class UIManager {
       const baseColor  = isEquipped ? T.EQUIP_BG  : T.SLOT_BG;
       const hoverColor = isEquipped ? "rgba(60, 44, 0, 0.95)" : T.SLOT_HOVER;
 
+      let isFocused = false;
       const setHoverState = () => {
         const equipped = this._equippedIds.has(item.id);
         const hint = item.slot ? (equipped ? "\n[Click to Unequip]" : "\n[Click to Equip]") : "";
@@ -903,6 +920,7 @@ export class UIManager {
         if (slot.thickness !== 3) slot.thickness = equipped ? 2 : 1;
       };
       const setFocusState = () => {
+        isFocused = true;
         const equipped = this._equippedIds.has(item.id);
         const hint = item.slot ? (equipped ? "\n[Click to Unequip]" : "\n[Click to Equip]") : "";
         this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}${hint}`;
@@ -910,16 +928,24 @@ export class UIManager {
         slot.thickness = 3; // Distinct visual indicator for keyboard focus
       };
       const setNormalState = () => {
-        this.inventoryDescription.text = "";
+        if (!isFocused) {
+          this.inventoryDescription.text = "";
+        }
         slot.background = baseColor;
-        const equipped = this._equippedIds.has(item.id);
-        slot.thickness = equipped ? 2 : 1;
+        if (!isFocused) {
+          const equipped = this._equippedIds.has(item.id);
+          slot.thickness = equipped ? 2 : 1;
+        }
+      };
+      const setBlurState = () => {
+        isFocused = false;
+        setNormalState();
       };
 
       slot.onPointerEnterObservable.add(setHoverState);
       slot.onPointerOutObservable.add(setNormalState);
       slot.onFocusObservable.add(setFocusState);
-      slot.onBlurObservable.add(setNormalState);
+      slot.onBlurObservable.add(setBlurState);
 
       const triggerItem = () => {
         if (item.slot && this.onInventoryItemClick) {
