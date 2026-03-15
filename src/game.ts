@@ -89,6 +89,7 @@ import { FactionCreatorUI } from "./ui/faction-creator-ui";
 import { LootTableCreatorSystem } from "./systems/loot-table-creator-system";
 import { LootTableCreatorUI } from "./ui/loot-table-creator-ui";
 import { EditorHubUI } from "./ui/editor-hub-ui";
+import { EditorLayout } from "./ui/editor-layout";
 import { buildHelpOverlayLines, summarizeValidationReport } from "./ui/editor-help-overlay";
 import { FastTravelUI } from "./ui/fast-travel-ui";
 import { SpellMakingUI } from "./ui/spell-making-ui";
@@ -155,6 +156,7 @@ export class Game {
   public lootTableCreatorSystem: LootTableCreatorSystem;
   public lootTableCreatorUI: LootTableCreatorUI;
   public editorHubUI: EditorHubUI;
+  public editorLayout: EditorLayout;
   public fastTravelUI: FastTravelUI;
   public spellMakingUI: SpellMakingUI;
   public guardEncounterUI: GuardEncounterUI;
@@ -387,6 +389,15 @@ export class Game {
     this._loadFrameworkMods();
     this.mapEditorSystem = new MapEditorSystem(this.scene);
 
+    // ── Editor layout — panel registry and unified selection model ────────────
+    this.editorLayout = new EditorLayout();
+    this.editorLayout.registerPanel("hierarchy",  { side: "left",   size: 240, isVisible: false });
+    this.editorLayout.registerPanel("palette",    { side: "left",   size: 220, isVisible: false });
+    this.editorLayout.registerPanel("layers",     { side: "left",   size: 220, isVisible: false });
+    this.editorLayout.registerPanel("notes",      { side: "float",             isVisible: false });
+    this.editorLayout.registerPanel("properties", { side: "right",  size: 300, isVisible: false });
+    this.editorLayout.registerPanel("validation", { side: "bottom", size: 200, isVisible: false });
+
     // ── Map editor property panel ─────────────────────────────────────────────
     this.mapEditorPropertyPanel = new MapEditorPropertyPanel(this.ui.uiTexture);
     this.mapEditorPropertyPanel.onApply = (entityId, props) => {
@@ -400,9 +411,14 @@ export class Game {
       this._refreshLayerPanel();
       this._refreshEditorToolbar();
     };
+    // Route entity selection through the unified EditorLayout selection model.
     this.mapEditorSystem.onEntitySelectionChanged = (entityId) => {
+      this.editorLayout.setSelection(entityId);
+    };
+    this.editorLayout.onSelectionChanged = (entityId) => {
       if (entityId === null) {
         this.mapEditorPropertyPanel.hide();
+        this.editorLayout.setVisible("properties", false);
         this.mapEditorHierarchyPanel.setSelection(null);
         return;
       }
@@ -412,8 +428,39 @@ export class Game {
       const position = this.mapEditorSystem.getEntityPosition(entityId) ?? undefined;
       if (type && entity !== null) {
         this.mapEditorPropertyPanel.show(entityId, type, entity, position);
+        this.editorLayout.setVisible("properties", true);
       }
       this.mapEditorHierarchyPanel.setSelection(entityId);
+    };
+    // Drive panel show/hide from layout changes (enables hideAll() to work).
+    this.editorLayout.onLayoutChanged = (state) => {
+      switch (state.panelId) {
+        case "hierarchy":
+          state.isVisible ? this.mapEditorHierarchyPanel.show() : this.mapEditorHierarchyPanel.hide();
+          break;
+        case "palette":
+          state.isVisible ? this.mapEditorPalettePanel.show() : this.mapEditorPalettePanel.hide();
+          break;
+        case "layers":
+          if (state.isVisible) {
+            this._refreshLayerPanel();
+            this.mapEditorLayerPanel.show();
+          } else {
+            this.mapEditorLayerPanel.hide();
+          }
+          break;
+        case "notes":
+          state.isVisible
+            ? this.mapEditorNotesPanel.show(this.mapEditorSystem.notes)
+            : this.mapEditorNotesPanel.hide();
+          break;
+        case "properties":
+          if (!state.isVisible) this.mapEditorPropertyPanel.hide();
+          break;
+        case "validation":
+          if (!state.isVisible) this.mapEditorValidationPanel.hide();
+          break;
+      }
     };
 
     // ── Map editor toolbar ────────────────────────────────────────────────────
@@ -449,7 +496,6 @@ export class Game {
     };
     this.mapEditorValidationPanel.onEntityFocus = (entityId) => {
       this.mapEditorSystem.selectEntityById(entityId);
-      this.mapEditorHierarchyPanel.setSelection(entityId);
     };
 
     // ── Map editor palette panel ──────────────────────────────────────────────
@@ -602,12 +648,11 @@ export class Game {
             if (!this.mapEditorSystem.isEnabled) {
               this.mapEditorSystem.toggle();
               this.mapEditorToolbar.show();
-              this.mapEditorHierarchyPanel.show();
-              this.mapEditorPalettePanel.show();
-              this.mapEditorLayerPanel.show();
+              this.editorLayout.setVisible("hierarchy", true);
+              this.editorLayout.setVisible("palette", true);
+              this.editorLayout.setVisible("layers", true);
               this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
               this._refreshEditorToolbar();
-              this._refreshLayerPanel();
               this.ui.showNotification("Map Editor enabled (F2 to exit)", 2500);
             }
             break;
@@ -1403,11 +1448,13 @@ export class Game {
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
                     this.mapEditorToolbar.hide();
-                    this.mapEditorHierarchyPanel.hide();
-                    this.mapEditorPalettePanel.hide();
-                    this.mapEditorValidationPanel.hide();
-                    this.mapEditorLayerPanel.hide();
-                    this.mapEditorNotesPanel.hide();
+                    this.editorLayout.setVisible("hierarchy", false);
+                    this.editorLayout.setVisible("palette", false);
+                    this.editorLayout.setVisible("validation", false);
+                    this.editorLayout.setVisible("layers", false);
+                    this.editorLayout.setVisible("notes", false);
+                    this.editorLayout.setVisible("properties", false);
+                    this.editorLayout.clearSelection();
                     this.ui.showNotification("Map editor mode disabled", 1800);
                 } else if (this.inventorySystem.isOpen) {
                     this.inventorySystem.toggleInventory();
@@ -1609,21 +1656,22 @@ export class Game {
                     document.exitPointerLock();
                     this.player.camera.detachControl();
                     this.mapEditorToolbar.show();
-                    this.mapEditorHierarchyPanel.show();
-                    this.mapEditorPalettePanel.show();
-                    this.mapEditorLayerPanel.show();
+                    this.editorLayout.setVisible("hierarchy", true);
+                    this.editorLayout.setVisible("palette", true);
+                    this.editorLayout.setVisible("layers", true);
                     this._refreshEditorToolbar();
                     this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-                    this._refreshLayerPanel();
                 } else {
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
                     this.mapEditorToolbar.hide();
-                    this.mapEditorHierarchyPanel.hide();
-                    this.mapEditorPalettePanel.hide();
-                    this.mapEditorValidationPanel.hide();
-                    this.mapEditorLayerPanel.hide();
-                    this.mapEditorNotesPanel.hide();
+                    this.editorLayout.setVisible("hierarchy", false);
+                    this.editorLayout.setVisible("palette", false);
+                    this.editorLayout.setVisible("validation", false);
+                    this.editorLayout.setVisible("layers", false);
+                    this.editorLayout.setVisible("notes", false);
+                    this.editorLayout.setVisible("properties", false);
+                    this.editorLayout.clearSelection();
                 }
                 this.ui.showNotification(isEnabled ? "Map editor mode enabled" : "Map editor mode disabled", 1800);
                 this._refreshHelpOverlayIfVisible();
@@ -1650,20 +1698,17 @@ export class Game {
                 }
             } else if (kbInfo.event.key === "l" || kbInfo.event.key === "L") {
                 if (!this.mapEditorSystem.isEnabled) return;
-                if (this.mapEditorLayerPanel.isVisible) {
-                    this.mapEditorLayerPanel.hide();
+                const layerVisible = this.editorLayout.getPanelState("layers")?.isVisible ?? false;
+                if (layerVisible) {
+                    this.editorLayout.setVisible("layers", false);
                 } else {
-                    this._refreshLayerPanel();
-                    this.mapEditorLayerPanel.show();
+                    this.editorLayout.setVisible("layers", true);
                     this.ui.showNotification("Layers panel opened", 1000);
                 }
             } else if ((kbInfo.event.key === "m" || kbInfo.event.key === "M") && (kbInfo.event.ctrlKey || kbInfo.event.metaKey)) {
                 if (!this.mapEditorSystem.isEnabled) return;
-                if (this.mapEditorNotesPanel.isVisible) {
-                    this.mapEditorNotesPanel.hide();
-                } else {
-                    this.mapEditorNotesPanel.show(this.mapEditorSystem.notes);
-                }
+                const notesVisible = this.editorLayout.getPanelState("notes")?.isVisible ?? false;
+                this.editorLayout.setVisible("notes", !notesVisible);
             } else if (kbInfo.event.key === "g" || kbInfo.event.key === "G") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const mode = this.mapEditorSystem.cycleGizmoMode();
@@ -1722,13 +1767,15 @@ export class Game {
                 this._triggerMapImport();
             } else if (kbInfo.event.key === "F7") {
                 if (!this.mapEditorSystem.isEnabled) return;
-                if (this.mapEditorValidationPanel.isVisible) {
-                    this.mapEditorValidationPanel.hide();
+                const validationVisible = this.editorLayout.getPanelState("validation")?.isVisible ?? false;
+                if (validationVisible) {
+                    this.editorLayout.setVisible("validation", false);
                 } else {
                     const validation = this.mapEditorSystem.validateMap(0.5, {
                       knownLootTableIds: this.lootTableSystem.getTableIds(),
                     });
                     this.mapEditorValidationPanel.show(validation);
+                    this.editorLayout.setVisible("validation", true);
                     if (!validation.isValid) {
                       console.warn("[MapEditorValidation]", validation.issues);
                     }
