@@ -115,17 +115,50 @@ interface WeaponProfile {
   skillId: string;
   /** Human-readable display name. */
   label: string;
+  /**
+   * Multiplier applied to the melee archetype's base stamina cost for this weapon.
+   * < 1.0 = cheaper to swing (sword), > 1.0 = more expensive (mace).
+   */
+  staminaCostMultiplier: number;
+  /**
+   * Multiplier applied to the melee archetype's base attack cooldown for this weapon.
+   * < 1.0 = faster swings (sword), > 1.0 = slower swings (mace).
+   */
+  cooldownMultiplier: number;
+  /**
+   * Probability [0, 1] that a successful normal melee hit staggers the target.
+   * Stagger briefly interrupts the NPC's AI (shorter than a power-attack stagger).
+   */
+  staggerChance: number;
+  /** Duration in seconds of the stagger applied by a normal melee hit. */
+  staggerDuration: number;
 }
+
+// ─── Staff charge constants ────────────────────────────────────────────────────
+
+/** Seconds to reach a full charge with a staff. */
+const STAFF_CHARGE_TIME = 1.5;
+/** Magicka cost for a full-charge staff blast. Scales down with partial charge. */
+const STAFF_CHARGE_MAGICKA_COST = 35;
+/** Range of the charged staff blast (forward raycast). */
+const STAFF_CHARGE_RANGE = 5.0;
+/** Base damage of a fully charged staff blast (before skill/attribute scaling). */
+const STAFF_CHARGE_DAMAGE_BASE = 40;
+/** Minimum charge fraction before a staff release deals damage. */
+const STAFF_MIN_CHARGE = 0.15;
+/** Cooldown in seconds after releasing a staff charge. */
+const STAFF_CHARGE_COOLDOWN = 1.2;
 
 /**
  * Per-weapon-type combat profiles.
  *
  * Design intent:
- *  sword  — fast, balanced; strong crit, light armor pen
- *  axe    — harder-hitting; better armor pen, reduced crit window
- *  mace   — heaviest strikes; excellent armor pen, almost no crit (blunt trauma)
+ *  sword  — fast, balanced; strong crit, light armor pen, moderate stagger
+ *  axe    — harder-hitting; better armor pen, slightly slower, low stagger
+ *  mace   — heaviest strikes; excellent armor pen, slow, high stagger chance
  *  bow    — long-range precision; best crit chance, minimal armor pen
- *  staff  — hybrid caster tool; weak melee damage, governed by destruction skill
+ *  staff  — hybrid caster tool; weak melee fallback, governed by destruction skill;
+ *           Q-press triggers a charged destruction blast (see beginStaffCharge)
  */
 const WEAPON_PROFILES: Record<WeaponArchetype, WeaponProfile> = {
   sword: {
@@ -135,6 +168,10 @@ const WEAPON_PROFILES: Record<WeaponArchetype, WeaponProfile> = {
     attackRange: 3.0,
     skillId: "blade",
     label: "Sword",
+    staminaCostMultiplier: 0.80,
+    cooldownMultiplier:    0.85,
+    staggerChance:         0.15,
+    staggerDuration:       0.20,
   },
   axe: {
     damageMultiplier: 1.20,
@@ -143,6 +180,10 @@ const WEAPON_PROFILES: Record<WeaponArchetype, WeaponProfile> = {
     attackRange: 2.8,
     skillId: "blade",
     label: "Axe",
+    staminaCostMultiplier: 1.10,
+    cooldownMultiplier:    1.15,
+    staggerChance:         0.10,
+    staggerDuration:       0.15,
   },
   mace: {
     damageMultiplier: 1.45,
@@ -151,6 +192,10 @@ const WEAPON_PROFILES: Record<WeaponArchetype, WeaponProfile> = {
     attackRange: 2.5,
     skillId: "blunt",
     label: "Mace",
+    staminaCostMultiplier: 1.40,
+    cooldownMultiplier:    1.40,
+    staggerChance:         0.40,
+    staggerDuration:       0.45,
   },
   bow: {
     damageMultiplier: 0.85,
@@ -159,6 +204,10 @@ const WEAPON_PROFILES: Record<WeaponArchetype, WeaponProfile> = {
     attackRange: 25.0,
     skillId: "marksman",
     label: "Bow",
+    staminaCostMultiplier: 1.00,
+    cooldownMultiplier:    1.00,
+    staggerChance:         0.00,
+    staggerDuration:       0.00,
   },
   staff: {
     damageMultiplier: 0.60,
@@ -167,6 +216,10 @@ const WEAPON_PROFILES: Record<WeaponArchetype, WeaponProfile> = {
     attackRange: 3.0,
     skillId: "destruction",
     label: "Staff",
+    staminaCostMultiplier: 1.20,
+    cooldownMultiplier:    1.50,
+    staggerChance:         0.05,
+    staggerDuration:       0.10,
   },
 };
 
@@ -275,6 +328,12 @@ export class CombatSystem {
   private _weaponArchetype: WeaponArchetype = "sword";
   /** True while the player is actively holding block. */
   private _isBlocking: boolean = false;
+  /** True while a staff charge attack is building up. */
+  private _isChargingStaff: boolean = false;
+  /** Seconds the staff charge has been held [0, STAFF_CHARGE_TIME]. */
+  private _staffChargeTimer: number = 0;
+  /** Remaining cooldown after a staff charge release (prevents instant re-charge). */
+  private _staffChargeCooldown: number = 0;
 
   private static readonly _OFFSET_Y1 = new Vector3(0, 1, 0);
   private static readonly _OFFSET_Y2 = new Vector3(0, 2, 0);
@@ -374,15 +433,120 @@ export class CombatSystem {
     this._isBlocking = false;
   }
 
+  // ─── Staff charge attack ────────────────────────────────────────────────────
+
+  /** True while the staff charge is building. */
+  public get isChargingStaff(): boolean {
+    return this._isChargingStaff;
+  }
+
+  /** Charge progress [0, 1]; 1.0 = fully charged. */
+  public get staffChargeProgress(): number {
+    return Math.min(1, this._staffChargeTimer / STAFF_CHARGE_TIME);
+  }
+
+  /**
+   * Begin charging a staff attack.  Call on Q KEYDOWN when weapon archetype is "staff".
+   *
+   * Returns false if a charge is already in progress, the cooldown is active,
+   * or the player has insufficient magicka for even a minimum charge.
+   */
+  public beginStaffCharge(): boolean {
+    if (this._isChargingStaff) return false;
+    if (this._staffChargeCooldown > 0) return false;
+    const minCost = Math.round(STAFF_CHARGE_MAGICKA_COST * STAFF_MIN_CHARGE);
+    if (this.player.magicka < minCost) {
+      this._ui.showNotification("Not enough magicka!", 1200);
+      return false;
+    }
+    this._isChargingStaff = true;
+    this._staffChargeTimer = 0;
+    this._ui.showNotification("Charging...", Math.round(STAFF_CHARGE_TIME * 1000));
+    return true;
+  }
+
+  /**
+   * Release the staff charge.  Call on Q KEYUP when `isChargingStaff` is true.
+   *
+   * Fires a forward-raycast destruction blast scaled by charge progress.
+   * Below STAFF_MIN_CHARGE the shot is cancelled without cost.
+   * Returns true if a shot was actually fired.
+   */
+  public releaseStaffCharge(): boolean {
+    if (!this._isChargingStaff) return false;
+    this._isChargingStaff = false;
+
+    const chargeFraction = this.staffChargeProgress;
+    this._staffChargeTimer = 0;
+    this._staffChargeCooldown = STAFF_CHARGE_COOLDOWN;
+
+    if (chargeFraction < STAFF_MIN_CHARGE) {
+      this._ui.showNotification("Charge released too early.", 800);
+      return false;
+    }
+
+    const magickaCost = Math.max(1, Math.round(STAFF_CHARGE_MAGICKA_COST * chargeFraction));
+    if (this.player.magicka < magickaCost) {
+      this._ui.showNotification("Not enough magicka!", 1200);
+      return false;
+    }
+    this.player.magicka -= magickaCost;
+    (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
+      .notifyResourceSpent?.("magicka");
+
+    const hit = this.player.raycastForward(STAFF_CHARGE_RANGE);
+    if (hit && hit.pickedMesh) {
+      const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
+      if (npc && !npc.isDead) {
+        const rawDmg = Math.max(
+          1,
+          Math.round(
+            STAFF_CHARGE_DAMAGE_BASE
+            * chargeFraction
+            * this._destructionMultiplier()
+          )
+        );
+        const finalDmg = applyDamageWithResistance(rawDmg, npc, "fire");
+        npc.takeDamage(finalDmg);
+
+        // Charged blast always staggers.
+        npc.isStaggered = true;
+        npc.staggerTimer = 0.4 + 0.4 * chargeFraction;
+        npc.isAttackTelegraphing = false;
+        npc.attackTelegraphTimer = 0;
+
+        const numberPos = hit.pickedPoint
+          ? hit.pickedPoint.addToRef(CombatSystem._OFFSET_Y1, this._hitPos)
+          : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos);
+        this._ui.showDamageNumber(numberPos, finalDmg, this.scene);
+        this._ui.showHitFlash("rgba(255, 60, 0, 0.5)");
+
+        const label = chargeFraction >= 0.9 ? "Staff Blast!" : "Charged Bolt!";
+        this._ui.showNotification(label, 1000);
+
+        if (npc.isDead) {
+          this._ui.showNotification(`${npc.mesh.name} defeated!`);
+          if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
+        } else if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
+          this._transitionTo(npc, AIState.CHASE);
+        }
+      }
+    }
+    return true;
+  }
+
   // ─── Player actions ────────────────────────────────────────────────────────
 
   public meleeAttack(): boolean {
     const meleeProfile = MELEE_PROFILES[this._meleeArchetype];
+    const weaponProfile = WEAPON_PROFILES[this._weaponArchetype];
     if (this._meleeCooldownRemaining > 0) {
       return false;
     }
 
-    const staminaCost = this._scaledMeleeStaminaCost(meleeProfile.staminaCost);
+    const staminaCost = this._scaledMeleeStaminaCost(
+      meleeProfile.staminaCost * weaponProfile.staminaCostMultiplier
+    );
     if (this.player.stamina < staminaCost) {
       this._ui.showNotification("Not enough stamina!");
       return false;
@@ -393,7 +557,9 @@ export class CombatSystem {
     const fatigueFactor = this._fatigueFactor();
 
     this.player.stamina -= staminaCost;
-    this._meleeCooldownRemaining = this._scaledMeleeCooldown(meleeProfile.cooldown);
+    this._meleeCooldownRemaining = this._scaledMeleeCooldown(
+      meleeProfile.cooldown * weaponProfile.cooldownMultiplier
+    );
     (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
       .notifyResourceSpent?.("stamina");
 
@@ -405,7 +571,6 @@ export class CombatSystem {
       return true;
     }
 
-    const weaponProfile = WEAPON_PROFILES[this._weaponArchetype];
     const hit = this.player.raycastForward(weaponProfile.attackRange);
     if (hit && hit.pickedMesh) {
       const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
@@ -429,6 +594,19 @@ export class CombatSystem {
         );
         const meleeDmg = applyDamageWithResistance(rawMeleeDmg, npc, "physical", weaponProfile.armorPenFraction);
         npc.takeDamage(meleeDmg);
+
+        // Per-weapon stagger chance on normal melee hits.
+        if (
+          !npc.isDead &&
+          !npc.isStaggered &&
+          weaponProfile.staggerChance > 0 &&
+          Math.random() < weaponProfile.staggerChance
+        ) {
+          npc.isStaggered = true;
+          npc.staggerTimer = weaponProfile.staggerDuration;
+          npc.isAttackTelegraphing = false;
+          npc.attackTelegraphTimer = 0;
+        }
 
         const numberPos = hit.pickedPoint
           ? hit.pickedPoint.addToRef(CombatSystem._OFFSET_Y1, this._hitPos)
@@ -473,12 +651,13 @@ export class CombatSystem {
    */
   public powerAttack(): boolean {
     const meleeProfile = MELEE_PROFILES[this._meleeArchetype];
+    const weaponProfile = WEAPON_PROFILES[this._weaponArchetype];
     if (this._meleeCooldownRemaining > 0) {
       return false;
     }
 
     const staminaCost = this._scaledMeleeStaminaCost(
-      meleeProfile.staminaCost * POWER_ATTACK_STAMINA_MULTIPLIER
+      meleeProfile.staminaCost * weaponProfile.staminaCostMultiplier * POWER_ATTACK_STAMINA_MULTIPLIER
     );
     if (this.player.stamina < staminaCost) {
       this._ui.showNotification("Not enough stamina for a power attack!");
@@ -488,11 +667,12 @@ export class CombatSystem {
     const fatigueFactor = this._fatigueFactor();
 
     this.player.stamina -= staminaCost;
-    this._meleeCooldownRemaining = this._scaledMeleeCooldown(meleeProfile.cooldown * 1.5); // longer recovery after a power swing
+    this._meleeCooldownRemaining = this._scaledMeleeCooldown(
+      meleeProfile.cooldown * weaponProfile.cooldownMultiplier * 1.5
+    ); // longer recovery after a power swing
     (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
       .notifyResourceSpent?.("stamina");
 
-    const weaponProfile = WEAPON_PROFILES[this._weaponArchetype];
     const hit = this.player.raycastForward(weaponProfile.attackRange);
     if (hit && hit.pickedMesh) {
       const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
@@ -723,6 +903,10 @@ export class CombatSystem {
   private _tickPlayerAttackCooldowns(deltaTime: number): void {
     this._meleeCooldownRemaining = Math.max(0, this._meleeCooldownRemaining - deltaTime);
     this._magicCooldownRemaining = Math.max(0, this._magicCooldownRemaining - deltaTime);
+    if (this._isChargingStaff) {
+      this._staffChargeTimer = Math.min(STAFF_CHARGE_TIME, this._staffChargeTimer + deltaTime);
+    }
+    this._staffChargeCooldown = Math.max(0, this._staffChargeCooldown - deltaTime);
   }
 
   // ─── State machine implementation ──────────────────────────────────────────
@@ -1106,6 +1290,9 @@ export class CombatSystem {
     npc.attackTelegraphTimer = Math.max(0.12, npc.attackWindup);
     this._stopMovement(npc);
     npc.setStateColor(COLOR_TELEGRAPH);
+    // Alert the player with a timed warning matching the windup window.
+    const windupMs = Math.round(npc.attackTelegraphTimer * 1000);
+    this._ui.showNotification(`⚠ ${npc.mesh.name} attacks!`, windupMs);
   }
 
   private _tickAttackTelegraph(npc: NPC, distSq: number, deltaTime: number): void {
