@@ -1857,9 +1857,14 @@ export class Game {
                     if (!this.isPaused) this.saveSystem.load();
                 }
             } else if (kbInfo.event.key === "q" || kbInfo.event.key === "Q") {
-                // Cast equipped spell
                 if (!this._isCombatInputBlocked()) {
-                    this.spellSystem.castSpell();
+                    if (this.combatSystem.activeWeaponArchetype === "staff") {
+                        // Staff archetype: begin charge attack instead of instant spell cast
+                        this.combatSystem.beginStaffCharge();
+                    } else {
+                        // Default: cast equipped spell
+                        this.spellSystem.castSpell();
+                    }
                 }
             } else if (kbInfo.event.key === "z" || kbInfo.event.key === "Z") {
                 // Cycle through known spells
@@ -2028,6 +2033,15 @@ export class Game {
                     if (fired) {
                         this.audioSystem.playMeleeAttack(); // reuse existing SFX placeholder
                         this.skillProgressionSystem.gainXP("marksman", 5 * this.classSystem.xpMultiplierFor("marksman"));
+                    }
+                }
+            }
+            // Release staff charge when Q is released
+            if (kbInfo.event.key === "q" || kbInfo.event.key === "Q") {
+                if (this.combatSystem.isChargingStaff) {
+                    const fired = this.combatSystem.releaseStaffCharge();
+                    if (fired) {
+                        this.skillProgressionSystem.gainXP("destruction", 8 * this.classSystem.xpMultiplierFor("destruction"));
                     }
                 }
             }

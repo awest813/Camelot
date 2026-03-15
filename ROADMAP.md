@@ -192,9 +192,9 @@ three-step overhaul track:
 
 ### Combat Feel and Balance
 
-- 🧭 Add weapon archetype tuning passes (speed, stagger, resource cost).
+- ✅ Add weapon archetype tuning passes (speed, stagger, resource cost).
 - ✅ Add lightweight enemy resistances/weaknesses for build diversity — per-archetype damage modifiers in NpcArchetypeDefinition.
-- 🧭 Improve telegraph readability for enemy attacks.
+- ✅ Improve telegraph readability for enemy attacks.
 
 ### Stability and Tooling
 
@@ -305,12 +305,12 @@ The natural next milestone in Character Progression Depth. Key design points:
 - **Saddlebag inventory** — Horse carries an additional carry-weight slot unlocked on purchase.
 - **Save state** — SAVE_VERSION 19: horse position, health, and equipped saddlebag items persisted.
 
-### Weapon Archetype Tuning Pass
-- Sword (Blade) — faster swing cadence, lower stamina cost, medium stagger.
-- Axe (Blade) — slower swing, higher damage, ignores 10% of armor rating.
-- Mace (Blunt) — low speed, high stagger chance, bonus vs. heavy armor.
-- Bow (Marksman) — already implemented; tune draw-speed multiplier per arrow type.
-- Staff (Destruction) — replaces Q-cast with a slower, higher-damage charge attack.
+### Weapon Archetype Tuning Pass ✅
+- ✅ Sword (Blade) — faster swing cadence (0.85× cooldown), lower stamina cost (0.80×), medium stagger (15% chance, 0.2 s).
+- ✅ Axe (Blade) — slightly slower swing (1.15× cooldown, 1.10× cost), higher damage (1.20×), better armor pen (25%), low stagger (10%).
+- ✅ Mace (Blunt) — slow swing (1.40× cooldown/cost), highest damage (1.45×), excellent armor pen (50%), high stagger (40% chance, 0.45 s).
+- ✅ Bow (Marksman) — per-arrow `drawTimeMultiplier`: iron 1.0, steel 1.05, elven 0.90 (lighter/faster), daedric 1.25 (heavier/slower).
+- ✅ Staff (Destruction) — Q KEYDOWN begins a charge (up to 1.5 s); Q KEYUP fires a scaled destruction blast (fire damage, always staggers, awards destruction XP).
 
 ### Content GUI — Release A (Dockable Editor Layout)
 - Dockable editor layout (Scene / Hierarchy / Inspector / Validation panes).

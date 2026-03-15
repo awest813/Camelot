@@ -43,15 +43,21 @@ interface ArrowProfile {
   damageMultiplier: number;
   /** Multiplier applied to arrow launch speed. */
   speedMultiplier: number;
+  /**
+   * Multiplier applied to BOW_DRAW_TIME for this arrow type.
+   * < 1.0 = lighter arrow, draws faster (elven).
+   * > 1.0 = heavier arrow, draws slower (daedric).
+   */
+  drawTimeMultiplier: number;
   /** Human-readable name. */
   label: string;
 }
 
 const ARROW_PROFILES: Record<ArrowType, ArrowProfile> = {
-  iron:    { damageMultiplier: 1.0,  speedMultiplier: 1.0,  label: "Iron Arrow"    },
-  steel:   { damageMultiplier: 1.25, speedMultiplier: 1.05, label: "Steel Arrow"   },
-  elven:   { damageMultiplier: 1.55, speedMultiplier: 1.10, label: "Elven Arrow"   },
-  daedric: { damageMultiplier: 2.0,  speedMultiplier: 1.15, label: "Daedric Arrow" },
+  iron:    { damageMultiplier: 1.0,  speedMultiplier: 1.0,  drawTimeMultiplier: 1.00, label: "Iron Arrow"    },
+  steel:   { damageMultiplier: 1.25, speedMultiplier: 1.05, drawTimeMultiplier: 1.05, label: "Steel Arrow"   },
+  elven:   { damageMultiplier: 1.55, speedMultiplier: 1.10, drawTimeMultiplier: 0.90, label: "Elven Arrow"   },
+  daedric: { damageMultiplier: 2.0,  speedMultiplier: 1.15, drawTimeMultiplier: 1.25, label: "Daedric Arrow" },
 };
 
 interface ActiveArrow {
@@ -322,9 +328,11 @@ export class ProjectileSystem {
   public update(deltaTime: number): void {
     this._cooldownRemaining = Math.max(0, this._cooldownRemaining - deltaTime);
 
-    // Advance draw progress while drawing
+    // Advance draw progress while drawing — speed scales with arrow type draw multiplier.
     if (this._isDrawing) {
-      this._drawProgress = Math.min(1, this._drawProgress + deltaTime / BOW_DRAW_TIME);
+      const arrowProfile = ARROW_PROFILES[this.equippedArrowType];
+      const effectiveDrawTime = BOW_DRAW_TIME * arrowProfile.drawTimeMultiplier;
+      this._drawProgress = Math.min(1, this._drawProgress + deltaTime / effectiveDrawTime);
     }
 
     const toDispose: ActiveArrow[] = [];

@@ -357,4 +357,48 @@ describe("ProjectileSystem", () => {
     const sneakCall = calls.find(([msg]) => String(msg).includes("Sneak Attack"));
     expect(sneakCall).toBeUndefined();
   });
+
+  // ─── Arrow draw-time multiplier ───────────────────────────────────────────
+
+  it("elven arrows draw faster than iron arrows (drawTimeMultiplier < 1)", () => {
+    // Iron: drawTimeMultiplier = 1.00 → effectiveDrawTime = 0.8 s
+    // Elven: drawTimeMultiplier = 0.90 → effectiveDrawTime = 0.72 s
+    // After 0.36 s with iron: progress = 0.36/0.8 = 0.45
+    // After 0.36 s with elven: progress = 0.36/0.72 = 0.50
+
+    projectileSystem.equippedArrowType = "iron";
+    projectileSystem.beginDraw();
+    projectileSystem.update(0.36);
+    const ironProgress = projectileSystem.drawProgress;
+    projectileSystem.releaseArrow();
+    projectileSystem.update(1.0); // clear cooldown
+
+    projectileSystem.equippedArrowType = "elven";
+    projectileSystem.beginDraw();
+    projectileSystem.update(0.36);
+    const elvenProgress = projectileSystem.drawProgress;
+
+    expect(elvenProgress).toBeGreaterThan(ironProgress);
+  });
+
+  it("daedric arrows draw slower than iron arrows (drawTimeMultiplier > 1)", () => {
+    // Iron: drawTimeMultiplier = 1.00 → effectiveDrawTime = 0.8 s
+    // Daedric: drawTimeMultiplier = 1.25 → effectiveDrawTime = 1.0 s
+    // After 0.5 s with iron: progress = 0.5/0.8 = 0.625
+    // After 0.5 s with daedric: progress = 0.5/1.0 = 0.5
+
+    projectileSystem.equippedArrowType = "iron";
+    projectileSystem.beginDraw();
+    projectileSystem.update(0.5);
+    const ironProgress = projectileSystem.drawProgress;
+    projectileSystem.releaseArrow();
+    projectileSystem.update(1.0); // clear cooldown
+
+    projectileSystem.equippedArrowType = "daedric";
+    projectileSystem.beginDraw();
+    projectileSystem.update(0.5);
+    const daedricProgress = projectileSystem.drawProgress;
+
+    expect(daedricProgress).toBeLessThan(ironProgress);
+  });
 });

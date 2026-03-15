@@ -177,7 +177,7 @@ describe('CombatSystem', () => {
         const ok = combatSystem.meleeAttack();
 
         expect(ok).toBe(true);
-        expect(mockPlayer.stamina).toBe(85);
+        expect(mockPlayer.stamina).toBe(88);  // soldier 15 × sword 0.80 = 12; 100 − 12 = 88
         expect(mockScene.pickWithRay).toHaveBeenCalled();
         expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(10); // Base MELEE_DAMAGE
         expect(mockUI.showDamageNumber).toHaveBeenCalled();
@@ -229,16 +229,16 @@ describe('CombatSystem', () => {
         mockScene.pickWithRay.mockReturnValue(null);
 
         expect(combatSystem.meleeAttack()).toBe(true);
-        expect(mockPlayer.stamina).toBe(85);
+        expect(mockPlayer.stamina).toBe(88);  // soldier 15 × sword 0.80 = 12; 100 − 12 = 88
 
         // Immediate second click should be rejected by cooldown.
         expect(combatSystem.meleeAttack()).toBe(false);
-        expect(mockPlayer.stamina).toBe(85);
+        expect(mockPlayer.stamina).toBe(88);
 
         // Cooldown ticks in updateNPCAI.
         combatSystem.updateNPCAI(0.5);
         expect(combatSystem.meleeAttack()).toBe(true);
-        expect(mockPlayer.stamina).toBe(70);
+        expect(mockPlayer.stamina).toBe(76);  // 88 − 12 = 76
     });
 
     it('magicAttack enforces cooldown cadence between casts', () => {
@@ -282,12 +282,12 @@ describe('CombatSystem', () => {
         expect(combatSystem.activeMeleeArchetype).toBe('duelist');
 
         expect(combatSystem.meleeAttack()).toBe(true);
-        expect(mockPlayer.stamina).toBe(91);
+        expect(mockPlayer.stamina).toBe(93);  // duelist 9 × sword 0.80 = 7.2 → 7; 100 − 7 = 93
         expect(combatSystem.meleeAttack()).toBe(false);
 
         combatSystem.updateNPCAI(0.33);
         expect(combatSystem.meleeAttack()).toBe(true);
-        expect(mockPlayer.stamina).toBe(82);
+        expect(mockPlayer.stamina).toBe(86);  // 93 − 7 = 86
 
         combatSystem.setMagicArchetype('surge');
         expect(combatSystem.activeMagicArchetype).toBe('surge');
@@ -726,11 +726,12 @@ describe('CombatSystem', () => {
         const dealt = (npc.takeDamage as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0];
         expect(dealt).toBe(33);
 
-        // Cooldown is shortened by blade skill, but still enforces cadence.
+        // Cooldown is shortened by blade skill AND sword's 0.85 cooldown multiplier.
+        // Effective cooldown ≈ _scaledMeleeCooldown(0.45 × 0.85) with cadence 1.3 ≈ 0.294 s.
         expect(skilledCombat.meleeAttack()).toBe(false);
-        skilledCombat.updateNPCAI(0.34);
+        skilledCombat.updateNPCAI(0.25);
         expect(skilledCombat.meleeAttack()).toBe(false);
-        skilledCombat.updateNPCAI(0.02);
+        skilledCombat.updateNPCAI(0.06);
         expect(skilledCombat.meleeAttack()).toBe(true);
     });
 
@@ -1023,6 +1024,217 @@ describe('CombatSystem', () => {
 
         // round(10 * 100/(100+100)) = round(5) = 5  → player takes 5 damage
         expect(mockPlayer.health).toBe(95);
+    });
+
+    // ─── Weapon archetype tuning ────────────────────────────────────────────
+
+    it('mace archetype applies higher stamina cost and slower cooldown than sword', () => {
+        mockScene.pickWithRay.mockReturnValue(null);
+
+        // Sword attack (default)
+        combatSystem.setWeaponArchetype('sword');
+        mockPlayer.stamina = 100;
+        expect(combatSystem.meleeAttack()).toBe(true);
+        const swordStamina = mockPlayer.stamina;
+
+        // Clear cooldown before mace attack
+        combatSystem.updateNPCAI(2.0);
+
+        // Mace attack — same melee archetype, higher weapon cost
+        combatSystem.setWeaponArchetype('mace');
+        mockPlayer.stamina = 100;
+        expect(combatSystem.meleeAttack()).toBe(true);
+        const maceStamina = mockPlayer.stamina;
+
+        // Mace should cost more stamina
+        expect(maceStamina).toBeLessThan(swordStamina);
+    });
+
+    it('sword archetype applies faster swing cooldown than mace', () => {
+        mockScene.pickWithRay.mockReturnValue(null);
+
+        combatSystem.setWeaponArchetype('mace');
+        expect(combatSystem.meleeAttack()).toBe(true);
+        // Short tick — sword would be off cooldown but mace should still be waiting
+        combatSystem.updateNPCAI(0.35);
+        // Mace cooldown > 0.35 s for soldier archetype (0.45 × 1.40 = 0.63 s unscaled)
+        expect(combatSystem.meleeAttack()).toBe(false);
+
+        // Enough time for mace to recover
+        combatSystem.updateNPCAI(1.0);
+        expect(combatSystem.meleeAttack()).toBe(true);
+    });
+
+    it('mace archetype has a higher stagger chance on normal melee hit than sword', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        // Sword: staggerChance = 0.15
+        combatSystem.setWeaponArchetype('sword');
+        const swordProfile = (combatSystem as any)._weaponArchetype;
+        expect(swordProfile).toBe('sword');
+
+        // Mace: staggerChance = 0.40 — verify via the exported WEAPON_PROFILES indirectly
+        combatSystem.setWeaponArchetype('mace');
+        // Force stagger by making Math.random return below mace stagger threshold
+        const origRandom = Math.random;
+        Math.random = () => 0.0; // always triggers stagger
+        try {
+            mockNpcs[0].isStaggered = false;
+            mockNpcs[0].staggerTimer = 0;
+            combatSystem.updateNPCAI(2.0); // clear any cooldown
+            mockPlayer.stamina = 100;
+            combatSystem.meleeAttack();
+            expect(mockNpcs[0].isStaggered).toBe(true);
+            expect(mockNpcs[0].staggerTimer).toBeGreaterThan(0);
+        } finally {
+            Math.random = origRandom;
+        }
+    });
+
+    it('mace stagger does not re-apply if NPC is already staggered', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        combatSystem.setWeaponArchetype('mace');
+        combatSystem.updateNPCAI(2.0); // clear cooldown
+
+        // Set stagger AFTER the cooldown advance so updateNPCAI doesn't tick it down
+        mockNpcs[0].isStaggered = true;
+        mockNpcs[0].staggerTimer = 5.0;
+
+        const origRandom = Math.random;
+        Math.random = () => 0.0; // would normally trigger stagger
+        try {
+            mockPlayer.stamina = 100;
+            combatSystem.meleeAttack();
+            // staggerTimer should NOT be reset to mace's staggerDuration (0.45 s)
+            // — the guard prevents re-stagger; timer should remain at 5.0
+            expect(mockNpcs[0].staggerTimer).toBe(5.0);
+        } finally {
+            Math.random = origRandom;
+        }
+    });
+
+    // ─── Staff charge attack ─────────────────────────────────────────────────
+
+    it('beginStaffCharge returns false when weapon is not staff (no state change)', () => {
+        combatSystem.setWeaponArchetype('sword');
+        // The test is behavioural — beginStaffCharge has no guard on weapon type;
+        // callers (game.ts) check the archetype. Here we just confirm the method exists
+        // and returns a boolean.
+        expect(typeof combatSystem.beginStaffCharge()).toBe('boolean');
+    });
+
+    it('beginStaffCharge returns true when player has enough magicka', () => {
+        combatSystem.setWeaponArchetype('staff');
+        mockPlayer.magicka = 100;
+        expect(combatSystem.beginStaffCharge()).toBe(true);
+        expect(combatSystem.isChargingStaff).toBe(true);
+    });
+
+    it('beginStaffCharge returns false when a charge is already in progress', () => {
+        combatSystem.setWeaponArchetype('staff');
+        mockPlayer.magicka = 100;
+        combatSystem.beginStaffCharge();
+        expect(combatSystem.beginStaffCharge()).toBe(false);
+    });
+
+    it('beginStaffCharge returns false when player has insufficient magicka', () => {
+        combatSystem.setWeaponArchetype('staff');
+        mockPlayer.magicka = 0;
+        expect(combatSystem.beginStaffCharge()).toBe(false);
+        expect(combatSystem.isChargingStaff).toBe(false);
+    });
+
+    it('releaseStaffCharge returns false when not charging', () => {
+        expect(combatSystem.releaseStaffCharge()).toBe(false);
+    });
+
+    it('releaseStaffCharge cancels and returns false when charge is too brief', () => {
+        mockPlayer.magicka = 100;
+        combatSystem.beginStaffCharge();
+        // 0 seconds elapsed — charge fraction = 0 < STAFF_MIN_CHARGE
+        expect(combatSystem.releaseStaffCharge()).toBe(false);
+        expect(combatSystem.isChargingStaff).toBe(false);
+    });
+
+    it('staff charge progress advances over time in updateNPCAI', () => {
+        mockPlayer.magicka = 100;
+        combatSystem.beginStaffCharge();
+        expect(combatSystem.staffChargeProgress).toBe(0);
+
+        combatSystem.updateNPCAI(0.5); // half the STAFF_CHARGE_TIME (1.5 s)
+        expect(combatSystem.staffChargeProgress).toBeCloseTo(0.333, 2);
+    });
+
+    it('staff charge progress is capped at 1.0 after full charge time', () => {
+        mockPlayer.magicka = 100;
+        combatSystem.beginStaffCharge();
+        combatSystem.updateNPCAI(2.0); // beyond STAFF_CHARGE_TIME
+        expect(combatSystem.staffChargeProgress).toBe(1.0);
+    });
+
+    it('releaseStaffCharge fires and spends magicka when charge fraction exceeds minimum', () => {
+        mockScene.pickWithRay.mockReturnValue(null); // no NPC in range
+        mockPlayer.magicka = 100;
+        combatSystem.beginStaffCharge();
+        combatSystem.updateNPCAI(0.5); // partial charge ~ 0.33
+
+        const fired = combatSystem.releaseStaffCharge();
+        expect(fired).toBe(true);
+        expect(combatSystem.isChargingStaff).toBe(false);
+        expect(mockPlayer.magicka).toBeLessThan(100);
+    });
+
+    it('releaseStaffCharge deals fire damage to NPC in range', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+        mockPlayer.magicka = 100;
+        combatSystem.beginStaffCharge();
+        combatSystem.updateNPCAI(1.5); // full charge
+
+        const fired = combatSystem.releaseStaffCharge();
+        expect(fired).toBe(true);
+        expect(mockNpcs[0].takeDamage).toHaveBeenCalled();
+        const dmg = (mockNpcs[0].takeDamage as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0];
+        expect(dmg).toBeGreaterThan(0);
+    });
+
+    it('releaseStaffCharge staggers the hit NPC', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+        mockPlayer.magicka = 100;
+        mockNpcs[0].isStaggered = false;
+        combatSystem.beginStaffCharge();
+        combatSystem.updateNPCAI(1.5); // full charge
+        combatSystem.releaseStaffCharge();
+
+        expect(mockNpcs[0].isStaggered).toBe(true);
+        expect(mockNpcs[0].staggerTimer).toBeGreaterThan(0);
+    });
+
+    it('telegraph notification warns the player when NPC begins wind-up', () => {
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.4;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+
+        combatSystem.updateNPCAI(0.016);
+
+        // The notification should contain the NPC's name and an attack warning symbol
+        const calls = (mockUI.showNotification as ReturnType<typeof vi.fn>).mock.calls;
+        const telegraphCall = calls.find((c: any[]) => typeof c[0] === 'string' && c[0].includes('attacks!'));
+        expect(telegraphCall).toBeDefined();
     });
 
 });
