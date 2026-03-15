@@ -78,7 +78,7 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 ### UX + Persistence
 
 - ✅ HUD, quest log, inventory, skill tree, pause flow.
-- ✅ Save/load (SAVE_VERSION 18) for all system states.
+- ✅ Save/load (SAVE_VERSION 19) for all system states.
 - ✅ Save file export to JSON file download + import from JSON/File (browser-safe).
 - ✅ Notifications, hit feedback, and debug support.
 - ✅ Compass HUD (top-center) showing cardinal direction from camera heading.
@@ -110,8 +110,8 @@ model.
 
 #### Release A — Authoring UX Foundations
 
-- 🧭 Dockable editor layout (Scene/Hierarchy/Inspector/Validation panes).
-- 🧭 Unified selection model shared by map entities, quest nodes, and dialogue nodes.
+- ✅ Dockable editor layout (Scene/Hierarchy/Inspector/Validation panes).
+- ✅ Unified selection model shared by map entities, quest nodes, and dialogue nodes.
 - ✅ Undo/redo history with grouped actions for transform + property edits (Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z).
 - ✅ Context-aware hotkey/help overlay so editor workflows are discoverable in-app (F1 toggles gameplay/editor key cheat sheet).
 
@@ -164,7 +164,7 @@ model.
 
 - ✅ **Character Level-Up UI** — Dedicated level-up dialog (`LevelUpUI`) showing available attribute bonuses (+1 to +5) per attribute with governing-skill annotations, letting the player manually choose 3 attributes to increase; selection requires exactly 3 distinct attributes; confirm button enables only when 3 are chosen; triggered by `PlayerLevelSystem.onLevelUpReady`; modal (Escape blocked until confirmed); pointer lock and camera control restored on confirm; `onLevelUpComplete` notification fires after bonuses are applied.
 - ✅ **DailyScheduleSystem** — NPC daily activity schedules (work, eat, sleep); `DailyScheduleSystem` wraps `ScheduleSystem` and connects it to `TimeSystem` via the `onHourChange` hook for fully automatic time-of-day NPC behaviour switching (no per-frame manual sync required); sleeping NPCs have their `mesh.metadata` cleared so they cannot be targeted for interaction or dialogue; metadata is restored on wake-up; `onNPCSleep` / `onNPCWake` callbacks fire HUD notifications; `isSleeping(name)` / `getActiveBehavior(npc)` query helpers; save-state persistence (SAVE_VERSION 18) re-derives sleep state from restored game time so the flag is never stale.
-- 🧭 **HorseSystem / Mount System** — Rideable horse companions; separate speed/stamina pool; dismount on combat; stable NPCs for purchase; horse inventory slot for saddlebags.
+- ✅ **HorseSystem / Mount System** — Rideable horse companions; separate speed/stamina pool; dismount on combat; stable NPCs for purchase; horse inventory slot for saddlebags.
 
 
 
@@ -293,10 +293,10 @@ If you want to contribute now, high-impact areas are:
 
 ---
 
-## Next Steps (Planned After DailyScheduleSystem)
+## Next Steps
 
-### HorseSystem / Mount System
-The natural next milestone in Character Progression Depth. Key design points:
+### HorseSystem / Mount System ✅
+Completed in SAVE_VERSION 19. Key deliverables:
 
 - **Horse entity** — Dedicated `Horse` class (capsule mesh, dedicated physics body, separate `maxSpeed`/`stamina` pool).
 - **Mounting / dismounting** — Interact with a horse to mount; dismount via `F` key or on entering combat.
@@ -312,6 +312,12 @@ The natural next milestone in Character Progression Depth. Key design points:
 - ✅ Bow (Marksman) — per-arrow `drawTimeMultiplier`: iron 1.0, steel 1.05, elven 0.90 (lighter/faster), daedric 1.25 (heavier/slower).
 - ✅ Staff (Destruction) — Q KEYDOWN begins a charge (up to 1.5 s); Q KEYUP fires a scaled destruction blast (fire damage, always staggers, awards destruction XP).
 
-### Content GUI — Release A (Dockable Editor Layout)
-- Dockable editor layout (Scene / Hierarchy / Inspector / Validation panes).
-- Unified selection model shared by map entities, quest nodes, and dialogue nodes.
+### Content GUI — Release A (Dockable Editor Layout) ✅
+- ✅ Dockable editor layout (`EditorLayout` headless class: `dock()`/`undock()`/`setVisible()`/`hideAll()`, `getPanelsBySide()`, `getLayoutSnapshot()`/`restoreLayoutSnapshot()` for persistence) — wired into `game.ts` for all 6 map editor panels (hierarchy, palette, layers, notes, properties, validation) with initial dock positions.
+- ✅ Unified selection model (`EditorLayout.setSelection()`/`clearSelection()`/`isSelected()`/`onSelectionChanged`) shared by map entities, quest nodes, and dialogue nodes — `mapEditorSystem.onEntitySelectionChanged` now routes through `editorLayout.setSelection()` so all panels share a single source of truth.
+
+### Content GUI — Release B (Content-Specific Editors)
+- 🧭 **Quest Graph GUI**: node canvas for objectives, dependencies, fail states, and rewards.
+- 🧭 **Dialogue Tree GUI**: branching conversation editor with condition/effect forms.
+- 🧭 **Loot + Spawn GUI**: weighted table editor, archetype picker, and spawn validation hints.
+- 🧭 Shared property inspectors generated from schema metadata to reduce bespoke UI code.
