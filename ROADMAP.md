@@ -117,10 +117,10 @@ model.
 
 #### Release B — Content-Specific Editors
 
-- 🧭 **Quest Graph GUI**: node canvas for objectives, dependencies, fail states, and rewards.
-- 🧭 **Dialogue Tree GUI**: branching conversation editor with condition/effect forms.
-- 🧭 **Loot + Spawn GUI**: weighted table editor, archetype picker, and spawn validation hints.
-- 🧭 Shared property inspectors generated from schema metadata to reduce bespoke UI code.
+- ✅ **Quest Graph GUI**: node canvas for objectives, dependencies, fail states, and rewards — `QuestCreatorNodeDraft` now carries `x`/`y` canvas positions (auto-assigned in a 4-column grid); `QuestCreatorUI` renders an SVG graph panel below the node list showing prerequisite arrows between nodes.
+- ✅ **Dialogue Tree GUI**: branching conversation editor with condition/effect forms — `DialogueCreatorUI` exposes per-choice condition (`flag`, `faction_min`, `quest_status`, `has_item`, `skill_min`) and effect (`set_flag`, `faction_delta`, `emit_event`, `activate_quest`, `consume_item`, `give_item`) editors in an expandable details panel alongside node text/speaker fields.
+- ✅ **Loot + Spawn GUI**: weighted table editor, archetype picker, and spawn validation hints — `SpawnCreatorSystem` (headless CRUD + validate + export/import) and `SpawnCreatorUI` HTML overlay; archetype picker dropdown (guard/merchant/enemy/boss/…) + free-text custom ID; loot table ID link; count, level range, respawn interval; inline per-entry validation hints; wired as `Shift+F11` and added to the F11 Editor Hub grid.
+- ✅ **Shared property inspectors** generated from schema metadata — `SchemaFieldBuilder` utility class (`src/ui/schema-field-builder.ts`) generates consistently styled `text`, `number`, `checkbox`, `select`, and `textarea` controls from a lightweight descriptor; used by `SpawnCreatorUI` to eliminate per-field boilerplate.
 
 #### Release C — Validation + Packaging Workflow
 
@@ -316,8 +316,8 @@ Completed in SAVE_VERSION 19. Key deliverables:
 - ✅ Dockable editor layout (`EditorLayout` headless class: `dock()`/`undock()`/`setVisible()`/`hideAll()`, `getPanelsBySide()`, `getLayoutSnapshot()`/`restoreLayoutSnapshot()` for persistence) — wired into `game.ts` for all 6 map editor panels (hierarchy, palette, layers, notes, properties, validation) with initial dock positions.
 - ✅ Unified selection model (`EditorLayout.setSelection()`/`clearSelection()`/`isSelected()`/`onSelectionChanged`) shared by map entities, quest nodes, and dialogue nodes — `mapEditorSystem.onEntitySelectionChanged` now routes through `editorLayout.setSelection()` so all panels share a single source of truth.
 
-### Content GUI — Release B (Content-Specific Editors)
-- 🧭 **Quest Graph GUI**: node canvas for objectives, dependencies, fail states, and rewards.
-- 🧭 **Dialogue Tree GUI**: branching conversation editor with condition/effect forms.
-- 🧭 **Loot + Spawn GUI**: weighted table editor, archetype picker, and spawn validation hints.
-- 🧭 Shared property inspectors generated from schema metadata to reduce bespoke UI code.
+### Content GUI — Release B (Content-Specific Editors) ✅
+- ✅ **Quest Graph GUI** — `QuestCreatorNodeDraft` gains `x`/`y` canvas positions; `QuestCreatorUI` renders an SVG graph panel with prerequisite arrows between quest nodes.
+- ✅ **Dialogue Tree GUI** — `DialogueCreatorUI` condition/effect editors (flag, faction, quest, item, skill checks; set_flag, faction_delta, emit_event, activate_quest, consume/give item effects) in expandable per-choice panels.
+- ✅ **Loot + Spawn GUI** — `SpawnCreatorSystem` + `SpawnCreatorUI` (Shift+F11 / Editor Hub): archetype picker, loot table link, count/level range/respawn interval, inline validation hints, JSON export/import.
+- ✅ **Shared SchemaFieldBuilder** (`src/ui/schema-field-builder.ts`) — generic labeled control factory (`text`/`number`/`checkbox`/`select`/`textarea`) consuming field descriptors; used by `SpawnCreatorUI`.

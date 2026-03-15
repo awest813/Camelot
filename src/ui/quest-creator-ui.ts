@@ -3,12 +3,20 @@ import type { QuestTriggerType } from "../framework/quests/quest-types";
 
 const TRIGGER_TYPES: QuestTriggerType[] = ["kill", "pickup", "talk", "custom"];
 
+// ── Graph canvas constants ────────────────────────────────────────────────────
+
+const NODE_W  = 200;
+const NODE_H  = 70;
+const CANVAS_W = 1200;
+const CANVAS_H = 600;
+
 /**
  * HTML-based Quest Creator overlay.
  *
- * Provides a two-section panel:
+ * Provides a three-section panel:
  *  1. Quest metadata  (id, name, description, XP reward)
  *  2. Node list       (add / edit / remove nodes with prerequisites)
+ *  3. Graph canvas    (SVG visualization of nodes and prerequisite edges)
  *
  * Actions: Validate, Export JSON (download), Import JSON (file-pick), Reset, Close.
  *
@@ -25,6 +33,7 @@ export class QuestCreatorUI {
   private _root: HTMLElement | null = null;
   private _statusEl: HTMLElement | null = null;
   private _nodeListEl: HTMLElement | null = null;
+  private _graphSvg: SVGSVGElement | null = null;
 
   // Meta inputs
   private _metaId: HTMLInputElement | null = null;
@@ -96,6 +105,9 @@ export class QuestCreatorUI {
 
     // Right: nodes
     body.appendChild(this._buildNodesSection());
+
+    // ── Graph canvas ──────────────────────────────────────────────────────────
+    panel.appendChild(this._buildGraphSection());
 
     // ── Footer ────────────────────────────────────────────────────────────────
     panel.appendChild(this._buildFooter());
@@ -190,6 +202,169 @@ export class QuestCreatorUI {
     return section;
   }
 
+  private _buildGraphSection(): HTMLElement {
+    const section = document.createElement("div");
+    section.className = "quest-creator__graph-section";
+
+    const h3 = document.createElement("h3");
+    h3.className   = "quest-creator__section-title";
+    h3.textContent = "Quest Graph";
+    section.appendChild(h3);
+
+    const hint = document.createElement("p");
+    hint.className   = "quest-creator__graph-hint";
+    hint.textContent = "Nodes are auto-positioned. Arrows show prerequisite dependencies (→ direction of play).";
+    section.appendChild(hint);
+
+    const container = document.createElement("div");
+    container.className = "quest-creator__graph-container";
+    section.appendChild(container);
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width",   String(CANVAS_W));
+    svg.setAttribute("height",  String(CANVAS_H));
+    svg.setAttribute("viewBox", `0 0 ${CANVAS_W} ${CANVAS_H}`);
+    svg.setAttribute("role",    "img");
+    svg.setAttribute("aria-label", "Quest dependency graph");
+    svg.classList.add("quest-creator__graph-svg");
+    this._graphSvg = svg;
+    container.appendChild(svg);
+
+    return section;
+  }
+
+  // ── Graph rendering ───────────────────────────────────────────────────────
+
+  private _renderGraph(): void {
+    const svg = this._graphSvg;
+    if (!svg) return;
+
+    // Clear existing content
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    const nodes = this._system.nodes;
+    if (nodes.length === 0) {
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("x", String(CANVAS_W / 2));
+      text.setAttribute("y", String(CANVAS_H / 2));
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("fill", "#888");
+      text.setAttribute("font-size", "14");
+      text.textContent = "Add nodes to see the quest graph";
+      svg.appendChild(text);
+      return;
+    }
+
+    // Build a position lookup
+    const posMap = new Map<string, { x: number; y: number }>(
+      nodes.map(n => [n.id, { x: n.x, y: n.y }]),
+    );
+
+    // ── Arrow-head marker definition ──────────────────────────────────────
+    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+    marker.setAttribute("id",         "qc-arrow");
+    marker.setAttribute("markerWidth", "8");
+    marker.setAttribute("markerHeight", "8");
+    marker.setAttribute("refX",       "6");
+    marker.setAttribute("refY",       "3");
+    marker.setAttribute("orient",     "auto");
+    const arrowPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    arrowPath.setAttribute("d",    "M0,0 L0,6 L8,3 z");
+    arrowPath.setAttribute("fill", "#4ea8e0");
+    marker.appendChild(arrowPath);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+
+    // ── Draw prerequisite edges ────────────────────────────────────────────
+    for (const node of nodes) {
+      for (const prereqId of node.prerequisites) {
+        const from = posMap.get(prereqId);
+        const to   = posMap.get(node.id);
+        if (!from || !to) continue;
+
+        // Line from bottom-center of prereq node to top-center of current node
+        const x1 = from.x + NODE_W / 2;
+        const y1 = from.y + NODE_H;
+        const x2 = to.x   + NODE_W / 2;
+        const y2 = to.y;
+
+        // Cubic bezier for smooth curve — control points 60px above/below endpoints
+        const cy1 = y1 + 60;
+        const cy2 = y2 - 60;
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d",
+          `M ${x1} ${y1} C ${x1} ${cy1} ${x2} ${cy2} ${x2} ${y2}`,
+        );
+        path.setAttribute("stroke",       "#4ea8e0");
+        path.setAttribute("stroke-width", "2");
+        path.setAttribute("fill",         "none");
+        path.setAttribute("marker-end",   "url(#qc-arrow)");
+        svg.appendChild(path);
+      }
+    }
+
+    // ── Draw node boxes ────────────────────────────────────────────────────
+    for (const node of nodes) {
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      g.setAttribute("transform", `translate(${node.x}, ${node.y})`);
+      g.setAttribute("role",      "group");
+      g.setAttribute("aria-label", `Quest node: ${node.id}`);
+
+      // Box background
+      const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      rect.setAttribute("width",  String(NODE_W));
+      rect.setAttribute("height", String(NODE_H));
+      rect.setAttribute("rx",     "6");
+      rect.setAttribute("ry",     "6");
+      rect.setAttribute("fill",   "#1e2a38");
+      rect.setAttribute("stroke", "#4ea8e0");
+      rect.setAttribute("stroke-width", "1.5");
+      g.appendChild(rect);
+
+      // Node id text
+      const idText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      idText.setAttribute("x",           String(NODE_W / 2));
+      idText.setAttribute("y",           "20");
+      idText.setAttribute("text-anchor", "middle");
+      idText.setAttribute("fill",        "#a0c8f0");
+      idText.setAttribute("font-size",   "11");
+      idText.setAttribute("font-weight", "bold");
+      idText.textContent = node.id;
+      g.appendChild(idText);
+
+      // Trigger type badge
+      const badge = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      badge.setAttribute("x",           String(NODE_W / 2));
+      badge.setAttribute("y",           "36");
+      badge.setAttribute("text-anchor", "middle");
+      badge.setAttribute("fill",        "#7dd3fc");
+      badge.setAttribute("font-size",   "10");
+      badge.textContent = `[${node.triggerType}]`;
+      if (node.targetId) badge.textContent += ` ${node.targetId}`;
+      if (node.requiredCount > 1) badge.textContent += ` ×${node.requiredCount}`;
+      g.appendChild(badge);
+
+      // Description (truncated)
+      if (node.description) {
+        const desc = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        desc.setAttribute("x",           String(NODE_W / 2));
+        desc.setAttribute("y",           "52");
+        desc.setAttribute("text-anchor", "middle");
+        desc.setAttribute("fill",        "#94a3b8");
+        desc.setAttribute("font-size",   "9");
+        const descText = node.description.length > 28
+          ? node.description.slice(0, 25) + "…"
+          : node.description;
+        desc.textContent = descText;
+        g.appendChild(desc);
+      }
+
+      svg.appendChild(g);
+    }
+  }
+
+
   private _buildFooter(): HTMLElement {
     const footer = document.createElement("div");
     footer.className = "quest-creator__footer";
@@ -236,12 +411,14 @@ export class QuestCreatorUI {
       empty.className = "quest-creator__empty";
       empty.textContent = "No nodes yet. Click \"+ Add Node\" to begin.";
       this._nodeListEl.appendChild(empty);
+      this._renderGraph();
       return;
     }
 
     for (const node of nodes) {
       this._nodeListEl.appendChild(this._buildNodeCard(node));
     }
+    this._renderGraph();
   }
 
   private _buildNodeCard(node: QuestCreatorNodeDraft): HTMLElement {
