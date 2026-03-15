@@ -13,6 +13,10 @@ export interface QuestCreatorNodeDraft {
   targetId: string;
   requiredCount: number;
   prerequisites: string[];
+  /** Canvas X position for the graph view (auto-assigned on add). */
+  x: number;
+  /** Canvas Y position for the graph view (auto-assigned on add). */
+  y: number;
 }
 
 /** The top-level quest draft being edited. */
@@ -66,10 +70,12 @@ export class QuestCreatorSystem {
   /**
    * Append a new node to the draft.
    * `partial.id` is used when supplied; otherwise a unique auto-ID is generated.
+   * x/y canvas positions are auto-assigned in a grid layout when not provided.
    * Returns the final node ID.
    */
   addNode(partial: Partial<QuestCreatorNodeDraft> = {}): string {
-    const id = partial.id?.trim() || `node_${++this._nodeIdCounter}`;
+    const id  = partial.id?.trim() || `node_${++this._nodeIdCounter}`;
+    const pos = this._defaultPos(this._draft.nodes.length);
     const node: QuestCreatorNodeDraft = {
       id,
       description:   partial.description   ?? "",
@@ -77,9 +83,18 @@ export class QuestCreatorSystem {
       targetId:      partial.targetId      ?? "",
       requiredCount: Math.max(1, partial.requiredCount ?? 1),
       prerequisites: [...(partial.prerequisites ?? [])],
+      x:             partial.x             ?? pos.x,
+      y:             partial.y             ?? pos.y,
     };
     this._draft.nodes.push(node);
     return id;
+  }
+
+  /** Auto-layout position for the Nth node on the canvas (grid). */
+  private _defaultPos(index: number): { x: number; y: number } {
+    const col = index % 4;
+    const row = Math.floor(index / 4);
+    return { x: 40 + col * 280, y: 40 + row * 160 };
   }
 
   /**
@@ -98,6 +113,8 @@ export class QuestCreatorSystem {
     if (updates.targetId      !== undefined) node.targetId      = updates.targetId.trim();
     if (updates.requiredCount !== undefined) node.requiredCount = Math.max(1, updates.requiredCount);
     if (updates.prerequisites !== undefined) node.prerequisites = [...updates.prerequisites];
+    if (updates.x             !== undefined) node.x             = updates.x;
+    if (updates.y             !== undefined) node.y             = updates.y;
 
     return true;
   }
@@ -198,23 +215,28 @@ export class QuestCreatorSystem {
    */
   importFromJson(json: string): boolean {
     try {
-      const parsed = JSON.parse(json) as QuestDefinition;
+      const parsed = JSON.parse(json) as Record<string, unknown>;
       if (!parsed || typeof parsed.id !== "string" || !Array.isArray(parsed.nodes)) {
         return false;
       }
       this._draft = {
-        id:          parsed.id,
-        name:        parsed.name        ?? "",
-        description: parsed.description ?? "",
-        xpReward:    parsed.xpReward    ?? 0,
-        nodes:       parsed.nodes.map(n => ({
-          id:            n.id,
-          description:   n.description,
-          triggerType:   n.triggerType,
-          targetId:      n.targetId,
-          requiredCount: n.requiredCount,
-          prerequisites: n.prerequisites ? [...n.prerequisites] : [],
-        })),
+        id:          parsed.id as string,
+        name:        (parsed.name        as string)  ?? "",
+        description: (parsed.description as string)  ?? "",
+        xpReward:    (parsed.xpReward    as number)  ?? 0,
+        nodes:       (parsed.nodes as Array<Record<string, unknown>>).map((n, idx) => {
+          const pos = this._defaultPos(idx);
+          return {
+            id:            n.id            as string,
+            description:   n.description   as string,
+            triggerType:   n.triggerType   as QuestTriggerType,
+            targetId:      n.targetId      as string,
+            requiredCount: n.requiredCount as number,
+            prerequisites: Array.isArray(n.prerequisites) ? [...n.prerequisites as string[]] : [],
+            x:             typeof n.x === "number" ? n.x : pos.x,
+            y:             typeof n.y === "number" ? n.y : pos.y,
+          };
+        }),
       };
       this._nodeIdCounter = 0;
       return true;

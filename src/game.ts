@@ -88,6 +88,8 @@ import { FactionCreatorSystem } from "./systems/faction-creator-system";
 import { FactionCreatorUI } from "./ui/faction-creator-ui";
 import { LootTableCreatorSystem } from "./systems/loot-table-creator-system";
 import { LootTableCreatorUI } from "./ui/loot-table-creator-ui";
+import { SpawnCreatorSystem } from "./systems/spawn-creator-system";
+import { SpawnCreatorUI } from "./ui/spawn-creator-ui";
 import { EditorHubUI } from "./ui/editor-hub-ui";
 import { EditorLayout } from "./ui/editor-layout";
 import { buildHelpOverlayLines, summarizeValidationReport } from "./ui/editor-help-overlay";
@@ -155,6 +157,8 @@ export class Game {
   public factionCreatorUI: FactionCreatorUI;
   public lootTableCreatorSystem: LootTableCreatorSystem;
   public lootTableCreatorUI: LootTableCreatorUI;
+  public spawnCreatorSystem: SpawnCreatorSystem;
+  public spawnCreatorUI: SpawnCreatorUI;
   public editorHubUI: EditorHubUI;
   public editorLayout: EditorLayout;
   public fastTravelUI: FastTravelUI;
@@ -637,6 +641,13 @@ export class Game {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
     };
 
+    // ── Spawn Creator ──────────────────────────────────────────────────────────
+    this.spawnCreatorSystem = new SpawnCreatorSystem();
+    this.spawnCreatorUI = new SpawnCreatorUI(this.spawnCreatorSystem);
+    this.spawnCreatorUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+    };
+
     // ── Editor Hub ─────────────────────────────────────────────────────────────
     this.editorHubUI = new EditorHubUI({
       onOpen: (tool) => {
@@ -673,6 +684,9 @@ export class Game {
             break;
           case "lootTable":
             this.lootTableCreatorUI.open();
+            break;
+          case "spawn":
+            this.spawnCreatorUI.open();
             break;
         }
       },
@@ -1515,6 +1529,10 @@ export class Game {
                     this.lootTableCreatorUI.close();
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.spawnCreatorUI.isVisible) {
+                    this.spawnCreatorUI.close();
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
                 } else if (this.editorHubUI.isVisible) {
                     this.editorHubUI.close();
                     this.canvas.requestPointerLock();
@@ -1831,14 +1849,26 @@ export class Game {
                     }
                 }
             } else if (kbInfo.event.key === "F11") {
-                // F11 → Editor Hub
-                const isNowOpen = this.editorHubUI.toggle();
-                if (isNowOpen) {
-                    this.interactionSystem.isBlocked = true;
-                    document.exitPointerLock();
-                    this.player.camera.detachControl();
+                if (kbInfo.event.shiftKey) {
+                    // Shift+F11 → Spawn Creator
+                    if (this.spawnCreatorUI.isVisible) {
+                        this.spawnCreatorUI.close();
+                    } else {
+                        this.spawnCreatorUI.open();
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    }
                 } else {
-                    this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+                    // F11 → Editor Hub
+                    const isNowOpen = this.editorHubUI.toggle();
+                    if (isNowOpen) {
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    } else {
+                        this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+                    }
                 }
             } else if (kbInfo.event.key === "F12") {
                 if (kbInfo.event.shiftKey) {

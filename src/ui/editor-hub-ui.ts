@@ -24,7 +24,8 @@ export type EditorToolId =
   | "npc"
   | "item"
   | "faction"
-  | "lootTable";
+  | "lootTable"
+  | "spawn";
 
 export interface EditorHubCallbacks {
   /** Called when the user clicks a tool button. */
@@ -96,6 +97,14 @@ const TOOLS: ToolEntry[] = [
     description: "Build weighted loot tables with multi-roll support, guaranteed drops, sub-table chaining, level-range conditions, and empty-roll probability.",
     shortcut:    "Shift+F8",
     accentVar:   "#fbbf24",
+  },
+  {
+    id:          "spawn",
+    label:       "Loot + Spawn Creator",
+    icon:        "🏕",
+    description: "Author NPC spawn groups with archetype picker, loot table linking, count, level range, and respawn interval; inline validation hints flag issues before export.",
+    shortcut:    "Shift+F11",
+    accentVar:   "#6ee7b7",
   },
 ];
 
