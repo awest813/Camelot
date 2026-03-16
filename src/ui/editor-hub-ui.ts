@@ -195,9 +195,20 @@ export class EditorHubUI {
     // Footer
     const footer = document.createElement("div");
     footer.className = "editor-hub__footer";
-    footer.innerHTML =
-      `<span>Press <kbd>Esc</kbd> or click outside to close &nbsp;·&nbsp; </span>` +
-      `<span>Each tool can also be opened directly with its shortcut key</span>`;
+
+    const span1 = document.createElement("span");
+    span1.textContent = "Press ";
+    const kbd = document.createElement("kbd");
+    kbd.textContent = "Esc";
+    span1.appendChild(kbd);
+    span1.appendChild(document.createTextNode(" or click outside to close \u00A0·\u00A0 "));
+
+    const span2 = document.createElement("span");
+    span2.textContent = "Each tool can also be opened directly with its shortcut key";
+
+    footer.appendChild(span1);
+    footer.appendChild(span2);
+
     panel.appendChild(footer);
 
     document.body.appendChild(root);
