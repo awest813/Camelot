@@ -131,10 +131,26 @@ model.
 
 #### Release D — Collaboration + Scale
 
-- 🧭 Asset/prefab browser with tags, favorites, and dependency previews.
+- ✅ **Asset Browser** (`AssetBrowserSystem` + `AssetBrowserUI`, Shift+F6 / Editor Hub "🗂 Asset Browser") — searchable asset registry with type + tag filters and favorites; `importFromBundle()` bulk-registers all assets from a `.bundle.json`; per-asset detail panel shows description, tags, dependency graph (forward + reverse BFS), and an "Insert" callback for active-editor integration.
+- ✅ **Bundle Merge Assistant** (`BundleMergeSystem` + `BundleMergeUI`, Shift+F5 / Editor Hub "🔀 Bundle Merge") — load two `.bundle.json` files, auto-detect conflicting content IDs across all systems and map entities, choose per-conflict resolution strategy (`keep-base` / `keep-incoming` / `rename-incoming`), bulk-apply a strategy with one click, then export the merged bundle as a diff-friendly JSON download.
 - 🧭 Layer/stream controls for large worlds (region visibility, lock/hide, author ownership).
-- 🧭 Merge assistant for conflicting content IDs and cross-file references.
 - 🧭 Optional cloud-backed publishing target compatible with local offline workflow.
+
+---
+
+## Next Steps
+
+### Content GUI — Release D Remainder
+
+The remaining Release D items and natural follow-ons:
+
+1. **Layer author-ownership controls** — Add an `owner: string` field to each `EditorLayer`; display the author column in `MapEditorLayerPanel`; allow filtering entities by owner; lock layers belonging to other authors by default when ownership info is present in an imported map.
+
+2. **Asset Browser enhancements** — Full-text tag editor (add/remove tags on a selected asset); "Export Selected" button that writes a minimal `.bundle.json` containing only the selected asset and its transitive dependencies; asset-count badge on the Editor Hub card.
+
+3. **Cloud-backed / offline-sync publishing** — LocalStorage-backed "workspace" draft that auto-saves all creator system state; optional export-on-close prompt so authors never lose work mid-session.
+
+---
 
 ### Framework-First Consolidation
 

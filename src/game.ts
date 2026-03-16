@@ -103,6 +103,10 @@ import { StableUI } from "./ui/stable-ui";
 import { SaddlebagUI } from "./ui/saddlebag-ui";
 import { DailyScheduleSystem } from "./systems/daily-schedule-system";
 import { HorseSystem } from "./systems/horse-system";
+import { AssetBrowserSystem } from "./systems/asset-browser-system";
+import { AssetBrowserUI } from "./ui/asset-browser-ui";
+import { BundleMergeSystem } from "./systems/bundle-merge-system";
+import { BundleMergeUI } from "./ui/bundle-merge-ui";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -163,6 +167,10 @@ export class Game {
   public spawnCreatorUI: SpawnCreatorUI;
   public contentBundleSystem: ContentBundleSystem;
   public contentBundleUI: ContentBundleUI;
+  public assetBrowserSystem: AssetBrowserSystem;
+  public assetBrowserUI: AssetBrowserUI;
+  public bundleMergeSystem: BundleMergeSystem;
+  public bundleMergeUI: BundleMergeUI;
   public editorHubUI: EditorHubUI;
   public editorLayout: EditorLayout;
   public fastTravelUI: FastTravelUI;
@@ -696,6 +704,48 @@ export class Game {
       }
     };
 
+    // ── Asset Browser ──────────────────────────────────────────────────────────
+    this.assetBrowserSystem = new AssetBrowserSystem();
+    this.assetBrowserUI = new AssetBrowserUI(this.assetBrowserSystem);
+    this.assetBrowserUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
+    this.assetBrowserUI.onImportBundle = () => {
+      const inp = document.createElement("input");
+      inp.type = "file";
+      inp.accept = ".json,.bundle.json";
+      inp.addEventListener("change", () => {
+        const file = inp.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const parsed = JSON.parse(reader.result as string);
+            const n = this.assetBrowserSystem.importFromBundle(parsed);
+            this.assetBrowserUI.refresh();
+            this.ui.showNotification(`Asset Browser: imported ${n} asset${n !== 1 ? "s" : ""} from bundle.`, 2500);
+          } catch {
+            this.ui.showNotification("Asset Browser: failed to parse bundle JSON.", 2500);
+          }
+        };
+        reader.readAsText(file);
+      });
+      inp.click();
+    };
+
+    // ── Bundle Merge ────────────────────────────────────────────────────────────
+    this.bundleMergeSystem = new BundleMergeSystem();
+    this.bundleMergeUI = new BundleMergeUI(this.bundleMergeSystem);
+    this.bundleMergeUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
+
     // ── Editor Hub ─────────────────────────────────────────────────────────────
     this.editorHubUI = new EditorHubUI({
       onOpen: (tool) => {
@@ -738,6 +788,12 @@ export class Game {
             break;
           case "bundle":
             this.contentBundleUI.open();
+            break;
+          case "assets":
+            this.assetBrowserUI.open();
+            break;
+          case "merge":
+            this.bundleMergeUI.open();
             break;
         }
       },
@@ -1588,6 +1644,14 @@ export class Game {
                     this.contentBundleUI.close();
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.assetBrowserUI.isVisible) {
+                    this.assetBrowserUI.close();
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
+                } else if (this.bundleMergeUI.isVisible) {
+                    this.bundleMergeUI.close();
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
                 } else if (this.editorHubUI.isVisible) {
                     this.editorHubUI.close();
                     this.canvas.requestPointerLock();
@@ -1836,8 +1900,20 @@ export class Game {
                     this._refreshLayerPanel();
                 }
             } else if (kbInfo.event.key === "F6") {
-                if (!this.mapEditorSystem.isEnabled) return;
-                this._triggerMapImport();
+                if (kbInfo.event.shiftKey) {
+                    // Shift+F6 → Asset Browser
+                    if (this.assetBrowserUI.isVisible) {
+                        this.assetBrowserUI.close();
+                    } else {
+                        this.assetBrowserUI.open();
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    }
+                } else {
+                    if (!this.mapEditorSystem.isEnabled) return;
+                    this._triggerMapImport();
+                }
             } else if (kbInfo.event.key === "F7") {
                 if (kbInfo.event.shiftKey) {
                     // Shift+F7 → Content Bundle Dashboard
@@ -1986,7 +2062,19 @@ export class Game {
                     this._refreshLayerPanel();
                 }
             } else if (kbInfo.event.key === "F5") {
-                if (!this.isPaused) this.saveSystem.save();
+                if (kbInfo.event.shiftKey) {
+                    // Shift+F5 → Bundle Merge Assistant
+                    if (this.bundleMergeUI.isVisible) {
+                        this.bundleMergeUI.close();
+                    } else {
+                        this.bundleMergeUI.open();
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    }
+                } else {
+                    if (!this.isPaused) this.saveSystem.save();
+                }
             } else if (kbInfo.event.key === "F9") {
                 if (kbInfo.event.shiftKey) {
                     // Shift+F9 → Faction Creator
