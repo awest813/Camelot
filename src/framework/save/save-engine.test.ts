@@ -183,8 +183,9 @@ describe("SaveEngine", () => {
 
   it("loadFromStorage returns null on structural validation failure", () => {
     const engine = new SaveEngine(adapter, "framework");
-    // Missing required fields like profileId or state
-    storage.framework = JSON.stringify({ schemaVersion: 1 });
+    // Invalid type for profileId prevents normalization from recovering correctly
+    // leading to a failure. For example, setting profileId to an empty string.
+    storage.framework = JSON.stringify({ schemaVersion: 1, profileId: "" });
     const result = engine.loadFromStorage();
     expect(result).toBeNull();
   });

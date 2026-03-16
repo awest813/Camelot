@@ -1346,6 +1346,7 @@ export class UIManager {
     closeBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
     closeBtn.top = "-14px";
     closeBtn.onPointerUpObservable.add(() => this.toggleAttributePanel(false));
+    this._applyA11y(closeBtn, "Close Attribute Panel");
     panel.addControl(closeBtn);
   }
 
