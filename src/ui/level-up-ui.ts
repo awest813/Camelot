@@ -64,8 +64,9 @@ export class LevelUpUI {
     this._refresh();
     if (this._root) this._root.style.display = "grid";
     this.isVisible = true;
-    // Move keyboard focus into the dialog for accessibility.
-    this._confirmBtn?.focus();
+    // Move keyboard focus to the first attribute button for accessibility.
+    const firstAttrBtn = this._rowEls.get("strength");
+    firstAttrBtn?.focus();
   }
 
   public close(): void {

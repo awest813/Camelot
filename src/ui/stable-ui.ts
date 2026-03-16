@@ -46,7 +46,7 @@ export class StableUI {
 
     this._horses = horses.slice();
     this._playerGold = playerGold;
-    const first = horses.find(h => !h.isOwned) ?? horses[0] ?? null;
+    const first = horses.find(h => !h.isOwned) ?? null;
     this._selectedId = first?.id ?? null;
 
     this._titleEl.textContent = `${npcName}: "Welcome to the stables."`;
