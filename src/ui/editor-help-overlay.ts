@@ -29,6 +29,8 @@ const EDITOR_CONTROLS: readonly string[] = [
   "Shift+F8: Open Loot Table Creator",
   "Shift+F11: Open Loot + Spawn Creator",
   "Shift+F7: Open Content Bundle Dashboard",
+  "Shift+F6: Open Asset Browser",
+  "Shift+F5: Open Bundle Merge Assistant",
   "Esc: Exit Editor",
 ];
 

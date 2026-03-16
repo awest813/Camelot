@@ -26,7 +26,9 @@ export type EditorToolId =
   | "faction"
   | "lootTable"
   | "spawn"
-  | "bundle";
+  | "bundle"
+  | "assets"
+  | "merge";
 
 export interface EditorHubCallbacks {
   /** Called when the user clicks a tool button. */
@@ -114,6 +116,22 @@ const TOOLS: ToolEntry[] = [
     description: "Pre-publish validation dashboard: aggregate diagnostics across all creator systems, review issues, export a deterministically-keyed JSON content bundle, and jump to any tool for rapid iteration.",
     shortcut:    "Shift+F7",
     accentVar:   "#818cf8",
+  },
+  {
+    id:          "assets",
+    label:       "Asset Browser",
+    icon:        "🗂",
+    description: "Searchable asset library: import a .bundle.json to register all its assets, then filter by type, tags, or favorites; view dependency and dependent graphs per asset; insert assets into the active editor.",
+    shortcut:    "Shift+F6",
+    accentVar:   "#67e8f9",
+  },
+  {
+    id:          "merge",
+    label:       "Bundle Merge",
+    icon:        "🔀",
+    description: "Merge two content bundles: load a base and an incoming .bundle.json, detect conflicting content IDs across all systems, choose a per-conflict resolution strategy, then export the merged bundle.",
+    shortcut:    "Shift+F5",
+    accentVar:   "#86efac",
   },
 ];
 
