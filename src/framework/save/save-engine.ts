@@ -69,9 +69,20 @@ export class SaveEngine {
     if (!this._storage) {
       throw new Error("SaveEngine storage adapter is not configured.");
     }
-    const raw = this._storage.getItem(this._storageKey);
-    if (!raw) return null;
-    return this.deserialize(raw);
+    try {
+      const raw = this._storage.getItem(this._storageKey);
+      if (!raw) return null;
+
+      const deserialized = this.deserialize(raw);
+      const validation = this.validateSaveFile(deserialized);
+      if (!validation.valid) {
+        return null;
+      }
+
+      return deserialized;
+    } catch {
+      return null;
+    }
   }
 
   /**
