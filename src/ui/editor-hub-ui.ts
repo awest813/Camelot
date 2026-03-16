@@ -141,9 +141,27 @@ export class EditorHubUI {
   private readonly _callbacks: EditorHubCallbacks;
   private _root: HTMLElement | null = null;
   private _keyHandler: ((e: KeyboardEvent) => void) | null = null;
+  /** Maps toolId → badge <span> element for live count updates. */
+  private readonly _badges = new Map<EditorToolId, HTMLElement>();
 
   constructor(callbacks: EditorHubCallbacks) {
     this._callbacks = callbacks;
+  }
+
+  /**
+   * Update (or clear) the numeric badge on a tool card.
+   * Call after the hub is built; silently ignored if the hub hasn't opened yet.
+   * @param count  A positive number shows a badge; 0 hides it.
+   */
+  setBadge(toolId: EditorToolId, count: number): void {
+    const badge = this._badges.get(toolId);
+    if (!badge) return;
+    if (count > 0) {
+      badge.textContent = String(count);
+      badge.hidden = false;
+    } else {
+      badge.hidden = true;
+    }
   }
 
   get isVisible(): boolean {
@@ -267,9 +285,22 @@ export class EditorHubUI {
     card.style.setProperty("--tool-accent", tool.accentVar);
     card.setAttribute("aria-label", `Open ${tool.label}`);
 
+    const iconWrap = document.createElement("div");
+    iconWrap.className = "editor-hub__tool-icon-wrap";
+
     const iconEl = document.createElement("div");
     iconEl.className   = "editor-hub__tool-icon";
     iconEl.textContent = tool.icon;
+
+    // Badge for live count (e.g. asset count on the Asset Browser card)
+    const badge = document.createElement("span");
+    badge.className = "editor-hub__badge";
+    badge.hidden    = true;
+    badge.setAttribute("aria-label", `${tool.label} count`);
+    this._badges.set(tool.id, badge);
+
+    iconWrap.appendChild(iconEl);
+    iconWrap.appendChild(badge);
 
     const body = document.createElement("div");
     body.className = "editor-hub__tool-body";
@@ -295,7 +326,7 @@ export class EditorHubUI {
     body.appendChild(nameRow);
     body.appendChild(desc);
 
-    card.appendChild(iconEl);
+    card.appendChild(iconWrap);
     card.appendChild(body);
 
     card.addEventListener("click", () => {

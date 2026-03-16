@@ -49,6 +49,12 @@ export class MapEditorLayerPanel {
   /** Fired when the user toggles layer lock. */
   public onLayerLockChange: ((name: EditorLayerName, locked: boolean) => void) | null = null;
 
+  /**
+   * The current author name; used to visually distinguish foreign-author
+   * layers (shown with a muted badge).  Set before calling `refresh()`.
+   */
+  public currentAuthor: string = "";
+
   private readonly _ui: AdvancedDynamicTexture;
   private readonly _panel: Rectangle;
   private readonly _listStack: StackPanel;
@@ -144,22 +150,43 @@ export class MapEditorLayerPanel {
 
   private _buildRow(layer: EditorLayer, count: number): Rectangle {
     const { icon, color } = LAYER_META[layer.name];
+    const isForeign =
+      this.currentAuthor !== "" &&
+      layer.owner !== undefined &&
+      layer.owner !== "" &&
+      layer.owner !== this.currentAuthor;
+
+    const hasOwner = layer.owner !== undefined && layer.owner !== "";
+    // Row height expands to show the owner sub-row when ownership info is present
+    const rowHeight = hasOwner ? "42px" : "30px";
 
     const row = new Rectangle(`editorLayerRow_${layer.name}`);
     row.width           = "210px";
-    row.height          = "30px";
-    row.background      = L.ROW_BG;
+    row.height          = rowHeight;
+    row.background      = isForeign ? "rgba(60, 20, 20, 0.70)" : L.ROW_BG;
     row.thickness       = 0;
     row.paddingBottom   = "1px";
     row.isPointerBlocker = true;
-    row.onPointerEnterObservable.add(() => { row.background = L.ROW_HOVER; });
-    row.onPointerOutObservable.add(() => { row.background = L.ROW_BG; });
+    row.onPointerEnterObservable.add(() => {
+      row.background = isForeign ? "rgba(80, 30, 30, 0.85)" : L.ROW_HOVER;
+    });
+    row.onPointerOutObservable.add(() => {
+      row.background = isForeign ? "rgba(60, 20, 20, 0.70)" : L.ROW_BG;
+    });
 
+    // Outer vertical stack (controls row + optional owner sub-row)
+    const outerStack = new StackPanel(`editorLayerOuter_${layer.name}`);
+    outerStack.isVertical = true;
+    outerStack.width      = "210px";
+    outerStack.height     = rowHeight;
+    row.addControl(outerStack);
+
+    // ── Controls row ─────────────────────────────────────────────────────────
     const inner = new StackPanel(`editorLayerRowInner_${layer.name}`);
     inner.isVertical = false;
     inner.width      = "210px";
     inner.height     = "30px";
-    row.addControl(inner);
+    outerStack.addControl(inner);
 
     // Type icon
     const iconBlock = new TextBlock(`editorLayerIcon_${layer.name}`, icon);
@@ -175,7 +202,7 @@ export class MapEditorLayerPanel {
     const nameBlock = new TextBlock(`editorLayerName_${layer.name}`, layer.label);
     nameBlock.color    = layer.isVisible ? L.TEXT : L.HIDDEN_TEXT;
     nameBlock.fontSize = 11;
-    nameBlock.width    = "78px";
+    nameBlock.width    = "68px";
     nameBlock.height   = "30px";
     nameBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     inner.addControl(nameBlock);
@@ -184,7 +211,7 @@ export class MapEditorLayerPanel {
     const countBadge = new TextBlock(`editorLayerCount_${layer.name}`, `(${count})`);
     countBadge.color    = L.DIM;
     countBadge.fontSize = 10;
-    countBadge.width    = "30px";
+    countBadge.width    = "26px";
     countBadge.height   = "30px";
     countBadge.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     inner.addControl(countBadge);
@@ -230,6 +257,32 @@ export class MapEditorLayerPanel {
       this.onLayerLockChange?.(layer.name, !layer.isLocked);
     });
     inner.addControl(lockBtn);
+
+    // ── Owner sub-row ─────────────────────────────────────────────────────────
+    if (hasOwner) {
+      const ownerRow = new StackPanel(`editorLayerOwnerRow_${layer.name}`);
+      ownerRow.isVertical = false;
+      ownerRow.width      = "210px";
+      ownerRow.height     = "12px";
+      ownerRow.paddingLeft = "28px";
+      outerStack.addControl(ownerRow);
+
+      const ownerIcon = new TextBlock(`editorLayerOwnerIcon_${layer.name}`, isForeign ? "🔐" : "✍");
+      ownerIcon.color    = isForeign ? "#E08830" : L.DIM;
+      ownerIcon.fontSize = 9;
+      ownerIcon.width    = "14px";
+      ownerIcon.height   = "12px";
+      ownerIcon.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+      ownerRow.addControl(ownerIcon);
+
+      const ownerLabel = new TextBlock(`editorLayerOwnerLabel_${layer.name}`, layer.owner!);
+      ownerLabel.color    = isForeign ? "#E08830" : L.DIM;
+      ownerLabel.fontSize = 9;
+      ownerLabel.width    = "164px";
+      ownerLabel.height   = "12px";
+      ownerLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+      ownerRow.addControl(ownerLabel);
+    }
 
     return row;
   }

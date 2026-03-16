@@ -140,15 +140,31 @@ model.
 
 ## Next Steps
 
-### Content GUI — Release D Remainder
+### Content GUI — Release D Remainder ✅
 
-The remaining Release D items and natural follow-ons:
+All planned Release D remainder items delivered:
 
-1. **Layer author-ownership controls** — Add an `owner: string` field to each `EditorLayer`; display the author column in `MapEditorLayerPanel`; allow filtering entities by owner; lock layers belonging to other authors by default when ownership info is present in an imported map.
+1. ✅ **Layer author-ownership controls** — `owner?: string` added to `EditorLayer`; `MapEditorSystem.currentAuthor` + `setLayerOwner()` method; foreign-author layers auto-locked on `importMap()` when both `currentAuthor` and `layer.owner` are set and differ; `MapEditorLayerPanel` shows owner sub-row per layer (amber text + 🔐 icon for foreign layers, muted for own).
 
-2. **Asset Browser enhancements** — Full-text tag editor (add/remove tags on a selected asset); "Export Selected" button that writes a minimal `.bundle.json` containing only the selected asset and its transitive dependencies; asset-count badge on the Editor Hub card.
+2. ✅ **Asset Browser enhancements** — Inline tag editor in detail panel (removable chips + add-tag input + "Add" button; changes committed live to registry); "⬇ Export Selected" button writes the selected asset + all transitive dependencies as `{id}_export.assets.json`; `EditorHubUI.setBadge(toolId, count)` updates a numeric badge on any tool card — wired on bundle import to show live asset count on the "🗂 Asset Browser" card.
 
-3. **Cloud-backed / offline-sync publishing** — LocalStorage-backed "workspace" draft that auto-saves all creator system state; optional export-on-close prompt so authors never lose work mid-session.
+3. ✅ **LocalStorage workspace draft** (`WorkspaceDraftSystem`, 20 tests) — `markDirty()` debounces a 2 s auto-save across all 8 creator systems; `restore()` reloads all stored system states on next session with a "Draft restored" HUD notification; `hasDraft()` / `clearDraft()` / `peekDraft()` / `getDraftSavedAt()` for programmatic control; `onSaved` callback shows a "Workspace draft auto-saved" notification after each auto-save; `markDirty()` wired to every creator UI `onClose`.
+
+---
+
+---
+
+## Next Steps
+
+### Content GUI — Release E (World-Scale Editing)
+
+Now that the full collaboration layer is in place, the next delivery focuses on **making large worlds tractable**:
+
+1. **Region-based streaming controls** — Add a `RegionSystem` (`src/systems/region-system.ts`) that partitions the map into named rectangular/spherical regions; expose visibility/active toggles per region in the layer panel so authors can work on one zone without loading every entity; integrate with `LodSystem` so inactive regions bypass LOD updates.
+
+2. **CLI / dev tooling** — A small Node.js script (`tools/validate-bundle.mjs`) that accepts a `.bundle.json` path, runs `ContentBundleSystem` validation headlessly (no browser required), and exits non-zero on errors; suitable for CI pipelines and pre-commit hooks.
+
+3. **Automated regression coverage** — Add quest-and-inventory integration test suite (`src/framework/quest-inventory.integration.test.ts`) covering pick-up-fetch-quest flows end-to-end using the headless framework engines, targeting known edge-cases: item-consume effects, multi-objective quest completion ordering, and faction-disposition gating.
 
 ---
 
