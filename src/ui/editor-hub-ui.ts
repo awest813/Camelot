@@ -122,6 +122,7 @@ export class EditorHubUI {
 
   private readonly _callbacks: EditorHubCallbacks;
   private _root: HTMLElement | null = null;
+  private _keyHandler: ((e: KeyboardEvent) => void) | null = null;
 
   constructor(callbacks: EditorHubCallbacks) {
     this._callbacks = callbacks;
@@ -134,13 +135,23 @@ export class EditorHubUI {
   open(): void {
     if (this._root) {
       this._root.hidden = false;
-      return;
+    } else {
+      this._build();
     }
-    this._build();
+    if (!this._keyHandler) {
+      this._keyHandler = (e: KeyboardEvent) => {
+        if (e.key === "Escape") this.close();
+      };
+      document.addEventListener("keydown", this._keyHandler);
+    }
   }
 
   close(): void {
     if (this._root) this._root.hidden = true;
+    if (this._keyHandler) {
+      document.removeEventListener("keydown", this._keyHandler);
+      this._keyHandler = null;
+    }
     this.onClose?.();
   }
 

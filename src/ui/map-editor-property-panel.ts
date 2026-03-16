@@ -309,10 +309,7 @@ export class MapEditorPropertyPanel {
 
     const props: EditorEntityProperties = {};
     for (const [key, input] of this._inputMap) {
-      const val = input.text.trim();
-      if (val !== "") {
-        (props as Record<string, string>)[key] = val;
-      }
+      (props as Record<string, string>)[key] = input.text.trim();
     }
 
     this.onApply?.(this._currentEntityId, props);
