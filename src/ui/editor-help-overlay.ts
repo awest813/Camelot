@@ -28,6 +28,7 @@ const EDITOR_CONTROLS: readonly string[] = [
   "Shift+F9: Open Faction Creator",
   "Shift+F8: Open Loot Table Creator",
   "Shift+F11: Open Loot + Spawn Creator",
+  "Shift+F7: Open Content Bundle Dashboard",
   "Esc: Exit Editor",
 ];
 
