@@ -124,10 +124,10 @@ model.
 
 #### Release C — Validation + Packaging Workflow
 
-- 🧭 Pre-publish validation dashboard aggregating map, quest, dialogue, and mod schema diagnostics.
-- 🧭 One-click content bundle export (map pack + quest/dialogue data + manifest).
-- 🧭 Diff-friendly JSON normalization and deterministic key ordering for source control reviews.
-- 🧭 "Play from here" test harness launchers for rapid iteration on selected content slices.
+- ✅ **Pre-publish validation dashboard** — `ContentBundleUI` (HTML overlay, Shift+F7 / Editor Hub "bundle") aggregates per-system diagnostics from all attached creator systems (map, quest, dialogue, faction, loot table, NPC, item, spawn) in a single scrollable dashboard with per-system pass/fail rows and expandable issue lists.
+- ✅ **One-click content bundle export** — `ContentBundleSystem.exportToFile()` writes a single `.bundle.json` file containing the manifest and all attached system payloads; `buildBundle()` returns the structured object for programmatic use.
+- ✅ **Diff-friendly JSON normalization** — `sortKeysDeep()` / `toNormalizedJson()` utilities recursively sort all object keys alphabetically so exported bundle JSON is stable and produces clean diffs regardless of authoring order.
+- ✅ **"Play from here" test harness launchers** — each system row in `ContentBundleUI` has an "▶ Open" button that closes the dashboard and fires `onPlayFromHere(systemId)` so the game layer immediately opens the matching creator UI (quest, dialogue, faction, loot table, NPC, item, spawn, or map editor) for rapid content iteration.
 
 #### Release D — Collaboration + Scale
 
@@ -321,3 +321,9 @@ Completed in SAVE_VERSION 19. Key deliverables:
 - ✅ **Dialogue Tree GUI** — `DialogueCreatorUI` condition/effect editors (flag, faction, quest, item, skill checks; set_flag, faction_delta, emit_event, activate_quest, consume/give item effects) in expandable per-choice panels.
 - ✅ **Loot + Spawn GUI** — `SpawnCreatorSystem` + `SpawnCreatorUI` (Shift+F11 / Editor Hub): archetype picker, loot table link, count/level range/respawn interval, inline validation hints, JSON export/import.
 - ✅ **Shared SchemaFieldBuilder** (`src/ui/schema-field-builder.ts`) — generic labeled control factory (`text`/`number`/`checkbox`/`select`/`textarea`) consuming field descriptors; used by `SpawnCreatorUI`.
+
+### Content GUI — Release C (Validation + Packaging Workflow) ✅
+- ✅ **ContentBundleSystem** (`src/systems/content-bundle-system.ts`) — headless aggregation layer: `attach*()` methods register each creator system; `validate()` runs every attached system's validator and returns a unified `ContentBundleReport` (per-system `BundleSystemReport` with `valid`, `label`, and normalised `issues[]`); `buildBundle()` / `exportToJson()` / `exportToFile()` produce the full content bundle; `sortKeysDeep()` / `toNormalizedJson()` helpers ensure all exported JSON uses deterministic alphabetical key ordering; `getPlayFromHereConfig(id)` returns metadata for the quick-open "play from here" button.
+- ✅ **ContentBundleUI** (`src/ui/content-bundle-ui.ts`) — HTML overlay (Shift+F7 / Editor Hub "📦 Content Bundle"): bundle metadata form (title, description, author); per-system diagnostic rows with pass/fail icons, issue counts, expandable issue lists, and "▶ Open" quick-open buttons; "Validate All" and "⬇ Export Bundle" action buttons; `onPlayFromHere` callback opens matching creator UI without re-navigating manually.
+- ✅ **Editor Hub expanded** — "Content Bundle" tool card added to the F11 Editor Hub launcher grid (shortcut Shift+F7, indigo accent).
+- ✅ **Keybinding** — Shift+F7 toggles `ContentBundleUI`; also listed in the F1 help overlay and the Editor Hub.

@@ -90,6 +90,8 @@ import { LootTableCreatorSystem } from "./systems/loot-table-creator-system";
 import { LootTableCreatorUI } from "./ui/loot-table-creator-ui";
 import { SpawnCreatorSystem } from "./systems/spawn-creator-system";
 import { SpawnCreatorUI } from "./ui/spawn-creator-ui";
+import { ContentBundleSystem } from "./systems/content-bundle-system";
+import { ContentBundleUI } from "./ui/content-bundle-ui";
 import { EditorHubUI } from "./ui/editor-hub-ui";
 import { EditorLayout } from "./ui/editor-layout";
 import { buildHelpOverlayLines, summarizeValidationReport } from "./ui/editor-help-overlay";
@@ -159,6 +161,8 @@ export class Game {
   public lootTableCreatorUI: LootTableCreatorUI;
   public spawnCreatorSystem: SpawnCreatorSystem;
   public spawnCreatorUI: SpawnCreatorUI;
+  public contentBundleSystem: ContentBundleSystem;
+  public contentBundleUI: ContentBundleUI;
   public editorHubUI: EditorHubUI;
   public editorLayout: EditorLayout;
   public fastTravelUI: FastTravelUI;
@@ -648,6 +652,50 @@ export class Game {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
     };
 
+    // ── Content Bundle ─────────────────────────────────────────────────────────
+    this.contentBundleSystem = new ContentBundleSystem();
+    this.contentBundleSystem
+      .attachQuest(this.questCreatorSystem)
+      .attachDialogue(this.dialogueCreatorSystem)
+      .attachFaction(this.factionCreatorSystem)
+      .attachLootTable(this.lootTableCreatorSystem)
+      .attachNpc(this.npcCreatorSystem)
+      .attachItem(this.itemCreatorSystem)
+      .attachSpawn(this.spawnCreatorSystem);
+    this.contentBundleUI = new ContentBundleUI(this.contentBundleSystem);
+    this.contentBundleUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
+    this.contentBundleUI.onPlayFromHere = (systemId) => {
+      this.interactionSystem.isBlocked = true;
+      document.exitPointerLock();
+      this.player.camera.detachControl();
+      switch (systemId) {
+        case "map":
+          if (!this.mapEditorSystem.isEnabled) {
+            this.mapEditorSystem.toggle();
+            this.mapEditorToolbar.show();
+            this.editorLayout.setVisible("hierarchy", true);
+            this.editorLayout.setVisible("palette", true);
+            this.editorLayout.setVisible("layers", true);
+            this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+            this._refreshEditorToolbar();
+          }
+          break;
+        case "quest":     this.questCreatorUI.open();     break;
+        case "dialogue":  this.dialogueCreatorUI.open();  break;
+        case "faction":   this.factionCreatorUI.open();   break;
+        case "lootTable": this.lootTableCreatorUI.open(); break;
+        case "npc":       this.npcCreatorUI.open();       break;
+        case "item":      this.itemCreatorUI.open();      break;
+        case "spawn":     this.spawnCreatorUI.open();     break;
+        default: break;
+      }
+    };
+
     // ── Editor Hub ─────────────────────────────────────────────────────────────
     this.editorHubUI = new EditorHubUI({
       onOpen: (tool) => {
@@ -687,6 +735,9 @@ export class Game {
             break;
           case "spawn":
             this.spawnCreatorUI.open();
+            break;
+          case "bundle":
+            this.contentBundleUI.open();
             break;
         }
       },
@@ -1533,6 +1584,10 @@ export class Game {
                     this.spawnCreatorUI.close();
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.contentBundleUI.isVisible) {
+                    this.contentBundleUI.close();
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
                 } else if (this.editorHubUI.isVisible) {
                     this.editorHubUI.close();
                     this.canvas.requestPointerLock();
@@ -1784,18 +1839,32 @@ export class Game {
                 if (!this.mapEditorSystem.isEnabled) return;
                 this._triggerMapImport();
             } else if (kbInfo.event.key === "F7") {
-                if (!this.mapEditorSystem.isEnabled) return;
-                const validationVisible = this.editorLayout.getPanelState("validation")?.isVisible ?? false;
-                if (validationVisible) {
-                    this.editorLayout.setVisible("validation", false);
+                if (kbInfo.event.shiftKey) {
+                    // Shift+F7 → Content Bundle Dashboard
+                    if (this.contentBundleUI.isVisible) {
+                        this.contentBundleUI.close();
+                    } else {
+                        this.contentBundleSystem.attachMap(this.mapEditorSystem);
+                        this.contentBundleUI.open();
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    }
                 } else {
-                    const validation = this.mapEditorSystem.validateMap(0.5, {
-                      knownLootTableIds: this.lootTableSystem.getTableIds(),
-                    });
-                    this.mapEditorValidationPanel.show(validation);
-                    this.editorLayout.setVisible("validation", true);
-                    if (!validation.isValid) {
-                      console.warn("[MapEditorValidation]", validation.issues);
+                    // F7 → Map validation panel (editor mode only)
+                    if (!this.mapEditorSystem.isEnabled) return;
+                    const validationVisible = this.editorLayout.getPanelState("validation")?.isVisible ?? false;
+                    if (validationVisible) {
+                        this.editorLayout.setVisible("validation", false);
+                    } else {
+                        const validation = this.mapEditorSystem.validateMap(0.5, {
+                          knownLootTableIds: this.lootTableSystem.getTableIds(),
+                        });
+                        this.mapEditorValidationPanel.show(validation);
+                        this.editorLayout.setVisible("validation", true);
+                        if (!validation.isValid) {
+                          console.warn("[MapEditorValidation]", validation.issues);
+                        }
                     }
                 }
             } else if (kbInfo.event.key === "F8") {
