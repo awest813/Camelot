@@ -412,20 +412,10 @@ export class AssetBrowserUI {
       this._detailEl.appendChild(desc);
     }
 
-    // Tags
-    if (asset.tags.length > 0) {
-      const tagsSection = this._makeDetailSection("Tags");
-      const tagsWrap = document.createElement("div");
-      tagsWrap.className = "asset-browser__detail-tags";
-      for (const tag of asset.tags) {
-        const t = document.createElement("span");
-        t.className   = "asset-browser__tag";
-        t.textContent = tag;
-        tagsWrap.appendChild(t);
-      }
-      tagsSection.appendChild(tagsWrap);
-      this._detailEl.appendChild(tagsSection);
-    }
+    // Tags — inline tag editor
+    const tagsSection = this._makeDetailSection("Tags");
+    tagsSection.appendChild(this._buildTagEditor(asset));
+    this._detailEl.appendChild(tagsSection);
 
     // Dependencies
     const deps = this._sys.getDependencies(id);
@@ -454,13 +444,155 @@ export class AssetBrowserUI {
       this._detailEl.appendChild(depSection);
     }
 
-    // Insert button
+    // Action buttons
+    const btnRow = document.createElement("div");
+    btnRow.className = "asset-browser__detail-btn-row";
+
     const insertBtn = document.createElement("button");
     insertBtn.className   = "asset-browser__btn asset-browser__btn--primary";
-    insertBtn.textContent = "↗ Insert Asset";
+    insertBtn.textContent = "↗ Insert";
     insertBtn.title       = "Insert this asset into the active editor";
     insertBtn.addEventListener("click", () => this.onInsert?.(asset));
-    this._detailEl.appendChild(insertBtn);
+
+    const exportBtn = document.createElement("button");
+    exportBtn.className   = "asset-browser__btn asset-browser__btn--secondary";
+    exportBtn.textContent = "⬇ Export Selected";
+    exportBtn.title       = "Export this asset and its transitive dependencies as a minimal .bundle.json";
+    exportBtn.addEventListener("click", () => this._exportSelected(id));
+
+    btnRow.appendChild(insertBtn);
+    btnRow.appendChild(exportBtn);
+    this._detailEl.appendChild(btnRow);
+  }
+
+  // ── Tag editor ─────────────────────────────────────────────────────────────
+
+  /**
+   * Inline tag editor for the detail panel.
+   * Shows existing tags as removable chips and an input to add new tags.
+   * Changes are committed immediately to the asset registry.
+   */
+  private _buildTagEditor(asset: AssetEntry): HTMLElement {
+    const wrap = document.createElement("div");
+    wrap.className = "asset-browser__tag-editor";
+
+    const chipWrap = document.createElement("div");
+    chipWrap.className = "asset-browser__tag-editor-chips";
+
+    const renderChips = () => {
+      chipWrap.innerHTML = "";
+      const current = this._sys.getById(asset.id);
+      for (const tag of current?.tags ?? []) {
+        const chip = document.createElement("span");
+        chip.className = "asset-browser__tag asset-browser__tag--editable";
+
+        const label = document.createElement("span");
+        label.textContent = tag;
+        chip.appendChild(label);
+
+        const removeBtn = document.createElement("button");
+        removeBtn.className   = "asset-browser__tag-remove";
+        removeBtn.textContent = "×";
+        removeBtn.setAttribute("aria-label", `Remove tag "${tag}"`);
+        removeBtn.addEventListener("click", () => {
+          const fresh = this._sys.getById(asset.id);
+          if (!fresh) return;
+          this._sys.register({ ...fresh, tags: fresh.tags.filter((t) => t !== tag) });
+          renderChips();
+          this._refresh();
+        });
+        chip.appendChild(removeBtn);
+        chipWrap.appendChild(chip);
+      }
+
+      if ((this._sys.getById(asset.id)?.tags ?? []).length === 0) {
+        const none = document.createElement("span");
+        none.className   = "asset-browser__detail-none";
+        none.textContent = "No tags.";
+        chipWrap.appendChild(none);
+      }
+    };
+
+    renderChips();
+    wrap.appendChild(chipWrap);
+
+    // Add-tag row
+    const addRow = document.createElement("div");
+    addRow.className = "asset-browser__tag-add-row";
+
+    const tagInput = document.createElement("input");
+    tagInput.type        = "text";
+    tagInput.placeholder = "Add tag…";
+    tagInput.className   = "asset-browser__tag-input";
+    tagInput.setAttribute("aria-label", "New tag");
+
+    const addBtn = document.createElement("button");
+    addBtn.className   = "asset-browser__btn asset-browser__btn--tag-add";
+    addBtn.textContent = "+ Add";
+
+    const doAdd = () => {
+      const raw = tagInput.value.trim().toLowerCase().replace(/\s+/g, "-");
+      if (!raw) return;
+      const fresh = this._sys.getById(asset.id);
+      if (!fresh) return;
+      if (!fresh.tags.includes(raw)) {
+        this._sys.register({ ...fresh, tags: [...fresh.tags, raw] });
+        renderChips();
+        this._refresh();
+      }
+      tagInput.value = "";
+      tagInput.focus();
+    };
+
+    addBtn.addEventListener("click", doAdd);
+    tagInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doAdd(); } });
+
+    addRow.appendChild(tagInput);
+    addRow.appendChild(addBtn);
+    wrap.appendChild(addRow);
+
+    return wrap;
+  }
+
+  // ── Export Selected ────────────────────────────────────────────────────────
+
+  /**
+   * Build a minimal `ContentBundleExport` containing the selected asset and
+   * all its transitive dependencies, then trigger a browser file download.
+   */
+  private _exportSelected(id: string): void {
+    const asset = this._sys.getById(id);
+    if (!asset) return;
+
+    const allAssets = [asset, ...this._sys.getTransitiveDependencies(id)];
+
+    // Build a minimal bundle with just these assets as a "map" payload
+    // (since the full creator-system data isn't available here, we export
+    //  a structured asset-list bundle that can be re-imported by the Asset Browser)
+    const payload = {
+      schemaVersion: 1 as const,
+      exportedAt:    new Date().toISOString(),
+      assetCount:    allAssets.length,
+      assets:        allAssets.map((a) => ({
+        id:           a.id,
+        name:         a.name,
+        type:         a.type,
+        tags:         a.tags,
+        description:  a.description,
+        dependencies: a.dependencies,
+      })),
+    };
+
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `${id}_export.assets.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
   private _makeDetailSection(title: string): HTMLElement {

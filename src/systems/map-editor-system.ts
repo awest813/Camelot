@@ -18,6 +18,12 @@ export interface EditorLayer {
   label: string;
   isVisible: boolean;
   isLocked: boolean;
+  /**
+   * Optional author identifier for this layer.
+   * When set, layers owned by a different author are automatically
+   * locked on import to prevent accidental edits.
+   */
+  owner?: string;
 }
 
 /** Default layer assignment per placement type. */
@@ -95,8 +101,8 @@ export interface MapExportData {
   }>;
   /** Optional map-level author notes or description. */
   notes?: string;
-  /** Persisted layer visibility/lock states. */
-  layers?: Array<{ name: EditorLayerName; isVisible: boolean; isLocked: boolean }>;
+  /** Persisted layer visibility/lock states (including optional owner). */
+  layers?: Array<{ name: EditorLayerName; isVisible: boolean; isLocked: boolean; owner?: string }>;
 }
 
 export interface MapValidationIssue {
@@ -189,6 +195,12 @@ export class MapEditorSystem {
   public terrainSculptStep: number = 0.5;
   /** Scene-level notes / description (persisted in map export). */
   public notes: string = "";
+  /**
+   * The current author identifier used for layer ownership.
+   * When set, layers owned by a different author are auto-locked on import.
+   * Persisted in the map export under each layer record.
+   */
+  public currentAuthor: string = "";
 
   /**
    * Called whenever the selected entity changes.
@@ -343,6 +355,17 @@ export class MapEditorSystem {
         e.mesh.metadata = { ...(e.mesh.metadata ?? {}), editable: !locked };
       }
     }
+    this.onLayerChanged?.({ ...layer });
+  }
+
+  /**
+   * Set the owner of a layer.
+   * Fires `onLayerChanged` so the layer panel can update the owner column.
+   */
+  setLayerOwner(name: EditorLayerName, owner: string): void {
+    const layer = this._layers.get(name);
+    if (!layer) return;
+    layer.owner = owner.trim() || undefined;
     this.onLayerChanged?.({ ...layer });
   }
 
@@ -747,6 +770,7 @@ export class MapEditorSystem {
       name: l.name,
       isVisible: l.isVisible,
       isLocked: l.isLocked,
+      ...(l.owner !== undefined ? { owner: l.owner } : {}),
     }));
 
     const data: MapExportData = { version: 1, entries, patrolRoutes, layers };
@@ -906,6 +930,16 @@ export class MapEditorSystem {
         if (!layer) continue;
         layer.isVisible = saved.isVisible;
         layer.isLocked  = saved.isLocked;
+        if (saved.owner !== undefined) layer.owner = saved.owner;
+        // Auto-lock layers owned by a different author
+        const isForeign =
+          this.currentAuthor !== "" &&
+          saved.owner !== undefined &&
+          saved.owner !== "" &&
+          saved.owner !== this.currentAuthor;
+        if (isForeign) {
+          layer.isLocked = true;
+        }
       }
     }
 

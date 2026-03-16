@@ -107,6 +107,7 @@ import { AssetBrowserSystem } from "./systems/asset-browser-system";
 import { AssetBrowserUI } from "./ui/asset-browser-ui";
 import { BundleMergeSystem } from "./systems/bundle-merge-system";
 import { BundleMergeUI } from "./ui/bundle-merge-ui";
+import { WorkspaceDraftSystem } from "./systems/workspace-draft-system";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -171,6 +172,7 @@ export class Game {
   public assetBrowserUI: AssetBrowserUI;
   public bundleMergeSystem: BundleMergeSystem;
   public bundleMergeUI: BundleMergeUI;
+  public workspaceDraftSystem: WorkspaceDraftSystem;
   public editorHubUI: EditorHubUI;
   public editorLayout: EditorLayout;
   public fastTravelUI: FastTravelUI;
@@ -338,6 +340,7 @@ export class Game {
 
   /** Refresh the layer panel after any layer or entity change. */
   private _refreshLayerPanel(): void {
+    this.mapEditorLayerPanel.currentAuthor = this.mapEditorSystem.currentAuthor;
     this.mapEditorLayerPanel.refresh(
       this.mapEditorSystem.getLayers(),
       this.mapEditorSystem.getLayerEntityCounts(),
@@ -616,6 +619,7 @@ export class Game {
     this.questCreatorUI = new QuestCreatorUI(this.questCreatorSystem);
     this.questCreatorUI.onClose = () => {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.workspaceDraftSystem.markDirty();
     };
 
     // ── Dialogue Creator ───────────────────────────────────────────────────────
@@ -623,6 +627,7 @@ export class Game {
     this.dialogueCreatorUI = new DialogueCreatorUI(this.dialogueCreatorSystem);
     this.dialogueCreatorUI.onClose = () => {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.workspaceDraftSystem.markDirty();
     };
 
     // ── NPC Creator ────────────────────────────────────────────────────────────
@@ -630,6 +635,7 @@ export class Game {
     this.npcCreatorUI = new NpcCreatorUI(this.npcCreatorSystem);
     this.npcCreatorUI.onClose = () => {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.workspaceDraftSystem.markDirty();
     };
 
     // ── Item Creator ───────────────────────────────────────────────────────────
@@ -637,6 +643,7 @@ export class Game {
     this.itemCreatorUI = new ItemCreatorUI(this.itemCreatorSystem);
     this.itemCreatorUI.onClose = () => {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.workspaceDraftSystem.markDirty();
     };
 
     // ── Faction Creator ────────────────────────────────────────────────────────
@@ -644,6 +651,7 @@ export class Game {
     this.factionCreatorUI = new FactionCreatorUI(this.factionCreatorSystem);
     this.factionCreatorUI.onClose = () => {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.workspaceDraftSystem.markDirty();
     };
 
     // ── Loot Table Creator ─────────────────────────────────────────────────────
@@ -651,6 +659,7 @@ export class Game {
     this.lootTableCreatorUI = new LootTableCreatorUI(this.lootTableCreatorSystem);
     this.lootTableCreatorUI.onClose = () => {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.workspaceDraftSystem.markDirty();
     };
 
     // ── Spawn Creator ──────────────────────────────────────────────────────────
@@ -658,6 +667,7 @@ export class Game {
     this.spawnCreatorUI = new SpawnCreatorUI(this.spawnCreatorSystem);
     this.spawnCreatorUI.onClose = () => {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.workspaceDraftSystem.markDirty();
     };
 
     // ── Content Bundle ─────────────────────────────────────────────────────────
@@ -726,6 +736,7 @@ export class Game {
             const parsed = JSON.parse(reader.result as string);
             const n = this.assetBrowserSystem.importFromBundle(parsed);
             this.assetBrowserUI.refresh();
+            this.editorHubUI.setBadge("assets", this.assetBrowserSystem.size);
             this.ui.showNotification(`Asset Browser: imported ${n} asset${n !== 1 ? "s" : ""} from bundle.`, 2500);
           } catch {
             this.ui.showNotification("Asset Browser: failed to parse bundle JSON.", 2500);
@@ -744,6 +755,21 @@ export class Game {
       if (this.mapEditorSystem.isEnabled || this.isPaused) return;
       this.canvas.requestPointerLock();
       this.player.camera.attachControl(this.canvas, true);
+    };
+
+    // ── Workspace Draft ─────────────────────────────────────────────────────────
+    this.workspaceDraftSystem = new WorkspaceDraftSystem();
+    this.workspaceDraftSystem
+      .attachQuest(this.questCreatorSystem)
+      .attachDialogue(this.dialogueCreatorSystem)
+      .attachFaction(this.factionCreatorSystem)
+      .attachLootTable(this.lootTableCreatorSystem)
+      .attachNpc(this.npcCreatorSystem)
+      .attachItem(this.itemCreatorSystem)
+      .attachSpawn(this.spawnCreatorSystem)
+      .attachMap(this.mapEditorSystem);
+    this.workspaceDraftSystem.onSaved = () => {
+      this.ui.showNotification("Workspace draft auto-saved.", 1500);
     };
 
     // ── Editor Hub ─────────────────────────────────────────────────────────────
@@ -2366,6 +2392,18 @@ export class Game {
     this.isPaused = false;
     this.canvas.requestPointerLock();
     this.player.camera.attachControl(this.canvas, true);
+
+    // ── Workspace draft restore ───────────────────────────────────────────────
+    if (this.workspaceDraftSystem.hasDraft()) {
+      const result = this.workspaceDraftSystem.restore();
+      if (result.restoredCount > 0) {
+        const ts = result.savedAt ? new Date(result.savedAt).toLocaleTimeString() : "unknown";
+        this.ui.showNotification(
+          `Workspace draft restored (${result.restoredSystems.join(", ")}) — saved at ${ts}`,
+          4000,
+        );
+      }
+    }
   }
 
   private _applyDefaultCharacterCreation(): void {
