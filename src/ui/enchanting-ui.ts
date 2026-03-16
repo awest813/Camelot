@@ -242,6 +242,7 @@ export class EnchantingUI {
       row.onPointerOutObservable.add(() => {
         row.background = item.id === this._selectedItemId ? T.SEL_BG : "transparent";
       });
+      row.accessibilityTag = { description: `Item: ${item.name}` };
 
       this._itemStack.addControl(row);
     }
@@ -295,6 +296,7 @@ export class EnchantingUI {
       row.onPointerOutObservable.add(() => {
         row.background = eff.id === this._selectedEffectId ? T.SEL_BG : "transparent";
       });
+      row.accessibilityTag = { description: `Effect: ${eff.name}` };
 
       this._effectStack.addControl(row);
     }
@@ -344,6 +346,7 @@ export class EnchantingUI {
       row.onPointerOutObservable.add(() => {
         row.background = def.type === this._selectedGemType ? T.SEL_BG : "transparent";
       });
+      row.accessibilityTag = { description: `Soul Gem: ${def.name}` };
 
       this._gemStack.addControl(row);
     }
@@ -466,6 +469,28 @@ export class EnchantingUI {
     row.paddingTop    = "2px";
     row.paddingBottom = "2px";
     row.isPointerBlocker = true;
+
+    row.isFocusInvisible = false;
+    row.tabIndex = 0;
+
+    let isFocused = false;
+    row.onFocusObservable.add(() => {
+      isFocused = true;
+      row.thickness = 2;
+    });
+    row.onBlurObservable.add(() => {
+      isFocused = false;
+      row.thickness = 1;
+    });
+    row.onPointerOutObservable.add(() => {
+      if (!isFocused) row.thickness = 1;
+    });
+    row.onKeyboardEventProcessedObservable.add((evt) => {
+      if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
+        row.onPointerClickObservable.notifyObservers(null as any);
+      }
+    });
+
     return row;
   }
 
