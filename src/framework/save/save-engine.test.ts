@@ -161,4 +161,38 @@ describe("SaveEngine", () => {
     expect(result.valid).toBe(false);
     expect(result.reason).toMatch(/checksum/i);
   });
+
+  it("loadFromStorage returns null on invalid JSON", () => {
+    const engine = new SaveEngine(adapter, "framework");
+    storage.framework = "not valid json";
+    const result = engine.loadFromStorage();
+    expect(result).toBeNull();
+  });
+
+  it("loadFromStorage returns null when storage adapter throws", () => {
+    const throwingAdapter: StorageAdapter = {
+      getItem: () => {
+        throw new Error("Storage failure");
+      },
+      setItem: () => {},
+    };
+    const engine = new SaveEngine(throwingAdapter, "any");
+    const result = engine.loadFromStorage();
+    expect(result).toBeNull();
+  });
+
+  it("loadFromStorage returns null on structural validation failure", () => {
+    const engine = new SaveEngine(adapter, "framework");
+    // Missing required fields like profileId or state
+    storage.framework = JSON.stringify({ schemaVersion: 1 });
+    const result = engine.loadFromStorage();
+    expect(result).toBeNull();
+  });
+
+  it("importSave throws when root value is not an object", () => {
+    const engine = new SaveEngine();
+    expect(() => engine.importSave("null")).toThrow(/must be an object/i);
+    expect(() => engine.importSave("123")).toThrow(/must be an object/i);
+    expect(() => engine.importSave("\"string\"")).toThrow(/must be an object/i);
+  });
 });
