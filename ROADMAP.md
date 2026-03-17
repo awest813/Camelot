@@ -156,15 +156,15 @@ All planned Release D remainder items delivered:
 
 ## Next Steps
 
-### Content GUI — Release E (World-Scale Editing)
+### Content GUI — Release E (World-Scale Editing) ✅
 
-Now that the full collaboration layer is in place, the next delivery focuses on **making large worlds tractable**:
+All three Release E items delivered:
 
-1. **Region-based streaming controls** — Add a `RegionSystem` (`src/systems/region-system.ts`) that partitions the map into named rectangular/spherical regions; expose visibility/active toggles per region in the layer panel so authors can work on one zone without loading every entity; integrate with `LodSystem` so inactive regions bypass LOD updates.
+1. ✅ **Region-based streaming controls** — `RegionSystem` (`src/systems/region-system.ts`, 39 tests) partitions the map into named rectangular or spherical regions; per-region `setVisible()` / `setActive()` toggles with callbacks; `getRegionsAtPoint()` spatial query; `getActiveRegionIds()` / `getInactiveRegionIds()` helpers for LOD and AI integration; `getSnapshot()` / `restoreSnapshot()` for persistence; `attachLodSystem()` hook for future mesh-level LOD bypass.
 
-2. **CLI / dev tooling** — A small Node.js script (`tools/validate-bundle.mjs`) that accepts a `.bundle.json` path, runs `ContentBundleSystem` validation headlessly (no browser required), and exits non-zero on errors; suitable for CI pipelines and pre-commit hooks.
+2. ✅ **CLI / dev tooling** — `tools/validate-bundle.mjs` accepts a `.bundle.json` path, validates manifest schema, cross-checks declared vs. present systems, and performs per-system structural validation (quest node ids, dialogue nextNodeId refs, faction threshold ordering, loot entry integrity, etc.); exits non-zero on errors; suitable for CI pipelines and pre-commit hooks.
 
-3. **Automated regression coverage** — Add quest-and-inventory integration test suite (`src/framework/quest-inventory.integration.test.ts`) covering pick-up-fetch-quest flows end-to-end using the headless framework engines, targeting known edge-cases: item-consume effects, multi-objective quest completion ordering, and faction-disposition gating.
+3. ✅ **Automated regression coverage** — Quest-and-inventory integration test suite (`src/framework/quest-inventory.integration.test.ts`, 27 tests) covering: item-consume effects via dialogue, give-item effects, fetch-quest pick-up flows with progress capping, multi-objective chain ordering with prerequisites, parallel start-node objectives, faction-disposition gating on dialogue choices, quest lifecycle guards (no re-activation after completion), and save/restore round-trip preserving quest progress and inventory state.
 
 ---
 
