@@ -28,7 +28,8 @@ export type EditorToolId =
   | "spawn"
   | "bundle"
   | "assets"
-  | "merge";
+  | "merge"
+  | "modManifest";
 
 export interface EditorHubCallbacks {
   /** Called when the user clicks a tool button. */
@@ -132,6 +133,14 @@ const TOOLS: ToolEntry[] = [
     description: "Merge two content bundles: load a base and an incoming .bundle.json, detect conflicting content IDs across all systems, choose a per-conflict resolution strategy, then export the merged bundle.",
     shortcut:    "Shift+F5",
     accentVar:   "#86efac",
+  },
+  {
+    id:          "modManifest",
+    label:       "Mod Manifest",
+    icon:        "📋",
+    description: "Author and export mod manifests: build an ordered mod load list with id, URL, and enabled state; validate for duplicates and missing URLs; download manifest.json for use with ModLoader.",
+    shortcut:    "Ctrl+Shift+M",
+    accentVar:   "#a5b4fc",
   },
 ];
 

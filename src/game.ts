@@ -108,6 +108,8 @@ import { AssetBrowserUI } from "./ui/asset-browser-ui";
 import { BundleMergeSystem } from "./systems/bundle-merge-system";
 import { BundleMergeUI } from "./ui/bundle-merge-ui";
 import { WorkspaceDraftSystem } from "./systems/workspace-draft-system";
+import { ModManifestSystem } from "./systems/mod-manifest-system";
+import { ModManifestUI } from "./ui/mod-manifest-ui";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -172,6 +174,8 @@ export class Game {
   public assetBrowserUI: AssetBrowserUI;
   public bundleMergeSystem: BundleMergeSystem;
   public bundleMergeUI: BundleMergeUI;
+  public modManifestSystem: ModManifestSystem;
+  public modManifestUI: ModManifestUI;
   public workspaceDraftSystem: WorkspaceDraftSystem;
   public editorHubUI: EditorHubUI;
   public editorLayout: EditorLayout;
@@ -757,6 +761,16 @@ export class Game {
       this.player.camera.attachControl(this.canvas, true);
     };
 
+    // ── Mod Manifest ────────────────────────────────────────────────────────────
+    this.modManifestSystem = new ModManifestSystem();
+    this.modManifestUI = new ModManifestUI(this.modManifestSystem);
+    this.modManifestUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
+
     // ── Workspace Draft ─────────────────────────────────────────────────────────
     this.workspaceDraftSystem = new WorkspaceDraftSystem();
     this.workspaceDraftSystem
@@ -820,6 +834,9 @@ export class Game {
             break;
           case "merge":
             this.bundleMergeUI.open();
+            break;
+          case "modManifest":
+            this.modManifestUI.open();
             break;
         }
       },
@@ -1678,6 +1695,10 @@ export class Game {
                     this.bundleMergeUI.close();
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.modManifestUI.isVisible) {
+                    this.modManifestUI.close();
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
                 } else if (this.editorHubUI.isVisible) {
                     this.editorHubUI.close();
                     this.canvas.requestPointerLock();
@@ -1868,7 +1889,20 @@ export class Game {
                     this.editorLayout.setVisible("layers", true);
                     this.ui.showNotification("Layers panel opened", 1000);
                 }
-            } else if ((kbInfo.event.key === "m" || kbInfo.event.key === "M") && (kbInfo.event.ctrlKey || kbInfo.event.metaKey)) {
+            } else if ((kbInfo.event.key === "M") && (kbInfo.event.ctrlKey || kbInfo.event.metaKey) && kbInfo.event.shiftKey) {
+                // Ctrl+Shift+M — key is "M" (uppercase) because Shift is held; shiftKey guard
+                // disambiguates from plain Ctrl+M (Scene Notes) which produces lowercase "m".
+                // → Mod Manifest Editor (global)
+                if (this.modManifestUI.isVisible) {
+                    this.modManifestUI.close();
+                } else {
+                    this.interactionSystem.isBlocked = true;
+                    document.exitPointerLock();
+                    this.player.camera.detachControl();
+                    this.modManifestUI.open();
+                }
+            } else if ((kbInfo.event.key === "m") && (kbInfo.event.ctrlKey || kbInfo.event.metaKey) && !kbInfo.event.shiftKey) {
+                // Ctrl+M (lowercase "m", no Shift) → Scene Notes (editor mode only)
                 if (!this.mapEditorSystem.isEnabled) return;
                 const notesVisible = this.editorLayout.getPanelState("notes")?.isVisible ?? false;
                 this.editorLayout.setVisible("notes", !notesVisible);
