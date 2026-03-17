@@ -188,13 +188,27 @@ Both planned Release H items delivered:
 
 ---
 
+### Content GUI — Release I (Mod Manifest Authoring + CLI Tooling) ✅
+
+All planned Release I items delivered:
+
+1. ✅ **ModManifestSystem** (`src/systems/mod-manifest-system.ts`, 44 tests) — headless mod-manifest authoring layer: `addEntry()` appends a new entry (auto-generated id when not provided); `removeEntry()` / `updateEntry()` for CRUD; `enableEntry()` / `disableEntry()` toggle the `enabled` flag; `moveEntryUp()` / `moveEntryDown()` for drag-free load-order reordering; `validate()` → `ModManifestValidationReport` (empty-id, duplicate-id, empty-url checks); `toManifest()` → `ModManifest` compatible with the framework `ModLoader` (omits `enabled` field when `true` for clean output); `exportToJson()` / `exportToFile()` (browser download of `manifest.json`) / `importFromJson()` / `importFromFile()`; `reset()` clears all entries.
+
+2. ✅ **ModManifestUI** (`src/ui/mod-manifest-ui.ts`) — HTML overlay (Ctrl+Shift+M / Editor Hub "📋 Mod Manifest"): scrollable ordered mod-entry list with per-row id display, URL text field, enabled checkbox, ▲ / ▼ reorder buttons, and ✕ remove button; load-order position badge; validate / export-JSON / import-JSON / reset action buttons with inline status feedback; Esc dismisses the overlay.
+
+3. ✅ **Generate Mod Manifest CLI** (`tools/generate-mod-manifest.mjs`) — node CLI accepting one or more `.mod.json` file paths; validates each file for a non-empty `id` string and `content` object, detects duplicate mod ids across files; prints per-file pass/fail summary; writes the resulting `manifest.json` to `--output <path>` or stdout; `--disabled` flag marks all entries `enabled: false`; exits non-zero on any validation error; suitable for CI pipelines and pre-commit hooks.
+
+4. ✅ **Editor Hub expanded** — "📋 Mod Manifest" tool card (Ctrl+Shift+M, indigo-blue accent) added to the F11 Editor Hub launcher alongside the existing creator tools.
+
+---
+
 ### Framework-First Consolidation
 
 - ✅ Expand framework runtime adapters so demo gameplay systems consume framework state as source-of-truth — `FrameworkRuntimeAdapter` (see Release H above).
 - ✅ Add richer dialogue effect hooks (quest activation, inventory consume/give, conditional branches by faction tiers).
 - ✅ Add quest authoring utilities and graph validation diagnostics (dead-end node detection, cycle hints) with in-game validation hotkey (F8).
 - ✅ Harden save migrations with versioned schema (SAVE_VERSION bumped on each structural change).
-- 🧭 Add CLI/dev tooling for mod manifest generation and content schema validation.
+- ✅ Add CLI/dev tooling for mod manifest generation and content schema validation — `ModManifestSystem` + `ModManifestUI` + `tools/generate-mod-manifest.mjs` (see Release I below).
 
 ### Oblivion-Lite Systems (v3)
 

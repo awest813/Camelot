@@ -31,6 +31,7 @@ const EDITOR_CONTROLS: readonly string[] = [
   "Shift+F7: Open Content Bundle Dashboard",
   "Shift+F6: Open Asset Browser",
   "Shift+F5: Open Bundle Merge Assistant",
+  "Ctrl+Shift+M: Open Mod Manifest Editor",
   "Esc: Exit Editor",
 ];
 

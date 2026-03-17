@@ -30,8 +30,8 @@ describe("EditorHubUI", () => {
     it("renders a card for every tool entry", () => {
       ui.open();
       const cards = document.querySelectorAll(".editor-hub__tool-card");
-      // 11 tools defined in TOOLS constant
-      expect(cards.length).toBe(11);
+      // 12 tools defined in TOOLS constant
+      expect(cards.length).toBe(12);
     });
 
     it("hides the panel after close()", () => {
