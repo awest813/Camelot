@@ -24,3 +24,4 @@ export * from "./mods/content-merge";
 export * from "./mods/mod-loader";
 
 export * from "./runtime/framework-runtime";
+export * from "./runtime/framework-runtime-adapter";
