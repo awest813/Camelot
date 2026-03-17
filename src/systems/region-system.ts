@@ -291,34 +291,19 @@ export class RegionSystem {
         point.z >= shape.min.z && point.z <= shape.max.z
       );
     } else {
-      const cx = shape.center.x - point.x;
-      const cy = shape.center.y - point.y;
-      const cz = shape.center.z - point.z;
-      return (cx * cx + cy * cy + cz * cz) <= shape.radius * shape.radius;
+      const dx = point.x - shape.center.x;
+      const dy = point.y - shape.center.y;
+      const dz = point.z - shape.center.z;
+      return (dx * dx + dy * dy + dz * dz) <= shape.radius * shape.radius;
     }
   }
 
   /**
-   * Notify the LOD system of an active-state change.
-   *
-   * The LOD system does not natively understand regions, so we use a
-   * side-channel: we set a non-standard `_regionActive` property on the LOD
-   * instance that the LOD update loop can consult when deciding whether to
-   * run the visibility pass for a given region's meshes.
-   *
-   * In practice the game layer is responsible for wiring this up properly
-   * (e.g. by tagging each mesh with its regionId so the LOD system can filter
-   * by active state).  This method fires the `onActiveChange` callback and
-   * stores the state so callers can query it.
+   * Notify the LOD system of an active-state change using its typed
+   * `setRegionActive()` API so inactive regions can bypass LOD update passes.
    */
   private _notifyLod(regionId: string, isActive: boolean): void {
     if (!this._lod) return;
-    // Store region active states on the LodSystem instance so the update loop
-    // can be extended to skip inactive regions without modifying LodSystem.
-    const lodAny = this._lod as unknown as Record<string, unknown>;
-    if (!lodAny._regionActive) {
-      lodAny._regionActive = {} as Record<string, boolean>;
-    }
-    (lodAny._regionActive as Record<string, boolean>)[regionId] = isActive;
+    this._lod.setRegionActive(regionId, isActive);
   }
 }

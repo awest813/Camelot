@@ -252,6 +252,40 @@ export class LodSystem {
     return singles + levels;
   }
 
+  // ── Region active state ───────────────────────────────────────────────────
+
+  private _regionActive: Map<string, boolean> = new Map();
+
+  /**
+   * Notify the LOD system that a named region has been activated or
+   * deactivated.  The host application is responsible for tagging each
+   * registered mesh with its `regionId` (e.g. via `mesh.metadata.regionId`)
+   * and for consulting this map inside a custom update loop to skip the
+   * visibility pass for inactive regions.
+   *
+   * @param regionId - The region identifier (matches `RegionSystem` region ids).
+   * @param isActive - Whether the region should participate in LOD updates.
+   */
+  public setRegionActive(regionId: string, isActive: boolean): void {
+    this._regionActive.set(regionId, isActive);
+  }
+
+  /**
+   * Return whether the given region is currently considered active.
+   * Returns `true` for regions that have never been registered (default-active).
+   */
+  public isRegionActive(regionId: string): boolean {
+    return this._regionActive.get(regionId) ?? true;
+  }
+
+  /**
+   * Return a snapshot of all region active states.
+   * Useful for the host update loop to skip LOD passes for inactive regions.
+   */
+  public getRegionActiveStates(): ReadonlyMap<string, boolean> {
+    return this._regionActive;
+  }
+
   /**
    * Restore visibility on all registered meshes and clear the registry.
    * Call when transitioning between cells so stale mesh references are released.
@@ -268,6 +302,7 @@ export class LodSystem {
       }
     }
     this._levelGroups = [];
+    this._regionActive.clear();
 
     this._frameCounter = 0;
   }

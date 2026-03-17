@@ -207,21 +207,24 @@ describe("RegionSystem — setActive", () => {
   });
 
   it("notifies LOD system by tagging _regionActive map", () => {
-    const fakeLod = {} as import("./lod-system").LodSystem;
+    const fakeLod = { setRegionActive: vi.fn(), isRegionActive: vi.fn() } as unknown as import("./lod-system").LodSystem;
     rs.setLodSystem(fakeLod);
     rs.setActive("zone_a", false);
-    // After deactivation the LOD system should have the region marked inactive
-    const lodAny = fakeLod as unknown as Record<string, unknown>;
-    expect((lodAny._regionActive as Record<string, boolean>)["zone_a"]).toBe(false);
+    // After deactivation the LOD system's setRegionActive should be called
+    expect((fakeLod as unknown as { setRegionActive: ReturnType<typeof vi.fn> }).setRegionActive)
+      .toHaveBeenCalledWith("zone_a", false);
   });
 
   it("marks region active again in LOD after re-activation", () => {
-    const fakeLod = {} as import("./lod-system").LodSystem;
+    const calls: Array<[string, boolean]> = [];
+    const fakeLod = {
+      setRegionActive: (id: string, active: boolean) => calls.push([id, active]),
+      isRegionActive: () => true,
+    } as unknown as import("./lod-system").LodSystem;
     rs.setLodSystem(fakeLod);
     rs.setActive("zone_a", false);
     rs.setActive("zone_a", true);
-    const lodAny = fakeLod as unknown as Record<string, unknown>;
-    expect((lodAny._regionActive as Record<string, boolean>)["zone_a"]).toBe(true);
+    expect(calls).toEqual([["zone_a", false], ["zone_a", true]]);
   });
 
   it("works without a LOD system attached", () => {
@@ -384,7 +387,7 @@ describe("RegionSystem — setLodSystem", () => {
   it("accepts null to detach a LOD system", () => {
     const rs = new RegionSystem();
     rs.addRegion(makeRect("zone_a", { x: 0, y: 0, z: 0 }, { x: 10, y: 10, z: 10 }));
-    const fakeLod = {} as import("./lod-system").LodSystem;
+    const fakeLod = { setRegionActive: vi.fn(), isRegionActive: vi.fn() } as unknown as import("./lod-system").LodSystem;
     rs.setLodSystem(fakeLod);
     rs.setLodSystem(null);
     // After detaching, setActive should not throw

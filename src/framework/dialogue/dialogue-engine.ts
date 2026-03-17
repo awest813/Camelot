@@ -74,6 +74,15 @@ export class DialogueSession {
   private _currentNodeId: string | null;
   private _completed = false;
 
+  /**
+   * Optional callback fired when the session reaches a terminal node and
+   * `isComplete` becomes `true`.  Set by the host (e.g. `FrameworkRuntime`)
+   * to avoid monkey-patching `choose()`.
+   *
+   * @param dialogueId - The id of the dialogue tree that just completed.
+   */
+  public onComplete: ((dialogueId: string) => void) | null = null;
+
   constructor(definition: DialogueDefinition, context: DialogueContext, nodeMap: Map<string, DialogueNode>) {
     this._definition = definition;
     this._context = context;
@@ -106,6 +115,7 @@ export class DialogueSession {
     if (!node) {
       this._completed = true;
       this._currentNodeId = null;
+      this._fireComplete();
       return {
         success: false,
         message: "Dialogue node is missing.",
@@ -140,6 +150,7 @@ export class DialogueSession {
     if (shouldEnd) {
       this._completed = true;
       this._currentNodeId = null;
+      this._fireComplete();
       return {
         success: true,
         message: "Dialogue complete.",
@@ -153,6 +164,7 @@ export class DialogueSession {
     if (!nextNode) {
       this._completed = true;
       this._currentNodeId = null;
+      this._fireComplete();
       return {
         success: false,
         message: "Dialogue could not continue to next node.",
@@ -175,6 +187,10 @@ export class DialogueSession {
       currentNodeId: this._currentNodeId,
       completed: this._completed,
     };
+  }
+
+  private _fireComplete(): void {
+    this.onComplete?.(this._definition.id);
   }
 
   private _toNodeView(node: DialogueNode): DialogueNodeView {

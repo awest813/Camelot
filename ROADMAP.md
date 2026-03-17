@@ -168,13 +168,25 @@ All planned Release E items delivered:
 
 ---
 
+### Framework-First Consolidation — Release F (Framework Hardening) ✅
+
+All planned Release F items delivered:
+
+1. ✅ **Framework event adapters** — `IFrameworkEventAdapter` interface (`src/framework/runtime/framework-adapter.ts`) with optional `onQuestEvent`, `onInventoryChange`, `onFactionReputationChange`, `onFlagChange`, and `onDialogueComplete` hooks; `FrameworkRuntime.registerAdapter()` / `unregisterAdapter()` / `adapterCount`; all framework state-change paths (applyQuestEvent, dialogue effects, flag writes, faction deltas) now fan-out to registered adapters so demo gameplay systems consume framework state as source-of-truth; 19 tests.
+
+2. ✅ **SaveMigrationRegistry** — `SaveMigrationRegistry` class (`src/framework/save/save-migration-registry.ts`) with `register(fromVersion, migration)` / `unregister()` / `has()` / `get()` / `validate()` / `buildChain()` / `apply()` / `registeredVersions()` / `size`; `withDefaults()` static factory pre-loads the framework v0→v1 migration; provides a clean runtime-extensible alternative to `DEFAULT_MIGRATIONS` so host games can register custom migration steps without monkey-patching; 23 tests.  Also fixed: `normalizeSave()` no longer defaults `profileId` to `"default"` so incomplete save files (`{ schemaVersion: 1 }`) are correctly rejected by `validateSaveFile()`.
+
+3. ✅ **CLI: mod manifest generator** — `tools/generate-mod-manifest.mjs` scans a directory for `*.json` mod files and generates a `mods-manifest.json`; extracts mod `id` from the file's top-level `"id"` field (falls back to filename stem); supports `--enabled` / `--disabled` flags, `--merge` (preserves existing enabled state), `--out <file>` (custom output path), `--dry-run` / `--json` (stdout only), and `--help`; exits non-zero on missing directory or no mods found.
+
+---
+
 ### Framework-First Consolidation
 
-- 🧭 Expand framework runtime adapters so demo gameplay systems consume framework state as source-of-truth.
+- ✅ Expand framework runtime adapters so demo gameplay systems consume framework state as source-of-truth.
 - ✅ Add richer dialogue effect hooks (quest activation, inventory consume/give, conditional branches by faction tiers).
 - ✅ Add quest authoring utilities and graph validation diagnostics (dead-end node detection, cycle hints) with in-game validation hotkey (F8).
 - ✅ Harden save migrations with versioned schema (SAVE_VERSION bumped on each structural change).
-- 🧭 Add CLI/dev tooling for mod manifest generation and content schema validation.
+- ✅ Add CLI/dev tooling for mod manifest generation and content schema validation.
 
 ### Oblivion-Lite Systems (v3)
 

@@ -376,3 +376,51 @@ describe("LodSystem", () => {
     expect(culled).toBe(3);
   });
 });
+
+describe("LodSystem — region active state", () => {
+  let lod: LodSystem;
+
+  beforeEach(() => {
+    lod = new LodSystem();
+  });
+
+  it("isRegionActive() returns true for unknown regions (default-active)", () => {
+    expect(lod.isRegionActive("zone_unknown")).toBe(true);
+  });
+
+  it("setRegionActive(false) marks a region as inactive", () => {
+    lod.setRegionActive("zone_a", false);
+    expect(lod.isRegionActive("zone_a")).toBe(false);
+  });
+
+  it("setRegionActive(true) marks a region as active", () => {
+    lod.setRegionActive("zone_a", false);
+    lod.setRegionActive("zone_a", true);
+    expect(lod.isRegionActive("zone_a")).toBe(true);
+  });
+
+  it("getRegionActiveStates() returns a read-only map of all region states", () => {
+    lod.setRegionActive("zone_a", false);
+    lod.setRegionActive("zone_b", true);
+    const states = lod.getRegionActiveStates();
+    expect(states.get("zone_a")).toBe(false);
+    expect(states.get("zone_b")).toBe(true);
+    expect(states.has("zone_unknown")).toBe(false);
+  });
+
+  it("clear() resets region active states", () => {
+    lod.setRegionActive("zone_a", false);
+    lod.clear();
+    expect(lod.isRegionActive("zone_a")).toBe(true); // back to default
+  });
+
+  it("multiple regions can be tracked independently", () => {
+    lod.setRegionActive("zone_a", false);
+    lod.setRegionActive("zone_b", false);
+    lod.setRegionActive("zone_c", true);
+    expect(lod.isRegionActive("zone_a")).toBe(false);
+    expect(lod.isRegionActive("zone_b")).toBe(false);
+    expect(lod.isRegionActive("zone_c")).toBe(true);
+    expect(lod.getRegionActiveStates().size).toBe(3);
+  });
+});

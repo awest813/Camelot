@@ -10,6 +10,7 @@ import { SaveEngine } from "../save/save-engine";
 import { FrameworkSaveFile, FrameworkStateSnapshot, StorageAdapter } from "../save/save-types";
 import { ModLoader } from "../mods/mod-loader";
 import { FetchLike, ModLoadReport } from "../mods/mod-types";
+import { IFrameworkEventAdapter } from "./framework-adapter";
 
 export interface FrameworkRuntimeOptions {
   inventoryCapacity?: number;
@@ -37,6 +38,7 @@ export class FrameworkRuntime {
   private _factionEngine: FactionEngine;
   private _modLoader: ModLoader | null = null;
   private _skillLevelProvider: ((skillId: string) => number) | undefined;
+  private _adapters: Set<IFrameworkEventAdapter> = new Set();
 
   constructor(baseContent: RpgContentBundle, options: FrameworkRuntimeOptions = {}) {
     this.contentRegistry.loadBase(baseContent);
@@ -64,15 +66,45 @@ export class FrameworkRuntime {
     return this._factionEngine;
   }
 
+  // ── Adapter registration ──────────────────────────────────────────────────
+
+  /**
+   * Register an event adapter.  The adapter will receive notifications for
+   * all framework events until it is unregistered.
+   *
+   * Registering the same adapter instance twice is a no-op.
+   */
+  public registerAdapter(adapter: IFrameworkEventAdapter): void {
+    this._adapters.add(adapter);
+  }
+
+  /**
+   * Unregister a previously registered adapter.  No-op if the adapter is
+   * not currently registered.
+   */
+  public unregisterAdapter(adapter: IFrameworkEventAdapter): void {
+    this._adapters.delete(adapter);
+  }
+
+  /** Number of currently registered adapters. */
+  public get adapterCount(): number {
+    return this._adapters.size;
+  }
+
+  // ── Core operations ───────────────────────────────────────────────────────
+
   public createDialogueSession(dialogueId: string): DialogueSession {
     const context: DialogueContext = {
       getFlag: (flag) => this._flags.get(flag) ?? false,
       setFlag: (flag, value) => {
         this._flags.set(flag, value);
+        for (const adapter of this._adapters) adapter.onFlagChange?.(flag, value);
       },
       getFactionReputation: (factionId) => this._factionEngine.getReputation(factionId),
       adjustFactionReputation: (factionId, amount) => {
         this._factionEngine.adjustReputation(factionId, amount);
+        const newRep = this._factionEngine.getReputation(factionId);
+        for (const adapter of this._adapters) adapter.onFactionReputationChange?.(factionId, newRep);
       },
       getQuestStatus: (questId) => this._questEngine.getQuestStatus(questId),
       getInventoryCount: (itemId) => this._inventoryEngine.getItemCount(itemId),
@@ -80,25 +112,42 @@ export class FrameworkRuntime {
       emitEvent: (eventId, payload) => {
         const event = this._translateDialogueEvent(eventId, payload);
         if (event) {
-          this._questEngine.applyEvent(event);
+          const results = this._questEngine.applyEvent(event);
+          for (const adapter of this._adapters) adapter.onQuestEvent?.(event, results);
         }
       },
       activateQuest: (questId) => {
         this._questEngine.activateQuest(questId);
       },
       consumeItem: (itemId, quantity) => {
-        return this._inventoryEngine.removeItem(itemId, quantity).success;
+        const result = this._inventoryEngine.removeItem(itemId, quantity);
+        if (result.success) {
+          const newQty = this._inventoryEngine.getItemCount(itemId);
+          for (const adapter of this._adapters) adapter.onInventoryChange?.(itemId, newQty);
+        }
+        return result.success;
       },
       giveItem: (itemId, quantity) => {
         this._inventoryEngine.addItem(itemId, quantity);
+        const newQty = this._inventoryEngine.getItemCount(itemId);
+        for (const adapter of this._adapters) adapter.onInventoryChange?.(itemId, newQty);
       },
     };
 
-    return this._dialogueEngine.createSession(dialogueId, context);
+    const session = this._dialogueEngine.createSession(dialogueId, context);
+
+    // Subscribe to the session's completion event to notify adapters.
+    session.onComplete = (completedDialogueId) => {
+      for (const adapter of this._adapters) adapter.onDialogueComplete?.(completedDialogueId);
+    };
+
+    return session;
   }
 
   public applyQuestEvent(event: QuestEvent): QuestEventResult[] {
-    return this._questEngine.applyEvent(event);
+    const results = this._questEngine.applyEvent(event);
+    for (const adapter of this._adapters) adapter.onQuestEvent?.(event, results);
+    return results;
   }
 
   public getSaveSnapshot(): FrameworkStateSnapshot {

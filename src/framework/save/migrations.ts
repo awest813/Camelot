@@ -77,7 +77,7 @@ const normalizeSave = (input: unknown): FrameworkSaveFile => {
   return {
     schemaVersion: Number(obj.schemaVersion ?? FRAMEWORK_SAVE_SCHEMA_VERSION),
     savedAt: Number(obj.savedAt ?? Date.now()),
-    profileId: typeof obj.profileId === "string" ? obj.profileId : "default",
+    profileId: typeof obj.profileId === "string" ? obj.profileId : "",
     state: normalizeState(obj.state),
   };
 };

@@ -17,9 +17,11 @@ export * from "./factions/faction-engine";
 export * from "./save/save-types";
 export * from "./save/migrations";
 export * from "./save/save-engine";
+export * from "./save/save-migration-registry";
 
 export * from "./mods/mod-types";
 export * from "./mods/content-merge";
 export * from "./mods/mod-loader";
 
+export * from "./runtime/framework-adapter";
 export * from "./runtime/framework-runtime";

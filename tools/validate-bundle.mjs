@@ -33,12 +33,39 @@ import { resolve } from "node:path";
 
 const args = process.argv.slice(2);
 const jsonOutput = args.includes("--json");
-const filePath = args.find((a) => !a.startsWith("--"));
 
-if (!filePath) {
+if (args.includes("--help") || args.includes("-h")) {
+  console.log(`
+Usage: validate-bundle.mjs <path-to-bundle.json> [--json]
+
+Arguments:
+  path-to-bundle.json   Path to the .bundle.json file to validate.
+
+Options:
+  --json                Print the full validation report as JSON.
+  --help                Show this help text.
+
+Exit codes:
+  0  All checks passed.
+  1  One or more validation errors were found.
+  2  The file could not be read or parsed (I/O / JSON error).
+`);
+  process.exit(0);
+}
+
+const positionalArgs = args.filter((a) => !a.startsWith("--"));
+
+if (positionalArgs.length === 0) {
   console.error("Usage: validate-bundle.mjs <path-to-bundle.json> [--json]");
   process.exit(2);
 }
+
+if (positionalArgs.length > 1) {
+  console.error(`Error: expected exactly one file path, got ${positionalArgs.length} positional arguments.`);
+  process.exit(2);
+}
+
+const filePath = positionalArgs[0];
 
 // ── File I/O ──────────────────────────────────────────────────────────────────
 
