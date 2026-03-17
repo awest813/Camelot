@@ -178,9 +178,19 @@ Both planned Stability and Tooling items delivered:
 
 ---
 
+### Content GUI — Release H (Scripted Event Sequences + Framework Adapters) ✅
+
+Both planned Release H items delivered:
+
+1. ✅ **EventScriptSystem** (`src/systems/event-script-system.ts`, 35 tests) — data-driven scripted encounter / cutscene engine: define named scripts composed of ordered steps (`show_notification`, `trigger_quest`, `award_item`, `remove_item`, `set_flag`, `faction_delta`, `wait_hours`, `emit_event`); conditional branching via `branch_on_flag` (flag → ifTrue / ifFalse sub-steps) and `branch_on_quest` (quest status → then / else sub-steps); branches are resolved eagerly at `run()` time into a flat resolved-step list; `wait_hours` suspends execution until `update(gameTimeMinutes)` is called with a matching game clock; `repeatable` flag controls whether a script can be run again after completing; `onStepExecuted`, `onScriptComplete`, `onScriptCancelled` callbacks; save-state persistence (`getSaveState()` / `restoreFromSave()`).
+
+2. ✅ **FrameworkRuntimeAdapter** (`src/framework/runtime/framework-runtime-adapter.ts`, 20 tests) — host-game integration bridge for `FrameworkRuntime`: accepts pluggable `SkillAdapter` (wires `SkillProgressionSystem.getSkillRank` → dialogue `skill_min` conditions) and `TimeAdapter` (exposes `TimeSystem.gameTime` to framework components); `addListener(NotificationListener)` returns an unsubscribe function and fires `onQuestActivated`, `onQuestCompleted`, `onItemConsumed`, `onItemGiven`, `onFactionRepChanged`, `onFlagChanged` callbacks; `applyQuestEvent()` wraps the runtime and triggers completion listeners; `createInstrumentedDialogueSession()` builds a fully-wired `DialogueContext` so every dialogue side-effect fires all registered notification listeners; `setFlag()` / `getFlag()` expose runtime flags publicly (backed by new `FrameworkRuntime.getFlag()` / `setFlag()` public methods); all engine accessors (`questEngine`, `inventoryEngine`, `factionEngine`, `dialogueEngine`, `contentRegistry`) pass through; `createSave()` / `restoreFromSave()` / `getSaveSnapshot()` delegate to runtime; exported from `src/framework/index.ts`.
+
+---
+
 ### Framework-First Consolidation
 
-- 🧭 Expand framework runtime adapters so demo gameplay systems consume framework state as source-of-truth.
+- ✅ Expand framework runtime adapters so demo gameplay systems consume framework state as source-of-truth — `FrameworkRuntimeAdapter` (see Release H above).
 - ✅ Add richer dialogue effect hooks (quest activation, inventory consume/give, conditional branches by faction tiers).
 - ✅ Add quest authoring utilities and graph validation diagnostics (dead-end node detection, cycle hints) with in-game validation hotkey (F8).
 - ✅ Harden save migrations with versioned schema (SAVE_VERSION bumped on each structural change).
@@ -258,7 +268,7 @@ three-step overhaul track:
 - ✅ Alchemy/potion crafting prototype (AlchemySystem + AlchemyUI).
 - ✅ Enchanting system (apply magical effects to weapons and armor) — soul gems, 10 enchantment types, skill scaling.
 - ✅ Faction/reputation prototype tied to quests (FactionEngine + PersuasionSystem).
-- 🧭 More advanced quest scripting hooks.
+- ✅ More advanced quest scripting hooks — `EventScriptSystem` (see Release H below).
 
 ### Performance + Scalability
 

@@ -64,6 +64,22 @@ export class FrameworkRuntime {
     return this._factionEngine;
   }
 
+  /**
+   * Read a named boolean flag (returns `false` for unknown flags).
+   * Flags are shared between dialogue sessions and are persisted in save files.
+   */
+  public getFlag(flag: string): boolean {
+    return this._flags.get(flag) ?? false;
+  }
+
+  /**
+   * Set a named boolean flag.
+   * The change is immediately visible to all subsequent dialogue sessions.
+   */
+  public setFlag(flag: string, value: boolean): void {
+    this._flags.set(flag, value);
+  }
+
   public createDialogueSession(dialogueId: string): DialogueSession {
     const context: DialogueContext = {
       getFlag: (flag) => this._flags.get(flag) ?? false,
