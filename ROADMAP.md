@@ -164,7 +164,17 @@ All three Release E items delivered:
 
 2. ✅ **CLI / dev tooling** — `tools/validate-bundle.mjs` accepts a `.bundle.json` path, validates manifest schema, cross-checks declared vs. present systems, and performs per-system structural validation (quest node ids, dialogue nextNodeId refs, faction threshold ordering, loot entry integrity, etc.); exits non-zero on errors; suitable for CI pipelines and pre-commit hooks.
 
-3. ✅ **Automated regression coverage** — Quest-and-inventory integration test suite (`src/framework/quest-inventory.integration.test.ts`, 27 tests) covering: item-consume effects via dialogue, give-item effects, fetch-quest pick-up flows with progress capping, multi-objective chain ordering with prerequisites, parallel start-node objectives, faction-disposition gating on dialogue choices, quest lifecycle guards (no re-activation after completion), and save/restore round-trip preserving quest progress and inventory state.
+3. ✅ **Automated regression coverage** — Quest-and-inventory integration test suite (`src/framework/quest-inventory.integration.test.ts`, 45 tests) covering: item-consume effects via dialogue, give-item effects, fetch-quest pick-up flows with progress capping, multi-objective chain ordering with prerequisites, parallel start-node objectives, faction-disposition gating on dialogue choices, quest lifecycle guards (no re-activation after completion), save/restore round-trip preserving quest progress and inventory state, flag-gated dialogue choices, quest-status-gated dialogue choices, has_item-gated dialogue choices, concurrent multi-quest tracking, and save/restore preserving flags + faction reputation.
+
+---
+
+### Content GUI — Release G (Stability and Tooling) ✅
+
+Both planned Stability and Tooling items delivered:
+
+1. ✅ **Save migration/versioning workflow** — `SaveMigrationRegistry` (`src/framework/save/save-migration-registry.ts`, 21 tests) provides a structured, composable API for managing versioned save migrations: `register(fromVersion, migration)` for fluent step registration; `validate(minVersion, targetVersion)` to verify chain completeness with no gaps; `buildChain(minVersion, targetVersion)` to retrieve the ordered migration list (throws on missing steps); `apply(input, targetVersion?)` to drive `applySaveMigrations` from the registry's own entries; and `SaveMigrationRegistry.withDefaults()` factory pre-seeded with the built-in v0→v1 migration for easy extension. Exported from the framework public API (`src/framework/index.ts`).
+
+2. ✅ **Expanded quest + inventory regression coverage** — Quest-and-inventory integration test suite extended from 27 to 45 tests adding: flag-gated dialogue choices (`set_flag` / `type: "flag"` conditions), quest-status-gated dialogue choices (`type: "quest_status"` for inactive/active/completed branching), `has_item`-gated dialogue choices with item-swap effects, concurrent multi-quest tracking (events attributed correctly, independent completion), and save/restore round-trips verifying flags, faction reputation, completed quest status, inventory contents, and full `exportSave`/`importSave` checksum cycle.
 
 ---
 
@@ -230,8 +240,8 @@ three-step overhaul track:
 
 ### Stability and Tooling
 
-- 🧭 Improve save migration/versioning workflow.
-- 🧭 Add additional automated regression coverage for quests and inventory.
+- ✅ Improve save migration/versioning workflow.
+- ✅ Add additional automated regression coverage for quests and inventory.
 
 ---
 
