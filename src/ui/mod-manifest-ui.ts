@@ -125,7 +125,7 @@ export class ModManifestUI {
 
     const hint = document.createElement("p");
     hint.className   = "mod-manifest__hint";
-    hint.textContent = "Mods are applied in order (top = highest priority). Only enabled mods are loaded.";
+    hint.textContent = "Mods load in order from top to bottom. Only enabled mods are loaded.";
     section.appendChild(hint);
 
     const list = document.createElement("div");
@@ -172,7 +172,7 @@ export class ModManifestUI {
     const fields = document.createElement("div");
     fields.className = "mod-manifest__entry-fields";
 
-    // ID field
+    // ID field (read-only — id is auto-generated on addEntry or set via importFromJson)
     const idWrap = document.createElement("div");
     idWrap.className = "mod-manifest__field";
     const idLabel = document.createElement("label");
@@ -180,15 +180,9 @@ export class ModManifestUI {
     const idInp = document.createElement("input");
     idInp.type        = "text";
     idInp.value       = entry.id;
-    idInp.placeholder = "e.g. my_mod";
-    idInp.setAttribute("aria-label", `Mod ID for entry ${index + 1}`);
-    idInp.addEventListener("input", () => {
-      this._sys.updateEntry(entry.id, { url: (fields.querySelector(`[data-field="url"]`) as HTMLInputElement)?.value ?? entry.url });
-      // We can't change the id key via updateEntry; re-add would be needed.
-      // Instead store id in a data attribute and update display only.
-      // Actual id update requires a workaround: we keep it as a display-only hint
-      // and commit on blur.
-    });
+    idInp.readOnly    = true;
+    idInp.setAttribute("aria-label", `Mod ID for entry ${index + 1} (read-only)`);
+    idInp.title       = "ID is set when the entry is created or imported. Use Import JSON to load entries with specific IDs.";
     idLabel.appendChild(idInp);
     idWrap.appendChild(idLabel);
     fields.appendChild(idWrap);

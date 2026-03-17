@@ -1890,7 +1890,9 @@ export class Game {
                     this.ui.showNotification("Layers panel opened", 1000);
                 }
             } else if ((kbInfo.event.key === "M") && (kbInfo.event.ctrlKey || kbInfo.event.metaKey) && kbInfo.event.shiftKey) {
-                // Ctrl+Shift+M → Mod Manifest Editor (global)
+                // Ctrl+Shift+M — key is "M" (uppercase) because Shift is held; shiftKey guard
+                // disambiguates from plain Ctrl+M (Scene Notes) which produces lowercase "m".
+                // → Mod Manifest Editor (global)
                 if (this.modManifestUI.isVisible) {
                     this.modManifestUI.close();
                 } else {
@@ -1900,6 +1902,7 @@ export class Game {
                     this.modManifestUI.open();
                 }
             } else if ((kbInfo.event.key === "m") && (kbInfo.event.ctrlKey || kbInfo.event.metaKey) && !kbInfo.event.shiftKey) {
+                // Ctrl+M (lowercase "m", no Shift) → Scene Notes (editor mode only)
                 if (!this.mapEditorSystem.isEnabled) return;
                 const notesVisible = this.editorLayout.getPanelState("notes")?.isVisible ?? false;
                 this.editorLayout.setVisible("notes", !notesVisible);
