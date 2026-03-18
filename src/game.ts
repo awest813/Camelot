@@ -103,6 +103,7 @@ import { StableUI } from "./ui/stable-ui";
 import { SaddlebagUI } from "./ui/saddlebag-ui";
 import { DailyScheduleSystem } from "./systems/daily-schedule-system";
 import { HorseSystem } from "./systems/horse-system";
+import { SwimmingSystem } from "./systems/swimming-system";
 import { AssetBrowserSystem } from "./systems/asset-browser-system";
 import { AssetBrowserUI } from "./ui/asset-browser-ui";
 import { BundleMergeSystem } from "./systems/bundle-merge-system";
@@ -249,6 +250,9 @@ export class Game {
 
   // v19 systems
   public horseSystem: HorseSystem;
+
+  // v20 systems
+  public swimSystem: SwimmingSystem;
 
   public isPaused: boolean = false;
 
@@ -1150,6 +1154,8 @@ export class Game {
       this.player.maxMagicka     = this.attributeSystem.maxMagicka;
       this.player.maxStamina     = this.attributeSystem.maxStamina;
       this.player.maxCarryWeight = this.attributeSystem.carryWeight;
+      // Sync water breathing ability (Argonian racial trait)
+      this.swimSystem.hasWaterBreathing = race.waterBreathing ?? false;
       this.saveSystem.markDirty();
     };
     this.saveSystem.setRaceSystem(this.raceSystem);
@@ -1260,6 +1266,26 @@ export class Game {
       this.saveSystem.markDirty();
     };
     this.saveSystem.setHorseSystem(this.horseSystem);
+
+    // ── v20: Swimming system ───────────────────────────────────────────────
+    this.swimSystem = new SwimmingSystem();
+    // Argonian racial water breathing — suppress breath drain for this race
+    if (this.raceSystem.chosenRace?.waterBreathing) {
+      this.swimSystem.hasWaterBreathing = true;
+    }
+    this.swimSystem.onEnterWater = () => {
+      this.ui.showNotification("Entered water.", 1500);
+    };
+    this.swimSystem.onExitWater = () => {
+      this.ui.showNotification("Surfaced.", 1500);
+    };
+    this.swimSystem.onBreathLow = () => {
+      this.ui.showNotification("Running out of breath!", 2000);
+    };
+    this.swimSystem.onDrowning = (_dmg) => {
+      this.player.notifyDamageTaken();
+    };
+    this.saveSystem.setSwimmingSystem(this.swimSystem);
 
     // ── Stable UI ─────────────────────────────────────────────────────────
     this.stableUI = new StableUI();
@@ -2679,6 +2705,9 @@ export class Game {
 
       // v9 active effects tick (DoT heals/damage, duration countdown)
       this.activeEffectsSystem.update(deltaTime, this.player);
+
+      // v20 swimming — drain breath / apply drowning damage while submerged
+      this.swimSystem.update(deltaTime, this.player);
 
       // v10 respawn and merchant restock checks (low-frequency, time-comparison only)
       const currentGameTime = this.timeSystem.gameTime;

@@ -231,6 +231,7 @@ All planned Release I items delivered:
 - ✅ **Character Level-Up UI** — Dedicated level-up dialog (`LevelUpUI`) showing available attribute bonuses (+1 to +5) per attribute with governing-skill annotations, letting the player manually choose 3 attributes to increase; selection requires exactly 3 distinct attributes; confirm button enables only when 3 are chosen; triggered by `PlayerLevelSystem.onLevelUpReady`; modal (Escape blocked until confirmed); pointer lock and camera control restored on confirm; `onLevelUpComplete` notification fires after bonuses are applied.
 - ✅ **DailyScheduleSystem** — NPC daily activity schedules (work, eat, sleep); `DailyScheduleSystem` wraps `ScheduleSystem` and connects it to `TimeSystem` via the `onHourChange` hook for fully automatic time-of-day NPC behaviour switching (no per-frame manual sync required); sleeping NPCs have their `mesh.metadata` cleared so they cannot be targeted for interaction or dialogue; metadata is restored on wake-up; `onNPCSleep` / `onNPCWake` callbacks fire HUD notifications; `isSleeping(name)` / `getActiveBehavior(npc)` query helpers; save-state persistence (SAVE_VERSION 18) re-derives sleep state from restored game time so the flag is never stale.
 - ✅ **HorseSystem / Mount System** — Rideable horse companions; separate speed/stamina pool; dismount on combat; stable NPCs for purchase; horse inventory slot for saddlebags.
+- ✅ **SwimmingSystem** — Oblivion-style underwater depth mechanics: breath meter (30 s default) drains while submerged; `onBreathLow` warning fires at 20 %; drowning damage (3 HP/s) applied when breath reaches 0; Argonian racial `waterBreathing` flag suppresses all breath drain; `hasWaterBreathing` toggle for Water Breathing spells/potions; swim-speed multiplier (0.65×) applied while submerged; `enterWater()` / `exitWater()` state transitions fire HUD notifications; save-state persistence (SAVE_VERSION 20).
 
 
 
@@ -360,6 +361,17 @@ If you want to contribute now, high-impact areas are:
 ---
 
 ## Next Steps
+
+### SwimmingSystem ✅
+Completed in SAVE_VERSION 20. Key deliverables:
+
+- **Breath meter** — 30-second breath capacity drains while submerged; restored instantly on surfacing.
+- **Drowning** — When breath reaches 0, the player takes 3 HP/s drowning damage until surfacing.
+- **Low-breath warning** — `onBreathLow` callback fires once per submersion when breath drops below 20 %.
+- **Water breathing** — `hasWaterBreathing` flag (toggled by Argonian race or Water Breathing effect) suppresses breath drain entirely.
+- **Swim speed** — `swimSpeedMultiplier` returns 0.65 while submerged for game-layer movement integration.
+- **Argonian integration** — `RaceDefinition.waterBreathing` field set to `true` for Argonian; synced on `onRaceChosen`.
+- **Save state** — SAVE_VERSION 20: `currentBreath`, `maxBreath`, and `isSubmerged` persisted.
 
 ### HorseSystem / Mount System ✅
 Completed in SAVE_VERSION 19. Key deliverables:
