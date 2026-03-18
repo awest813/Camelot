@@ -113,6 +113,11 @@ export interface RaceDefinition {
     poison?: number;
     magic?: number;
   };
+  /**
+   * When `true` the race can breathe underwater indefinitely.
+   * Used by `SwimmingSystem` to suppress breath drain for this race.
+   */
+  waterBreathing?: boolean;
 }
 
 /** State saved to disk. */
@@ -348,6 +353,7 @@ export const RACES: ReadonlyArray<RaceDefinition> = [
     attributeBonus: { endurance: RACE_ATTRIBUTE_BONUS, agility: RACE_ATTRIBUTE_BONUS },
     skillBonus: { sneak: RACE_SKILL_BONUS, restoration: RACE_SKILL_BONUS },
     resistance: { poison: 1.0 },
+    waterBreathing: true,
     power: {
       id: "histskin",
       name: "Histskin",
