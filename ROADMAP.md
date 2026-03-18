@@ -274,8 +274,8 @@ three-step overhaul track:
 
 ### World Building Depth
 
-- 🧭 Add additional biome-specific encounter tables.
-- 🧭 Introduce landmark-driven exploration rewards.
+- ✅ Add additional biome-specific encounter tables — `BiomeSystem` (see Release J below).
+- ✅ Introduce landmark-driven exploration rewards — `LandmarkSystem` (see Release J below).
 - 🧭 Add environmental storytelling props and ambient events.
 
 ### Systems Expansion
@@ -405,3 +405,11 @@ Completed in SAVE_VERSION 19. Key deliverables:
 - ✅ **ContentBundleUI** (`src/ui/content-bundle-ui.ts`) — HTML overlay (Shift+F7 / Editor Hub "📦 Content Bundle"): bundle metadata form (title, description, author); per-system diagnostic rows with pass/fail icons, issue counts, expandable issue lists, and "▶ Open" quick-open buttons; "Validate All" and "⬇ Export Bundle" action buttons; `onPlayFromHere` callback opens matching creator UI without re-navigating manually.
 - ✅ **Editor Hub expanded** — "Content Bundle" tool card added to the F11 Editor Hub launcher grid (shortcut Shift+F7, indigo accent).
 - ✅ **Keybinding** — Shift+F7 toggles `ContentBundleUI`; also listed in the F1 help overlay and the Editor Hub.
+
+### Content GUI — Release J (Biome + Landmark Systems) ✅
+
+Both planned World Building Depth items delivered:
+
+1. ✅ **BiomeSystem** (`src/systems/biome-system.ts`, 39 tests) — headless biome registry bridging `RegionSystem` regions to encounter-table data: `registerBiome()` / `unregisterBiome()` for biome CRUD; `setRegionBiome(regionId, biomeId)` / `clearRegionBiome()` / `getBiomeForRegion()` / `getRegionsForBiome()` for region↔biome association; encounter helpers `getSpawnTableIds(regionId)` (returns the biome's `spawnTableIds` list), `getEncounterWeightMultiplier(regionId)` (default `1.0` for unmapped), `getEncounterLevelRange(regionId)` (`{ min, max }` with `0` meaning no bound), `isLevelInRange(regionId, playerLevel)` (always `true` for unmapped regions), and `getAmbientMoodId(regionId)` for music/VFX hooks; `unregisterBiome()` cascades to remove all region mappings for that biome; `getSaveState()` / `restoreFromSave()` persist the region↔biome mapping (stale biome refs silently dropped on restore); `clear()` resets everything.
+
+2. ✅ **LandmarkSystem** (`src/systems/landmark-system.ts`, 39 tests) — named world-landmark registry with XP + item discovery rewards: `registerLandmark()` / `unregisterLandmark()` for CRUD; `discover(id)` returns a `LandmarkDiscoveryResult` (`alreadyDiscovered`, `xpAwarded`, `itemsAwarded`) — one-time landmarks (`isOneTime: true`) grant rewards only on the first call, repeatable landmarks grant on every call; `isDiscovered()` / `getDiscoveredIds()` / `getUndiscoveredIds()` for journal/map integration; `getLandmarksNearPoint(x, y, z, radius)` Euclidean spatial query for trigger-volume use; `onDiscovered` callback fires after every `discover()` call so the HUD layer can show notifications and apply XP/item grants; `resetDiscoveries()` clears flags without removing definitions; `getSaveState()` / `restoreFromSave()` persist discovered ids (stale ids silently ignored on restore); `clear()` wipes everything.
