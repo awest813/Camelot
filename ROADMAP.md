@@ -274,9 +274,9 @@ three-step overhaul track:
 
 ### World Building Depth
 
-- 🧭 Add additional biome-specific encounter tables.
-- 🧭 Introduce landmark-driven exploration rewards.
-- 🧭 Add environmental storytelling props and ambient events.
+- 🧭 Add additional biome-specific encounter tables — planned for Release J (`BiomeEncounterSystem`).
+- 🧭 Introduce landmark-driven exploration rewards — planned for Release J (`LandmarkSystem`).
+- 🧭 Add environmental storytelling props and ambient events — planned for Release J (Environmental Storytelling Hooks).
 
 ### Systems Expansion
 
@@ -405,3 +405,17 @@ Completed in SAVE_VERSION 19. Key deliverables:
 - ✅ **ContentBundleUI** (`src/ui/content-bundle-ui.ts`) — HTML overlay (Shift+F7 / Editor Hub "📦 Content Bundle"): bundle metadata form (title, description, author); per-system diagnostic rows with pass/fail icons, issue counts, expandable issue lists, and "▶ Open" quick-open buttons; "Validate All" and "⬇ Export Bundle" action buttons; `onPlayFromHere` callback opens matching creator UI without re-navigating manually.
 - ✅ **Editor Hub expanded** — "Content Bundle" tool card added to the F11 Editor Hub launcher grid (shortcut Shift+F7, indigo accent).
 - ✅ **Keybinding** — Shift+F7 toggles `ContentBundleUI`; also listed in the F1 help overlay and the Editor Hub.
+
+---
+
+## Next Steps
+
+### Content GUI — Release J (World Building Depth) 🧭
+
+Planned deliverables:
+
+1. 🧭 **BiomeEncounterSystem** (`src/systems/biome-encounter-system.ts`) — Data-driven per-biome encounter and loot table assignment: register biome types (forest, plains, swamp, dungeon, tundra) each with a weighted list of `SpawnCreator` template IDs and `LootTable` IDs; `getEncountersForBiome(biomeId)` and `getLootTablesForBiome(biomeId)` replace the flat default tables used by `ChunkManager` and `StructureManager`; `onBiomeEntered(biomeId)` callback fires `GameEventBus` for ambient audio and weather cues; save-state persistence (SAVE_VERSION 21).
+
+2. 🧭 **LandmarkSystem** (`src/systems/landmark-system.ts`) — Named point-of-interest landmarks with discovery rewards: `registerLandmark(def)` (id, name, description, position, biomeId, rewardGold, rewardXP, rewardItems[]); `discover(id, gameTime)` marks a landmark as found, awards gold/XP via `PlayerLevelSystem`, gives items via inventory engine, fires `onLandmarkDiscovered` callback + HUD notification, and registers the location with `FastTravelSystem`; `getDiscovered()` / `getUndiscovered()` for map overlay; `getLandmarkAt(position, radius)` spatial query for auto-discover on proximity; save-state persistence (SAVE_VERSION 21).
+
+3. 🧭 **Environmental Storytelling Hooks** — Ambient event scripting layer extending `EventScriptSystem`: new step types `place_prop` (spawn a named static mesh at a world position), `remove_prop` (despawn by id), `play_ambient_audio` (positional audio clip at world position with falloff radius), and `world_state_hint` (fire a HUD subtitle-style message tied to a world flag); wired to `RegionSystem.onRegionEntered` so entering a region auto-triggers its ambient script; no additional save state required (scripts re-derive from flags already persisted by `EventScriptSystem`).
