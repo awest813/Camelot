@@ -835,64 +835,63 @@ export class CombatSystem {
    *  RETURN      → ALERT       : player re-enters aggroRange during return trip
    *  RETURN      → PATROL      : NPC reached spawnPosition
    */
+  /**
+   * Drive every NPC's AI state machine. Performs a single pass over the NPC array
+   * to handle DoT effects, AI state transitions, and attack reservation scoring.
+   */
   public updateNPCAI(deltaTime: number): void {
     this._tickPlayerAttackCooldowns(deltaTime);
 
     const playerPos = this.player.camera.position;
-    this._refreshAttackReservations(playerPos);
 
-    for (const npc of this.npcs) {
+    // Prepare candidate tracking for the NEXT frame's attack reservations.
+    // This introduces a 1-frame lag for slot handoffs but saves a full O(N) pass.
+    this._topAttackScores.fill(Infinity);
+    this._topAttackNpcs.fill(null);
+    let candidateCount = 0;
+
+    for (let i = 0; i < this.npcs.length; i++) {
+      const npc = this.npcs[i];
       if (npc.isDead) continue;
-      // Tick damage-over-time status effects (burn, poison, freeze, shock)
+
+      // 1. Tick DoTs
       npc.tickStatusEffects(deltaTime);
-      // Skip further AI processing if the DoT killed the NPC this frame
       if (npc.isDead) {
         if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
         continue;
       }
-      this._tickNPC(npc, playerPos, deltaTime);
-    }
-  }
 
-  /**
-   * Select which hostile NPCs are allowed to occupy ATTACK state this frame.
-   * Current attackers get priority to avoid constant handoff churn.
-   */
-  private _refreshAttackReservations(playerPos: Vector3): void {
-    this._attackReservations.clear();
-    this._topAttackScores.fill(Infinity);
-    this._topAttackNpcs.fill(null);
+      // 2. Core Distance Check (calculated once per frame)
+      const distSq = Vector3.DistanceSquared(npc.mesh.position, playerPos);
 
-    let count = 0;
-    for (let i = 0; i < this.npcs.length; i++) {
-      const npc = this.npcs[i];
-      if (npc.isDead || (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK)) {
-        continue;
-      }
+      // 3. Score for next frame's attack slots
+      if (npc.aiState === AIState.CHASE || npc.aiState === AIState.ATTACK) {
+        let score = distSq;
+        if (npc.aiState !== AIState.ATTACK) {
+          score += 1e12;
+        }
 
-      let score = Vector3.DistanceSquared(npc.mesh.position, playerPos);
-      if (npc.aiState !== AIState.ATTACK) {
-        // Large penalty for not being in ATTACK state to prioritize current attackers.
-        // We use an extremely large number to ensure any ATTACK state NPC always wins over a CHASE state NPC,
-        // even in very large scenes where DistanceSquared might exceed 1,000,000.
-        score += 1e12;
-      }
-
-      for (let j = 0; j < MAX_CONCURRENT_ATTACKERS; j++) {
-        if (score < this._topAttackScores[j]) {
-          for (let k = MAX_CONCURRENT_ATTACKERS - 1; k > j; k--) {
-            this._topAttackScores[k] = this._topAttackScores[k - 1];
-            this._topAttackNpcs[k] = this._topAttackNpcs[k - 1];
+        for (let j = 0; j < MAX_CONCURRENT_ATTACKERS; j++) {
+          if (score < this._topAttackScores[j]) {
+            for (let k = MAX_CONCURRENT_ATTACKERS - 1; k > j; k--) {
+              this._topAttackScores[k] = this._topAttackScores[k - 1];
+              this._topAttackNpcs[k] = this._topAttackNpcs[k - 1];
+            }
+            this._topAttackScores[j] = score;
+            this._topAttackNpcs[j] = npc;
+            if (candidateCount < MAX_CONCURRENT_ATTACKERS) candidateCount++;
+            break;
           }
-          this._topAttackScores[j] = score;
-          this._topAttackNpcs[j] = npc;
-          if (count < MAX_CONCURRENT_ATTACKERS) count++;
-          break;
         }
       }
+
+      // 4. Tick AI State Machine
+      this._tickNPC(npc, playerPos, deltaTime, distSq);
     }
 
-    for (let i = 0; i < count; i++) {
+    // Finalize reservations for the NEXT frame.
+    this._attackReservations.clear();
+    for (let i = 0; i < candidateCount; i++) {
       const topNpc = this._topAttackNpcs[i];
       if (topNpc) {
         this._attackReservations.add(topNpc);
@@ -911,7 +910,7 @@ export class CombatSystem {
 
   // ─── State machine implementation ──────────────────────────────────────────
 
-  private _tickNPC(npc: NPC, playerPos: Vector3, deltaTime: number): void {
+  private _tickNPC(npc: NPC, playerPos: Vector3, deltaTime: number, distSq: number): void {
     // Stagger: briefly freeze the NPC's AI after a player power attack.
     if (npc.isStaggered) {
       npc.staggerTimer -= deltaTime;
@@ -923,22 +922,27 @@ export class CombatSystem {
       return;
     }
 
-    const distSq      = Vector3.DistanceSquared(npc.mesh.position, playerPos);
-    const aggroRangeSq  = npc.aggroRange * npc.aggroRange;
-    const attackEngageRange = this._getAttackEngageRange(npc);
-    const attackDisengageRange = this._getAttackDisengageRange(npc);
-    const attackEngageRangeSq = attackEngageRange * attackEngageRange;
-    const attackDisengageRangeSq = attackDisengageRange * attackDisengageRange;
-    const deaggroRangeSq = 4 * aggroRangeSq; // (2 × aggroRange)²
-
     // Cooldown discipline: keep ticking while hostile, even when repositioning.
     if (npc.isAggressive) {
       npc.attackTimer = Math.max(0, npc.attackTimer - deltaTime);
     }
 
+    const aggroRangeSq = npc.aggroRange * npc.aggroRange;
+    const deaggroRangeSq = 4 * aggroRangeSq; // (2 * aggroRange)²
+
+    const engage = this._getAttackEngageRange(npc);
+    const engageSq = engage * engage;
+    const disengage = this._getAttackDisengageRange(npc);
+    const disengageSq = disengage * disengage;
+
     // Track the player's last known world position any time they are within aggro range.
+    // Uses copyFrom to avoid frequent Vector3 allocations.
     if (distSq <= aggroRangeSq) {
-      npc.lastKnownPlayerPos = playerPos.clone();
+      if (!npc.lastKnownPlayerPos) {
+        npc.lastKnownPlayerPos = playerPos.clone();
+      } else {
+        npc.lastKnownPlayerPos.copyFrom(playerPos);
+      }
     }
 
     switch (npc.aiState) {
@@ -1003,7 +1007,7 @@ export class CombatSystem {
           this._transitionTo(npc, AIState.RETURN);
           break;
         }
-        if (distSq <= attackEngageRangeSq && this._attackReservations.has(npc)) {
+        if (distSq <= engageSq && this._attackReservations.has(npc)) {
           this._transitionTo(npc, AIState.ATTACK);
           break;
         }
@@ -1020,7 +1024,7 @@ export class CombatSystem {
           this._transitionTo(npc, AIState.CHASE);
           break;
         }
-        if (distSq > attackDisengageRangeSq) {
+        if (distSq > disengageSq) {
           this._transitionTo(npc, AIState.CHASE);
           break;
         }
@@ -1037,8 +1041,8 @@ export class CombatSystem {
           this._updateAttackReposition(npc, playerPos, distSq, deltaTime);
         } else {
           // Ready to attack or winding up: close the distance aggressively if needed
-          const strikeRangeSq = (npc.attackRange * 0.5) * (npc.attackRange * 0.5);
-          if (distSq > strikeRangeSq) {
+          const strikeRange = npc.attackRange * 0.5;
+          if (distSq > strikeRange * strikeRange) {
              this._moveRelativeToTarget(npc, playerPos, npc.moveSpeed, deltaTime);
           } else {
              this._stopMovement(npc);
@@ -1343,11 +1347,12 @@ export class CombatSystem {
 
   private _updateAttackReposition(npc: NPC, playerPos: Vector3, distSq: number, deltaTime: number): void {
     const standoff = npc.attackRange * 0.82;
-    const dist = Math.sqrt(distSq);
     let radialSpeed = 0;
-    if (dist < standoff - 0.45) {
+
+    // Use squared comparisons to avoid Math.sqrt() where possible
+    if (distSq < (standoff - 0.45) * (standoff - 0.45)) {
       radialSpeed = -npc.moveSpeed * 0.55;
-    } else if (dist > standoff + 0.55) {
+    } else if (distSq > (standoff + 0.55) * (standoff + 0.55)) {
       radialSpeed = npc.moveSpeed * 0.45;
     }
 
