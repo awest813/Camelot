@@ -270,12 +270,22 @@ three-step overhaul track:
 
 ---
 
+### Content GUI — Release J (Biome + Landmark Systems) ✅
+
+Both planned Release J items delivered:
+
+1. ✅ **BiomeSystem** (`src/systems/biome-system.ts`, 41 tests) — biome-specific encounter tables: `addBiome()` / `removeBiome()` / `getBiome()` CRUD; rect and sphere bounding volumes for spatial containment; `getBiomesAtPoint(x, y, z)` spatial query; `updatePlayerPosition(x, y, z)` recalculates membership each frame and fires `onBiomeEntered` / `onBiomeExited` callbacks on transitions; `getCurrentBiomeIds()` returns the set of biomes the player is currently inside; `getEncounterGroups(biomeId)` returns the weighted encounter-table references; `sampleEncounterTable(biomeId, rng?)` performs a weighted random draw and returns a table id (or `null` when the biome has no groups); `encounterRate` field (encounters per in-game hour) for caller-side scheduling; `ambientId` field for ambient sound/event integration; `getSnapshot()` / `restoreSnapshot()` for persistence; `clear()`.
+
+2. ✅ **LandmarkSystem** (`src/systems/landmark-system.ts`, 45 tests) — landmark-driven exploration rewards: `addLandmark()` / `removeLandmark()` / `getLandmark()` CRUD; eight `LandmarkType` values (`dungeon`, `ruin`, `shrine`, `cave`, `tower`, `camp`, `settlement`, `monument`); `discoverLandmark(id)` grants `discoveryReward` (XP, fame, fixed items, loot-table reference) on first call and fires `onLandmarkDiscovered`; `completeLandmark(id)` grants `completionReward` on first call (auto-discovers if not yet done) and fires `onLandmarkCompleted`; both actions are idempotent after first call; `isDiscovered()` / `isCompleted()` flags; `getDiscoveredLandmarks()` / `getCompletedLandmarks()` / `getLandmarksByType(type)` query helpers; `getLandmarksInRadius(x, y, z, radius)` spatial query; `getNearestLandmark(x, y, z)` returns closest landmark id; `getUndiscoveredInRadius()` for proximity-triggered auto-discovery; `getSnapshot()` / `restoreSnapshot()` (silent — no callbacks on load to prevent duplicate reward grants); `clear()`.
+
+---
+
 ## Mid-Term (3–5 Releases)
 
 ### World Building Depth
 
-- 🧭 Add additional biome-specific encounter tables.
-- 🧭 Introduce landmark-driven exploration rewards.
+- ✅ Add additional biome-specific encounter tables — `BiomeSystem` (see Release J above).
+- ✅ Introduce landmark-driven exploration rewards — `LandmarkSystem` (see Release J above).
 - 🧭 Add environmental storytelling props and ambient events.
 
 ### Systems Expansion
