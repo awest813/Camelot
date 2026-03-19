@@ -616,6 +616,14 @@ export class MapEditorSystem {
     return this._findEntityById(entityId)?.properties ?? null;
   }
 
+  /**
+   * Returns the layer currently assigned to the given entity, or null when the
+   * entity does not exist.
+   */
+  getEntityLayer(entityId: string): EditorLayerName | null {
+    return this._findEntityById(entityId)?.layerName ?? null;
+  }
+
   setEntityProperties(entityId: string, properties: EditorEntityProperties): boolean {
     const entity = this._findEntityById(entityId);
     if (!entity) return false;
@@ -634,6 +642,34 @@ export class MapEditorSystem {
       after: { ...entity.properties },
     });
 
+    return true;
+  }
+
+  /**
+   * Reassign an entity to a different editor layer.
+   *
+   * Visibility and lock state are immediately inherited from the destination
+   * layer so moved entities participate in the layer panel consistently.
+   */
+  setEntityLayer(entityId: string, layerName: EditorLayerName): boolean {
+    const entity = this._findEntityById(entityId);
+    const layer = this._layers.get(layerName);
+    if (!entity || !layer) return false;
+
+    entity.layerName = layerName;
+    entity.mesh.metadata = {
+      ...(entity.mesh.metadata ?? {}),
+      editorLayerName: layerName,
+      editable: !layer.isLocked,
+    };
+    entity.mesh.setEnabled(layer.isVisible);
+    entity.mesh.isPickable = !layer.isLocked;
+
+    if (layer.isLocked && this._selectedEntityId === entityId) {
+      this._clearSelection();
+    }
+
+    this.onLayerChanged?.({ ...layer });
     return true;
   }
 
