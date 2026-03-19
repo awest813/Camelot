@@ -427,8 +427,11 @@ export class Game {
 
     // ── Map editor property panel ─────────────────────────────────────────────
     this.mapEditorPropertyPanel = new MapEditorPropertyPanel(this.ui.uiTexture);
-    this.mapEditorPropertyPanel.onApply = (entityId, props) => {
+    this.mapEditorPropertyPanel.onApply = (entityId, props, layerName) => {
       this.mapEditorSystem.setEntityProperties(entityId, props);
+      this.mapEditorSystem.setEntityLayer(entityId, layerName);
+      this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+      this._refreshLayerPanel();
       this.ui.showNotification("Properties applied", 1200);
     };
     this.mapEditorPropertyPanel.onDelete = (entityId) => {
@@ -454,7 +457,13 @@ export class Game {
       const type = mesh?.metadata?.editorType;
       const position = this.mapEditorSystem.getEntityPosition(entityId) ?? undefined;
       if (type && entity !== null) {
-        this.mapEditorPropertyPanel.show(entityId, type, entity, position);
+        this.mapEditorPropertyPanel.show(
+          entityId,
+          type,
+          entity,
+          position,
+          this.mapEditorSystem.getEntityLayer(entityId) ?? "objects",
+        );
         this.editorLayout.setVisible("properties", true);
       }
       this.mapEditorHierarchyPanel.setSelection(entityId);
@@ -574,7 +583,7 @@ export class Game {
     };
 
     // ── Map editor system: entity moved (gizmo drag-end) ──────────────────────
-    this.mapEditorSystem.onEntityMoved = (entityId, position) => {
+    this.mapEditorSystem.onEntityMoved = (_entityId, position) => {
       this.mapEditorPropertyPanel.updatePosition(position);
       this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
     };

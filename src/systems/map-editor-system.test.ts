@@ -194,6 +194,33 @@ describe('MapEditorSystem — Phase 2 (entity properties)', () => {
         expect(editor.setEntityProperties('missing', { label: 'noop' })).toBe(false);
         expect(editor.getEntityProperties('missing')).toBeNull();
     });
+
+    it('reassigns an entity to a different layer and updates exported data', () => {
+        const { editor } = makeEditor();
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'loot');
+        const entityId = mesh.metadata?.editorEntityId as string;
+
+        expect(editor.getEntityLayer(entityId)).toBe('objects');
+        expect(editor.setEntityLayer(entityId, 'events')).toBe(true);
+
+        expect(editor.getEntityLayer(entityId)).toBe('events');
+        expect(mesh.metadata?.editorLayerName).toBe('events');
+        expect(editor.exportMap().entries[0].layerName).toBe('events');
+    });
+
+    it('applies target layer visibility and lock state when moving an entity', () => {
+        const { editor } = makeEditor();
+        editor.setLayerVisible('triggers', false);
+        editor.setLayerLocked('triggers', true);
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+        const entityId = mesh.metadata?.editorEntityId as string;
+
+        expect(editor.setEntityLayer(entityId, 'triggers')).toBe(true);
+
+        expect(mesh.isEnabled()).toBe(false);
+        expect(mesh.isPickable).toBe(false);
+        expect(editor.selectedEntityId).toBeNull();
+    });
 });
 
 // ─── Phase 2: Patrol route authoring ─────────────────────────────────────────

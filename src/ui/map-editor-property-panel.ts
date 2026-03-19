@@ -1,5 +1,5 @@
 import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Button, InputText } from "@babylonjs/gui/2D";
-import type { EditorPlacementType, EditorEntityProperties } from "../systems/map-editor-system";
+import type { EditorPlacementType, EditorEntityProperties, EditorLayerName } from "../systems/map-editor-system";
 
 // ── Design tokens (aligned with UIManager) ──────────────────────────────────
 const P = {
@@ -15,7 +15,17 @@ const P = {
   BTN_DELETE_HOVER: "rgba(120, 16, 16, 0.98)",
   BTN_APPLY_BG:     "rgba(8, 40, 8, 0.95)",
   BTN_APPLY_HOVER:  "rgba(16, 80, 16, 0.98)",
+  LAYER_CHIP_BG:    "rgba(28, 20, 6, 0.95)",
+  LAYER_CHIP_ACTIVE:"rgba(80, 56, 10, 0.98)",
 };
+
+const LAYER_OPTIONS: Array<{ name: EditorLayerName; label: string }> = [
+  { name: "terrain", label: "Terrain" },
+  { name: "objects", label: "Objects" },
+  { name: "events", label: "Events" },
+  { name: "npcs", label: "NPCs" },
+  { name: "triggers", label: "Triggers" },
+];
 
 /** Property field descriptors keyed by placement type */
 const FIELDS_BY_TYPE: Record<EditorPlacementType, Array<{ key: keyof EditorEntityProperties; label: string }>> = {
@@ -39,7 +49,7 @@ const FIELDS_BY_TYPE: Record<EditorPlacementType, Array<{ key: keyof EditorEntit
  */
 export class MapEditorPropertyPanel {
   /** Fired when the user clicks Apply with the entity ID and merged properties. */
-  public onApply: ((entityId: string, properties: EditorEntityProperties) => void) | null = null;
+  public onApply: ((entityId: string, properties: EditorEntityProperties, layerName: EditorLayerName) => void) | null = null;
 
   /** Fired when the user clicks Delete with the entity ID to remove. */
   public onDelete: ((entityId: string) => void) | null = null;
@@ -53,12 +63,15 @@ export class MapEditorPropertyPanel {
   private readonly _idText: TextBlock;
   private readonly _positionText: TextBlock;
   private readonly _fieldsStack: StackPanel;
+  private readonly _layerStack: StackPanel;
   private readonly _applyBtn: Button;
   private readonly _deleteBtn: Button;
 
   private _currentEntityId: string | null = null;
   private _currentType: EditorPlacementType | null = null;
+  private _currentLayerName: EditorLayerName = "objects";
   private _inputMap: Map<keyof EditorEntityProperties, InputText> = new Map();
+  private _layerChipMap: Map<EditorLayerName, Button> = new Map();
 
   constructor(ui: AdvancedDynamicTexture) {
     this._ui = ui;
@@ -166,6 +179,11 @@ export class MapEditorPropertyPanel {
     this._fieldsStack.width = "100%";
     inner.addControl(this._fieldsStack);
 
+    this._layerStack = new StackPanel("editorPropLayers");
+    this._layerStack.isVertical = true;
+    this._layerStack.width = "100%";
+    inner.addControl(this._layerStack);
+
     // ── Button row ────────────────────────────────────────────────────────────
     const btnRow = new StackPanel("editorPropBtnRow");
     btnRow.isVertical = false;
@@ -229,9 +247,11 @@ export class MapEditorPropertyPanel {
     entityType: EditorPlacementType,
     properties: Readonly<EditorEntityProperties>,
     position?: { x: number; y: number; z: number },
+    layerName: EditorLayerName = "objects",
   ): void {
     this._currentEntityId = entityId;
     this._currentType     = entityType;
+    this._currentLayerName = layerName;
 
     this._titleText.text = `[${entityType}]`;
     this._idText.text    = `id: ${entityId}`;
@@ -240,6 +260,7 @@ export class MapEditorPropertyPanel {
       : "";
 
     this._rebuildFields(entityType, properties);
+    this._rebuildLayerControls();
     this._panel.isVisible = true;
   }
 
@@ -258,6 +279,8 @@ export class MapEditorPropertyPanel {
     this._panel.isVisible = false;
     this._currentEntityId = null;
     this._currentType     = null;
+    this._currentLayerName = "objects";
+    this._layerChipMap.clear();
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
@@ -304,6 +327,59 @@ export class MapEditorPropertyPanel {
     }
   }
 
+  private _rebuildLayerControls(): void {
+    this._layerStack.clearControls();
+    this._layerChipMap.clear();
+
+    const label = new TextBlock("prop_layer_label", "Layer:");
+    label.height = "18px";
+    label.color = P.DIM;
+    label.fontSize = 10;
+    label.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    label.paddingLeft = "8px";
+    this._layerStack.addControl(label);
+
+    const rows: EditorLayerName[][] = [
+      ["terrain", "objects", "events"],
+      ["npcs", "triggers"],
+    ];
+
+    for (const layerRow of rows) {
+      const row = new StackPanel(`prop_layer_row_${layerRow.join("_")}`);
+      row.isVertical = false;
+      row.height = "24px";
+      row.paddingLeft = "8px";
+      row.paddingRight = "8px";
+      this._layerStack.addControl(row);
+
+      for (const layerName of layerRow) {
+        const option = LAYER_OPTIONS.find((entry) => entry.name === layerName);
+        if (!option) continue;
+        const chip = Button.CreateSimpleButton(`prop_layer_chip_${layerName}`, option.label);
+        chip.width = "76px";
+        chip.height = "18px";
+        chip.fontSize = 10;
+        chip.color = P.TEXT;
+        chip.background = this._currentLayerName === layerName ? P.LAYER_CHIP_ACTIVE : P.LAYER_CHIP_BG;
+        chip.cornerRadius = 3;
+        chip.thickness = 1;
+        chip.onPointerUpObservable.add(() => {
+          this._currentLayerName = layerName;
+          this._refreshLayerChipStyles();
+        });
+        row.addControl(chip);
+        this._layerChipMap.set(layerName, chip);
+      }
+    }
+  }
+
+  private _refreshLayerChipStyles(): void {
+    for (const [layerName, chip] of this._layerChipMap) {
+      chip.background = this._currentLayerName === layerName ? P.LAYER_CHIP_ACTIVE : P.LAYER_CHIP_BG;
+      chip.color = P.TEXT;
+    }
+  }
+
   private _handleApply(): void {
     if (!this._currentEntityId || !this._currentType) return;
 
@@ -312,7 +388,7 @@ export class MapEditorPropertyPanel {
       (props as Record<string, string>)[key] = input.text.trim();
     }
 
-    this.onApply?.(this._currentEntityId, props);
+    this.onApply?.(this._currentEntityId, props, this._currentLayerName);
   }
 
   private _handleDelete(): void {

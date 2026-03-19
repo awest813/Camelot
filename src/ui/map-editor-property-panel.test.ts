@@ -126,8 +126,8 @@ describe('MapEditorPropertyPanel — show / hide', () => {
 describe('MapEditorPropertyPanel — onApply', () => {
     it('fires onApply with correct entityId when Apply is clicked', () => {
         const { panel } = makePanel();
-        const applyCalls: Array<{ id: string; props: any }> = [];
-        panel.onApply = (id, props) => applyCalls.push({ id, props });
+        const applyCalls: Array<{ id: string; props: any; layerName: string }> = [];
+        panel.onApply = (id, props, layerName) => applyCalls.push({ id, props, layerName });
 
         panel.show('editor_entity_42', 'marker', { label: 'myLabel' });
         // Simulate Apply button click via the internal handler
@@ -135,6 +135,7 @@ describe('MapEditorPropertyPanel — onApply', () => {
 
         expect(applyCalls.length).toBe(1);
         expect(applyCalls[0].id).toBe('editor_entity_42');
+        expect(applyCalls[0].layerName).toBe('objects');
     });
 
     it('does not fire onApply when no entity is shown', () => {
@@ -145,6 +146,17 @@ describe('MapEditorPropertyPanel — onApply', () => {
         (panel as any)._handleApply();
 
         expect(applyCalls.length).toBe(0);
+    });
+
+    it('includes the selected layer when Apply is clicked', () => {
+        const { panel } = makePanel();
+        const applyCalls: Array<{ layerName: string }> = [];
+        panel.onApply = (_id, _props, layerName) => applyCalls.push({ layerName });
+
+        panel.show('editor_entity_42', 'marker', {}, undefined, 'terrain');
+        (panel as any)._handleApply();
+
+        expect(applyCalls).toEqual([{ layerName: 'terrain' }]);
     });
 });
 
@@ -226,6 +238,17 @@ describe('MapEditorPropertyPanel — field rendering', () => {
         panel.show('e1', 'structure', {});
         expect((panel as any)._inputMap.has('lootTableId')).toBe(false);
         expect((panel as any)._inputMap.has('structureId')).toBe(true);
+    });
+
+    it('builds layer chips for the available editor layers', () => {
+        const { panel } = makePanel();
+        panel.show('e0', 'marker', {});
+        const chipMap = (panel as any)._layerChipMap as Map<string, unknown>;
+        expect(chipMap.has('terrain')).toBe(true);
+        expect(chipMap.has('objects')).toBe(true);
+        expect(chipMap.has('events')).toBe(true);
+        expect(chipMap.has('npcs')).toBe(true);
+        expect(chipMap.has('triggers')).toBe(true);
     });
 });
 
