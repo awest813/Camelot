@@ -280,13 +280,24 @@ Both planned Release J items delivered:
 
 ---
 
+### Content GUI — Release K (Ambient Events + Dynamic Encounters) ✅
+
+Both planned Release K items delivered:
+
+1. ✅ **AmbientEventSystem** (`src/systems/ambient-event-system.ts`, 45 tests) — environmental storytelling engine: `addEvent()` / `removeEvent()` / `getEvent()` CRUD; each `AmbientEventDefinition` carries a `conditions` record (optional `timeRange` for day/night windows including midnight wrap-around, `weather` allowlist, `biomeIds` requiring at least one active biome, `minPlayerLevel`, `requiredFlags` that must all be set, `forbiddenFlags` that must all be absent) and an `effect` record (`notification` text, `setFlag`, `emitEvent`); `update(context)` scans all events each game-clock tick and fires eligible ones via `onEventTriggered(eventId, effect)`; per-event `cooldownHours` rate-limits repeat fires with correct 24-hour wrap; `oneShot` flag allows exactly one lifetime fire; `getEligibleEventIds(context)` returns matching event ids without side-effects (debug/preview); `getLastFiredAt()` / `hasFired()` query helpers; `getSnapshot()` / `restoreSnapshot()` for save persistence (callbacks suppressed on load).
+
+2. ✅ **EncounterSystem** (`src/systems/encounter-system.ts`, 43 tests) — dynamic random encounter scheduling: `addTemplate()` / `removeTemplate()` / `getTemplate()` CRUD; each `EncounterTemplate` links to a `tableId` (encounter/loot table), declares `biomeIds` for auto-scheduling, `minCount`/`maxCount` for spawn quantity variance, optional `minLevel`/`maxLevel` gates, `cooldownHours`, and `spawnChance` [0,1] for probabilistic firing; `triggerEncounter(templateId, context, rng?)` fires the encounter manually (returns `EncounterResult` with resolved `count` and `playerLevel`, or `null` when gated); `update(context, activeBiomeIds, rng?)` auto-fires all eligible templates whose biome set intersects the active set — respects cooldown, level gate, and spawn chance; `getTemplatesForBiome(biomeId)` for `BiomeSystem.onBiomeEntered` wiring; `getEligibleTemplates(context)` dry-run; `getTriggerCount()` / `getLastTriggeredAt()` query helpers; `getSnapshot()` / `restoreSnapshot()` for save persistence.
+
+---
+
 ## Mid-Term (3–5 Releases)
 
 ### World Building Depth
 
 - ✅ Add additional biome-specific encounter tables — `BiomeSystem` (see Release J above).
 - ✅ Introduce landmark-driven exploration rewards — `LandmarkSystem` (see Release J above).
-- 🧭 Add environmental storytelling props and ambient events.
+- ✅ Add environmental storytelling props and ambient events — `AmbientEventSystem` (see Release K above).
+- ✅ Dynamic random encounter scheduling — `EncounterSystem` (see Release K above).
 
 ### Systems Expansion
 
