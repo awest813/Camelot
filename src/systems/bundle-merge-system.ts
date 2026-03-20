@@ -112,9 +112,9 @@ export class BundleMergeSystem {
     checkTopLevel("spawn");
 
     // Map entity conflicts
-    if (this._base.map?.entities && this._incoming.map?.entities) {
-      const baseEntIds  = new Map(this._base.map.entities.map((e) => [e.id, e]));
-      for (const inc of this._incoming.map.entities) {
+    if (this._base.map?.entries && this._incoming.map?.entries) {
+      const baseEntIds  = new Map(this._base.map.entries.map((e) => [e.id, e]));
+      for (const inc of this._incoming.map.entries) {
         if (!inc.id) continue;
         const b = baseEntIds.get(inc.id);
         if (!b) continue;
@@ -122,8 +122,8 @@ export class BundleMergeSystem {
         conflicts.push({
           id:            conflictKey,
           systemId:      "map",
-          baseLabel:     `Map entity: ${b.label ?? b.id} (${b.type ?? "?"})`,
-          incomingLabel: `Map entity: ${inc.label ?? inc.id} (${inc.type ?? "?"})`,
+          baseLabel:     `Map entity: ${b.properties?.label ?? b.id} (${b.type ?? "?"})`,
+          incomingLabel: `Map entity: ${inc.properties?.label ?? inc.id} (${inc.type ?? "?"})`,
           strategy:      this._strategies.get(conflictKey) ?? "keep-base",
         });
       }
@@ -191,18 +191,18 @@ export class BundleMergeSystem {
 
       if (!conflict) {
         // No conflict — prefer incoming if base is missing, otherwise base
-        (merged as Record<string, unknown>)[sysId] = b ?? i;
+        (merged as unknown as Record<string, unknown>)[sysId] = b ?? i;
       } else {
         const strategy = this._strategies.get(conflict.id) ?? "keep-base";
         if (strategy === "keep-base") {
-          (merged as Record<string, unknown>)[sysId] = b;
+          (merged as unknown as Record<string, unknown>)[sysId] = b;
           keptBase++;
         } else if (strategy === "keep-incoming") {
-          (merged as Record<string, unknown>)[sysId] = i;
+          (merged as unknown as Record<string, unknown>)[sysId] = i;
           keptIncoming++;
         } else {
           // rename-incoming: include both; rename the incoming entry
-          (merged as Record<string, unknown>)[sysId] = b;
+          (merged as unknown as Record<string, unknown>)[sysId] = b;
           // We log the renamed payload as a side-band (no place in top-level schema for two same-type entries)
           renamed++;
         }
@@ -222,8 +222,8 @@ export class BundleMergeSystem {
     // Map entities — merge at the entity level
     if (this._base.map || this._incoming.map) {
       includedSystems.add("map");
-      const baseEntities  = this._base.map?.entities  ?? [];
-      const incEntities   = this._incoming.map?.entities ?? [];
+      const baseEntities  = this._base.map?.entries  ?? [];
+      const incEntities   = this._incoming.map?.entries ?? [];
       const mergedEntities: typeof baseEntities = [...baseEntities];
       const baseIds = new Set(baseEntities.map((e) => e.id));
 
@@ -252,17 +252,16 @@ export class BundleMergeSystem {
 
       const basePatrolRoutes   = this._base.map?.patrolRoutes   ?? [];
       const incPatrolRoutes    = this._incoming.map?.patrolRoutes ?? [];
-      const baseRouteIds = new Set(basePatrolRoutes.map((r: { groupId?: string }) => r.groupId));
+      const baseRouteIds = new Set(basePatrolRoutes.map((r) => r.id));
       const mergedRoutes = [
         ...basePatrolRoutes,
-        ...incPatrolRoutes.filter((r: { groupId?: string }) => !baseRouteIds.has(r.groupId)),
+        ...incPatrolRoutes.filter((r) => !baseRouteIds.has(r.id)),
       ];
 
       merged.map = {
         ...(this._base.map ?? this._incoming.map!),
-        entities:     mergedEntities,
+        entries:      mergedEntities,
         patrolRoutes: mergedRoutes,
-        exportedAt:   new Date().toISOString(),
       };
     }
 
