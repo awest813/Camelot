@@ -35,6 +35,15 @@ export class GuardEncounterUI {
 
     this._root.style.display = "grid";
     this.isVisible = true;
+
+    if (this._payBtn && !this._payBtn.disabled) {
+      this._payBtn.focus();
+    } else if (this._persuadeBtn && !this._persuadeBtn.disabled) {
+      this._persuadeBtn.focus();
+    } else if (this._root) {
+      const firstBtn = this._root.querySelector("button");
+      if (firstBtn) firstBtn.focus();
+    }
   }
 
   public close(): void {
@@ -55,6 +64,9 @@ export class GuardEncounterUI {
 
     const root = document.createElement("div");
     root.className = "guard-encounter";
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
+    root.setAttribute("aria-labelledby", "guard-encounter-title");
     root.style.display = "none";
 
     const panel = document.createElement("section");
@@ -62,6 +74,7 @@ export class GuardEncounterUI {
     root.appendChild(panel);
 
     const title = document.createElement("h2");
+    title.id = "guard-encounter-title";
     title.className = "guard-encounter__title";
     title.textContent = "Guard Challenge";
     panel.appendChild(title);
