@@ -86,14 +86,14 @@ describe("BundleMergeSystem", () => {
   it("detects map entity conflicts", () => {
     sys.loadBase(makeBundle({
       map: {
-        version: 1, exportedAt: "", patrolRoutes: [],
-        entities: [{ id: "ent-01", type: "loot", label: "Chest Base", position: { x:0,y:0,z:0 } }],
+        version: 1, patrolRoutes: [],
+        entries: [{ id: "ent-01", type: "loot", properties: { label: "Chest Base" }, position: { x:0,y:0,z:0 }, rotation: { x:0,y:0,z:0 } }],
       } as any,
     }));
     sys.loadIncoming(makeBundle({
       map: {
-        version: 1, exportedAt: "", patrolRoutes: [],
-        entities: [{ id: "ent-01", type: "loot", label: "Chest Incoming", position: { x:1,y:0,z:1 } }],
+        version: 1, patrolRoutes: [],
+        entries: [{ id: "ent-01", type: "loot", properties: { label: "Chest Incoming" }, position: { x:1,y:0,z:1 }, rotation: { x:0,y:0,z:0 } }],
       } as any,
     }));
     const conflicts = sys.findConflicts();
@@ -178,38 +178,38 @@ describe("BundleMergeSystem", () => {
   it("map entities are merged without conflicts by adding incoming uniques", () => {
     sys.loadBase(makeBundle({
       map: {
-        version: 1, exportedAt: "", patrolRoutes: [],
-        entities: [{ id: "ent-01", type: "loot", label: "Base", position: { x:0,y:0,z:0 } }],
+        version: 1, patrolRoutes: [],
+        entries: [{ id: "ent-01", type: "loot", properties: { label: "Base" }, position: { x:0,y:0,z:0 }, rotation: { x:0,y:0,z:0 } }],
       } as any,
     }));
     sys.loadIncoming(makeBundle({
       map: {
-        version: 1, exportedAt: "", patrolRoutes: [],
-        entities: [{ id: "ent-02", type: "npc", label: "Guard", position: { x:5,y:0,z:5 } }],
+        version: 1, patrolRoutes: [],
+        entries: [{ id: "ent-02", type: "npc" as any, properties: { label: "Guard" }, position: { x:5,y:0,z:5 }, rotation: { x:0,y:0,z:0 } }],
       } as any,
     }));
     const { bundle } = sys.buildMerged();
-    expect(bundle.map?.entities).toHaveLength(2);
+    expect(bundle.map?.entries).toHaveLength(2);
   });
 
   it("map entity conflict with rename-incoming adds suffixed entity", () => {
     sys.loadBase(makeBundle({
       map: {
-        version: 1, exportedAt: "", patrolRoutes: [],
-        entities: [{ id: "ent-01", type: "loot", label: "Base Chest", position: { x:0,y:0,z:0 } }],
+        version: 1, patrolRoutes: [],
+        entries: [{ id: "ent-01", type: "loot", properties: { label: "Base Chest" }, position: { x:0,y:0,z:0 }, rotation: { x:0,y:0,z:0 } }],
       } as any,
     }));
     sys.loadIncoming(makeBundle({
       map: {
-        version: 1, exportedAt: "", patrolRoutes: [],
-        entities: [{ id: "ent-01", type: "loot", label: "Inc Chest", position: { x:1,y:0,z:1 } }],
+        version: 1, patrolRoutes: [],
+        entries: [{ id: "ent-01", type: "loot", properties: { label: "Inc Chest" }, position: { x:1,y:0,z:1 }, rotation: { x:0,y:0,z:0 } }],
       } as any,
     }));
     const [c] = sys.findConflicts();
     sys.setStrategy(c.id, "rename-incoming");
     const { bundle, renamed } = sys.buildMerged();
     expect(renamed).toBe(1);
-    const ids = bundle.map!.entities.map((e: { id: string }) => e.id);
+    const ids = bundle.map!.entries.map((e: { id: string }) => e.id);
     expect(ids).toContain("ent-01");
     expect(ids).toContain("ent-01_merged");
   });
