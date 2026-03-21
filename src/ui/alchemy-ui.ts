@@ -425,6 +425,18 @@ export class AlchemyUI {
 
   private _refreshSelectionLabel(): void {
     const count = this._selectedIngredientIds.length;
+
+    // Update craft button state
+    const canCraft = count >= 2;
+    this._craftBtn.isEnabled = canCraft;
+    this._craftBtn.background = canCraft ? T.CRAFT_BG : T.BTN_BG;
+    if (this._craftBtn.textBlock) {
+      this._craftBtn.textBlock.color = canCraft ? T.TEXT : T.DIM;
+    }
+    this._craftBtn.accessibilityTag = {
+      description: canCraft ? "Craft Potion" : "Need at least 2 ingredients to craft"
+    };
+
     if (count === 0) {
       this._selectionLabel.text  = "Select 2–4 ingredients to craft";
       this._selectionLabel.color = T.DIM;
@@ -459,7 +471,9 @@ export class AlchemyUI {
     btn.cornerRadius  = 4;
     btn.thickness     = 1;
     if (btn.textBlock) btn.textBlock.color = T.TEXT;
-    btn.onPointerEnterObservable.add(() => { btn.background = hover; });
+    btn.onPointerEnterObservable.add(() => {
+      if (btn.isEnabled) btn.background = hover;
+    });
 
     btn.isFocusInvisible = false;
     btn.tabIndex = 0;
@@ -475,7 +489,7 @@ export class AlchemyUI {
       btn.thickness = 1;
     });
     btn.onPointerOutObservable.add(() => {
-      btn.background = bg;
+      if (btn.isEnabled) btn.background = bg;
       if (!isFocused) btn.thickness = 1;
     });
     btn.onKeyboardEventProcessedObservable.add((evt) => {
