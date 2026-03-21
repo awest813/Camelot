@@ -42,12 +42,16 @@ export class CharacterCreationUI {
     return new Promise<CharacterCreationResult>((resolve) => {
       const root = document.createElement("div");
       root.className = "character-create";
+      root.setAttribute("role", "dialog");
+      root.setAttribute("aria-modal", "true");
+      root.setAttribute("aria-labelledby", "character-create-title");
 
       const panel = document.createElement("section");
       panel.className = "character-create__panel";
       root.appendChild(panel);
 
       const title = document.createElement("h2");
+      title.id = "character-create-title";
       title.className = "character-create__title";
       title.textContent = "Forge Your Character";
       panel.appendChild(title);
@@ -228,6 +232,8 @@ export class CharacterCreationUI {
         nameInput.maxLength = 30;
         nameInput.value = enteredName;
         inputWrap.appendChild(nameInput);
+
+        setTimeout(() => nameInput.focus(), 10);
 
         nameInput.addEventListener("input", () => {
           enteredName = nameInput.value;
