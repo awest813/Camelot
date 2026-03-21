@@ -290,6 +290,16 @@ Both planned Release K items delivered:
 
 ---
 
+### Content GUI — Release L (Crafting + Travel Event Systems) ✅
+
+Both planned Release L items delivered:
+
+1. ✅ **CraftingSystem** (`src/systems/crafting-system.ts`, 50 tests) — material-based item crafting (smithing/forging): `addRecipe()` / `removeRecipe()` / `getRecipe()` CRUD; each `CraftingRecipe` declares a `category` (`weapon` / `armor` / `jewelry` / `misc`), a `requiredMaterials` list (materialId + quantity pairs), `outputItemId` / `outputItemName` / `outputQuantity`, an optional `requiredSkill` gate, and `craftingXp` awarded on success; `canCraft(recipeId, materials, skill)` checks material availability and skill level without side-effects; `craft(recipeId, materials, skill)` validates requirements and returns a discriminated `CraftOutcome` (`success: true` with `CraftingResult` or `success: false` with a `CraftingFailReason` — `unknown_recipe` / `missing_materials` / `skill_too_low`); `getAvailableRecipes(materials, skill)` returns all currently craftable recipes; `getRecipesByCategory(category)` for forge-UI filtering; `getTotalCrafted(recipeId)` tracks per-recipe craft counts; `onItemCrafted` callback delivers the result to the game layer for inventory and XP updates; `getSnapshot()` / `restoreSnapshot()` for save persistence.
+
+2. ✅ **TravelEventSystem** (`src/systems/travel-event-system.ts`, 45 tests) — random events during fast travel: `addEvent()` / `removeEvent()` / `getEvent()` CRUD; each `TravelEventDefinition` carries a `conditions` record (`biomeIds` requiring at least one active biome, `weather` allowlist, `minPlayerLevel`, `requiredFlags`, `forbiddenFlags`) and an `outcome` record (`notification` text, `setFlag`, `emitEvent`, `landmarkId` for auto-discovery via `LandmarkSystem`); `rollEvent(context, rng?)` performs a weighted random draw among eligible events, applies the outcome, and fires `onTravelEventFired(eventId, outcome)` — returns `null` when no eligible event exists; per-event `weight` field biases the weighted draw; `cooldownHours` rate-limits repeat fires with correct 24-hour midnight wrap-around; `oneShot` flag allows exactly one lifetime fire; `getEligibleEvents(context)` dry-run for debug overlays; `getLastFiredAt()` / `hasFired()` / `getTotalEventsFired()` query helpers; `getSnapshot()` / `restoreSnapshot()` for save persistence (callbacks suppressed on load).
+
+---
+
 ## Mid-Term (3–5 Releases)
 
 ### World Building Depth
@@ -298,6 +308,8 @@ Both planned Release K items delivered:
 - ✅ Introduce landmark-driven exploration rewards — `LandmarkSystem` (see Release J above).
 - ✅ Add environmental storytelling props and ambient events — `AmbientEventSystem` (see Release K above).
 - ✅ Dynamic random encounter scheduling — `EncounterSystem` (see Release K above).
+- ✅ Material-based item crafting (smithing/forging) — `CraftingSystem` (see Release L above).
+- ✅ Random events during fast travel with biome/weather/flag conditions — `TravelEventSystem` (see Release L above).
 
 ### Systems Expansion
 
