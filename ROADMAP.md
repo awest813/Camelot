@@ -300,6 +300,16 @@ Both planned Release L items delivered:
 
 ---
 
+### Content GUI — Release M (Weather Schedule + Journal Systems) ✅
+
+Both planned Release M items delivered:
+
+1. ✅ **WeatherScheduleSystem** (`src/systems/weather-schedule-system.ts`, 45 tests) — authored named weather sequences with timed transitions: `addSchedule()` / `removeSchedule()` / `getSchedule()` CRUD; each `WeatherScheduleDefinition` carries an ordered `steps[]` list of `WeatherScheduleStep` entries (each with a target `weather: WeatherState` and `durationSeconds`); `play(id)` starts playback from step 0 and fires `onStep(scheduleId, stepIndex, step)` so the game layer can call `weatherSystem.forceWeather(step.weather)`; `update(deltaTime)` advances the countdown and transitions to the next step when time expires, carrying over any excess delta so rapid small ticks never skip steps; `loop: true` wraps back to step 0 after the last step — `onComplete(scheduleId)` fires only for non-looping sequences; `pause()` / `resume()` temporarily halt progression; `jumpToStep(index)` for scripted mid-sequence jumps; `getSnapshot()` / `restoreSnapshot()` for save persistence (callbacks suppressed on load).
+
+2. ✅ **JournalSystem** (`src/systems/journal-system.ts`, 56 tests) — player journal with categories, tags, notes, favorites, and text search: `addEntry()` / `updateEntry()` / `removeEntry()` / `getEntry()` CRUD; each `JournalEntry` carries `title`, `body`, `category` (`quest` / `lore` / `note` / `rumor` / `observation` / `misc`), `tags[]` (normalised to lower-case on write), optional `summary`, `createdAt` / `updatedAt` timestamps, and a `favorite` flag; `toggleFavorite(id)` flips and returns the new state; `getFavorites()` returns starred entries sorted by `updatedAt` descending; `getByCategory(category)` and `getByTags(tags[])` (AND logic, case-insensitive) for filtered browsing; `search(query)` performs a case-insensitive substring match across `title`, `body`, and `summary` with title-match entries ranked above body-match entries; `getAllEntries()` returns all entries sorted by `updatedAt` descending; `getAllTags()` returns the distinct tag vocabulary sorted alphabetically; `getSnapshot()` / `restoreSnapshot()` for save persistence.
+
+---
+
 ## Mid-Term (3–5 Releases)
 
 ### World Building Depth
@@ -310,6 +320,8 @@ Both planned Release L items delivered:
 - ✅ Dynamic random encounter scheduling — `EncounterSystem` (see Release K above).
 - ✅ Material-based item crafting (smithing/forging) — `CraftingSystem` (see Release L above).
 - ✅ Random events during fast travel with biome/weather/flag conditions — `TravelEventSystem` (see Release L above).
+- ✅ Authored named weather sequences with timed transitions and loop support — `WeatherScheduleSystem` (see Release M above).
+- ✅ Player journal with categories, tags, full-text search, and favorites — `JournalSystem` (see Release M above).
 
 ### Systems Expansion
 
