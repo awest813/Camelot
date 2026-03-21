@@ -310,6 +310,16 @@ Both planned Release M items delivered:
 
 ---
 
+### Content GUI — Release N (UI/UX Depth & Polish) ✅
+
+Two focused UI components that add polish and contextual depth to all existing game panels.
+
+1. ✅ **TooltipUI** (`src/ui/tooltip-ui.ts`, 21 tests) — reusable hover-tooltip overlay that can attach to any DOM element: `attach(element, content)` registers the element and wires `mouseenter` / `mouseleave` / `focus` / `blur` listeners; a configurable `showDelay` (default 220 ms) prevents tooltip flicker during rapid cursor movement while a `hideDelay` (default 80 ms) gives the cursor time to move from the target onto the tooltip; `detach(element)` removes all listeners and the `aria-describedby` annotation; `detachAll()` tears down every attachment and destroys the singleton tooltip DOM node; `updateContent(element, content)` hot-patches live text when the tooltip is already visible; `isVisible` / `attachedCount` query accessors; fully accessible — tooltip element carries `role="tooltip"` and `aria-live="polite"` and all targets receive `aria-describedby`; positioned via `position: fixed` with viewport-edge clamping so it never overflows the screen. Designed for use by `LevelUpUI` (attribute description hints), the inventory panel (item stat summaries), skill-tree nodes, and any future editor controls.
+
+2. ✅ **ActiveEffectHUD** (`src/ui/active-effect-hud.ts`, 35 tests) — visual HUD strip that renders every currently active spell / potion / enchantment effect as a compact pill: `show()` creates the DOM lazily and sets `display: flex`; `hide()` collapses the strip without destroying state; `update(effects)` synchronises pills with the `ActiveEffectsSystem.activeEffects` snapshot — new effects get a pill added, effects no longer present have their pill removed, and existing effects have their countdown and progress bar updated in-place; each pill carries an effect-type icon (`❤` heal, `🔥` fire, `🔰` resist, etc.), the effect's display name, a compact `formatDuration` countdown (`30s` / `2m 15s` / `∞`), and a thin shrinking progress bar (`role="progressbar"` with `aria-valuenow`); effects are colour-coded by category (`heal` / `magicka` / `stamina` / `fortify` / `harm`); `destroy()` removes all pills and the root DOM node; root carries `role="status"` and `aria-live="polite"` for screen-reader announcements. Plugs directly into the existing `ActiveEffect.totalDuration` field that was specifically added for UI progress display.
+
+---
+
 ## Mid-Term (3–5 Releases)
 
 ### World Building Depth
