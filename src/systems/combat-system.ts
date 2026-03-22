@@ -844,9 +844,10 @@ export class CombatSystem {
     this._tickPlayerAttackCooldowns(deltaTime);
 
     const playerPos = this.player.camera.position;
+    const nextReservations: Set<NPC> = new Set();
 
-    // Prepare candidate tracking for the NEXT frame's attack reservations.
-    // This introduces a 1-frame lag for slot handoffs but saves a full O(N) pass.
+    // Score candidates for this frame's attack reservations before ticking the
+    // state machine so ATTACK/CHASE decisions can react immediately.
     this._topAttackScores.fill(Infinity);
     this._topAttackNpcs.fill(null);
     let candidateCount = 0;
@@ -855,17 +856,8 @@ export class CombatSystem {
       const npc = this.npcs[i];
       if (npc.isDead) continue;
 
-      // 1. Tick DoTs
-      npc.tickStatusEffects(deltaTime);
-      if (npc.isDead) {
-        if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
-        continue;
-      }
-
-      // 2. Core Distance Check (calculated once per frame)
       const distSq = Vector3.DistanceSquared(npc.mesh.position, playerPos);
 
-      // 3. Score for next frame's attack slots
       if (npc.aiState === AIState.CHASE || npc.aiState === AIState.ATTACK) {
         let score = distSq;
         if (npc.aiState !== AIState.ATTACK) {
@@ -885,18 +877,32 @@ export class CombatSystem {
           }
         }
       }
-
-      // 4. Tick AI State Machine
-      this._tickNPC(npc, playerPos, deltaTime, distSq);
     }
 
-    // Finalize reservations for the NEXT frame.
-    this._attackReservations.clear();
     for (let i = 0; i < candidateCount; i++) {
       const topNpc = this._topAttackNpcs[i];
       if (topNpc) {
-        this._attackReservations.add(topNpc);
+        nextReservations.add(topNpc);
       }
+    }
+    this._attackReservations = nextReservations;
+
+    for (let i = 0; i < this.npcs.length; i++) {
+      const npc = this.npcs[i];
+      if (npc.isDead) continue;
+
+      // 1. Tick DoTs
+      npc.tickStatusEffects(deltaTime);
+      if (npc.isDead) {
+        if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
+        continue;
+      }
+
+      // 2. Core Distance Check (calculated once per frame)
+      const distSq = Vector3.DistanceSquared(npc.mesh.position, playerPos);
+
+      // 3. Tick AI State Machine
+      this._tickNPC(npc, playerPos, deltaTime, distSq);
     }
   }
 
@@ -924,7 +930,7 @@ export class CombatSystem {
     }
 
     // Cooldown discipline: keep ticking while hostile, even when repositioning.
-    if (npc.isAggressive) {
+    if (this._isCombatState(npc.aiState)) {
       npc.attackTimer = Math.max(0, npc.attackTimer - deltaTime);
     }
 
@@ -1151,6 +1157,10 @@ export class CombatSystem {
         this._stopMovement(npc);
         break;
     }
+  }
+
+  private _isCombatState(state: AIState): boolean {
+    return state === AIState.ALERT || state === AIState.CHASE || state === AIState.ATTACK;
   }
 
   private _getAttackEngageRange(npc: NPC): number {
