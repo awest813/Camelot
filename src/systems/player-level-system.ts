@@ -69,6 +69,7 @@ export const MAJOR_LEVELUPS_REQUIRED = 10;
  */
 export const SKILL_GOVERNING_ATTRIBUTE: Readonly<Record<ProgressionSkillId, AttributeName>> = {
   blade:       "strength",
+  blunt:       "strength",
   block:       "endurance",
   destruction: "willpower",
   restoration: "willpower",

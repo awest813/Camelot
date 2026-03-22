@@ -113,7 +113,7 @@ export class MapEditorPalettePanel {
     this._panel.adaptHeightToChildren = true;
     this._panel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     this._panel.verticalAlignment   = Control.VERTICAL_ALIGNMENT_BOTTOM;
-    this._panel.bottom = "8px";
+    this._panel.top    = "-8px";
     this._panel.left   = "4px";
     this._panel.background  = P.PANEL_BG;
     this._panel.color       = P.PANEL_BORDER;

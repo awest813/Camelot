@@ -1251,7 +1251,7 @@ describe('MapEditorSystem — onEntityMoved', () => {
         const entityId = mesh.metadata?.editorEntityId as string;
 
         const moves: Array<{ id: string; position: { x: number; y: number; z: number } }> = [];
-        editor.onEntityMoved = (id, pos) => moves.push({ id, pos });
+        editor.onEntityMoved = (id, position) => moves.push({ id, position });
 
         // Simulate what _fireEntityMoved does: it reads from the attached mesh.
         // We exercise the callback interface directly since gizmo is not
@@ -1260,7 +1260,7 @@ describe('MapEditorSystem — onEntityMoved', () => {
 
         expect(moves.length).toBe(1);
         expect(moves[0].id).toBe(entityId);
-        expect(moves[0].pos).toEqual({ x: 3, y: 1, z: 5 });
+        expect(moves[0].position).toEqual({ x: 3, y: 1, z: 5 });
     });
 
     it('does not throw when onEntityMoved is null and a move completes', () => {

@@ -451,7 +451,14 @@ describe("GraphicsSystem", () => {
   });
 
   it("accepts bloom overrides inside postProcess", () => {
-    const gfx = new GraphicsSystem({ postProcess: { bloom: { threshold: 0.5 } } });
+    const gfx = new GraphicsSystem({
+      postProcess: {
+        bloom: {
+          ...DEFAULT_POST_PROCESS.bloom,
+          threshold: 0.5,
+        },
+      },
+    });
     expect(gfx.postProcess.bloom.threshold).toBeCloseTo(0.5, 5);
     // Other bloom fields retain defaults
     expect(gfx.postProcess.bloom.weight).toBeCloseTo(DEFAULT_POST_PROCESS.bloom.weight, 5);

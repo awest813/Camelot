@@ -44,6 +44,7 @@ export type ClassSpecialization = "combat" | "magic" | "stealth";
 /** All seven progression skill ids in a stable order. */
 const ALL_SKILL_IDS: ReadonlyArray<ProgressionSkillId> = [
   "blade",
+  "blunt",
   "block",
   "destruction",
   "restoration",
@@ -223,7 +224,7 @@ export const CHARACTER_CLASSES: ReadonlyArray<CharacterClass> = [
  * the original groupings.
  */
 const SPECIALIZATION_SKILLS: Record<ClassSpecialization, ReadonlySet<ProgressionSkillId>> = {
-  combat:  new Set(["blade", "block", "marksman"]),
+  combat:  new Set(["blade", "blunt", "block", "marksman"]),
   magic:   new Set(["destruction", "restoration", "alchemy"]),
   stealth: new Set(["sneak", "speechcraft", "marksman"]),
 };
@@ -388,4 +389,3 @@ export class ClassSystem {
     }
   }
 }
-
