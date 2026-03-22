@@ -418,6 +418,38 @@ describe('MapEditorLayerPanel — onLayerLockChange callback', () => {
     });
 });
 
+describe('MapEditorLayerPanel — onLayerOwnerChange callback', () => {
+    it('fires onLayerOwnerChange when set', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        const received: Array<{ name: string; owner: string }> = [];
+        panel.onLayerOwnerChange = (name, owner) => received.push({ name, owner });
+        panel.onLayerOwnerChange?.('objects', 'Alice');
+        expect(received).toHaveLength(1);
+        expect(received[0]).toEqual({ name: 'objects', owner: 'Alice' });
+    });
+
+    it('does not throw when onLayerOwnerChange is null', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        panel.onLayerOwnerChange = null;
+        expect(() => panel.onLayerOwnerChange?.('terrain', '')).not.toThrow();
+    });
+});
+
+describe('MapEditorLayerPanel — owner metadata rendering', () => {
+    it('renders owner rows when currentAuthor is set even for unowned layers', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        panel.currentAuthor = 'Alice';
+        panel.refresh(makeDefaultLayers(), { terrain: 0, objects: 0, events: 0, npcs: 0, triggers: 0 });
+
+        const listStack = (panel as any)._listStack;
+        expect(listStack.children).toHaveLength(5);
+
+        const firstRow = listStack.children[0];
+        const ownerRow = firstRow.children[0].children[1];
+        expect(ownerRow.children).toHaveLength(3);
+    });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MapEditorNotesPanel
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -221,6 +221,37 @@ describe('MapEditorSystem — Phase 2 (entity properties)', () => {
         expect(mesh.isPickable).toBe(false);
         expect(editor.selectedEntityId).toBeNull();
     });
+
+    it('stores layer owner metadata in exported map data', () => {
+        const { editor } = makeEditor();
+
+        editor.setLayerOwner('objects', 'Alice');
+        editor.setLayerOwner('events', 'Bob');
+
+        const exported = editor.exportMap();
+        expect(exported.layers).toEqual(expect.arrayContaining([
+            expect.objectContaining({ name: 'objects', owner: 'Alice' }),
+            expect.objectContaining({ name: 'events', owner: 'Bob' }),
+        ]));
+    });
+
+    it('auto-locks foreign-owned layers on import for the current author', () => {
+        const { editor } = makeEditor();
+        editor.currentAuthor = 'Alice';
+
+        editor.importMap({
+            version: 1,
+            entries: [],
+            patrolRoutes: [],
+            layers: [
+                { name: 'objects', isVisible: true, isLocked: false, owner: 'Bob' },
+                { name: 'events', isVisible: true, isLocked: false, owner: 'Alice' },
+            ],
+        });
+
+        expect(editor.getLayer('objects')).toMatchObject({ owner: 'Bob', isLocked: true });
+        expect(editor.getLayer('events')).toMatchObject({ owner: 'Alice', isLocked: false });
+    });
 });
 
 // ─── Phase 2: Patrol route authoring ─────────────────────────────────────────

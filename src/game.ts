@@ -116,6 +116,8 @@ import { ModManifestUI } from "./ui/mod-manifest-ui";
 const SNEAK_XP_PER_SECOND = 2;
 /** Inventory item ID used for player gold (bounty payment check). */
 const GOLD_ITEM_ID = "gold_coins";
+/** Persisted local author identity for layer ownership workflows. */
+const MAP_EDITOR_AUTHOR_STORAGE_KEY = "camelot_map_editor_author";
 
 export class Game {
   public scene: Scene;
@@ -355,6 +357,18 @@ export class Game {
     );
   }
 
+  private _loadMapEditorAuthor(): string {
+    if (typeof localStorage === "undefined") {
+      return "Local Author";
+    }
+    return localStorage.getItem(MAP_EDITOR_AUTHOR_STORAGE_KEY)?.trim() || "Local Author";
+  }
+
+  private _persistMapEditorAuthor(author: string): void {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(MAP_EDITOR_AUTHOR_STORAGE_KEY, author);
+  }
+
   init(): void {
     this._setLight();
     this.player = new Player(this.scene, this.canvas);
@@ -415,6 +429,7 @@ export class Game {
     this.dialogueSystem.dialogueSessionProvider = (targetNpc) => this._createFrameworkDialogueSession(targetNpc.mesh.name);
     this._loadFrameworkMods();
     this.mapEditorSystem = new MapEditorSystem(this.scene);
+    this.mapEditorSystem.currentAuthor = this._loadMapEditorAuthor();
 
     // ── Editor layout — panel registry and unified selection model ────────────
     this.editorLayout = new EditorLayout();
@@ -599,6 +614,16 @@ export class Game {
       this._refreshLayerPanel();
       const msg = locked ? `Layer "${name}" locked` : `Layer "${name}" unlocked`;
       this.ui.showNotification(msg, 1200);
+    };
+    this.mapEditorLayerPanel.onLayerOwnerChange = (name, owner) => {
+      this.mapEditorSystem.setLayerOwner(name, owner);
+      this._persistMapEditorAuthor(this.mapEditorSystem.currentAuthor);
+      this._refreshLayerPanel();
+      const trimmedOwner = owner.trim();
+      const msg = trimmedOwner === ""
+        ? `Cleared owner for "${name}"`
+        : `Layer "${name}" claimed by ${trimmedOwner}`;
+      this.ui.showNotification(msg, 1400);
     };
     this.mapEditorSystem.onLayerChanged = () => {
       this._refreshLayerPanel();
