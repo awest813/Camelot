@@ -10,6 +10,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { NavigationSystem } from "./navigation-system";
 import { SkillProgressionSystem } from "./skill-progression-system";
+import type { ProgressionSkillId } from "./skill-progression-system";
 import { AttributeSystem } from "./attribute-system";
 
 const MELEE_DAMAGE = 10;
@@ -112,7 +113,7 @@ interface WeaponProfile {
   /** Forward raycast distance in metres used for melee hit detection. */
   attackRange: number;
   /** Skill ID governing proficiency scaling for this weapon type. */
-  skillId: string;
+  skillId: ProgressionSkillId;
   /** Human-readable display name. */
   label: string;
   /**

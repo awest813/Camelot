@@ -9,6 +9,7 @@
  *
  * Skills and their natural triggers:
  *   blade        – melee attacks that connect
+ *   blunt        – heavy melee attacks that connect
  *   destruction  – damaging spells cast
  *   restoration  – healing spells cast
  *   marksman     – arrows that connect
@@ -50,6 +51,7 @@ function levelToMultiplier(level: number): number {
 
 export type ProgressionSkillId =
   | "blade"
+  | "blunt"
   | "block"
   | "destruction"
   | "restoration"
@@ -90,6 +92,7 @@ export class SkillProgressionSystem {
     this._skills = new Map<ProgressionSkillId, ProgressionSkill>();
     const definitions: Array<{ id: ProgressionSkillId; name: string }> = [
       { id: "blade",       name: "Blade" },
+      { id: "blunt",       name: "Blunt" },
       { id: "block",       name: "Block" },
       { id: "destruction", name: "Destruction" },
       { id: "restoration", name: "Restoration" },
