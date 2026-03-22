@@ -214,6 +214,30 @@ describe('WorldManager chunk load queue', () => {
     // With the fix, no origin chunk should have been loaded
     expect(wm.loadedChunkCount).toBe(0);
   });
+
+  it('prunes stale queued chunks immediately when the player changes chunk', () => {
+    const wm = new WorldManager(mockScene);
+    advanceFrames(wm, 10);
+    expect(wm.loadQueueLength).toBe(25);
+
+    wm.update(new Vector3(100 * 50, 0, 100 * 50));
+
+    expect(wm.loadQueueLength).toBe(0);
+    expect(wm.loadQueuePoolSize).toBeGreaterThanOrEqual(25);
+  });
+
+  it('reuses pooled queue entries across distant streaming sweeps', () => {
+    const wm = new WorldManager(mockScene);
+
+    advanceFrames(wm, 10);
+    const initialAllocated = wm.loadQueueEntriesAllocated;
+
+    wm.update(new Vector3(100 * 50, 0, 100 * 50));
+    advanceFrames(wm, 9, new Vector3(100 * 50, 0, 100 * 50));
+
+    expect(wm.loadQueueLength).toBe(25);
+    expect(wm.loadQueueEntriesAllocated).toBe(initialAllocated);
+  });
 });
 
 describe('WorldManager chunk reloading', () => {
