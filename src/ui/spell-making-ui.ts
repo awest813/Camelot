@@ -110,6 +110,7 @@ export class SpellMakingUI {
     const closeBtn = document.createElement("button");
     closeBtn.className = "spell-making__close-btn";
     closeBtn.textContent = "✕";
+    closeBtn.setAttribute("aria-label", "Close spellmaking altar");
     closeBtn.addEventListener("click", () => this.close());
     header.appendChild(closeBtn);
 
