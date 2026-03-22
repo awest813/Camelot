@@ -49,6 +49,9 @@ export class MapEditorLayerPanel {
   /** Fired when the user toggles layer lock. */
   public onLayerLockChange: ((name: EditorLayerName, locked: boolean) => void) | null = null;
 
+  /** Fired when the user claims, reassigns, or clears a layer owner. */
+  public onLayerOwnerChange: ((name: EditorLayerName, owner: string) => void) | null = null;
+
   /**
    * The current author name; used to visually distinguish foreign-author
    * layers (shown with a muted badge).  Set before calling `refresh()`.
@@ -150,15 +153,18 @@ export class MapEditorLayerPanel {
 
   private _buildRow(layer: EditorLayer, count: number): Rectangle {
     const { icon, color } = LAYER_META[layer.name];
+    const currentAuthor = this.currentAuthor.trim();
     const isForeign =
-      this.currentAuthor !== "" &&
+      currentAuthor !== "" &&
       layer.owner !== undefined &&
       layer.owner !== "" &&
-      layer.owner !== this.currentAuthor;
+      layer.owner !== currentAuthor;
 
     const hasOwner = layer.owner !== undefined && layer.owner !== "";
-    // Row height expands to show the owner sub-row when ownership info is present
-    const rowHeight = hasOwner ? "42px" : "30px";
+    const canEditOwnership = currentAuthor !== "";
+    const showOwnerRow = hasOwner || canEditOwnership;
+    // Row height expands to show the owner sub-row and claim/clear actions.
+    const rowHeight = showOwnerRow ? "46px" : "30px";
 
     const row = new Rectangle(`editorLayerRow_${layer.name}`);
     row.width           = "210px";
@@ -259,11 +265,11 @@ export class MapEditorLayerPanel {
     inner.addControl(lockBtn);
 
     // ── Owner sub-row ─────────────────────────────────────────────────────────
-    if (hasOwner) {
+    if (showOwnerRow) {
       const ownerRow = new StackPanel(`editorLayerOwnerRow_${layer.name}`);
       ownerRow.isVertical = false;
       ownerRow.width      = "210px";
-      ownerRow.height     = "12px";
+      ownerRow.height     = "16px";
       ownerRow.paddingLeft = "28px";
       outerStack.addControl(ownerRow);
 
@@ -271,17 +277,40 @@ export class MapEditorLayerPanel {
       ownerIcon.color    = isForeign ? "#E08830" : L.DIM;
       ownerIcon.fontSize = 9;
       ownerIcon.width    = "14px";
-      ownerIcon.height   = "12px";
+      ownerIcon.height   = "16px";
       ownerIcon.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
       ownerRow.addControl(ownerIcon);
 
-      const ownerLabel = new TextBlock(`editorLayerOwnerLabel_${layer.name}`, layer.owner!);
+      const ownerLabel = new TextBlock(
+        `editorLayerOwnerLabel_${layer.name}`,
+        hasOwner ? layer.owner! : "Unowned",
+      );
       ownerLabel.color    = isForeign ? "#E08830" : L.DIM;
       ownerLabel.fontSize = 9;
-      ownerLabel.width    = "164px";
-      ownerLabel.height   = "12px";
+      ownerLabel.width    = canEditOwnership ? "98px" : "150px";
+      ownerLabel.height   = "16px";
       ownerLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
       ownerRow.addControl(ownerLabel);
+
+      if (canEditOwnership) {
+        const nextOwner = hasOwner && !isForeign ? "" : currentAuthor;
+        const ownerActionLabel = hasOwner && !isForeign ? "Clear" : "Claim";
+        const ownerBtn = Button.CreateSimpleButton(
+          `editorLayerOwnerBtn_${layer.name}`,
+          ownerActionLabel,
+        );
+        ownerBtn.width        = "48px";
+        ownerBtn.height       = "14px";
+        ownerBtn.fontSize     = 8;
+        ownerBtn.thickness    = 1;
+        ownerBtn.cornerRadius = 3;
+        ownerBtn.color        = hasOwner && !isForeign ? L.LOCK_COLOR : L.ACCENT;
+        ownerBtn.background   = hasOwner && !isForeign ? L.BTN_LOCKED : L.BTN_ON;
+        ownerBtn.onPointerUpObservable.add(() => {
+          this.onLayerOwnerChange?.(layer.name, nextOwner);
+        });
+        ownerRow.addControl(ownerBtn);
+      }
     }
 
     return row;
