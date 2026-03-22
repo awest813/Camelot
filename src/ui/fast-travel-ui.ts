@@ -76,6 +76,7 @@ export class FastTravelUI {
     const closeBtn = document.createElement("button");
     closeBtn.className = "fast-travel__close-btn";
     closeBtn.textContent = "✕";
+    closeBtn.setAttribute("aria-label", "Close fast travel map");
     closeBtn.addEventListener("click", () => this.close());
     header.appendChild(closeBtn);
 
