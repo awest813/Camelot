@@ -8,8 +8,16 @@ import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType } from "@babylonjs/core/Physics";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { StructureManager } from "./structure-manager";
+import { ObjectPool } from "../systems/object-pool";
 
 export type BiomeType = "plains" | "forest" | "desert" | "tundra";
+
+type LoadQueueEntry = {
+  cx: number;
+  cz: number;
+  key: string;
+  dist: number;
+};
 
 export class WorldManager {
   private scene: Scene;
@@ -31,7 +39,7 @@ export class WorldManager {
    * Drained at most `_loadBudgetPerFrame` entries per `update()` call so that
    * entering a new area does not spike all chunk geometry into a single frame.
    */
-  private _loadQueue: Array<{ cx: number; cz: number; key: string }> = [];
+  private _loadQueue: LoadQueueEntry[] = [];
   /** Keys already present in `_loadQueue` — prevents duplicate enqueue. */
   private _enqueuedKeys: Set<string> = new Set();
   /** Maximum chunks created per `update()` call to cap per-frame build cost. */
@@ -39,6 +47,19 @@ export class WorldManager {
   /** Last player chunk position; used by `_processLoadQueue` to skip stale entries. */
   private _lastPlayerChunkX: number = 0;
   private _lastPlayerChunkZ: number = 0;
+
+  /** Reuses ephemeral queue-entry objects to avoid chunk-streaming allocations. */
+  private readonly _loadQueueEntryPool = new ObjectPool<LoadQueueEntry>(
+    () => ({ cx: 0, cz: 0, key: "", dist: 0 }),
+    (entry) => {
+      entry.cx = 0;
+      entry.cz = 0;
+      entry.key = "";
+      entry.dist = 0;
+    },
+    32,
+    256,
+  );
 
   private readonly biomeMaterials: Map<BiomeType, StandardMaterial> = new Map();
   private treeTrunkMaterial?: StandardMaterial;
@@ -67,6 +88,16 @@ export class WorldManager {
     return this._loadQueue.length;
   }
 
+  /** Number of idle queue-entry objects available for immediate reuse. */
+  public get loadQueuePoolSize(): number {
+    return this._loadQueueEntryPool.size;
+  }
+
+  /** Total queue-entry objects ever allocated for chunk streaming. */
+  public get loadQueueEntriesAllocated(): number {
+    return this._loadQueueEntryPool.totalAllocated;
+  }
+
   /**
    * Determine the biome for a given chunk coordinate.
    * Uses a deterministic hash so each chunk always gets the same biome.
@@ -85,8 +116,13 @@ export class WorldManager {
     // _processLoadQueue uses the most up-to-date position every frame.
     const chunkX = Math.floor(playerPosition.x / this.chunkSize);
     const chunkZ = Math.floor(playerPosition.z / this.chunkSize);
+    const chunkChanged = chunkX !== this._lastPlayerChunkX || chunkZ !== this._lastPlayerChunkZ;
     this._lastPlayerChunkX = chunkX;
     this._lastPlayerChunkZ = chunkZ;
+
+    if (chunkChanged && this._loadQueue.length > 0) {
+      this._pruneStaleQueueEntries(chunkX, chunkZ);
+    }
 
     // Always drain the load queue (bounded work every frame regardless of interval)
     this._processLoadQueue();
@@ -94,23 +130,7 @@ export class WorldManager {
     // Run the chunk management sweep every _updateInterval frames
     if (++this._frameCounter % this._updateInterval !== 0) return;
 
-    // Enqueue chunks that are needed but not yet loaded, sorted by
-    // Chebyshev distance so the closest tiles arrive first.
-    const toEnqueue: Array<{ cx: number; cz: number; key: string; dist: number }> = [];
-    for (let x = chunkX - this.loadDistance; x <= chunkX + this.loadDistance; x++) {
-      for (let z = chunkZ - this.loadDistance; z <= chunkZ + this.loadDistance; z++) {
-        const key = `${x},${z}`;
-        if (!this.loadedChunks.has(key) && !this._enqueuedKeys.has(key)) {
-          const dist = Math.max(Math.abs(x - chunkX), Math.abs(z - chunkZ));
-          toEnqueue.push({ cx: x, cz: z, key, dist });
-        }
-      }
-    }
-    toEnqueue.sort((a, b) => a.dist - b.dist);
-    for (const entry of toEnqueue) {
-      this._enqueuedKeys.add(entry.key);
-      this._loadQueue.push(entry);
-    }
+    this._enqueueMissingChunks(chunkX, chunkZ);
 
     // Unload chunks that are too far from the player
     for (const [key, { mesh, body, cx, cz }] of this.loadedChunks) {
@@ -141,7 +161,7 @@ export class WorldManager {
    */
   public dispose(): void {
     // Drain the load queue without spawning anything
-    this._loadQueue.length = 0;
+    this._releaseLoadQueueEntries();
     this._enqueuedKeys.clear();
 
     // Dispose all loaded chunks (physics then mesh)
@@ -159,6 +179,7 @@ export class WorldManager {
     }
     this.loadedChunks.clear();
     this.chunkVegetation.clear();
+    this._loadQueueEntryPool.clear();
   }
 
   /**
@@ -177,13 +198,62 @@ export class WorldManager {
         Math.abs(entry.cx - this._lastPlayerChunkX),
         Math.abs(entry.cz - this._lastPlayerChunkZ),
       );
-      if (chebyshev > this.loadDistance) {
-        continue;
-      }
-      if (!this.loadedChunks.has(entry.key)) {
+      if (chebyshev <= this.loadDistance && !this.loadedChunks.has(entry.key)) {
         this._loadChunk(entry.cx, entry.cz);
       }
+      this._loadQueueEntryPool.release(entry);
     }
+  }
+
+  /** Drop queued chunks that no longer belong near the current player chunk. */
+  private _pruneStaleQueueEntries(chunkX: number, chunkZ: number): void {
+    if (this._loadQueue.length === 0) return;
+
+    const retained: LoadQueueEntry[] = [];
+    for (const entry of this._loadQueue) {
+      entry.dist = Math.max(Math.abs(entry.cx - chunkX), Math.abs(entry.cz - chunkZ));
+      if (entry.dist <= this.loadDistance) {
+        retained.push(entry);
+      } else {
+        this._enqueuedKeys.delete(entry.key);
+        this._loadQueueEntryPool.release(entry);
+      }
+    }
+
+    retained.sort((a, b) => a.dist - b.dist);
+    this._loadQueue = retained;
+  }
+
+  /** Add all missing chunks in load range, reusing queue-entry objects from the pool. */
+  private _enqueueMissingChunks(chunkX: number, chunkZ: number): void {
+    const toEnqueue: LoadQueueEntry[] = [];
+    for (let x = chunkX - this.loadDistance; x <= chunkX + this.loadDistance; x++) {
+      for (let z = chunkZ - this.loadDistance; z <= chunkZ + this.loadDistance; z++) {
+        const key = `${x},${z}`;
+        if (!this.loadedChunks.has(key) && !this._enqueuedKeys.has(key)) {
+          const entry = this._loadQueueEntryPool.acquire();
+          entry.cx = x;
+          entry.cz = z;
+          entry.key = key;
+          entry.dist = Math.max(Math.abs(x - chunkX), Math.abs(z - chunkZ));
+          toEnqueue.push(entry);
+        }
+      }
+    }
+
+    toEnqueue.sort((a, b) => a.dist - b.dist);
+    for (const entry of toEnqueue) {
+      this._enqueuedKeys.add(entry.key);
+      this._loadQueue.push(entry);
+    }
+  }
+
+  /** Return every queued entry object to the pool. */
+  private _releaseLoadQueueEntries(): void {
+    for (const entry of this._loadQueue) {
+      this._loadQueueEntryPool.release(entry);
+    }
+    this._loadQueue = [];
   }
 
   private _loadChunk(x: number, z: number): void {

@@ -344,7 +344,7 @@ Two focused UI components that add polish and contextual depth to all existing g
 
 - ✅ **LodSystem** — Multi-level LOD with `registerLevels()`: supports high/medium/low detail mesh swapping based on player distance; previous binary visible/hidden culling preserved via `register()`; `update()` culled-count includes level-group hidden meshes; disposed-mesh pruning handles level groups; `unregisterLevels()` / `clear()` restore all LOD mesh visibilities.
 - ✅ **ObjectPool\<T\>** — Generic reusable object pool eliminating GC-pressure allocation spikes for frequently created/destroyed game objects (loot meshes, projectiles, hit particles); `acquire()` / `release()` / `prewarm()` / `clear()`; `size` / `totalAllocated` accessors for profiling; configurable `maxSize` overflow disposal.
-- 🧭 Optimize chunk streaming and object pooling.
+- ✅ **Chunk streaming + queue-entry pooling** — `WorldManager` now prunes stale queued chunks immediately when the player crosses chunk boundaries, keeps remaining work distance-sorted, and reuses pooled `LoadQueueEntry` objects via `ObjectPool` to avoid repeated queue-allocation churn during rapid travel and teleports; debug accessors surface queue-pool size and total queue-entry allocations for profiling.
 - 🧭 Profile heavy combat scenes and UI redraw paths.
 
 ### Rendering + Visual Quality
