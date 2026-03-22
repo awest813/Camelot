@@ -11,7 +11,7 @@
  *   - `majorSkills`         — Three to four distinct skills that start at +25
  *                             and gain 1.5× XP.
  *
- * All seven skills not listed in `majorSkills` are automatically treated as
+ * All nine skills not listed in `majorSkills` are automatically treated as
  * minor skills (1.25× XP, starting +10).
  *
  * Integration:
@@ -104,7 +104,7 @@ export const FAVORED_ATTRIBUTE_BONUS = 10;
 
 /**
  * Ten preset classes mirroring Oblivion's built-in class roster, adapted to
- * the seven ProgressionSkillIds available in this engine.
+ * the nine ProgressionSkillIds available in this engine.
  *
  * Each class lists 3–4 distinct major skills; all remaining skills are
  * automatically treated as minor skills.
