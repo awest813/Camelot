@@ -351,6 +351,7 @@ export class Game {
   /** Refresh the layer panel after any layer or entity change. */
   private _refreshLayerPanel(): void {
     this.mapEditorLayerPanel.currentAuthor = this.mapEditorSystem.currentAuthor;
+    this.mapEditorLayerPanel.activeLayerName = this.mapEditorSystem.activeLayerName;
     this.mapEditorLayerPanel.refresh(
       this.mapEditorSystem.getLayers(),
       this.mapEditorSystem.getLayerEntityCounts(),
@@ -608,6 +609,15 @@ export class Game {
     this.mapEditorLayerPanel.onLayerVisibilityChange = (name, visible) => {
       this.mapEditorSystem.setLayerVisible(name, visible);
       this._refreshLayerPanel();
+    };
+    this.mapEditorLayerPanel.onLayerActivate = (name) => {
+      const next = this.mapEditorSystem.activeLayerName === name ? null : name;
+      this.mapEditorSystem.setActiveLayer(next);
+      this._refreshLayerPanel();
+      const msg = next === null
+        ? "Layer targeting reset to placement defaults"
+        : `New placements now target "${name}"`;
+      this.ui.showNotification(msg, 1400);
     };
     this.mapEditorLayerPanel.onLayerLockChange = (name, locked) => {
       this.mapEditorSystem.setLayerLocked(name, locked);

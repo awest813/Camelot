@@ -435,6 +435,22 @@ describe('MapEditorLayerPanel — onLayerOwnerChange callback', () => {
     });
 });
 
+describe('MapEditorLayerPanel — onLayerActivate callback', () => {
+    it('fires onLayerActivate when set', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        const received: string[] = [];
+        panel.onLayerActivate = (name) => received.push(name);
+        panel.onLayerActivate?.('events');
+        expect(received).toEqual(['events']);
+    });
+
+    it('does not throw when onLayerActivate is null', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        panel.onLayerActivate = null;
+        expect(() => panel.onLayerActivate?.('terrain')).not.toThrow();
+    });
+});
+
 describe('MapEditorLayerPanel — owner metadata rendering', () => {
     it('renders owner rows when currentAuthor is set even for unowned layers', () => {
         const panel = new MapEditorLayerPanel(makeMockUi());
@@ -447,6 +463,16 @@ describe('MapEditorLayerPanel — owner metadata rendering', () => {
         const firstRow = listStack.children[0];
         const ownerRow = firstRow.children[0].children[1];
         expect(ownerRow.children).toHaveLength(3);
+    });
+
+    it('highlights the active placement layer row', () => {
+        const panel = new MapEditorLayerPanel(makeMockUi());
+        panel.activeLayerName = 'objects';
+        panel.refresh(makeDefaultLayers(), { terrain: 0, objects: 0, events: 0, npcs: 0, triggers: 0 });
+
+        const listStack = (panel as any)._listStack;
+        const activeRow = listStack.children[1];
+        expect(activeRow.background).toBe('rgba(80, 56, 10, 0.96)');
     });
 });
 

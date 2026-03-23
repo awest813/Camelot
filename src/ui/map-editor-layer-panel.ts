@@ -52,11 +52,15 @@ export class MapEditorLayerPanel {
   /** Fired when the user claims, reassigns, or clears a layer owner. */
   public onLayerOwnerChange: ((name: EditorLayerName, owner: string) => void) | null = null;
 
+  /** Fired when the user marks a layer as the active placement target. */
+  public onLayerActivate: ((name: EditorLayerName) => void) | null = null;
+
   /**
    * The current author name; used to visually distinguish foreign-author
    * layers (shown with a muted badge).  Set before calling `refresh()`.
    */
   public currentAuthor: string = "";
+  public activeLayerName: EditorLayerName | null = null;
 
   private readonly _ui: AdvancedDynamicTexture;
   private readonly _panel: Rectangle;
@@ -159,6 +163,7 @@ export class MapEditorLayerPanel {
       layer.owner !== undefined &&
       layer.owner !== "" &&
       layer.owner !== currentAuthor;
+    const isActive = this.activeLayerName === layer.name;
 
     const hasOwner = layer.owner !== undefined && layer.owner !== "";
     const canEditOwnership = currentAuthor !== "";
@@ -169,15 +174,15 @@ export class MapEditorLayerPanel {
     const row = new Rectangle(`editorLayerRow_${layer.name}`);
     row.width           = "210px";
     row.height          = rowHeight;
-    row.background      = isForeign ? "rgba(60, 20, 20, 0.70)" : L.ROW_BG;
+    row.background      = this._getRowBackground(isForeign, isActive);
     row.thickness       = 0;
     row.paddingBottom   = "1px";
     row.isPointerBlocker = true;
     row.onPointerEnterObservable.add(() => {
-      row.background = isForeign ? "rgba(80, 30, 30, 0.85)" : L.ROW_HOVER;
+      row.background = this._getRowBackground(isForeign, isActive, true);
     });
     row.onPointerOutObservable.add(() => {
-      row.background = isForeign ? "rgba(60, 20, 20, 0.70)" : L.ROW_BG;
+      row.background = this._getRowBackground(isForeign, isActive);
     });
 
     // Outer vertical stack (controls row + optional owner sub-row)
@@ -221,6 +226,22 @@ export class MapEditorLayerPanel {
     countBadge.height   = "30px";
     countBadge.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     inner.addControl(countBadge);
+
+    const activeBtn = Button.CreateSimpleButton(
+      `editorLayerActiveBtn_${layer.name}`,
+      isActive ? "●" : "○",
+    );
+    activeBtn.width        = "24px";
+    activeBtn.height       = "22px";
+    activeBtn.fontSize     = 11;
+    activeBtn.color        = isActive ? L.TITLE : L.DIM;
+    activeBtn.background   = isActive ? L.BTN_ON : L.BTN_BG;
+    activeBtn.cornerRadius = 3;
+    activeBtn.thickness    = 1;
+    activeBtn.onPointerUpObservable.add(() => {
+      this.onLayerActivate?.(layer.name);
+    });
+    inner.addControl(activeBtn);
 
     // Visibility toggle button
     const visBtn = Button.CreateSimpleButton(
@@ -314,5 +335,11 @@ export class MapEditorLayerPanel {
     }
 
     return row;
+  }
+
+  private _getRowBackground(isForeign: boolean, isActive: boolean, isHover: boolean = false): string {
+    if (isForeign) return isHover ? "rgba(80, 30, 30, 0.85)" : "rgba(60, 20, 20, 0.70)";
+    if (isActive) return isHover ? "rgba(95, 68, 12, 0.98)" : "rgba(80, 56, 10, 0.96)";
+    return isHover ? L.ROW_HOVER : L.ROW_BG;
   }
 }

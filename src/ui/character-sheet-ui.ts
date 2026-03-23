@@ -107,11 +107,11 @@ export class CharacterSheetUI {
   public isVisible: boolean = false;
 
   private _root:          HTMLDivElement | null = null;
-  private _identityEl:    HTMLDivElement | null = null;
-  private _attributesEl:  HTMLDivElement | null = null;
-  private _skillsEl:      HTMLDivElement | null = null;
-  private _derivedEl:     HTMLDivElement | null = null;
-  private _reputationEl:  HTMLDivElement | null = null;
+  private _identityEl:    HTMLElement | null = null;
+  private _attributesEl:  HTMLElement | null = null;
+  private _skillsEl:      HTMLElement | null = null;
+  private _derivedEl:     HTMLElement | null = null;
+  private _reputationEl:  HTMLElement | null = null;
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
