@@ -320,6 +320,16 @@ Two focused UI components that add polish and contextual depth to all existing g
 
 ---
 
+### Content GUI — Release O (Skill Tree UI + Journal UI) ✅
+
+Two player-facing overlay panels that surface existing headless systems through interactive, accessible HTML UIs.
+
+1. ✅ **SkillTreeUI** (`src/ui/skill-tree-ui.ts`, 36 tests) — interactive skill tree overlay: `show()` / `hide()` / `isVisible` lifecycle; `update(trees, skillPoints, prereqFn)` synchronises the panel with the current `SkillTreeSystem` state without re-creating the DOM; tab bar renders one tab per `SkillTree` (Combat / Magic / Survival), switching tabs replaces the active pane; each skill is rendered as a card with name, description, rank pips (`renderRankPips` helper — filled `●` and empty `○` circles), and either an "Upgrade" button or a "Max" badge; locked skills (unmet prerequisites) receive an `is-locked` class and a `🔒` description prefix; the upgrade button is disabled when no skill points remain or the skill is locked; `onPurchase(treeIndex, skillIndex)` callback fired on button click; `destroy()` removes the DOM node; fully accessible — root carries `role="dialog"` / `aria-modal`, tabs have `role="tab"` / `aria-selected`, the active pane carries `role="tabpanel"`, and pip spans carry an `aria-label` with rank info; close button (`✕`) calls `hide()`.
+
+2. ✅ **JournalUI** (`src/ui/journal-ui.ts`, 36 tests) — player-facing journal browser overlay: `show()` / `hide()` / `isVisible` lifecycle; `update(system)` snapshots entries from a `JournalSystem` instance filtered by the active category tab and search query; two-panel layout — scrollable entry list on the left (title, category badge, ⭐/☆ favorite toggle button) and detail pane on the right (title, category · date meta row, tag chips, full body); category tab bar (`All` / `Quest` / `Lore` / `Note` / `Rumor` / `Observation` / `Misc` / `⭐ Favorites`) with `role="tab"` / `aria-selected`; search input (`role="search"`) narrows the list in real time via `JournalSystem.search()`; clicking a Favorites tab delegates to `system.getFavorites()`; switching tabs resets `selectedId` and clears the detail pane; `onFavoriteToggle(id)` callback allows the caller to invoke `system.toggleFavorite()` and re-render; `activeFilter` / `selectedId` read-only accessors for testing; `destroy()` removes the DOM node; fully accessible — root carries `role="dialog"` / `aria-modal`, entry list has `role="list"`, tab bar has `aria-label`, favorite buttons have `aria-pressed`, detail pane has `aria-live="polite"`; close button (`✕`) calls `hide()`.
+
+---
+
 ## Mid-Term (3–5 Releases)
 
 ### World Building Depth
