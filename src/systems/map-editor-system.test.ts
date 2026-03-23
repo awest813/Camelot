@@ -208,6 +208,32 @@ describe('MapEditorSystem — Phase 2 (entity properties)', () => {
         expect(editor.exportMap().entries[0].layerName).toBe('events');
     });
 
+    it('uses the active layer as the placement target for new entities', () => {
+        const { editor } = makeEditor();
+
+        expect(editor.setActiveLayer('triggers')).toBe(true);
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'loot');
+        const entityId = mesh.metadata?.editorEntityId as string;
+
+        expect(editor.activeLayerName).toBe('triggers');
+        expect(editor.getEntityLayer(entityId)).toBe('triggers');
+        expect(mesh.metadata?.editorLayerName).toBe('triggers');
+        expect(editor.exportMap().entries[0].layerName).toBe('triggers');
+    });
+
+    it('clears the active layer and falls back to the placement default', () => {
+        const { editor } = makeEditor();
+
+        editor.setActiveLayer('events');
+        expect(editor.setActiveLayer(null)).toBe(true);
+
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'loot');
+        const entityId = mesh.metadata?.editorEntityId as string;
+
+        expect(editor.activeLayerName).toBeNull();
+        expect(editor.getEntityLayer(entityId)).toBe('objects');
+    });
+
     it('applies target layer visibility and lock state when moving an entity', () => {
         const { editor } = makeEditor();
         editor.setLayerVisible('triggers', false);
@@ -217,6 +243,20 @@ describe('MapEditorSystem — Phase 2 (entity properties)', () => {
 
         expect(editor.setEntityLayer(entityId, 'triggers')).toBe(true);
 
+        expect(mesh.isEnabled()).toBe(false);
+        expect(mesh.isPickable).toBe(false);
+        expect(editor.selectedEntityId).toBeNull();
+    });
+
+    it('inherits hidden and locked state when placing directly into the active layer', () => {
+        const { editor } = makeEditor();
+        editor.setLayerVisible('triggers', false);
+        editor.setLayerLocked('triggers', true);
+        editor.setActiveLayer('triggers');
+
+        const mesh = editor.placeEntity(new Vector3(0, 1, 0), 'marker');
+
+        expect(mesh.metadata?.editorLayerName).toBe('triggers');
         expect(mesh.isEnabled()).toBe(false);
         expect(mesh.isPickable).toBe(false);
         expect(editor.selectedEntityId).toBeNull();

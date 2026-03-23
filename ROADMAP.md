@@ -413,7 +413,7 @@ Camelot will evolve toward a creator-friendly worldbuilding pipeline through a d
 - ✅ **Loot Table Creator UI** — HTML overlay panel (`LootTableCreatorUI`): table-settings column (id, rolls, unique flag, none-weight) + scrollable entry list with per-entry itemId / itemName / subTableId / weight / quantity range / level conditions / guarantee; reorder-up/down per entry; validate / export-JSON / import-JSON / reset actions; opens/closes with **Shift+F8** (also dismissable with **Esc**).
 - ✅ **EditorHub expanded** — Faction Creator and Loot Table Creator added to the F11 Editor Hub launcher grid alongside Map, Quest, Dialogue, NPC, and Item editors.
 - ✅ **Map Editor UX improvements** — `MapEditorPalettePanel` (placement-palette browser with per-type description and quick-place button, bottom-left dock); `MapEditorValidationPanel` (dedicated scrollable validation results pane, toggled by F7, with re-validate and entity-focus actions); **D** key shortcut to duplicate the selected entity; toolbar extended with live undo/redo stack counters.
-- 🚧 Layer-based editing (terrain, encounters, narrative, lighting) — foundation shipped: entities can now be reassigned between editor layers from the property inspector, and custom layer assignments persist through map export/import.
+- ✅ Layer-based editing (terrain, encounters, narrative, lighting) — completed with entity layer reassignment in the property inspector, persistent custom layer assignments through map export/import, and active layer targeting from the layer panel so new placements can be routed directly into the chosen layer while inheriting its visibility/lock state.
 - 🧭 Optional standalone editor shell for non-programmer content creators.
 
 ### Networking Exploration

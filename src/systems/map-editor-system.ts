@@ -234,6 +234,7 @@ export class MapEditorSystem {
   private _activePatrolGroupId: string | null = null;
   private _patrolGroupCounter: number = 0;
   private _selectedEntityId: string | null = null;
+  private _activeLayerName: EditorLayerName | null = null;
   private _layers: Map<EditorLayerName, EditorLayer> = new Map(
     DEFAULT_LAYERS.map((l) => [l.name, { ...l }]),
   );
@@ -387,6 +388,24 @@ export class MapEditorSystem {
       counts[e.layerName] = (counts[e.layerName] ?? 0) + 1;
     }
     return counts;
+  }
+
+  /**
+   * The currently targeted layer for newly placed entities.
+   * When `null`, placement falls back to the default layer for the entity type.
+   */
+  get activeLayerName(): EditorLayerName | null {
+    return this._activeLayerName;
+  }
+
+  /**
+   * Set or clear the active placement layer.
+   * Returns `true` when the layer exists (or null is provided), `false` otherwise.
+   */
+  setActiveLayer(name: EditorLayerName | null): boolean {
+    if (name !== null && !this._layers.has(name)) return false;
+    this._activeLayerName = name;
+    return true;
   }
 
   /**
@@ -570,7 +589,7 @@ export class MapEditorSystem {
     const id = `editor_entity_${this._entityCounter++}`;
 
     const mesh = this._buildEntityMesh(id, snapped, type);
-    const layerName: EditorLayerName = TYPE_DEFAULT_LAYER[type];
+    const layerName = this._resolvePlacementLayerName(type);
     const layer = this._layers.get(layerName);
     mesh.metadata = {
       ...(mesh.metadata ?? {}),
@@ -595,7 +614,11 @@ export class MapEditorSystem {
     mesh.metadata.editorProperties = entity.properties;
 
     this._entities.push(entity);
-    this._selectMesh(mesh);
+    if (layer && (!layer.isVisible || layer.isLocked)) {
+      this._clearSelection();
+    } else {
+      this._selectMesh(mesh);
+    }
 
     this._pushCommand({
       type: "place",
@@ -1089,6 +1112,7 @@ export class MapEditorSystem {
     this._clearSelection();
     this._undoStack = [];
     this._redoStack = [];
+    this._activeLayerName = null;
     // Reset layer states
     for (const layer of this._layers.values()) {
       layer.isVisible = true;
@@ -1103,6 +1127,14 @@ export class MapEditorSystem {
   /** Returns the layer name for a given type/entry, falling back to type default. */
   private _resolveLayerName(type: EditorPlacementType, layerName?: EditorLayerName): EditorLayerName {
     if (layerName && this._layers.has(layerName)) return layerName;
+    return TYPE_DEFAULT_LAYER[type];
+  }
+
+  /** Resolve the layer used for new placements, honoring the active layer target when set. */
+  private _resolvePlacementLayerName(type: EditorPlacementType): EditorLayerName {
+    if (this._activeLayerName && this._layers.has(this._activeLayerName)) {
+      return this._activeLayerName;
+    }
     return TYPE_DEFAULT_LAYER[type];
   }
 

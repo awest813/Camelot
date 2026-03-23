@@ -90,6 +90,7 @@ The in-engine **Map Editor** (activated with F2) lets you author world content w
 - **Patrol route authoring**: press P to start a new NPC patrol group; each NPC spawn point placed while the group is active is added to the route and connected by a visible overlay line.
 - **Map export / import**: press F4 to serialize the full editor layout (entities + patrol routes) to a portable JSON object (copied to clipboard or printed to console). The JSON can be re-imported to recreate the layout in a fresh session.
 - **Property panel**: select any placed entity to open the in-editor property panel; configure label, loot table ID, spawn template, objective ID, dialogue trigger, or structure ID. Press Apply to commit changes or Delete to remove the entity.
+- **Layer-targeted editing**: the layer panel can now mark an active placement layer so new entities land directly in `terrain`, `objects`, `events`, `npcs`, or `triggers`, while still honoring each layer's visibility/lock state.
 
 ### Phase 3 — Validation + Data Safety (active)
 
@@ -203,7 +204,7 @@ npm run test:watch
 
 The full roadmap lives in [`ROADMAP.md`](./ROADMAP.md). Key upcoming focus areas:
 
-- **Map Editor Phase 2/3** (active): content placement property panels plus validation/report tooling for map quality checks.
+- **Map Editor Phase 4** (active): standalone editor shell exploration and broader creator workflows beyond the in-runtime layer/panel toolset.
 - **Framework-first consolidation**: wiring framework state as source-of-truth for all demo systems.
 - **Content tooling**: quest authoring utilities, mod validation CLI.
 - **Map Editor Phase 3+**: serialized map packs, collaboration workflows, standalone editor shell.
