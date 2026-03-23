@@ -91,6 +91,8 @@ export class BiomeSystem {
   private _biomes: Map<string, BiomeDefinition> = new Map();
   /** Biome ids that currently contain the tracked player position. */
   private _currentBiomeIds: Set<string> = new Set();
+  /** Reused scratch set to avoid per-frame allocations in `updatePlayerPosition()`. */
+  private _nextBiomeIds: Set<string> = new Set();
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
 
@@ -161,7 +163,13 @@ export class BiomeSystem {
    * player movement) from the game layer.
    */
   public updatePlayerPosition(x: number, y: number, z: number): void {
-    const nowInside = new Set(this.getBiomesAtPoint(x, y, z));
+    const nowInside = this._nextBiomeIds;
+    nowInside.clear();
+    for (const [id, def] of this._biomes) {
+      if (this._containsPoint(def.shape, x, y, z)) {
+        nowInside.add(id);
+      }
+    }
 
     // Exited biomes
     for (const id of this._currentBiomeIds) {
@@ -178,6 +186,8 @@ export class BiomeSystem {
         this.onBiomeEntered?.(id);
       }
     }
+
+    nowInside.clear();
   }
 
   /**

@@ -102,6 +102,11 @@ export class GameEventBus {
   public emit<T extends GameEventType>(event: T, payload: GameEvents[T]): void {
     const set = this._listeners.get(event);
     if (!set) return;
+    if (set.size === 1) {
+      const callback = set.values().next().value as GameEventCallback<T> | undefined;
+      callback?.(payload);
+      return;
+    }
     // Snapshot to allow safe removal inside a callback
     for (const cb of Array.from(set)) {
       (cb as GameEventCallback<T>)(payload);
