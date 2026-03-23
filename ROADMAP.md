@@ -330,6 +330,16 @@ Two player-facing overlay panels that surface existing headless systems through 
 
 ---
 
+### Content GUI — Release P (Crafting Workbench UI + Character Sheet UI) ✅
+
+Two player-facing overlay panels that surface existing headless systems through interactive, accessible HTML UIs.
+
+1. ✅ **CraftingUI** (`src/ui/crafting-ui.ts`, 50 tests) — player-facing crafting workbench overlay: `show()` / `hide()` / `isVisible` lifecycle; `update(system, materials, skill)` synchronises the panel with the current `CraftingSystem` state without re-creating the DOM; category tab bar (`All` / `Weapon` / `Armor` / `Jewelry` / `Misc`) with `role="tab"` / `aria-selected`, switching tabs filters the recipe list and clears the selected recipe; two-panel layout — scrollable recipe list on the left (recipe name, category badge, per-recipe craft count, ✓/✗ availability indicator) and detail pane on the right (title, description, output item, skill requirement with met/unmet styling, per-material rows coloured `mat-ok` / `mat-missing` with available/required quantities, "Craft" button, craft count); "Craft" button is disabled when any material is missing or skill requirement is not met; `onCraft(recipeId)` callback fired on button click; `activeFilter` / `selectedId` read-only accessors for testing; `destroy()` removes the DOM node; fully accessible — root carries `role="dialog"` / `aria-modal`, tablist carries `aria-label`, tabs have `role="tab"` / `aria-selected`, recipe list has `role="list"`, each row has `role="listitem"`, detail pane carries `aria-live="polite"`, material qty spans carry `aria-label` with available/required context; close button (`✕`) calls `hide()`.
+
+2. ✅ **CharacterSheetUI** (`src/ui/character-sheet-ui.ts`, 50 tests) — player character summary overlay: `show()` / `hide()` / `isVisible` lifecycle; `update(data)` renders a `CharacterSheetData` snapshot without re-creating the DOM; identity section displays name, level, race, class, birthsign, and specialization with dash placeholders for absent fields; attributes section renders all seven primary attributes (`strength` / `endurance` / `intelligence` / `agility` / `willpower` / `speed` / `luck`) each tagged with `data-attribute` for targeting; skills section renders all `ProgressionSkill` entries from `SkillProgressionSystem.getAllSkills()` with current level and XP-progress percentage (each XP element carries an `aria-label`); derived stats section shows max Health, Magicka, Stamina, and Carry Weight; reputation section shows fame and infamy scores with optional tier label spans; `destroy()` removes the DOM node; fully accessible — root carries `role="dialog"` / `aria-modal`, every section carries an `aria-label`, close button (`✕`) calls `hide()`.
+
+---
+
 ## Mid-Term (3–5 Releases)
 
 ### World Building Depth
