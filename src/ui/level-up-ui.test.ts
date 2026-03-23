@@ -221,5 +221,11 @@ describe("LevelUpUI", () => {
       const rows = document.querySelectorAll(".level-up__attr-btn") as NodeListOf<HTMLButtonElement>;
       expect(rows[1].getAttribute("aria-pressed")).toBe("false");
     });
+
+    it("sets aria-live=polite on the selection status text", () => {
+      ui.open(2, makeBonuses());
+      const selEl = document.querySelector(".level-up__selection");
+      expect(selEl?.getAttribute("aria-live")).toBe("polite");
+    });
   });
 });

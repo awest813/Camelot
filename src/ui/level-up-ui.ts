@@ -157,6 +157,7 @@ export class LevelUpUI {
 
     const selectionEl = document.createElement("p");
     selectionEl.className = "level-up__selection";
+    selectionEl.setAttribute("aria-live", "polite");
     footer.appendChild(selectionEl);
     this._selectionEl = selectionEl;
 
