@@ -228,6 +228,7 @@ export class ItemCreatorUI {
       const rm = document.createElement("button");
       rm.className   = "item-creator__tag-rm";
       rm.textContent = "✕";
+      rm.setAttribute("aria-label", `Remove tag "${tag}"`);
       rm.addEventListener("click", () => {
         this._sys.removeTag(tag);
         this._renderTags();
