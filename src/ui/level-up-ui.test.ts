@@ -56,6 +56,7 @@ describe("LevelUpUI", () => {
       ui.open(2, makeBonuses());
       const btn = document.querySelector(".level-up__confirm-btn") as HTMLButtonElement;
       expect(btn.disabled).toBe(true);
+      expect(btn.getAttribute("aria-disabled")).toBe("true");
     });
 
     it("resets selection when opened a second time", () => {
@@ -91,6 +92,7 @@ describe("LevelUpUI", () => {
       rows[2].click();
       const btn = document.querySelector(".level-up__confirm-btn") as HTMLButtonElement;
       expect(btn.disabled).toBe(false);
+      expect(btn.getAttribute("aria-disabled")).toBe("false");
     });
 
     it("marks selected rows with is-selected class", () => {
@@ -117,6 +119,7 @@ describe("LevelUpUI", () => {
       rows[2].click();
       expect(rows[3].disabled).toBe(true);
       expect(rows[3].classList.contains("is-disabled")).toBe(true);
+      expect(rows[3].getAttribute("aria-disabled")).toBe("true");
     });
 
     it("does not allow selecting a 4th attribute", () => {
