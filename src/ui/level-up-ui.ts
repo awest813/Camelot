@@ -165,6 +165,7 @@ export class LevelUpUI {
     confirmBtn.type = "button";
     confirmBtn.textContent = "Confirm Level-Up";
     confirmBtn.disabled = true;
+    confirmBtn.setAttribute("aria-disabled", "true");
     confirmBtn.addEventListener("click", () => this._handleConfirm());
     footer.appendChild(confirmBtn);
     this._confirmBtn = confirmBtn;
@@ -207,6 +208,7 @@ export class LevelUpUI {
       btn.classList.toggle("is-selected", isSelected);
       btn.classList.toggle("is-disabled", isDisabled);
       btn.setAttribute("aria-pressed", isSelected ? "true" : "false");
+      btn.setAttribute("aria-disabled", isDisabled ? "true" : "false");
       btn.disabled = isDisabled;
 
       const bonusEl = btn.querySelector(".level-up__attr-bonus") as HTMLElement | null;
@@ -231,6 +233,7 @@ export class LevelUpUI {
 
     if (this._confirmBtn) {
       this._confirmBtn.disabled = this._selected.length !== 3;
+      this._confirmBtn.setAttribute("aria-disabled", (this._selected.length !== 3).toString());
     }
   }
 
