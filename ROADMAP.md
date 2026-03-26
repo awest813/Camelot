@@ -340,6 +340,16 @@ Two player-facing overlay panels that surface existing headless systems through 
 
 ---
 
+### Content GUI — Release Q (Barter UI + Container UI) ✅
+
+Two player-facing overlay panels that surface the existing headless `BarterSystem` and `ContainerSystem` through interactive, accessible HTML UIs.
+
+1. ✅ **BarterUI** (`src/ui/barter-ui.ts`, 55 tests) — merchant trade / barter overlay: `show()` / `hide()` / `isVisible` lifecycle; `update(system, playerItems)` synchronises both columns with the current `BarterSystem` state without re-creating the DOM; two-column layout — merchant's goods on the left (item name, optional quantity badge for stackable items, buy price in gold, "Buy" button) and player's inventory on the right (item name, optional quantity badge, sell price in gold, "Sell" button); "Buy" button is disabled when the player cannot afford the item; "Sell" button is disabled when the merchant does not have enough gold; gold footer shows merchant gold and player gold; `onBuy(itemId)` / `onSell(itemId)` callbacks fired on button click; `onClose()` callback fired on close-button click; `destroy()` removes the DOM node; fully accessible — root carries `role="dialog"` / `aria-modal`, both inventory lists carry `role="list"` / `aria-label`, each item row carries `role="listitem"` / `data-item-id`, price spans carry `aria-label`, gold totals carry `aria-label`, close button (`✕`) calls `hide()`.
+
+2. ✅ **ContainerUI** (`src/ui/container-ui.ts`, 46 tests) — container loot overlay: `show()` / `hide()` / `isVisible` lifecycle; `update(system)` renders the active container's contents from `ContainerSystem.activeContainer` without re-creating the DOM; scrollable item list with per-item name, optional quantity badge (with `aria-label`) for stacked items, and a "Take" button per row; "Take All" footer button — enabled only when the container has at least one item, disabled (and `aria-disabled="true"`) when empty or no container is active; `onTakeItem(itemId)` callback fired on individual Take; `onTakeAll()` callback fired on Take All; `onClose()` callback fired on close-button click; shows "Empty." placeholder when container has no items; `destroy()` removes the DOM node; fully accessible — root carries `role="dialog"` / `aria-modal`, item list carries `role="list"` / `aria-label` / `aria-live="polite"`, each item row carries `role="listitem"` / `data-item-id`, close button (`✕`) calls `hide()`.
+
+---
+
 ## Mid-Term (3–5 Releases)
 
 ### World Building Depth
