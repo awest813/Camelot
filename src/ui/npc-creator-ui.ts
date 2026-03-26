@@ -460,6 +460,7 @@ export class NpcCreatorUI {
     const rmBtn = document.createElement("button");
     rmBtn.className   = "npc-creator__btn npc-creator__btn--sm npc-creator__btn--danger";
     rmBtn.textContent = "✕";
+    rmBtn.setAttribute("aria-label", "Remove");
     rmBtn.addEventListener("click", onRemove);
     row.appendChild(keyEl);
     row.appendChild(valEl);

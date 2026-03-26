@@ -371,6 +371,7 @@ export class DialogueCreatorUI {
     const removeBtn = document.createElement("button");
     removeBtn.className = "dlg-creator__btn dlg-creator__btn--sm dlg-creator__btn--danger";
     removeBtn.textContent = "✕";
+    removeBtn.setAttribute("aria-label", "Remove choice");
     removeBtn.addEventListener("click", () => {
       this._sys.removeChoice(node.id, choice.id);
       this._renderDetail();
@@ -473,6 +474,7 @@ export class DialogueCreatorUI {
       const rmBtn = document.createElement("button");
       rmBtn.className   = "dlg-creator__btn dlg-creator__btn--sm dlg-creator__btn--danger";
       rmBtn.textContent = "✕";
+      rmBtn.setAttribute("aria-label", "Remove condition");
       rmBtn.addEventListener("click", () => {
         this._sys.removeCondition(nodeId, choice.id, idx);
         this._renderDetail();
@@ -577,6 +579,7 @@ export class DialogueCreatorUI {
       const rmBtn = document.createElement("button");
       rmBtn.className   = "dlg-creator__btn dlg-creator__btn--sm dlg-creator__btn--danger";
       rmBtn.textContent = "✕";
+      rmBtn.setAttribute("aria-label", "Remove effect");
       rmBtn.addEventListener("click", () => {
         this._sys.removeEffect(nodeId, choice.id, idx);
         this._renderDetail();
