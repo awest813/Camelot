@@ -211,6 +211,7 @@ export class LevelUpUI {
       btn.setAttribute("aria-pressed", isSelected ? "true" : "false");
       btn.setAttribute("aria-disabled", isDisabled ? "true" : "false");
       btn.disabled = isDisabled;
+      btn.title = isDisabled ? "You can only select 3 attributes" : "";
 
       const bonusEl = btn.querySelector(".level-up__attr-bonus") as HTMLElement | null;
       if (bonusEl) {
@@ -233,8 +234,10 @@ export class LevelUpUI {
     }
 
     if (this._confirmBtn) {
-      this._confirmBtn.disabled = this._selected.length !== 3;
-      this._confirmBtn.setAttribute("aria-disabled", (this._selected.length !== 3).toString());
+      const isConfirmDisabled = this._selected.length !== 3;
+      this._confirmBtn.disabled = isConfirmDisabled;
+      this._confirmBtn.setAttribute("aria-disabled", isConfirmDisabled.toString());
+      this._confirmBtn.title = isConfirmDisabled ? "Select 3 attributes to continue" : "";
     }
   }
 
