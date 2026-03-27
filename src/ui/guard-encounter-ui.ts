@@ -29,8 +29,17 @@ export class GuardEncounterUI {
 
     this._headerEl.textContent = `${view.guardName}: "You are under arrest."`;
     this._bountyEl.textContent = `Faction: ${view.factionId}  •  Bounty: ${view.bounty}g  •  Your Gold: ${view.playerGold}g`;
-    this._payBtn.disabled = view.playerGold < view.bounty;
-    this._persuadeBtn.disabled = !view.canPersuade;
+
+    const cannotPay = view.playerGold < view.bounty;
+    this._payBtn.disabled = cannotPay;
+    this._payBtn.setAttribute("aria-disabled", cannotPay.toString());
+    this._payBtn.title = cannotPay ? "Not enough gold to pay the fine." : "Pay the fine and clear your bounty.";
+
+    const cannotPersuade = !view.canPersuade;
+    this._persuadeBtn.disabled = cannotPersuade;
+    this._persuadeBtn.setAttribute("aria-disabled", cannotPersuade.toString());
+    this._persuadeBtn.title = cannotPersuade ? "Speechcraft too low to persuade." : "Attempt to persuade the guard to look the other way.";
+
     this.showStatus("Choose your response.");
 
     this._root.style.display = "grid";
