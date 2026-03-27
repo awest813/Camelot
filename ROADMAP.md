@@ -350,6 +350,16 @@ Two player-facing overlay panels that surface the existing headless `BarterSyste
 
 ---
 
+### Content GUI — Release R (Wait Dialog UI + Quick-Slot HUD) ✅
+
+Two player-facing HTML overlay components that surface the existing headless `WaitSystem` and `QuickSlotSystem` through interactive, accessible UIs.
+
+1. ✅ **WaitUI** (`src/ui/wait-ui.ts`, 49 tests) — Oblivion-style time-skip rest dialog: `show(currentTimeString?)` / `hide()` / `isVisible` lifecycle; `setCurrentTime(timeString)` updates the current-time label while the dialog is open; hour spinner with ▼/▲ decrement/increment buttons and a direct number input clamped to `[WAIT_MIN_HOURS, WAIT_MAX_HOURS]` (1–24); `hours` getter exposes the currently selected count; "Wait" button fires `onConfirm(hours)` callback; "Cancel" and close (`✕`) buttons both hide the panel and fire `onClose()`; `destroy()` removes the DOM node; fully accessible — root carries `role="dialog"` / `aria-modal` / `aria-label`, current-time span carries `aria-live="polite"`, hour input carries `aria-label`, ▼/▲ buttons carry individual `aria-label` attributes.
+
+2. ✅ **QuickSlotHUD** (`src/ui/quickslot-hud.ts`, 49 tests) — persistent hot-bar HUD strip for the four quick-slot bindings (keys **7**, **8**, **9**, **0**): `show()` / `hide()` / `isVisible` lifecycle; `update(system)` diffs each slot against the previous snapshot and only re-renders cells whose content has changed; each slot cell shows its key label, bound item name (or `"—"` placeholder when empty), and an optional `×N` quantity badge (with `aria-label`) for stackable items with quantity > 1; `onAssign(key, itemId)` callback fires on cell click or Enter/Space keydown so the game layer can open an item-picker; `destroy()` removes the DOM node; fully accessible — root carries `role="toolbar"` / `aria-label`, each slot cell carries `role="button"` / `tabindex="0"` / `data-key` / `aria-label` (updated to include item name and quantity when bound).
+
+---
+
 ## Mid-Term (3–5 Releases)
 
 ### World Building Depth
