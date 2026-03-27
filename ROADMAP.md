@@ -358,6 +358,16 @@ Two player-facing HTML overlay components that surface the existing headless `Wa
 
 2. ✅ **QuickSlotHUD** (`src/ui/quickslot-hud.ts`, 49 tests) — persistent hot-bar HUD strip for the four quick-slot bindings (keys **7**, **8**, **9**, **0**): `show()` / `hide()` / `isVisible` lifecycle; `update(system)` diffs each slot against the previous snapshot and only re-renders cells whose content has changed; each slot cell shows its key label, bound item name (or `"—"` placeholder when empty), and an optional `×N` quantity badge (with `aria-label`) for stackable items with quantity > 1; `onAssign(key, itemId)` callback fires on cell click or Enter/Space keydown so the game layer can open an item-picker; `destroy()` removes the DOM node; fully accessible — root carries `role="toolbar"` / `aria-label`, each slot cell carries `role="button"` / `tabindex="0"` / `data-key` / `aria-label` (updated to include item name and quantity when bound).
 
+### Content GUI — Release S (UI/UX Debug, Audit & Polish) ✅
+
+A targeted audit-and-harden pass over three runtime game-facing HTML overlays, each of which lacked ARIA attributes and automated test coverage.
+
+1. ✅ **FastTravelUI** (`src/ui/fast-travel-ui.ts`, 45 tests) — Destination picker overlay: `open(options[])` lazy-creates the DOM, renders a scrollable list of `FastTravelOptionView` rows (name + `~Nh` ETA), pre-selects the first entry, and updates the status line; clicking a row re-selects it and refreshes `aria-pressed`; the Travel button fires `onTravel(locationId)` with the selected id (disabled when no options are present); "Cancel" and `✕` both call `close()` which fires `onClose()`; **bug fixed**: root now carries `role="dialog"` / `aria-modal="true"` / `aria-labelledby` linked to the `<h2>` title (was missing entirely).
+
+2. ✅ **GuardEncounterUI** (`src/ui/guard-encounter-ui.ts`, 42 tests) — Arrest-challenge modal: `open(view)` populates guard name, faction, bounty, and player gold; Pay Fine button is disabled when `playerGold < bounty`; Persuade button is disabled when `canPersuade` is false; `showStatus(message, isError?)` toggles `--error` / `--ok` modifier classes; each of the four action buttons (Pay Fine / Go to Jail / Persuade / Resist Arrest) fires `onResolve(action)` with the matching `GuardEncounterAction` literal; `close()` hides the panel; already had correct ARIA attributes (`role="dialog"` / `aria-modal` / `aria-labelledby`).
+
+3. ✅ **SpellMakingUI** (`src/ui/spell-making-ui.ts`, 52 tests) — Spellmaking altar overlay: `open()` lazy-creates the DOM, resets the name input and both component cards to defaults, computes and displays the initial cost preview; secondary-effect card is opt-in via a checkbox; the Forge button fires `onForge({ name, components })` — validation rejects an empty spell name with an error status; `showStatus(message, isError?)` toggles the same modifier-class pattern; `close()` / Cancel / `✕` all hide the panel and fire `onClose()`; **bug fixed**: root now carries `role="dialog"` / `aria-modal="true"` / `aria-labelledby` linked to the `<h2>` title (was missing entirely).
+
 ---
 
 ## Mid-Term (3–5 Releases)
