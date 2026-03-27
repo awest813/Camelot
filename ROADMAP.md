@@ -368,6 +368,12 @@ A targeted audit-and-harden pass over three runtime game-facing HTML overlays, e
 
 3. ✅ **SpellMakingUI** (`src/ui/spell-making-ui.ts`, 52 tests) — Spellmaking altar overlay: `open()` lazy-creates the DOM, resets the name input and both component cards to defaults, computes and displays the initial cost preview; secondary-effect card is opt-in via a checkbox; the Forge button fires `onForge({ name, components })` — validation rejects an empty spell name with an error status; `showStatus(message, isError?)` toggles the same modifier-class pattern; `close()` / Cancel / `✕` all hide the panel and fire `onClose()`; **bug fixed**: root now carries `role="dialog"` / `aria-modal="true"` / `aria-labelledby` linked to the `<h2>` title (was missing entirely).
 
+### Content GUI — Release T (Standalone Editor Shell) ✅
+
+A full-screen HTML workspace designed for non-programmer content creators, wrapping the entire Camelot creator toolset in a professional, IDE-like shell.
+
+1. ✅ **StandaloneEditorShell** (`src/ui/standalone-editor-shell.ts`, 52 tests) — Full-page application shell: `open()` / `close()` / `toggle()` / `isVisible` lifecycle with lazy DOM construction; **title bar** showing the Camelot Editor brand logo plus four file-action toolbar buttons (New, Open, Save, Export) each backed by an optional callback (`onNew` / `onOpen` / `onSave` / `onExport`) and disabled when no callback is provided; **left sidebar `<nav>`** with three grouped sections — ✏ Content (Quest, Dialogue, NPC, Item), 🌍 World (Map, Faction, Loot Table, Spawn), 🔧 Tools (Content Bundle, Asset Browser, Bundle Merge, Mod Manifest) — each tool item shows its icon, label, and keyboard shortcut, clicking fires `onToolSelect(toolId)` and highlights the item; **`setActiveSection(toolId)`** programmatically highlights the given sidebar nav item with the `--active` modifier class and `aria-current="page"`, removing both from any previously active item; **main content area** hosting a **welcome dashboard** (`role="region"`) with a heading, subtitle, quick-access cards for the four most-used tools (Map, Quest, Dialogue, Content Bundle) each carrying `data-tool-id` and `--card-accent` CSS custom property, plus a tip paragraph; **bottom status bar** (`role="status"` / `aria-live="polite"`) with a coloured dot (green `#5EC45E` for ok, amber `#E08830` for error) and `setStatus(message, isError?)` method for live updates; Escape key closes the shell and removes the listener; fully accessible — root `role="application"`, sidebar `role="navigation"`, toolbar `role="toolbar"`, close button `aria-label`, all interactive elements carry descriptive `aria-label` attributes.
+
 ---
 
 ## Mid-Term (3–5 Releases)
@@ -444,7 +450,7 @@ Camelot will evolve toward a creator-friendly worldbuilding pipeline through a d
 - ✅ **EditorHub expanded** — Faction Creator and Loot Table Creator added to the F11 Editor Hub launcher grid alongside Map, Quest, Dialogue, NPC, and Item editors.
 - ✅ **Map Editor UX improvements** — `MapEditorPalettePanel` (placement-palette browser with per-type description and quick-place button, bottom-left dock); `MapEditorValidationPanel` (dedicated scrollable validation results pane, toggled by F7, with re-validate and entity-focus actions); **D** key shortcut to duplicate the selected entity; toolbar extended with live undo/redo stack counters.
 - ✅ Layer-based editing (terrain, encounters, narrative, lighting) — completed with entity layer reassignment in the property inspector, persistent custom layer assignments through map export/import, and active layer targeting from the layer panel so new placements can be routed directly into the chosen layer while inheriting its visibility/lock state.
-- 🧭 Optional standalone editor shell for non-programmer content creators.
+- ✅ Optional standalone editor shell for non-programmer content creators.
 
 ### Networking Exploration
 
