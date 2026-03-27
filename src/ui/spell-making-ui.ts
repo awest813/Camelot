@@ -83,6 +83,9 @@ export class SpellMakingUI {
 
     const root = document.createElement("div");
     root.className = "spell-making";
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
+    root.setAttribute("aria-labelledby", "spell-making-title");
     root.style.display = "none";
 
     const panel = document.createElement("section");
@@ -98,6 +101,7 @@ export class SpellMakingUI {
     header.appendChild(titleWrap);
 
     const title = document.createElement("h2");
+    title.id = "spell-making-title";
     title.className = "spell-making__title";
     title.textContent = "Spellmaking Altar";
     titleWrap.appendChild(title);

@@ -49,6 +49,9 @@ export class FastTravelUI {
 
     const root = document.createElement("div");
     root.className = "fast-travel";
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
+    root.setAttribute("aria-labelledby", "fast-travel-title");
     root.style.display = "none";
 
     const panel = document.createElement("section");
@@ -64,6 +67,7 @@ export class FastTravelUI {
     header.appendChild(titleWrap);
 
     const title = document.createElement("h2");
+    title.id = "fast-travel-title";
     title.className = "fast-travel__title";
     title.textContent = "Fast Travel";
     titleWrap.appendChild(title);
