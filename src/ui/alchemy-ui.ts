@@ -298,6 +298,9 @@ export class AlchemyUI {
       row.paddingBottom = "2px";
       row.isPointerBlocker = true;
 
+      row.isFocusInvisible = false;
+      row.tabIndex = 0;
+
       const nameText = new TextBlock(`ingName_${def.id}`, `${def.name}  ×${quantity}`);
       nameText.color    = isSelected ? T.TITLE : T.TEXT;
       nameText.fontSize = 13;
@@ -327,6 +330,18 @@ export class AlchemyUI {
       effectText.top      = "26px";
       row.addControl(effectText);
 
+      row.accessibilityTag = { description: `Ingredient: ${def.name}, Effects: ${effectNames}` };
+
+      let isFocused = false;
+      row.onFocusObservable.add(() => {
+        isFocused = true;
+        row.thickness = 2;
+      });
+      row.onBlurObservable.add(() => {
+        isFocused = false;
+        row.thickness = 1;
+      });
+
       row.onPointerClickObservable.add(() => this._toggleIngredientSelection(def.id));
       row.onPointerEnterObservable.add(() => {
         if (!this._selectedIngredientIds.includes(def.id)) {
@@ -335,6 +350,12 @@ export class AlchemyUI {
       });
       row.onPointerOutObservable.add(() => {
         row.background = this._selectedIngredientIds.includes(def.id) ? T.SEL_BG : "transparent";
+        if (!isFocused) row.thickness = 1;
+      });
+      row.onKeyboardEventProcessedObservable.add((evt) => {
+        if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
+          row.onPointerClickObservable.notifyObservers(null as any);
+        }
       });
 
       this._ingredientStack.addControl(row);
