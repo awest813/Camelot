@@ -105,6 +105,7 @@ import { DailyScheduleSystem } from "./systems/daily-schedule-system";
 import { HorseSystem } from "./systems/horse-system";
 import { SwimmingSystem } from "./systems/swimming-system";
 import { DiseaseSystem } from "./systems/disease-system";
+import { EventManagerSystem } from "./systems/event-manager-system";
 import { AssetBrowserSystem } from "./systems/asset-browser-system";
 import { AssetBrowserUI } from "./ui/asset-browser-ui";
 import { BundleMergeSystem } from "./systems/bundle-merge-system";
@@ -259,6 +260,9 @@ export class Game {
 
   // v21 systems
   public diseaseSystem: DiseaseSystem;
+
+  // v22 systems
+  public eventManagerSystem: EventManagerSystem;
 
   public isPaused: boolean = false;
 
@@ -1352,6 +1356,13 @@ export class Game {
       this.ui.showNotification(`Cured of ${def?.name ?? id}.`, 2000);
     };
     this.saveSystem.setDiseaseSystem(this.diseaseSystem);
+
+    // ── v22: Event Manager (Dungeon Master) ───────────────────────────────
+    this.eventManagerSystem = new EventManagerSystem();
+    this.eventManagerSystem.onEventTriggered = (id, def) => {
+      this.ui.showNotification(`📜 ${def.title}`, 3000);
+    };
+    this.saveSystem.setEventManagerSystem(this.eventManagerSystem);
 
     // ── Stable UI ─────────────────────────────────────────────────────────
     this.stableUI = new StableUI();
