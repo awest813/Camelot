@@ -68,6 +68,9 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ **ClassSystem** — Oblivion-style character classes (Warrior, Knight, Barbarian, Mage, Sorcerer, Healer, Thief, Scout, Rogue, Battlemage); each class defines a specialization (combat/magic/stealth), two favored attributes (+10 each), five major skills (starting +25 levels, 1.5× XP), and five minor skills (starting +10 levels, 1.25× XP); specialization group grants +5 to all related skills; `xpMultiplierFor(skillId)` scales all in-game XP awards so major-skill users progress faster; `onClassChosen` callback syncs derived stats; save-state persistence (SAVE_VERSION 14).
 - ✅ **RaceSystem** (fully activated powers) — Oblivion-depth racial powers for all 10 races (Nord, Imperial, Breton, Redguard, High Elf, Dark Elf, Wood Elf, Orc, Khajiit, Argonian); each race now grants a genuine once-per-24h rechargeable power that dispatches real `ActiveEffect` entries (health/magicka/stamina restore, fortify strength, resist damage, etc.); `activatePower(gameTime, activeEffectsSystem)` dispatches all power effects, `canActivatePower()` enforces the cooldown, `powerCooldownRemaining()` reports minutes left; `onPowerActivated` callback fires HUD notification; V key activates the power in-game; power cooldown persisted (SAVE_VERSION 16).
 - ✅ **PlayerLevelSystem** — Oblivion-style skill-based character leveling: accumulate 10 major-skill level-ups (as defined by the chosen ClassSystem) to trigger a character level-up; each attribute's bonus (+1 to +5) follows the Oblivion multiplier table (1–4 level-ups → +2, 5–7 → +3, 8–9 → +4, 10+ → +5) based on how many governing skills were leveled that character level; `confirmLevelUp(primary, sec1, sec2)` applies bonuses for three distinct chosen attributes and advances `characterLevel`; `suggestedAttributes` convenience property returns the three highest-bonus attributes for auto-apply; `onLevelUpReady` fires with the available bonuses when the threshold is reached; `onLevelUpComplete(newLevel)` fires after bonuses are applied; skill → attribute mapping mirrors Oblivion (blade → Strength, block → Endurance, destruction/restoration → Willpower, marksman → Agility, sneak → Speed, speechcraft → Luck, alchemy → Intelligence); attribute bonuses immediately sync `maxHealth`/`maxMagicka`/`maxStamina`/`maxCarryWeight`; save-state persistence (SAVE_VERSION 17).
+- ✅ **HorseSystem** — Mount and stable system: register named horses with individual speed multipliers (1.8×–2.5×) and saddlebag capacities; purchase horses from stable NPCs at configurable gold prices; O to mount/dismount; Shift+O to browse the stable (unmounted) or open the saddlebag inventory (mounted); `onMount`, `onDismount`, `onHorsePurchased` callbacks wired to HUD notifications; saddlebag item management (add, remove, transfer to player); save-state persistence (SAVE_VERSION 19).
+- ✅ **SwimmingSystem** — Breath and drowning system: 30-second breath meter drains while submerged; drowning damage (3 HP/s) applied when breath reaches zero; `onBreathLow` warning fires at 20 % breath; `hasWaterBreathing` flag suppresses all drain (Argonian racial trait or Water Breathing spell/potion); `swimSpeedMultiplier` (0.65×) returned to game layer; `setMaxBreath()` for effect-based upgrades; save-state persistence (SAVE_VERSION 20).
+- ✅ **DiseaseSystem** — Oblivion-style disease contraction and cure: seven built-in diseases (Rust Chancre, Swamp Rot, Witbane, Collywobbles, Brain Rot, Yellow Tick, Porphyric Hemophilia) each weakening one or more attributes; 5 % per-hit chance to contract a random disease in combat; `diseaseResistanceChance` flag for full Argonian immunity; `cureAllDiseases()` for Cure Disease potions and shrine blessings; `getAttributePenalties()` returns the merged attribute debuff map for stat integration; `registerDisease()` for mod-defined diseases; `onDiseaseContracted`/`onDiseaseCured` callbacks; save-state persistence (SAVE_VERSION 21).
 
 ### World + Content
 
@@ -78,13 +81,14 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 ### UX + Persistence
 
 - ✅ HUD, quest log, inventory, skill tree, pause flow.
-- ✅ Save/load (SAVE_VERSION 19) for all system states.
+- ✅ Save/load (SAVE_VERSION 21) for all system states.
 - ✅ Save file export to JSON file download + import from JSON/File (browser-safe).
 - ✅ Notifications, hit feedback, and debug support.
 - ✅ Compass HUD (top-center) showing cardinal direction from camera heading.
 - ✅ Wait/Rest dialog (T) for time-skipping 1–24 in-game hours with stat restoration.
 - ✅ Fame/Infamy HUD (H key) showing reputation tier, active effects, and jail history.
 - ✅ Racial Power (V key) — activate the chosen race's once-per-day power; HUD notification shows name + description; cooldown status message when on recharge.
+- ✅ Horse / Stable UI (O / Shift+O) — mount your horse, browse stables, manage saddlebag.
 
 ---
 
@@ -516,3 +520,13 @@ Completed in SAVE_VERSION 19. Key deliverables:
 - ✅ **ContentBundleUI** (`src/ui/content-bundle-ui.ts`) — HTML overlay (Shift+F7 / Editor Hub "📦 Content Bundle"): bundle metadata form (title, description, author); per-system diagnostic rows with pass/fail icons, issue counts, expandable issue lists, and "▶ Open" quick-open buttons; "Validate All" and "⬇ Export Bundle" action buttons; `onPlayFromHere` callback opens matching creator UI without re-navigating manually.
 - ✅ **Editor Hub expanded** — "Content Bundle" tool card added to the F11 Editor Hub launcher grid (shortcut Shift+F7, indigo accent).
 - ✅ **Keybinding** — Shift+F7 toggles `ContentBundleUI`; also listed in the F1 help overlay and the Editor Hub.
+
+---
+
+## Next Steps
+
+### Gameplay Depth — Release U (Disease System) ✅
+
+Disease system delivered:
+
+1. ✅ **DiseaseSystem** (`src/systems/disease-system.ts`, 48 tests) — Oblivion-style disease contraction and cure: seven built-in diseases — Rust Chancre (Endurance −5), Swamp Rot (Willpower −5), Witbane (Intelligence −5), Collywobbles (Strength −5), Brain Rot (Intelligence −10), Yellow Tick (Agility −5), Porphyric Hemophilia (Willpower −2, Endurance −2); `contractDisease(id, rng?)` rolls against `diseaseResistanceChance` [0, 1] before infecting the player (Argonian racial immunity sets resistance to 1.0); `cureDisease(id)` / `cureAllDiseases()` for Cure Disease potions and shrine blessings; `hasDisease(id)` / `getActiveDiseases()` query helpers; `getAttributePenalties()` returns a merged per-attribute debuff map aggregated across all active diseases for direct integration with `AttributeSystem`; `registerDisease(def)` allows mod-defined diseases; `onDiseaseContracted` / `onDiseaseCured` HUD notification callbacks; 5 % per-hit disease exposure chance wired to `CombatSystem.onPlayerHit`; race-switch callback syncs Argonian immunity dynamically; save-state persistence (SAVE_VERSION 21).

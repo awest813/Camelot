@@ -35,6 +35,7 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 - Melee and magic combat loops with resource costs and cooldown discipline.
 - Damage feedback via floating combat text and hit indicators.
 - Three melee archetypes (Duelist / Soldier / Bruiser) and three magic archetypes (Spark / Bolt / Surge).
+- **Swimming**: breath meter (30 s) drains while submerged; drowning damage when depleted; Argonian racial immunity suppresses drain. (Argonian racial trait and Water Breathing spell/potion respected.)
 
 ### NPCs + AI
 
@@ -61,6 +62,8 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 - **Guard Challenge Modal**: when guards confront you over bounty, choose to pay fine, serve jail time, resist arrest, or attempt persuasion.
 - **Birthsign System**: choose one of 13 birthsigns at character creation for permanent attribute/stat bonuses and a once-per-day special power (Mara's Gift, Moonshadow, Lover's Kiss, …).
 - **Class System**: choose a character class (Warrior, Mage, Thief, Battlemage, etc.) that defines two favored attributes, five major skills (1.5× XP, start higher), and five minor skills (1.25× XP).
+- **Horse / Stable System**: purchase and ride horses from stable NPCs; each horse has its own speed multiplier and saddlebag inventory; O to mount/dismount, Shift+O to browse stable or open saddlebag.
+- **Disease System**: contract one of seven Oblivion-style diseases (Rust Chancre, Swamp Rot, Witbane, Collywobbles, Brain Rot, Yellow Tick, Porphyric Hemophilia) through combat hits; each disease weakens one or more attributes until cured by a Cure Disease potion or shrine; Argonians are immune.
 
 ### UI + Quality of Life
 
@@ -115,6 +118,8 @@ The in-engine **Map Editor** (activated with F2) lets you author world content w
 | 4 / 5 / 6    | Magic archetype select              |
 | 7 / 8 / 9 / 0 | Quick-slot consumable use         |
 | Y            | Open fast travel menu               |
+| **O**        | **Mount / dismount horse**          |
+| **Shift+O**  | **Browse stable (unmounted) / open saddlebag (mounted)** |
 | M            | Toggle audio mute                   |
 | F5           | Quick save                          |
 | F9           | Quick load                          |

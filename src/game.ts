@@ -104,6 +104,7 @@ import { SaddlebagUI } from "./ui/saddlebag-ui";
 import { DailyScheduleSystem } from "./systems/daily-schedule-system";
 import { HorseSystem } from "./systems/horse-system";
 import { SwimmingSystem } from "./systems/swimming-system";
+import { DiseaseSystem } from "./systems/disease-system";
 import { AssetBrowserSystem } from "./systems/asset-browser-system";
 import { AssetBrowserUI } from "./ui/asset-browser-ui";
 import { BundleMergeSystem } from "./systems/bundle-merge-system";
@@ -255,6 +256,9 @@ export class Game {
 
   // v20 systems
   public swimSystem: SwimmingSystem;
+
+  // v21 systems
+  public diseaseSystem: DiseaseSystem;
 
   public isPaused: boolean = false;
 
@@ -1200,6 +1204,8 @@ export class Game {
       this.player.maxCarryWeight = this.attributeSystem.carryWeight;
       // Sync water breathing ability (Argonian racial trait)
       this.swimSystem.hasWaterBreathing = race.waterBreathing ?? false;
+      // Sync disease immunity (Argonian racial trait — 100 % resistance)
+      this.diseaseSystem.diseaseResistanceChance = race.id === "argonian" ? 1.0 : 0;
       this.saveSystem.markDirty();
     };
     this.saveSystem.setRaceSystem(this.raceSystem);
@@ -1330,6 +1336,22 @@ export class Game {
       this.player.notifyDamageTaken();
     };
     this.saveSystem.setSwimmingSystem(this.swimSystem);
+
+    // ── v21: Disease system ────────────────────────────────────────────────
+    this.diseaseSystem = new DiseaseSystem();
+    // Argonian racial disease immunity — 100 % resistance
+    if (this.raceSystem.chosenRace?.id === "argonian") {
+      this.diseaseSystem.diseaseResistanceChance = 1.0;
+    }
+    this.diseaseSystem.onDiseaseContracted = (id) => {
+      const def = this.diseaseSystem.getDefinition(id);
+      this.ui.showNotification(`Contracted ${def?.name ?? id}!`, 3000);
+    };
+    this.diseaseSystem.onDiseaseCured = (id) => {
+      const def = this.diseaseSystem.getDefinition(id);
+      this.ui.showNotification(`Cured of ${def?.name ?? id}.`, 2000);
+    };
+    this.saveSystem.setDiseaseSystem(this.diseaseSystem);
 
     // ── Stable UI ─────────────────────────────────────────────────────────
     this.stableUI = new StableUI();
@@ -1526,7 +1548,19 @@ export class Game {
             }
         }
     };
-    this.combatSystem.onPlayerHit = () => this.audioSystem.playPlayerHit();
+    this.combatSystem.onPlayerHit = () => {
+        this.audioSystem.playPlayerHit();
+        // Small chance to contract a random disease on each hit (Oblivion-style).
+        // ~5 % base chance per strike; resistance is factored inside contractDisease().
+        if (Math.random() < 0.05) {
+            const diseasePool = [
+                "rust_chancre", "swamp_rot", "witbane",
+                "collywobbles", "yellow_tick",
+            ];
+            const pick = diseasePool[Math.floor(Math.random() * diseasePool.length)];
+            this.diseaseSystem.contractDisease(pick);
+        }
+    };
     this.combatSystem.onBlockSuccess = () => {
         this.skillProgressionSystem.gainXP("block", 5 * this.classSystem.xpMultiplierFor("block"));
     };

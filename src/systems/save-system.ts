@@ -35,9 +35,10 @@ import type { PlayerLevelSystem } from "./player-level-system";
 import type { DailyScheduleSystem } from "./daily-schedule-system";
 import type { HorseSystem } from "./horse-system";
 import type { SwimmingSystem } from "./swimming-system";
+import type { DiseaseSystem } from "./disease-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 20;
+const SAVE_VERSION = 21;
 /** Oldest save version that can still be loaded (forward-compat window). */
 const SAVE_VERSION_MIN = 5;
 
@@ -103,6 +104,8 @@ interface ParsedSaveData {
   horse?: unknown;
   // v20 additions
   swimming?: unknown;
+  // v21 additions
+  disease?: unknown;
 }
 
 interface EquipmentEntry {
@@ -164,6 +167,8 @@ export interface SaveData {
   horse?: any;
   // v20 additions
   swimming?: any;
+  // v21 additions
+  disease?: any;
 }
 
 export class SaveSystem {
@@ -233,6 +238,9 @@ export class SaveSystem {
 
   // v20 optional systems
   private _swimmingSystem: SwimmingSystem | null = null;
+
+  // v21 optional systems
+  private _diseaseSystem: DiseaseSystem | null = null;
 
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
@@ -336,6 +344,10 @@ export class SaveSystem {
 
   public setSwimmingSystem(s: SwimmingSystem): void            { this._swimmingSystem = s; }
 
+  // ── v21 system injection ──────────────────────────────────────────────────
+
+  public setDiseaseSystem(s: DiseaseSystem): void              { this._diseaseSystem = s; }
+
 
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
@@ -413,6 +425,7 @@ export class SaveSystem {
     if (this._dailyScheduleSystem)    data.dailySchedule    = this._dailyScheduleSystem.getSaveState();
     if (this._horseSystem)            data.horse            = this._horseSystem.getSaveState();
     if (this._swimmingSystem)         data.swimming         = this._swimmingSystem.getSaveState();
+    if (this._diseaseSystem)          data.disease          = this._diseaseSystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -606,6 +619,10 @@ export class SaveSystem {
     if (this._swimmingSystem && data.swimming)
       this._swimmingSystem.restoreFromSave(data.swimming as any);
 
+    // v21 systems
+    if (this._diseaseSystem && data.disease)
+      this._diseaseSystem.restoreFromSave(data.disease as any);
+
     // Restore player name (v15+; keep default "Hero" for older saves)
     if (typeof data.player.name === "string" && data.player.name.trim()) {
       this._player.name = data.player.name;
@@ -782,6 +799,8 @@ export class SaveSystem {
       playerLevel: data.playerLevel,
       dailySchedule: data.dailySchedule,
       horse: data.horse,
+      swimming: data.swimming,
+      disease: data.disease,
     };
   }
 
