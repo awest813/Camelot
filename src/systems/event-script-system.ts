@@ -17,6 +17,11 @@
  *  • emit_event         – Dispatch a typed game event (e.g. quest:kill:enemy).
  *  • branch_on_flag     – Conditional branch based on a flag value.
  *  • branch_on_quest    – Conditional branch based on quest status.
+ *  • camera_look_at     – Point the camera at a world-space position.
+ *  • camera_pan_to      – Smoothly move the camera to a world-space position.
+ *  • camera_fade_out    – Fade the viewport to black.
+ *  • camera_fade_in     – Fade the viewport back in from black.
+ *  • camera_shake       – Apply a shake impulse to the camera.
  *
  * Usage:
  * ```ts
@@ -48,7 +53,12 @@ export type SimpleEventScriptStep =
   | { type: "set_flag"; flag: string; value: boolean }
   | { type: "faction_delta"; factionId: string; amount: number }
   | { type: "wait_hours"; hours: number }
-  | { type: "emit_event"; eventType: string; targetId: string; amount?: number };
+  | { type: "emit_event"; eventType: string; targetId: string; amount?: number }
+  | { type: "camera_look_at"; x: number; y: number; z: number }
+  | { type: "camera_pan_to"; x: number; y: number; z: number; durationMs?: number }
+  | { type: "camera_fade_out"; durationMs?: number }
+  | { type: "camera_fade_in"; durationMs?: number }
+  | { type: "camera_shake"; intensity?: number; durationMs?: number };
 
 /** Branching steps (may contain sub-steps). */
 export type BranchEventScriptStep =
@@ -96,6 +106,17 @@ export interface EventScriptContext {
   emitEvent: (eventType: string, targetId: string, amount: number) => void;
   /** Returns the current game time in minutes (from TimeSystem.gameTime). */
   getCurrentGameTimeMinutes: () => number;
+  // ── Optional camera control callbacks ──────────────────────────────────────
+  /** Point the camera at the given world-space position. */
+  cameraLookAt?: (x: number, y: number, z: number) => void;
+  /** Smoothly move the camera to the given world-space position. */
+  cameraPanTo?: (x: number, y: number, z: number, durationMs: number) => void;
+  /** Fade the viewport to black over the given duration. */
+  cameraFadeOut?: (durationMs: number) => void;
+  /** Fade the viewport back in from black over the given duration. */
+  cameraFadeIn?: (durationMs: number) => void;
+  /** Apply a shake impulse to the camera. */
+  cameraShake?: (intensity: number, durationMs: number) => void;
 }
 
 /** Internal state for a script that is currently running. */
@@ -348,6 +369,21 @@ export class EventScriptSystem {
         break;
       case "emit_event":
         context.emitEvent(step.eventType, step.targetId, step.amount ?? 1);
+        break;
+      case "camera_look_at":
+        context.cameraLookAt?.(step.x, step.y, step.z);
+        break;
+      case "camera_pan_to":
+        context.cameraPanTo?.(step.x, step.y, step.z, step.durationMs ?? 1000);
+        break;
+      case "camera_fade_out":
+        context.cameraFadeOut?.(step.durationMs ?? 500);
+        break;
+      case "camera_fade_in":
+        context.cameraFadeIn?.(step.durationMs ?? 500);
+        break;
+      case "camera_shake":
+        context.cameraShake?.(step.intensity ?? 0.5, step.durationMs ?? 500);
         break;
     }
     this.onStepExecuted?.(scriptId, stepIndex, step);
