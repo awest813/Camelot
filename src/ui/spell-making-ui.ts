@@ -166,6 +166,7 @@ export class SpellMakingUI {
     const status = document.createElement("p");
     status.className = "spell-making__status";
     status.textContent = "Forge a spell to add it to your known spells.";
+    status.setAttribute("aria-live", "polite");
     panel.appendChild(status);
     this._statusEl = status;
 
@@ -358,7 +359,16 @@ export class SpellMakingUI {
     const components = this._collectComponents();
     const cost = this._computeCost(components);
     this._costEl.textContent = `Estimated cost: ${cost} gold`;
-    this._forgeButton.disabled = components.length === 0;
+
+    const isDisabled = components.length === 0;
+    this._forgeButton.disabled = isDisabled;
+    this._forgeButton.setAttribute("aria-disabled", isDisabled ? "true" : "false");
+
+    if (isDisabled) {
+      this._forgeButton.setAttribute("title", "Add at least one spell component.");
+    } else {
+      this._forgeButton.removeAttribute("title");
+    }
   }
 
   private _emitForgeRequest(): void {
