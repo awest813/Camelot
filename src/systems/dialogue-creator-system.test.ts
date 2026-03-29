@@ -246,6 +246,79 @@ describe("DialogueCreatorSystem", () => {
     });
   });
 
+  // ── Camera sequence linking ────────────────────────────────────────────────
+
+  describe("updateNodeCamera", () => {
+    it("sets cameraSequenceId on an existing node", () => {
+      const id = sys.addNode({ text: "Look over here." });
+      sys.updateNodeCamera(id, "intro_cam");
+      const node = sys.nodes.find(n => n.id === id)!;
+      expect(node.cameraSequenceId).toBe("intro_cam");
+    });
+
+    it("clears cameraSequenceId when null is passed", () => {
+      const id = sys.addNode({ text: "Look over here." });
+      sys.updateNodeCamera(id, "intro_cam");
+      sys.updateNodeCamera(id, null);
+      const node = sys.nodes.find(n => n.id === id)!;
+      expect(node.cameraSequenceId).toBeUndefined();
+    });
+
+    it("clears cameraSequenceId when empty string is passed", () => {
+      const id = sys.addNode({ text: "Look over here." });
+      sys.updateNodeCamera(id, "intro_cam");
+      sys.updateNodeCamera(id, "");
+      const node = sys.nodes.find(n => n.id === id)!;
+      expect(node.cameraSequenceId).toBeUndefined();
+    });
+
+    it("returns false for unknown nodeId", () => {
+      expect(sys.updateNodeCamera("ghost_node", "cam_seq")).toBe(false);
+    });
+
+    it("addNode accepts cameraSequenceId in partial", () => {
+      const id = sys.addNode({ text: "Drama!", cameraSequenceId: "boss_cam" });
+      const node = sys.nodes.find(n => n.id === id)!;
+      expect(node.cameraSequenceId).toBe("boss_cam");
+    });
+  });
+
+  describe("cameraSequenceId export / import round-trip", () => {
+    it("toDefinition includes cameraSequenceId when set", () => {
+      const id = sys.addNode({ text: "Dramatic scene." });
+      sys.setMeta("dlg_cam", id);
+      sys.updateNodeCamera(id, "cutscene_1");
+      const def = sys.toDefinition();
+      expect(def.nodes[0].cameraSequenceId).toBe("cutscene_1");
+    });
+
+    it("toDefinition omits cameraSequenceId when not set", () => {
+      const id = sys.addNode({ text: "Normal scene." });
+      sys.setMeta("dlg_cam", id);
+      const def = sys.toDefinition();
+      expect(def.nodes[0].cameraSequenceId).toBeUndefined();
+    });
+
+    it("importFromJson round-trips cameraSequenceId", () => {
+      const id = sys.addNode({ speaker: "Narrator", text: "The story begins." });
+      sys.setMeta("dlg_story", id);
+      sys.updateNodeCamera(id, "opening_cam");
+      const json = sys.exportToJson();
+      const sys2 = new DialogueCreatorSystem();
+      sys2.importFromJson(json);
+      expect(sys2.nodes[0].cameraSequenceId).toBe("opening_cam");
+    });
+
+    it("importFromJson treats absent cameraSequenceId as undefined", () => {
+      const id = sys.addNode({ speaker: "Guard", text: "Halt!" });
+      sys.setMeta("dlg_guard", id);
+      const json = sys.exportToJson();
+      const sys2 = new DialogueCreatorSystem();
+      sys2.importFromJson(json);
+      expect(sys2.nodes[0].cameraSequenceId).toBeUndefined();
+    });
+  });
+
   // ── Reset ─────────────────────────────────────────────────────────────────
 
   describe("reset", () => {

@@ -27,6 +27,12 @@ export interface DialogueNode {
   speaker: string;
   text: string;
   terminal?: boolean;
+  /**
+   * Optional id of a `CameraSequenceDefinition` to play when this node is
+   * shown.  The game layer is responsible for looking up and playing the
+   * sequence via `CameraScriptingSystem`.
+   */
+  cameraSequenceId?: string;
   choices: DialogueChoice[];
 }
 
@@ -62,6 +68,11 @@ export interface DialogueNodeView {
   speaker: string;
   text: string;
   terminal: boolean;
+  /**
+   * Optional id of a `CameraSequenceDefinition` to play when this node is
+   * shown.  Forwarded from the underlying `DialogueNode` definition.
+   */
+  cameraSequenceId?: string;
   choices: DialogueChoiceView[];
 }
 

@@ -193,6 +193,7 @@ export class DialogueSession {
       speaker: node.speaker,
       text: node.text,
       terminal: Boolean(node.terminal),
+      cameraSequenceId: node.cameraSequenceId,
       choices,
     };
   }
