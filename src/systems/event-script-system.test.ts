@@ -565,4 +565,121 @@ describe("EventScriptSystem", () => {
     expect(ctx.items.get("guild_key")).toBe(1);
     expect(system.isCompleted("guild_intro")).toBe(true);
   });
+
+  // ── Camera steps ──────────────────────────────────────────────────────────
+
+  it("camera_look_at calls context.cameraLookAt with correct coords", () => {
+    const lookAtCalls: Array<{ x: number; y: number; z: number }> = [];
+    const ctx = makeContext({ cameraLookAt: (x, y, z) => lookAtCalls.push({ x, y, z }) });
+    system.registerScript({
+      id: "s1",
+      steps: [{ type: "camera_look_at", x: 10, y: 5, z: -20 }],
+    });
+    system.run("s1", ctx);
+    expect(lookAtCalls).toEqual([{ x: 10, y: 5, z: -20 }]);
+  });
+
+  it("camera_look_at is a no-op when cameraLookAt is not provided", () => {
+    const ctx = makeContext();
+    system.registerScript({
+      id: "s1",
+      steps: [{ type: "camera_look_at", x: 0, y: 0, z: 0 }],
+    });
+    expect(() => system.run("s1", ctx)).not.toThrow();
+    expect(system.isCompleted("s1")).toBe(true);
+  });
+
+  it("camera_pan_to calls context.cameraPanTo with default durationMs 1000", () => {
+    const panCalls: Array<{ x: number; y: number; z: number; d: number }> = [];
+    const ctx = makeContext({
+      cameraPanTo: (x, y, z, d) => panCalls.push({ x, y, z, d }),
+    });
+    system.registerScript({
+      id: "s1",
+      steps: [{ type: "camera_pan_to", x: 1, y: 2, z: 3 }],
+    });
+    system.run("s1", ctx);
+    expect(panCalls).toEqual([{ x: 1, y: 2, z: 3, d: 1000 }]);
+  });
+
+  it("camera_pan_to uses custom durationMs when provided", () => {
+    const panCalls: Array<{ x: number; y: number; z: number; d: number }> = [];
+    const ctx = makeContext({
+      cameraPanTo: (x, y, z, d) => panCalls.push({ x, y, z, d }),
+    });
+    system.registerScript({
+      id: "s1",
+      steps: [{ type: "camera_pan_to", x: 0, y: 0, z: 0, durationMs: 2500 }],
+    });
+    system.run("s1", ctx);
+    expect(panCalls[0].d).toBe(2500);
+  });
+
+  it("camera_pan_to is a no-op when cameraPanTo is not provided", () => {
+    const ctx = makeContext();
+    system.registerScript({
+      id: "s1",
+      steps: [{ type: "camera_pan_to", x: 0, y: 0, z: 0 }],
+    });
+    expect(() => system.run("s1", ctx)).not.toThrow();
+    expect(system.isCompleted("s1")).toBe(true);
+  });
+
+  it("camera_fade_out calls context.cameraFadeOut with default durationMs 500", () => {
+    const fadeCalls: number[] = [];
+    const ctx = makeContext({ cameraFadeOut: (d) => fadeCalls.push(d) });
+    system.registerScript({ id: "s1", steps: [{ type: "camera_fade_out" }] });
+    system.run("s1", ctx);
+    expect(fadeCalls).toEqual([500]);
+  });
+
+  it("camera_fade_out uses custom durationMs when provided", () => {
+    const fadeCalls: number[] = [];
+    const ctx = makeContext({ cameraFadeOut: (d) => fadeCalls.push(d) });
+    system.registerScript({ id: "s1", steps: [{ type: "camera_fade_out", durationMs: 800 }] });
+    system.run("s1", ctx);
+    expect(fadeCalls).toEqual([800]);
+  });
+
+  it("camera_fade_in calls context.cameraFadeIn with default durationMs 500", () => {
+    const fadeCalls: number[] = [];
+    const ctx = makeContext({ cameraFadeIn: (d) => fadeCalls.push(d) });
+    system.registerScript({ id: "s1", steps: [{ type: "camera_fade_in" }] });
+    system.run("s1", ctx);
+    expect(fadeCalls).toEqual([500]);
+  });
+
+  it("camera_shake calls context.cameraShake with defaults intensity 0.5 and durationMs 500", () => {
+    const shakeCalls: Array<{ i: number; d: number }> = [];
+    const ctx = makeContext({ cameraShake: (i, d) => shakeCalls.push({ i, d }) });
+    system.registerScript({ id: "s1", steps: [{ type: "camera_shake" }] });
+    system.run("s1", ctx);
+    expect(shakeCalls).toEqual([{ i: 0.5, d: 500 }]);
+  });
+
+  it("camera_shake uses custom intensity and durationMs when provided", () => {
+    const shakeCalls: Array<{ i: number; d: number }> = [];
+    const ctx = makeContext({ cameraShake: (i, d) => shakeCalls.push({ i, d }) });
+    system.registerScript({
+      id: "s1",
+      steps: [{ type: "camera_shake", intensity: 1.5, durationMs: 300 }],
+    });
+    system.run("s1", ctx);
+    expect(shakeCalls).toEqual([{ i: 1.5, d: 300 }]);
+  });
+
+  it("camera steps fire onStepExecuted like other steps", () => {
+    const types: string[] = [];
+    const ctx = makeContext({ cameraFadeOut: () => {} });
+    system.onStepExecuted = (_id, _idx, step) => types.push(step.type);
+    system.registerScript({
+      id: "s1",
+      steps: [
+        { type: "camera_fade_out", durationMs: 400 },
+        { type: "camera_fade_in", durationMs: 400 },
+      ],
+    });
+    system.run("s1", ctx);
+    expect(types).toEqual(["camera_fade_out", "camera_fade_in"]);
+  });
 });

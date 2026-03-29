@@ -380,6 +380,16 @@ A full-screen HTML workspace designed for non-programmer content creators, wrapp
 
 ---
 
+### Content GUI — Release U (Camera Scripting + New-User Tutorial) ✅
+
+Two closely related systems that improve the first-time player experience and give designers scripted cinematic control over the camera.
+
+1. ✅ **Camera scripting steps added to EventScriptSystem** (`src/systems/event-script-system.ts`, now 46 tests) — five new step types extend the data-driven scripting engine with full camera control: `camera_look_at` (point the camera at a world-space `{x, y, z}` position), `camera_pan_to` (smoothly move the camera to a position over a configurable `durationMs`, default 1000 ms), `camera_fade_out` (fade the viewport to black, default 500 ms), `camera_fade_in` (fade the viewport back in from black, default 500 ms), and `camera_shake` (apply a camera shake impulse with configurable `intensity`, default 0.5, and `durationMs`, default 500 ms); all five callbacks are **optional** on `EventScriptContext` so hosts without a camera layer do not break — missing callbacks are silently skipped; camera steps participate in the existing `onStepExecuted` callback and save-state round-trip with no additional changes required.
+
+2. ✅ **TutorialSystem** (`src/systems/tutorial-system.ts`, 54 tests) — guided new-player tutorial engine: `addStep()` appends a `TutorialStep` (required `id` + `message`; optional `highlightTarget` for UI element focus and `advanceHint` for action prompts) to the end of the sequence; `removeStep(id)` / `clearSteps()` / `getStep(id)` / `getAllSteps()` for full step CRUD; `start()` begins the tutorial from step 0 and fires `onStepBegin(0, step)` — returns `false` when no steps are registered, already active, already completed, or already skipped; `advance()` completes the current step (fires `onStepComplete`), then either fires `onStepBegin` for the next step or sets `isCompleted` and fires `onTutorialComplete` when the last step is reached — returns `false` when the tutorial is not active; `skip()` ends the tutorial early (fires `onTutorialSkipped`) without marking it complete — no-op when inactive; `reset()` returns the system to its initial not-started state without removing registered steps or firing callbacks, allowing tutorials to be replayed; `isStarted` / `isCompleted` / `isSkipped` / `isActive` / `currentStep` / `currentStepIndex` / `totalSteps` query accessors; `getSnapshot()` / `restoreSnapshot(state)` for save persistence (callbacks suppressed on load to prevent duplicate effects).
+
+---
+
 ## Mid-Term (3–5 Releases)
 
 ### World Building Depth
