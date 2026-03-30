@@ -2811,9 +2811,8 @@ export class Game {
       this.navigationSystem.update(deltaTime);
       this.saveSystem.markDirty();
       this.saveSystem.tickAutosave(deltaTime);
-      const chunkSize = 50;
-      const cx = Math.floor(this.player.camera.position.x / chunkSize);
-      const cz = Math.floor(this.player.camera.position.z / chunkSize);
+      const cx = Math.floor(this.player.camera.position.x / this.world.chunkSize);
+      const cz = Math.floor(this.player.camera.position.z / this.world.chunkSize);
       if (cx !== this._lastNavChunkX || cz !== this._lastNavChunkZ) {
         this._lastNavChunkX = cx;
         this._lastNavChunkZ = cz;

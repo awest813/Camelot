@@ -354,3 +354,155 @@ describe('WorldManager chunk physics disposal', () => {
     expect(meshIdx).toBeGreaterThan(bodyIdx);
   });
 });
+
+describe('WorldManager.chunkSize', () => {
+  it('exposes the chunk size as a public readonly property', () => {
+    const wm = new WorldManager(mockScene);
+    expect(wm.chunkSize).toBe(50);
+  });
+
+  it('chunkSize is consistent across multiple instances', () => {
+    const wm1 = new WorldManager(mockScene);
+    const wm2 = new WorldManager(mockScene);
+    expect(wm1.chunkSize).toBe(wm2.chunkSize);
+  });
+});
+
+describe('WorldManager chunk callbacks', () => {
+  beforeEach(() => {
+    mockMeshDispose.mockClear();
+    mockBodyDispose.mockClear();
+  });
+
+  it('onChunkLoaded fires once for each newly loaded chunk', () => {
+    const wm = new WorldManager(mockScene);
+    const loaded: Array<{ cx: number; cz: number }> = [];
+    wm.onChunkLoaded = (cx, cz) => loaded.push({ cx, cz });
+
+    advanceFrames(wm, 10 + 25);
+
+    expect(loaded.length).toBe(25);
+  });
+
+  it('onChunkLoaded callback receives correct cx/cz coordinates', () => {
+    const wm = new WorldManager(mockScene);
+    const loaded: Array<{ cx: number; cz: number; biome: string }> = [];
+    wm.onChunkLoaded = (cx, cz, biome) => loaded.push({ cx, cz, biome });
+
+    // Load all chunks around origin
+    advanceFrames(wm, 10 + 25);
+
+    // Chunk (0,0) must be among those loaded
+    const origin = loaded.find(e => e.cx === 0 && e.cz === 0);
+    expect(origin).toBeDefined();
+    expect(['plains', 'forest', 'desert', 'tundra']).toContain(origin?.biome);
+  });
+
+  it('onChunkLoaded reports the same biome as getBiome', () => {
+    const wm = new WorldManager(mockScene);
+    const loaded: Array<{ cx: number; cz: number; biome: string }> = [];
+    wm.onChunkLoaded = (cx, cz, biome) => loaded.push({ cx, cz, biome });
+
+    advanceFrames(wm, 10 + 25);
+
+    for (const entry of loaded) {
+      expect(entry.biome).toBe(wm.getBiome(entry.cx, entry.cz));
+    }
+  });
+
+  it('onChunkLoaded does not fire for a chunk that was already loaded', () => {
+    const wm = new WorldManager(mockScene);
+    let callCount = 0;
+    wm.onChunkLoaded = () => { callCount++; };
+
+    // Load all 25 origin chunks
+    advanceFrames(wm, 10 + 25);
+    const afterFirst = callCount;
+    expect(afterFirst).toBe(25);
+
+    // Run many more frames at the same position — no new chunks should load
+    advanceFrames(wm, 50);
+    expect(callCount).toBe(afterFirst);
+  });
+
+  it('onChunkLoaded does not fire for stale queue entries that are skipped', () => {
+    const wm = new WorldManager(mockScene);
+    let callCount = 0;
+    wm.onChunkLoaded = () => { callCount++; };
+
+    // Queue up chunks near origin but do not drain yet
+    advanceFrames(wm, 10); // sweep fires, queue is filled, 0 loaded so far
+
+    // Teleport far away immediately so all queued entries become stale
+    const farPos = new Vector3(100 * 50, 0, 100 * 50);
+    wm.update(farPos); // prunes stale entries from queue
+
+    // No origin chunk should have been loaded
+    expect(callCount).toBe(0);
+  });
+
+  it('onChunkUnloaded fires for each chunk that is distance-unloaded', () => {
+    const wm = new WorldManager(mockScene);
+    const unloaded: Array<{ cx: number; cz: number }> = [];
+    wm.onChunkUnloaded = (cx, cz) => unloaded.push({ cx, cz });
+
+    // Load all 25 origin chunks
+    advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
+    expect(wm.loadedChunkCount).toBe(25);
+    expect(unloaded.length).toBe(0);
+
+    // Move far enough that origin chunks exceed unloadDistance (4)
+    const farPos = new Vector3(300, 0, 300); // chunkX=6, chunkZ=6 → |0-6|=6>4
+    advanceFrames(wm, 10, farPos);
+
+    expect(unloaded.length).toBeGreaterThan(0);
+  });
+
+  it('onChunkUnloaded receives correct cx/cz for unloaded chunks', () => {
+    const wm = new WorldManager(mockScene);
+    const unloaded: Array<{ cx: number; cz: number }> = [];
+    wm.onChunkUnloaded = (cx, cz) => unloaded.push({ cx, cz });
+
+    advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
+
+    // Move far away; origin chunks at (0,0) should be unloaded
+    const farPos = new Vector3(300, 0, 300);
+    advanceFrames(wm, 10, farPos);
+
+    // Chunk (0,0) should appear in the unloaded list
+    const originEntry = unloaded.find(e => e.cx === 0 && e.cz === 0);
+    expect(originEntry).toBeDefined();
+  });
+
+  it('onChunkUnloaded does not fire during dispose()', () => {
+    const wm = new WorldManager(mockScene);
+    let unloadCount = 0;
+    wm.onChunkUnloaded = () => { unloadCount++; };
+
+    advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
+    expect(wm.loadedChunkCount).toBe(25);
+
+    wm.dispose();
+
+    // dispose() should clean up without firing the unload callback
+    expect(unloadCount).toBe(0);
+    expect(wm.loadedChunkCount).toBe(0);
+  });
+
+  it('onChunkLoaded and onChunkUnloaded can be reassigned at runtime', () => {
+    const wm = new WorldManager(mockScene);
+    let loadCount = 0;
+    let unloadCount = 0;
+
+    wm.onChunkLoaded = () => { loadCount++; };
+    wm.onChunkUnloaded = () => { unloadCount++; };
+
+    advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
+    expect(loadCount).toBe(25);
+
+    // Clear callback and trigger unloads — should not increment
+    wm.onChunkUnloaded = null;
+    advanceFrames(wm, 10, new Vector3(300, 0, 300));
+    expect(unloadCount).toBe(0);
+  });
+});
