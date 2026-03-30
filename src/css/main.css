@@ -66,7 +66,7 @@ body::before {
 }
 
 .character-create__panel {
-  width: min(980px, 96vw);
+  width: min(1040px, 96vw);
   max-height: calc(100vh - 48px);
   overflow: auto;
   border-radius: 14px;
@@ -76,6 +76,44 @@ body::before {
   padding: 20px;
   scrollbar-width: thin;
   scrollbar-color: rgba(212, 160, 23, 0.6) rgba(25, 19, 12, 0.9);
+}
+
+.character-create__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  gap: 16px;
+  align-items: start;
+}
+
+.character-create__main {
+  min-width: 0;
+}
+
+.character-create__intro {
+  grid-column: 1 / -1;
+  color: #dfd2b3;
+  line-height: 1.5;
+  font-size: 15px;
+}
+
+.character-create__intro p {
+  margin: 0 0 12px;
+}
+
+.character-create__checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 16px;
+  cursor: pointer;
+  color: #c9b892;
+  font-size: 14px;
+}
+
+.character-create__checkbox-row input {
+  margin-top: 3px;
+  flex-shrink: 0;
+  accent-color: #D4A017;
 }
 
 .character-create__title {
@@ -266,6 +304,16 @@ body::before {
   opacity: 0.45;
 }
 
+@media (max-width: 860px) {
+  .character-create__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .character-create__details {
+    order: -1;
+  }
+}
+
 @media (max-width: 640px) {
   .character-create {
     padding: 12px;
@@ -291,6 +339,46 @@ body::before {
   .character-create__button {
     flex: 1;
   }
+}
+
+/* ── Post-creation onboarding tip banner ───────────────────────────────────── */
+
+.onboarding-tip {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 25;
+  width: min(520px, calc(100vw - 32px));
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 160, 23, 0.55);
+  background: rgba(8, 6, 4, 0.94);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  color: #dfd2b3;
+  font-size: 14px;
+  line-height: 1.45;
+  pointer-events: none;
+  user-select: none;
+}
+
+.onboarding-tip__title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #D4A017;
+}
+
+.onboarding-tip__msg {
+  margin: 0;
+}
+
+.onboarding-tip__hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #8f7e57;
 }
 
 /* ── Fast Travel ───────────────────────────────────────────────────────────── */
