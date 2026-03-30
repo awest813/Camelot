@@ -7,17 +7,7 @@ import { NPC } from "../entities/npc";
 import { Player } from "../entities/player";
 import { DialogueSession } from "../framework/dialogue/dialogue-engine";
 import { DialogueNodeView } from "../framework/dialogue/dialogue-types";
-
-// Design tokens — mirrored from UIManager to keep dialogue styling consistent.
-const D = {
-  PANEL_BG:     "rgba(6, 4, 2, 0.95)",
-  PANEL_BORDER: "#6B4F12",
-  TITLE:        "#D4A017",
-  TEXT:         "#EEE0C0",
-  DIM:          "#998877",
-  BTN_BG:       "rgba(28, 20, 6, 0.95)",
-  BTN_HOVER:    "rgba(80, 56, 10, 0.98)",
-};
+import { SHARED_UI_PANEL as D } from "../ui/ui-manager";
 
 export class DialogueSystem {
   public scene: Scene;
@@ -174,6 +164,17 @@ export class DialogueSystem {
     if (session && node) {
       this._activeSession = session;
       this._renderNode(node);
+      return;
+    }
+
+    if (session && !node) {
+      if (import.meta.env.DEV) {
+        console.warn(
+          "[DialogueSystem] Framework session returned no current node; ending dialogue.",
+          { npc: npc.mesh.name },
+        );
+      }
+      this._endDialogue();
       return;
     }
 
