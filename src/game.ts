@@ -1359,7 +1359,7 @@ export class Game {
 
     // ── v22: Event Manager (Dungeon Master) ───────────────────────────────
     this.eventManagerSystem = new EventManagerSystem();
-    this.eventManagerSystem.onEventTriggered = (id, def) => {
+    this.eventManagerSystem.onEventTriggered = (_id, def) => {
       this.ui.showNotification(`📜 ${def.title}`, 3000);
     };
     this.saveSystem.setEventManagerSystem(this.eventManagerSystem);

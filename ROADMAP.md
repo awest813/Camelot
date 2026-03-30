@@ -81,7 +81,7 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 ### UX + Persistence
 
 - ✅ HUD, quest log, inventory, skill tree, pause flow.
-- ✅ Save/load (SAVE_VERSION 21) for all system states.
+- ✅ Save/load (SAVE_VERSION 22) for all system states.
 - ✅ Save file export to JSON file download + import from JSON/File (browser-safe).
 - ✅ Notifications, hit feedback, and debug support.
 - ✅ Compass HUD (top-center) showing cardinal direction from camera heading.
