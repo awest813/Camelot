@@ -550,6 +550,21 @@ Disease system delivered:
 
 1. ✅ **DiseaseSystem** (`src/systems/disease-system.ts`, 48 tests) — Oblivion-style disease contraction and cure: seven built-in diseases — Rust Chancre (Endurance −5), Swamp Rot (Willpower −5), Witbane (Intelligence −5), Collywobbles (Strength −5), Brain Rot (Intelligence −10), Yellow Tick (Agility −5), Porphyric Hemophilia (Willpower −2, Endurance −2); `contractDisease(id, rng?)` rolls against `diseaseResistanceChance` [0, 1] before infecting the player (Argonian racial immunity sets resistance to 1.0); `cureDisease(id)` / `cureAllDiseases()` for Cure Disease potions and shrine blessings; `hasDisease(id)` / `getActiveDiseases()` query helpers; `getAttributePenalties()` returns a merged per-attribute debuff map aggregated across all active diseases for direct integration with `AttributeSystem`; `registerDisease(def)` allows mod-defined diseases; `onDiseaseContracted` / `onDiseaseCured` HUD notification callbacks; 5 % per-hit disease exposure chance wired to `CombatSystem.onPlayerHit`; race-switch callback syncs Argonian immunity dynamically; save-state persistence (SAVE_VERSION 21).
 
+### NPC Overhaul ✅
+
+Comprehensive expansion of the NPC authoring and spawn pipeline:
+
+- ✅ **New types** — `NpcVoiceType` (9 values: neutral, male_warrior, female_warrior, old_man, old_woman, merchant, child, beast, undead), `NpcPersonalityTrait` (8 values: brave, cowardly, aggressive, friendly, shy, greedy, noble, cunning), `NpcAIProfile` (aggroRange, attackRange, attackDamage, attackCooldown, moveSpeed, fleesBelowHealthPct) added to `content-types.ts`.
+- ✅ **New NPC roles** — `NpcRole` expanded with `bandit`, `healer`, `trainer`, `beggar`; `NpcArchetypeSystem` applies role-specific combat tuning for each.
+- ✅ **`NpcArchetypeDefinition` expanded** — new optional fields: `voiceType`, `personalityTraits`, `aiProfile` (per-archetype combat AI overrides that supersede role defaults), `scheduleId` (link to `DailyScheduleSystem`), `startingEquipment` (item ID list for inventory integration).
+- ✅ **`NpcCreatorSystem` expanded** — `addPersonalityTrait()` / `removePersonalityTrait()` / `clearPersonalityTraits()`; `setAIProfileField()` / `removeAIProfileField()` / `clearAIProfile()`; `addStartingEquipment()` / `removeStartingEquipment()` / `clearStartingEquipment()`; `setMeta` handles `voiceType` and `scheduleId`; `validate()` checks AI profile value ranges; `toDefinition()` / `importFromJson()` / `reset()` all handle new fields; exported constants `NPC_VOICE_TYPES` and `NPC_PERSONALITY_TRAITS`.
+- ✅ **`NpcArchetypeSystem.spawnNpc()` expanded** — applies `aiProfile` overrides after role-based defaults; copies `voiceType`, `personalityTraits`, and `startingEquipmentIds` onto the spawned NPC entity.
+- ✅ **`NPC` entity expanded** — `voiceType`, `personalityTraits`, `fleesBelowHealthPct`, `startingEquipmentIds` fields added.
+- ✅ **`NpcCreatorUI` expanded** — voice type select, personality trait checkboxes, `scheduleId` field, per-field AI profile overrides (with Set/Clear), starting equipment add/remove list.
+- ✅ **Test coverage** — `npc-creator-system.test.ts` expanded to 50 tests; `npc-archetype-system.test.ts` expanded to 19 tests.
+
+---
+
 ### Gameplay Depth — Release V (Event Manager System) ✅
 
 Event Manager (Dungeon Master) system delivered:

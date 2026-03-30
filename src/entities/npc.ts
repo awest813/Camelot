@@ -256,6 +256,23 @@ export class NPC {
    */
   public armorRating: number = 0;
 
+  // ─── Extended Overhaul Fields ──────────────────────────────────────────────
+
+  /** Voice profile identifier (set from archetype on spawn). */
+  public voiceType: string = "neutral";
+
+  /** Behavioral personality tags (set from archetype on spawn). */
+  public personalityTraits: string[] = [];
+
+  /**
+   * Health fraction [0–1] below which the NPC transitions to flee behavior.
+   * 0 means the NPC never flees; applied by CombatSystem during CHASE/ATTACK.
+   */
+  public fleesBelowHealthPct: number = 0;
+
+  /** Item IDs the NPC was spawned carrying (used by inventory integration). */
+  public startingEquipmentIds: string[] = [];
+
   // ─── Visuals ────────────────────────────────────────────────────────────────
 
   /** Current "resting" diffuse colour — restored after a hit-flash. */

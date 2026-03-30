@@ -101,6 +101,37 @@ export class NpcArchetypeSystem {
     } else if (def.role === "guard") {
       npc.aggroRange = 15;
       npc.attackDamage = 12;
+    } else if (def.role === "bandit") {
+      npc.aggroRange   = 13;
+      npc.attackDamage = 8;
+    } else if (def.role === "healer") {
+      npc.aggroRange = 8;  // healers don't seek combat
+    } else if (def.role === "trainer") {
+      npc.aggroRange = 8;
+    }
+    // "beggar", "villager", "companion", and other non-combat roles use entity defaults
+
+    // Apply per-archetype AI profile overrides (after role defaults)
+    if (def.aiProfile) {
+      if (def.aiProfile.aggroRange      !== undefined) npc.aggroRange      = def.aiProfile.aggroRange;
+      if (def.aiProfile.attackRange     !== undefined) npc.attackRange     = def.aiProfile.attackRange;
+      if (def.aiProfile.attackDamage    !== undefined) npc.attackDamage    = def.aiProfile.attackDamage;
+      if (def.aiProfile.attackCooldown  !== undefined) npc.attackCooldown  = def.aiProfile.attackCooldown;
+      if (def.aiProfile.moveSpeed       !== undefined) npc.moveSpeed       = def.aiProfile.moveSpeed;
+      if (def.aiProfile.fleesBelowHealthPct !== undefined) npc.fleesBelowHealthPct = def.aiProfile.fleesBelowHealthPct;
+    }
+
+    // Store starting equipment IDs for inventory integration
+    if (def.startingEquipment && def.startingEquipment.length > 0) {
+      npc.startingEquipmentIds = [...def.startingEquipment];
+    }
+
+    // Store voice type and personality traits
+    if (def.voiceType) {
+      npc.voiceType = def.voiceType;
+    }
+    if (def.personalityTraits && def.personalityTraits.length > 0) {
+      npc.personalityTraits = [...def.personalityTraits];
     }
 
     // Apply archetype-defined resistances and weaknesses

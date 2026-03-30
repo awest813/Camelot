@@ -1,6 +1,15 @@
 import type { NpcCreatorSystem, NpcCreatorDraft } from "../systems/npc-creator-system";
-import { NPC_ROLES, DAMAGE_TYPES } from "../systems/npc-creator-system";
-import type { DamageType } from "../framework/content/content-types";
+import { NPC_ROLES, DAMAGE_TYPES, NPC_VOICE_TYPES, NPC_PERSONALITY_TRAITS } from "../systems/npc-creator-system";
+import type { DamageType, NpcAIProfile } from "../framework/content/content-types";
+
+const AI_FIELDS: { field: keyof NpcAIProfile; label: string; min: string; max: string; step: string }[] = [
+  { field: "aggroRange",           label: "Aggro Range",             min: "0.5", max: "100", step: "0.5"  },
+  { field: "attackRange",          label: "Attack Range",            min: "0.1", max: "20",  step: "0.1"  },
+  { field: "attackDamage",         label: "Attack Damage",           min: "0.1", max: "999", step: "1"    },
+  { field: "attackCooldown",       label: "Attack Cooldown (s)",     min: "0.1", max: "30",  step: "0.1"  },
+  { field: "moveSpeed",            label: "Move Speed",              min: "0.1", max: "20",  step: "0.1"  },
+  { field: "fleesBelowHealthPct",  label: "Flee Below Health (0–1)", min: "0",   max: "1",   step: "0.05" },
+];
 
 /**
  * HTML-based NPC Archetype Creator overlay.
@@ -41,6 +50,15 @@ export class NpcCreatorUI {
   private _skillsEl!: HTMLElement;
   private _resEl!: HTMLElement;
   private _weakEl!: HTMLElement;
+  private _aiProfileEl!: HTMLElement;
+  private _equipmentEl!: HTMLElement;
+
+  // Identity extras
+  private _voiceSel!: HTMLSelectElement;
+  private _traitCheckboxes: Map<string, HTMLInputElement> = new Map();
+
+  // Stats extras
+  private _scheduleInp!: HTMLInputElement;
 
   constructor(system: NpcCreatorSystem) {
     this._sys = system;
@@ -140,6 +158,46 @@ export class NpcCreatorUI {
     this._merchantChk = this._addCheckbox(sec, "Offers merchant services", "npcc_merchant");
     this._respawnChk  = this._addCheckbox(sec, "Respawns after death", "npcc_respawn");
 
+    // Voice type
+    const voiceWrap = document.createElement("div");
+    voiceWrap.className = "npc-creator__field";
+    const voiceLbl = document.createElement("label");
+    voiceLbl.className   = "npc-creator__label";
+    voiceLbl.textContent = "Voice Type";
+    this._voiceSel = document.createElement("select");
+    this._voiceSel.className = "npc-creator__select";
+    for (const v of NPC_VOICE_TYPES) {
+      const opt = document.createElement("option");
+      opt.value = opt.textContent = v;
+      this._voiceSel.appendChild(opt);
+    }
+    voiceLbl.htmlFor = this._voiceSel.id = "npcc_voice_type";
+    this._voiceSel.addEventListener("change", () => this._sys.setMeta({ voiceType: this._voiceSel.value as NpcCreatorDraft["voiceType"] }));
+    voiceWrap.appendChild(voiceLbl);
+    voiceWrap.appendChild(this._voiceSel);
+    sec.appendChild(voiceWrap);
+
+    // Personality traits
+    const traitTitle = document.createElement("p");
+    traitTitle.className   = "npc-creator__section-sep";
+    traitTitle.textContent = "Personality Traits";
+    sec.appendChild(traitTitle);
+
+    const traitsWrap = document.createElement("div");
+    traitsWrap.className = "npc-creator__traits-grid";
+    for (const trait of NPC_PERSONALITY_TRAITS) {
+      const chk = this._addCheckbox(traitsWrap, trait, `npcc_trait_${trait}`);
+      this._traitCheckboxes.set(trait, chk);
+      chk.addEventListener("change", () => {
+        if (chk.checked) {
+          this._sys.addPersonalityTrait(trait as NpcCreatorDraft["personalityTraits"][number]);
+        } else {
+          this._sys.removePersonalityTrait(trait as NpcCreatorDraft["personalityTraits"][number]);
+        }
+      });
+    }
+    sec.appendChild(traitsWrap);
+
     // Sync flags on change
     this._hostileChk.addEventListener("change",  () => this._sys.setMeta({ isHostile:  this._hostileChk.checked }));
     this._merchantChk.addEventListener("change", () => this._sys.setMeta({ isMerchant: this._merchantChk.checked }));
@@ -174,6 +232,7 @@ export class NpcCreatorUI {
     this._dialogueInp = this._addField(sec, "Dialogue ID",     "text", "e.g. dlg_innkeeper_greeting");
     this._lootInp     = this._addField(sec, "Loot Table ID",   "text", "e.g. humanoid_common");
     this._patrolInp   = this._addField(sec, "Patrol Group ID", "text", "e.g. patrol_group_01");
+    this._scheduleInp = this._addField(sec, "Schedule ID",     "text", "e.g. sched_innkeeper");
 
     const syncNum = () => this._sys.setMeta({
       level:       parseFloat(this._levelInp.value)  || 1,
@@ -185,10 +244,11 @@ export class NpcCreatorUI {
       dialogueId:   this._dialogueInp.value,
       lootTableId:  this._lootInp.value,
       patrolGroupId: this._patrolInp.value,
+      scheduleId:   this._scheduleInp.value,
     });
 
     for (const el of [this._levelInp, this._healthInp, this._disposInp]) el.addEventListener("input", syncNum);
-    for (const el of [this._factionInp, this._dialogueInp, this._lootInp, this._patrolInp]) el.addEventListener("input", syncLinks);
+    for (const el of [this._factionInp, this._dialogueInp, this._lootInp, this._patrolInp, this._scheduleInp]) el.addEventListener("input", syncLinks);
 
     return sec;
   }
@@ -239,6 +299,67 @@ export class NpcCreatorUI {
     sec.appendChild(this._buildDamageTypeRow("Add Weakness", (type, val) => {
       this._sys.setWeakness(type, val);
       this._renderWeaknesses();
+    }));
+
+    // AI Profile overrides
+    const aiTitle = document.createElement("p");
+    aiTitle.className   = "npc-creator__section-sep";
+    aiTitle.textContent = "AI Profile Overrides";
+    sec.appendChild(aiTitle);
+
+    this._aiProfileEl = document.createElement("div");
+    this._aiProfileEl.className = "npc-creator__kv-list";
+    sec.appendChild(this._aiProfileEl);
+
+    for (const { field, label, min, max, step } of AI_FIELDS) {
+      const row = document.createElement("div");
+      row.className = "npc-creator__add-kv-row";
+      const lbl = document.createElement("label");
+      lbl.className   = "npc-creator__label npc-creator__label--sm";
+      lbl.textContent = label;
+      const inp = document.createElement("input");
+      inp.type        = "number";
+      inp.className   = "npc-creator__input npc-creator__input--sm";
+      inp.placeholder = "default";
+      inp.min = min; inp.max = max; inp.step = step;
+      inp.id = `npcc_ai_${field}`;
+      lbl.htmlFor = inp.id;
+      const setBtn = document.createElement("button");
+      setBtn.className   = "npc-creator__btn npc-creator__btn--sm";
+      setBtn.textContent = "Set";
+      setBtn.addEventListener("click", () => {
+        if (inp.value === "") return;
+        this._sys.setAIProfileField(field, parseFloat(inp.value) as NpcAIProfile[typeof field]);
+        this._renderAIProfile();
+      });
+      const clrBtn = document.createElement("button");
+      clrBtn.className   = "npc-creator__btn npc-creator__btn--sm npc-creator__btn--danger";
+      clrBtn.textContent = "Clear";
+      clrBtn.addEventListener("click", () => {
+        this._sys.removeAIProfileField(field);
+        inp.value = "";
+        this._renderAIProfile();
+      });
+      row.appendChild(lbl);
+      row.appendChild(inp);
+      row.appendChild(setBtn);
+      row.appendChild(clrBtn);
+      sec.appendChild(row);
+    }
+
+    // Starting Equipment
+    const equipTitle = document.createElement("p");
+    equipTitle.className   = "npc-creator__section-sep";
+    equipTitle.textContent = "Starting Equipment";
+    sec.appendChild(equipTitle);
+
+    this._equipmentEl = document.createElement("div");
+    this._equipmentEl.className = "npc-creator__kv-list";
+    sec.appendChild(this._equipmentEl);
+
+    sec.appendChild(this._buildAddKvRow("Add Item", "item ID", "", (k) => {
+      this._sys.addStartingEquipment(k);
+      this._renderEquipment();
     }));
 
     return sec;
@@ -307,6 +428,49 @@ export class NpcCreatorUI {
       empty.className   = "npc-creator__empty";
       empty.textContent = "No weaknesses.";
       this._weakEl.appendChild(empty);
+    }
+  }
+
+  private _renderAIProfile(): void {
+    if (!this._aiProfileEl) return;
+    this._aiProfileEl.innerHTML = "";
+    const ai = this._sys.draft.aiProfile;
+    const keys = Object.keys(ai) as (keyof typeof ai)[];
+    if (keys.length === 0) {
+      const empty = document.createElement("p");
+      empty.className   = "npc-creator__empty";
+      empty.textContent = "No overrides — NPC uses role/entity defaults.";
+      this._aiProfileEl.appendChild(empty);
+      return;
+    }
+    for (const key of keys) {
+      this._aiProfileEl.appendChild(
+        this._makeKvRow(key, String(ai[key]), () => {
+          this._sys.removeAIProfileField(key);
+          this._renderAIProfile();
+        }),
+      );
+    }
+  }
+
+  private _renderEquipment(): void {
+    if (!this._equipmentEl) return;
+    this._equipmentEl.innerHTML = "";
+    const items = this._sys.draft.startingEquipment;
+    if (items.length === 0) {
+      const empty = document.createElement("p");
+      empty.className   = "npc-creator__empty";
+      empty.textContent = "No starting equipment.";
+      this._equipmentEl.appendChild(empty);
+      return;
+    }
+    for (const itemId of items) {
+      this._equipmentEl.appendChild(
+        this._makeKvRow(itemId, "", () => {
+          this._sys.removeStartingEquipment(itemId);
+          this._renderEquipment();
+        }),
+      );
     }
   }
 
@@ -529,6 +693,10 @@ export class NpcCreatorUI {
     this._hostileChk.checked  = d.isHostile;
     this._merchantChk.checked = d.isMerchant;
     this._respawnChk.checked  = d.respawns;
+    this._voiceSel.value     = d.voiceType;
+    for (const [trait, chk] of this._traitCheckboxes) {
+      chk.checked = d.personalityTraits.includes(trait as NpcCreatorDraft["personalityTraits"][number]);
+    }
     this._healthInp.value    = String(d.baseHealth);
     this._levelInp.value     = String(d.level);
     this._disposInp.value    = String(d.disposition);
@@ -536,9 +704,12 @@ export class NpcCreatorUI {
     this._dialogueInp.value  = d.dialogueId;
     this._lootInp.value      = d.lootTableId;
     this._patrolInp.value    = d.patrolGroupId;
+    this._scheduleInp.value  = d.scheduleId;
     this._renderSkills();
     this._renderResistances();
     this._renderWeaknesses();
+    this._renderAIProfile();
+    this._renderEquipment();
   }
 
   private _setStatus(message: string, type: "ok" | "error" | ""): void {
