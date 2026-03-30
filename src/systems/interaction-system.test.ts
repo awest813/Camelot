@@ -38,6 +38,11 @@ describe("InteractionSystem", () => {
     };
 
     system = new InteractionSystem(scene, player, inventory, dialogue, ui);
+    system.cellManager = {
+      isTransitioning: false,
+      tryTransition: vi.fn(() => true),
+      portals: new Map([["p1", {}]]),
+    } as any;
   });
 
   it("starts dialogue with non-hostile NPCs", () => {
@@ -77,5 +82,38 @@ describe("InteractionSystem", () => {
 
     expect(ui.setInteractionText).toHaveBeenCalledWith("Bandit is hostile");
     expect(ui.setCrosshairActive).toHaveBeenCalledWith(true);
+  });
+
+  it("calls tryTransition when interacting with a portal", () => {
+    const tryTransition = vi.fn(() => true);
+    system.cellManager = {
+      isTransitioning: false,
+      tryTransition,
+      portals: new Map([["door1", {}]]),
+    } as any;
+    const portal = { id: "door1", labelText: "Enter" };
+    player.raycastForward.mockReturnValue({
+      pickedMesh: { metadata: { type: "portal", portal } },
+    });
+    system.interact();
+    expect(tryTransition).toHaveBeenCalledWith("door1");
+  });
+
+  it("uses onPortalTransition when set instead of tryTransition", () => {
+    const tryTransition = vi.fn();
+    const onPortalTransition = vi.fn();
+    system.cellManager = {
+      isTransitioning: false,
+      tryTransition,
+      portals: new Map([["door1", {}]]),
+    } as any;
+    system.onPortalTransition = onPortalTransition;
+    const portal = { id: "door1", labelText: "Enter" };
+    player.raycastForward.mockReturnValue({
+      pickedMesh: { metadata: { type: "portal", portal } },
+    });
+    system.interact();
+    expect(onPortalTransition).toHaveBeenCalledWith("door1");
+    expect(tryTransition).not.toHaveBeenCalled();
   });
 });

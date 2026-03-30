@@ -176,4 +176,53 @@ describe("CellManager", () => {
     expect(fresh.currentCellId).toBe("crypt_01");
     expect(fresh.visitedCellIds).toContain("crypt_01");
   });
+
+  it("hydrateActiveCellFromState runs interior build for current cell after restore", () => {
+    const buildSpy = vi.fn(() => []);
+    cellManager.registerCell({
+      id: "ruin_01",
+      name: "Ruin",
+      type: "interior",
+      spawnPosition: new Vector3(),
+      build: buildSpy,
+    });
+    cellManager.restoreFromSave({ currentCellId: "ruin_01", visitedCellIds: ["exterior", "ruin_01"] });
+    buildSpy.mockClear();
+    cellManager.hydrateActiveCellFromState();
+    expect(buildSpy).toHaveBeenCalled();
+  });
+
+  it("enterCellById moves to interior and runs build", () => {
+    const buildSpy = vi.fn(() => []);
+    cellManager.registerCell({
+      id: "hall_01",
+      name: "Great Hall",
+      type: "interior",
+      spawnPosition: new Vector3(0, 1, 0),
+      build: buildSpy,
+    });
+    const dest = new Vector3(1, 2, 3);
+    const spy = vi.fn();
+    cellManager.onCellChanged = spy;
+    const ok = cellManager.enterCellById("hall_01", dest);
+    expect(ok).toBe(true);
+    expect(cellManager.currentCellId).toBe("hall_01");
+    expect(mockPlayer.camera.position.x).toBeCloseTo(1);
+    expect(mockPlayer.camera.position.y).toBeCloseTo(2);
+    expect(mockPlayer.camera.position.z).toBeCloseTo(3);
+    expect(buildSpy).toHaveBeenCalled();
+    expect(spy).toHaveBeenCalledWith("hall_01", "Great Hall");
+  });
+
+  it("enterCellById with silent skips onCellChanged", () => {
+    cellManager.registerCell({ id: "quiet_01", name: "Quiet", type: "interior", spawnPosition: new Vector3(), build: () => [] });
+    const spy = vi.fn();
+    cellManager.onCellChanged = spy;
+    cellManager.enterCellById("quiet_01", new Vector3(), true);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("getCellDefinition returns registered cell", () => {
+    expect(cellManager.getCellDefinition("exterior")?.name).toBe("Exterior World");
+  });
 });
