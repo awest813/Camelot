@@ -3,12 +3,12 @@ import { NPC_ROLES, DAMAGE_TYPES, NPC_VOICE_TYPES, NPC_PERSONALITY_TRAITS } from
 import type { DamageType, NpcAIProfile } from "../framework/content/content-types";
 
 const AI_FIELDS: { field: keyof NpcAIProfile; label: string; min: string; max: string; step: string }[] = [
-  { field: "aggroRange",           label: "Aggro Range",             min: "0", max: "100", step: "0.5"  },
-  { field: "attackRange",          label: "Attack Range",            min: "0", max: "20",  step: "0.1"  },
-  { field: "attackDamage",         label: "Attack Damage",           min: "0", max: "999", step: "1"    },
-  { field: "attackCooldown",       label: "Attack Cooldown (s)",     min: "0", max: "30",  step: "0.1"  },
-  { field: "moveSpeed",            label: "Move Speed",              min: "0", max: "20",  step: "0.1"  },
-  { field: "fleesBelowHealthPct",  label: "Flee Below Health (0–1)", min: "0", max: "1",   step: "0.05" },
+  { field: "aggroRange",           label: "Aggro Range",             min: "0.5", max: "100", step: "0.5"  },
+  { field: "attackRange",          label: "Attack Range",            min: "0.1", max: "20",  step: "0.1"  },
+  { field: "attackDamage",         label: "Attack Damage",           min: "0.1", max: "999", step: "1"    },
+  { field: "attackCooldown",       label: "Attack Cooldown (s)",     min: "0.1", max: "30",  step: "0.1"  },
+  { field: "moveSpeed",            label: "Move Speed",              min: "0.1", max: "20",  step: "0.1"  },
+  { field: "fleesBelowHealthPct",  label: "Flee Below Health (0–1)", min: "0",   max: "1",   step: "0.05" },
 ];
 
 /**
