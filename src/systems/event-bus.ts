@@ -41,6 +41,16 @@ export interface GameEvents {
   "loot:dropped": { tableId: string; items: Item[] };
   /** An NPC's disposition towards the player changed. */
   "disposition:changed": { npcId: string; oldValue: number; newValue: number };
+  /** A pet was granted to the player for the first time. */
+  "pet:acquired": { petId: string; petName: string; species: string };
+  /** A pet was summoned into the world. */
+  "pet:summoned": { petId: string; petName: string };
+  /** A pet was dismissed from the world. */
+  "pet:dismissed": { petId: string; petName: string };
+  /** A pet gained a level. */
+  "pet:levelUp": { petId: string; petName: string; newLevel: number };
+  /** The active pet died. */
+  "pet:died": { petId: string; petName: string };
 }
 
 export type GameEventType = keyof GameEvents;
