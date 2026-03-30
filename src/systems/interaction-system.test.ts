@@ -116,4 +116,39 @@ describe("InteractionSystem", () => {
     expect(onPortalTransition).toHaveBeenCalledWith("door1");
     expect(tryTransition).not.toHaveBeenCalled();
   });
+
+  it("blocks portal interaction while a screen fade is active", () => {
+    const onPortalTransition = vi.fn();
+    system.cellManager = {
+      isTransitioning: false,
+      tryTransition: vi.fn(),
+      portals: new Map([["door1", {}]]),
+    } as any;
+    system.onPortalTransition = onPortalTransition;
+    ui.isScreenFadeActive = true;
+    const portal = { id: "door1", labelText: "Enter" };
+    player.raycastForward.mockReturnValue({
+      pickedMesh: { metadata: { type: "portal", portal } },
+    });
+    system.interact();
+    expect(onPortalTransition).not.toHaveBeenCalled();
+  });
+
+  it("hides portal prompt while a screen fade is active", () => {
+    system.cellManager = {
+      isTransitioning: false,
+      tryTransition: vi.fn(),
+      portals: new Map([["door1", {}]]),
+    } as any;
+    ui.isScreenFadeActive = true;
+    const portal = { id: "door1", labelText: "Enter" };
+    player.raycastForward.mockReturnValue({
+      pickedMesh: { metadata: { type: "portal", portal } },
+    });
+    system.update();
+    system.update();
+    system.update();
+    expect(ui.setInteractionText).toHaveBeenCalledWith("");
+    expect(ui.setCrosshairActive).toHaveBeenCalledWith(false);
+  });
 });

@@ -3196,6 +3196,7 @@ export class Game {
 
   private _beginPortalTransition(portalId: string): void {
       if (!this.cellManager.portals.has(portalId)) return;
+      if (this.ui.isScreenFadeActive) return;
       this.ui.playScreenFadeSequence({
           fadeOutMs: 420,
           holdMs: 140,
@@ -3281,6 +3282,7 @@ export class Game {
           });
       } else {
           this.player.camera.position.copyFrom(dest);
+          this.lodSystem?.clear();
           applyTimeAndClose();
       }
   }

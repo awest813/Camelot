@@ -68,11 +68,6 @@ export class FastTravelSystem {
    * @returns `true` if this is a *newly* discovered location; `false` if it
    *          was already known (useful for "You discovered X!" notifications).
    */
-  /** Returns a discovered location by id, or undefined if unknown. */
-  public getDiscoveredLocation(locationId: string): FastTravelLocation | undefined {
-    return this._locations.get(locationId);
-  }
-
   public discoverLocation(
     id: string,
     name: string,
@@ -85,6 +80,11 @@ export class FastTravelSystem {
       position: { x: position.x, y: position.y, z: position.z },
     });
     return isNew;
+  }
+
+  /** Returns a discovered location by id, or undefined if unknown. */
+  public getDiscoveredLocation(locationId: string): FastTravelLocation | undefined {
+    return this._locations.get(locationId);
   }
 
   /**
