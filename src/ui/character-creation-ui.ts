@@ -1,12 +1,15 @@
 import { BIRTHSIGNS, type BirthsignDefinition } from "../systems/birthsign-system";
 import { CHARACTER_CLASSES, type CharacterClass } from "../systems/class-system";
 import { RACES, type RaceDefinition } from "../systems/race-system";
+import { shouldSkipOnboardingTips } from "../onboarding-preferences";
 
-interface CharacterCreationResult {
+export interface CharacterCreationResult {
   name: string;
   raceId: string;
   birthsignId: string;
   classId: string;
+  /** When true, post-creation gameplay tips are not started (also persisted). */
+  skipGameplayTips: boolean;
 }
 
 /**
@@ -37,6 +40,8 @@ const heritageLabel = (heritage: RaceDefinition["heritage"]): string => {
   return heritage.charAt(0).toUpperCase() + heritage.slice(1);
 };
 
+type CreationStep = "welcome" | "name" | "race" | "birthsign" | "class";
+
 export class CharacterCreationUI {
   public async open(): Promise<CharacterCreationResult> {
     return new Promise<CharacterCreationResult>((resolve) => {
@@ -53,7 +58,7 @@ export class CharacterCreationUI {
       const title = document.createElement("h2");
       title.id = "character-create-title";
       title.className = "character-create__title";
-      title.textContent = "Forge Your Character";
+      title.textContent = "Begin Your Journey";
       panel.appendChild(title);
 
       const subtitle = document.createElement("p");
@@ -62,36 +67,50 @@ export class CharacterCreationUI {
 
       const stepPills = document.createElement("div");
       stepPills.className = "character-create__steps";
+      stepPills.setAttribute("role", "tablist");
       panel.appendChild(stepPills);
 
+      const welcomePill = document.createElement("span");
+      welcomePill.className = "character-create__step-pill is-active";
+      welcomePill.textContent = "Welcome";
+      welcomePill.setAttribute("aria-current", "step");
+      stepPills.appendChild(welcomePill);
+
       const nameStep = document.createElement("span");
-      nameStep.className = "character-create__step-pill is-active";
-      nameStep.textContent = "1. Name";
-      nameStep.setAttribute("aria-current", "step");
+      nameStep.className = "character-create__step-pill";
+      nameStep.textContent = "Name";
       stepPills.appendChild(nameStep);
 
       const raceStep = document.createElement("span");
       raceStep.className = "character-create__step-pill";
-      raceStep.textContent = "2. Race";
+      raceStep.textContent = "Race";
       stepPills.appendChild(raceStep);
 
       const birthsignStep = document.createElement("span");
       birthsignStep.className = "character-create__step-pill";
-      birthsignStep.textContent = "3. Birthsign";
+      birthsignStep.textContent = "Birthsign";
       stepPills.appendChild(birthsignStep);
 
       const classStep = document.createElement("span");
       classStep.className = "character-create__step-pill";
-      classStep.textContent = "4. Class";
+      classStep.textContent = "Class";
       stepPills.appendChild(classStep);
+
+      const layout = document.createElement("div");
+      layout.className = "character-create__layout";
+      panel.appendChild(layout);
+
+      const mainCol = document.createElement("div");
+      mainCol.className = "character-create__main";
+      layout.appendChild(mainCol);
 
       const cards = document.createElement("div");
       cards.className = "character-create__cards";
-      panel.appendChild(cards);
+      mainCol.appendChild(cards);
 
       const details = document.createElement("aside");
       details.className = "character-create__details";
-      panel.appendChild(details);
+      layout.appendChild(details);
 
       const detailsTitle = document.createElement("h3");
       detailsTitle.className = "character-create__details-title";
@@ -118,12 +137,12 @@ export class CharacterCreationUI {
       const continueButton = document.createElement("button");
       continueButton.className = "character-create__button";
       continueButton.textContent = "Continue";
-      continueButton.disabled = true;
       actions.appendChild(continueButton);
 
       document.body.appendChild(root);
 
-      let step: "name" | "race" | "birthsign" | "class" = "name";
+      let step: CreationStep = "welcome";
+      let skipGameplayTips = shouldSkipOnboardingTips();
       let enteredName: string = "";
       let selectedRace: RaceDefinition | null = null;
       let selectedBirthsign: BirthsignDefinition | null = null;
@@ -133,9 +152,9 @@ export class CharacterCreationUI {
         while (cards.firstChild) cards.removeChild(cards.firstChild);
       };
 
-      const setAllStepPills = (active: typeof step) => {
-        const steps: typeof step[] = ["name", "race", "birthsign", "class"];
-        const pills = [nameStep, raceStep, birthsignStep, classStep];
+      const setAllStepPills = (active: CreationStep) => {
+        const steps: CreationStep[] = ["welcome", "name", "race", "birthsign", "class"];
+        const pills = [welcomePill, nameStep, raceStep, birthsignStep, classStep];
         steps.forEach((s, i) => {
           if (s === active) {
             pills[i].classList.add("is-active");
@@ -159,7 +178,6 @@ export class CharacterCreationUI {
         detailsBody.textContent = entry.description;
 
         if ("heritage" in entry) {
-          // RaceDefinition
           const heritage = document.createElement("li");
           heritage.textContent = `Heritage: ${heritageLabel(entry.heritage)}`;
           detailsMeta.appendChild(heritage);
@@ -181,7 +199,6 @@ export class CharacterCreationUI {
             }
           }
         } else if ("guardian" in entry) {
-          // BirthsignDefinition
           const guardian = document.createElement("li");
           guardian.textContent = `Guardian: ${guardianLabel(entry.guardian)}`;
           detailsMeta.appendChild(guardian);
@@ -192,7 +209,6 @@ export class CharacterCreationUI {
             detailsMeta.appendChild(power);
           }
         } else {
-          // CharacterClass
           const spec = document.createElement("li");
           spec.textContent = `Specialization: ${entry.specialization}`;
           detailsMeta.appendChild(spec);
@@ -207,20 +223,57 @@ export class CharacterCreationUI {
         }
       };
 
-      // ── Step: Name ─────────────────────────────────────────────────────────
+      const renderWelcome = () => {
+        clearCards();
+        subtitle.textContent =
+          "You will name your hero, choose a people and birthsign, then a class. Afterward, optional tips introduce movement and interaction.";
+        continueButton.textContent = "Continue";
+        continueButton.disabled = false;
+        backButton.disabled = true;
+        setAllStepPills("welcome");
+
+        const intro = document.createElement("div");
+        intro.className = "character-create__intro";
+        cards.appendChild(intro);
+
+        const p1 = document.createElement("p");
+        p1.textContent =
+          "Race shapes heritage and passive bonuses. Birthsign grants lasting gifts and often a daily power. Class sets which skills level fastest at the start.";
+        intro.appendChild(p1);
+
+        const p2 = document.createElement("p");
+        p2.textContent = "You can revisit this flow anytime by starting a new session; your choices apply before you enter the world.";
+        intro.appendChild(p2);
+
+        const row = document.createElement("label");
+        row.className = "character-create__checkbox-row";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = skipGameplayTips;
+        cb.addEventListener("change", () => {
+          skipGameplayTips = cb.checked;
+        });
+        row.appendChild(cb);
+        const span = document.createElement("span");
+        span.textContent = "Skip post-creation gameplay tips (movement, inventory, quests)";
+        row.appendChild(span);
+        intro.appendChild(row);
+
+        detailsTitle.textContent = "Before you start";
+        detailsBody.textContent =
+          "Use Continue and Back to move through the steps. On the last step, Begin Adventure applies your choices and enters the game.";
+        detailsMeta.innerHTML = "";
+      };
 
       const renderName = () => {
         clearCards();
         subtitle.textContent =
-          "Name your hero. Choose a name below or type your own — each is inspired by a sign of the medieval zodiac.";
+          "Name your hero. Choose a suggestion below or type your own — each name is inspired by a sign of the medieval zodiac.";
         continueButton.textContent = "Continue";
         continueButton.disabled = enteredName.trim().length === 0;
-        continueButton.setAttribute("aria-disabled", continueButton.disabled.toString());
-        backButton.disabled = true;
-        backButton.setAttribute("aria-disabled", "true");
+        backButton.disabled = false;
         setAllStepPills("name");
 
-        // Text input
         const inputWrap = document.createElement("div");
         inputWrap.className = "character-create__name-wrap";
         cards.appendChild(inputWrap);
@@ -240,7 +293,6 @@ export class CharacterCreationUI {
           continueButton.disabled = enteredName.trim().length === 0;
         });
 
-        // Zodiac name suggestions
         const suggestLabel = document.createElement("p");
         suggestLabel.className = "character-create__suggest-label";
         suggestLabel.textContent = "Zodiac-inspired suggestions:";
@@ -252,6 +304,7 @@ export class CharacterCreationUI {
 
         for (const { sign, name } of ZODIAC_NAME_SUGGESTIONS) {
           const btn = document.createElement("button");
+          btn.type = "button";
           btn.className = "character-create__suggest-btn";
           btn.title = sign;
           btn.textContent = name;
@@ -263,19 +316,15 @@ export class CharacterCreationUI {
           suggestGrid.appendChild(btn);
         }
 
-        // Show the zodiac sign as a tooltip hint
-        detailsTitle.textContent = "Your Name";
+        detailsTitle.textContent = "Your name";
         detailsBody.textContent =
-          "Your name will be known across the realm.  " +
-          "Pick a zodiac-sign name for a touch of destiny, or forge your own legend.";
+          "Your name will be known across the realm. Pick a zodiac-inspired name for a touch of destiny, or forge your own legend.";
         detailsMeta.innerHTML = "";
       };
 
-      // ── Step: Race ─────────────────────────────────────────────────────────
-
       const renderRaces = () => {
         clearCards();
-        subtitle.textContent = "Choose your race to define your heritage, innate talents, and appearance.";
+        subtitle.textContent = "Choose your race to define heritage, innate talents, and starting skill leanings.";
         continueButton.textContent = "Continue";
         continueButton.disabled = !selectedRace;
         backButton.disabled = false;
@@ -283,6 +332,7 @@ export class CharacterCreationUI {
 
         for (const race of RACES) {
           const card = document.createElement("button");
+          card.type = "button";
           card.className = "character-create__card";
           const isSelected = selectedRace?.id === race.id;
           if (isSelected) card.classList.add("is-selected");
@@ -308,11 +358,9 @@ export class CharacterCreationUI {
         setDetails(selectedRace);
       };
 
-      // ── Step: Birthsign ────────────────────────────────────────────────────
-
       const renderBirthsigns = () => {
         clearCards();
-        subtitle.textContent = "Pick your birthsign to define innate gifts and unique powers.";
+        subtitle.textContent = "Pick your birthsign for innate gifts, attribute shaping, and often a once-per-day power.";
         continueButton.textContent = "Continue";
         continueButton.disabled = !selectedBirthsign;
         backButton.disabled = false;
@@ -320,6 +368,7 @@ export class CharacterCreationUI {
 
         for (const sign of BIRTHSIGNS) {
           const card = document.createElement("button");
+          card.type = "button";
           card.className = "character-create__card";
           const isSelected = selectedBirthsign?.id === sign.id;
           if (isSelected) card.classList.add("is-selected");
@@ -345,18 +394,17 @@ export class CharacterCreationUI {
         setDetails(selectedBirthsign);
       };
 
-      // ── Step: Class ────────────────────────────────────────────────────────
-
       const renderClasses = () => {
         clearCards();
-        subtitle.textContent = "Select a class to shape your early skill growth and combat style.";
-        continueButton.textContent = "Begin Adventure";
+        subtitle.textContent = "Select a class to shape early skill growth, XP multipliers, and your opening combat style.";
+        continueButton.textContent = "Begin adventure";
         continueButton.disabled = !selectedClass;
         backButton.disabled = false;
         setAllStepPills("class");
 
         for (const cls of CHARACTER_CLASSES) {
           const card = document.createElement("button");
+          card.type = "button";
           card.className = "character-create__card";
           const isSelected = selectedClass?.id === cls.id;
           if (isSelected) card.classList.add("is-selected");
@@ -383,7 +431,10 @@ export class CharacterCreationUI {
       };
 
       backButton.addEventListener("click", () => {
-        if (step === "race") {
+        if (step === "name") {
+          step = "welcome";
+          renderWelcome();
+        } else if (step === "race") {
           step = "name";
           renderName();
         } else if (step === "birthsign") {
@@ -396,6 +447,11 @@ export class CharacterCreationUI {
       });
 
       continueButton.addEventListener("click", () => {
+        if (step === "welcome") {
+          step = "name";
+          renderName();
+          return;
+        }
         if (step === "name") {
           if (!enteredName.trim()) return;
           step = "race";
@@ -422,11 +478,11 @@ export class CharacterCreationUI {
           raceId: selectedRace.id,
           birthsignId: selectedBirthsign.id,
           classId: selectedClass.id,
+          skipGameplayTips,
         });
       });
 
-      renderName();
+      renderWelcome();
     });
   }
 }
-

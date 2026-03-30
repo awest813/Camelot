@@ -18,6 +18,8 @@ export class InventorySystem {
   public items: Item[] = [];
   public maxCapacity: number = 20;
   public isOpen: boolean = false;
+  /** Fired once each time the inventory panel is opened (after pointer lock is released). */
+  public onOpen: (() => void) | null = null;
   public _player: Player;
   public _ui: UIManager;
   public _canvas: HTMLCanvasElement;
@@ -101,6 +103,7 @@ export class InventorySystem {
       document.exitPointerLock();
       this._player.camera.detachControl();
       this._updateUI();
+      this.onOpen?.();
     } else {
       this._ui.toggleInventory(false);
       this._canvas.requestPointerLock();

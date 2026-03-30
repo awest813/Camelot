@@ -36,6 +36,9 @@ export class QuestSystem {
   private _ui: UIManager;
   public isLogOpen: boolean = false;
 
+  /** Fired once each time the quest log is opened. */
+  public onOpen: (() => void) | null = null;
+
   /** Fired with the quest's xpReward when a quest is completed. */
   public onQuestComplete: ((xpReward: number) => void) | null = null;
 
@@ -79,7 +82,10 @@ export class QuestSystem {
   public toggleQuestLog(): void {
     this.isLogOpen = !this.isLogOpen;
     this._ui.toggleQuestLog(this.isLogOpen);
-    if (this.isLogOpen) this._ui.updateQuestLog(this._quests);
+    if (this.isLogOpen) {
+      this._ui.updateQuestLog(this._quests);
+      this.onOpen?.();
+    }
   }
 
   /** Restore quest progress from a saved state (used by SaveSystem). */

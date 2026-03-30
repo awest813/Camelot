@@ -76,6 +76,13 @@ import { ClassSystem } from "./systems/class-system";
 import { RaceSystem } from "./systems/race-system";
 import { PlayerLevelSystem } from "./systems/player-level-system";
 import { CharacterCreationUI } from "./ui/character-creation-ui";
+import { TutorialSystem } from "./systems/tutorial-system";
+import {
+  hasCompletedOnboardingTips,
+  persistOnboardingTipsCompleted,
+  persistSkipOnboardingTips,
+  shouldSkipOnboardingTips,
+} from "./onboarding-preferences";
 import { QuestCreatorSystem } from "./systems/quest-creator-system";
 import { QuestCreatorUI } from "./ui/quest-creator-ui";
 import { DialogueCreatorSystem } from "./systems/dialogue-creator-system";
@@ -292,6 +299,10 @@ export class Game {
   private _helpOverlayVisible: boolean = false;
   private _activeGuardChallenge: { guard: NPC; factionId: string; bounty: number } | null = null;
 
+  /** Short post-creation tips; advances on Space or when the hinted action occurs. */
+  private readonly _onboardingTutorial = new TutorialSystem();
+  private _onboardingTipEl: HTMLDivElement | null = null;
+
   constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
     this.scene = scene;
     this.canvas = canvas;
@@ -421,9 +432,19 @@ export class Game {
     this.ui.onInventoryItemClick = (item) => this.equipmentSystem.handleItemClick(item);
     this.saveSystem         = new SaveSystem(this.player, this.inventorySystem, this.equipmentSystem, this.ui);
     this.questSystem        = new QuestSystem(this.ui);
+    this.questSystem.onOpen = () => {
+      if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === "quests") {
+        this._onboardingTutorial.advance();
+      }
+    };
     this.saveSystem.setQuestSystem(this.questSystem);
     this.saveSystem.onAfterLoad = () => this._cleanupCollectedLoot();
     this.interactionSystem  = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem, this.ui);
+    this.inventorySystem.onOpen = () => {
+      if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === "inventory") {
+        this._onboardingTutorial.advance();
+      }
+    };
     this.skillTreeSystem    = new SkillTreeSystem(this.player, this.ui);
     this.ui.onSkillPurchase = (treeIdx, skillIdx) => this.skillTreeSystem.purchaseSkill(treeIdx, skillIdx);
     this.saveSystem.setSkillTreeSystem(this.skillTreeSystem);
@@ -1413,6 +1434,8 @@ export class Game {
       }
     };
 
+    this._wireOnboardingTutorialUi();
+
     this._runCharacterCreation().catch((error: unknown) => {
       console.error("Character creation failed; applying defaults", error);
       this._applyDefaultCharacterCreation();
@@ -1580,12 +1603,18 @@ export class Game {
         this._applyFrameworkQuestEvent("pickup", id);
         const frameworkItemId = this._toFrameworkInventoryItemId(id);
         if (frameworkItemId) this.frameworkRuntime.inventoryEngine.addItem(frameworkItemId, 1);
+        if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === "interact") {
+          this._onboardingTutorial.advance();
+        }
     };
     this.dialogueSystem.onTalkStart  = (name)  => {
         this.questSystem.onTalk(name);
         this._applyFrameworkQuestEvent("talk", this._toFrameworkTargetId(name));
         // Speechcraft XP each time dialogue is initiated
         this.skillProgressionSystem.gainXP("speechcraft", 8 * this.classSystem.xpMultiplierFor("speechcraft"));
+        if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === "interact") {
+          this._onboardingTutorial.advance();
+        }
     };
 
     // Quest XP and fame callbacks are wired in the v9 block above.
@@ -1713,7 +1742,11 @@ export class Game {
     // Input handling for pause
     this.scene.onKeyboardObservable.add((kbInfo) => {
         if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
-            if (kbInfo.event.key === "Escape") {
+            if (kbInfo.event.key === " " || kbInfo.event.code === "Space") {
+                if (!kbInfo.event.repeat && this._tryAdvanceOnboardingTutorial()) {
+                    kbInfo.event.preventDefault();
+                }
+            } else if (kbInfo.event.key === "Escape") {
                 if (this.dialogueSystem.isInDialogue) return;
 
                 if (this.levelUpUI.isVisible) {
@@ -2536,6 +2569,9 @@ export class Game {
       this._applyDefaultCharacterCreation();
     }
 
+    persistSkipOnboardingTips(selection.skipGameplayTips);
+    this._startOnboardingTutorialIfNeeded();
+
     this.ui.showNotification(`Welcome, ${this.player.name}! Character creation complete.`, 2800);
     this.interactionSystem.isBlocked = false;
     this.isPaused = false;
@@ -2571,6 +2607,102 @@ export class Game {
       this.attributeSystem,
       this.skillProgressionSystem,
     );
+    this._startOnboardingTutorialIfNeeded();
+  }
+
+  private _wireOnboardingTutorialUi(): void {
+    this._onboardingTutorial.onStepBegin = (_index, step) => {
+      this._showOnboardingTipBanner(step.message, step.advanceHint);
+    };
+    this._onboardingTutorial.onStepComplete = () => {
+      /* next step's onStepBegin refreshes the banner */
+    };
+    this._onboardingTutorial.onTutorialComplete = () => {
+      this._removeOnboardingTipBanner();
+      persistOnboardingTipsCompleted();
+      this.ui.showNotification("Tutorial tips dismissed. Press Esc for pause anytime.", 3200);
+    };
+    this._onboardingTutorial.onTutorialSkipped = () => {
+      this._removeOnboardingTipBanner();
+    };
+  }
+
+  private _showOnboardingTipBanner(message: string, advanceHint?: string): void {
+    if (typeof document === "undefined") return;
+    this._removeOnboardingTipBanner();
+    const wrap = document.createElement("div");
+    wrap.className = "onboarding-tip";
+    wrap.setAttribute("role", "status");
+    wrap.setAttribute("aria-live", "polite");
+    const title = document.createElement("p");
+    title.className = "onboarding-tip__title";
+    title.textContent = "Getting started";
+    const msg = document.createElement("p");
+    msg.className = "onboarding-tip__msg";
+    msg.textContent = message;
+    wrap.appendChild(title);
+    wrap.appendChild(msg);
+    const hintText =
+      advanceHint?.trim() ||
+      "Press Space to continue when you are ready (or perform the highlighted action).";
+    const hint = document.createElement("p");
+    hint.className = "onboarding-tip__hint";
+    hint.textContent = hintText;
+    wrap.appendChild(hint);
+    document.body.appendChild(wrap);
+    this._onboardingTipEl = wrap;
+  }
+
+  private _removeOnboardingTipBanner(): void {
+    if (this._onboardingTipEl?.parentNode) {
+      this._onboardingTipEl.parentNode.removeChild(this._onboardingTipEl);
+    }
+    this._onboardingTipEl = null;
+  }
+
+  /** @returns true if Space was consumed to advance onboarding */
+  private _tryAdvanceOnboardingTutorial(): boolean {
+    if (!this._onboardingTutorial.isActive) return false;
+    if (
+      this.isPaused ||
+      this.dialogueSystem.isInDialogue ||
+      this.inventorySystem.isOpen ||
+      this.questSystem.isLogOpen ||
+      this.mapEditorSystem.isEnabled
+    ) {
+      return false;
+    }
+    this._onboardingTutorial.advance();
+    return true;
+  }
+
+  private _startOnboardingTutorialIfNeeded(): void {
+    if (typeof document === "undefined") return;
+    if (shouldSkipOnboardingTips() || hasCompletedOnboardingTips()) return;
+
+    this._onboardingTutorial.clearSteps();
+    this._onboardingTutorial.addStep({
+      id: "move",
+      message: "Move with W A S D and look with the mouse. Click the game view if the cursor does not turn.",
+      advanceHint: "Press Space when you have tried moving.",
+    });
+    this._onboardingTutorial.addStep({
+      id: "inventory",
+      message: "Press I to open your inventory. Equip gear from there when you find items in the world.",
+      advanceHint: "Open inventory with I, or press Space to skip ahead.",
+    });
+    this._onboardingTutorial.addStep({
+      id: "interact",
+      message: "Face loot or a friendly NPC and press E to take items or start a conversation.",
+      advanceHint: "Use E on something, or press Space to continue.",
+    });
+    this._onboardingTutorial.addStep({
+      id: "quests",
+      message: "Press J to open the quest log and track objectives.",
+      advanceHint: "Open the log with J, or press Space to finish tips.",
+    });
+
+    this._onboardingTutorial.start();
   }
 
   private _setLight(): void {
