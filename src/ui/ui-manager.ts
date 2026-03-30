@@ -95,6 +95,10 @@ export class UIManager {
   // Notifications
   public notificationPanel: StackPanel;
 
+  /** Full-screen fade for cell loads and scripted cuts (above HUD, below pause at 100). */
+  private _transitionOverlay: Rectangle | null = null;
+  private _transitionFadeObserver: any = null;
+
   // Skill Tree
   public skillTreePanel: Rectangle;
   private _skillPointsLabel: TextBlock;
@@ -274,6 +278,83 @@ export class UIManager {
     this.notificationPanel.left = "-16px";
     this.notificationPanel.isVertical = true;
     this._ui.addControl(this.notificationPanel);
+
+    this._transitionOverlay = new Rectangle("screenTransition");
+    this._transitionOverlay.width = "100%";
+    this._transitionOverlay.height = "100%";
+    this._transitionOverlay.thickness = 0;
+    this._transitionOverlay.background = "black";
+    this._transitionOverlay.alpha = 0;
+    this._transitionOverlay.isVisible = false;
+    this._transitionOverlay.isPointerBlocker = true;
+    this._transitionOverlay.zIndex = 5000;
+    this._ui.addControl(this._transitionOverlay);
+  }
+
+  /**
+   * Fade to black, optionally run work while fully black, then fade in.
+   * If another sequence is running it is cancelled first.
+   */
+  public playScreenFadeSequence(options: {
+    fadeOutMs?: number;
+    holdMs?: number;
+    fadeInMs?: number;
+    onBlack?: () => void;
+    onComplete?: () => void;
+  } = {}): void {
+    this.cancelScreenFade();
+    if (!this._transitionOverlay) return;
+
+    const fadeOutMs = options.fadeOutMs ?? 380;
+    const holdMs = options.holdMs ?? 120;
+    const fadeInMs = options.fadeInMs ?? 420;
+    const total = fadeOutMs + holdMs + fadeInMs;
+
+    const overlay = this._transitionOverlay;
+    overlay.isVisible = true;
+    overlay.alpha = 0;
+
+    let elapsed = 0;
+    let blackFired = false;
+
+    this._transitionFadeObserver = this.scene.onBeforeRenderObservable.add(() => {
+      elapsed += this.scene.getEngine().getDeltaTime();
+
+      if (elapsed <= fadeOutMs) {
+        overlay.alpha = Math.min(1, elapsed / fadeOutMs);
+      } else if (elapsed <= fadeOutMs + holdMs) {
+        overlay.alpha = 1;
+        if (!blackFired) {
+          blackFired = true;
+          options.onBlack?.();
+        }
+      } else if (elapsed <= total) {
+        const t = (elapsed - fadeOutMs - holdMs) / fadeInMs;
+        overlay.alpha = Math.max(0, 1 - t);
+      } else {
+        overlay.alpha = 0;
+        overlay.isVisible = false;
+        this.scene.onBeforeRenderObservable.remove(this._transitionFadeObserver);
+        this._transitionFadeObserver = null;
+        options.onComplete?.();
+      }
+    });
+  }
+
+  /** Stop an in-progress screen fade and hide the overlay. */
+  public cancelScreenFade(): void {
+    if (this._transitionFadeObserver) {
+      this.scene.onBeforeRenderObservable.remove(this._transitionFadeObserver);
+      this._transitionFadeObserver = null;
+    }
+    if (this._transitionOverlay) {
+      this._transitionOverlay.alpha = 0;
+      this._transitionOverlay.isVisible = false;
+    }
+  }
+
+  public get isScreenFadeActive(): boolean {
+    return this._transitionOverlay !== null && this._transitionOverlay.isVisible && this._transitionOverlay.alpha > 0.001;
   }
 
   private _initInventoryUI(): void {

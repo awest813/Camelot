@@ -4,6 +4,7 @@ import { Player } from "../entities/player";
 import { InventorySystem } from "./inventory-system";
 import { DialogueSystem } from "./dialogue-system";
 import { UIManager } from "../ui/ui-manager";
+import type { CellManager } from "../world/cell-manager";
 
 export class InteractionSystem {
   public scene: Scene;
@@ -17,6 +18,15 @@ export class InteractionSystem {
 
   /** Set to true while the game is paused or a UI overlay owns focus. */
   public isBlocked: boolean = false;
+
+  /** When set, portal meshes can trigger cell transitions (E key). */
+  public cellManager: CellManager | null = null;
+
+  /**
+   * Runs a map/interior transition with optional screen fade. When null,
+   * `cellManager.tryTransition` is used directly.
+   */
+  public onPortalTransition: ((portalId: string) => void) | null = null;
 
   // Throttle raycast: only run every N frames
   private _frameCounter: number = 0;
@@ -74,6 +84,14 @@ export class InteractionSystem {
           } else if (metadata.type === 'loot') {
               this.ui.setInteractionText(`[E] Take ${metadata.loot.item.name}`);
               this.ui.setCrosshairActive(true);
+          } else if (metadata.type === 'portal' && metadata.portal && this.cellManager) {
+              if (this.cellManager.isTransitioning) {
+                  this.ui.setInteractionText("");
+                  this.ui.setCrosshairActive(false);
+              } else {
+                  this.ui.setInteractionText(`[E] ${metadata.portal.labelText}`);
+                  this.ui.setCrosshairActive(true);
+              }
           }
       } else {
           this.ui.setInteractionText("");
@@ -104,6 +122,14 @@ export class InteractionSystem {
           if (this.inventorySystem.addItem(loot.item)) {
               loot.dispose();
               if (this.onLootPickup) this.onLootPickup(loot.item.id);
+          }
+      } else if (metadata.type === 'portal' && metadata.portal && this.cellManager) {
+          if (this.cellManager.isTransitioning) return;
+          const portalId = metadata.portal.id as string;
+          if (this.onPortalTransition) {
+              this.onPortalTransition(portalId);
+          } else {
+              this.cellManager.tryTransition(portalId);
           }
       }
     }

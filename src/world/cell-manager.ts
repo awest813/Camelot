@@ -297,6 +297,59 @@ export class CellManager {
     }
   }
 
+  /**
+   * Rebuild interior meshes to match `currentCellId` after load or other
+   * out-of-band state changes. Does not fire `onCellChanged`.
+   */
+  public hydrateActiveCellFromState(): void {
+    this._disposeActiveCellMeshes();
+    const def = this._cells.get(this._currentCellId);
+    if (def?.type === "interior" && def.build) {
+      this._activeCellMeshes = def.build(this._scene);
+    }
+  }
+
+  /** Look up a registered cell by id (exterior or interior). */
+  public getCellDefinition(id: string): CellDefinition | undefined {
+    return this._cells.get(id);
+  }
+
+  /**
+   * Move the player into a cell without using a portal (e.g. fast travel).
+   * Rebuilds interior geometry when entering an interior from elsewhere.
+   *
+   * @param silent  When true, `onCellChanged` is not fired (caller handles UI).
+   */
+  public enterCellById(cellId: string, arrivalPosition: Vector3, silent: boolean = false): boolean {
+    if (this._isTransitioning) return false;
+
+    const targetDef = this._cells.get(cellId);
+    if (!targetDef) return false;
+
+    if (this._currentCellId === cellId && targetDef.type === "interior") {
+      this._player.camera.position.copyFrom(arrivalPosition);
+      return true;
+    }
+
+    this._isTransitioning = true;
+    this._disposeActiveCellMeshes();
+
+    if (targetDef.type === "interior" && targetDef.build) {
+      this._activeCellMeshes = targetDef.build(this._scene);
+    }
+
+    this._player.camera.position.copyFrom(arrivalPosition);
+    this._currentCellId = targetDef.id;
+    this._visitedCellIds.add(targetDef.id);
+
+    this._isTransitioning = false;
+
+    if (!silent) {
+      this.onCellChanged?.(targetDef.id, targetDef.name);
+    }
+    return true;
+  }
+
   // ── Private helpers ───────────────────────────────────────────────────────
 
   private _disposeActiveCellMeshes(): void {

@@ -459,8 +459,12 @@ export class Game {
       }
     };
     this.saveSystem.setQuestSystem(this.questSystem);
-    this.saveSystem.onAfterLoad = () => this._cleanupCollectedLoot();
+    this.saveSystem.onAfterLoad = () => {
+      this._cleanupCollectedLoot();
+      this._hydrateCellAfterLoad();
+    };
     this.interactionSystem  = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem, this.ui);
+    this.interactionSystem.cellManager = this.cellManager;
     this.inventorySystem.onOpen = () => {
       if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === "inventory") {
         this._onboardingTutorial.advance();
@@ -1109,16 +1113,11 @@ export class Game {
     this.fastTravelSystem = new FastTravelSystem();
     // Seed the starting village as a discovered location
     this.fastTravelSystem.discoverLocation("start_village", "Starting Village", new Vector3(0, 2, 0));
-    // Auto-discover locations when the player enters a new cell
-    this.cellManager.onCellChanged = (_cellId, cellName) => {
-      const isNew = this.fastTravelSystem.discoverLocation(
-        _cellId, cellName, this.player.camera.position.clone()
-      );
-      this.ui.showNotification(
-        isNew ? `Discovered: ${cellName}` : `Entered: ${cellName}`, 2500
-      );
-      this.lodSystem?.clear();
+    // Auto-discover locations when the player enters a new cell (portals use fade + tryTransition)
+    this.cellManager.onCellChanged = (cellId, cellName) => {
+      this._onCellEntered(cellId, cellName);
     };
+    this.interactionSystem.onPortalTransition = (portalId) => this._beginPortalTransition(portalId);
     this.saveSystem.setFastTravelSystem(this.fastTravelSystem);
     this.fastTravelUI.onTravel = (locationId) => this._attemptFastTravel(locationId);
 
@@ -3185,6 +3184,39 @@ export class Game {
       );
   }
 
+  private _onCellEntered(cellId: string, cellName: string): void {
+      const isNew = this.fastTravelSystem.discoverLocation(
+          cellId, cellName, this.player.camera.position.clone()
+      );
+      this.ui.showNotification(
+          isNew ? `Discovered: ${cellName}` : `Entered: ${cellName}`, 2500
+      );
+      this.lodSystem?.clear();
+  }
+
+  private _beginPortalTransition(portalId: string): void {
+      if (!this.cellManager.portals.has(portalId)) return;
+      this.ui.playScreenFadeSequence({
+          fadeOutMs: 420,
+          holdMs: 140,
+          fadeInMs: 480,
+          onBlack: () => {
+              this.cellManager.tryTransition(portalId);
+          },
+      });
+  }
+
+  /** Rebuild interior geometry after load so cell save state matches the scene. */
+  private _hydrateCellAfterLoad(): void {
+      this.cellManager.hydrateActiveCellFromState();
+      const cell = this.cellManager.currentCell;
+      if (cell) {
+          this.fastTravelSystem.discoverLocation(
+              cell.id, cell.name, this.player.camera.position.clone()
+          );
+      }
+  }
+
   private _attemptFastTravel(locationId: string): void {
       const hours = this.fastTravelSystem.estimateTravelHours(this.player.camera.position, locationId);
       if (hours === null) {
@@ -3192,26 +3224,65 @@ export class Game {
           return;
       }
 
-      const result = this.fastTravelSystem.fastTravelTo(
-          locationId,
-          this.player,
-          this._isPlayerInCombat(),
-          this.stealthSystem.isCrouching,
-      );
-      if (!result.ok) {
-          this.ui.showNotification(result.message, 2200);
+      if (this._isPlayerInCombat()) {
+          this.ui.showNotification("Cannot fast travel while in combat.", 2200);
+          return;
+      }
+      if (this.stealthSystem.isCrouching) {
+          this.ui.showNotification("Cannot fast travel while sneaking.", 2200);
           return;
       }
 
-      this.timeSystem.advanceHours(hours);
-      this.respawnSystem.update(this.timeSystem.gameTime);
-      this.merchantRestockSystem.update(this.timeSystem.gameTime, this.barterSystem);
-      this.ui.showNotification(
-          `${result.message} (${hours.toFixed(1)}h passed) — ${this.timeSystem.timeString}`,
-          3200,
-      );
-      this.fastTravelUI.close();
-      this.saveSystem.markDirty();
+      const loc = this.fastTravelSystem.getDiscoveredLocation(locationId);
+      if (!loc) {
+          this.ui.showNotification(`Location "${locationId}" has not been discovered.`, 2200);
+          return;
+      }
+
+      const cellDef = this.cellManager.getCellDefinition(locationId);
+      const targetIsInterior = cellDef?.type === "interior";
+      const needsFade = targetIsInterior || this.cellManager.isInterior;
+      const dest = new Vector3(loc.position.x, loc.position.y, loc.position.z);
+      const message = `Fast travelled to ${loc.name}.`;
+
+      const applyTimeAndClose = () => {
+          this.timeSystem.advanceHours(hours);
+          this.respawnSystem.update(this.timeSystem.gameTime);
+          this.merchantRestockSystem.update(this.timeSystem.gameTime, this.barterSystem);
+          this.ui.showNotification(
+              `${message} (${hours.toFixed(1)}h passed) — ${this.timeSystem.timeString}`,
+              3200,
+          );
+          this.fastTravelUI.close();
+          this.saveSystem.markDirty();
+      };
+
+      if (needsFade) {
+          this.ui.playScreenFadeSequence({
+              fadeOutMs: 400,
+              holdMs: 120,
+              fadeInMs: 450,
+              onBlack: () => {
+                  if (targetIsInterior) {
+                      this.cellManager.enterCellById(locationId, dest, true);
+                  } else {
+                      this.cellManager.enterCellById("exterior", dest, true);
+                  }
+              },
+              onComplete: () => {
+                  this.fastTravelSystem.discoverLocation(
+                      targetIsInterior ? locationId : (this.cellManager.currentCell?.id ?? "exterior"),
+                      targetIsInterior ? loc.name : (this.cellManager.currentCell?.name ?? "Exterior World"),
+                      this.player.camera.position.clone(),
+                  );
+                  this.lodSystem?.clear();
+                  applyTimeAndClose();
+              },
+          });
+      } else {
+          this.player.camera.position.copyFrom(dest);
+          applyTimeAndClose();
+      }
   }
 
   private _getInventoryGold(): number {
