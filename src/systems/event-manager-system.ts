@@ -492,9 +492,10 @@ export class EventManagerSystem {
     if (def.oneShot && this._firedOnce.has(def.id)) return false;
 
     // Cooldown.
-    if ((def.cooldownMs ?? 0) > 0) {
+    const cooldownMs = def.cooldownMs ?? 0;
+    if (cooldownMs > 0) {
       const last = this._lastFiredAt.get(def.id);
-      if (last !== undefined && this._now() - last < def.cooldownMs) {
+      if (last !== undefined && this._now() - last < cooldownMs) {
         return false;
       }
     }
