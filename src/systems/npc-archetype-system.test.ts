@@ -73,6 +73,60 @@ const BOSS_ARCHETYPE: NpcArchetypeDefinition = {
   level: 6,
 };
 
+const ROAD_BANDIT_ARCHETYPE: NpcArchetypeDefinition = {
+  id: "archetype_road_bandit",
+  name: "Road Bandit",
+  role: "bandit",
+  factionId: "outlaws",
+  isHostile: true,
+  isMerchant: false,
+  baseHealth: 90,
+  level: 2,
+};
+
+const HEALER_ARCHETYPE: NpcArchetypeDefinition = {
+  id: "archetype_healer",
+  name: "Village Healer",
+  role: "healer",
+  factionId: "",
+  isHostile: false,
+  isMerchant: false,
+  baseHealth: 80,
+  level: 2,
+};
+
+const TRAINER_ARCHETYPE: NpcArchetypeDefinition = {
+  id: "archetype_trainer",
+  name: "Skill Trainer",
+  role: "trainer",
+  factionId: "",
+  isHostile: false,
+  isMerchant: false,
+  baseHealth: 100,
+  level: 4,
+};
+
+const OVERRIDDEN_ARCHETYPE: NpcArchetypeDefinition = {
+  id: "archetype_overridden",
+  name: "Overridden NPC",
+  role: "enemy",
+  factionId: "",
+  isHostile: true,
+  isMerchant: false,
+  baseHealth: 100,
+  level: 3,
+  aiProfile: {
+    aggroRange: 25,
+    attackDamage: 30,
+    attackCooldown: 0.8,
+    moveSpeed: 4,
+    fleesBelowHealthPct: 0.2,
+  },
+  voiceType: "male_warrior",
+  personalityTraits: ["brave", "aggressive"],
+  startingEquipment: ["sword_iron", "shield_wood"],
+};
+
 describe("NpcArchetypeSystem", () => {
   it("registers and retrieves an archetype", () => {
     const sys = new NpcArchetypeSystem();
@@ -154,5 +208,102 @@ describe("NpcArchetypeSystem", () => {
     const npc = sys.spawnNpc("archetype_boss", scene, new Vector3(0, 0, 0));
     expect(npc!.aggroRange).toBeGreaterThan(12);
     expect(npc!.attackDamage).toBeGreaterThan(5);
+  });
+
+  it("bandit role gets enhanced aggro and damage", () => {
+    const sys = new NpcArchetypeSystem();
+    sys.registerArchetype(ROAD_BANDIT_ARCHETYPE);
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const npc = sys.spawnNpc("archetype_road_bandit", scene, new Vector3(0, 0, 0));
+    expect(npc!.aggroRange).toBe(13);
+    expect(npc!.attackDamage).toBe(8);
+  });
+
+  it("healer role gets reduced aggro range", () => {
+    const sys = new NpcArchetypeSystem();
+    sys.registerArchetype(HEALER_ARCHETYPE);
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const npc = sys.spawnNpc("archetype_healer", scene, new Vector3(0, 0, 0));
+    expect(npc!.aggroRange).toBe(8);
+  });
+
+  it("trainer role gets reduced aggro range", () => {
+    const sys = new NpcArchetypeSystem();
+    sys.registerArchetype(TRAINER_ARCHETYPE);
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const npc = sys.spawnNpc("archetype_trainer", scene, new Vector3(0, 0, 0));
+    expect(npc!.aggroRange).toBe(8);
+  });
+
+  it("aiProfile overrides are applied after role defaults", () => {
+    const sys = new NpcArchetypeSystem();
+    sys.registerArchetype(OVERRIDDEN_ARCHETYPE);
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const npc = sys.spawnNpc("archetype_overridden", scene, new Vector3(0, 0, 0));
+    expect(npc!.aggroRange).toBe(25);
+    expect(npc!.attackDamage).toBe(30);
+    expect(npc!.attackCooldown).toBe(0.8);
+    expect(npc!.moveSpeed).toBe(4);
+    expect(npc!.fleesBelowHealthPct).toBe(0.2);
+  });
+
+  it("startingEquipment is stored on spawned NPC", () => {
+    const sys = new NpcArchetypeSystem();
+    sys.registerArchetype(OVERRIDDEN_ARCHETYPE);
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const npc = sys.spawnNpc("archetype_overridden", scene, new Vector3(0, 0, 0));
+    expect(npc!.startingEquipmentIds).toContain("sword_iron");
+    expect(npc!.startingEquipmentIds).toContain("shield_wood");
+  });
+
+  it("voiceType is set on spawned NPC", () => {
+    const sys = new NpcArchetypeSystem();
+    sys.registerArchetype(OVERRIDDEN_ARCHETYPE);
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const npc = sys.spawnNpc("archetype_overridden", scene, new Vector3(0, 0, 0));
+    expect(npc!.voiceType).toBe("male_warrior");
+  });
+
+  it("personalityTraits are set on spawned NPC", () => {
+    const sys = new NpcArchetypeSystem();
+    sys.registerArchetype(OVERRIDDEN_ARCHETYPE);
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const npc = sys.spawnNpc("archetype_overridden", scene, new Vector3(0, 0, 0));
+    expect(npc!.personalityTraits).toContain("brave");
+    expect(npc!.personalityTraits).toContain("aggressive");
+  });
+
+  it("NPC defaults to neutral voiceType when archetype has none", () => {
+    const sys = new NpcArchetypeSystem();
+    sys.registerArchetype(GUARD_ARCHETYPE);
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const npc = sys.spawnNpc("archetype_guard", scene, new Vector3(0, 0, 0));
+    expect(npc!.voiceType).toBe("neutral");
+  });
+
+  it("NPC defaults to empty personalityTraits when archetype has none", () => {
+    const sys = new NpcArchetypeSystem();
+    sys.registerArchetype(GUARD_ARCHETYPE);
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const npc = sys.spawnNpc("archetype_guard", scene, new Vector3(0, 0, 0));
+    expect(npc!.personalityTraits).toHaveLength(0);
+  });
+
+  it("NPC defaults to empty startingEquipmentIds when archetype has none", () => {
+    const sys = new NpcArchetypeSystem();
+    sys.registerArchetype(GUARD_ARCHETYPE);
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const npc = sys.spawnNpc("archetype_guard", scene, new Vector3(0, 0, 0));
+    expect(npc!.startingEquipmentIds).toHaveLength(0);
   });
 });

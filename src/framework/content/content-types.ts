@@ -5,7 +5,50 @@ import { QuestDefinition } from "../quests/quest-types";
 
 // ── NPC archetype definition ──────────────────────────────────────────────────
 
-export type NpcRole = "guard" | "merchant" | "innkeeper" | "villager" | "enemy" | "boss" | "companion";
+export type NpcRole = "guard" | "merchant" | "innkeeper" | "villager" | "enemy" | "boss" | "companion" | "bandit" | "healer" | "trainer" | "beggar";
+
+export type NpcVoiceType =
+  | "neutral"
+  | "male_warrior"
+  | "female_warrior"
+  | "old_man"
+  | "old_woman"
+  | "merchant"
+  | "child"
+  | "beast"
+  | "undead";
+
+export type NpcPersonalityTrait =
+  | "brave"
+  | "cowardly"
+  | "aggressive"
+  | "friendly"
+  | "shy"
+  | "greedy"
+  | "noble"
+  | "cunning";
+
+/**
+ * Per-archetype combat AI tuning overrides.
+ * Fields left undefined fall back to role-based or entity defaults.
+ */
+export interface NpcAIProfile {
+  /** Detection radius in world units. */
+  aggroRange: number;
+  /** Melee engage radius in world units. */
+  attackRange: number;
+  /** Per-hit damage value. */
+  attackDamage: number;
+  /** Seconds between melee attacks. */
+  attackCooldown: number;
+  /** Walk / run speed multiplier. */
+  moveSpeed: number;
+  /**
+   * Health fraction [0–1] below which the NPC flees instead of fighting.
+   * 0 means the NPC never flees.
+   */
+  fleesBelowHealthPct: number;
+}
 
 /** Damage categories matched by the combat system's resistance calculations. */
 export type DamageType = "physical" | "fire" | "frost" | "shock";
@@ -49,6 +92,19 @@ export interface NpcArchetypeDefinition {
    * Example: `{ fire: 0.5 }` → 50% extra fire damage (1.5× total).
    */
   damageWeaknesses?: Partial<Record<DamageType, number>>;
+  /** Voice profile identifier for dialogue audio integration. */
+  voiceType?: NpcVoiceType;
+  /** Behavioral personality tags used by dialogue conditions and AI. */
+  personalityTraits?: NpcPersonalityTrait[];
+  /**
+   * Per-archetype combat AI parameter overrides.
+   * Values provided here take precedence over role-based defaults.
+   */
+  aiProfile?: Partial<NpcAIProfile>;
+  /** Named daily-schedule definition id (links to DailyScheduleSystem). */
+  scheduleId?: string;
+  /** Item definition IDs the NPC spawns carrying (for inventory integration). */
+  startingEquipment?: string[];
 }
 
 // ── Content bundle ────────────────────────────────────────────────────────────
