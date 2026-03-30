@@ -21,7 +21,8 @@ type LoadQueueEntry = {
 
 export class WorldManager {
   private scene: Scene;
-  private chunkSize: number = 50;
+  /** World-unit side-length of each terrain chunk. */
+  public readonly chunkSize: number = 50;
   private loadedChunks: Map<string, { mesh: Mesh; body: PhysicsAggregate; cx: number; cz: number }> = new Map();
   private chunkVegetation: Map<string, Mesh[]> = new Map();
   private loadDistance: number = 2; // Chebyshev radius of chunks to load
@@ -60,6 +61,18 @@ export class WorldManager {
     32,
     256,
   );
+
+  /**
+   * Fires immediately after a chunk finishes being built and registered.
+   * Receives the chunk grid coordinates and its biome type.
+   */
+  public onChunkLoaded: ((cx: number, cz: number, biome: BiomeType) => void) | null = null;
+
+  /**
+   * Fires immediately after a chunk is removed from the scene (distance-based unload).
+   * Does **not** fire during `dispose()` — use that for full teardown scenarios.
+   */
+  public onChunkUnloaded: ((cx: number, cz: number) => void) | null = null;
 
   private readonly biomeMaterials: Map<BiomeType, StandardMaterial> = new Map();
   private treeTrunkMaterial?: StandardMaterial;
@@ -151,6 +164,7 @@ export class WorldManager {
 
         // Dispose structure meshes, physics, and loot for this chunk
         this.structures.disposeChunk(cx, cz);
+        this.onChunkUnloaded?.(cx, cz);
       }
     }
   }
@@ -291,6 +305,8 @@ export class WorldManager {
 
     // Spawn a structure for this chunk (ruins, shrine, or tower based on biome)
     this.structures.trySpawnForChunk(x, z, biome, this.chunkSize);
+
+    this.onChunkLoaded?.(x, z, biome);
   }
 
   /** Returns per-biome diffuse and specular colours for richer, more saturated terrain. */
