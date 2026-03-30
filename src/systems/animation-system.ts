@@ -14,9 +14,13 @@
  * Animations available:
  *   idle            — gentle Y-scale breathing loop
  *   walk            — moderate Y-scale bob loop (moving NPC)
- *   run             — fast Y-scale bob loop (chasing NPC)
+ *   run             — fast Y-scale bob loop (chasing / fleeing NPC)
+ *   alert           — slower tense breathing while spotting the player (loop)
+ *   investigate     — cautious bob while searching last known position (loop)
+ *   return          — subdued bob while walking back to spawn (loop)
  *   attackTelegraph — quick XZ-scale puff before a strike (one-shot)
  *   stagger         — squish-stretch X/Y pulse on hit interrupt (one-shot)
+ *   hit             — quick damage flinch (one-shot)
  *   death           — Z-rotation topple + Y-scale flatten (one-shot, persistent)
  */
 
@@ -25,7 +29,17 @@ import { Animation } from "@babylonjs/core/Animations/animation";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 
 /** The set of named animation clips the system can play. */
-export type AnimationClip = "idle" | "walk" | "run" | "telegraph" | "stagger" | "death";
+export type AnimationClip =
+  | "idle"
+  | "walk"
+  | "run"
+  | "alert"
+  | "investigate"
+  | "return"
+  | "telegraph"
+  | "stagger"
+  | "hit"
+  | "death";
 
 const FPS = 60;
 
@@ -125,6 +139,87 @@ export class AnimationSystem {
     this._scene.beginAnimation(mesh, 0, 24, true);
   }
 
+  /**
+   * Tense alert loop — slower, slightly larger breathing than idle.
+   */
+  public playAlert(mesh: Mesh): void {
+    const current = this._active.get(mesh.name);
+    if (current === "alert" || current === "death") return;
+    this._stopAll(mesh);
+    this._active.set(mesh.name, "alert");
+
+    const anim = new Animation(
+      `${mesh.name}_alert`,
+      "scaling.y",
+      FPS,
+      Animation.ANIMATIONTYPE_FLOAT,
+      Animation.ANIMATIONLOOPMODE_CYCLE,
+    );
+    anim.setKeys([
+      { frame: 0,   value: 1.0   },
+      { frame: 55,  value: 1.022 },
+      { frame: 110, value: 1.0   },
+      { frame: 165, value: 0.988 },
+      { frame: 220, value: 1.0   },
+    ]);
+    mesh.animations = [anim];
+    this._scene.beginAnimation(mesh, 0, 220, true);
+  }
+
+  /**
+   * Cautious investigate bob — gentler and longer period than walk.
+   */
+  public playInvestigate(mesh: Mesh): void {
+    const current = this._active.get(mesh.name);
+    if (current === "investigate" || current === "death") return;
+    this._stopAll(mesh);
+    this._active.set(mesh.name, "investigate");
+
+    const anim = new Animation(
+      `${mesh.name}_investigate`,
+      "scaling.y",
+      FPS,
+      Animation.ANIMATIONTYPE_FLOAT,
+      Animation.ANIMATIONLOOPMODE_CYCLE,
+    );
+    anim.setKeys([
+      { frame: 0,  value: 1.0  },
+      { frame: 14, value: 1.03 },
+      { frame: 28, value: 1.0  },
+      { frame: 42, value: 0.98 },
+      { frame: 56, value: 1.0  },
+    ]);
+    mesh.animations = [anim];
+    this._scene.beginAnimation(mesh, 0, 56, true);
+  }
+
+  /**
+   * Subdued return-home bob — shallow breathing while disengaging.
+   */
+  public playReturn(mesh: Mesh): void {
+    const current = this._active.get(mesh.name);
+    if (current === "return" || current === "death") return;
+    this._stopAll(mesh);
+    this._active.set(mesh.name, "return");
+
+    const anim = new Animation(
+      `${mesh.name}_return`,
+      "scaling.y",
+      FPS,
+      Animation.ANIMATIONTYPE_FLOAT,
+      Animation.ANIMATIONLOOPMODE_CYCLE,
+    );
+    anim.setKeys([
+      { frame: 0,   value: 1.0    },
+      { frame: 50,  value: 1.009  },
+      { frame: 100, value: 1.0    },
+      { frame: 150, value: 0.9935 },
+      { frame: 200, value: 1.0    },
+    ]);
+    mesh.animations = [anim];
+    this._scene.beginAnimation(mesh, 0, 200, true);
+  }
+
   // ── One-shot clips ─────────────────────────────────────────────────────────
 
   /**
@@ -201,6 +296,36 @@ export class AnimationSystem {
   }
 
   /**
+   * Quick flinch when the NPC takes damage (lighter than stagger).
+   */
+  public playHitReact(mesh: Mesh): void {
+    if (this._active.get(mesh.name) === "death") return;
+    this._stopAll(mesh);
+    this._active.set(mesh.name, "hit");
+
+    const scaleX = _makeAnimation(`${mesh.name}_hit_sx`, "scaling.x", FPS, [
+      { frame: 0,  value: 1.0  },
+      { frame: 3,  value: 1.12 },
+      { frame: 7,  value: 0.94 },
+      { frame: 12, value: 1.0  },
+    ]);
+    const scaleY = _makeAnimation(`${mesh.name}_hit_sy`, "scaling.y", FPS, [
+      { frame: 0,  value: 1.0  },
+      { frame: 3,  value: 0.88 },
+      { frame: 7,  value: 1.06 },
+      { frame: 12, value: 1.0  },
+    ]);
+
+    mesh.animations = [scaleX, scaleY];
+    this._scene.beginAnimation(mesh, 0, 12, false, 1.0, () => {
+      mesh.scaling.set(1, 1, 1);
+      if (this._active.get(mesh.name) === "hit") {
+        this._active.delete(mesh.name);
+      }
+    });
+  }
+
+  /**
    * Play the death-topple animation: capsule rotates onto its side and flattens.
    *
    * Must be called *after* the physics body has been set to STATIC so that the
@@ -269,6 +394,7 @@ export class AnimationSystem {
    * @param isAttackTelegraph  True while the NPC is in telegraph wind-up.
    * @param isStaggered        True while the NPC is staggered.
    * @param isDead             True when the NPC has died.
+   * @param justTakenDamage    True for one frame after non-lethal damage.
    */
   public updateNPCAnimation(
     mesh: Mesh,
@@ -276,6 +402,7 @@ export class AnimationSystem {
     isAttackTelegraph: boolean,
     isStaggered: boolean,
     isDead: boolean,
+    justTakenDamage: boolean = false,
   ): void {
     if (isDead) {
       if (!this.isDeadClip(mesh.name)) {
@@ -288,6 +415,15 @@ export class AnimationSystem {
       if (this._active.get(mesh.name) !== "stagger") {
         this.playStagger(mesh);
       }
+      return;
+    }
+
+    if (justTakenDamage) {
+      this.playHitReact(mesh);
+      return;
+    }
+
+    if (this._active.get(mesh.name) === "hit") {
       return;
     }
 
@@ -304,14 +440,21 @@ export class AnimationSystem {
       case "FLEE":
         this.playRun(mesh);
         break;
-      case "ATTACK":
       case "ALERT":
-      case "PATROL":
+        this.playAlert(mesh);
+        break;
       case "INVESTIGATE":
+        this.playInvestigate(mesh);
+        break;
+      case "RETURN":
+        this.playReturn(mesh);
+        break;
+      case "ATTACK":
+      case "PATROL":
         this.playWalk(mesh);
         break;
       default:
-        // IDLE, RETURN
+        // IDLE
         this.playIdle(mesh);
     }
   }
