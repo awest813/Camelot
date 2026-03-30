@@ -17,7 +17,7 @@ This document is for AI coding agents and contributors who need to change how ne
 
 ## Player onboarding (post-creation tips)
 
-- **Preference**: `src/onboarding-preferences.ts` — `camelot_skip_onboarding_tips` in `localStorage` (`1` = do not auto-start tips). Updated from the welcome-step checkbox and when the player opts out.
+- **Preference**: `src/onboarding-preferences.ts` — `localStorage` keys: `camelot_skip_onboarding_tips` (`1` = never auto-start from the welcome checkbox), `camelot_onboarding_tips_done` (`1` = tip sequence was finished once, so tips do not restart on every page reload).
 - **Engine**: `TutorialSystem` in `src/systems/tutorial-system.ts` — linear steps with `onStepBegin` / `advance()` / `onTutorialComplete`.
 - **Wiring** (`src/game.ts`):
   - `_wireOnboardingTutorialUi()` attaches banner rendering and completion messaging.

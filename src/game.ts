@@ -77,7 +77,12 @@ import { RaceSystem } from "./systems/race-system";
 import { PlayerLevelSystem } from "./systems/player-level-system";
 import { CharacterCreationUI } from "./ui/character-creation-ui";
 import { TutorialSystem } from "./systems/tutorial-system";
-import { persistSkipOnboardingTips, shouldSkipOnboardingTips } from "./onboarding-preferences";
+import {
+  hasCompletedOnboardingTips,
+  persistOnboardingTipsCompleted,
+  persistSkipOnboardingTips,
+  shouldSkipOnboardingTips,
+} from "./onboarding-preferences";
 import { QuestCreatorSystem } from "./systems/quest-creator-system";
 import { QuestCreatorUI } from "./ui/quest-creator-ui";
 import { DialogueCreatorSystem } from "./systems/dialogue-creator-system";
@@ -2614,6 +2619,7 @@ export class Game {
     };
     this._onboardingTutorial.onTutorialComplete = () => {
       this._removeOnboardingTipBanner();
+      persistOnboardingTipsCompleted();
       this.ui.showNotification("Tutorial tips dismissed. Press Esc for pause anytime.", 3200);
     };
     this._onboardingTutorial.onTutorialSkipped = () => {
@@ -2672,7 +2678,7 @@ export class Game {
 
   private _startOnboardingTutorialIfNeeded(): void {
     if (typeof document === "undefined") return;
-    if (shouldSkipOnboardingTips()) return;
+    if (shouldSkipOnboardingTips() || hasCompletedOnboardingTips()) return;
 
     this._onboardingTutorial.clearSteps();
     this._onboardingTutorial.addStep({
