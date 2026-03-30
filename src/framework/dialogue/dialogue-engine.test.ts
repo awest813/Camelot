@@ -49,6 +49,14 @@ const makeContext = (overrides?: Partial<{
 };
 
 describe("DialogueEngine", () => {
+  it("hasDialogue returns whether an id is registered", () => {
+    const engine = new DialogueEngine([
+      { id: "a", startNodeId: "n1", nodes: [{ id: "n1", speaker: "X", text: "Hi", choices: [] }] },
+    ]);
+    expect(engine.hasDialogue("a")).toBe(true);
+    expect(engine.hasDialogue("missing")).toBe(false);
+  });
+
   it("evaluates conditions and applies effects while traversing nodes", () => {
     const engine = new DialogueEngine([
       {

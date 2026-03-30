@@ -26,6 +26,11 @@ export class DialogueEngine {
     this._nodeMaps.set(definition.id, nodeMap);
   }
 
+  /** Returns true when a dialogue definition is registered for `dialogueId`. */
+  public hasDialogue(dialogueId: string): boolean {
+    return this._definitions.has(dialogueId);
+  }
+
   public createSession(dialogueId: string, context: DialogueContext): DialogueSession {
     const definition = this._definitions.get(dialogueId);
     const nodeMap = this._nodeMaps.get(dialogueId);

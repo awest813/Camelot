@@ -36,6 +36,7 @@ export class DialogueCreatorUI {
   private _detailEl: HTMLElement | null = null;
   private _statusEl: HTMLElement | null = null;
   private _selectedNodeId: string | null = null;
+  private _domIdSeq = 0;
 
   // Header inputs
   private _idInput: HTMLInputElement | null = null;
@@ -315,6 +316,18 @@ export class DialogueCreatorUI {
     termRow.appendChild(termCheck);
     termRow.appendChild(termLabel);
     wrap.appendChild(termRow);
+
+    wrap.appendChild(
+      this._makeField(
+        "Camera sequence id",
+        node.cameraSequenceId ?? "",
+        "text",
+        "Optional CameraScriptingSystem sequence id",
+        (v) => {
+          this._sys.updateNode(node.id, { cameraSequenceId: v.trim() || undefined });
+        },
+      ),
+    );
 
     // Choices
     const choicesSect = document.createElement("div");
@@ -702,7 +715,7 @@ export class DialogueCreatorUI {
     inp.className   = "dlg-creator__input";
     inp.placeholder = placeholder;
     inp.value       = value;
-    lbl.htmlFor = inp.id = `dlgc_field_${label.replace(/\s+/g, "_").toLowerCase()}_${Math.random().toString(36).slice(2, 7)}`;
+    lbl.htmlFor = inp.id = `dlgc_field_${label.replace(/\s+/g, "_").toLowerCase()}_${++this._domIdSeq}`;
     inp.addEventListener("input", () => onChange(inp.value));
     wrap.appendChild(lbl);
     wrap.appendChild(inp);
@@ -720,7 +733,7 @@ export class DialogueCreatorUI {
     ta.placeholder = placeholder;
     ta.value       = value;
     ta.rows        = 4;
-    lbl.htmlFor = ta.id = `dlgc_ta_${Math.random().toString(36).slice(2, 7)}`;
+    lbl.htmlFor = ta.id = `dlgc_ta_${++this._domIdSeq}`;
     ta.addEventListener("input", () => onChange(ta.value));
     wrap.appendChild(lbl);
     wrap.appendChild(ta);

@@ -32,6 +32,17 @@ const T = {
   EQUIP_BORDER: "#D4A017",
 };
 
+/** Subset of `T` for panels that should match the main HUD (e.g. dialogue). */
+export const SHARED_UI_PANEL = {
+  PANEL_BG:     T.PANEL_BG,
+  PANEL_BORDER: T.PANEL_BORDER,
+  TITLE:        T.TITLE,
+  TEXT:         T.TEXT,
+  DIM:          T.DIM,
+  BTN_BG:       T.BTN_BG,
+  BTN_HOVER:    T.BTN_HOVER,
+} as const;
+
 const clampPercentage = (current: number, max: number): string => {
   if (max <= 0) return "0%";
   const percent = (current / max) * 100;

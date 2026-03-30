@@ -90,6 +90,7 @@ import { QuestCreatorSystem } from "./systems/quest-creator-system";
 import { QuestCreatorUI } from "./ui/quest-creator-ui";
 import { DialogueCreatorSystem } from "./systems/dialogue-creator-system";
 import { DialogueCreatorUI } from "./ui/dialogue-creator-ui";
+import { resolveDialogueIdForNpcMeshName } from "./systems/dialogue-npc-resolve";
 import { NpcCreatorSystem } from "./systems/npc-creator-system";
 import { NpcCreatorUI } from "./ui/npc-creator-ui";
 import { ItemCreatorSystem } from "./systems/item-creator-system";
@@ -2955,18 +2956,23 @@ export class Game {
   }
 
   private _createFrameworkDialogueSession(npcName: string) {
-      const dialogueId = this._resolveFrameworkDialogueId(npcName);
+      const archetypes = this.frameworkRuntime.contentRegistry.getAllNpcArchetypes();
+      const dialogueId = resolveDialogueIdForNpcMeshName(npcName, archetypes);
       if (!dialogueId) return null;
-      try {
-          return this.frameworkRuntime.createDialogueSession(dialogueId);
-      } catch {
+      if (!this.frameworkRuntime.dialogueEngine.hasDialogue(dialogueId)) {
+          if (import.meta.env.DEV) {
+              console.warn(`[Game] No registered dialogue '${dialogueId}' for NPC mesh '${npcName}'.`);
+          }
           return null;
       }
-  }
-
-  private _resolveFrameworkDialogueId(npcName: string): string | null {
-      if (npcName.includes("Guard")) return "guard_intro";
-      return null;
+      try {
+          return this.frameworkRuntime.createDialogueSession(dialogueId);
+      } catch (err) {
+          if (import.meta.env.DEV) {
+              console.warn(`[Game] createDialogueSession('${dialogueId}') failed for '${npcName}'.`, err);
+          }
+          return null;
+      }
   }
 
   private _toFrameworkTargetId(entityName: string): string {

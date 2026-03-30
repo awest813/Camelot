@@ -275,7 +275,7 @@ export class DialogueCreatorSystem {
   /**
    * Validate the current draft.
    * Checks for: missing ID, missing/invalid start node, dangling nextNodeId
-   * references, unreachable nodes, and empty speaker text.
+   * references, unreachable nodes, empty node body text, and empty choice labels.
    */
   validate(): DialogueValidationReport {
     const issues: DialogueValidationIssue[] = [];
