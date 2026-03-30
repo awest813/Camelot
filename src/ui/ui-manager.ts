@@ -1101,7 +1101,7 @@ export class UIManager {
    * Spawn a floating damage number at the given world position.
    * It drifts upward and fades out over ~1 second.
    */
-  public showDamageNumber(worldPos: Vector3, damage: number, scene: Scene): void {
+  public showDamageNumber(worldPos: Vector3, damage: number, scene: Scene, color?: string): void {
     const camera = scene.activeCamera;
     if (!camera) return;
     const engine = scene.getEngine();
@@ -1114,7 +1114,7 @@ export class UIManager {
 
     const text = new TextBlock();
     text.text = `-${damage}`;
-    text.color = "#FF6030";
+    text.color = color ?? "#FF6030";
     text.fontSize = 24;
     text.fontWeight = "bold";
     text.shadowColor = "black";

@@ -12,6 +12,7 @@ import { NavigationSystem } from "./navigation-system";
 import { SkillProgressionSystem } from "./skill-progression-system";
 import type { ProgressionSkillId } from "./skill-progression-system";
 import { AttributeSystem } from "./attribute-system";
+import type { ActiveEffectsSystem } from "./active-effects-system";
 
 const MELEE_DAMAGE = 10;
 const MAGIC_DAMAGE = 20;
@@ -49,6 +50,48 @@ const FATIGUE_DAMAGE_MIN_FACTOR = 0.5;
 const HIT_CHANCE_BASE = 0.55;
 /** Hard floor so that a very-low-agility, exhausted player still connects sometimes. */
 const HIT_CHANCE_MIN = 0.25;
+
+// ─── Block counter-stagger ────────────────────────────────────────────────────
+
+/**
+ * Probability [0, 1] that a successful player block staggers the attacker.
+ * Matches Oblivion's "Shield Bash" feel — blocking isn't purely passive.
+ */
+const BLOCK_COUNTER_STAGGER_CHANCE = 0.45;
+/** Duration of the stagger applied to the attacker after the player successfully blocks. */
+const BLOCK_COUNTER_STAGGER_DURATION = 0.35;
+
+// ─── NPC flee constants ────────────────────────────────────────────────────────
+
+/** NPCs in FLEE state move at this multiple of their normal moveSpeed. */
+const FLEE_SPEED_MULTIPLIER = 1.5;
+/**
+ * Squared distance (world units²) beyond which a fleeing NPC is considered safe —
+ * it transitions to RETURN/IDLE rather than continuing to run.
+ */
+const FLEE_SAFE_DISTANCE_SQ = 400; // 20 units
+
+// ─── Skill XP awards ─────────────────────────────────────────────────────────
+
+/** XP granted to the relevant weapon skill on a successful normal melee hit. */
+const SKILL_XP_MELEE_HIT = 6;
+/** XP granted to the weapon skill on a power-attack hit. */
+const SKILL_XP_POWER_HIT = 10;
+/** XP granted to the block skill on each successfully blocked hit. */
+const SKILL_XP_BLOCK_HIT = 4;
+/** XP granted to the destruction skill on a magic projectile hit. */
+const SKILL_XP_MAGIC_HIT = 8;
+
+// ─── Damage number colors ─────────────────────────────────────────────────────
+
+/** Normal physical hit damage number color. */
+const DMG_COLOR_PHYSICAL = "#FF6030";
+/** Critical hit damage number — gold to make crits pop visually. */
+const DMG_COLOR_CRIT = "#FFD700";
+/** Magic hit damage number — blue-white. */
+const DMG_COLOR_MAGIC = "#88CCFF";
+/** Power attack damage number — orange-red, heftier than normal. */
+const DMG_COLOR_POWER = "#FF8C00";
 
 /**
  * Applies NPC-specific resistance, weakness, and armor rating to a raw damage amount.
@@ -298,7 +341,13 @@ const COLOR_CHASE       = Color3.Red();
 const COLOR_TELEGRAPH   = new Color3(1.0, 0.15, 0.15);
 const COLOR_RETURN      = new Color3(1.0, 0.85, 0.0);  // warm yellow — calming down
 const COLOR_INVESTIGATE = new Color3(0.8, 0.65, 0.0);  // amber — cautious search
-const MAX_CONCURRENT_ATTACKERS = 1;
+const COLOR_FLEE        = new Color3(0.6, 0.0, 0.8);   // purple — panicked flight
+/**
+ * Maximum number of NPCs that may be in ATTACK state simultaneously.
+ * Increasing this to 2 allows flanking — a more dynamic group-combat feel
+ * while still preventing the player from being dog-piled by a crowd.
+ */
+const MAX_CONCURRENT_ATTACKERS = 2;
 
 export class CombatSystem {
   public scene: Scene;
@@ -308,6 +357,7 @@ export class CombatSystem {
   private _nav: NavigationSystem | null;
   private _skillSystem: SkillProgressionSystem | null;
   private _attributeSystem: AttributeSystem | null;
+  private _activeEffectsSystem: ActiveEffectsSystem | null;
 
   // Scratch vectors — reused every frame to avoid GC pressure
   private _currentVel: Vector3 = new Vector3();
@@ -357,6 +407,7 @@ export class CombatSystem {
     opts?: {
       skillSystem?: SkillProgressionSystem | null;
       attributeSystem?: AttributeSystem | null;
+      activeEffectsSystem?: ActiveEffectsSystem | null;
     }
   ) {
     this.scene = scene;
@@ -366,14 +417,22 @@ export class CombatSystem {
     this._nav = nav ?? null;
     this._skillSystem = opts?.skillSystem ?? null;
     this._attributeSystem = opts?.attributeSystem ?? null;
+    this._activeEffectsSystem = opts?.activeEffectsSystem ?? null;
   }
 
-  public setScalingSystems(opts: { skillSystem?: SkillProgressionSystem | null; attributeSystem?: AttributeSystem | null }): void {
+  public setScalingSystems(opts: {
+    skillSystem?: SkillProgressionSystem | null;
+    attributeSystem?: AttributeSystem | null;
+    activeEffectsSystem?: ActiveEffectsSystem | null;
+  }): void {
     if (opts.skillSystem !== undefined) {
       this._skillSystem = opts.skillSystem;
     }
     if (opts.attributeSystem !== undefined) {
       this._attributeSystem = opts.attributeSystem;
+    }
+    if (opts.activeEffectsSystem !== undefined) {
+      this._activeEffectsSystem = opts.activeEffectsSystem;
     }
   }
 
@@ -516,11 +575,13 @@ export class CombatSystem {
         npc.isAttackTelegraphing = false;
         npc.attackTelegraphTimer = 0;
 
+        this._skillSystem?.gainXP("destruction", SKILL_XP_MAGIC_HIT);
+
         const numberPos = hit.pickedPoint
           ? hit.pickedPoint.addToRef(CombatSystem._OFFSET_Y1, this._hitPos)
           : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos);
-        this._ui.showDamageNumber(numberPos, finalDmg, this.scene);
-        this._ui.showHitFlash("rgba(255, 60, 0, 0.5)");
+        this._ui.showDamageNumber(numberPos, finalDmg, this.scene, DMG_COLOR_MAGIC);
+        this._ui.showHitFlash("rgba(100, 180, 255, 0.4)");
 
         const label = chargeFraction >= 0.9 ? "Staff Blast!" : "Charged Bolt!";
         this._ui.showNotification(label, 1000);
@@ -609,11 +670,17 @@ export class CombatSystem {
           npc.attackTelegraphTimer = 0;
         }
 
+        // Award skill XP for a successful hit.
+        this._skillSystem?.gainXP(weaponProfile.skillId, SKILL_XP_MELEE_HIT);
+
         const numberPos = hit.pickedPoint
           ? hit.pickedPoint.addToRef(CombatSystem._OFFSET_Y1, this._hitPos)
           : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos);
-        this._ui.showDamageNumber(numberPos, meleeDmg, this.scene);
-        this._ui.showHitFlash("rgba(255, 200, 0, 0.25)");
+        this._ui.showDamageNumber(
+          numberPos, meleeDmg, this.scene,
+          isCrit ? DMG_COLOR_CRIT : DMG_COLOR_PHYSICAL,
+        );
+        this._ui.showHitFlash(isCrit ? "rgba(255, 215, 0, 0.35)" : "rgba(255, 200, 0, 0.25)");
 
         if (isCrit) {
           this._ui.showNotification("Critical Hit!", 1000);
@@ -698,10 +765,13 @@ export class CombatSystem {
         npc.isAttackTelegraphing = false;
         npc.attackTelegraphTimer = 0;
 
+        // Award bonus skill XP for a power attack hit.
+        this._skillSystem?.gainXP(weaponProfile.skillId, SKILL_XP_POWER_HIT);
+
         const numberPos = hit.pickedPoint
           ? hit.pickedPoint.addToRef(CombatSystem._OFFSET_Y1, this._hitPos)
           : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos);
-        this._ui.showDamageNumber(numberPos, finalDmg, this.scene);
+        this._ui.showDamageNumber(numberPos, finalDmg, this.scene, DMG_COLOR_POWER);
         this._ui.showHitFlash("rgba(255, 100, 0, 0.45)");
         this._ui.showNotification("Power Strike!", 1000);
 
@@ -790,12 +860,15 @@ export class CombatSystem {
           );
           const magicDmg = applyDamageWithResistance(rawMagicDmg, npc, magicDamageType);
           npc.takeDamage(magicDmg);
+          // Award destruction skill XP for a projectile hit.
+          this._skillSystem?.gainXP("destruction", SKILL_XP_MAGIC_HIT);
           this._ui.showDamageNumber(
             npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos),
             magicDmg,
-            this.scene
+            this.scene,
+            DMG_COLOR_MAGIC,
           );
-          this._ui.showHitFlash("rgba(255, 100, 0, 0.3)");
+          this._ui.showHitFlash("rgba(100, 180, 255, 0.3)");
 
           if (npc.isDead) {
             this._ui.showNotification(`${npc.mesh.name} defeated!`);
@@ -1070,6 +1143,35 @@ export class CombatSystem {
         }
         this._returnToSpawn(npc, deltaTime);
         break;
+
+      // ── FLEE ──────────────────────────────────────────────────────────────
+      case AIState.FLEE:
+        // Stop fleeing once out of danger range — transition to calm state.
+        if (distSq >= FLEE_SAFE_DISTANCE_SQ) {
+          this._transitionTo(npc, npc.patrolPoints.length > 0 ? AIState.RETURN : AIState.IDLE);
+          break;
+        }
+        this._fleeFromPlayer(npc, playerPos, deltaTime);
+        break;
+    }
+
+    // ── Flee trigger (checked every tick regardless of state) ────────────────
+    // If an NPC with a non-zero flee threshold just dropped below it, start running.
+    // Checked after the state tick so DoT damage is already applied this frame.
+    const fleePct: number = (npc as unknown as { fleesBelowHealthPct?: number }).fleesBelowHealthPct ?? 0;
+    if (
+      fleePct > 0 &&
+      !npc.isDead &&
+      npc.aiState !== AIState.FLEE &&
+      npc.aiState !== AIState.IDLE &&
+      npc.aiState !== AIState.PATROL &&
+      npc.aiState !== AIState.RETURN
+    ) {
+      const maxHp: number = (npc as unknown as { maxHealth?: number }).maxHealth ?? 100;
+      if (npc.health / maxHp < fleePct) {
+        this._transitionTo(npc, AIState.FLEE);
+        this._ui.showNotification(`${npc.mesh.name} flees!`, 1500);
+      }
     }
   }
 
@@ -1088,7 +1190,8 @@ export class CombatSystem {
       newState === AIState.CHASE       ||
       newState === AIState.ATTACK      ||
       newState === AIState.RETURN      ||
-      newState === AIState.INVESTIGATE
+      newState === AIState.INVESTIGATE ||
+      newState === AIState.FLEE
     );
 
     switch (newState) {
@@ -1143,6 +1246,17 @@ export class CombatSystem {
         npc.strafeDirection = 0;
         npc.strafeTimer = 0;
         npc.setStateColor(COLOR_RETURN);
+        break;
+
+      case AIState.FLEE:
+        npc.currentPath = [];
+        npc.pathIndex = 0;
+        npc.pathRefreshTimer = 0;
+        npc.isAttackTelegraphing = false;
+        npc.attackTelegraphTimer = 0;
+        npc.strafeDirection = 0;
+        npc.strafeTimer = 0;
+        npc.setStateColor(COLOR_FLEE);
         break;
 
       case AIState.PATROL:
@@ -1331,6 +1445,13 @@ export class CombatSystem {
     const playerAR = Math.max(0, this.player.bonusArmor);
     let dmg = Math.max(1, Math.round(npc.attackDamage * 100 / (100 + playerAR)));
 
+    // Apply resist_damage from active magical effects (potions, spells, enchantments).
+    const resistPct = Math.min(100, Math.max(0,
+      this._activeEffectsSystem?.totalMagnitude("resist_damage") ?? 0));
+    if (resistPct > 0) {
+      dmg = Math.max(1, Math.round(dmg * (1 - resistPct / 100)));
+    }
+
     if (this._isBlocking) {
       // Oblivion-style block: scale damage reduction with block skill.
       const blockReduction = this._blockDamageReduction();
@@ -1342,6 +1463,19 @@ export class CombatSystem {
       this._ui.showNotification(`Blocked! ${dmg} damage taken.`, 1500);
       this._ui.showHitFlash("rgba(80, 120, 200, 0.35)");
       if (this.onBlockSuccess) this.onBlockSuccess();
+
+      // Award block skill XP for each hit successfully blocked.
+      this._skillSystem?.gainXP("block", SKILL_XP_BLOCK_HIT);
+
+      // Block counter: chance to stagger the attacker (Oblivion-style shield bash feel).
+      if (Math.random() < BLOCK_COUNTER_STAGGER_CHANCE) {
+        npc.isStaggered = true;
+        npc.staggerTimer = BLOCK_COUNTER_STAGGER_DURATION;
+        npc.isAttackTelegraphing = false;
+        npc.attackTelegraphTimer = 0;
+        this._ui.showNotification("Counter!", 700);
+      }
+
       if (this.player.stamina <= 0) {
         this._isBlocking = false;
         this._ui.showNotification("Block broken!", 1200);
@@ -1506,6 +1640,30 @@ export class CombatSystem {
     this._blendedVel.z = this._currentVel.z + (desiredVelocity.z - this._currentVel.z) * blend;
     this._blendedVel.y = this._currentVel.y;
     npc.physicsAggregate.body.setLinearVelocity(this._blendedVel);
+  }
+
+  /**
+   * Move an NPC directly away from the player at FLEE_SPEED_MULTIPLIER × moveSpeed.
+   * The NPC faces away from the player so it "runs" correctly.
+   */
+  private _fleeFromPlayer(npc: NPC, playerPos: Vector3, deltaTime: number): void {
+    if (!npc.physicsAggregate?.body) return;
+
+    playerPos.subtractToRef(npc.mesh.position, this._dir);
+    this._dir.y = 0;
+    if (this._dir.lengthSquared() <= 0.001) {
+      // If exactly on top of the player, flee in a random lateral direction.
+      this._dir.set(1, 0, 0);
+    }
+    // Reverse direction — run away.
+    this._dir.normalize().scaleInPlace(-1);
+    this._dir.scaleToRef(npc.moveSpeed * FLEE_SPEED_MULTIPLIER, this._desiredVel);
+    this._setSmoothedHorizontalVelocity(npc, this._desiredVel, deltaTime);
+
+    // Face away from player.
+    const lookAway = npc.mesh.position.add(this._dir);
+    this._lookAtTarget.set(lookAway.x, npc.mesh.position.y, lookAway.z);
+    npc.mesh.lookAt(this._lookAtTarget);
   }
 
   /** Zero the NPC's horizontal velocity while preserving vertical (gravity). */

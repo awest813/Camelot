@@ -29,11 +29,13 @@ function makeUI() {
   return { showNotification: vi.fn() } as any;
 }
 
-function makeNPC(x = 5, alive = true) {
+function makeNPC(z = 5, alive = true) {
   const { Vector3 } = require("@babylonjs/core/Maths/math.vector");
   return {
     isDead: !alive,
-    mesh: { name: "Bandit", position: new Vector3(x, 0, 0) },
+    // Place NPCs along the +Z axis so they are within the camera's default
+    // forward-facing targeting cone (camera at origin facing +Z).
+    mesh: { name: "Bandit", position: new Vector3(0, 0, z) },
     takeDamage: vi.fn(),
     applyStatusEffect: vi.fn(),
     statusEffects: [],

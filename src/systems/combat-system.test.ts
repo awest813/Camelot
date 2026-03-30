@@ -396,7 +396,7 @@ describe('CombatSystem', () => {
         expect(blendedVelocity.x).toBeLessThan(0);
     });
 
-    it('hands off attack ownership between nearby NPCs', () => {
+    it('allows two nearby NPCs to attack simultaneously (group combat)', () => {
         const npcA = mockNpcs[0];
         const npcB = {
             ...mockNpcs[0],
@@ -420,19 +420,15 @@ describe('CombatSystem', () => {
 
         combatSystem.npcs = [npcA, npcB];
 
-        // Closest NPC receives attack slot first.
+        // With MAX_CONCURRENT_ATTACKERS = 2, both NPCs within engage range can attack.
         combatSystem.updateNPCAI(0.016);
         expect(npcA.aiState).toBe('ATTACK');
-        expect(npcB.aiState).toBe('CHASE');
+        expect(npcB.aiState).toBe('ATTACK');
 
-        // Move current attacker out of range so the second NPC takes over.
+        // Move npcA out of attack range: it drops back to CHASE; npcB keeps attacking.
         npcA.mesh.position = new Vector3(0, 0, 5);
         combatSystem.updateNPCAI(0.016);
         expect(npcA.aiState).toBe('CHASE');
-        expect(npcB.aiState).toBe('CHASE');
-
-        // Next update grants attack slot to the remaining close NPC.
-        combatSystem.updateNPCAI(0.016);
         expect(npcB.aiState).toBe('ATTACK');
     });
 
