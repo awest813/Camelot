@@ -3014,12 +3014,17 @@ export class Game {
 
       // Drive procedural animations from current NPC AI state
       for (const npc of this.scheduleSystem.npcs) {
+        const hitReact = npc.justTakenDamageVisual;
+        if (hitReact) {
+          npc.justTakenDamageVisual = false;
+        }
         this.animationSystem.updateNPCAnimation(
           npc.mesh,
           npc.aiState,
           npc.isAttackTelegraphing,
           npc.isStaggered,
           npc.isDead,
+          hitReact,
         );
       }
 

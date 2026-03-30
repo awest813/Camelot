@@ -198,6 +198,12 @@ export class NPC {
   /** Remaining seconds of the current stagger. */
   public staggerTimer: number = 0;
 
+  /**
+   * Set to true when the NPC takes damage (non-lethal). Consumed by the game loop
+   * to trigger a one-frame hit-reaction animation request.
+   */
+  public justTakenDamageVisual: boolean = false;
+
   // ─── Faction & role ─────────────────────────────────────────────────────────
 
   /** Faction this NPC belongs to (matches IDs used by CrimeSystem bounties). */
@@ -357,6 +363,9 @@ export class NPC {
     if (this.isDead) return;
     this.health = Math.max(0, this.health - amount);
     this._flashHit();
+    if (this.health > 0 && amount > 0) {
+      this.justTakenDamageVisual = true;
+    }
     if (this.health <= 0) {
       this._die();
     }
