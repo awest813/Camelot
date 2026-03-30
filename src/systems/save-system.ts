@@ -37,9 +37,10 @@ import type { HorseSystem } from "./horse-system";
 import type { SwimmingSystem } from "./swimming-system";
 import type { DiseaseSystem } from "./disease-system";
 import type { EventManagerSystem } from "./event-manager-system";
+import type { PetSystem } from "./pet-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 22;
+const SAVE_VERSION = 23;
 /** Oldest save version that can still be loaded (forward-compat window). */
 const SAVE_VERSION_MIN = 5;
 
@@ -109,6 +110,8 @@ interface ParsedSaveData {
   disease?: unknown;
   // v22 additions
   eventManager?: unknown;
+  // v23 additions
+  pets?: unknown;
 }
 
 interface EquipmentEntry {
@@ -174,6 +177,8 @@ export interface SaveData {
   disease?: any;
   // v22 additions
   eventManager?: any;
+  // v23 additions
+  pets?: any;
 }
 
 export class SaveSystem {
@@ -248,6 +253,8 @@ export class SaveSystem {
   private _diseaseSystem: DiseaseSystem | null = null;
   // ── v22 optional systems ──────────────────────────────────────────────────
   private _eventManagerSystem: EventManagerSystem | null = null;
+  // ── v23 optional systems ──────────────────────────────────────────────────
+  private _petSystem: PetSystem | null = null;
 
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
@@ -358,6 +365,11 @@ export class SaveSystem {
   // ── v22 system injection ──────────────────────────────────────────────────
 
   public setEventManagerSystem(s: EventManagerSystem): void   { this._eventManagerSystem = s; }
+
+  // ── v23 system injection ──────────────────────────────────────────────────
+
+  public setPetSystem(s: PetSystem): void                     { this._petSystem = s; }
+
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
     for (const [slot, item] of this._equipment.getEquipped()) {
@@ -436,6 +448,7 @@ export class SaveSystem {
     if (this._swimmingSystem)         data.swimming         = this._swimmingSystem.getSaveState();
     if (this._diseaseSystem)          data.disease          = this._diseaseSystem.getSaveState();
     if (this._eventManagerSystem)     data.eventManager     = this._eventManagerSystem.getSaveState();
+    if (this._petSystem)              data.pets             = this._petSystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -636,6 +649,10 @@ export class SaveSystem {
     // v22 systems
     if (this._eventManagerSystem && data.eventManager)
       this._eventManagerSystem.restoreFromSave(data.eventManager as any);
+
+    // v23 systems
+    if (this._petSystem && data.pets)
+      this._petSystem.restoreFromSave(data.pets as any);
 
     // Restore player name (v15+; keep default "Hero" for older saves)
     if (typeof data.player.name === "string" && data.player.name.trim()) {
