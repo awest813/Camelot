@@ -225,4 +225,24 @@ describe("CellManager", () => {
   it("getCellDefinition returns registered cell", () => {
     expect(cellManager.getCellDefinition("exterior")?.name).toBe("Exterior World");
   });
+
+  it("exit portal is removed from portals map when interior is disposed on exit", () => {
+    cellManager.buildSimpleInterior(
+      "cave_02",
+      "Test Cave",
+      "entrance_cave02",
+      new Vector3(10, 0, 10),
+      new Vector3(10, 1, 9),
+    );
+
+    // Enter the interior — this builds the room including the exit portal
+    cellManager.tryTransition("entrance_cave02");
+    expect(cellManager.currentCellId).toBe("cave_02");
+    expect(cellManager.portals.has("exit_cave_02")).toBe(true);
+
+    // Exit back to exterior — _disposeActiveCellMeshes should clean up the exit portal
+    cellManager.tryTransition("exit_cave_02");
+    expect(cellManager.currentCellId).toBe("exterior");
+    expect(cellManager.portals.has("exit_cave_02")).toBe(false);
+  });
 });

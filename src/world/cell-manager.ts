@@ -353,6 +353,12 @@ export class CellManager {
   // ── Private helpers ───────────────────────────────────────────────────────
 
   private _disposeActiveCellMeshes(): void {
+    // Remove portal entries whose meshes are about to be disposed (e.g. interior exit portals).
+    for (const [id, portal] of this._portals) {
+      if (this._activeCellMeshes.includes(portal.mesh)) {
+        this._portals.delete(id);
+      }
+    }
     for (const mesh of this._activeCellMeshes) {
       if (!mesh.isDisposed()) mesh.dispose();
     }

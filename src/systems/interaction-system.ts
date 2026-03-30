@@ -85,7 +85,7 @@ export class InteractionSystem {
               this.ui.setInteractionText(`[E] Take ${metadata.loot.item.name}`);
               this.ui.setCrosshairActive(true);
           } else if (metadata.type === 'portal' && metadata.portal && this.cellManager) {
-              if (this.cellManager.isTransitioning) {
+              if (this.cellManager.isTransitioning || this.ui.isScreenFadeActive) {
                   this.ui.setInteractionText("");
                   this.ui.setCrosshairActive(false);
               } else {
@@ -124,7 +124,7 @@ export class InteractionSystem {
               if (this.onLootPickup) this.onLootPickup(loot.item.id);
           }
       } else if (metadata.type === 'portal' && metadata.portal && this.cellManager) {
-          if (this.cellManager.isTransitioning) return;
+          if (this.cellManager.isTransitioning || this.ui.isScreenFadeActive) return;
           const portalId = metadata.portal.id as string;
           if (this.onPortalTransition) {
               this.onPortalTransition(portalId);
