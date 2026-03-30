@@ -3,6 +3,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { NPC } from "../entities/npc";
 import type { Player } from "../entities/player";
 import type { UIManager } from "../ui/ui-manager";
+import type { SkillProgressionSystem } from "./skill-progression-system";
 
 // ── Spell types ───────────────────────────────────────────────────────────────
 
@@ -153,6 +154,17 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
 const TOUCH_RANGE = 3.5; // world units for "touch" delivery spells
 
 /**
+ * Half-angle of the forward-facing cone used for single-target spell acquisition.
+ * Only NPCs within this cone (measured as a dot product threshold) are eligible.
+ * cos(60°) ≈ 0.5  → 60° half-angle = 120° total frontal arc.
+ */
+const SPELL_TARGET_CONE_DOT = 0.5;
+
+/** XP awarded to the relevant magic school skill on a successful spell hit. */
+const SKILL_XP_SPELL_DESTRUCTION = 8;
+const SKILL_XP_SPELL_RESTORATION = 6;
+
+/**
  * Manages known spells, the currently equipped spell, casting cooldowns,
  * and delivers spell effects to NPCs and the player.
  *
@@ -176,6 +188,7 @@ export class SpellSystem {
   private _npcs: NPC[];
   private _ui: UIManager;
   private _scene: Scene | null;
+  private _skillSystem: SkillProgressionSystem | null = null;
 
   private _definitions: Map<string, SpellDefinition> = new Map();
   private _knownSpellIds: Set<string> = new Set();
@@ -207,6 +220,11 @@ export class SpellSystem {
 
   public get npcs(): NPC[] { return this._npcs; }
   public set npcs(value: NPC[]) { this._npcs = value; }
+
+  /** Wire up skill progression so spells award XP to the appropriate school. */
+  public setSkillSystem(system: SkillProgressionSystem | null): void {
+    this._skillSystem = system;
+  }
 
   // ── Spell registry ────────────────────────────────────────────────────────
 
@@ -295,6 +313,15 @@ export class SpellSystem {
     this._cooldownRemaining = spell.cooldown;
 
     const result = this._resolveEffect(spell);
+
+    // Award skill XP on effective casts.
+    if (result.success) {
+      if (spell.school === "destruction" && result.hitNpc) {
+        this._skillSystem?.gainXP("destruction", SKILL_XP_SPELL_DESTRUCTION);
+      } else if (spell.school === "restoration" && (result.heal ?? 0) > 0) {
+        this._skillSystem?.gainXP("restoration", SKILL_XP_SPELL_RESTORATION);
+      }
+    }
 
     const msg = result.hitNpc
       ? `${spell.name} → ${result.hitNpc} (${result.damage ?? 0} dmg)`
@@ -406,18 +433,52 @@ export class SpellSystem {
     });
   }
 
-  /** Find the closest live NPC within `range` in front of the player camera. */
+  /**
+   * Find the closest live NPC within `range` that is also inside the player's
+   * forward-facing targeting cone (dot product ≥ SPELL_TARGET_CONE_DOT).
+   *
+   * This prevents spells from snapping onto enemies behind or beside the player —
+   * matching Oblivion's intent-based targeting and giving the player directional
+   * control over which enemy they hit.
+   */
   private _findTargetNpc(playerPos: Vector3, range: number): NPC | null {
+    // Obtain the camera's normalised forward direction.
+    // getForwardRay requires BabylonJS's Ray class side-effect; fall back to
+    // a +Z default if it is unavailable (unit tests, headless environments).
+    let forward: Vector3;
+    try {
+      forward = this._player.camera.getForwardRay
+        ? this._player.camera.getForwardRay(1).direction
+        : new Vector3(0, 0, 1);
+    } catch {
+      forward = new Vector3(0, 0, 1);
+    }
+
     let closest: NPC | null = null;
     let closestDist = range;
 
     for (const npc of this._npcs) {
       if (npc.isDead) continue;
       const dist = Vector3.Distance(playerPos, npc.mesh.position);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closest = npc;
+      if (dist >= closestDist) continue;
+
+      // Directional check: is the NPC within the frontal cone?
+      const toNpc = npc.mesh.position.subtract(playerPos);
+      toNpc.y = 0; // Ignore vertical component for the dot check
+      const toNpcLen = toNpc.length();
+      if (toNpcLen > 0.001) {
+        toNpc.scaleInPlace(1 / toNpcLen);
+        const fwdFlat = new Vector3(forward.x, 0, forward.z);
+        const fwdLen = fwdFlat.length();
+        if (fwdLen > 0.001) {
+          fwdFlat.scaleInPlace(1 / fwdLen);
+          const dot = Vector3.Dot(fwdFlat, toNpc);
+          if (dot < SPELL_TARGET_CONE_DOT) continue; // outside targeting arc
+        }
       }
+
+      closestDist = dist;
+      closest = npc;
     }
     return closest;
   }

@@ -24,6 +24,8 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
  *   ATTACK      → RETURN      (player > 2×aggroRange away)
  *   RETURN      → ALERT       (player re-enters aggroRange during return)
  *   RETURN      → PATROL      (reached spawnPosition)
+ *   CHASE/ATTACK → FLEE       (health drops below fleesBelowHealthPct threshold)
+ *   FLEE        → RETURN      (player out of aggro range or NPC escapes)
  */
 export enum AIState {
   IDLE        = "IDLE",
@@ -33,6 +35,8 @@ export enum AIState {
   ATTACK      = "ATTACK",
   RETURN      = "RETURN",
   INVESTIGATE = "INVESTIGATE",
+  /** NPC is running away from the player (triggered when health drops below fleesBelowHealthPct). */
+  FLEE        = "FLEE",
 }
 
 /**
