@@ -111,6 +111,7 @@ export class PetUI {
     this._ensurePanel();
     this._renderPanel();
     this._panelRoot!.style.display = "flex";
+    this._panelRoot!.focus();
     this.isVisible = true;
   }
 
@@ -213,6 +214,10 @@ export class PetUI {
     if (this._panelRoot) return;
 
     const root = document.createElement("div");
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
+    root.setAttribute("aria-labelledby", "pet-panel-title");
+    root.tabIndex = -1;
     Object.assign(root.style, {
       position:       "fixed",
       top:            "50%",
@@ -241,6 +246,7 @@ export class PetUI {
     });
 
     const title = document.createElement("h3");
+    title.id = "pet-panel-title";
     Object.assign(title.style, {
       margin: "0", color: C.TITLE, fontSize: "15px", letterSpacing: "1px",
     });
@@ -248,6 +254,7 @@ export class PetUI {
 
     const closeBtn = document.createElement("button");
     _styleButton(closeBtn, "×", { fontSize: "18px", padding: "0 6px" });
+    closeBtn.setAttribute("aria-label", "Close companions panel");
     closeBtn.addEventListener("click", () => {
       this.close();
       this.onClose?.();
@@ -369,11 +376,13 @@ export class PetUI {
       const btn = document.createElement("button");
       if (isActive) {
         _styleButton(btn, "Dismiss");
+        btn.setAttribute("aria-label", `Dismiss ${pet.name}`);
         btn.addEventListener("click", () => {
           this.onDismiss?.();
         });
       } else {
         _styleButton(btn, "Summon");
+        btn.setAttribute("aria-label", `Summon ${pet.name}`);
         btn.addEventListener("click", () => {
           this.onSummon?.(pet.id);
         });
