@@ -32,6 +32,8 @@ export class DialogueSystem {
 
   /** Fired with the NPC's mesh name when a conversation begins. */
   public onTalkStart: ((npcName: string) => void) | null = null;
+  /** Fired after dialogue UI and cinematic camera are torn down (pointer lock restored). */
+  public onDialogueClosed: (() => void) | null = null;
   /** Optional session factory. If provided, dialogue UI is driven by framework data. */
   public dialogueSessionProvider: ((npc: NPC) => DialogueSession | null) | null = null;
 
@@ -285,5 +287,7 @@ export class DialogueSystem {
     // Restore controls and pointer lock so mouse-look works immediately
     this.canvas.requestPointerLock();
     this.player.camera.attachControl(this.canvas, true);
+
+    if (this.onDialogueClosed) this.onDialogueClosed();
   }
 }

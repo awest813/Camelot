@@ -81,6 +81,18 @@ export class WaitSystem {
     return { ok: true, message: `Waited ${h} ${plural}. Time is now ${newTime}.` };
   }
 
+  /**
+   * Advance time and restore stats without opening the wait UI (inn bed, scripted rest).
+   * Clamps hours to the same range as {@link wait}.
+   */
+  public rest(
+    hours: number,
+    timeSystem: TimeSystem,
+    player: Player,
+  ): { ok: boolean; message: string } {
+    return this.wait(hours, timeSystem, player);
+  }
+
   // ── Getters ───────────────────────────────────────────────────────────────
 
   /** Cumulative in-game hours the player has waited (lifetime total). */
