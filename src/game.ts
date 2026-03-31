@@ -1824,7 +1824,8 @@ export class Game {
     this.scene.onKeyboardObservable.add((kbInfo) => {
         if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
             if (kbInfo.event.key === " " || kbInfo.event.code === "Space") {
-                if (!kbInfo.event.repeat && this._tryAdvanceOnboardingTutorial()) {
+                const keyEv = kbInfo.event as KeyboardEvent;
+                if (!keyEv.repeat && this._tryAdvanceOnboardingTutorial()) {
                     kbInfo.event.preventDefault();
                 }
             } else if (kbInfo.event.key === "Escape") {

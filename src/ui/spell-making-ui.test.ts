@@ -299,7 +299,7 @@ describe("SpellMakingUI", () => {
 
   describe("Forge Spell button", () => {
     it("fires onForge with spell name and components when name is provided", () => {
-      const onForge = vi.fn<[SpellMakingForgeRequest], void>();
+      const onForge = vi.fn<(request: SpellMakingForgeRequest) => void>();
       ui.onForge = onForge;
       ui.open();
       setNameInput("Storm Lash");
@@ -311,7 +311,7 @@ describe("SpellMakingUI", () => {
     });
 
     it("forged request includes at least the primary component", () => {
-      const onForge = vi.fn<[SpellMakingForgeRequest], void>();
+      const onForge = vi.fn<(request: SpellMakingForgeRequest) => void>();
       ui.onForge = onForge;
       ui.open();
       setNameInput("Frost Bite");
@@ -321,7 +321,7 @@ describe("SpellMakingUI", () => {
     });
 
     it("forged request includes two components when secondary is enabled", () => {
-      const onForge = vi.fn<[SpellMakingForgeRequest], void>();
+      const onForge = vi.fn<(request: SpellMakingForgeRequest) => void>();
       ui.onForge = onForge;
       ui.open();
       setNameInput("Twin Force");
@@ -357,7 +357,7 @@ describe("SpellMakingUI", () => {
     });
 
     it("primary component has magnitude from the magnitude input (default 15)", () => {
-      const onForge = vi.fn<[SpellMakingForgeRequest], void>();
+      const onForge = vi.fn<(request: SpellMakingForgeRequest) => void>();
       ui.onForge = onForge;
       ui.open();
       setNameInput("Test Spell");
@@ -367,7 +367,7 @@ describe("SpellMakingUI", () => {
     });
 
     it("primary component has school 'destruction' by default", () => {
-      const onForge = vi.fn<[SpellMakingForgeRequest], void>();
+      const onForge = vi.fn<(request: SpellMakingForgeRequest) => void>();
       ui.onForge = onForge;
       ui.open();
       setNameInput("Fire Spell");
@@ -377,7 +377,7 @@ describe("SpellMakingUI", () => {
     });
 
     it("primary component effectType defaults to 'damage'", () => {
-      const onForge = vi.fn<[SpellMakingForgeRequest], void>();
+      const onForge = vi.fn<(request: SpellMakingForgeRequest) => void>();
       ui.onForge = onForge;
       ui.open();
       setNameInput("Damage Spell");
@@ -387,7 +387,7 @@ describe("SpellMakingUI", () => {
     });
 
     it("primary component includes damageType when effectType is 'damage'", () => {
-      const onForge = vi.fn<[SpellMakingForgeRequest], void>();
+      const onForge = vi.fn<(request: SpellMakingForgeRequest) => void>();
       ui.onForge = onForge;
       ui.open();
       setNameInput("Shock Spell");

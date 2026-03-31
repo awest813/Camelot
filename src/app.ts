@@ -90,6 +90,9 @@ class App {
       if (!this._fpsElement) {
         const div = document.createElement("div");
         div.id = "display-fps";
+        div.setAttribute("role", "status");
+        div.setAttribute("aria-live", "polite");
+        div.setAttribute("aria-atomic", "true");
         div.textContent = "0";
         document.body.appendChild(div);
         this._fpsElement = div;
@@ -161,17 +164,8 @@ class App {
 
   private _showFatalError(message: string): void {
     const errorBanner = document.createElement("div");
-    errorBanner.style.position = "fixed";
-    errorBanner.style.left = "16px";
-    errorBanner.style.right = "16px";
-    errorBanner.style.bottom = "16px";
-    errorBanner.style.padding = "12px 16px";
-    errorBanner.style.borderRadius = "8px";
-    errorBanner.style.background = "rgba(120, 0, 0, 0.9)";
-    errorBanner.style.color = "#fff";
-    errorBanner.style.fontFamily = "system-ui, sans-serif";
-    errorBanner.style.fontSize = "14px";
-    errorBanner.style.zIndex = "9999";
+    errorBanner.className = "app-fatal-error";
+    errorBanner.setAttribute("role", "alert");
     errorBanner.textContent = message;
     document.body.appendChild(errorBanner);
   }

@@ -181,8 +181,9 @@ export class UIManager {
       arm.height = def.h;
       arm.top = def.top;
       arm.left = def.left;
+      arm.cornerRadius = 1;
       arm.thickness = 0;
-      arm.background = "rgba(255,255,255,0.9)";
+      arm.background = "rgba(248, 246, 240, 0.92)";
       this.crosshair.addControl(arm);
       this._crosshairArms.push(arm);
     }
@@ -190,8 +191,9 @@ export class UIManager {
     const dot = new Rectangle();
     dot.width = "3px";
     dot.height = "3px";
+    dot.cornerRadius = 2;
     dot.thickness = 0;
-    dot.background = "rgba(255,255,255,0.9)";
+    dot.background = "rgba(248, 246, 240, 0.95)";
     this.crosshair.addControl(dot);
     this._crosshairArms.push(dot);
 
@@ -202,8 +204,9 @@ export class UIManager {
     this.interactionLabel.fontSize = 18;
     this.interactionLabel.fontWeight = "bold";
     this.interactionLabel.top = "60px";
-    this.interactionLabel.shadowColor = "rgba(0,0,0,0.9)";
-    this.interactionLabel.shadowBlur = 5;
+    this.interactionLabel.shadowColor = "rgba(0,0,0,0.85)";
+    this.interactionLabel.shadowBlur = 6;
+    this.interactionLabel.shadowOffsetY = 1;
     this._ui.addControl(this.interactionLabel);
 
     // ── Status Bars (Bottom Center) ───────────────────────────────────────────
@@ -254,8 +257,8 @@ export class UIManager {
     const xpBarContainer = new Rectangle();
     xpBarContainer.width = "580px";
     xpBarContainer.height = "8px";
-    xpBarContainer.cornerRadius = 4;
-    xpBarContainer.color = T.PANEL_BORDER;
+    xpBarContainer.cornerRadius = 5;
+    xpBarContainer.color = "rgba(212, 160, 23, 0.45)";
     xpBarContainer.thickness = 1;
     xpBarContainer.background = T.XP_BG;
     xpRow.addControl(xpBarContainer);
@@ -263,7 +266,7 @@ export class UIManager {
     this.xpBar = new Rectangle();
     this.xpBar.width = "0%";
     this.xpBar.height = "100%";
-    this.xpBar.cornerRadius = 4;
+    this.xpBar.cornerRadius = 5;
     this.xpBar.thickness = 0;
     this.xpBar.background = T.XP_FILL;
     this.xpBar.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
@@ -1122,8 +1125,8 @@ export class UIManager {
     const container = new Rectangle();
     container.width = "192px";
     container.height = "22px";
-    container.cornerRadius = 5;
-    container.color = "rgba(255,255,255,0.10)";
+    container.cornerRadius = 6;
+    container.color = "rgba(212, 160, 23, 0.28)";
     container.thickness = 1;
     container.background = trackColor;
     parent.addControl(container);
@@ -1140,12 +1143,14 @@ export class UIManager {
     // Label overlaid on top of bar
     const labelText = new TextBlock();
     labelText.text = label;
-    labelText.color = "rgba(255,255,255,0.82)";
+    labelText.color = "rgba(255, 252, 245, 0.9)";
     labelText.fontSize = 10;
     labelText.fontWeight = "bold";
     labelText.width = "100%";
     labelText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    labelText.paddingLeft = "7px";
+    labelText.paddingLeft = "8px";
+    labelText.shadowColor = "rgba(0,0,0,0.55)";
+    labelText.shadowBlur = 3;
     container.addControl(labelText);
 
     return { container, bar };
