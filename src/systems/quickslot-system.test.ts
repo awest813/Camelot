@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { QuickSlotSystem, QUICK_SLOT_KEYS } from "./quickslot-system";
+import { QuickSlotSystem, QUICK_SLOT_KEYS, isConsumableItem } from "./quickslot-system";
 import type { QuickSlotKey } from "./quickslot-system";
 import type { Item } from "./inventory-system";
 
@@ -194,17 +194,45 @@ describe("QuickSlotSystem", () => {
       expect(inv._removed).toEqual([{ id: "potion_hp_01", amount: 1 }]);
     });
 
-    it("fires onItemConsumed callback with correct item and key", () => {
+    it("fires onItemConsumed callback with correct item and source key", () => {
       const potion  = makeHealPotion();
       const inv     = makeInventory([potion]);
       const sys     = new QuickSlotSystem(inv, makePlayer(50), makeUI());
       sys.bindSlot("0", "potion_hp_01");
 
-      const events: Array<{ id: string; key: QuickSlotKey }> = [];
-      sys.onItemConsumed = (item, key) => events.push({ id: item.id, key });
+      const events: Array<{ id: string; source: QuickSlotKey | "inventory" }> = [];
+      sys.onItemConsumed = (item, source) => events.push({ id: item.id, source });
 
       sys.useSlot("0");
-      expect(events).toEqual([{ id: "potion_hp_01", key: "0" }]);
+      expect(events).toEqual([{ id: "potion_hp_01", source: "0" }]);
+    });
+  });
+
+  describe("tryConsumeFromInventoryRow", () => {
+    it("consumes from inventory and reports inventory source", () => {
+      const player = makePlayer(30);
+      const inv = makeInventory([makeHealPotion("potion_hp_01", 2)]);
+      const sys = new QuickSlotSystem(inv, player, makeUI());
+      const events: Array<{ id: string; source: string }> = [];
+      sys.onItemConsumed = (item, source) => events.push({ id: item.id, source });
+      const row = inv.items[0];
+      expect(sys.tryConsumeFromInventoryRow(row)).toBe(true);
+      expect(player.health).toBe(80);
+      expect(events).toEqual([{ id: "potion_hp_01", source: "inventory" }]);
+    });
+
+    it("returns false for non-consumables so host can equip", () => {
+      const inv = makeInventory([makeWeapon()]);
+      const sys = new QuickSlotSystem(inv, makePlayer(), makeUI());
+      expect(sys.tryConsumeFromInventoryRow(inv.items[0])).toBe(false);
+    });
+  });
+
+  describe("isConsumableItem", () => {
+    it("is true when heal/magicka/stamina stat is positive", () => {
+      expect(isConsumableItem(makeHealPotion())).toBe(true);
+      expect(isConsumableItem(makeWeapon())).toBe(false);
+      expect(isConsumableItem({ ...makeHealPotion(), stats: { value: 25 } })).toBe(false);
     });
   });
 
