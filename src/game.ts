@@ -128,11 +128,18 @@ import { BundleMergeUI } from "./ui/bundle-merge-ui";
 import { WorkspaceDraftSystem } from "./systems/workspace-draft-system";
 import { ModManifestSystem } from "./systems/mod-manifest-system";
 import { ModManifestUI } from "./ui/mod-manifest-ui";
+import { BarterUI } from "./ui/barter-ui";
+import type { Item } from "./systems/inventory-system";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
 /** Inventory item ID used for player gold (bounty payment check). */
 const GOLD_ITEM_ID = "gold_coins";
+/** Map framework bundle item ids to Babylon inventory ids when they differ. */
+const FRAMEWORK_ITEM_TO_GAME: Readonly<Record<string, string>> = {
+  health_potion: "potion_hp_01",
+  iron_sword: "sword_01",
+};
 /** Persisted local author identity for layer ownership workflows. */
 const MAP_EDITOR_AUTHOR_STORAGE_KEY = "camelot_map_editor_author";
 
@@ -283,6 +290,10 @@ export class Game {
   public animationSystem: AnimationSystem;
   public petSystem: PetSystem;
   public petUI: PetUI;
+
+  private readonly _barterUI = new BarterUI();
+  /** When set, open barter after dialogue teardown (pointer lock restored first). */
+  private _pendingBarterMerchantId: string | null = null;
 
   public isPaused: boolean = false;
 
@@ -462,6 +473,7 @@ export class Game {
     this.saveSystem.onAfterLoad = () => {
       this._cleanupCollectedLoot();
       this._hydrateCellAfterLoad();
+      this._syncInventoryGoldToFramework();
     };
     this.interactionSystem  = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem, this.ui);
     this.interactionSystem.cellManager = this.cellManager;
@@ -974,6 +986,16 @@ export class Game {
     this.projectileSystem = new ProjectileSystem(this.scene, this.player, this.scheduleSystem.npcs, this.ui);
     this.projectileSystem.stealthSystem = this.stealthSystem;
     this.barterSystem    = new BarterSystem(this.inventorySystem, this.ui);
+    this.barterSystem.onTransaction = () => {
+      this._mirrorBarterGoldToInventory();
+      this._syncInventoryGoldToFramework();
+    };
+    this.frameworkRuntime.setDialogueHostHooks({
+      onDialogueHostEvent: (eventId, payload) => this._handleDialogueHostEvent(eventId, payload),
+      onDialogueConsumeItem: (itemId, quantity) => this._dialogueConsumeInventoryItem(itemId, quantity),
+      onDialogueGiveItem: (itemId, quantity) => this._giveDialogueItemToPlayer(itemId, quantity),
+      dialogueInventoryCount: (itemId) => this._dialogueInventoryCountForFramework(itemId),
+    });
 
     // Register v2 systems with save
     this.saveSystem.setAttributeSystem(this.attributeSystem);
@@ -1179,8 +1201,13 @@ export class Game {
 
     this.spellMakingUI = new SpellMakingUI((components) => this.spellMakingSystem.computeCost(components));
     this.spellMakingUI.onForge = ({ name, components }) => {
+      this.barterSystem.playerGold = this._getInventoryGold();
       const result = this.spellMakingSystem.forgeSpell(name, components, this.barterSystem);
       if (result.ok) {
+        if (result.goldCost && result.goldCost > 0) {
+          this._consumeInventoryGold(result.goldCost);
+        }
+        this.barterSystem.playerGold = this._getInventoryGold();
         this.spellMakingUI.showStatus(
           `Forged "${result.spell!.name}" for ${result.goldCost} gold. Press Z to cycle spells.`,
         );
@@ -1224,6 +1251,43 @@ export class Game {
       "merchant_01",
       merchantTemplate,
       500,
+      72,
+      this.timeSystem.gameTime,
+    );
+    this.merchantRestockSystem.registerMerchant(
+      "merchant_general_01",
+      [
+        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 8, weight: 0.3, stats: { value: 25 } },
+        { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 4, weight: 1, stats: { value: 15 } },
+      ],
+      450,
+      72,
+      this.timeSystem.gameTime,
+    );
+    this.merchantRestockSystem.registerMerchant(
+      "merchant_weapons_01",
+      [
+        { id: "iron_sword", name: "Iron Sword", description: "A basic iron sword.", stackable: false, quantity: 2, slot: "mainHand", weight: 3, stats: { damage: 10, value: 80 } },
+        { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 6, weight: 1, stats: { value: 15 } },
+      ],
+      800,
+      72,
+      this.timeSystem.gameTime,
+    );
+    this.merchantRestockSystem.registerMerchant(
+      "merchant_armor_01",
+      [
+        { id: "leather_chest_01", name: "Leather Chest", description: "Light armor. +15 Armor Rating.", stackable: false, quantity: 1, slot: "chest", weight: 4, stats: { armor: 15, value: 55 } },
+        { id: "iron_helm_01", name: "Iron Helm", description: "A sturdy iron helmet. +12 Armor Rating.", stackable: false, quantity: 2, slot: "head", weight: 2.5, stats: { armor: 12, value: 45 } },
+      ],
+      650,
+      72,
+      this.timeSystem.gameTime,
+    );
+    this.merchantRestockSystem.registerMerchant(
+      "merchant_alchemist_01",
+      [{ id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 12, weight: 0.3, stats: { value: 25 } }],
+      520,
       72,
       this.timeSystem.gameTime,
     );
@@ -1610,7 +1674,7 @@ export class Game {
       new Vector3(-8, 2, 8),  // return position after exiting
     );
 
-    // Register a sample merchant
+    // Register merchants (dialogue `barter:open` uses payload.merchantId)
     this.barterSystem.registerMerchant({
       id: "merchant_01",
       name: "Trader Elan",
@@ -1625,6 +1689,84 @@ export class Game {
       openHour: 8,
       closeHour: 20,
     });
+    this.barterSystem.registerMerchant({
+      id: "merchant_general_01",
+      name: "Village General Goods",
+      factionId: "merchants_guild",
+      inventory: [
+        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 8, weight: 0.3, stats: { value: 25 } },
+        { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 4, weight: 1, stats: { value: 15 } },
+      ],
+      gold: 450,
+      priceMultiplier: 1.05,
+      isOpen: true,
+      openHour: 7,
+      closeHour: 21,
+    });
+    this.barterSystem.registerMerchant({
+      id: "merchant_weapons_01",
+      name: "Roadside Arms",
+      factionId: "merchants_guild",
+      inventory: [
+        { id: "iron_sword", name: "Iron Sword", description: "A basic iron sword.", stackable: false, quantity: 2, slot: "mainHand", weight: 3, stats: { damage: 10, value: 80 } },
+        { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 6, weight: 1, stats: { value: 15 } },
+      ],
+      gold: 800,
+      priceMultiplier: 1.15,
+      isOpen: true,
+      openHour: 8,
+      closeHour: 19,
+    });
+    this.barterSystem.registerMerchant({
+      id: "merchant_armor_01",
+      name: "Shield & Hauberk",
+      factionId: "merchants_guild",
+      inventory: [
+        { id: "leather_chest_01", name: "Leather Chest", description: "Light armor. +15 Armor Rating.", stackable: false, quantity: 1, slot: "chest", weight: 4, stats: { armor: 15, value: 55 } },
+        { id: "iron_helm_01", name: "Iron Helm", description: "A sturdy iron helmet. +12 Armor Rating.", stackable: false, quantity: 2, slot: "head", weight: 2.5, stats: { armor: 12, value: 45 } },
+      ],
+      gold: 650,
+      priceMultiplier: 1.12,
+      isOpen: true,
+      openHour: 8,
+      closeHour: 19,
+    });
+    this.barterSystem.registerMerchant({
+      id: "merchant_alchemist_01",
+      name: "Stillwater Reagents",
+      factionId: "mages_college",
+      inventory: [
+        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 12, weight: 0.3, stats: { value: 25 } },
+      ],
+      gold: 520,
+      priceMultiplier: 1.2,
+      isOpen: true,
+      openHour: 9,
+      closeHour: 18,
+    });
+
+    this._barterUI.onBuy = (itemId) => {
+      const mid = this.barterSystem.activeMerchantId;
+      if (!mid) return;
+      this.barterSystem.buyItem(mid, itemId);
+      this._barterUI.update(this.barterSystem, this.inventorySystem.items);
+      this.saveSystem.markDirty();
+    };
+    this._barterUI.onSell = (itemId) => {
+      const mid = this.barterSystem.activeMerchantId;
+      if (!mid) return;
+      this.barterSystem.sellItem(mid, itemId);
+      this._barterUI.update(this.barterSystem, this.inventorySystem.items);
+      this.saveSystem.markDirty();
+    };
+    this._barterUI.onClose = () => {
+      this._barterUI.hide();
+      this.barterSystem.closeBarter();
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
 
     // Prevent browser context menu from capturing right-click combat input.
     this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
@@ -1696,6 +1838,11 @@ export class Game {
         if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === "interact") {
           this._onboardingTutorial.advance();
         }
+    };
+    this.dialogueSystem.onDialogueClosed = () => {
+      this.barterSystem.playerGold = this._getInventoryGold();
+      this._syncInventoryGoldToFramework();
+      this._flushPendingBarter();
     };
 
     // Quest XP and fame callbacks are wired in the v9 block above.
@@ -1879,6 +2026,8 @@ export class Game {
                     this.player.camera.attachControl(this.canvas, true);
                 } else if (this.spellMakingUI.isVisible) {
                     this.spellMakingUI.close();
+                } else if (this._barterUI.isVisible) {
+                    this._barterUI.onClose?.();
                 } else if (this.fastTravelUI.isVisible) {
                     this.fastTravelUI.close();
                 } else if (this.petUI.isVisible) {
@@ -3293,6 +3442,113 @@ export class Game {
       return goldEntry?.quantity ?? 0;
   }
 
+  /** Sync framework engine gold count from the live inventory (for dialogue conditions). */
+  private _syncInventoryGoldToFramework(): void {
+      const qty = this._getInventoryGold();
+      const eng = this.frameworkRuntime.inventoryEngine;
+      const cur = eng.getItemCount("gold_coins");
+      if (cur === qty) return;
+      if (cur > qty) {
+        eng.removeItem("gold_coins", cur - qty);
+      } else {
+        eng.addItem("gold_coins", qty - cur);
+      }
+  }
+
+  /** Keep the gold stack aligned with BarterSystem's running total after trades. */
+  private _mirrorBarterGoldToInventory(): void {
+      const target = Math.max(0, Math.floor(this.barterSystem.playerGold));
+      const current = this._getInventoryGold();
+      if (current === target) return;
+      if (current > target) {
+        this.inventorySystem.removeItem(GOLD_ITEM_ID, current - target);
+      } else {
+        this.inventorySystem.addItem({
+          id: GOLD_ITEM_ID,
+          name: "Gold Coins",
+          description: "Currency for trade and fines.",
+          stackable: true,
+          quantity: target - current,
+          weight: 0.1,
+          stats: { value: 1 },
+        });
+      }
+  }
+
+  private _dialogueInventoryCountForFramework(itemId: string): number {
+      if (itemId === "gold_coins") return this._getInventoryGold();
+      const gameId = FRAMEWORK_ITEM_TO_GAME[itemId] ?? itemId;
+      return this.inventorySystem.items.find((i) => i.id === gameId)?.quantity ?? 0;
+  }
+
+  private _dialogueConsumeInventoryItem(itemId: string, quantity: number): boolean {
+      if (itemId === "gold_coins") {
+        return this._consumeInventoryGold(quantity);
+      }
+      const gameId = FRAMEWORK_ITEM_TO_GAME[itemId] ?? itemId;
+      return this.inventorySystem.removeItem(gameId, quantity);
+  }
+
+  private _giveDialogueItemToPlayer(itemId: string, quantity: number): void {
+      const def = this.frameworkRuntime.contentRegistry.getItemDefinition(itemId);
+      if (!def) return;
+      const gameId = FRAMEWORK_ITEM_TO_GAME[itemId] ?? itemId;
+      const existing = this.inventorySystem.items.find((i) => i.id === gameId);
+      if (existing) {
+        this.inventorySystem.addItem({ ...existing, quantity });
+        return;
+      }
+      const item: Item = {
+        id: gameId,
+        name: def.name,
+        description: def.description,
+        stackable: def.stackable,
+        quantity,
+        weight: 0.3,
+        stats: { value: 10 },
+      };
+      if (def.slot) item.slot = def.slot;
+      this.inventorySystem.addItem(item);
+  }
+
+  private _handleDialogueHostEvent(eventId: string, payload?: Record<string, unknown>): void {
+      if (eventId === "barter:open") {
+        const merchantId = typeof payload?.merchantId === "string" ? payload.merchantId : "merchant_01";
+        this._pendingBarterMerchantId = merchantId;
+        return;
+      }
+      if (eventId === "rest:inn") {
+        const hoursRaw = payload?.hours;
+        const hours = typeof hoursRaw === "number" && Number.isFinite(hoursRaw)
+          ? Math.round(hoursRaw)
+          : 8;
+        const result = this.waitSystem.rest(hours, this.timeSystem, this.player);
+        if (result.ok) {
+          this.ui.showNotification(`You slept soundly. ${result.message}`, 3200);
+          this.skillProgressionSystem.gainXP("speechcraft", 6 * this.classSystem.xpMultiplierFor("speechcraft"));
+          this.saveSystem.markDirty();
+        }
+      }
+  }
+
+  private _flushPendingBarter(): void {
+      const merchantId = this._pendingBarterMerchantId;
+      this._pendingBarterMerchantId = null;
+      if (!merchantId) return;
+
+      const hour = this.timeSystem.hour;
+      if (!this.barterSystem.openBarter(merchantId, hour)) {
+        return;
+      }
+
+      this.barterSystem.playerGold = this._getInventoryGold();
+      this._barterUI.show();
+      this._barterUI.update(this.barterSystem, this.inventorySystem.items);
+      this.interactionSystem.isBlocked = true;
+      document.exitPointerLock();
+      this.player.camera.detachControl();
+  }
+
   private _consumeInventoryGold(amount: number): boolean {
       if (amount <= 0) return true;
       const available = this._getInventoryGold();
@@ -3451,6 +3707,7 @@ export class Game {
           this.levelUpUI.isVisible ||
           this.guardEncounterUI.isVisible ||
           this.spellMakingUI.isVisible ||
+          this._barterUI.isVisible ||
           this.fastTravelUI.isVisible ||
           this.stableUI.isVisible ||
           this.saddlebagUI.isVisible ||

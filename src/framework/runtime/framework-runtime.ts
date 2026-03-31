@@ -24,6 +24,21 @@ export interface FrameworkRuntimeOptions {
    * dialogue choices gated by skill level are correctly enabled/disabled.
    */
   skillLevelProvider?: (skillId: string) => number;
+  /**
+   * When set, dialogue `emit_event` effects invoke this after quest-event translation
+   * so the host can handle non-quest ids (`barter:open`, `rest:inn`, …).
+   */
+  onDialogueHostEvent?: (eventId: string, payload?: Record<string, unknown>) => void;
+  /**
+   * When set, dialogue `consume_item` uses this instead of the headless inventory engine.
+   * Return whether the items were removed.
+   */
+  onDialogueConsumeItem?: (itemId: string, quantity: number) => boolean;
+  /**
+   * When set, dialogue `give_item` delegates here (framework inventory is not updated by
+   * `createDialogueSession` in that case — the host should mirror state if needed).
+   */
+  onDialogueGiveItem?: (itemId: string, quantity: number) => void;
 }
 
 export class FrameworkRuntime {
@@ -37,10 +52,17 @@ export class FrameworkRuntime {
   private _factionEngine: FactionEngine;
   private _modLoader: ModLoader | null = null;
   private _skillLevelProvider: ((skillId: string) => number) | undefined;
+  private _onDialogueHostEvent?: (eventId: string, payload?: Record<string, unknown>) => void;
+  private _onDialogueConsumeItem?: (itemId: string, quantity: number) => boolean;
+  private _onDialogueGiveItem?: (itemId: string, quantity: number) => void;
+  private _dialogueInventoryCount?: (itemId: string) => number;
 
   constructor(baseContent: RpgContentBundle, options: FrameworkRuntimeOptions = {}) {
     this.contentRegistry.loadBase(baseContent);
     this._skillLevelProvider = options.skillLevelProvider;
+    this._onDialogueHostEvent = options.onDialogueHostEvent;
+    this._onDialogueConsumeItem = options.onDialogueConsumeItem;
+    this._onDialogueGiveItem = options.onDialogueGiveItem;
     this._rebuildEngines(options.inventoryCapacity ?? 20);
     this.saveEngine = new SaveEngine(options.storage, options.storageKey);
     if (options.fetchImpl) {
@@ -50,6 +72,24 @@ export class FrameworkRuntime {
 
   public get dialogueEngine(): DialogueEngine {
     return this._dialogueEngine;
+  }
+
+  /**
+   * Update dialogue host hooks after construction (e.g. once BarterSystem exists).
+   * Omitted keys leave the previous callback in place.
+   */
+  public setDialogueHostHooks(
+    hooks: Partial<{
+      onDialogueHostEvent: (eventId: string, payload?: Record<string, unknown>) => void;
+      onDialogueConsumeItem: (itemId: string, quantity: number) => boolean;
+      onDialogueGiveItem: (itemId: string, quantity: number) => void;
+      dialogueInventoryCount: (itemId: string) => number;
+    }>,
+  ): void {
+    if (hooks.onDialogueHostEvent !== undefined) this._onDialogueHostEvent = hooks.onDialogueHostEvent;
+    if (hooks.onDialogueConsumeItem !== undefined) this._onDialogueConsumeItem = hooks.onDialogueConsumeItem;
+    if (hooks.onDialogueGiveItem !== undefined) this._onDialogueGiveItem = hooks.onDialogueGiveItem;
+    if (hooks.dialogueInventoryCount !== undefined) this._dialogueInventoryCount = hooks.dialogueInventoryCount;
   }
 
   public get questEngine(): QuestGraphEngine {
@@ -91,9 +131,11 @@ export class FrameworkRuntime {
         this._factionEngine.adjustReputation(factionId, amount);
       },
       getQuestStatus: (questId) => this._questEngine.getQuestStatus(questId),
-      getInventoryCount: (itemId) => this._inventoryEngine.getItemCount(itemId),
+      getInventoryCount: (itemId) =>
+        this._dialogueInventoryCount?.(itemId) ?? this._inventoryEngine.getItemCount(itemId),
       getSkillLevel: this._skillLevelProvider,
       emitEvent: (eventId, payload) => {
+        this._onDialogueHostEvent?.(eventId, payload);
         const event = this._translateDialogueEvent(eventId, payload);
         if (event) {
           this._questEngine.applyEvent(event);
@@ -103,9 +145,16 @@ export class FrameworkRuntime {
         this._questEngine.activateQuest(questId);
       },
       consumeItem: (itemId, quantity) => {
+        if (this._onDialogueConsumeItem) {
+          return this._onDialogueConsumeItem(itemId, quantity);
+        }
         return this._inventoryEngine.removeItem(itemId, quantity).success;
       },
       giveItem: (itemId, quantity) => {
+        if (this._onDialogueGiveItem) {
+          this._onDialogueGiveItem(itemId, quantity);
+          return;
+        }
         this._inventoryEngine.addItem(itemId, quantity);
       },
     };

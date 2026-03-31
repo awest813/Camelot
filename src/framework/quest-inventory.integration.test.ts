@@ -42,25 +42,24 @@ describe("Item-consume effects via dialogue", () => {
     expect(runtime.inventoryEngine.getItemCount("gold_coins")).toBe(40);
   });
 
-  it("consume_item fails gracefully when player does not have the item", () => {
-    // No gold_coins in inventory — choosing "pay" should still complete the
-    // dialogue (the effect is best-effort) without throwing.
+  it("pay choice is unavailable when player has no gold (has_item gate)", () => {
     const runtime = mkRuntime();
     const session = runtime.createDialogueSession("innkeeper_intro");
     session.choose("rest");
-    expect(() => session.choose("pay")).not.toThrow();
-    expect(session.isComplete).toBe(true);
+    const node = session.getCurrentNode();
+    const pay = node?.choices.find((c) => c.id === "pay");
+    expect(pay?.isAvailable).toBe(false);
+    expect(session.isComplete).toBe(false);
   });
 
-  it("consume_item does not remove items when quantity exceeds what is held", () => {
+  it("pay choice is unavailable when player has insufficient gold", () => {
     const runtime = mkRuntime();
-    runtime.inventoryEngine.addItem("gold_coins", 5); // only 5, needs 10
-    const before = runtime.inventoryEngine.getItemCount("gold_coins");
+    runtime.inventoryEngine.addItem("gold_coins", 5);
     const session = runtime.createDialogueSession("innkeeper_intro");
     session.choose("rest");
-    session.choose("pay");
-    // removeItem fails silently; no partial removal should occur
-    expect(runtime.inventoryEngine.getItemCount("gold_coins")).toBe(before);
+    const pay = session.getCurrentNode()?.choices.find((c) => c.id === "pay");
+    expect(pay?.isAvailable).toBe(false);
+    expect(runtime.inventoryEngine.getItemCount("gold_coins")).toBe(5);
   });
 
   it("multiple consume_item sessions each deduct independently", () => {

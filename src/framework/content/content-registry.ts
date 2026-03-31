@@ -1,3 +1,4 @@
+import type { ItemDefinition } from "../inventory/inventory-types";
 import { NpcArchetypeDefinition, RpgContentBundle } from "./content-types";
 
 type ContentWithId = { id: string };
@@ -45,6 +46,11 @@ export class ContentRegistry {
   /** All registered NPC archetypes. */
   public getAllNpcArchetypes(): NpcArchetypeDefinition[] {
     return Array.from(this._npcArchetypes.values()).map(r => r.value);
+  }
+
+  /** Return a registered item definition by id, or `null` if unknown. */
+  public getItemDefinition(id: string): ItemDefinition | null {
+    return this._items.get(id)?.value ?? null;
   }
 
   public getSource(domain: DomainName, id: string): string | null {

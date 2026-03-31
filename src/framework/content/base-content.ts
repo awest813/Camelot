@@ -68,7 +68,7 @@ export const frameworkBaseContent: RpgContentBundle = {
               id: "buy",
               text: "I'd like to trade.",
               endsDialogue: true,
-              effects: [{ type: "emit_event", eventId: "barter:open" }],
+              effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_01" } }],
             },
             {
               id: "rumors",
@@ -132,9 +132,10 @@ export const frameworkBaseContent: RpgContentBundle = {
               id: "pay",
               text: "Here you go. (10 gold)",
               endsDialogue: true,
+              conditions: [{ type: "has_item", itemId: "gold_coins", minQuantity: 10 }],
               effects: [
                 { type: "consume_item", itemId: "gold_coins", quantity: 10 },
-                { type: "emit_event", eventId: "rest:inn" },
+                { type: "emit_event", eventId: "rest:inn", payload: { hours: 8 } },
               ],
             },
             {
@@ -167,27 +168,30 @@ export const frameworkBaseContent: RpgContentBundle = {
               id: "buy_ale",
               text: "I'll have an ale. (2 gold)",
               nextNodeId: "ale_reply",
+              conditions: [{ type: "has_item", itemId: "gold_coins", minQuantity: 2 }],
               effects: [
                 { type: "consume_item", itemId: "gold_coins", quantity: 2 },
-                { type: "emit_event", eventId: "inn:buy_drink:ale" },
+                { type: "give_item", itemId: "ale", quantity: 1 },
               ],
             },
             {
               id: "buy_mead",
               text: "A mug of mead, please. (3 gold)",
               nextNodeId: "mead_reply",
+              conditions: [{ type: "has_item", itemId: "gold_coins", minQuantity: 3 }],
               effects: [
                 { type: "consume_item", itemId: "gold_coins", quantity: 3 },
-                { type: "emit_event", eventId: "inn:buy_drink:mead" },
+                { type: "give_item", itemId: "mead", quantity: 1 },
               ],
             },
             {
               id: "buy_stew",
               text: "A bowl of stew. (4 gold)",
               nextNodeId: "food_reply",
+              conditions: [{ type: "has_item", itemId: "gold_coins", minQuantity: 4 }],
               effects: [
                 { type: "consume_item", itemId: "gold_coins", quantity: 4 },
-                { type: "emit_event", eventId: "inn:buy_food:stew" },
+                { type: "give_item", itemId: "stew", quantity: 1 },
               ],
             },
             {
@@ -253,7 +257,7 @@ export const frameworkBaseContent: RpgContentBundle = {
               id: "trade",
               text: "Let me see what you have.",
               endsDialogue: true,
-              effects: [{ type: "emit_event", eventId: "barter:open" }],
+              effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_general_01" } }],
             },
             {
               id: "rumors",
@@ -272,7 +276,12 @@ export const frameworkBaseContent: RpgContentBundle = {
           speaker: "Shopkeeper",
           text: "Word is the old garrison road is clear again. Good news for supply caravans — and for anyone moving goods quietly.",
           choices: [
-            { id: "trade", text: "Good to know. Let me browse.", endsDialogue: true, effects: [{ type: "emit_event", eventId: "barter:open" }] },
+            {
+              id: "trade",
+              text: "Good to know. Let me browse.",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_general_01" } }],
+            },
             { id: "leave", text: "Thanks.", endsDialogue: true },
           ],
         },
@@ -291,7 +300,7 @@ export const frameworkBaseContent: RpgContentBundle = {
               id: "trade",
               text: "Show me your weapons.",
               endsDialogue: true,
-              effects: [{ type: "emit_event", eventId: "barter:open" }],
+              effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_weapons_01" } }],
             },
             {
               id: "ask_repair",
@@ -310,7 +319,12 @@ export const frameworkBaseContent: RpgContentBundle = {
           speaker: "Weapons Dealer",
           text: "Leave it on the counter. I charge by the condition — badly damaged pieces cost more to fix right.",
           choices: [
-            { id: "trade", text: "Fair enough. Let's see prices.", endsDialogue: true, effects: [{ type: "emit_event", eventId: "barter:open" }] },
+            {
+              id: "trade",
+              text: "Fair enough. Let's see prices.",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_weapons_01" } }],
+            },
             { id: "leave", text: "I'll think about it.", endsDialogue: true },
           ],
         },
@@ -329,7 +343,7 @@ export const frameworkBaseContent: RpgContentBundle = {
               id: "trade",
               text: "Let me see your stock.",
               endsDialogue: true,
-              effects: [{ type: "emit_event", eventId: "barter:open" }],
+              effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_armor_01" } }],
             },
             {
               id: "ask_light",
@@ -353,7 +367,12 @@ export const frameworkBaseContent: RpgContentBundle = {
           speaker: "Armorer",
           text: "Leather cuirass and bracers. Lets you move, deflects glancing blows. Rangers and scouts swear by it.",
           choices: [
-            { id: "trade", text: "Show me.", endsDialogue: true, effects: [{ type: "emit_event", eventId: "barter:open" }] },
+            {
+              id: "trade",
+              text: "Show me.",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_armor_01" } }],
+            },
             { id: "leave", text: "I'll keep that in mind.", endsDialogue: true },
           ],
         },
@@ -362,7 +381,12 @@ export const frameworkBaseContent: RpgContentBundle = {
           speaker: "Armorer",
           text: "Iron plate. It'll slow you down, but you'll weather hits that would drop a lesser fighter.",
           choices: [
-            { id: "trade", text: "That sounds like what I need.", endsDialogue: true, effects: [{ type: "emit_event", eventId: "barter:open" }] },
+            {
+              id: "trade",
+              text: "That sounds like what I need.",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_armor_01" } }],
+            },
             { id: "leave", text: "I'll think it over.", endsDialogue: true },
           ],
         },
@@ -381,7 +405,7 @@ export const frameworkBaseContent: RpgContentBundle = {
               id: "trade",
               text: "I'd like to browse your potions.",
               endsDialogue: true,
-              effects: [{ type: "emit_event", eventId: "barter:open" }],
+              effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_alchemist_01" } }],
             },
             {
               id: "ask_lore",
@@ -402,7 +426,12 @@ export const frameworkBaseContent: RpgContentBundle = {
             + "Combine two that share a property and you get a potion. "
             + "Combine opposing ones and… well, that's how I lost my eyebrows.",
           choices: [
-            { id: "trade", text: "Fascinating. Let me see what you have.", endsDialogue: true, effects: [{ type: "emit_event", eventId: "barter:open" }] },
+            {
+              id: "trade",
+              text: "Fascinating. Let me see what you have.",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_alchemist_01" } }],
+            },
             { id: "leave", text: "Noted. I'll be careful.", endsDialogue: true },
           ],
         },
