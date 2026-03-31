@@ -236,7 +236,7 @@ describe("GuardEncounterUI", () => {
 
   describe("onResolve", () => {
     it("Pay Fine button fires onResolve with 'pay_fine'", () => {
-      const onResolve = vi.fn<[GuardEncounterAction], void>();
+      const onResolve = vi.fn<(action: GuardEncounterAction) => void>();
       ui.onResolve = onResolve;
       ui.open(makeView({ bounty: 100, playerGold: 500 }));
       const payBtn = Array.from(document.querySelectorAll<HTMLButtonElement>(".guard-encounter__btn")).find(
@@ -247,7 +247,7 @@ describe("GuardEncounterUI", () => {
     });
 
     it("Go to Jail button fires onResolve with 'go_to_jail'", () => {
-      const onResolve = vi.fn<[GuardEncounterAction], void>();
+      const onResolve = vi.fn<(action: GuardEncounterAction) => void>();
       ui.onResolve = onResolve;
       ui.open(makeView());
       const jailBtn = Array.from(document.querySelectorAll<HTMLButtonElement>(".guard-encounter__btn")).find(
@@ -258,7 +258,7 @@ describe("GuardEncounterUI", () => {
     });
 
     it("Persuade button fires onResolve with 'persuade'", () => {
-      const onResolve = vi.fn<[GuardEncounterAction], void>();
+      const onResolve = vi.fn<(action: GuardEncounterAction) => void>();
       ui.onResolve = onResolve;
       ui.open(makeView({ canPersuade: true }));
       const persuadeBtn = Array.from(document.querySelectorAll<HTMLButtonElement>(".guard-encounter__btn")).find(
@@ -269,7 +269,7 @@ describe("GuardEncounterUI", () => {
     });
 
     it("Resist Arrest button fires onResolve with 'resist_arrest'", () => {
-      const onResolve = vi.fn<[GuardEncounterAction], void>();
+      const onResolve = vi.fn<(action: GuardEncounterAction) => void>();
       ui.onResolve = onResolve;
       ui.open(makeView());
       const resistBtn = Array.from(document.querySelectorAll<HTMLButtonElement>(".guard-encounter__btn")).find(
