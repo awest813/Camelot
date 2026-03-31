@@ -149,13 +149,27 @@ export class BarterSystem {
     const added = this._inventory.addItem({ ...item, quantity: 1 });
     if (!added) return false;
 
-    this.playerGold  -= price;
-    merchant.gold    += price;
+    this.playerGold -= price;
+    merchant.gold += price;
 
     if (item.quantity > 1) {
       merchant.inventory[idx] = { ...item, quantity: item.quantity - 1 };
     } else {
       merchant.inventory.splice(idx, 1);
+    }
+
+    const verify = this._inventory.items.find((i) => i.id === item.id);
+    if (!verify || verify.quantity < 1) {
+      this._inventory.removeItem(item.id, 1);
+      this.playerGold += price;
+      merchant.gold -= price;
+      if (item.quantity > 1) {
+        merchant.inventory[idx] = { ...item, quantity: item.quantity };
+      } else {
+        merchant.inventory.splice(idx, 0, { ...item, quantity: 1 });
+      }
+      this._ui.showNotification("Inventory full — purchase cancelled.", 2200);
+      return false;
     }
 
     this.onTransaction?.("buy", item.name, price);

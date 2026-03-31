@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { InventorySystem } from "./inventory-system";
 import { BarterSystem } from "./barter-system";
 
 describe("BarterSystem", () => {
@@ -29,9 +30,25 @@ describe("BarterSystem", () => {
   beforeEach(() => {
     mockUI = { showNotification: vi.fn() };
     mockInventory = {
-      items: [],
-      addItem: vi.fn(() => true),
-      removeItem: vi.fn(() => true),
+      items: [] as typeof potion[],
+      addItem(item: typeof potion) {
+        const copy = { ...item };
+        const existing = this.items.find((i) => i.id === copy.id);
+        if (copy.stackable && existing) {
+          existing.quantity += copy.quantity;
+        } else {
+          this.items.push(copy);
+        }
+        return true;
+      },
+      removeItem(itemId: string, amount: number) {
+        const idx = this.items.findIndex((i) => i.id === itemId);
+        if (idx === -1) return false;
+        const row = this.items[idx];
+        if (row.quantity > amount) row.quantity -= amount;
+        else this.items.splice(idx, 1);
+        return true;
+      },
     };
 
     barter = new BarterSystem(mockInventory, mockUI);
@@ -128,7 +145,7 @@ describe("BarterSystem", () => {
     barter.buyItem("merch_01", "potion_hp");
     expect(barter.playerGold).toBe(200 - price);
     expect(barter.getMerchant("merch_01")!.gold).toBe(500 + price);
-    expect(mockInventory.addItem).toHaveBeenCalled();
+    expect(mockInventory.items.some((i) => i.id === "potion_hp")).toBe(true);
   });
 
   it("buyItem returns false if player gold < price", () => {
@@ -147,6 +164,38 @@ describe("BarterSystem", () => {
     const stock = barter.getMerchant("merch_01")!.inventory.find(i => i.id === "potion_hp");
     // quantity was 5, should now be 4
     expect(stock?.quantity).toBe(4);
+  });
+
+  it("buyItem rolls back gold and stock if item vanishes after addItem (integrity check)", () => {
+    const rogueInv = {
+      items: [] as typeof potion[],
+      addItem(_item: typeof potion) {
+        return true;
+      },
+      removeItem(_itemId: string, _amount: number) {
+        return true;
+      },
+    };
+    const rogueBarter = new BarterSystem(rogueInv as unknown as InventorySystem, mockUI);
+    rogueBarter.playerGold = 200;
+    rogueBarter.barterSkill = 20;
+    rogueBarter.registerMerchant({
+      id: "merch_01",
+      name: "Trader",
+      factionId: "town",
+      inventory: [{ ...potion, quantity: 2 }],
+      gold: 500,
+      priceMultiplier: 1.0,
+      isOpen: true,
+      openHour: 8,
+      closeHour: 20,
+    });
+    const price = rogueBarter.getBuyPrice(potion, "merch_01");
+    expect(rogueBarter.buyItem("merch_01", "potion_hp")).toBe(false);
+    expect(rogueBarter.playerGold).toBe(200);
+    const m = rogueBarter.getMerchant("merch_01")!;
+    expect(m.gold).toBe(500);
+    expect(m.inventory.find((i) => i.id === "potion_hp")?.quantity).toBe(2);
   });
 
   // ── sellItem ──────────────────────────────────────────────────────────────

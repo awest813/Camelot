@@ -63,7 +63,7 @@ import { EnchantingUI } from "./ui/enchanting-ui";
 import { LodSystem } from "./systems/lod-system";
 import { WeatherSystem } from "./systems/weather-system";
 import { GraphicsSystem } from "./systems/graphics-system";
-import { QuickSlotSystem } from "./systems/quickslot-system";
+import { QuickSlotSystem, isConsumableItem } from "./systems/quickslot-system";
 import { WaitSystem } from "./systems/wait-system";
 import { SkillProgressionSystem } from "./systems/skill-progression-system";
 import { FastTravelSystem } from "./systems/fast-travel-system";
@@ -140,6 +140,8 @@ const FRAMEWORK_ITEM_TO_GAME: Readonly<Record<string, string>> = {
   health_potion: "potion_hp_01",
   iron_sword: "sword_01",
 };
+/** Merchant / restock health potions: `value` for barter pricing, `heal` for consumable use. */
+const HEALTH_POTION_STATS = { value: 25, heal: 50 } as const;
 /** Persisted local author identity for layer ownership workflows. */
 const MAP_EDITOR_AUTHOR_STORAGE_KEY = "camelot_map_editor_author";
 
@@ -461,7 +463,6 @@ export class Game {
     this.dialogueSystem     = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
     this.inventorySystem    = new InventorySystem(this.player, this.ui, this.canvas);
     this.equipmentSystem    = new EquipmentSystem(this.player, this.inventorySystem, this.ui);
-    this.ui.onInventoryItemClick = (item) => this.equipmentSystem.handleItemClick(item);
     this.saveSystem         = new SaveSystem(this.player, this.inventorySystem, this.equipmentSystem, this.ui);
     this.questSystem        = new QuestSystem(this.ui);
     this.questSystem.onOpen = () => {
@@ -1097,11 +1098,20 @@ export class Game {
     this.quickSlotSystem = new QuickSlotSystem(this.inventorySystem, this.player, this.ui);
     // Seed slot 7 with the starter health potion (if the player has one)
     this.quickSlotSystem.bindSlot("7", "potion_hp_01");
-    this.quickSlotSystem.onItemConsumed = (item, _key) => {
-      this.eventBus.emit("player:consumeItem" as any, { itemId: item.id });
+    this.quickSlotSystem.onItemConsumed = (item, source) => {
+      this.eventBus.emit("player:consumeItem" as any, { itemId: item.id, source });
       this.saveSystem.markDirty();
     };
     this.saveSystem.setQuickSlotSystem(this.quickSlotSystem);
+
+    this.ui.onInventoryItemClick = (item) => {
+      if (this.quickSlotSystem.tryConsumeFromInventoryRow(item)) {
+        this.saveSystem.markDirty();
+        return;
+      }
+      this.equipmentSystem.handleItemClick(item);
+    };
+    this.ui.isConsumableItem = isConsumableItem;
 
     // ── v7 system wiring (QoL: Wait + Compass) ────────────────────────────────
     this.waitSystem = new WaitSystem();
@@ -1244,7 +1254,7 @@ export class Game {
     // MerchantRestockSystem — restock the starter merchant every 72 game-hours
     this.merchantRestockSystem = new MerchantRestockSystem();
     const merchantTemplate = [
-      { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 5, weight: 0.3, stats: { value: 25 } },
+      { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 5, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
       { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 3, weight: 1, stats: { value: 15 } },
     ];
     this.merchantRestockSystem.registerMerchant(
@@ -1257,7 +1267,7 @@ export class Game {
     this.merchantRestockSystem.registerMerchant(
       "merchant_general_01",
       [
-        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 8, weight: 0.3, stats: { value: 25 } },
+        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 8, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
         { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 4, weight: 1, stats: { value: 15 } },
       ],
       450,
@@ -1286,7 +1296,7 @@ export class Game {
     );
     this.merchantRestockSystem.registerMerchant(
       "merchant_alchemist_01",
-      [{ id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 12, weight: 0.3, stats: { value: 25 } }],
+      [{ id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 12, weight: 0.3, stats: { ...HEALTH_POTION_STATS } }],
       520,
       72,
       this.timeSystem.gameTime,
@@ -1680,7 +1690,7 @@ export class Game {
       name: "Trader Elan",
       factionId: "town",
       inventory: [
-        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 5, weight: 0.3, stats: { value: 25 } },
+        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 5, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
         { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 3, weight: 1, stats: { value: 15 } },
       ],
       gold: 500,
@@ -1694,7 +1704,7 @@ export class Game {
       name: "Village General Goods",
       factionId: "merchants_guild",
       inventory: [
-        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 8, weight: 0.3, stats: { value: 25 } },
+        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 8, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
         { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 4, weight: 1, stats: { value: 15 } },
       ],
       gold: 450,
@@ -1736,7 +1746,7 @@ export class Game {
       name: "Stillwater Reagents",
       factionId: "mages_college",
       inventory: [
-        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 12, weight: 0.3, stats: { value: 25 } },
+        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 12, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
       ],
       gold: 520,
       priceMultiplier: 1.2,
@@ -1865,7 +1875,7 @@ export class Game {
         description: "Restores 50 HP.",
         stackable: true,
         quantity: 1,
-        stats: { heal: 50 }
+        stats: { ...HEALTH_POTION_STATS }
     });
 
     new Loot(this.scene, new Vector3(6, 1, 7), {
@@ -3505,7 +3515,10 @@ export class Game {
         stackable: def.stackable,
         quantity,
         weight: 0.3,
-        stats: { value: 10 },
+        stats:
+          itemId === "health_potion"
+            ? { ...HEALTH_POTION_STATS }
+            : { value: 10 },
       };
       if (def.slot) item.slot = def.slot;
       this.inventorySystem.addItem(item);
@@ -3514,6 +3527,15 @@ export class Game {
   private _handleDialogueHostEvent(eventId: string, payload?: Record<string, unknown>): void {
       if (eventId === "barter:open") {
         const merchantId = typeof payload?.merchantId === "string" ? payload.merchantId : "merchant_01";
+        if (this._barterUI.isVisible) {
+          this._barterUI.hide();
+          this.barterSystem.closeBarter();
+          this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+          if (!this.mapEditorSystem.isEnabled && !this.isPaused) {
+            this.canvas.requestPointerLock();
+            this.player.camera.attachControl(this.canvas, true);
+          }
+        }
         this._pendingBarterMerchantId = merchantId;
         return;
       }
