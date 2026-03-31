@@ -72,6 +72,12 @@ export class UIManager {
   /** Called when the player clicks an inventory item slot. Set by Game to hook into EquipmentSystem. */
   public onInventoryItemClick: ((item: Item) => void) | null = null;
 
+  /**
+   * When set (by Game), inventory rows show a drink/use hint for consumables
+   * (same rule as QuickSlotSystem: positive heal / magicka / stamina on stats).
+   */
+  public isConsumableItem: ((item: Item) => boolean) | null = null;
+
   // Pause Menu
   public pausePanel: Rectangle;
   public resumeButton: Button;
@@ -1007,9 +1013,18 @@ export class UIManager {
       const hoverColor = isEquipped ? "rgba(60, 44, 0, 0.95)" : T.SLOT_HOVER;
 
       let isFocused = false;
+      const useHint = (): string => {
+        if (this.isConsumableItem?.(item)) return "\n[Click to Use]";
+        if (item.slot) {
+          const equipped = this._equippedIds.has(item.id);
+          return equipped ? "\n[Click to Unequip]" : "\n[Click to Equip]";
+        }
+        return "";
+      };
+
       const setHoverState = () => {
         const equipped = this._equippedIds.has(item.id);
-        const hint = item.slot ? (equipped ? "\n[Click to Unequip]" : "\n[Click to Equip]") : "";
+        const hint = useHint();
         this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}${hint}`;
         slot.background = hoverColor;
         if (slot.thickness !== 3) slot.thickness = equipped ? 2 : 1;
@@ -1017,7 +1032,7 @@ export class UIManager {
       const setFocusState = () => {
         isFocused = true;
         const equipped = this._equippedIds.has(item.id);
-        const hint = item.slot ? (equipped ? "\n[Click to Unequip]" : "\n[Click to Equip]") : "";
+        const hint = useHint();
         this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}${hint}`;
         slot.background = hoverColor;
         slot.thickness = 3; // Distinct visual indicator for keyboard focus
@@ -1043,12 +1058,13 @@ export class UIManager {
       slot.onBlurObservable.add(setBlurState);
 
       const triggerItem = () => {
-        if (item.slot && this.onInventoryItemClick) {
+        if (this.onInventoryItemClick) {
           this.onInventoryItemClick(item);
         }
       };
 
-      if (item.slot) {
+      const clickable = Boolean(this.isConsumableItem?.(item) || item.slot);
+      if (clickable) {
         slot.onPointerUpObservable.add(triggerItem);
         slot.onKeyboardEventProcessedObservable.add((evt) => {
           if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {

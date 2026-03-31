@@ -8,6 +8,20 @@ export type QuickSlotKey = "7" | "8" | "9" | "0";
 
 export const QUICK_SLOT_KEYS: readonly QuickSlotKey[] = ["7", "8", "9", "0"] as const;
 
+/** Where a consumable was triggered from (HUD quick slot vs inventory click). */
+export type ConsumableUseSource = QuickSlotKey | "inventory";
+
+/** True when `item.stats` has a positive heal / magicka / stamina restore (quick slots + inventory use). */
+export function isConsumableItem(item: Item): boolean {
+  const s = item.stats;
+  if (!s) return false;
+  return (
+    (typeof s.heal === "number" && s.heal > 0) ||
+    (typeof s.magicka === "number" && s.magicka > 0) ||
+    (typeof s.stamina === "number" && s.stamina > 0)
+  );
+}
+
 // ── Save / load ───────────────────────────────────────────────────────────────
 
 export interface QuickSlotSaveState {
@@ -30,8 +44,8 @@ export interface QuickSlotSaveState {
  * Wire-up example (game.ts):
  * ```ts
  * this.quickSlotSystem = new QuickSlotSystem(this.inventorySystem, this.player, this.ui);
- * this.quickSlotSystem.onItemConsumed = (item, key) => {
- *   this.eventBus.emit("player:consumeItem", { itemId: item.id });
+ * this.quickSlotSystem.onItemConsumed = (item, source) => {
+   *   this.eventBus.emit("player:consumeItem", { itemId: item.id, source });
  * };
  * // Bind a starter health potion to slot 7
  * this.quickSlotSystem.bindSlot("7", "potion_hp_01");
@@ -52,7 +66,7 @@ export class QuickSlotSystem {
   private readonly _ui: UIManager;
 
   /** Fired after an item is successfully consumed. Useful for event bus integration. */
-  public onItemConsumed: ((item: Item, key: QuickSlotKey) => void) | null = null;
+  public onItemConsumed: ((item: Item, source: ConsumableUseSource) => void) | null = null;
 
   constructor(inventory: InventorySystem, player: Player, ui: UIManager) {
     this._inventory = inventory;
@@ -120,15 +134,19 @@ export class QuickSlotSystem {
       return false;
     }
 
-    // Apply effects
-    this._applyStatRestore("heal",    "health",  "maxHealth",  "HP",      item);
-    this._applyStatRestore("magicka", "magicka", "maxMagicka", "Magicka", item);
-    this._applyStatRestore("stamina", "stamina", "maxStamina", "Stamina", item);
+    this._consumeOneUnit(item, key);
+    return true;
+  }
 
-    // Remove one from inventory
-    this._inventory.removeItem(itemId, 1);
-
-    this.onItemConsumed?.(item, key);
+  /**
+   * Inventory panel: use one unit if the row is a consumable (potion, etc.).
+   * Returns false when the item is not consumable so the host can equip gear instead.
+   */
+  public tryConsumeFromInventoryRow(item: Item): boolean {
+    const live = this._inventory.items.find((i) => i.id === item.id);
+    if (!live) return false;
+    if (!this._isConsumable(live)) return false;
+    this._consumeOneUnit(live, "inventory");
     return true;
   }
 
@@ -147,14 +165,16 @@ export class QuickSlotSystem {
 
   // ── Private helpers ───────────────────────────────────────────────────────
 
+  private _consumeOneUnit(item: Item, source: ConsumableUseSource): void {
+    this._applyStatRestore("heal",    "health",  "maxHealth",  "HP",      item);
+    this._applyStatRestore("magicka", "magicka", "maxMagicka", "Magicka", item);
+    this._applyStatRestore("stamina", "stamina", "maxStamina", "Stamina", item);
+    this._inventory.removeItem(item.id, 1);
+    this.onItemConsumed?.(item, source);
+  }
+
   private _isConsumable(item: Item): boolean {
-    const s = item.stats;
-    if (!s) return false;
-    return (
-      (typeof s.heal    === "number" && s.heal    > 0) ||
-      (typeof s.magicka === "number" && s.magicka > 0) ||
-      (typeof s.stamina === "number" && s.stamina > 0)
-    );
+    return isConsumableItem(item);
   }
 
   /**
