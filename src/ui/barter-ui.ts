@@ -318,6 +318,9 @@ export class BarterUI {
     btn.textContent = action === "buy" ? "Buy" : "Sell";
     btn.disabled = !actionEnabled;
     btn.setAttribute("aria-disabled", actionEnabled ? "false" : "true");
+    if (!actionEnabled) {
+      btn.title = action === "buy" ? "Not enough gold to purchase." : "Merchant does not have enough gold to buy this.";
+    }
     btn.addEventListener("click", () => {
       if (!btn.disabled) {
         if (action === "buy") {
