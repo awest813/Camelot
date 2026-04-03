@@ -265,8 +265,12 @@ export class SkillTreeUI {
       btn.className = "skill-tree-ui__upgrade-btn";
       btn.type = "button";
       btn.textContent = "Upgrade";
+      btn.setAttribute("aria-label", `Upgrade ${skill.name}`);
       btn.disabled = !canBuy;
       btn.setAttribute("aria-disabled", canBuy ? "false" : "true");
+      if (!canBuy) {
+        btn.title = isLocked ? "Prerequisites not met." : "Not enough skill points.";
+      }
       btn.addEventListener("click", () => {
         if (!btn.disabled) {
           this.onPurchase?.(treeIndex, skillIndex);

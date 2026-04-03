@@ -337,6 +337,13 @@ describe("ContainerUI", () => {
       expect(onTakeItem).toHaveBeenCalledWith("iron_sword");
     });
 
+    it("has a contextual aria-label on the Take button", () => {
+      ui.show();
+      ui.update(makeSystem());
+      const btn = document.querySelector<HTMLButtonElement>(".container-ui__take-btn");
+      expect(btn?.getAttribute("aria-label")).toBe("Take Iron Sword");
+    });
+
     it("fires correct item id for each row's button", () => {
       const onTakeItem = vi.fn();
       ui.onTakeItem = onTakeItem;
