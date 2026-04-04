@@ -36,6 +36,41 @@ const ZODIAC_NAME_SUGGESTIONS: ReadonlyArray<{ sign: string; name: string }> = [
   { sign: "Pisces",      name: "Pisceon"  },
 ];
 
+/** Per-race decorative icons shown on race cards. */
+const RACE_ICONS: Readonly<Record<string, string>> = {
+  nord:     "❄",
+  imperial: "⚜",
+  breton:   "✦",
+  redguard: "⚔",
+  altmer:   "⚡",
+  dunmer:   "🔥",
+  bosmer:   "🍃",
+  orsimer:  "🛡",
+  khajiit:  "🌙",
+  argonian: "💧",
+};
+
+/** Fallback icons by heritage when no per-race icon is defined. */
+const HERITAGE_ICONS: Readonly<Record<RaceDefinition["heritage"], string>> = {
+  human: "⚜",
+  elven: "✦",
+  beast: "🐾",
+};
+
+/** Icons for birthsign guardian types. */
+const GUARDIAN_ICONS: Readonly<Record<BirthsignDefinition["guardian"], string>> = {
+  warrior: "⚔",
+  mage:    "✦",
+  thief:   "🌙",
+};
+
+/** Icons for class specializations. */
+const SPEC_ICONS: Readonly<Record<CharacterClass["specialization"], string>> = {
+  combat:  "⚔",
+  magic:   "✦",
+  stealth: "🌙",
+};
+
 const guardianLabel = (guardian: BirthsignDefinition["guardian"]): string => {
   return guardian.charAt(0).toUpperCase() + guardian.slice(1);
 };
@@ -252,6 +287,12 @@ export class CharacterCreationUI {
         intro.className = "character-create__intro";
         cards.appendChild(intro);
 
+        const emblem = document.createElement("div");
+        emblem.className = "character-create__emblem";
+        emblem.textContent = "⚔";
+        emblem.setAttribute("aria-hidden", "true");
+        intro.appendChild(emblem);
+
         const p1 = document.createElement("p");
         p1.textContent =
           "Race shapes heritage and passive bonuses. Birthsign grants lasting gifts and often a daily power. Class sets which skills level fastest at the start.";
@@ -293,6 +334,35 @@ export class CharacterCreationUI {
         seedSection.className = "character-create__world-section";
         cards.appendChild(seedSection);
 
+        // ── Declare visual-card arrays up front so select listeners can reference them ──
+        const wtCardEls: HTMLButtonElement[] = [];
+        const biomeTileEls: HTMLButtonElement[] = [];
+
+        const worldTypeVisualDefs: ReadonlyArray<{ value: WorldType; label: string }> = [
+          { value: "normal",    label: "Normal"    },
+          { value: "flat",      label: "Flat"      },
+          { value: "amplified", label: "Amplified" },
+          { value: "island",    label: "Island"    },
+        ];
+
+        const biomeVisualDefs: ReadonlyArray<{ value: string; label: string; icon: string }> = [
+          { value: "",       label: "Random",  icon: "⚄" },
+          { value: "plains", label: "Plains",  icon: "🌾" },
+          { value: "forest", label: "Forest",  icon: "🌲" },
+          { value: "desert", label: "Desert",  icon: "☀" },
+          { value: "tundra", label: "Tundra",  icon: "❄" },
+        ];
+
+        // ── World type section ────────────────────────────────────────────────
+        const wtSectionLabel = document.createElement("p");
+        wtSectionLabel.className = "character-create__world-section-label";
+        wtSectionLabel.textContent = "World type";
+        seedSection.appendChild(wtSectionLabel);
+
+        const worldTypeVisualGrid = document.createElement("div");
+        worldTypeVisualGrid.className = "character-create__world-type-cards";
+        seedSection.appendChild(worldTypeVisualGrid);
+
         // ── Seed input row ────────────────────────────────────────────────────
         const seedRow = document.createElement("div");
         seedRow.className = "character-create__world-row";
@@ -333,10 +403,46 @@ export class CharacterCreationUI {
         });
         seedInputWrap.appendChild(randomBtn);
 
-        // ── World Type select ─────────────────────────────────────────────────
+        // ── Starting biome section ────────────────────────────────────────────
+        const biomeSectionLabel = document.createElement("p");
+        biomeSectionLabel.className = "character-create__world-section-label";
+        biomeSectionLabel.textContent = "Starting biome";
+        seedSection.appendChild(biomeSectionLabel);
+
+        const biomeVisualGrid = document.createElement("div");
+        biomeVisualGrid.className = "character-create__biome-tiles";
+        seedSection.appendChild(biomeVisualGrid);
+
+        // ── Advanced settings toggle ──────────────────────────────────────────
+        const advancedToggle = document.createElement("button");
+        advancedToggle.type = "button";
+        advancedToggle.className = "character-create__advanced-toggle";
+
+        const advancedToggleIcon = document.createElement("span");
+        advancedToggleIcon.className = "character-create__advanced-toggle-icon";
+        advancedToggleIcon.textContent = "▶";
+        advancedToggle.appendChild(advancedToggleIcon);
+
+        const advancedToggleText = document.createElement("span");
+        advancedToggleText.textContent = "Advanced settings (biome scale, structure density)";
+        advancedToggle.appendChild(advancedToggleText);
+        seedSection.appendChild(advancedToggle);
+
+        const advancedContent = document.createElement("div");
+        advancedContent.className = "character-create__advanced-content";
+        seedSection.appendChild(advancedContent);
+
+        let advancedOpen = false;
+        advancedToggle.addEventListener("click", () => {
+          advancedOpen = !advancedOpen;
+          advancedToggle.classList.toggle("is-open", advancedOpen);
+          advancedContent.classList.toggle("is-open", advancedOpen);
+        });
+
+        // ── World Type select (in advanced; kept in DOM for accessibility & tests) ──
         const typeRow = document.createElement("div");
         typeRow.className = "character-create__world-row";
-        seedSection.appendChild(typeRow);
+        advancedContent.appendChild(typeRow);
 
         const typeLabel = document.createElement("label");
         typeLabel.className = "character-create__world-label";
@@ -347,7 +453,7 @@ export class CharacterCreationUI {
         const typeSelect = document.createElement("select");
         typeSelect.id = "world-type-select";
         typeSelect.className = "character-create__world-select";
-        const worldTypeOptions: { value: WorldType; label: string }[] = [
+        const worldTypeOptions: ReadonlyArray<{ value: WorldType; label: string }> = [
           { value: "normal",    label: "Normal — varied, smooth biome transitions" },
           { value: "flat",      label: "Flat — all plains, no elevation variation" },
           { value: "amplified", label: "Amplified — dramatic biome contrasts" },
@@ -362,13 +468,18 @@ export class CharacterCreationUI {
         }
         typeSelect.addEventListener("change", () => {
           worldType = typeSelect.value as WorldType;
+          wtCardEls.forEach((c, i) => {
+            const sel = worldTypeVisualDefs[i].value === worldType;
+            c.classList.toggle("is-selected", sel);
+            c.setAttribute("aria-pressed", sel.toString());
+          });
         });
         typeRow.appendChild(typeSelect);
 
         // ── Biome Scale select ────────────────────────────────────────────────
         const scaleRow = document.createElement("div");
         scaleRow.className = "character-create__world-row";
-        seedSection.appendChild(scaleRow);
+        advancedContent.appendChild(scaleRow);
 
         const scaleLabel = document.createElement("label");
         scaleLabel.className = "character-create__world-label";
@@ -379,7 +490,7 @@ export class CharacterCreationUI {
         const scaleSelect = document.createElement("select");
         scaleSelect.id = "biome-scale-select";
         scaleSelect.className = "character-create__world-select";
-        const biomeScaleOptions: { value: BiomeScale; label: string }[] = [
+        const biomeScaleOptions: ReadonlyArray<{ value: BiomeScale; label: string }> = [
           { value: "small",  label: "Small — tight, frequent biome transitions" },
           { value: "medium", label: "Medium — balanced (default)" },
           { value: "large",  label: "Large — wide, expansive biome zones" },
@@ -400,7 +511,7 @@ export class CharacterCreationUI {
         // ── Structure Density select ──────────────────────────────────────────
         const densityRow = document.createElement("div");
         densityRow.className = "character-create__world-row";
-        seedSection.appendChild(densityRow);
+        advancedContent.appendChild(densityRow);
 
         const densityLabel = document.createElement("label");
         densityLabel.className = "character-create__world-label";
@@ -411,7 +522,7 @@ export class CharacterCreationUI {
         const densitySelect = document.createElement("select");
         densitySelect.id = "structure-density-select";
         densitySelect.className = "character-create__world-select";
-        const structureDensityOptions: { value: StructureDensity; label: string }[] = [
+        const structureDensityOptions: ReadonlyArray<{ value: StructureDensity; label: string }> = [
           { value: "none",     label: "None — no ruins, shrines, or watchtowers" },
           { value: "rare",     label: "Rare — occasional structures (~10 %)" },
           { value: "normal",   label: "Normal — standard frequency (~25 %)" },
@@ -432,7 +543,7 @@ export class CharacterCreationUI {
         // ── Starting Biome select ─────────────────────────────────────────────
         const biomeRow = document.createElement("div");
         biomeRow.className = "character-create__world-row";
-        seedSection.appendChild(biomeRow);
+        advancedContent.appendChild(biomeRow);
 
         const biomeLabel = document.createElement("label");
         biomeLabel.className = "character-create__world-label";
@@ -443,7 +554,7 @@ export class CharacterCreationUI {
         const biomeSelect = document.createElement("select");
         biomeSelect.id = "starting-biome-select";
         biomeSelect.className = "character-create__world-select";
-        const startingBiomeOptions: { value: string; label: string }[] = [
+        const startingBiomeOptions: ReadonlyArray<{ value: string; label: string }> = [
           { value: "",       label: "Random — determined by seed" },
           { value: "plains", label: "Plains — open grasslands" },
           { value: "forest", label: "Forest — dense woodland" },
@@ -459,8 +570,76 @@ export class CharacterCreationUI {
         }
         biomeSelect.addEventListener("change", () => {
           startingBiome = biomeSelect.value ? (biomeSelect.value as BiomeType) : null;
+          biomeTileEls.forEach((t, i) => {
+            const sel = biomeVisualDefs[i].value === biomeSelect.value;
+            t.classList.toggle("is-selected", sel);
+            t.setAttribute("aria-pressed", sel.toString());
+          });
         });
         biomeRow.appendChild(biomeSelect);
+
+        // ── Populate visual world type cards ──────────────────────────────────
+        for (const opt of worldTypeVisualDefs) {
+          const card = document.createElement("button");
+          card.type = "button";
+          card.className = `character-create__world-type-card character-create__world-type-card--${opt.value}`;
+          const isSelected = worldType === opt.value;
+          if (isSelected) card.classList.add("is-selected");
+          card.setAttribute("aria-pressed", isSelected.toString());
+
+          const cardLabel = document.createElement("span");
+          cardLabel.className = "character-create__world-type-card__label";
+          cardLabel.textContent = opt.label;
+          card.appendChild(cardLabel);
+
+          card.addEventListener("click", () => {
+            worldType = opt.value;
+            typeSelect.value = opt.value;
+            wtCardEls.forEach((c, i) => {
+              const sel = worldTypeVisualDefs[i].value === opt.value;
+              c.classList.toggle("is-selected", sel);
+              c.setAttribute("aria-pressed", sel.toString());
+            });
+          });
+
+          wtCardEls.push(card);
+          worldTypeVisualGrid.appendChild(card);
+        }
+
+        // ── Populate visual biome tiles ───────────────────────────────────────
+        const currentBiomeVal = startingBiome ?? "";
+        for (const opt of biomeVisualDefs) {
+          const tile = document.createElement("button");
+          tile.type = "button";
+          tile.className = `character-create__biome-tile character-create__biome-tile--${opt.value || "random"}`;
+          const isSelected = currentBiomeVal === opt.value;
+          if (isSelected) tile.classList.add("is-selected");
+          tile.setAttribute("aria-pressed", isSelected.toString());
+
+          const icon = document.createElement("span");
+          icon.className = "character-create__biome-tile__icon";
+          icon.textContent = opt.icon;
+          icon.setAttribute("aria-hidden", "true");
+          tile.appendChild(icon);
+
+          const tileLabel = document.createElement("span");
+          tileLabel.className = "character-create__biome-tile__label";
+          tileLabel.textContent = opt.label;
+          tile.appendChild(tileLabel);
+
+          tile.addEventListener("click", () => {
+            startingBiome = opt.value ? (opt.value as BiomeType) : null;
+            biomeSelect.value = opt.value;
+            biomeTileEls.forEach((t, i) => {
+              const sel = biomeVisualDefs[i].value === opt.value;
+              t.classList.toggle("is-selected", sel);
+              t.setAttribute("aria-pressed", sel.toString());
+            });
+          });
+
+          biomeTileEls.push(tile);
+          biomeVisualGrid.appendChild(tile);
+        }
 
         detailsTitle.textContent = "World seed";
         detailsBody.textContent =
@@ -551,10 +730,16 @@ export class CharacterCreationUI {
         for (const race of RACES) {
           const card = document.createElement("button");
           card.type = "button";
-          card.className = "character-create__card";
+          card.className = `character-create__card character-create__card--${race.heritage}`;
           const isSelected = selectedRace?.id === race.id;
           if (isSelected) card.classList.add("is-selected");
           card.setAttribute("aria-pressed", isSelected.toString());
+
+          const icon = document.createElement("span");
+          icon.className = "character-create__card-icon";
+          icon.textContent = RACE_ICONS[race.id] ?? HERITAGE_ICONS[race.heritage];
+          icon.setAttribute("aria-hidden", "true");
+          card.appendChild(icon);
 
           const cardName = document.createElement("strong");
           cardName.textContent = race.name;
@@ -587,10 +772,16 @@ export class CharacterCreationUI {
         for (const sign of BIRTHSIGNS) {
           const card = document.createElement("button");
           card.type = "button";
-          card.className = "character-create__card";
+          card.className = `character-create__card character-create__card--${sign.guardian}`;
           const isSelected = selectedBirthsign?.id === sign.id;
           if (isSelected) card.classList.add("is-selected");
           card.setAttribute("aria-pressed", isSelected.toString());
+
+          const icon = document.createElement("span");
+          icon.className = "character-create__card-icon";
+          icon.textContent = GUARDIAN_ICONS[sign.guardian];
+          icon.setAttribute("aria-hidden", "true");
+          card.appendChild(icon);
 
           const cardName = document.createElement("strong");
           cardName.textContent = sign.name;
@@ -623,10 +814,16 @@ export class CharacterCreationUI {
         for (const cls of CHARACTER_CLASSES) {
           const card = document.createElement("button");
           card.type = "button";
-          card.className = "character-create__card";
+          card.className = `character-create__card character-create__card--${cls.specialization}`;
           const isSelected = selectedClass?.id === cls.id;
           if (isSelected) card.classList.add("is-selected");
           card.setAttribute("aria-pressed", isSelected.toString());
+
+          const icon = document.createElement("span");
+          icon.className = "character-create__card-icon";
+          icon.textContent = SPEC_ICONS[cls.specialization];
+          icon.setAttribute("aria-hidden", "true");
+          card.appendChild(icon);
 
           const cardName = document.createElement("strong");
           cardName.textContent = cls.name;
