@@ -1567,6 +1567,32 @@ export class Game {
           this.shadowGenerator?.addShadowCaster(root, true);
         });
       }
+
+      // ── Haunted house in tundra (1-in-10 chance — Skyrim abandoned shacks) ──
+      if (biome === "tundra" && _chunkRand(cx, cz, 17) < 0.10) {
+        const hx = worldX + (_chunkRand(cx, cz, 18) - 0.5) * this.world.chunkSize * 0.55;
+        const hz = worldZ + (_chunkRand(cx, cz, 19) - 0.5) * this.world.chunkSize * 0.55;
+        this.fantasyAssets.getInstance("hauntedHouse", (root) => {
+          if (!root) return;
+          root.position.set(hx, 0, hz);
+          root.rotation.y = _chunkRand(cx, cz, 20) * Math.PI * 2;
+          root.scaling.setAll(1.2);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
+
+      // ── Graveyard near ruins in plains/forest (1-in-10 chance) ───────────
+      if ((biome === "plains" || biome === "forest") && _chunkRand(cx, cz, 21) < 0.10) {
+        const gx = worldX + (_chunkRand(cx, cz, 22) - 0.5) * this.world.chunkSize * 0.6;
+        const gz = worldZ + (_chunkRand(cx, cz, 23) - 0.5) * this.world.chunkSize * 0.6;
+        this.fantasyAssets.getInstance("graveYardScene", (root) => {
+          if (!root) return;
+          root.position.set(gx, 0, gz);
+          root.rotation.y = _chunkRand(cx, cz, 24) * Math.PI * 2;
+          root.scaling.setAll(1.0);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
     };
 
     // ── v23 Pet System ─────────────────────────────────────────────────────

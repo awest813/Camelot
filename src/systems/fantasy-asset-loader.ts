@@ -23,40 +23,54 @@ import "@babylonjs/loaders/glTF";
 // ── Asset catalogue ──────────────────────────────────────────────────────────
 
 export type FantasyAssetKey =
-  | "elfAnimated"   // Animated elf character — Oblivion-style humanoid NPC
-  | "runeSword"     // Rune-inscribed longsword — high-tier loot
-  | "frostAxe"      // Frost-enchanted axe — ice dungeon loot
-  | "moltenDagger"  // Molten obsidian dagger — assassin loot
-  | "mausoleum"     // Stone mausoleum — graveyard structure
-  | "obelisk"       // Ancient obelisk — desert shrine / standing stone
-  | "cottage"       // Thatched roof cottage — settlement structure
-  | "inn"           // Roadside inn — settlement structure
-  | "dragon";       // Dragon — rare world encounter
+  | "elfAnimated"     // Animated elf character — Oblivion-style humanoid NPC
+  | "runeSword"       // Rune-inscribed longsword — high-tier loot
+  | "frostAxe"        // Frost-enchanted axe — ice dungeon loot (Demos path)
+  | "moltenDagger"    // Molten obsidian dagger — assassin loot
+  | "mausoleum"       // Stone mausoleum — graveyard structure
+  | "obelisk"         // Ancient obelisk — desert shrine / standing stone
+  | "cottage"         // Thatched roof cottage — settlement structure
+  | "inn"             // Roadside inn — settlement structure
+  | "dragon"          // Dragon — rare world encounter
+  | "hauntedHouse"    // Haunted house — ruins/fort structure variant
+  | "village"         // Village scene — settlement cluster
+  | "valleyVillage"   // Valley village with terrain — large settlement
+  | "graveYardScene"; // Graveyard scene — cemetery near ruins
 
-const CDN = "https://assets.babylonjs.com/meshes/";
+const CDN      = "https://assets.babylonjs.com/meshes/";
+const CDN_DEMO = CDN + "Demos/weaponsDemo/meshes/";
 
 /** CDN URL for each asset key. */
 const ASSET_URLS: Record<FantasyAssetKey, string> = {
-  elfAnimated:  CDN + "Elf_allAnimations.gltf",
-  runeSword:    CDN + "runeSword.glb",
-  frostAxe:     CDN + "frostAxe_noMorph.glb",
-  moltenDagger: CDN + "moltenDagger.glb",
-  mausoleum:    CDN + "mausoleumLarge.glb",
-  obelisk:      CDN + "obelisk1.glb",
-  cottage:      CDN + "cottage.glb",
-  inn:          CDN + "inn.glb",
-  dragon:       CDN + "dragon.glb",
+  elfAnimated:   CDN      + "Elf_allAnimations.gltf",
+  // Weapons: confirmed at both root and Demos sub-path; use Demos path as primary
+  runeSword:     CDN_DEMO + "runeSword.glb",
+  frostAxe:      CDN_DEMO + "frostAxe.glb",
+  moltenDagger:  CDN_DEMO + "moltenDagger.glb",
+  mausoleum:     CDN      + "mausoleumLarge.glb",
+  obelisk:       CDN      + "obelisk1.glb",
+  cottage:       CDN      + "cottage.glb",
+  inn:           CDN      + "inn.glb",
+  dragon:        CDN      + "dragon.glb",
+  hauntedHouse:  CDN      + "haunted_house.glb",
+  village:       CDN      + "village.glb",
+  valleyVillage: CDN      + "valleyvillage.glb",
+  graveYardScene: CDN     + "graveyardScene.glb",
 };
 
 // ── Scale overrides (world-unit scale applied after load) ────────────────────
 
 const ASSET_SCALE: Partial<Record<FantasyAssetKey, number>> = {
-  elfAnimated:  1.0,
-  mausoleum:    1.0,
-  obelisk:      1.0,
-  cottage:      1.0,
-  inn:          1.0,
-  dragon:       2.0,
+  elfAnimated:   1.0,
+  mausoleum:     1.0,
+  obelisk:       1.0,
+  cottage:       1.0,
+  inn:           1.0,
+  dragon:        2.0,
+  hauntedHouse:  1.0,
+  village:       1.0,
+  valleyVillage: 1.0,
+  graveYardScene: 1.0,
 };
 
 // ── Internal state per asset ──────────────────────────────────────────────────
