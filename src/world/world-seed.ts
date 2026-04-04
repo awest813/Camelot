@@ -157,9 +157,14 @@ export class WorldSeed {
     }
 
     if (this.options.worldType === "amplified") {
-      // Amplified worlds use the same biome distribution but compress the
-      // normalised value toward extremes for more dramatic contrasts.
-      const amp = n < 0.5 ? n * n * 4 : 1 - (1 - n) * (1 - n) * 4;
+      // Amplified worlds compress the normalised biome value toward extremes
+      // for more dramatic contrasts.  The compression factor (4) maps the
+      // [0, 0.5] half of n onto [0, 1] using a quadratic curve, producing
+      // sharp biome boundaries.
+      const AMPLIFIED_COMPRESSION = 4;
+      const amp = n < 0.5
+        ? n * n * AMPLIFIED_COMPRESSION
+        : 1 - (1 - n) * (1 - n) * AMPLIFIED_COMPRESSION;
       const a = Math.max(0, Math.min(1, amp));
       if (a < 0.25) return "tundra";
       if (a < 0.5)  return "plains";
@@ -191,13 +196,18 @@ export class WorldSeed {
   /**
    * Hash a string seed to a stable 32-bit integer using the djb2 algorithm.
    * The result is always non-negative.
+   *
+   * Implementation note: the intermediate `| 0` coerces the accumulator to a
+   * signed 32-bit integer on every iteration, which is correct for djb2 — it
+   * intentionally wraps on overflow.  The final `>>> 0` reinterprets the
+   * signed result as an unsigned 32-bit value so the return is always ≥ 0.
    */
   public static hashString(s: string): number {
     let hash = 5381;
     for (let i = 0; i < s.length; i++) {
-      // hash * 33 + charCode
+      // hash * 33 + charCode, keeping arithmetic in 32-bit signed range
       hash = (((hash << 5) + hash) + s.charCodeAt(i)) | 0;
     }
-    return hash >>> 0; // convert to unsigned 32-bit
+    return hash >>> 0; // reinterpret as unsigned 32-bit
   }
 }
