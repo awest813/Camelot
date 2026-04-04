@@ -135,6 +135,15 @@ body::before {
   scrollbar-color: rgba(212, 160, 23, 0.6) rgba(25, 19, 12, 0.9);
 }
 
+.character-create__panel::before {
+  content: "";
+  display: block;
+  height: 3px;
+  border-radius: 13px 13px 0 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(212, 160, 23, 0.7) 40%, rgba(255, 222, 152, 1) 50%, rgba(212, 160, 23, 0.7) 60%, transparent 100%);
+  margin: -20px -20px 16px;
+}
+
 .character-create__layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
@@ -479,6 +488,328 @@ body::before {
 
   .character-create__button {
     flex: 1;
+  }
+}
+
+/* ── Character creation: welcome emblem ────────────────────────────────────── */
+
+.character-create__emblem {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(212, 160, 23, 0.55);
+  background: radial-gradient(circle, rgba(62, 44, 8, 0.9), rgba(8, 6, 4, 0.96));
+  box-shadow: 0 0 22px rgba(212, 160, 23, 0.18), inset 0 0 10px rgba(212, 160, 23, 0.06);
+  font-size: 26px;
+  line-height: 1;
+  color: #D4A017;
+  text-shadow: 0 0 10px rgba(212, 160, 23, 0.35);
+  user-select: none;
+}
+
+/* ── Character creation: world step visual overhaul ─────────────────────────── */
+
+.character-create__world-section-label {
+  margin: 12px 0 8px;
+  color: #D4A017;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.character-create__world-section-label:first-child {
+  margin-top: 0;
+}
+
+/* World type visual cards */
+
+.character-create__world-type-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.character-create__world-type-card {
+  position: relative;
+  border-radius: 8px;
+  border: 2px solid rgba(107, 79, 18, 0.55);
+  overflow: hidden;
+  cursor: pointer;
+  height: 74px;
+  background: rgba(10, 8, 4, 0.9);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  transition: border-color 140ms ease, transform 120ms ease, box-shadow 140ms ease;
+}
+
+.character-create__world-type-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.4;
+  transition: opacity 150ms ease;
+}
+
+.character-create__world-type-card--normal::before {
+  background-image: url('https://assets.babylonjs.com/textures/rock.png');
+  background-color: #1a120a;
+}
+
+.character-create__world-type-card--flat::before {
+  background-image: url('https://assets.babylonjs.com/textures/floor.png');
+  background-color: #0e1208;
+}
+
+.character-create__world-type-card--amplified::before {
+  background-image: url('https://assets.babylonjs.com/textures/metal.jpg');
+  background-color: #12100e;
+}
+
+.character-create__world-type-card--island::before {
+  background-image: url('https://assets.babylonjs.com/textures/waterbump.png');
+  background-color: #061420;
+}
+
+.character-create__world-type-card:hover::before,
+.character-create__world-type-card.is-selected::before {
+  opacity: 0.68;
+}
+
+.character-create__world-type-card__label {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  padding: 5px 6px 6px;
+  background: linear-gradient(to top, rgba(4, 3, 2, 0.94) 55%, transparent);
+  color: #f2dca8;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.character-create__world-type-card:hover {
+  border-color: rgba(212, 160, 23, 0.75);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+.character-create__world-type-card.is-selected {
+  border-color: #D4A017;
+  box-shadow: 0 0 0 1px rgba(212, 160, 23, 0.3), 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Biome tiles */
+
+.character-create__biome-tiles {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.character-create__biome-tile {
+  position: relative;
+  border-radius: 8px;
+  border: 2px solid rgba(107, 79, 18, 0.55);
+  overflow: hidden;
+  cursor: pointer;
+  height: 66px;
+  background: rgba(10, 8, 4, 0.9);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  transition: border-color 140ms ease, transform 120ms ease, box-shadow 140ms ease;
+}
+
+.character-create__biome-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.45;
+  transition: opacity 150ms ease;
+}
+
+.character-create__biome-tile--random::before {
+  background: linear-gradient(135deg, #0a1a10 0%, #1a0a0a 30%, #0a0e1a 60%, #10081a 100%);
+}
+
+.character-create__biome-tile--plains::before {
+  background-image: url('https://assets.babylonjs.com/textures/grass.png');
+  background-color: #081408;
+}
+
+.character-create__biome-tile--forest::before {
+  background-image: url('https://assets.babylonjs.com/textures/wood.jpg');
+  background-color: #040e06;
+}
+
+.character-create__biome-tile--desert::before {
+  background-image: url('https://assets.babylonjs.com/textures/sand.jpg');
+  background-color: #1a1006;
+}
+
+.character-create__biome-tile--tundra::before {
+  background-image: url('https://assets.babylonjs.com/textures/snow.png');
+  background-color: #0e1016;
+}
+
+.character-create__biome-tile:hover::before,
+.character-create__biome-tile.is-selected::before {
+  opacity: 0.72;
+}
+
+.character-create__biome-tile__icon {
+  position: relative;
+  z-index: 1;
+  font-size: 16px;
+  line-height: 1;
+  margin-bottom: 2px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
+}
+
+.character-create__biome-tile__label {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  padding: 2px 3px 4px;
+  background: linear-gradient(to top, rgba(4, 3, 2, 0.94) 50%, transparent);
+  color: #f2dca8;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.character-create__biome-tile:hover {
+  border-color: rgba(212, 160, 23, 0.75);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
+}
+
+.character-create__biome-tile.is-selected {
+  border-color: #D4A017;
+  box-shadow: 0 0 0 1px rgba(212, 160, 23, 0.3), 0 6px 14px rgba(0, 0, 0, 0.3);
+}
+
+/* Advanced settings collapsible */
+
+.character-create__advanced-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  color: #8f7e57;
+  font-size: 12px;
+  padding: 7px 0 4px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  border-top: 1px solid rgba(107, 79, 18, 0.28);
+  margin-top: 4px;
+  width: 100%;
+  transition: color 120ms ease;
+}
+
+.character-create__advanced-toggle:hover {
+  color: #c9b892;
+}
+
+.character-create__advanced-toggle-icon {
+  display: inline-block;
+  font-size: 9px;
+  color: rgba(212, 160, 23, 0.55);
+  transition: transform 200ms ease;
+}
+
+.character-create__advanced-toggle.is-open .character-create__advanced-toggle-icon {
+  transform: rotate(90deg);
+}
+
+.character-create__advanced-content {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 10px;
+}
+
+.character-create__advanced-content.is-open {
+  display: flex;
+}
+
+/* Card icon & heritage / guardian / spec colour tints */
+
+.character-create__card-icon {
+  display: block;
+  font-size: 22px;
+  line-height: 1;
+  margin-bottom: 7px;
+  text-align: center;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+}
+
+.character-create__card--human .character-create__tag {
+  color: #c9a855;
+}
+
+.character-create__card--elven .character-create__tag {
+  color: #7cc4cc;
+}
+
+.character-create__card--beast .character-create__tag {
+  color: #c4874a;
+}
+
+.character-create__card--warrior .character-create__tag {
+  color: #c9a855;
+}
+
+.character-create__card--mage .character-create__tag {
+  color: #7cc4cc;
+}
+
+.character-create__card--thief .character-create__tag {
+  color: #c4874a;
+}
+
+.character-create__card--combat .character-create__tag {
+  color: #c9a855;
+}
+
+.character-create__card--magic .character-create__tag {
+  color: #7cc4cc;
+}
+
+.character-create__card--stealth .character-create__tag {
+  color: #c4874a;
+}
+
+@media (max-width: 640px) {
+  .character-create__world-type-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .character-create__biome-tiles {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
