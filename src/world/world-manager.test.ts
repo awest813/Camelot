@@ -25,7 +25,8 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
     CreateCylinder: vi.fn(function() {
       return {
         position: { set: vi.fn(), x: 0, y: 0, z: 0 },
-        rotation: { z: 0 },
+        rotation: { y: 0, z: 0 },
+        scaling: { y: 0 },
         material: null,
         receiveShadows: false,
         dispose: mockMeshDispose,
@@ -34,7 +35,36 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
     CreateBox: vi.fn(function() {
       return {
         position: { set: vi.fn(), x: 0, y: 0, z: 0 },
-        rotation: { y: 0 },
+        rotation: { y: 0, z: 0 },
+        scaling: { y: 0 },
+        material: null,
+        receiveShadows: false,
+        dispose: mockMeshDispose,
+      };
+    }),
+    CreateSphere: vi.fn(function() {
+      return {
+        position: { set: vi.fn(), x: 0, y: 0, z: 0 },
+        rotation: { y: 0, z: 0 },
+        scaling: { y: 0 },
+        material: null,
+        receiveShadows: false,
+        dispose: mockMeshDispose,
+      };
+    }),
+    CreateTorus: vi.fn(function() {
+      return {
+        position: { set: vi.fn(), x: 0, y: 0, z: 0 },
+        rotation: { y: 0, z: 0 },
+        material: null,
+        receiveShadows: false,
+        dispose: mockMeshDispose,
+      };
+    }),
+    CreatePlane: vi.fn(function() {
+      return {
+        position: { set: vi.fn(), x: 0, y: 0, z: 0 },
+        rotation: { y: 0, z: 0 },
         material: null,
         receiveShadows: false,
         dispose: mockMeshDispose,

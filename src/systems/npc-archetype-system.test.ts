@@ -6,17 +6,31 @@ import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { Scene } from "@babylonjs/core/scene";
 
 // Minimal mesh and physics mocks — NPC constructor needs these to not throw.
-vi.mock("@babylonjs/core/Meshes/meshBuilder", () => ({
-  MeshBuilder: {
-    CreateCapsule: vi.fn(() => ({
-      position: new Vector3(),
-      material: null,
-      isDisposed: vi.fn(() => false),
-      lookAt: vi.fn(),
-      metadata: null,
-    })),
-  },
-}));
+// Includes the extra shapes added by fantasy-prop visual accessories.
+vi.mock("@babylonjs/core/Meshes/meshBuilder", () => {
+  const mesh = () => ({
+    position: { set: vi.fn(), x: 0, y: 0, z: 0 },
+    rotation: { y: 0, z: 0 },
+    scaling: { setAll: vi.fn(), y: 1 },
+    material: null,
+    receiveShadows: false,
+    isVisible: true,
+    isDisposed: vi.fn(() => false),
+    lookAt: vi.fn(),
+    metadata: null,
+    parent: null,
+    getChildMeshes: vi.fn(() => []),
+  });
+  return {
+    MeshBuilder: {
+      CreateCapsule: vi.fn(mesh),
+      CreateBox:     vi.fn(mesh),
+      CreateSphere:  vi.fn(mesh),
+      CreateCylinder: vi.fn(mesh),
+      CreateTorus:   vi.fn(mesh),
+    },
+  };
+});
 vi.mock("@babylonjs/core/Materials/standardMaterial", () => ({
   StandardMaterial: class {
     diffuseColor: any = null;

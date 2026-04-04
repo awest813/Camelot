@@ -401,17 +401,86 @@ export class NPC {
     this.mesh.metadata = null;
   }
 
+  /**
+   * Derive an NPC archetype role from the mesh name for visual differentiation.
+   * Guards → steel armour colours; merchants → warm leather; undead → ashen pale;
+   * mages → deep purple; bosses → black/gold.  Falls back to the default tan skin.
+   */
+  private _archetypeFromName(name: string): "guard" | "merchant" | "mage" | "boss" | "undead" | "default" {
+    const lower = name.toLowerCase();
+    if (lower.includes("guard") || lower.includes("knight") || lower.includes("soldier")) return "guard";
+    if (lower.includes("merchant") || lower.includes("innkeeper") || lower.includes("vendor")) return "merchant";
+    if (lower.includes("mage") || lower.includes("wizard") || lower.includes("sorcerer")) return "mage";
+    if (lower.includes("boss") || lower.includes("chief") || lower.includes("lord")) return "boss";
+    if (lower.includes("undead") || lower.includes("skeleton") || lower.includes("draugr") || lower.includes("zombie")) return "undead";
+    return "default";
+  }
+
   private _createMesh(position: Vector3, name: string): void {
     this.mesh = MeshBuilder.CreateCapsule(name, { radius: 0.5, height: 2 }, this.scene);
     this.mesh.position = position;
 
-    const material = new StandardMaterial(`${name}_mat`, this.scene);
-    // Warm tan skin tone with subtle specular for a more organic look
-    material.diffuseColor  = new Color3(0.82, 0.64, 0.38);
-    material.specularColor = new Color3(0.12, 0.09, 0.05);
-    material.specularPower = 24;
+    // ── Role-based visual palette ──────────────────────────────────────────
+    const archetype = this._archetypeFromName(name);
+    const material  = new StandardMaterial(`${name}_mat`, this.scene);
+
+    switch (archetype) {
+      case "guard":
+        // Imperial steel — cold blue-grey metallic
+        material.diffuseColor  = new Color3(0.46, 0.52, 0.60);
+        material.specularColor = new Color3(0.55, 0.60, 0.70);
+        material.specularPower = 80;
+        this._baseColor = new Color3(0.46, 0.52, 0.60);
+        break;
+      case "merchant":
+        // Warm leather-clad merchant — deep amber/ochre
+        material.diffuseColor  = new Color3(0.68, 0.42, 0.18);
+        material.specularColor = new Color3(0.18, 0.12, 0.05);
+        material.specularPower = 20;
+        this._baseColor = new Color3(0.68, 0.42, 0.18);
+        break;
+      case "mage":
+        // Mage's robe — deep purple with arcane shimmer
+        material.diffuseColor  = new Color3(0.32, 0.14, 0.60);
+        material.specularColor = new Color3(0.40, 0.20, 0.80);
+        material.specularPower = 64;
+        this._baseColor = new Color3(0.32, 0.14, 0.60);
+        break;
+      case "boss":
+        // Boss / chieftain — obsidian black with gold trim
+        material.diffuseColor  = new Color3(0.10, 0.08, 0.06);
+        material.specularColor = new Color3(0.72, 0.56, 0.12);
+        material.specularPower = 96;
+        this._baseColor = new Color3(0.10, 0.08, 0.06);
+        break;
+      case "undead":
+        // Draugr / undead — ashen bone grey
+        material.diffuseColor  = new Color3(0.62, 0.58, 0.52);
+        material.specularColor = new Color3(0.08, 0.08, 0.07);
+        material.specularPower = 12;
+        this._baseColor = new Color3(0.62, 0.58, 0.52);
+        break;
+      default:
+        // Villager — warm tan skin
+        material.diffuseColor  = new Color3(0.82, 0.64, 0.38);
+        material.specularColor = new Color3(0.12, 0.09, 0.05);
+        material.specularPower = 24;
+        this._baseColor = new Color3(0.82, 0.64, 0.38);
+    }
+
     this.mesh.material = material;
     this.mesh.receiveShadows = true;
+
+    // ── Visual accessories ─────────────────────────────────────────────────
+    // Small indicator pieces parented to the capsule so they move with it.
+    // Physics is only on the capsule — accessories are purely decorative.
+    if (archetype === "guard") {
+      this._addHelmet(name);
+    } else if (archetype === "mage") {
+      this._addStaff(name);
+    } else if (archetype === "boss") {
+      this._addCrown(name);
+    }
 
     this.physicsAggregate = new PhysicsAggregate(
       this.mesh, PhysicsShapeType.CAPSULE, { mass: 1, restitution: 0 }, this.scene
@@ -421,5 +490,67 @@ export class NPC {
     this.physicsAggregate.body.setMassProperties({ inertia: new Vector3(0, 0, 0) });
 
     this.mesh.metadata = { type: "npc", npc: this };
+  }
+
+  /** Add a helmet-like flattened box on top of the capsule for guards. */
+  private _addHelmet(name: string): void {
+    const helmet = MeshBuilder.CreateBox(`${name}_helmet`, { width: 0.65, height: 0.28, depth: 0.65 }, this.scene);
+    helmet.position = new Vector3(0, 1.02, 0); // relative to capsule centre
+    helmet.parent   = this.mesh;
+
+    const mat = new StandardMaterial(`${name}_helmetMat`, this.scene);
+    mat.diffuseColor  = new Color3(0.38, 0.42, 0.50);
+    mat.specularColor = new Color3(0.60, 0.65, 0.75);
+    mat.specularPower = 96;
+    helmet.material   = mat;
+    helmet.receiveShadows = true;
+  }
+
+  /** Add a floating staff orb above mages. */
+  private _addStaff(name: string): void {
+    // Staff handle
+    const staff = MeshBuilder.CreateCylinder(
+      `${name}_staff`,
+      { height: 1.6, diameterTop: 0.04, diameterBottom: 0.06, tessellation: 8 },
+      this.scene,
+    );
+    staff.position = new Vector3(0.45, -0.2, 0);
+    staff.parent   = this.mesh;
+
+    const staffMat = new StandardMaterial(`${name}_staffMat`, this.scene);
+    staffMat.diffuseColor  = new Color3(0.28, 0.16, 0.06);
+    staffMat.specularColor = new Color3(0.10, 0.06, 0.02);
+    staffMat.specularPower = 18;
+    staff.material = staffMat;
+
+    // Arcane orb on top
+    const orb = MeshBuilder.CreateSphere(`${name}_orb`, { diameter: 0.18, segments: 6 }, this.scene);
+    orb.position = new Vector3(0.45, 0.62, 0);
+    orb.parent   = this.mesh;
+
+    const orbMat = new StandardMaterial(`${name}_orbMat`, this.scene);
+    orbMat.diffuseColor  = new Color3(0.20, 0.05, 0.80);
+    orbMat.emissiveColor = new Color3(0.15, 0.02, 0.60);
+    orbMat.specularColor = new Color3(0.60, 0.30, 1.00);
+    orbMat.specularPower = 128;
+    orb.material = orbMat;
+  }
+
+  /** Add a small gold crown above boss NPCs. */
+  private _addCrown(name: string): void {
+    const crown = MeshBuilder.CreateTorus(
+      `${name}_crown`,
+      { diameter: 0.55, thickness: 0.08, tessellation: 16 },
+      this.scene,
+    );
+    crown.position = new Vector3(0, 1.08, 0);
+    crown.parent   = this.mesh;
+
+    const mat = new StandardMaterial(`${name}_crownMat`, this.scene);
+    mat.diffuseColor  = new Color3(0.85, 0.65, 0.05);
+    mat.specularColor = new Color3(1.00, 0.88, 0.20);
+    mat.specularPower = 128;
+    mat.emissiveColor = new Color3(0.10, 0.08, 0.00);
+    crown.material   = mat;
   }
 }
