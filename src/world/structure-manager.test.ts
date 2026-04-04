@@ -350,3 +350,44 @@ describe('StructureManager.dispose', () => {
     expect(() => { sm.dispose(); sm.dispose(); }).not.toThrow();
   });
 });
+
+// ── Seed integration ──────────────────────────────────────────────────────────
+
+describe('StructureManager with WorldSeed', () => {
+  it('uses the seed hasStructure() when a seed is provided', async () => {
+    const { WorldSeed } = await import('./world-seed');
+    // "none" density → no structures
+    const seed = new WorldSeed(1, { structureDensity: 'none' });
+    const sm = new StructureManager(mockScene, null, seed);
+    for (let x = -5; x <= 5; x++) {
+      for (let z = -5; z <= 5; z++) {
+        expect(sm.hasStructureAt(x, z)).toBe(false);
+      }
+    }
+  });
+
+  it('falls back to default ~25% rate when no seed is supplied', () => {
+    const sm = new StructureManager(mockScene);
+    let count = 0;
+    for (let x = -10; x <= 10; x++) {
+      for (let z = -10; z <= 10; z++) {
+        if (sm.hasStructureAt(x, z)) count++;
+      }
+    }
+    const total = 21 * 21;
+    // Default threshold is 25%, expect 5–50% (generous for hash non-uniformity)
+    expect(count / total).toBeGreaterThan(0.05);
+    expect(count / total).toBeLessThan(0.50);
+  });
+
+  it('flat worldType suppresses structure spawning', async () => {
+    const { WorldSeed } = await import('./world-seed');
+    const seed = new WorldSeed(1, { worldType: 'flat' });
+    const sm = new StructureManager(mockScene, null, seed);
+    for (let x = -5; x <= 5; x++) {
+      for (let z = -5; z <= 5; z++) {
+        expect(sm.hasStructureAt(x, z)).toBe(false);
+      }
+    }
+  });
+});
