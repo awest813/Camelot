@@ -84,7 +84,13 @@ export class WorldManager {
   /** Optional shadow generator — meshes added as shadow casters when provided. */
   private readonly _shadows: ShadowGenerator | null;
 
-  /** Optional world seed — drives biome layout and structure placement when set. */
+  /**
+   * Optional world seed — drives biome layout and structure placement when set.
+   *
+   * Two-phase initialization: `null` on construction (before character
+   * creation), then replaced by `setSeed()` once the player finishes the
+   * character creation wizard and before the first chunk is streamed in.
+   */
   private _seed: WorldSeed | null;
 
   constructor(scene: Scene, shadowGenerator: ShadowGenerator | null = null, seed: WorldSeed | null = null) {

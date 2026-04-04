@@ -39,7 +39,15 @@ export class StructureManager {
    *  register it with ScheduleSystem / CombatSystem. */
   public onNPCSpawn: ((npc: NPC) => void) | null = null;
 
-  /** Optional world seed — used for seeded placement and randomisation. */
+  /**
+   * Optional world seed — used for seeded placement and randomisation.
+   *
+   * Two-phase initialization: set to the constructor argument (typically `null`
+   * for new games) during `WorldManager.init()`, then overwritten by
+   * `setSeed()` once the player completes character creation (and before the
+   * first chunk is streamed in).  This keeps construction side-effect-free
+   * while still allowing the player's chosen seed to drive the whole world.
+   */
   private _seed: WorldSeed | null;
 
   /** Optional shadow generator — structure meshes are registered as casters. */

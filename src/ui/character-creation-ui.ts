@@ -700,6 +700,9 @@ export class CharacterCreationUI {
         if (!enteredName.trim() || !selectedRace || !selectedBirthsign || !selectedClass) return;
 
         const trimmed = worldSeedString.trim();
+        // 0xffffffff is the max unsigned 32-bit value; WorldSeed stores seedValue as a
+        // plain JS number (64-bit float) and WorldSeed.hashString() returns an unsigned
+        // 32-bit integer via `>>> 0`, so the full [0, 0xffffffff] range is valid.
         const rawSeed = trimmed || String(Math.floor(Math.random() * 0xffffffff));
         // Use numeric type when the input is a pure integer so WorldSeed stores
         // the value verbatim rather than hashing it.
