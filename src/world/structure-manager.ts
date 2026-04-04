@@ -6,6 +6,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType } from "@babylonjs/core/Physics";
+import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { NPC } from "../entities/npc";
 import { Loot } from "../entities/loot";
@@ -203,6 +204,26 @@ export class StructureManager {
     meshes.push(chestMesh);
     bodies.push(chestBody);
 
+    // ── Fantasy props ──────────────────────────────────────────────────────
+
+    // Two wall torches on the north wall flanking the entrance
+    this._addTorch(`ruins_torch_L_${cx}_${cz}`, new Vector3(origin.x - 2.5, 2.4, origin.z + 3.5), meshes);
+    this._addTorch(`ruins_torch_R_${cx}_${cz}`, new Vector3(origin.x + 2.5, 2.4, origin.z + 3.5), meshes);
+
+    // Guard campfire in the center courtyard
+    this._addCampfire(`ruins_campfire_${cx}_${cz}`, new Vector3(origin.x, 0, origin.z - 1), meshes);
+
+    // Scattered barrels (guard supplies)
+    this._addBarrel(`ruins_barrel_A_${cx}_${cz}`, new Vector3(origin.x - 3.0, 0, origin.z + 1.5), meshes, bodies);
+    this._addBarrel(`ruins_barrel_B_${cx}_${cz}`, new Vector3(origin.x - 3.3, 0, origin.z + 2.2), meshes, bodies);
+
+    // Faction banner on east wall — dark red to mark a bandit/enemy camp
+    this._addBanner(`ruins_banner_${cx}_${cz}`, new Vector3(origin.x + 3.5, 0, origin.z), new Color3(0.55, 0.06, 0.04), "bandits", meshes);
+
+    // A pair of standing stones flanking the ruined entrance for Ayleid ambiance
+    this._addStandingStone(`ruins_monolith_L_${cx}_${cz}`, new Vector3(origin.x - 5.5, 0, origin.z - 2), 2.2, meshes, bodies);
+    this._addStandingStone(`ruins_monolith_R_${cx}_${cz}`, new Vector3(origin.x + 5.5, 0, origin.z - 2), 1.8, meshes, bodies);
+
     // Hostile guard NPC
     const guard = new NPC(this._scene, new Vector3(origin.x + 2, 2, origin.z + 2), `RuinGuard_${cx}_${cz}`);
     guard.aggroRange = 12;
@@ -276,6 +297,34 @@ export class StructureManager {
       stats: { damage: 3 },
     });
     loot.push(relic);
+
+    // ── Fantasy props ──────────────────────────────────────────────────────
+
+    // Altar torch — sacred shrine flame
+    this._addTorch(`shrine_torch_A_${cx}_${cz}`, new Vector3(origin.x - 1.0, 0.4, origin.z - 1.2), meshes);
+    this._addTorch(`shrine_torch_B_${cx}_${cz}`, new Vector3(origin.x + 1.0, 0.4, origin.z - 1.2), meshes);
+
+    // Four outer standing stones in a ritual ring — Oblivion-style Ayleid ruin
+    const ringR = 5.5;
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      const sx = origin.x + Math.cos(angle) * ringR;
+      const sz = origin.z + Math.sin(angle) * ringR;
+      const sh = 1.8 + this._rand(cx, cz, i + 40) * 1.2;
+      this._addStandingStone(`shrine_menhir_${cx}_${cz}_${i}`, new Vector3(sx, 0, sz), sh, meshes, bodies);
+    }
+
+    // Glowing rune emissive slab in the platform center — mystical altar glow
+    const runeSlab = MeshBuilder.CreateBox(`shrine_rune_${cx}_${cz}`, { width: 1.2, height: 0.04, depth: 0.7 }, this._scene);
+    runeSlab.position.set(origin.x, 0.42, origin.z);
+    runeSlab.material = this._mat(
+      "shrine_rune",
+      new Color3(0.1, 0.5, 0.9),
+      new Color3(0.0, 0.0, 0.0),
+      1,
+      { emissive: new Color3(0.0, 0.28, 0.70), disableLighting: true },
+    );
+    meshes.push(runeSlab);
 
     return { meshes, loot, bodies };
   }
@@ -357,6 +406,22 @@ export class StructureManager {
     meshes.push(chestMesh);
     bodies.push(chestBody);
 
+    // ── Fantasy props ──────────────────────────────────────────────────────
+
+    // Torches flanking the doorway — guard post lighting
+    this._addTorch(`tower_torch_L_${cx}_${cz}`, new Vector3(origin.x - 1.2, 2.8, origin.z - tW / 2 - 0.1), meshes);
+    this._addTorch(`tower_torch_R_${cx}_${cz}`, new Vector3(origin.x + 1.2, 2.8, origin.z - tW / 2 - 0.1), meshes);
+
+    // Supply barrels stacked by the east wall
+    this._addBarrel(`tower_barrel_A_${cx}_${cz}`, new Vector3(origin.x + tW / 2 - 0.5, 0, origin.z - 0.5), meshes, bodies);
+    this._addBarrel(`tower_barrel_B_${cx}_${cz}`, new Vector3(origin.x + tW / 2 - 0.5, 0, origin.z + 0.4), meshes, bodies);
+
+    // Guard faction banner — Imperial/Legion blue
+    this._addBanner(`tower_banner_${cx}_${cz}`, new Vector3(origin.x - tW / 2 - 0.2, 0, origin.z), new Color3(0.10, 0.20, 0.65), "imperial", meshes);
+
+    // Campfire outside (guard warming spot)
+    this._addCampfire(`tower_campfire_${cx}_${cz}`, new Vector3(origin.x + 3.5, 0, origin.z - tW / 2 - 3), meshes);
+
     // Guard NPC positioned in front of the doorway
     const guard = new NPC(this._scene, new Vector3(origin.x, 2, origin.z - tW / 2 - 2), `TowerGuard_${cx}_${cz}`);
     guard.aggroRange = 15;
@@ -369,6 +434,230 @@ export class StructureManager {
     if (this.onNPCSpawn) this.onNPCSpawn(guard);
 
     return { meshes, loot, bodies };
+  }
+
+  // ─── Fantasy props ─────────────────────────────────────────────────────────
+
+  /**
+   * Place a wall-mounted torch sconce: iron bracket cylinder + flame cone with
+   * emissive warm-orange glow and a dynamic PointLight. Oblivion-style ambient.
+   */
+  private _addTorch(name: string, position: Vector3, meshes: Mesh[]): void {
+    // Iron sconce bracket
+    const bracket = MeshBuilder.CreateCylinder(
+      `${name}_bracket`,
+      { height: 0.12, diameterTop: 0.08, diameterBottom: 0.10, tessellation: 8 },
+      this._scene,
+    );
+    bracket.position.set(position.x, position.y, position.z);
+    bracket.material = this._mat("torch_iron", new Color3(0.18, 0.14, 0.09), new Color3(0.28, 0.22, 0.10), 64);
+    meshes.push(this._shadow(bracket));
+
+    // Torch handle
+    const handle = MeshBuilder.CreateCylinder(
+      `${name}_handle`,
+      { height: 0.45, diameterTop: 0.06, diameterBottom: 0.08, tessellation: 8 },
+      this._scene,
+    );
+    handle.position.set(position.x, position.y + 0.28, position.z);
+    handle.material = this._mat("torch_wood", new Color3(0.30, 0.18, 0.06), new Color3(0.08, 0.05, 0.02), 12);
+    meshes.push(handle);
+
+    // Flame head — emissive warm orange, no shadowing
+    const flame = MeshBuilder.CreateCylinder(
+      `${name}_flame`,
+      { height: 0.30, diameterTop: 0.0, diameterBottom: 0.13, tessellation: 6 },
+      this._scene,
+    );
+    flame.position.set(position.x, position.y + 0.65, position.z);
+    flame.material = this._mat(
+      "torch_flame",
+      new Color3(1.0, 0.45, 0.05),
+      new Color3(0.0, 0.0, 0.0),
+      1,
+      { emissive: new Color3(1.0, 0.35, 0.02), disableLighting: true },
+    );
+    meshes.push(flame);
+
+    // Warm point light simulating the fire glow
+    const light = new PointLight(`${name}_light`, new Vector3(position.x, position.y + 0.7, position.z), this._scene);
+    light.diffuse   = new Color3(1.0, 0.58, 0.15);
+    light.specular  = new Color3(0.9, 0.45, 0.05);
+    light.intensity = 0.9;
+    light.range     = 7.0;
+  }
+
+  /**
+   * Place a campfire: ring of log stumps + flame cone with PointLight.
+   * Guards' resting spot — warm Oblivion/Skyrim dungeon atmosphere.
+   */
+  private _addCampfire(name: string, position: Vector3, meshes: Mesh[]): void {
+    const logMat = this._mat("campfire_log", new Color3(0.28, 0.14, 0.05), new Color3(0.05, 0.03, 0.01), 10);
+    const stoneMat = this._mat("campfire_stone", new Color3(0.40, 0.36, 0.30), new Color3(0.08, 0.07, 0.06), 18);
+
+    // Ring of small stones
+    const stoneCount = 6;
+    const stoneR    = 0.55;
+    for (let i = 0; i < stoneCount; i++) {
+      const angle = (i / stoneCount) * Math.PI * 2;
+      const stone = MeshBuilder.CreateBox(
+        `${name}_stone_${i}`,
+        { width: 0.18, height: 0.12, depth: 0.18 },
+        this._scene,
+      );
+      stone.position.set(
+        position.x + Math.cos(angle) * stoneR,
+        position.y + 0.06,
+        position.z + Math.sin(angle) * stoneR,
+      );
+      stone.rotation.y = angle;
+      stone.material   = stoneMat;
+      meshes.push(stone);
+    }
+
+    // Two crossed logs
+    for (let i = 0; i < 2; i++) {
+      const log = MeshBuilder.CreateCylinder(
+        `${name}_log_${i}`,
+        { height: 0.85, diameterTop: 0.09, diameterBottom: 0.11, tessellation: 8 },
+        this._scene,
+      );
+      log.rotation.z = Math.PI / 2;
+      log.rotation.y = (i * Math.PI) / 2;
+      log.position.set(position.x, position.y + 0.08, position.z);
+      log.material = logMat;
+      meshes.push(log);
+    }
+
+    // Flame
+    const flame = MeshBuilder.CreateCylinder(
+      `${name}_flame`,
+      { height: 0.50, diameterTop: 0.0, diameterBottom: 0.22, tessellation: 6 },
+      this._scene,
+    );
+    flame.position.set(position.x, position.y + 0.38, position.z);
+    flame.material = this._mat(
+      "campfire_flame",
+      new Color3(1.0, 0.40, 0.04),
+      new Color3(0.0, 0.0, 0.0),
+      1,
+      { emissive: new Color3(1.0, 0.30, 0.02), disableLighting: true },
+    );
+    meshes.push(flame);
+
+    // Firelight
+    const light = new PointLight(`${name}_light`, new Vector3(position.x, position.y + 0.6, position.z), this._scene);
+    light.diffuse   = new Color3(1.0, 0.55, 0.12);
+    light.specular  = new Color3(0.9, 0.42, 0.04);
+    light.intensity = 1.4;
+    light.range     = 10.0;
+  }
+
+  /**
+   * Place a wooden barrel with iron bands. Stacked beside structures for
+   * a lived-in Oblivion/Skyrim feel.
+   */
+  private _addBarrel(name: string, position: Vector3, meshes: Mesh[], bodies: PhysicsAggregate[]): void {
+    const woodMat = this._mat("barrel_wood", new Color3(0.42, 0.26, 0.08), new Color3(0.10, 0.06, 0.02), 14);
+    const ironMat = this._mat("barrel_iron", new Color3(0.20, 0.18, 0.15), new Color3(0.30, 0.28, 0.22), 56);
+
+    // Main barrel body
+    const barrel = MeshBuilder.CreateCylinder(
+      `${name}_body`,
+      { height: 0.75, diameterTop: 0.40, diameterBottom: 0.38, tessellation: 12 },
+      this._scene,
+    );
+    barrel.position.set(position.x, position.y + 0.38, position.z);
+    barrel.material = woodMat;
+    bodies.push(new PhysicsAggregate(barrel, PhysicsShapeType.CYLINDER, { mass: 0 }, this._scene));
+    meshes.push(this._shadow(barrel));
+
+    // Iron band rings (top, middle, bottom)
+    const bandOffsets = [0.28, 0.0, -0.28];
+    for (let i = 0; i < bandOffsets.length; i++) {
+      const band = MeshBuilder.CreateTorus(
+        `${name}_band_${i}`,
+        { diameter: 0.44, thickness: 0.04, tessellation: 12 },
+        this._scene,
+      );
+      band.position.set(position.x, position.y + 0.38 + bandOffsets[i], position.z);
+      band.material = ironMat;
+      meshes.push(band);
+    }
+  }
+
+  /**
+   * Place a faction banner: a tall pole with a coloured pennant.
+   * Marks guard camps and ruins for an Oblivion-style occupied fort feel.
+   * @param materialKey  Stable key for the pennant colour — used to share the material across chunks.
+   */
+  private _addBanner(name: string, position: Vector3, bannerColor: Color3, materialKey: string, meshes: Mesh[]): void {
+    const poleMat = this._mat("banner_pole", new Color3(0.22, 0.15, 0.06), new Color3(0.06, 0.04, 0.01), 12);
+
+    // Wooden pole
+    const pole = MeshBuilder.CreateCylinder(
+      `${name}_pole`,
+      { height: 3.2, diameterTop: 0.06, diameterBottom: 0.08, tessellation: 8 },
+      this._scene,
+    );
+    pole.position.set(position.x, position.y + 1.6, position.z);
+    pole.material = poleMat;
+    meshes.push(this._shadow(pole));
+
+    // Fabric pennant — emissive so it reads even in shadow
+    const pennant = MeshBuilder.CreatePlane(
+      `${name}_pennant`,
+      { width: 0.8, height: 1.1 },
+      this._scene,
+    );
+    pennant.position.set(position.x + 0.4, position.y + 2.9, position.z);
+    pennant.rotation.y = Math.PI / 2;
+    pennant.material = this._mat(
+      `banner_pennant_${materialKey}`,
+      bannerColor,
+      new Color3(0, 0, 0),
+      1,
+      {
+        emissive: new Color3(bannerColor.r * 0.25, bannerColor.g * 0.25, bannerColor.b * 0.25),
+        backFaceCulling: false,
+      },
+    );
+    meshes.push(pennant);
+  }
+
+  /**
+   * Place a carved standing stone / monolith.  Scattered throughout the world
+   * as Oblivion-style waymarkers and ancient Ayleid remnants.
+   */
+  private _addStandingStone(name: string, position: Vector3, height: number, meshes: Mesh[], bodies: PhysicsAggregate[]): void {
+    const stoneMat = this._mat(
+      "standing_stone",
+      new Color3(0.35, 0.32, 0.28),
+      new Color3(0.12, 0.11, 0.09),
+      36,
+    );
+
+    // Main upright stone — slightly irregular by rotating slightly
+    const stone = MeshBuilder.CreateBox(
+      `${name}_stone`,
+      { width: 0.55 + height * 0.06, height, depth: 0.25 + height * 0.04 },
+      this._scene,
+    );
+    stone.position.set(position.x, position.y + height / 2, position.z);
+    stone.rotation.y = Math.random() * 0.3 - 0.15; // slight angle variation
+    stone.material   = stoneMat;
+    bodies.push(new PhysicsAggregate(stone, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
+    meshes.push(this._shadow(stone));
+
+    // Moss / lichen cap slab
+    const cap = MeshBuilder.CreateBox(
+      `${name}_cap`,
+      { width: 0.70, height: 0.12, depth: 0.38 },
+      this._scene,
+    );
+    cap.position.set(position.x, position.y + height + 0.05, position.z);
+    cap.material = this._mat("standing_stone_cap", new Color3(0.30, 0.38, 0.25), new Color3(0.06, 0.08, 0.04), 20);
+    meshes.push(cap);
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -411,13 +700,22 @@ export class StructureManager {
    * Materials are keyed by `name` so each unique type is created only once,
    * reducing GPU material count from O(loaded structures) to O(structure types).
    */
-  private _mat(name: string, diffuse: Color3, specular = new Color3(0.10, 0.10, 0.10), specularPower = 24): StandardMaterial {
+  private _mat(
+    name: string,
+    diffuse: Color3,
+    specular    = new Color3(0.10, 0.10, 0.10),
+    specularPower = 24,
+    opts?: { emissive?: Color3; disableLighting?: boolean; backFaceCulling?: boolean }
+  ): StandardMaterial {
     let mat = this._sharedMaterials.get(name);
     if (!mat) {
       mat = new StandardMaterial(name, this._scene);
       mat.diffuseColor  = diffuse;
       mat.specularColor = specular;
       mat.specularPower = specularPower;
+      if (opts?.emissive)        mat.emissiveColor    = opts.emissive;
+      if (opts?.disableLighting) mat.disableLighting  = true;
+      if (opts?.backFaceCulling === false) mat.backFaceCulling = false;
       mat.freeze();
       this._sharedMaterials.set(name, mat);
     }

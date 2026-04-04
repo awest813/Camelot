@@ -118,6 +118,7 @@ import { SwimmingSystem } from "./systems/swimming-system";
 import { DiseaseSystem } from "./systems/disease-system";
 import { EventManagerSystem } from "./systems/event-manager-system";
 import { AnimationSystem } from "./systems/animation-system";
+import { FantasyAssetLoader } from "./systems/fantasy-asset-loader";
 import { PetSystem } from "./systems/pet-system";
 import type { Pet } from "./systems/pet-system";
 import { PetUI } from "./ui/pet-ui";
@@ -292,6 +293,9 @@ export class Game {
   public animationSystem: AnimationSystem;
   public petSystem: PetSystem;
   public petUI: PetUI;
+
+  /** Fantasy asset loader — streams BabylonJS CDN models (weapons, structures, creatures). */
+  public fantasyAssets: FantasyAssetLoader;
 
   private readonly _barterUI = new BarterUI();
   /** When set, open barter after dialogue teardown (pointer lock restored first). */
@@ -1482,6 +1486,115 @@ export class Game {
     // ── v23 Animation System ───────────────────────────────────────────────
     this.animationSystem = new AnimationSystem(this.scene);
 
+    // ── Fantasy Asset Loader ───────────────────────────────────────────────
+    // Kick off background CDN downloads so assets are ready when the world
+    // generates.  Uses BabylonJS Assets CDN — elf, weapons, obelisk, dragon, etc.
+    this.fantasyAssets = new FantasyAssetLoader(this.scene);
+    this.fantasyAssets.preloadAll();
+
+    // ── CDN model world placement via chunk lifecycle ──────────────────────
+    // Deterministic seeding: same chunk always produces same props.
+    const _chunkRand = (cx: number, cz: number, slot: number) =>
+      Math.abs(Math.sin(cx * 311.7 + cz * 127.1 + slot * 59.3)) % 1;
+
+    this.world.onChunkLoaded = (cx, cz, biome) => {
+      const worldX = cx * this.world.chunkSize;
+      const worldZ = cz * this.world.chunkSize;
+
+      // ── Obelisks in desert / plains (1-in-8 chance per chunk) ────────────
+      if ((biome === "desert" || biome === "plains") && _chunkRand(cx, cz, 0) < 0.125) {
+        const ox = worldX + (_chunkRand(cx, cz, 1) - 0.5) * this.world.chunkSize * 0.7;
+        const oz = worldZ + (_chunkRand(cx, cz, 2) - 0.5) * this.world.chunkSize * 0.7;
+        this.fantasyAssets.getInstance("obelisk", (root) => {
+          if (!root) return;
+          const s = 0.8 + _chunkRand(cx, cz, 3) * 0.6;
+          root.position.set(ox, 0, oz);
+          root.rotation.y = _chunkRand(cx, cz, 4) * Math.PI * 2;
+          root.scaling.setAll(s);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
+
+      // ── Cottage in plains (1-in-12 chance) ───────────────────────────────
+      if (biome === "plains" && _chunkRand(cx, cz, 5) < 0.083) {
+        const cx2 = worldX + (_chunkRand(cx, cz, 6) - 0.5) * this.world.chunkSize * 0.5;
+        const cz2 = worldZ + (_chunkRand(cx, cz, 7) - 0.5) * this.world.chunkSize * 0.5;
+        this.fantasyAssets.getInstance("cottage", (root) => {
+          if (!root) return;
+          root.position.set(cx2, 0, cz2);
+          root.rotation.y = _chunkRand(cx, cz, 8) * Math.PI * 2;
+          root.scaling.setAll(1.0);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
+
+      // ── Dragon encounter in tundra (1-in-20 chance — very rare) ──────────
+      if (biome === "tundra" && _chunkRand(cx, cz, 9) < 0.05) {
+        const dx = worldX + (_chunkRand(cx, cz, 10) - 0.5) * this.world.chunkSize * 0.6;
+        const dz = worldZ + (_chunkRand(cx, cz, 11) - 0.5) * this.world.chunkSize * 0.6;
+        // Register the boss NPC first so the AI/combat system tracks it
+        const dragonNpc = new NPC(this.scene, new Vector3(dx, 2, dz), `DragonBoss_${cx}_${cz}`);
+        dragonNpc.maxHealth    = 500;
+        dragonNpc.health       = 500;
+        dragonNpc.attackDamage = 40;
+        dragonNpc.aggroRange   = 25;
+        dragonNpc.xpReward     = 500;
+        dragonNpc.armorRating  = 60;
+        // Hide the default capsule — the CDN model provides the visual
+        dragonNpc.mesh.isVisible = false;
+        this.scheduleSystem.addNPC(dragonNpc);
+        this.levelScalingSystem?.scaleNPC(dragonNpc, this.player.level);
+
+        // Attach CDN dragon model once loaded
+        this.fantasyAssets.getInstance("dragon", (root) => {
+          if (!root || dragonNpc.isDead) return;
+          root.position.set(dx, 0, dz);
+          root.rotation.y = _chunkRand(cx, cz, 12) * Math.PI * 2;
+          root.scaling.setAll(2.5);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
+
+      // ── Inn in forest (1-in-15 chance) ────────────────────────────────────
+      if (biome === "forest" && _chunkRand(cx, cz, 13) < 0.067) {
+        const ix = worldX + (_chunkRand(cx, cz, 14) - 0.5) * this.world.chunkSize * 0.5;
+        const iz = worldZ + (_chunkRand(cx, cz, 15) - 0.5) * this.world.chunkSize * 0.5;
+        this.fantasyAssets.getInstance("inn", (root) => {
+          if (!root) return;
+          root.position.set(ix, 0, iz);
+          root.rotation.y = _chunkRand(cx, cz, 16) * Math.PI * 2;
+          root.scaling.setAll(1.0);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
+
+      // ── Haunted house in tundra (1-in-10 chance — Skyrim abandoned shacks) ──
+      if (biome === "tundra" && _chunkRand(cx, cz, 17) < 0.10) {
+        const hx = worldX + (_chunkRand(cx, cz, 18) - 0.5) * this.world.chunkSize * 0.55;
+        const hz = worldZ + (_chunkRand(cx, cz, 19) - 0.5) * this.world.chunkSize * 0.55;
+        this.fantasyAssets.getInstance("hauntedHouse", (root) => {
+          if (!root) return;
+          root.position.set(hx, 0, hz);
+          root.rotation.y = _chunkRand(cx, cz, 20) * Math.PI * 2;
+          root.scaling.setAll(1.2);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
+
+      // ── Graveyard near ruins in plains/forest (1-in-10 chance) ───────────
+      if ((biome === "plains" || biome === "forest") && _chunkRand(cx, cz, 21) < 0.10) {
+        const gx = worldX + (_chunkRand(cx, cz, 22) - 0.5) * this.world.chunkSize * 0.6;
+        const gz = worldZ + (_chunkRand(cx, cz, 23) - 0.5) * this.world.chunkSize * 0.6;
+        this.fantasyAssets.getInstance("graveYardScene", (root) => {
+          if (!root) return;
+          root.position.set(gx, 0, gz);
+          root.rotation.y = _chunkRand(cx, cz, 24) * Math.PI * 2;
+          root.scaling.setAll(1.0);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
+    };
+
     // ── v23 Pet System ─────────────────────────────────────────────────────
     this.petSystem = new PetSystem();
     this.petSystem.onPetAcquired = (pet) => {
@@ -1897,6 +2010,51 @@ export class Game {
         slot: "head",
         stats: { armor: 12 }
     });
+
+    // ── Fantasy weapon loot (with CDN 3D model overlays) ─────────────────
+    // Each weapon is a standard Loot sphere for physics/pickup, with a
+    // BabylonJS Assets CDN model parented to it as the visual representation.
+    const _placeWeaponLoot = (
+      lootPos: Vector3,
+      item: { id: string; name: string; description: string; slot: string; stats: Record<string, number> },
+      assetKey: "runeSword" | "frostAxe" | "moltenDagger",
+      modelScale: number,
+      modelOffsetY: number,
+    ) => {
+      const loot = new Loot(this.scene, lootPos, { ...item, stackable: false, quantity: 1 });
+      // Dim the sphere so the CDN model is the main visual
+      (loot.mesh.material as any).alpha = 0.0;
+      this.fantasyAssets.getInstance(assetKey, (root) => {
+        if (!root) {
+          // Fallback: restore sphere visibility
+          (loot.mesh.material as any).alpha = 1.0;
+          return;
+        }
+        root.parent   = loot.mesh;
+        root.position = new Vector3(0, modelOffsetY, 0);
+        root.scaling.setAll(modelScale);
+        this.shadowGenerator?.addShadowCaster(root, true);
+      });
+      return loot;
+    };
+
+    _placeWeaponLoot(
+      new Vector3(3, 1, 3),
+      { id: "rune_sword_01", name: "Runesword", description: "A blade etched with glowing runes. +22 Damage, +8 Magicka.", slot: "mainHand", stats: { damage: 22, magicka: 8 } },
+      "runeSword", 0.6, -0.2,
+    );
+
+    _placeWeaponLoot(
+      new Vector3(9, 1, 4),
+      { id: "frost_axe_01", name: "Frost Axe", description: "A frost-enchanted axe. +18 Damage, +12 frost resist.", slot: "mainHand", stats: { damage: 18, frostResist: 12 } },
+      "frostAxe", 0.55, -0.15,
+    );
+
+    _placeWeaponLoot(
+      new Vector3(5, 1, 10),
+      { id: "molten_dagger_01", name: "Molten Dagger", description: "Forged in volcanic glass. +14 Damage, 5 fire DoT.", slot: "mainHand", stats: { damage: 14, fireDot: 5 } },
+      "moltenDagger", 0.5, -0.1,
+    );
 
     // Test Quests
     this.questSystem.addQuest({

@@ -17,9 +17,10 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
   MeshBuilder: {
     CreateBox: vi.fn(() => ({
       position: { set: vi.fn(), x: 0, y: 0, z: 0 },
-      rotation: { y: 0 },
+      rotation: { y: 0, z: 0 },
       material: null,
       receiveShadows: false,
+      parent: null,
       dispose: mockMeshDispose,
     })),
     CreateGround: vi.fn(() => ({
@@ -31,11 +32,44 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
     })),
     CreateCylinder: vi.fn(() => ({
       position: { set: vi.fn(), x: 0, y: 0, z: 0 },
-      rotation: { z: 0 },
+      rotation: { y: 0, z: 0 },
+      material: null,
+      receiveShadows: false,
+      parent: null,
+      dispose: mockMeshDispose,
+    })),
+    CreateSphere: vi.fn(() => ({
+      position: { set: vi.fn(), x: 0, y: 0, z: 0 },
+      rotation: { y: 0, z: 0 },
+      material: null,
+      receiveShadows: false,
+      parent: null,
+      dispose: mockMeshDispose,
+    })),
+    CreateTorus: vi.fn(() => ({
+      position: { set: vi.fn(), x: 0, y: 0, z: 0 },
+      rotation: { y: 0, z: 0 },
       material: null,
       receiveShadows: false,
       dispose: mockMeshDispose,
     })),
+    CreatePlane: vi.fn(() => ({
+      position: { set: vi.fn(), x: 0, y: 0, z: 0 },
+      rotation: { y: 0, z: 0 },
+      material: null,
+      receiveShadows: false,
+      dispose: mockMeshDispose,
+    })),
+  },
+}));
+
+vi.mock('@babylonjs/core/Lights/pointLight', () => ({
+  PointLight: class {
+    diffuse: any = null;
+    specular: any = null;
+    intensity: number = 1;
+    range: number = 10;
+    constructor(_name: string, _position: any, _scene: any) {}
   },
 }));
 
@@ -47,7 +81,7 @@ vi.mock('@babylonjs/core/Physics/v2/physicsAggregate', () => ({
 }));
 
 vi.mock('@babylonjs/core/Physics', () => ({
-  PhysicsShapeType: { BOX: 'BOX' },
+  PhysicsShapeType: { BOX: 'BOX', CYLINDER: 'CYLINDER', CAPSULE: 'CAPSULE' },
 }));
 
 vi.mock('@babylonjs/core/Materials/standardMaterial', () => ({
@@ -273,9 +307,12 @@ describe('StructureManager shared material pool', () => {
     expect(matsAfterSecond).toBe(matsAfterFirst);
   });
 
-  it('uses at most 6 unique material types for all three structure types combined', () => {
-    // expected: ruins_stone, shrine_stone, shrine_altar, tower_stone, tower_wood, chest_wood
-    const MAX_STRUCTURE_MATERIAL_TYPES = 6;
+  it('uses at most 30 unique material types for all three structure types combined', () => {
+    // original 6: ruins_stone, shrine_stone, shrine_altar, tower_stone, tower_wood, chest_wood
+    // fantasy props add: torch_iron, torch_wood, torch_flame, campfire_stone, campfire_log,
+    // campfire_flame, barrel_wood, barrel_iron, banner_pole, banner_pennant_bandits,
+    // banner_pennant_imperial, standing_stone, standing_stone_cap, shrine_rune
+    const MAX_STRUCTURE_MATERIAL_TYPES = 30;
     const sm = new StructureManager(mockScene);
 
     const biomesNeeded: Array<'plains' | 'desert' | 'tundra'> = ['plains', 'desert', 'tundra'];

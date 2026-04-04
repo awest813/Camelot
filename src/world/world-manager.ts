@@ -81,6 +81,9 @@ export class WorldManager {
   private cactusMaterial?: StandardMaterial;
   private iceMaterial?: StandardMaterial;
 
+  /** Shared material cache for fantasy environment props — avoids getMaterialByName calls. */
+  private readonly _envMaterials: Map<string, StandardMaterial> = new Map();
+
   /** Optional shadow generator — meshes added as shadow casters when provided. */
   private readonly _shadows: ShadowGenerator | null;
 
@@ -445,30 +448,96 @@ export class WorldManager {
     const rand = (i: number) =>
       Math.abs(Math.sin(chunkX * 127.1 + chunkZ * 311.7 + i * 74.3)) % 1;
 
-    let count = 0;
+    // ── Per-biome prop distribution ──────────────────────────────────────────
+
     switch (biome) {
-      case "forest": count = 8; break;
-      case "plains": count = 2; break;
-      case "desert": count = 3; break;
-      case "tundra": count = 1; break;
-    }
+      case "forest": {
+        // 6 pine trees
+        for (let i = 0; i < 6; i++) {
+          const px = centerX + (rand(i * 2) * 2 - 1) * halfSize;
+          const pz = centerZ + (rand(i * 2 + 1) * 2 - 1) * halfSize;
+          meshes.push(...this._spawnTree(px, pz, `tree_${chunkX}_${chunkZ}_${i}`, rand(i * 3)));
+        }
+        // 2 giant mushrooms — Oblivion Blackwood/Morrowind feel
+        for (let i = 0; i < 2; i++) {
+          const px = centerX + (rand(100 + i * 2) * 2 - 1) * halfSize;
+          const pz = centerZ + (rand(100 + i * 2 + 1) * 2 - 1) * halfSize;
+          meshes.push(...this._spawnMushroom(px, pz, `mushroom_${chunkX}_${chunkZ}_${i}`, rand(100 + i * 3)));
+        }
+        // 1 mossy boulder
+        {
+          const px = centerX + (rand(120) * 2 - 1) * halfSize;
+          const pz = centerZ + (rand(121) * 2 - 1) * halfSize;
+          meshes.push(...this._spawnBoulder(px, pz, `boulder_${chunkX}_${chunkZ}`, rand(122)));
+        }
+        break;
+      }
 
-    for (let i = 0; i < count; i++) {
-      const px = centerX + (rand(i * 2)       * 2 - 1) * halfSize;
-      const pz = centerZ + (rand(i * 2 + 1)   * 2 - 1) * halfSize;
-      const scale = rand(i * 3); // 0..1, used for size variation
+      case "plains": {
+        // 2 trees
+        for (let i = 0; i < 2; i++) {
+          const px = centerX + (rand(i * 2) * 2 - 1) * halfSize;
+          const pz = centerZ + (rand(i * 2 + 1) * 2 - 1) * halfSize;
+          meshes.push(...this._spawnTree(px, pz, `tree_${chunkX}_${chunkZ}_${i}`, rand(i * 3)));
+        }
+        // 1–2 ancient standing stones — Oblivion Ayleid waymarkers
+        const stoneCount = rand(200) < 0.5 ? 1 : 2;
+        for (let i = 0; i < stoneCount; i++) {
+          const px = centerX + (rand(200 + i * 2) * 2 - 1) * halfSize;
+          const pz = centerZ + (rand(200 + i * 2 + 1) * 2 - 1) * halfSize;
+          meshes.push(...this._spawnMonolith(px, pz, `monolith_${chunkX}_${chunkZ}_${i}`, rand(200 + i * 3)));
+        }
+        // Wildflower cluster — small coloured dots scattered in grass
+        if (rand(210) < 0.6) {
+          const px = centerX + (rand(211) * 2 - 1) * halfSize;
+          const pz = centerZ + (rand(212) * 2 - 1) * halfSize;
+          meshes.push(...this._spawnWildflowers(px, pz, `flowers_${chunkX}_${chunkZ}`, rand(213)));
+        }
+        break;
+      }
 
-      switch (biome) {
-        case "forest":
-        case "plains":
-          meshes.push(...this._spawnTree(px, pz, `tree_${chunkX}_${chunkZ}_${i}`, scale));
-          break;
-        case "desert":
+      case "desert": {
+        // 2 cacti
+        for (let i = 0; i < 2; i++) {
+          const px = centerX + (rand(i * 2) * 2 - 1) * halfSize;
+          const pz = centerZ + (rand(i * 2 + 1) * 2 - 1) * halfSize;
           meshes.push(...this._spawnCactus(px, pz, `cactus_${chunkX}_${chunkZ}_${i}`));
-          break;
-        case "tundra":
-          meshes.push(...this._spawnIceCrystal(px, pz, `ice_${chunkX}_${chunkZ}_${i}`, scale));
-          break;
+        }
+        // 1 desert palm (oasis feel)
+        {
+          const px = centerX + (rand(300) * 2 - 1) * halfSize;
+          const pz = centerZ + (rand(301) * 2 - 1) * halfSize;
+          meshes.push(...this._spawnDesertPalm(px, pz, `palm_${chunkX}_${chunkZ}`));
+        }
+        // Scattered sandstone boulders
+        if (rand(310) < 0.7) {
+          const px = centerX + (rand(311) * 2 - 1) * halfSize;
+          const pz = centerZ + (rand(312) * 2 - 1) * halfSize;
+          meshes.push(...this._spawnBoulder(px, pz, `sboulder_${chunkX}_${chunkZ}`, rand(313)));
+        }
+        break;
+      }
+
+      case "tundra": {
+        // 1–2 ice crystal clusters
+        for (let i = 0; i < 2; i++) {
+          const px = centerX + (rand(i * 2) * 2 - 1) * halfSize;
+          const pz = centerZ + (rand(i * 2 + 1) * 2 - 1) * halfSize;
+          meshes.push(...this._spawnIceCrystal(px, pz, `ice_${chunkX}_${chunkZ}_${i}`, rand(i * 3)));
+        }
+        // Dead twisted trees — Skyrim Winterhold atmosphere
+        if (rand(400) < 0.65) {
+          const px = centerX + (rand(401) * 2 - 1) * halfSize;
+          const pz = centerZ + (rand(402) * 2 - 1) * halfSize;
+          meshes.push(...this._spawnDeadTree(px, pz, `deadtree_${chunkX}_${chunkZ}`, rand(403)));
+        }
+        // Snow boulders
+        if (rand(410) < 0.55) {
+          const px = centerX + (rand(411) * 2 - 1) * halfSize;
+          const pz = centerZ + (rand(412) * 2 - 1) * halfSize;
+          meshes.push(...this._spawnSnowBoulder(px, pz, `snowboulder_${chunkX}_${chunkZ}`, rand(413)));
+        }
+        break;
       }
     }
 
@@ -577,6 +646,346 @@ export class WorldManager {
     meshes.push(shard);
 
     return meshes;
+  }
+
+  // ── Fantasy environment props ──────────────────────────────────────────────
+
+  /**
+   * Get or create a cached StandardMaterial for fantasy environment props.
+   * Prevents duplicate material allocations without depending on scene.getMaterialByName.
+   */
+  private _envMat(key: string, create: () => StandardMaterial): StandardMaterial {
+    let mat = this._envMaterials.get(key);
+    if (!mat) {
+      mat = create();
+      this._envMaterials.set(key, mat);
+    }
+    return mat;
+  }
+
+  /**
+   * Giant mushroom — Oblivion Blackwood/Morrowind overgrown-forest atmosphere.
+   * Thick pale stalk with a broad spotted cap in earthy burgundy/red.
+   */
+  private _spawnMushroom(x: number, z: number, name: string, scale: number): Mesh[] {
+    const stalkH  = 1.2 + scale * 1.6; // 1.2–2.8 m
+
+    const stalkMat = this._envMat("mushroom_stalk", () => {
+      const m = new StandardMaterial("mushroom_stalk", this.scene);
+      m.diffuseColor  = new Color3(0.88, 0.84, 0.76);
+      m.specularColor = new Color3(0.10, 0.09, 0.07);
+      m.specularPower = 20;
+      m.freeze();
+      return m;
+    });
+
+    // Earthy wine-red cap — Morrowind Telvanni / Oblivion deepwoods feel
+    const capMat = this._envMat("mushroom_cap", () => {
+      const m = new StandardMaterial("mushroom_cap", this.scene);
+      m.diffuseColor  = new Color3(0.62, 0.10, 0.08);
+      m.specularColor = new Color3(0.24, 0.06, 0.04);
+      m.specularPower = 30;
+      m.freeze();
+      return m;
+    });
+
+    const stalk = MeshBuilder.CreateCylinder(
+      `${name}_stalk`,
+      { height: stalkH, diameterTop: 0.20 + scale * 0.15, diameterBottom: 0.28 + scale * 0.18, tessellation: 10 },
+      this.scene,
+    );
+    stalk.position.set(x, stalkH / 2, z);
+    stalk.material = stalkMat;
+    this._addShadowCaster(stalk);
+
+    const capR = 0.9 + scale * 0.7; // 0.9–1.6 m radius
+    const cap = MeshBuilder.CreateCylinder(
+      `${name}_cap`,
+      { height: capR * 0.55, diameterTop: capR * 0.5, diameterBottom: capR * 2.0, tessellation: 12 },
+      this.scene,
+    );
+    cap.position.set(x, stalkH + capR * 0.2, z);
+    cap.material = capMat;
+    this._addShadowCaster(cap);
+
+    return [stalk, cap];
+  }
+
+  /**
+   * Mossy boulder — rounded stone with green moss overlay.
+   * Common in forests; also appears in tundra as a grey variant.
+   */
+  private _spawnBoulder(x: number, z: number, name: string, scale: number): Mesh[] {
+    const r    = 0.5 + scale * 1.0; // 0.5–1.5 m radius
+    const bucket = Math.round(scale * 3);
+    const mat = this._envMat(`boulder_moss_${bucket}`, () => {
+      const m = new StandardMaterial(`boulder_moss_${bucket}`, this.scene);
+      m.diffuseColor  = new Color3(0.38 - scale * 0.08, 0.36 - scale * 0.05, 0.30);
+      m.specularColor = new Color3(0.10, 0.10, 0.08);
+      m.specularPower = 16;
+      m.freeze();
+      return m;
+    });
+
+    const boulder = MeshBuilder.CreateSphere(
+      `${name}_rock`,
+      { diameter: r * 2, segments: 5 },
+      this.scene,
+    );
+    boulder.scaling.y = 0.65 + scale * 0.2; // flatten slightly
+    boulder.position.set(x, r * 0.6, z);
+    boulder.rotation.y = scale * Math.PI;
+    boulder.material   = mat;
+    this._addShadowCaster(boulder);
+
+    return [boulder];
+  }
+
+  /**
+   * Ancient monolith / standing stone — Oblivion Ayleid waymarker.
+   * Tall weathered limestone block with a rough cap slab.
+   */
+  private _spawnMonolith(x: number, z: number, name: string, scale: number): Mesh[] {
+    const h = 1.6 + scale * 2.4; // 1.6–4.0 m
+
+    const mat = this._envMat("monolith_stone", () => {
+      const m = new StandardMaterial("monolith_stone", this.scene);
+      m.diffuseColor  = new Color3(0.48, 0.43, 0.36);
+      m.specularColor = new Color3(0.14, 0.13, 0.10);
+      m.specularPower = 28;
+      m.freeze();
+      return m;
+    });
+
+    const stone = MeshBuilder.CreateBox(
+      `${name}_stone`,
+      { width: 0.50 + scale * 0.25, height: h, depth: 0.22 + scale * 0.12 },
+      this.scene,
+    );
+    stone.position.set(x, h / 2, z);
+    stone.rotation.y = scale * 1.8; // slight turn for variety
+    stone.material   = mat;
+    this._addShadowCaster(stone);
+
+    // Cap slab (wider than the stone, slightly angled)
+    const cap = MeshBuilder.CreateBox(
+      `${name}_cap`,
+      { width: 0.72 + scale * 0.28, height: 0.14, depth: 0.34 + scale * 0.14 },
+      this.scene,
+    );
+    cap.position.set(x, h + 0.07, z);
+    cap.rotation.y = stone.rotation.y + 0.08;
+    cap.material = this._envMat("monolith_cap", () => {
+      const m = new StandardMaterial("monolith_cap", this.scene);
+      m.diffuseColor  = new Color3(0.36, 0.42, 0.28);
+      m.specularColor = new Color3(0.06, 0.08, 0.04);
+      m.specularPower = 16;
+      m.freeze();
+      return m;
+    });
+    this._addShadowCaster(cap);
+
+    return [stone, cap];
+  }
+
+  /**
+   * Wildflower cluster — tiny coloured sphere "blooms" scattered in a radius.
+   * Plains ambient detail for a living Cyrodiil/Skyrim landscape.
+   */
+  private _spawnWildflowers(x: number, z: number, name: string, seed: number): Mesh[] {
+    const meshes: Mesh[] = [];
+    const colors = [
+      new Color3(0.90, 0.22, 0.30), // red
+      new Color3(0.95, 0.78, 0.10), // yellow
+      new Color3(0.50, 0.25, 0.85), // purple
+      new Color3(0.98, 0.98, 0.98), // white
+    ];
+    const count = 8;
+    for (let i = 0; i < count; i++) {
+      const a  = (i / count) * Math.PI * 2 + seed;
+      const r  = 0.6 + Math.abs(Math.sin(seed * 17.3 + i)) * 1.6;
+      const fx = x + Math.cos(a) * r;
+      const fz = z + Math.sin(a) * r;
+      const bloom = MeshBuilder.CreateSphere(
+        `${name}_bloom_${i}`,
+        { diameter: 0.14, segments: 3 },
+        this.scene,
+      );
+      bloom.position.set(fx, 0.10, fz);
+      const col = colors[i % colors.length];
+      const bMat = new StandardMaterial(`${name}_bmat_${i}`, this.scene);
+      bMat.diffuseColor  = col;
+      bMat.emissiveColor = new Color3(col.r * 0.15, col.g * 0.15, col.b * 0.15);
+      bMat.freeze();
+      bloom.material = bMat;
+      meshes.push(bloom);
+
+      // Thin stem
+      const stem = MeshBuilder.CreateCylinder(
+        `${name}_stem_${i}`,
+        { height: 0.12, diameterTop: 0.02, diameterBottom: 0.03, tessellation: 4 },
+        this.scene,
+      );
+      stem.position.set(fx, 0.05, fz);
+      stem.material = this._envMat("flower_stem", () => {
+        const sm = new StandardMaterial("flower_stem", this.scene);
+        sm.diffuseColor = new Color3(0.18, 0.44, 0.12);
+        sm.freeze();
+        return sm;
+      });
+      meshes.push(stem);
+    }
+    return meshes;
+  }
+
+  /**
+   * Desert palm — tall segmented trunk with a fan of wide fronds.
+   * Gives the desert biome an oasis / Hammerfell silhouette.
+   */
+  private _spawnDesertPalm(x: number, z: number, name: string): Mesh[] {
+    const trunkMat = this._envMat("palm_trunk", () => {
+      const m = new StandardMaterial("palm_trunk", this.scene);
+      m.diffuseColor  = new Color3(0.52, 0.38, 0.18);
+      m.specularColor = new Color3(0.10, 0.07, 0.03);
+      m.specularPower = 14;
+      m.freeze();
+      return m;
+    });
+    const frondMat = this._envMat("palm_frond", () => {
+      const m = new StandardMaterial("palm_frond", this.scene);
+      m.diffuseColor  = new Color3(0.18, 0.54, 0.12);
+      m.specularColor = new Color3(0.06, 0.14, 0.04);
+      m.specularPower = 20;
+      m.freeze();
+      return m;
+    });
+    const trunkH   = 5.5;
+
+    const trunk = MeshBuilder.CreateCylinder(
+      `${name}_trunk`,
+      { height: trunkH, diameterTop: 0.22, diameterBottom: 0.38, tessellation: 8 },
+      this.scene,
+    );
+    trunk.position.set(x, trunkH / 2, z);
+    trunk.material = trunkMat;
+    this._addShadowCaster(trunk);
+
+    // Fan of 6 fronds arching outward
+    const frondCount = 6;
+    const meshes: Mesh[] = [trunk];
+    for (let i = 0; i < frondCount; i++) {
+      const angle = (i / frondCount) * Math.PI * 2;
+      const frond = MeshBuilder.CreateCylinder(
+        `${name}_frond_${i}`,
+        { height: 2.2, diameterTop: 0.0, diameterBottom: 0.6, tessellation: 6 },
+        this.scene,
+      );
+      frond.rotation.z = -Math.PI / 3.5; // arch outward
+      frond.rotation.y = angle;
+      frond.position.set(
+        x + Math.cos(angle) * 0.7,
+        trunkH + 0.5,
+        z + Math.sin(angle) * 0.7,
+      );
+      frond.material = frondMat;
+      this._addShadowCaster(frond);
+      meshes.push(frond);
+    }
+
+    return meshes;
+  }
+
+  /**
+   * Dead twisted tree — Skyrim Winterhold / Morthal atmosphere.
+   * Bare black branches reaching skyward like clawed hands.
+   */
+  private _spawnDeadTree(x: number, z: number, name: string, scale: number): Mesh[] {
+    const trunkH = 2.5 + scale * 2.0;
+    const mat = this._envMat("dead_tree", () => {
+      const m = new StandardMaterial("dead_tree", this.scene);
+      m.diffuseColor  = new Color3(0.14, 0.11, 0.10);
+      m.specularColor = new Color3(0.06, 0.05, 0.04);
+      m.specularPower = 10;
+      m.freeze();
+      return m;
+    });
+
+    const trunk = MeshBuilder.CreateCylinder(
+      `${name}_trunk`,
+      { height: trunkH, diameterTop: 0.12, diameterBottom: 0.32, tessellation: 6 },
+      this.scene,
+    );
+    trunk.rotation.z = (scale - 0.5) * 0.3; // slight lean
+    trunk.position.set(x, trunkH / 2, z);
+    trunk.material = mat;
+    this._addShadowCaster(trunk);
+
+    // 3 bare branch segments radiating up from near the top
+    const meshes: Mesh[] = [trunk];
+    for (let i = 0; i < 3; i++) {
+      const bAngle = (i / 3) * Math.PI * 2 + scale;
+      const bH     = 1.0 + scale * 0.5;
+      const branch = MeshBuilder.CreateCylinder(
+        `${name}_branch_${i}`,
+        { height: bH, diameterTop: 0.02, diameterBottom: 0.10, tessellation: 5 },
+        this.scene,
+      );
+      branch.rotation.z = Math.PI / 4 + (i * 0.2);
+      branch.rotation.y = bAngle;
+      branch.position.set(
+        x + Math.cos(bAngle) * 0.4,
+        trunkH - 0.5 + bH * 0.3,
+        z + Math.sin(bAngle) * 0.4,
+      );
+      branch.material = mat;
+      meshes.push(branch);
+    }
+
+    return meshes;
+  }
+
+  /**
+   * Snow-capped boulder — tundra ambient stone half-buried in drifts.
+   */
+  private _spawnSnowBoulder(x: number, z: number, name: string, scale: number): Mesh[] {
+    const r = 0.5 + scale * 1.2;
+
+    const boulder = MeshBuilder.CreateSphere(
+      `${name}_rock`,
+      { diameter: r * 2, segments: 5 },
+      this.scene,
+    );
+    boulder.scaling.y = 0.7;
+    boulder.position.set(x, r * 0.55, z);
+    boulder.material = this._envMat("snow_boulder", () => {
+      const m = new StandardMaterial("snow_boulder", this.scene);
+      m.diffuseColor  = new Color3(0.56, 0.54, 0.58);
+      m.specularColor = new Color3(0.16, 0.16, 0.20);
+      m.specularPower = 24;
+      m.freeze();
+      return m;
+    });
+    this._addShadowCaster(boulder);
+
+    // Snow drift cap (flattened sphere on top)
+    const cap = MeshBuilder.CreateSphere(
+      `${name}_snow`,
+      { diameter: r * 1.4, segments: 4 },
+      this.scene,
+    );
+    cap.scaling.y = 0.35;
+    cap.position.set(x, r * 0.55 + r * 0.55, z);
+    cap.material = this._envMat("snow_cap", () => {
+      const m = new StandardMaterial("snow_cap", this.scene);
+      m.diffuseColor  = new Color3(0.90, 0.92, 0.96);
+      m.specularColor = new Color3(0.50, 0.52, 0.58);
+      m.specularPower = 64;
+      m.freeze();
+      return m;
+    });
+    cap.receiveShadows = true;
+
+    return [boulder, cap];
   }
 }
 
