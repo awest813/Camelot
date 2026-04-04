@@ -2834,6 +2834,10 @@ export class Game {
       this._applyDefaultCharacterCreation();
     }
 
+    if (selection.worldSeed) {
+      this.world.setSeed(selection.worldSeed);
+    }
+
     persistSkipOnboardingTips(selection.skipGameplayTips);
     this._startOnboardingTutorialIfNeeded();
 

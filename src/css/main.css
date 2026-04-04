@@ -217,6 +217,90 @@ body::before {
   grid-column: 1 / -1;
 }
 
+/* ── World Step ──────────────────────────────────────────────────────────── */
+
+.character-create__world-section {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.character-create__world-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.character-create__world-label {
+  flex: 0 0 140px;
+  font-size: 13px;
+  color: #c9b892;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.character-create__world-seed-wrap {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+}
+
+.character-create__world-seed-input {
+  flex: 1;
+  border-radius: 10px;
+  border: 1px solid rgba(132, 108, 65, 0.7);
+  background: rgba(18, 13, 7, 0.95);
+  color: #f3e5c3;
+  font-size: 15px;
+  padding: 9px 12px;
+}
+
+.character-create__world-seed-input::placeholder {
+  color: #8f7e57;
+}
+
+.character-create__world-seed-input:focus-visible {
+  outline: 2px solid rgba(212, 160, 23, 0.85);
+  outline-offset: 2px;
+  border-color: rgba(212, 160, 23, 0.9);
+}
+
+.character-create__world-random-btn {
+  border: 1px solid rgba(132, 108, 65, 0.65);
+  border-radius: 8px;
+  background: rgba(30, 22, 10, 0.95);
+  color: #e8d5ad;
+  font-size: 13px;
+  padding: 8px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter 0.15s ease, box-shadow 0.15s ease;
+}
+
+.character-create__world-random-btn:hover,
+.character-create__world-random-btn:focus-visible {
+  filter: brightness(1.25);
+  box-shadow: 0 0 6px rgba(212, 160, 23, 0.35);
+}
+
+.character-create__world-select {
+  flex: 1;
+  border-radius: 8px;
+  border: 1px solid rgba(132, 108, 65, 0.7);
+  background: rgba(18, 13, 7, 0.95);
+  color: #f3e5c3;
+  font-size: 14px;
+  padding: 9px 10px;
+  cursor: pointer;
+}
+
+.character-create__world-select:focus-visible {
+  outline: 2px solid rgba(212, 160, 23, 0.85);
+  outline-offset: 2px;
+  border-color: rgba(212, 160, 23, 0.9);
+}
+
 .character-create__name-input {
   width: 100%;
   border-radius: 10px;

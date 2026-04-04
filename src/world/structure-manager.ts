@@ -40,7 +40,7 @@ export class StructureManager {
   public onNPCSpawn: ((npc: NPC) => void) | null = null;
 
   /** Optional world seed — used for seeded placement and randomisation. */
-  private readonly _seed: WorldSeed | null;
+  private _seed: WorldSeed | null;
 
   /** Optional shadow generator — structure meshes are registered as casters. */
   private readonly _shadows: ShadowGenerator | null;
@@ -48,6 +48,14 @@ export class StructureManager {
   constructor(scene: Scene, shadowGenerator: ShadowGenerator | null = null, seed: WorldSeed | null = null) {
     this._scene = scene;
     this._shadows = shadowGenerator;
+    this._seed = seed;
+  }
+
+  /**
+   * Replace the active world seed.  Should be called before any chunks are
+   * spawned so that structure placement is fully consistent.
+   */
+  public setSeed(seed: WorldSeed | null): void {
     this._seed = seed;
   }
 

@@ -2,6 +2,8 @@ import { BIRTHSIGNS, type BirthsignDefinition } from "../systems/birthsign-syste
 import { CHARACTER_CLASSES, type CharacterClass } from "../systems/class-system";
 import { RACES, type RaceDefinition } from "../systems/race-system";
 import { shouldSkipOnboardingTips } from "../onboarding-preferences";
+import { WorldSeed, type WorldType, type BiomeScale, type StructureDensity } from "../world/world-seed";
+import type { BiomeType } from "../world/world-manager";
 
 export interface CharacterCreationResult {
   name: string;
@@ -10,6 +12,8 @@ export interface CharacterCreationResult {
   classId: string;
   /** When true, post-creation gameplay tips are not started (also persisted). */
   skipGameplayTips: boolean;
+  /** World seed to apply before the first chunk is loaded. Null = unseeded (legacy behaviour). */
+  worldSeed: WorldSeed | null;
 }
 
 /**
@@ -40,7 +44,7 @@ const heritageLabel = (heritage: RaceDefinition["heritage"]): string => {
   return heritage.charAt(0).toUpperCase() + heritage.slice(1);
 };
 
-type CreationStep = "welcome" | "name" | "race" | "birthsign" | "class";
+type CreationStep = "welcome" | "world" | "name" | "race" | "birthsign" | "class";
 
 export class CharacterCreationUI {
   public async open(): Promise<CharacterCreationResult> {
@@ -75,6 +79,11 @@ export class CharacterCreationUI {
       welcomePill.textContent = "Welcome";
       welcomePill.setAttribute("aria-current", "step");
       stepPills.appendChild(welcomePill);
+
+      const worldStep = document.createElement("span");
+      worldStep.className = "character-create__step-pill";
+      worldStep.textContent = "World";
+      stepPills.appendChild(worldStep);
 
       const nameStep = document.createElement("span");
       nameStep.className = "character-create__step-pill";
@@ -148,13 +157,20 @@ export class CharacterCreationUI {
       let selectedBirthsign: BirthsignDefinition | null = null;
       let selectedClass: CharacterClass | null = null;
 
+      // World step state
+      let worldSeedString: string = "";
+      let worldType: WorldType = "normal";
+      let biomeScale: BiomeScale = "medium";
+      let structureDensity: StructureDensity = "normal";
+      let startingBiome: BiomeType | null = null;
+
       const clearCards = () => {
         while (cards.firstChild) cards.removeChild(cards.firstChild);
       };
 
       const setAllStepPills = (active: CreationStep) => {
-        const steps: CreationStep[] = ["welcome", "name", "race", "birthsign", "class"];
-        const pills = [welcomePill, nameStep, raceStep, birthsignStep, classStep];
+        const steps: CreationStep[] = ["welcome", "world", "name", "race", "birthsign", "class"];
+        const pills = [welcomePill, worldStep, nameStep, raceStep, birthsignStep, classStep];
         steps.forEach((s, i) => {
           if (s === active) {
             pills[i].classList.add("is-active");
@@ -264,6 +280,208 @@ export class CharacterCreationUI {
           "Use Continue and Back to move through the steps. On the last step, Begin Adventure applies your choices and enters the game.";
         detailsMeta.innerHTML = "";
       };
+
+      const renderWorld = () => {
+        clearCards();
+        subtitle.textContent = "Configure your world seed and generation settings, or leave everything as-is for a random world.";
+        continueButton.textContent = "Continue";
+        continueButton.disabled = false;
+        backButton.disabled = false;
+        setAllStepPills("world");
+
+        const seedSection = document.createElement("div");
+        seedSection.className = "character-create__world-section";
+        cards.appendChild(seedSection);
+
+        // ── Seed input row ────────────────────────────────────────────────────
+        const seedRow = document.createElement("div");
+        seedRow.className = "character-create__world-row";
+        seedSection.appendChild(seedRow);
+
+        const seedLabel = document.createElement("label");
+        seedLabel.className = "character-create__world-label";
+        seedLabel.htmlFor = "world-seed-input";
+        seedLabel.textContent = "Seed";
+        seedRow.appendChild(seedLabel);
+
+        const seedInputWrap = document.createElement("div");
+        seedInputWrap.className = "character-create__world-seed-wrap";
+        seedRow.appendChild(seedInputWrap);
+
+        const seedInput = document.createElement("input");
+        seedInput.type = "text";
+        seedInput.id = "world-seed-input";
+        seedInput.className = "character-create__world-seed-input";
+        seedInput.placeholder = "Leave empty for a random seed…";
+        seedInput.value = worldSeedString;
+        seedInput.maxLength = 64;
+        seedInputWrap.appendChild(seedInput);
+
+        seedInput.addEventListener("input", () => {
+          worldSeedString = seedInput.value;
+        });
+
+        const randomBtn = document.createElement("button");
+        randomBtn.type = "button";
+        randomBtn.className = "character-create__world-random-btn";
+        randomBtn.textContent = "Randomize";
+        randomBtn.title = "Generate a random numeric seed";
+        randomBtn.addEventListener("click", () => {
+          const r = Math.floor(Math.random() * 0xffffffff);
+          worldSeedString = String(r);
+          seedInput.value = worldSeedString;
+        });
+        seedInputWrap.appendChild(randomBtn);
+
+        // ── World Type select ─────────────────────────────────────────────────
+        const typeRow = document.createElement("div");
+        typeRow.className = "character-create__world-row";
+        seedSection.appendChild(typeRow);
+
+        const typeLabel = document.createElement("label");
+        typeLabel.className = "character-create__world-label";
+        typeLabel.htmlFor = "world-type-select";
+        typeLabel.textContent = "World type";
+        typeRow.appendChild(typeLabel);
+
+        const typeSelect = document.createElement("select");
+        typeSelect.id = "world-type-select";
+        typeSelect.className = "character-create__world-select";
+        const worldTypeOptions: { value: WorldType; label: string }[] = [
+          { value: "normal",    label: "Normal — varied, smooth biome transitions" },
+          { value: "flat",      label: "Flat — all plains, no elevation variation" },
+          { value: "amplified", label: "Amplified — dramatic biome contrasts" },
+          { value: "island",    label: "Island — lush centre, harsh tundra/desert outskirts" },
+        ];
+        for (const opt of worldTypeOptions) {
+          const el = document.createElement("option");
+          el.value = opt.value;
+          el.textContent = opt.label;
+          if (opt.value === worldType) el.selected = true;
+          typeSelect.appendChild(el);
+        }
+        typeSelect.addEventListener("change", () => {
+          worldType = typeSelect.value as WorldType;
+        });
+        typeRow.appendChild(typeSelect);
+
+        // ── Biome Scale select ────────────────────────────────────────────────
+        const scaleRow = document.createElement("div");
+        scaleRow.className = "character-create__world-row";
+        seedSection.appendChild(scaleRow);
+
+        const scaleLabel = document.createElement("label");
+        scaleLabel.className = "character-create__world-label";
+        scaleLabel.htmlFor = "biome-scale-select";
+        scaleLabel.textContent = "Biome scale";
+        scaleRow.appendChild(scaleLabel);
+
+        const scaleSelect = document.createElement("select");
+        scaleSelect.id = "biome-scale-select";
+        scaleSelect.className = "character-create__world-select";
+        const biomeScaleOptions: { value: BiomeScale; label: string }[] = [
+          { value: "small",  label: "Small — tight, frequent biome transitions" },
+          { value: "medium", label: "Medium — balanced (default)" },
+          { value: "large",  label: "Large — wide, expansive biome zones" },
+          { value: "huge",   label: "Huge — continent-scale biome regions" },
+        ];
+        for (const opt of biomeScaleOptions) {
+          const el = document.createElement("option");
+          el.value = opt.value;
+          el.textContent = opt.label;
+          if (opt.value === biomeScale) el.selected = true;
+          scaleSelect.appendChild(el);
+        }
+        scaleSelect.addEventListener("change", () => {
+          biomeScale = scaleSelect.value as BiomeScale;
+        });
+        scaleRow.appendChild(scaleSelect);
+
+        // ── Structure Density select ──────────────────────────────────────────
+        const densityRow = document.createElement("div");
+        densityRow.className = "character-create__world-row";
+        seedSection.appendChild(densityRow);
+
+        const densityLabel = document.createElement("label");
+        densityLabel.className = "character-create__world-label";
+        densityLabel.htmlFor = "structure-density-select";
+        densityLabel.textContent = "Structure density";
+        densityRow.appendChild(densityLabel);
+
+        const densitySelect = document.createElement("select");
+        densitySelect.id = "structure-density-select";
+        densitySelect.className = "character-create__world-select";
+        const structureDensityOptions: { value: StructureDensity; label: string }[] = [
+          { value: "none",     label: "None — no ruins, shrines, or watchtowers" },
+          { value: "rare",     label: "Rare — occasional structures (~10 %)" },
+          { value: "normal",   label: "Normal — standard frequency (~25 %)" },
+          { value: "abundant", label: "Abundant — structures everywhere (~45 %)" },
+        ];
+        for (const opt of structureDensityOptions) {
+          const el = document.createElement("option");
+          el.value = opt.value;
+          el.textContent = opt.label;
+          if (opt.value === structureDensity) el.selected = true;
+          densitySelect.appendChild(el);
+        }
+        densitySelect.addEventListener("change", () => {
+          structureDensity = densitySelect.value as StructureDensity;
+        });
+        densityRow.appendChild(densitySelect);
+
+        // ── Starting Biome select ─────────────────────────────────────────────
+        const biomeRow = document.createElement("div");
+        biomeRow.className = "character-create__world-row";
+        seedSection.appendChild(biomeRow);
+
+        const biomeLabel = document.createElement("label");
+        biomeLabel.className = "character-create__world-label";
+        biomeLabel.htmlFor = "starting-biome-select";
+        biomeLabel.textContent = "Starting biome";
+        biomeRow.appendChild(biomeLabel);
+
+        const biomeSelect = document.createElement("select");
+        biomeSelect.id = "starting-biome-select";
+        biomeSelect.className = "character-create__world-select";
+        const startingBiomeOptions: { value: string; label: string }[] = [
+          { value: "",       label: "Random — determined by seed" },
+          { value: "plains", label: "Plains — open grasslands" },
+          { value: "forest", label: "Forest — dense woodland" },
+          { value: "desert", label: "Desert — hot, arid sands" },
+          { value: "tundra", label: "Tundra — frozen, icy wastes" },
+        ];
+        for (const opt of startingBiomeOptions) {
+          const el = document.createElement("option");
+          el.value = opt.value;
+          el.textContent = opt.label;
+          if ((startingBiome ?? "") === opt.value) el.selected = true;
+          biomeSelect.appendChild(el);
+        }
+        biomeSelect.addEventListener("change", () => {
+          startingBiome = biomeSelect.value ? (biomeSelect.value as BiomeType) : null;
+        });
+        biomeRow.appendChild(biomeSelect);
+
+        detailsTitle.textContent = "World seed";
+        detailsBody.textContent =
+          "A seed is a number or phrase that deterministically shapes your entire world. " +
+          "The same seed always generates the same landscape. " +
+          "Leave it blank to get a unique random world each time.";
+        detailsMeta.innerHTML = "";
+        const li1 = document.createElement("li");
+        li1.textContent = "World type controls overall terrain shape.";
+        detailsMeta.appendChild(li1);
+        const li2 = document.createElement("li");
+        li2.textContent = "Biome scale sets how large each biome region feels.";
+        detailsMeta.appendChild(li2);
+        const li3 = document.createElement("li");
+        li3.textContent = "Structure density controls ruins, shrines, and watchtowers.";
+        detailsMeta.appendChild(li3);
+        const li4 = document.createElement("li");
+        li4.textContent = "Starting biome pins your spawn area to a chosen landscape.";
+        detailsMeta.appendChild(li4);
+      };
+
 
       const renderName = () => {
         clearCards();
@@ -431,9 +649,12 @@ export class CharacterCreationUI {
       };
 
       backButton.addEventListener("click", () => {
-        if (step === "name") {
+        if (step === "world") {
           step = "welcome";
           renderWelcome();
+        } else if (step === "name") {
+          step = "world";
+          renderWorld();
         } else if (step === "race") {
           step = "name";
           renderName();
@@ -448,6 +669,11 @@ export class CharacterCreationUI {
 
       continueButton.addEventListener("click", () => {
         if (step === "welcome") {
+          step = "world";
+          renderWorld();
+          return;
+        }
+        if (step === "world") {
           step = "name";
           renderName();
           return;
@@ -472,6 +698,19 @@ export class CharacterCreationUI {
         }
 
         if (!enteredName.trim() || !selectedRace || !selectedBirthsign || !selectedClass) return;
+
+        const trimmed = worldSeedString.trim();
+        const rawSeed = trimmed || String(Math.floor(Math.random() * 0xffffffff));
+        // Use numeric type when the input is a pure integer so WorldSeed stores
+        // the value verbatim rather than hashing it.
+        const seedArg: string | number = /^\d+$/.test(rawSeed) ? Number(rawSeed) : rawSeed;
+        const builtSeed = new WorldSeed(seedArg, {
+          worldType,
+          biomeScale,
+          structureDensity,
+          startingBiome,
+        });
+
         root.remove();
         resolve({
           name: enteredName.trim(),
@@ -479,6 +718,7 @@ export class CharacterCreationUI {
           birthsignId: selectedBirthsign.id,
           classId: selectedClass.id,
           skipGameplayTips,
+          worldSeed: builtSeed,
         });
       });
 
