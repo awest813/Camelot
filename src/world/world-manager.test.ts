@@ -506,3 +506,38 @@ describe('WorldManager chunk callbacks', () => {
     expect(unloadCount).toBe(0);
   });
 });
+
+// ── Seed integration ──────────────────────────────────────────────────────────
+
+describe('WorldManager with WorldSeed', () => {
+  it('uses the seed for biome determination when a seed is supplied', async () => {
+    const { WorldSeed } = await import('./world-seed');
+    const seed = new WorldSeed(42, { worldType: 'flat' });
+    const wm = new WorldManager(mockScene, null, seed);
+    // Flat world type → every chunk is plains
+    for (let x = -3; x <= 3; x++) {
+      for (let z = -3; z <= 3; z++) {
+        expect(wm.getBiome(x, z)).toBe('plains');
+      }
+    }
+  });
+
+  it('falls back to the default formula when no seed is supplied', () => {
+    const wm = new WorldManager(mockScene);
+    const valid: BiomeType[] = ['plains', 'forest', 'desert', 'tundra'];
+    expect(valid).toContain(wm.getBiome(0, 0));
+  });
+
+  it('different seeds produce different biome layouts', async () => {
+    const { WorldSeed } = await import('./world-seed');
+    const wmA = new WorldManager(mockScene, null, new WorldSeed(1));
+    const wmB = new WorldManager(mockScene, null, new WorldSeed(999999));
+    let differ = false;
+    outer: for (let x = -5; x <= 5; x++) {
+      for (let z = -5; z <= 5; z++) {
+        if (wmA.getBiome(x, z) !== wmB.getBiome(x, z)) { differ = true; break outer; }
+      }
+    }
+    expect(differ).toBe(true);
+  });
+});

@@ -9,6 +9,7 @@ import { PhysicsShapeType } from "@babylonjs/core/Physics";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { StructureManager } from "./structure-manager";
 import { ObjectPool } from "../systems/object-pool";
+import type { WorldSeed } from "./world-seed";
 
 export type BiomeType = "plains" | "forest" | "desert" | "tundra";
 
@@ -83,10 +84,14 @@ export class WorldManager {
   /** Optional shadow generator — meshes added as shadow casters when provided. */
   private readonly _shadows: ShadowGenerator | null;
 
-  constructor(scene: Scene, shadowGenerator: ShadowGenerator | null = null) {
+  /** Optional world seed — drives biome layout and structure placement when set. */
+  private readonly _seed: WorldSeed | null;
+
+  constructor(scene: Scene, shadowGenerator: ShadowGenerator | null = null, seed: WorldSeed | null = null) {
     this.scene = scene;
     this._shadows = shadowGenerator;
-    this.structures = new StructureManager(scene, shadowGenerator);
+    this._seed = seed;
+    this.structures = new StructureManager(scene, shadowGenerator, seed);
   }
 
   // ── Debug / test accessors ─────────────────────────────────────────────────
@@ -113,9 +118,11 @@ export class WorldManager {
 
   /**
    * Determine the biome for a given chunk coordinate.
-   * Uses a deterministic hash so each chunk always gets the same biome.
+   * Uses the active `WorldSeed` when one is set; otherwise falls back to the
+   * default deterministic trig hash so existing behaviour is preserved.
    */
   public getBiome(chunkX: number, chunkZ: number): BiomeType {
+    if (this._seed) return this._seed.getBiome(chunkX, chunkZ);
     const v = Math.sin(chunkX * 0.5 + chunkZ * 0.3) * Math.cos(chunkX * 0.2 - chunkZ * 0.7);
     const n = (v + 1) / 2; // normalise to [0, 1]
     if (n < 0.25) return "tundra";

@@ -10,6 +10,7 @@ import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGener
 import { NPC } from "../entities/npc";
 import { Loot } from "../entities/loot";
 import { BiomeType } from "./world-manager";
+import type { WorldSeed } from "./world-seed";
 
 interface StructureSpawn {
   meshes: Mesh[];
@@ -38,21 +39,28 @@ export class StructureManager {
    *  register it with ScheduleSystem / CombatSystem. */
   public onNPCSpawn: ((npc: NPC) => void) | null = null;
 
+  /** Optional world seed — used for seeded placement and randomisation. */
+  private readonly _seed: WorldSeed | null;
+
   /** Optional shadow generator — structure meshes are registered as casters. */
   private readonly _shadows: ShadowGenerator | null;
 
-  constructor(scene: Scene, shadowGenerator: ShadowGenerator | null = null) {
+  constructor(scene: Scene, shadowGenerator: ShadowGenerator | null = null, seed: WorldSeed | null = null) {
     this._scene = scene;
     this._shadows = shadowGenerator;
+    this._seed = seed;
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────
 
   /**
    * Returns true if a structure is seeded at the given chunk coordinates.
+   * Delegates to the active `WorldSeed` when one is provided; otherwise uses
+   * the default 25 % deterministic threshold so existing worlds are unchanged.
    * Deterministic and does not require a scene — safe to use in tests.
    */
   public hasStructureAt(chunkX: number, chunkZ: number): boolean {
+    if (this._seed) return this._seed.hasStructure(chunkX, chunkZ);
     return this._rand(chunkX, chunkZ, 0) <= 0.25;
   }
 
@@ -400,8 +408,10 @@ export class StructureManager {
     return mat;
   }
 
-  /** Deterministic pseudo-random in [0, 1) seeded by chunk coords and slot. */
+  /** Deterministic pseudo-random in [0, 1) seeded by chunk coords and slot.
+   *  Delegates to the active `WorldSeed` when one is provided. */
   private _rand(cx: number, cz: number, slot: number): number {
+    if (this._seed) return this._seed.rand(cx, cz, slot);
     return Math.abs(Math.sin(cx * 217.3 + cz * 431.9 + slot * 83.1)) % 1;
   }
 }
