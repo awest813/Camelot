@@ -220,6 +220,7 @@ export class ContainerUI {
     takeBtn.className = "container-ui__take-btn";
     takeBtn.type = "button";
     takeBtn.textContent = "Take";
+    takeBtn.setAttribute("aria-label", `Take ${item.name}`);
     takeBtn.addEventListener("click", () => {
       this.onTakeItem?.(item.id);
     });

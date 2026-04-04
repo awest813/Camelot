@@ -316,6 +316,7 @@ export class BarterUI {
     btn.className = `barter-ui__action-btn barter-ui__action-btn--${action}`;
     btn.type = "button";
     btn.textContent = action === "buy" ? "Buy" : "Sell";
+    btn.setAttribute("aria-label", action === "buy" ? `Buy ${item.name}` : `Sell ${item.name}`);
     btn.disabled = !actionEnabled;
     btn.setAttribute("aria-disabled", actionEnabled ? "false" : "true");
     if (!actionEnabled) {
