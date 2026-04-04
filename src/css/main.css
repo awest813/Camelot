@@ -562,6 +562,9 @@ body::before {
 }
 
 .character-create__world-type-card--normal::before {
+  /* BabylonJS asset library textures – purely decorative background images.
+     CSS background-image does not support Subresource Integrity (SRI); these
+     images cannot affect page logic or scripts if the CDN is ever compromised. */
   background-image: url('https://assets.babylonjs.com/textures/rock.png');
   background-color: #1a120a;
 }

@@ -68,7 +68,7 @@ const GUARDIAN_ICONS: Readonly<Record<BirthsignDefinition["guardian"], string>> 
 const SPEC_ICONS: Readonly<Record<CharacterClass["specialization"], string>> = {
   combat:  "⚔",
   magic:   "✦",
-  stealth: "🌑",
+  stealth: "🌙",
 };
 
 const guardianLabel = (guardian: BirthsignDefinition["guardian"]): string => {
