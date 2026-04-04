@@ -84,14 +84,31 @@ export class WorldManager {
   /** Optional shadow generator — meshes added as shadow casters when provided. */
   private readonly _shadows: ShadowGenerator | null;
 
-  /** Optional world seed — drives biome layout and structure placement when set. */
-  private readonly _seed: WorldSeed | null;
+  /**
+   * Optional world seed — drives biome layout and structure placement when set.
+   *
+   * Two-phase initialization: `null` on construction (before character
+   * creation), then replaced by `setSeed()` once the player finishes the
+   * character creation wizard and before the first chunk is streamed in.
+   */
+  private _seed: WorldSeed | null;
 
   constructor(scene: Scene, shadowGenerator: ShadowGenerator | null = null, seed: WorldSeed | null = null) {
     this.scene = scene;
     this._shadows = shadowGenerator;
     this._seed = seed;
     this.structures = new StructureManager(scene, shadowGenerator, seed);
+  }
+
+  /**
+   * Replace the active world seed.  Must be called before any chunks are
+   * loaded (e.g. immediately after character creation and before the first
+   * `update()` tick) to avoid biome inconsistencies between already-loaded
+   * and future chunks.
+   */
+  public setSeed(seed: WorldSeed | null): void {
+    this._seed = seed;
+    this.structures.setSeed(seed);
   }
 
   // ── Debug / test accessors ─────────────────────────────────────────────────
