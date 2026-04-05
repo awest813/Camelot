@@ -331,6 +331,11 @@ export class AnimationSystem {
    * Must be called *after* the physics body has been set to STATIC so that the
    * physics engine no longer overrides rotation.  The final pose is kept
    * permanently (clip stays registered as "death").
+   *
+   * **Important (rotationQuaternion):** BabylonJS ignores `mesh.rotation` when
+   * `mesh.rotationQuaternion` is non-null.  If the physics impostor wrote a
+   * quaternion onto the mesh, the caller must set `mesh.rotationQuaternion = null`
+   * before invoking `playDeath` so the `rotation.z` keyframes take effect.
    */
   public playDeath(mesh: Mesh): void {
     if (this._active.get(mesh.name) === "death") return;
@@ -373,6 +378,14 @@ export class AnimationSystem {
   /** True if this mesh is permanently in the death-topple pose. */
   public isDeadClip(meshName: string): boolean {
     return this._active.get(meshName) === "death";
+  }
+
+  /**
+   * Returns the currently playing clip name for a mesh, or `undefined` if no
+   * clip is active.  Useful for UI feedback and diagnostic logging.
+   */
+  public getActiveClip(meshName: string): AnimationClip | undefined {
+    return this._active.get(meshName);
   }
 
   /**
