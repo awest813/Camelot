@@ -18,10 +18,18 @@
  *   alert           — slower tense breathing while spotting the player (loop)
  *   investigate     — cautious bob while searching last known position (loop)
  *   return          — subdued bob while walking back to spawn (loop)
+ *   victory         — energetic triumphant bob after combat (loop)
+ *   spawn           — scale-pop entry when an NPC/pet first appears (one-shot)
  *   attackTelegraph — quick XZ-scale puff before a strike (one-shot)
  *   stagger         — squish-stretch X/Y pulse on hit interrupt (one-shot)
  *   hit             — quick damage flinch (one-shot)
  *   death           — Z-rotation topple + Y-scale flatten (one-shot, persistent)
+ *
+ * Snapshot API:
+ *   getSnapshot()       — captures the active-clip map for save/restore
+ *   restoreSnapshot()   — restores tracking state from a prior snapshot
+ *                         (does not replay BabylonJS animations; use the
+ *                          individual play* methods to visually resume clips)
  */
 
 import { Scene } from "@babylonjs/core/scene";
@@ -36,12 +44,20 @@ export type AnimationClip =
   | "alert"
   | "investigate"
   | "return"
+  | "victory"
+  | "spawn"
   | "telegraph"
   | "stagger"
   | "hit"
   | "death";
 
 const FPS = 60;
+
+/** Runtime set of all valid clip names — used for snapshot validation. */
+const VALID_CLIPS = new Set<string>([
+  "idle", "walk", "run", "alert", "investigate", "return",
+  "victory", "spawn", "telegraph", "stagger", "hit", "death",
+]);
 
 export class AnimationSystem {
   private readonly _scene: Scene;
@@ -220,7 +236,74 @@ export class AnimationSystem {
     this._scene.beginAnimation(mesh, 0, 200, true);
   }
 
+  /**
+   * Energetic triumph loop — exaggerated bob played after defeating an enemy.
+   * No-op if the mesh is already celebrating or dead.
+   */
+  public playVictory(mesh: Mesh): void {
+    const current = this._active.get(mesh.name);
+    if (current === "victory" || current === "death") return;
+    this._stopAll(mesh);
+    this._active.set(mesh.name, "victory");
+
+    const anim = new Animation(
+      `${mesh.name}_victory`,
+      "scaling.y",
+      FPS,
+      Animation.ANIMATIONTYPE_FLOAT,
+      Animation.ANIMATIONLOOPMODE_CYCLE,
+    );
+    anim.setKeys([
+      { frame: 0,  value: 1.0  },
+      { frame: 8,  value: 1.08 },
+      { frame: 16, value: 1.0  },
+      { frame: 24, value: 0.94 },
+      { frame: 32, value: 1.0  },
+    ]);
+    mesh.animations = [anim];
+    this._scene.beginAnimation(mesh, 0, 32, true);
+  }
+
   // ── One-shot clips ─────────────────────────────────────────────────────────
+
+  /**
+   * Play an entry scale-pop when an NPC or pet first appears in the scene.
+   * The mesh scales up from flat (Y=0) to a slight overshoot then settles at
+   * natural size.  Ignored on dead meshes.  Calls `onComplete` when done.
+   */
+  public playSpawn(mesh: Mesh, onComplete?: () => void): void {
+    if (this._active.get(mesh.name) === "death") return;
+    this._stopAll(mesh);
+    this._active.set(mesh.name, "spawn");
+
+    const scaleY = _makeAnimation(`${mesh.name}_spawn_sy`, "scaling.y", FPS, [
+      { frame: 0,  value: 0.0  },
+      { frame: 6,  value: 1.2  },
+      { frame: 12, value: 0.9  },
+      { frame: 16, value: 1.0  },
+    ]);
+    const scaleX = _makeAnimation(`${mesh.name}_spawn_sx`, "scaling.x", FPS, [
+      { frame: 0,  value: 0.9  },
+      { frame: 6,  value: 1.1  },
+      { frame: 12, value: 0.95 },
+      { frame: 16, value: 1.0  },
+    ]);
+    const scaleZ = _makeAnimation(`${mesh.name}_spawn_sz`, "scaling.z", FPS, [
+      { frame: 0,  value: 0.9  },
+      { frame: 6,  value: 1.1  },
+      { frame: 12, value: 0.95 },
+      { frame: 16, value: 1.0  },
+    ]);
+
+    mesh.animations = [scaleY, scaleX, scaleZ];
+    this._scene.beginAnimation(mesh, 0, 16, false, 1.0, () => {
+      mesh.scaling.set(1, 1, 1);
+      if (this._active.get(mesh.name) === "spawn") {
+        this._active.delete(mesh.name);
+      }
+      onComplete?.();
+    });
+  }
 
   /**
    * Play a pre-strike puff: XZ scale grows while Y shrinks, then snaps back.
@@ -363,6 +446,82 @@ export class AnimationSystem {
     this._scene.beginAnimation(mesh, 0, 22, false);
   }
 
+  /**
+   * Drive animation state for a pet mesh from simple motion flags.
+   *
+   * Mirrors the convenience of `updateNPCAnimation` for the pet companion
+   * so `game.ts` can call a single method per pet update instead of routing
+   * to individual play* calls.
+   *
+   * @param mesh       The pet's capsule mesh.
+   * @param isMoving   True while the pet is actively travelling toward a target.
+   * @param isSprinting True while the pet is running at full speed.
+   * @param isDead     True when the pet has died.
+   */
+  public updatePetAnimation(
+    mesh: Mesh,
+    isMoving: boolean,
+    isSprinting: boolean,
+    isDead: boolean,
+  ): void {
+    if (isDead) {
+      if (!this.isDeadClip(mesh.name)) {
+        this.playDeath(mesh);
+      }
+      return;
+    }
+
+    if (isSprinting) {
+      if (this._active.get(mesh.name) !== "run") {
+        this.playRun(mesh);
+      }
+      return;
+    }
+
+    if (isMoving) {
+      if (this._active.get(mesh.name) !== "walk") {
+        this.playWalk(mesh);
+      }
+      return;
+    }
+
+    if (this._active.get(mesh.name) !== "idle") {
+      this.playIdle(mesh);
+    }
+  }
+
+  // ── Snapshot ───────────────────────────────────────────────────────────────
+
+  /**
+   * Capture the current active-clip tracking state as a plain object suitable
+   * for serialisation (e.g. save files, test assertions).
+   *
+   * Note: the snapshot records *which* clip each mesh was playing; it does not
+   * preserve the BabylonJS animation timeline position.  After a restore the
+   * game layer should call the appropriate play* method to visually resume
+   * each looping clip, and one-shot clips in progress are simply cleared.
+   */
+  public getSnapshot(): Record<string, AnimationClip> {
+    const snap: Record<string, AnimationClip> = {};
+    this._active.forEach((clip, name) => {
+      snap[name] = clip;
+    });
+    return snap;
+  }
+
+  /**
+   * Restore active-clip tracking state from a prior `getSnapshot()` result.
+   * Replaces any existing tracking data entirely.
+   */
+  public restoreSnapshot(snapshot: Record<string, AnimationClip>): void {
+    this._active.clear();
+    for (const [name, clip] of Object.entries(snapshot)) {
+      if (VALID_CLIPS.has(clip)) {
+        this._active.set(name, clip as AnimationClip);
+      }
+    }
+  }
+
   // ── Utility ────────────────────────────────────────────────────────────────
 
   /**
@@ -461,6 +620,9 @@ export class AnimationSystem {
         break;
       case "RETURN":
         this.playReturn(mesh);
+        break;
+      case "VICTORY":
+        this.playVictory(mesh);
         break;
       case "ATTACK":
       case "PATROL":

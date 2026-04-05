@@ -664,6 +664,7 @@ describe("AnimationSystem", () => {
       ["ALERT",       "alert"],
       ["INVESTIGATE", "investigate"],
       ["RETURN",      "return"],
+      ["VICTORY",     "victory"],
       ["ATTACK",      "walk"],
       ["PATROL",      "walk"],
       ["IDLE",        "idle"],
@@ -676,5 +677,222 @@ describe("AnimationSystem", () => {
         expect(sys.getActiveClip(mesh.name)).toBe(expectedClip);
       },
     );
+  });
+
+  // ── playVictory ────────────────────────────────────────────────────────────
+
+  describe("playVictory", () => {
+    it("sets active clip to 'victory'", () => {
+      sys.playVictory(mesh);
+      expect(sys.getActiveClip(mesh.name)).toBe("victory");
+    });
+
+    it("calls beginAnimation with loop=true", () => {
+      sys.playVictory(mesh);
+      const call = scene.lastCallFor(mesh);
+      expect(call).not.toBeNull();
+      expect(call!.loop).toBe(true);
+    });
+
+    it("is a no-op if already celebrating", () => {
+      sys.playVictory(mesh);
+      const callCount = scene._calls.length;
+      sys.playVictory(mesh);
+      expect(scene._calls.length).toBe(callCount);
+    });
+
+    it("is a no-op on dead mesh", () => {
+      sys.playDeath(mesh);
+      const callCount = scene._calls.length;
+      sys.playVictory(mesh);
+      expect(scene._calls.length).toBe(callCount);
+      expect(sys.isDeadClip(mesh.name)).toBe(true);
+    });
+
+    it("transitions from idle to victory", () => {
+      sys.playIdle(mesh);
+      sys.playVictory(mesh);
+      expect(sys.getActiveClip(mesh.name)).toBe("victory");
+    });
+  });
+
+  // ── playSpawn ──────────────────────────────────────────────────────────────
+
+  describe("playSpawn", () => {
+    it("sets active clip to 'spawn'", () => {
+      sys.playSpawn(mesh);
+      expect(sys.getActiveClip(mesh.name)).toBe("spawn");
+    });
+
+    it("calls beginAnimation with loop=false", () => {
+      sys.playSpawn(mesh);
+      const call = scene.lastCallFor(mesh);
+      expect(call).not.toBeNull();
+      expect(call!.loop).toBe(false);
+    });
+
+    it("is a no-op on dead mesh", () => {
+      sys.playDeath(mesh);
+      const callCount = scene._calls.length;
+      sys.playSpawn(mesh);
+      expect(scene._calls.length).toBe(callCount);
+      expect(sys.isDeadClip(mesh.name)).toBe(true);
+    });
+
+    it("calls onComplete callback after animation finishes", () => {
+      const cb = vi.fn();
+      sys.playSpawn(mesh, cb);
+      scene.triggerComplete(mesh);
+      expect(cb).toHaveBeenCalledOnce();
+    });
+
+    it("resets scaling to (1,1,1) on completion", () => {
+      sys.playSpawn(mesh);
+      mesh.scaling.set(0, 1.2, 0);
+      scene.triggerComplete(mesh);
+      expect(mesh.scaling.x).toBe(1);
+      expect(mesh.scaling.y).toBe(1);
+      expect(mesh.scaling.z).toBe(1);
+    });
+
+    it("clears active clip on completion", () => {
+      sys.playSpawn(mesh);
+      scene.triggerComplete(mesh);
+      expect(sys.getActiveClip(mesh.name)).toBeUndefined();
+    });
+
+    it("does not clear active if a new clip started before completion", () => {
+      sys.playSpawn(mesh);
+      sys.playIdle(mesh);
+      scene.triggerComplete(mesh);
+      expect(sys.getActiveClip(mesh.name)).toBe("idle");
+    });
+
+    it("assigns three animation tracks to the mesh", () => {
+      sys.playSpawn(mesh);
+      expect(mesh.animations).toHaveLength(3);
+    });
+  });
+
+  // ── updatePetAnimation ────────────────────────────────────────────────────
+
+  describe("updatePetAnimation", () => {
+    it("plays death when isDead=true", () => {
+      sys.updatePetAnimation(mesh, false, false, true);
+      expect(sys.isDeadClip(mesh.name)).toBe(true);
+    });
+
+    it("does not re-trigger death when already dead", () => {
+      sys.updatePetAnimation(mesh, false, false, true);
+      const callCount = scene._calls.length;
+      sys.updatePetAnimation(mesh, false, false, true);
+      expect(scene._calls.length).toBe(callCount);
+    });
+
+    it("plays run when isSprinting=true", () => {
+      sys.updatePetAnimation(mesh, false, true, false);
+      expect(sys.getActiveClip(mesh.name)).toBe("run");
+    });
+
+    it("does not re-trigger run when already running", () => {
+      sys.updatePetAnimation(mesh, false, true, false);
+      const callCount = scene._calls.length;
+      sys.updatePetAnimation(mesh, false, true, false);
+      expect(scene._calls.length).toBe(callCount);
+    });
+
+    it("plays walk when isMoving=true", () => {
+      sys.updatePetAnimation(mesh, true, false, false);
+      expect(sys.getActiveClip(mesh.name)).toBe("walk");
+    });
+
+    it("does not re-trigger walk when already walking", () => {
+      sys.updatePetAnimation(mesh, true, false, false);
+      const callCount = scene._calls.length;
+      sys.updatePetAnimation(mesh, true, false, false);
+      expect(scene._calls.length).toBe(callCount);
+    });
+
+    it("plays idle when not moving", () => {
+      sys.updatePetAnimation(mesh, false, false, false);
+      expect(sys.getActiveClip(mesh.name)).toBe("idle");
+    });
+
+    it("does not re-trigger idle when already idling", () => {
+      sys.updatePetAnimation(mesh, false, false, false);
+      const callCount = scene._calls.length;
+      sys.updatePetAnimation(mesh, false, false, false);
+      expect(scene._calls.length).toBe(callCount);
+    });
+
+    it("isDead takes priority over isSprinting and isMoving", () => {
+      sys.updatePetAnimation(mesh, true, true, true);
+      expect(sys.isDeadClip(mesh.name)).toBe(true);
+    });
+
+    it("isSprinting takes priority over isMoving", () => {
+      sys.updatePetAnimation(mesh, true, true, false);
+      expect(sys.getActiveClip(mesh.name)).toBe("run");
+    });
+  });
+
+  // ── getSnapshot / restoreSnapshot ─────────────────────────────────────────
+
+  describe("getSnapshot / restoreSnapshot", () => {
+    it("getSnapshot returns empty object when no clips are active", () => {
+      expect(sys.getSnapshot()).toEqual({});
+    });
+
+    it("getSnapshot captures active clips for all tracked meshes", () => {
+      const m2 = makeMesh("npc_2");
+      sys.playIdle(mesh);
+      sys.playRun(m2);
+      const snap = sys.getSnapshot();
+      expect(snap[mesh.name]).toBe("idle");
+      expect(snap[m2.name]).toBe("run");
+    });
+
+    it("getSnapshot returns a plain object copy — mutating it does not affect system state", () => {
+      sys.playIdle(mesh);
+      const snap = sys.getSnapshot();
+      snap[mesh.name] = "run" as AnimationClip;
+      expect(sys.getActiveClip(mesh.name)).toBe("idle");
+    });
+
+    it("restoreSnapshot replaces active-clip state", () => {
+      sys.playIdle(mesh);
+      const snap: Record<string, AnimationClip> = { [mesh.name]: "walk" };
+      sys.restoreSnapshot(snap);
+      expect(sys.getActiveClip(mesh.name)).toBe("walk");
+    });
+
+    it("restoreSnapshot clears meshes not present in snapshot", () => {
+      sys.playIdle(mesh);
+      sys.restoreSnapshot({});
+      expect(sys.getActiveClip(mesh.name)).toBeUndefined();
+    });
+
+    it("restoreSnapshot preserves death state so isDeadClip returns true", () => {
+      const snap: Record<string, AnimationClip> = { [mesh.name]: "death" };
+      sys.restoreSnapshot(snap);
+      expect(sys.isDeadClip(mesh.name)).toBe(true);
+    });
+
+    it("restoreSnapshot ignores entries with invalid clip names", () => {
+      const snap = { [mesh.name]: "invalid_clip" } as Record<string, AnimationClip>;
+      sys.restoreSnapshot(snap);
+      expect(sys.getActiveClip(mesh.name)).toBeUndefined();
+    });
+
+    it("round-trip: getSnapshot then restoreSnapshot reproduces original state", () => {
+      const m2 = makeMesh("npc_2");
+      sys.playAlert(mesh);
+      sys.playDeath(m2);
+      const snap = sys.getSnapshot();
+      const fresh = new AnimationSystem(scene as any);
+      fresh.restoreSnapshot(snap);
+      expect(fresh.getActiveClip(mesh.name)).toBe("alert");
+      expect(fresh.isDeadClip(m2.name)).toBe(true);
+    });
   });
 });
