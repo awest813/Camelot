@@ -202,7 +202,31 @@ describe("WaitUI", () => {
       expect(ui.hours).toBe(7);
     });
 
-    it("clamps to WAIT_MIN_HOURS when decremented below minimum", () => {
+    it("disables decrement button when at WAIT_MIN_HOURS", () => {
+      ui.show();
+      const input = document.querySelector(".wait-ui__hours-input") as HTMLInputElement;
+      input.value = String(WAIT_MIN_HOURS);
+      input.dispatchEvent(new Event("change"));
+      const decBtn = document.querySelector(".wait-ui__dec-btn") as HTMLButtonElement;
+      expect(decBtn.getAttribute("aria-disabled")).toBe("true");
+      expect(decBtn.getAttribute("title")).toBe("Minimum hours reached");
+      expect(decBtn.style.opacity).toBe("0.5");
+      expect(decBtn.style.cursor).toBe("not-allowed");
+    });
+
+    it("disables increment button when at WAIT_MAX_HOURS", () => {
+      ui.show();
+      const input = document.querySelector(".wait-ui__hours-input") as HTMLInputElement;
+      input.value = String(WAIT_MAX_HOURS);
+      input.dispatchEvent(new Event("change"));
+      const incBtn = document.querySelector(".wait-ui__inc-btn") as HTMLButtonElement;
+      expect(incBtn.getAttribute("aria-disabled")).toBe("true");
+      expect(incBtn.getAttribute("title")).toBe("Maximum hours reached");
+      expect(incBtn.style.opacity).toBe("0.5");
+      expect(incBtn.style.cursor).toBe("not-allowed");
+    });
+
+    it("blocks decrement click when at minimum", () => {
       ui.show();
       const input = document.querySelector(".wait-ui__hours-input") as HTMLInputElement;
       // Set to minimum first via DOM
@@ -213,7 +237,7 @@ describe("WaitUI", () => {
       expect(ui.hours).toBe(WAIT_MIN_HOURS);
     });
 
-    it("clamps to WAIT_MAX_HOURS when incremented above maximum", () => {
+    it("blocks increment click when at maximum", () => {
       ui.show();
       const input = document.querySelector(".wait-ui__hours-input") as HTMLInputElement;
       input.value = String(WAIT_MAX_HOURS);

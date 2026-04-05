@@ -36,6 +36,8 @@ export class WaitUI {
   private _root:        HTMLDivElement | null = null;
   private _timeEl:      HTMLSpanElement | null = null;
   private _hoursInput:  HTMLInputElement | null = null;
+  private _decBtn:      HTMLButtonElement | null = null;
+  private _incBtn:      HTMLButtonElement | null = null;
   private _hoursValue:  number = 8;
 
   // ── Public API ──────────────────────────────────────────────────────────────
@@ -81,6 +83,8 @@ export class WaitUI {
     this._root       = null;
     this._timeEl     = null;
     this._hoursInput = null;
+    this._decBtn     = null;
+    this._incBtn     = null;
     this.isVisible   = false;
   }
 
@@ -153,6 +157,7 @@ export class WaitUI {
     decBtn.textContent = "▼";
     decBtn.setAttribute("aria-label", "Decrease hours");
     decBtn.addEventListener("click", () => {
+      if (decBtn.getAttribute("aria-disabled") === "true") return;
       this._setHours(this._hoursValue - 1);
     });
     spinnerRow.appendChild(decBtn);
@@ -180,6 +185,7 @@ export class WaitUI {
     incBtn.textContent = "▲";
     incBtn.setAttribute("aria-label", "Increase hours");
     incBtn.addEventListener("click", () => {
+      if (incBtn.getAttribute("aria-disabled") === "true") return;
       this._setHours(this._hoursValue + 1);
     });
     spinnerRow.appendChild(incBtn);
@@ -221,10 +227,43 @@ export class WaitUI {
     this._root       = root;
     this._timeEl     = timeEl;
     this._hoursInput = hoursInput;
+    this._decBtn     = decBtn;
+    this._incBtn     = incBtn;
+
+    // Initial setup of button states
+    this._setHours(this._hoursValue);
   }
 
   private _setHours(value: number): void {
     this._hoursValue = Math.max(WAIT_MIN_HOURS, Math.min(WAIT_MAX_HOURS, Math.round(value)));
     if (this._hoursInput) this._hoursInput.value = String(this._hoursValue);
+
+    if (this._decBtn) {
+      const atMin = this._hoursValue <= WAIT_MIN_HOURS;
+      this._decBtn.setAttribute("aria-disabled", String(atMin));
+      if (atMin) {
+        this._decBtn.setAttribute("title", "Minimum hours reached");
+        this._decBtn.style.opacity = "0.5";
+        this._decBtn.style.cursor = "not-allowed";
+      } else {
+        this._decBtn.removeAttribute("title");
+        this._decBtn.style.opacity = "";
+        this._decBtn.style.cursor = "";
+      }
+    }
+
+    if (this._incBtn) {
+      const atMax = this._hoursValue >= WAIT_MAX_HOURS;
+      this._incBtn.setAttribute("aria-disabled", String(atMax));
+      if (atMax) {
+        this._incBtn.setAttribute("title", "Maximum hours reached");
+        this._incBtn.style.opacity = "0.5";
+        this._incBtn.style.cursor = "not-allowed";
+      } else {
+        this._incBtn.removeAttribute("title");
+        this._incBtn.style.opacity = "";
+        this._incBtn.style.cursor = "";
+      }
+    }
   }
 }
