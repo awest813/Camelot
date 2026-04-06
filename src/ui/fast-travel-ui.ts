@@ -91,6 +91,7 @@ export class FastTravelUI {
 
     const status = document.createElement("p");
     status.className = "fast-travel__status";
+    status.setAttribute("aria-live", "polite");
     panel.appendChild(status);
     this._statusEl = status;
 

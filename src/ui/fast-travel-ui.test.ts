@@ -119,6 +119,12 @@ describe("FastTravelUI", () => {
       expect(etas[0].textContent).toBe("~4.5h");
     });
 
+    it("status has aria-live=polite", () => {
+      ui.open(SAMPLE_OPTIONS);
+      const status = document.querySelector(".fast-travel__status") as HTMLElement;
+      expect(status?.getAttribute("aria-live")).toBe("polite");
+    });
+
     it("status text references the selected destination", () => {
       ui.open(SAMPLE_OPTIONS);
       const status = document.querySelector(".fast-travel__status") as HTMLElement;
