@@ -110,7 +110,7 @@ export class ScreenshotSystem {
   // ── Private helpers ────────────────────────────────────────────────────────
 
   private _buildFilename(): string {
-    // ISO timestamp with colons/dots replaced so the string is safe as a filename
+    // Keep only "YYYY-MM-DDTHH-MM-SS" (19 chars) to produce a safe filename
     const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     return `screenshot-${ts}.${this._format}`;
   }

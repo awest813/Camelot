@@ -7,7 +7,8 @@ const BASE_CONTROLS: readonly string[] = [
   "Q: Cast Spell · Z: Cycle Spells · X: Spellmaking · L: Alchemy · B: Enchanting · T: Wait",
   "V: Racial Power · H: Fame / Status · Y: Fast Travel Menu",
   "O: Mount / Dismount · Shift+O: Stable (buy horse) or Saddlebag (if mounted)",
-  "7/8/9/0: Quick Slots · F5/F9: Save/Load · F3: Debug Overlay · PrintScreen: Screenshot",
+  "7/8/9/0: Quick Slots · F5/F9: Save/Load · F3: Debug Overlay",
+  "PrintScreen: Screenshot",
 ];
 
 const EDITOR_CONTROLS: readonly string[] = [
