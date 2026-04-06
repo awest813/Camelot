@@ -18,6 +18,11 @@ describe("buildHelpOverlayLines", () => {
     expect(joined).toContain("Saddlebag");
   });
 
+  it("includes PrintScreen screenshot hint in gameplay overlay", () => {
+    const lines = buildHelpOverlayLines(false);
+    expect(lines.join("\n")).toContain("PrintScreen: Screenshot");
+  });
+
   it("returns editor-focused controls when editor is enabled", () => {
     const lines = buildHelpOverlayLines(true);
     expect(lines[0]).toBe("Editor Controls");
