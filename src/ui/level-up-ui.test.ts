@@ -55,8 +55,9 @@ describe("LevelUpUI", () => {
     it("disables the confirm button initially", () => {
       ui.open(2, makeBonuses());
       const btn = document.querySelector(".level-up__confirm-btn") as HTMLButtonElement;
-      expect(btn.disabled).toBe(true);
+      expect(btn.disabled).toBe(false);
       expect(btn.getAttribute("aria-disabled")).toBe("true");
+      expect(btn.style.opacity).toBe("0.5");
     });
 
     it("resets selection when opened a second time", () => {
@@ -69,7 +70,7 @@ describe("LevelUpUI", () => {
       // Re-open
       ui.open(3, makeBonuses());
       const confirmBtn = document.querySelector(".level-up__confirm-btn") as HTMLButtonElement;
-      expect(confirmBtn.disabled).toBe(true);
+      expect(confirmBtn.getAttribute("aria-disabled")).toBe("true");
     });
   });
 
@@ -91,8 +92,8 @@ describe("LevelUpUI", () => {
       rows[1].click();
       rows[2].click();
       const btn = document.querySelector(".level-up__confirm-btn") as HTMLButtonElement;
-      expect(btn.disabled).toBe(false);
       expect(btn.getAttribute("aria-disabled")).toBe("false");
+      expect(btn.style.opacity).toBe("");
     });
 
     it("marks selected rows with is-selected class", () => {
@@ -117,7 +118,7 @@ describe("LevelUpUI", () => {
       rows[0].click();
       rows[1].click();
       rows[2].click();
-      expect(rows[3].disabled).toBe(true);
+      expect(rows[3].disabled).toBe(false);
       expect(rows[3].classList.contains("is-disabled")).toBe(true);
       expect(rows[3].getAttribute("aria-disabled")).toBe("true");
     });
@@ -128,9 +129,10 @@ describe("LevelUpUI", () => {
       rows[0].click();
       rows[1].click();
       rows[2].click();
-      // Attempt to click a 4th — button is disabled, so the handler should not add it
-      // Force-click via the original handler would not run on disabled btn
-      expect(rows[3].disabled).toBe(true);
+      // Attempt to click a 4th — button has aria-disabled, the internal logic stops it
+      rows[3].click();
+      const selectedCount = document.querySelectorAll(".level-up__attr-btn.is-selected").length;
+      expect(selectedCount).toBe(3);
     });
 
     it("re-enables other rows when a selection is removed back to 2", () => {
@@ -141,7 +143,7 @@ describe("LevelUpUI", () => {
       rows[2].click();
       // Deselect one
       rows[0].click();
-      expect(rows[3].disabled).toBe(false);
+      expect(rows[3].getAttribute("aria-disabled")).toBe("false");
     });
 
     it("updates the selection summary text", () => {
