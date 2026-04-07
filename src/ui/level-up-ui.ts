@@ -165,8 +165,9 @@ export class LevelUpUI {
     confirmBtn.className = "level-up__confirm-btn";
     confirmBtn.type = "button";
     confirmBtn.textContent = "Confirm Level-Up";
-    confirmBtn.disabled = true;
     confirmBtn.setAttribute("aria-disabled", "true");
+    confirmBtn.style.opacity = "0.5";
+    confirmBtn.style.cursor = "not-allowed";
     confirmBtn.addEventListener("click", () => this._handleConfirm());
     footer.appendChild(confirmBtn);
     this._confirmBtn = confirmBtn;
@@ -210,8 +211,9 @@ export class LevelUpUI {
       btn.classList.toggle("is-disabled", isDisabled);
       btn.setAttribute("aria-pressed", isSelected ? "true" : "false");
       btn.setAttribute("aria-disabled", isDisabled ? "true" : "false");
-      btn.disabled = isDisabled;
       btn.title = isDisabled ? "You can only select 3 attributes" : "";
+      btn.style.opacity = isDisabled ? "0.5" : "";
+      btn.style.cursor = isDisabled ? "not-allowed" : "";
 
       const bonusEl = btn.querySelector(".level-up__attr-bonus") as HTMLElement | null;
       if (bonusEl) {
@@ -235,13 +237,15 @@ export class LevelUpUI {
 
     if (this._confirmBtn) {
       const isConfirmDisabled = this._selected.length !== 3;
-      this._confirmBtn.disabled = isConfirmDisabled;
       this._confirmBtn.setAttribute("aria-disabled", isConfirmDisabled.toString());
       this._confirmBtn.title = isConfirmDisabled ? "Select 3 attributes to continue" : "";
+      this._confirmBtn.style.opacity = isConfirmDisabled ? "0.5" : "";
+      this._confirmBtn.style.cursor = isConfirmDisabled ? "not-allowed" : "";
     }
   }
 
   private _handleConfirm(): void {
+    if (this._confirmBtn?.getAttribute("aria-disabled") === "true") return;
     if (this._selected.length !== 3) return;
     const [primary, sec1, sec2] = this._selected as [AttributeName, AttributeName, AttributeName];
     this.close();
