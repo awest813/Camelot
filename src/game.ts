@@ -131,6 +131,7 @@ import { ModManifestSystem } from "./systems/mod-manifest-system";
 import { ModManifestUI } from "./ui/mod-manifest-ui";
 import { BarterUI } from "./ui/barter-ui";
 import type { Item } from "./systems/inventory-system";
+import { ScreenshotSystem } from "./systems/screenshot-system";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -296,6 +297,9 @@ export class Game {
 
   /** Fantasy asset loader — streams BabylonJS CDN models (weapons, structures, creatures). */
   public fantasyAssets: FantasyAssetLoader;
+
+  /** Captures the WebGL canvas as a PNG/JPEG and triggers a browser download. */
+  public readonly screenshotSystem = new ScreenshotSystem();
 
   private readonly _barterUI = new BarterUI();
   /** When set, open barter after dialogue teardown (pointer lock restored first). */
@@ -2881,6 +2885,9 @@ export class Game {
             } else if (kbInfo.event.key === "F3") {
                 const shown = this.ui.toggleDebugOverlay();
                 this.ui.showNotification(shown ? "Debug overlay ON" : "Debug overlay OFF", 1200);
+            } else if (kbInfo.event.key === "PrintScreen") {
+                this.screenshotSystem.download(this.canvas);
+                this.ui.showNotification("Screenshot saved", 1500);
             } else if (kbInfo.event.key === "F1") {
                 this._toggleHelpOverlay();
             } else if (kbInfo.event.key === "7" || kbInfo.event.key === "8" ||
