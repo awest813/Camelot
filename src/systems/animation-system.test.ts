@@ -879,7 +879,7 @@ describe("AnimationSystem", () => {
     });
 
     it("restoreSnapshot ignores entries with invalid clip names", () => {
-      const snap = { [mesh.name]: "invalid_clip" } as Record<string, AnimationClip>;
+      const snap = { [mesh.name]: "invalid_clip" } as unknown as Record<string, AnimationClip>;
       sys.restoreSnapshot(snap);
       expect(sys.getActiveClip(mesh.name)).toBeUndefined();
     });
