@@ -129,6 +129,8 @@ export class FastTravelUI {
       this._listEl.appendChild(empty);
       this._statusEl.textContent = "Explore the world to discover destinations.";
       this._travelBtn.disabled = true;
+      this._travelBtn.setAttribute("aria-disabled", "true");
+      this._travelBtn.title = "No destinations available.";
       return;
     }
 
@@ -164,7 +166,12 @@ export class FastTravelUI {
       this._statusEl.textContent = "Choose a destination.";
     }
 
-    this._travelBtn.disabled = !selected;
+    const isDisabled = !selected;
+    this._travelBtn.disabled = isDisabled;
+    this._travelBtn.setAttribute("aria-disabled", isDisabled ? "true" : "false");
+    this._travelBtn.title = isDisabled
+      ? "Select a destination to travel."
+      : `Travel to ${selected?.name}.`;
   }
 }
 

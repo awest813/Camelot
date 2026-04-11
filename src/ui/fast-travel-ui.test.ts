@@ -135,6 +135,8 @@ describe("FastTravelUI", () => {
       ui.open(SAMPLE_OPTIONS);
       const btn = document.querySelector(".fast-travel__btn--primary") as HTMLButtonElement;
       expect(btn.disabled).toBe(false);
+      expect(btn.getAttribute("aria-disabled")).toBe("false");
+      expect(btn.title).toContain("Travel to Whiterun");
     });
 
     it("open() with empty array shows empty message", () => {
@@ -147,6 +149,8 @@ describe("FastTravelUI", () => {
       ui.open([]);
       const btn = document.querySelector(".fast-travel__btn--primary") as HTMLButtonElement;
       expect(btn.disabled).toBe(true);
+      expect(btn.getAttribute("aria-disabled")).toBe("true");
+      expect(btn.title).toBe("No destinations available.");
     });
 
     it("status prompts exploration when no options", () => {
@@ -288,6 +292,16 @@ describe("FastTravelUI", () => {
   });
 
   // ── Travel button ─────────────────────────────────────────────────────────────
+
+  describe("travel button accessibility", () => {
+    it("updates travel button title when a new row is selected", () => {
+      ui.open(SAMPLE_OPTIONS);
+      const rows = document.querySelectorAll<HTMLButtonElement>(".fast-travel__row");
+      rows[1].click();
+      const btn = document.querySelector(".fast-travel__btn--primary") as HTMLButtonElement;
+      expect(btn.title).toContain("Travel to Riften");
+    });
+  });
 
   describe("travel button", () => {
     it("clicking Travel fires onTravel with selected id", () => {
