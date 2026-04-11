@@ -430,11 +430,16 @@ export class CharacterCreationUI {
 
         const advancedContent = document.createElement("div");
         advancedContent.className = "character-create__advanced-content";
+        advancedContent.id = "character-create-advanced-content";
         seedSection.appendChild(advancedContent);
+
+        advancedToggle.setAttribute("aria-controls", "character-create-advanced-content");
+        advancedToggle.setAttribute("aria-expanded", "false");
 
         let advancedOpen = false;
         advancedToggle.addEventListener("click", () => {
           advancedOpen = !advancedOpen;
+          advancedToggle.setAttribute("aria-expanded", String(advancedOpen));
           advancedToggle.classList.toggle("is-open", advancedOpen);
           advancedContent.classList.toggle("is-open", advancedOpen);
         });
