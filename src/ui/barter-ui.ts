@@ -317,18 +317,21 @@ export class BarterUI {
     btn.type = "button";
     btn.textContent = action === "buy" ? "Buy" : "Sell";
     btn.setAttribute("aria-label", action === "buy" ? `Buy ${item.name}` : `Sell ${item.name}`);
-    btn.disabled = !actionEnabled;
     btn.setAttribute("aria-disabled", actionEnabled ? "false" : "true");
     if (!actionEnabled) {
       btn.title = action === "buy" ? "Not enough gold to purchase." : "Merchant does not have enough gold to buy this.";
+      btn.style.opacity = "0.5";
+      btn.style.cursor = "not-allowed";
+    } else {
+      btn.style.opacity = "";
+      btn.style.cursor = "";
     }
     btn.addEventListener("click", () => {
-      if (!btn.disabled) {
-        if (action === "buy") {
-          this.onBuy?.(item.id);
-        } else {
-          this.onSell?.(item.id);
-        }
+      if (btn.getAttribute("aria-disabled") === "true") return;
+      if (action === "buy") {
+        this.onBuy?.(item.id);
+      } else {
+        this.onSell?.(item.id);
       }
     });
     li.appendChild(btn);

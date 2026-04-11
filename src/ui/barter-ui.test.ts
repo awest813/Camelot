@@ -260,7 +260,9 @@ describe("BarterUI", () => {
       const btn = document.querySelector<HTMLButtonElement>(
         "[aria-label='Merchant inventory'] .barter-ui__action-btn--buy",
       );
-      expect(btn?.disabled).toBe(true);
+      expect(btn?.disabled).toBe(false);
+      expect(btn?.style.opacity).toBe("0.5");
+      expect(btn?.style.cursor).toBe("not-allowed");
     });
 
     it("enables Buy button when player can afford the item", () => {
@@ -271,6 +273,8 @@ describe("BarterUI", () => {
         "[aria-label='Merchant inventory'] .barter-ui__action-btn--buy",
       );
       expect(btn?.disabled).toBe(false);
+      expect(btn?.style.opacity).toBe("");
+      expect(btn?.style.cursor).toBe("");
     });
 
     it("Buy button has aria-disabled=false when affordable", () => {
