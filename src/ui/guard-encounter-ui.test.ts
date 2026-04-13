@@ -119,6 +119,7 @@ describe("GuardEncounterUI", () => {
         (b) => b.textContent === "Pay Fine",
       );
       expect(payBtn?.disabled).toBe(false);
+      expect(payBtn?.getAttribute("aria-disabled")).toBe("false");
     });
 
     it("Pay Fine button is disabled when player cannot afford the fine", () => {
@@ -126,7 +127,8 @@ describe("GuardEncounterUI", () => {
       const payBtn = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find(
         (b) => b.textContent === "Pay Fine",
       );
-      expect(payBtn?.disabled).toBe(true);
+      expect(payBtn?.disabled).toBe(false);
+      expect(payBtn?.getAttribute("aria-disabled")).toBe("true");
     });
 
     it("Persuade button is enabled when canPersuade is true", () => {
@@ -135,6 +137,7 @@ describe("GuardEncounterUI", () => {
         (b) => b.textContent === "Persuade",
       );
       expect(persuadeBtn?.disabled).toBe(false);
+      expect(persuadeBtn?.getAttribute("aria-disabled")).toBe("false");
     });
 
     it("Persuade button is disabled when canPersuade is false", () => {
@@ -142,7 +145,8 @@ describe("GuardEncounterUI", () => {
       const persuadeBtn = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find(
         (b) => b.textContent === "Persuade",
       );
-      expect(persuadeBtn?.disabled).toBe(true);
+      expect(persuadeBtn?.disabled).toBe(false);
+      expect(persuadeBtn?.getAttribute("aria-disabled")).toBe("true");
     });
 
     it("renders all four action buttons", () => {
@@ -295,8 +299,9 @@ describe("GuardEncounterUI", () => {
       const payBtn = Array.from(document.querySelectorAll<HTMLButtonElement>(".guard-encounter__btn")).find(
         (b) => b.textContent === "Pay Fine",
       ) as HTMLButtonElement;
-      // Disabled buttons do not fire click events in browsers / jsdom
-      expect(payBtn.disabled).toBe(true);
+
+      payBtn.click();
+      expect(onResolve).not.toHaveBeenCalled();
     });
   });
 
@@ -337,6 +342,7 @@ describe("GuardEncounterUI", () => {
         (b) => b.textContent === "Pay Fine",
       );
       expect(payBtn?.disabled).toBe(false);
+      expect(payBtn?.getAttribute("aria-disabled")).toBe("false");
     });
 
     it("Pay Fine is disabled when playerGold is one less than bounty", () => {
@@ -344,7 +350,8 @@ describe("GuardEncounterUI", () => {
       const payBtn = Array.from(document.querySelectorAll<HTMLButtonElement>(".guard-encounter__btn")).find(
         (b) => b.textContent === "Pay Fine",
       );
-      expect(payBtn?.disabled).toBe(true);
+      expect(payBtn?.disabled).toBe(false);
+      expect(payBtn?.getAttribute("aria-disabled")).toBe("true");
     });
 
     it("zero bounty makes Pay Fine always enabled", () => {
@@ -353,6 +360,7 @@ describe("GuardEncounterUI", () => {
         (b) => b.textContent === "Pay Fine",
       );
       expect(payBtn?.disabled).toBe(false);
+      expect(payBtn?.getAttribute("aria-disabled")).toBe("false");
     });
   });
 });

@@ -31,12 +31,10 @@ export class GuardEncounterUI {
     this._bountyEl.textContent = `Faction: ${view.factionId}  •  Bounty: ${view.bounty}g  •  Your Gold: ${view.playerGold}g`;
 
     const cannotPay = view.playerGold < view.bounty;
-    this._payBtn.disabled = cannotPay;
     this._payBtn.setAttribute("aria-disabled", cannotPay.toString());
     this._payBtn.title = cannotPay ? "Not enough gold to pay the fine." : "Pay the fine and clear your bounty.";
 
     const cannotPersuade = !view.canPersuade;
-    this._persuadeBtn.disabled = cannotPersuade;
     this._persuadeBtn.setAttribute("aria-disabled", cannotPersuade.toString());
     this._persuadeBtn.title = cannotPersuade ? "Speechcraft too low to persuade." : "Attempt to persuade the guard to look the other way.";
 
@@ -45,9 +43,9 @@ export class GuardEncounterUI {
     this._root.style.display = "grid";
     this.isVisible = true;
 
-    if (this._payBtn && !this._payBtn.disabled) {
+    if (this._payBtn && this._payBtn.getAttribute("aria-disabled") !== "true") {
       this._payBtn.focus();
-    } else if (this._persuadeBtn && !this._persuadeBtn.disabled) {
+    } else if (this._persuadeBtn && this._persuadeBtn.getAttribute("aria-disabled") !== "true") {
       this._persuadeBtn.focus();
     } else if (this._root) {
       const firstBtn = this._root.querySelector("button");
@@ -115,7 +113,14 @@ export class GuardEncounterUI {
       const button = document.createElement("button");
       button.className = classes;
       button.textContent = label;
-      button.addEventListener("click", () => this.onResolve?.(action));
+      button.addEventListener("click", (e) => {
+        if (button.getAttribute("aria-disabled") === "true") {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        this.onResolve?.(action);
+      });
       actions.appendChild(button);
       return button;
     };

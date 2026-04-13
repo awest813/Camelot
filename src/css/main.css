@@ -1275,7 +1275,8 @@ body::before {
   background: linear-gradient(180deg, rgba(124, 40, 40, 0.95), rgba(86, 24, 24, 0.98));
 }
 
-.guard-encounter__btn:disabled {
+.guard-encounter__btn:disabled,
+.guard-encounter__btn[aria-disabled="true"] {
   opacity: 0.45;
   cursor: not-allowed;
 }
