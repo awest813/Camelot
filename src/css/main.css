@@ -449,7 +449,8 @@ body::before {
   color: #d4c5a0;
 }
 
-.character-create__button:disabled {
+.character-create__button:disabled,
+.character-create__button[aria-disabled="true"] {
   cursor: not-allowed;
   opacity: 0.45;
 }
