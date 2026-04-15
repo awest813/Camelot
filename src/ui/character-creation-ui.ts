@@ -168,6 +168,11 @@ export class CharacterCreationUI {
       detailsMeta.className = "character-create__meta";
       details.appendChild(detailsMeta);
 
+      function setBtnDisabled(btn: HTMLButtonElement, disabled: boolean, tooltip?: string) {
+        btn.setAttribute("aria-disabled", disabled ? "true" : "false");
+        btn.title = disabled && tooltip ? tooltip : "";
+      }
+
       const actions = document.createElement("div");
       actions.className = "character-create__actions";
       panel.appendChild(actions);
@@ -175,7 +180,7 @@ export class CharacterCreationUI {
       const backButton = document.createElement("button");
       backButton.className = "character-create__button character-create__button--secondary";
       backButton.textContent = "Back";
-      backButton.disabled = true;
+      setBtnDisabled(backButton, true);
       actions.appendChild(backButton);
 
       const continueButton = document.createElement("button");
@@ -279,8 +284,8 @@ export class CharacterCreationUI {
         subtitle.textContent =
           "You will name your hero, choose a people and birthsign, then a class. Afterward, optional tips introduce movement and interaction.";
         continueButton.textContent = "Continue";
-        continueButton.disabled = false;
-        backButton.disabled = true;
+        setBtnDisabled(continueButton, false);
+        setBtnDisabled(backButton, true);
         setAllStepPills("welcome");
 
         const intro = document.createElement("div");
@@ -326,8 +331,8 @@ export class CharacterCreationUI {
         clearCards();
         subtitle.textContent = "Configure your world seed and generation settings, or leave everything as-is for a random world.";
         continueButton.textContent = "Continue";
-        continueButton.disabled = false;
-        backButton.disabled = false;
+        setBtnDisabled(continueButton, false);
+        setBtnDisabled(backButton, false);
         setAllStepPills("world");
 
         const seedSection = document.createElement("div");
@@ -672,8 +677,8 @@ export class CharacterCreationUI {
         subtitle.textContent =
           "Name your hero. Choose a suggestion below or type your own — each name is inspired by a sign of the medieval zodiac.";
         continueButton.textContent = "Continue";
-        continueButton.disabled = enteredName.trim().length === 0;
-        backButton.disabled = false;
+        setBtnDisabled(continueButton, enteredName.trim().length === 0, "Please enter a name to continue.");
+        setBtnDisabled(backButton, false);
         setAllStepPills("name");
 
         const inputWrap = document.createElement("div");
@@ -692,7 +697,7 @@ export class CharacterCreationUI {
 
         nameInput.addEventListener("input", () => {
           enteredName = nameInput.value;
-          continueButton.disabled = enteredName.trim().length === 0;
+          setBtnDisabled(continueButton, enteredName.trim().length === 0, "Please enter a name to continue.");
         });
 
         const suggestLabel = document.createElement("p");
@@ -713,7 +718,7 @@ export class CharacterCreationUI {
           btn.addEventListener("click", () => {
             enteredName = name;
             nameInput.value = name;
-            continueButton.disabled = false;
+            setBtnDisabled(continueButton, false);
           });
           suggestGrid.appendChild(btn);
         }
@@ -728,8 +733,8 @@ export class CharacterCreationUI {
         clearCards();
         subtitle.textContent = "Choose your race to define heritage, innate talents, and starting skill leanings.";
         continueButton.textContent = "Continue";
-        continueButton.disabled = !selectedRace;
-        backButton.disabled = false;
+        setBtnDisabled(continueButton, !selectedRace, "Please select a race to continue.");
+        setBtnDisabled(backButton, false);
         setAllStepPills("race");
 
         for (const race of RACES) {
@@ -770,8 +775,8 @@ export class CharacterCreationUI {
         clearCards();
         subtitle.textContent = "Pick your birthsign for innate gifts, attribute shaping, and often a once-per-day power.";
         continueButton.textContent = "Continue";
-        continueButton.disabled = !selectedBirthsign;
-        backButton.disabled = false;
+        setBtnDisabled(continueButton, !selectedBirthsign, "Please select a birthsign to continue.");
+        setBtnDisabled(backButton, false);
         setAllStepPills("birthsign");
 
         for (const sign of BIRTHSIGNS) {
@@ -812,8 +817,8 @@ export class CharacterCreationUI {
         clearCards();
         subtitle.textContent = "Select a class to shape early skill growth, XP multipliers, and your opening combat style.";
         continueButton.textContent = "Begin adventure";
-        continueButton.disabled = !selectedClass;
-        backButton.disabled = false;
+        setBtnDisabled(continueButton, !selectedClass, "Please select a class to continue.");
+        setBtnDisabled(backButton, false);
         setAllStepPills("class");
 
         for (const cls of CHARACTER_CLASSES) {
@@ -851,6 +856,7 @@ export class CharacterCreationUI {
       };
 
       backButton.addEventListener("click", () => {
+        if (backButton.getAttribute("aria-disabled") === "true") return;
         if (step === "world") {
           step = "welcome";
           renderWelcome();
@@ -870,6 +876,7 @@ export class CharacterCreationUI {
       });
 
       continueButton.addEventListener("click", () => {
+        if (continueButton.getAttribute("aria-disabled") === "true") return;
         if (step === "welcome") {
           step = "world";
           renderWorld();
