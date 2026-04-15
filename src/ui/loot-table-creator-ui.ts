@@ -243,6 +243,7 @@ export class LootTableCreatorUI {
     const upBtn = document.createElement("button");
     upBtn.className   = "loot-table-creator__btn loot-table-creator__btn--sm";
     upBtn.textContent = "↑";
+    upBtn.setAttribute("aria-label", "Move entry up");
     upBtn.title       = "Move up";
     upBtn.addEventListener("click", () => {
       this._sys.moveEntryUp(entry.entryKey);
@@ -253,6 +254,7 @@ export class LootTableCreatorUI {
     const downBtn = document.createElement("button");
     downBtn.className   = "loot-table-creator__btn loot-table-creator__btn--sm";
     downBtn.textContent = "↓";
+    downBtn.setAttribute("aria-label", "Move entry down");
     downBtn.title       = "Move down";
     downBtn.addEventListener("click", () => {
       this._sys.moveEntryDown(entry.entryKey);
