@@ -1402,7 +1402,7 @@ export class Game {
       this.player.maxCarryWeight = this.attributeSystem.carryWeight;
       this.ui.showNotification(`Character Level ${newLevel}!`, 4000);
       this.eventBus.emit("player:levelUp", { newLevel });
-      this.trainerSystem?.onCharacterLevelUp();
+      this.trainerSystem.onCharacterLevelUp();
       this.saveSystem.markDirty();
     };
     this.saveSystem.setPlayerLevelSystem(this.playerLevelSystem);
@@ -1679,6 +1679,8 @@ export class Game {
     // ── v24: Trainer System ───────────────────────────────────────────────
     this.trainerSystem = new TrainerSystem();
     this.trainerSystem.onTrainingComplete = (_trainerId, skillId, newLevel, goldSpent) => {
+      // Gold sufficiency is pre-validated by TrainerSystem.train() via canTrain();
+      // this callback only fires on a successful, already-approved session.
       this.skillProgressionSystem.setSkillLevel(skillId, newLevel);
       this._consumeInventoryGold(goldSpent);
       this.ui.showNotification(`${skillId} raised to ${newLevel}!  (−${goldSpent}g)`, 3000);
