@@ -490,6 +490,16 @@ Camelot will evolve toward a creator-friendly worldbuilding pipeline through a d
 - ✅ Layer-based editing (terrain, encounters, narrative, lighting) — completed with entity layer reassignment in the property inspector, persistent custom layer assignments through map export/import, and active layer targeting from the layer panel so new placements can be routed directly into the chosen layer while inheriting its visibility/lock state.
 - ✅ Optional standalone editor shell for non-programmer content creators.
 
+#### Phase 3/4 Continuation — Custom Layers + Map Pack System ✅
+
+All Phase 3/4 continuation items delivered (82 new tests):
+
+1. ✅ **Custom layer support** (`MapEditorSystem`) — `EditorLayerName` broadened to `string` (5 built-in names exported as `BUILTIN_LAYER_NAMES`/`BuiltinLayerName`); `addCustomLayer(id, label)` / `removeCustomLayer(id)` / `isBuiltinLayer(id)` / `getCustomLayerIds()` enable user-defined layers beyond the five built-ins; entities on a removed custom layer are automatically reassigned to their type-default built-in layer; custom layers survive `exportMap()` / `importMap()` round-trips with label preserved; `clearAll()` removes all custom layers; `getLayerEntityCounts()` includes custom layer keys; `setActiveLayer()` accepts custom layer IDs; `MapEditorLayerPanel` and `MapEditorPropertyPanel` updated for string-typed layer names with custom-layer fallback icon/color.
+
+2. ✅ **Static validation helper** (`MapEditorSystem.validateMapData`) — static method that runs the full validation rule-set against a `MapExportData` object without requiring a live editor instance; the existing `validateMap()` instance method delegates to it; enables offline and pack-level validation without constructing a scene.
+
+3. ✅ **MapPackSystem** (`src/systems/map-pack-system.ts`, 54 tests) — headless multi-map bundle manager: `addMap(id, label, data)` / `removeMap(id)` / `getMap(id)` / `getAllMaps()` / `getMapIds()` CRUD; `updateMapData(id, data)` / `updateMapLabel(id, label)` for in-place edits; `validateMap(id, spacing?, context?)` / `validateAll(spacing?, context?)` / `isAllValid(spacing?, context?)` via `MapEditorSystem.validateMapData`; pack metadata — `title`, `author`, `description` fields; `buildPack()` → `MapPackData`; `exportToJson()` / `exportToFile(filename?)` (browser download); `importFromJson(json)` / `importFromFile(File)` (Promise) with duplicate-ID skipping and metadata merge; `reset()` clears all maps and metadata; `onMapAdded` / `onMapRemoved` callbacks; `mapCount` getter.
+
 ### Networking Exploration
 
 - 🧭 Investigate co-op/multiplayer architecture feasibility.

@@ -11,7 +11,16 @@ import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 export type EditorGizmoMode = "position" | "rotation" | "scale";
 export type EditorPlacementType = "marker" | "loot" | "npc-spawn" | "quest-marker" | "structure";
 export type EditorTerrainTool = "none" | "sculpt" | "paint";
-export type EditorLayerName = "terrain" | "objects" | "events" | "npcs" | "triggers";
+
+/** The five built-in layer names shipped with the editor. */
+export const BUILTIN_LAYER_NAMES = ["terrain", "objects", "events", "npcs", "triggers"] as const;
+/** Union of the five built-in layer name literals. */
+export type BuiltinLayerName = typeof BUILTIN_LAYER_NAMES[number];
+/**
+ * Layer name type — either one of the five built-in names or any custom
+ * string identifier created via `MapEditorSystem.addCustomLayer()`.
+ */
+export type EditorLayerName = string;
 
 export interface EditorLayer {
   name: EditorLayerName;
@@ -27,7 +36,7 @@ export interface EditorLayer {
 }
 
 /** Default layer assignment per placement type. */
-const TYPE_DEFAULT_LAYER: Record<EditorPlacementType, EditorLayerName> = {
+const TYPE_DEFAULT_LAYER: Record<EditorPlacementType, BuiltinLayerName> = {
   marker:         "objects",
   loot:           "objects",
   "npc-spawn":    "npcs",
@@ -101,8 +110,8 @@ export interface MapExportData {
   }>;
   /** Optional map-level author notes or description. */
   notes?: string;
-  /** Persisted layer visibility/lock states (including optional owner). */
-  layers?: Array<{ name: EditorLayerName; isVisible: boolean; isLocked: boolean; owner?: string }>;
+  /** Persisted layer states. Custom layers include a `label` field; builtin layers may omit it. */
+  layers?: Array<{ name: EditorLayerName; label?: string; isVisible: boolean; isLocked: boolean; owner?: string }>;
 }
 
 export interface MapValidationIssue {
@@ -235,9 +244,11 @@ export class MapEditorSystem {
   private _patrolGroupCounter: number = 0;
   private _selectedEntityId: string | null = null;
   private _activeLayerName: EditorLayerName | null = null;
-  private _layers: Map<EditorLayerName, EditorLayer> = new Map(
+  private _layers: Map<string, EditorLayer> = new Map(
     DEFAULT_LAYERS.map((l) => [l.name, { ...l }]),
   );
+  /** IDs of user-created custom layers (not in BUILTIN_LAYER_NAMES). */
+  private _customLayerIds: Set<string> = new Set();
 
   // ── Undo/redo stacks ─────────────────────────────────────────────────────
   private _undoStack: EditorCommand[] = [];
@@ -320,7 +331,7 @@ export class MapEditorSystem {
   /**
    * Returns the current state of a single layer, or null if not found.
    */
-  getLayer(name: EditorLayerName): EditorLayer | null {
+  getLayer(name: string): EditorLayer | null {
     const l = this._layers.get(name);
     return l ? { ...l } : null;
   }
@@ -329,7 +340,7 @@ export class MapEditorSystem {
    * Show or hide all entities on the given layer.
    * Also updates the layer state and fires `onLayerChanged`.
    */
-  setLayerVisible(name: EditorLayerName, visible: boolean): void {
+  setLayerVisible(name: string, visible: boolean): void {
     const layer = this._layers.get(name);
     if (!layer) return;
     layer.isVisible = visible;
@@ -346,7 +357,7 @@ export class MapEditorSystem {
    * Locked layers' entities are not pickable by the editor pointer.
    * Also fires `onLayerChanged`.
    */
-  setLayerLocked(name: EditorLayerName, locked: boolean): void {
+  setLayerLocked(name: string, locked: boolean): void {
     const layer = this._layers.get(name);
     if (!layer) return;
     layer.isLocked = locked;
@@ -363,7 +374,7 @@ export class MapEditorSystem {
    * Set the owner of a layer.
    * Fires `onLayerChanged` so the layer panel can update the owner column.
    */
-  setLayerOwner(name: EditorLayerName, owner: string): void {
+  setLayerOwner(name: string, owner: string): void {
     const layer = this._layers.get(name);
     if (!layer) return;
     layer.owner = owner.trim() || undefined;
@@ -373,17 +384,18 @@ export class MapEditorSystem {
   /**
    * Returns the number of entities currently assigned to the given layer.
    */
-  getLayerEntityCount(name: EditorLayerName): number {
+  getLayerEntityCount(name: string): number {
     return this._entities.filter((e) => e.layerName === name).length;
   }
 
   /**
-   * Returns a map of entity counts per layer.
+   * Returns a map of entity counts per layer (builtin and custom).
    */
-  getLayerEntityCounts(): Record<EditorLayerName, number> {
-    const counts: Record<EditorLayerName, number> = {
-      terrain: 0, objects: 0, events: 0, npcs: 0, triggers: 0,
-    };
+  getLayerEntityCounts(): Record<string, number> {
+    const counts: Record<string, number> = {};
+    for (const name of this._layers.keys()) {
+      counts[name] = 0;
+    }
     for (const e of this._entities) {
       counts[e.layerName] = (counts[e.layerName] ?? 0) + 1;
     }
@@ -394,7 +406,7 @@ export class MapEditorSystem {
    * The currently targeted layer for newly placed entities.
    * When `null`, placement falls back to the default layer for the entity type.
    */
-  get activeLayerName(): EditorLayerName | null {
+  get activeLayerName(): string | null {
     return this._activeLayerName;
   }
 
@@ -402,10 +414,71 @@ export class MapEditorSystem {
    * Set or clear the active placement layer.
    * Returns `true` when the layer exists (or null is provided), `false` otherwise.
    */
-  setActiveLayer(name: EditorLayerName | null): boolean {
+  setActiveLayer(name: string | null): boolean {
     if (name !== null && !this._layers.has(name)) return false;
     this._activeLayerName = name;
     return true;
+  }
+
+  /**
+   * Returns `true` if the given layer name is one of the five built-in layers.
+   */
+  isBuiltinLayer(name: string): boolean {
+    return (BUILTIN_LAYER_NAMES as readonly string[]).includes(name);
+  }
+
+  /**
+   * Add a new custom layer with the given ID and display label.
+   * Returns `true` on success; `false` if the ID is empty, already in use
+   * (either built-in or custom), or exceeds 64 characters.
+   */
+  addCustomLayer(id: string, label: string): boolean {
+    const trimmedId = id.trim();
+    const trimmedLabel = label.trim();
+    if (!trimmedId || trimmedId.length > 64) return false;
+    if (this._layers.has(trimmedId)) return false;
+    const layer: EditorLayer = {
+      name: trimmedId,
+      label: trimmedLabel || trimmedId,
+      isVisible: true,
+      isLocked: false,
+    };
+    this._layers.set(trimmedId, layer);
+    this._customLayerIds.add(trimmedId);
+    this.onLayerChanged?.({ ...layer });
+    return true;
+  }
+
+  /**
+   * Remove a custom layer by its ID.
+   * Entities on the removed layer are reassigned to their type-default built-in
+   * layer.  Returns `true` on success; `false` if the layer is not found or is
+   * a built-in layer (built-ins cannot be removed).
+   */
+  removeCustomLayer(id: string): boolean {
+    if (!this._customLayerIds.has(id)) return false;
+    // Reassign entities to their type-default layer
+    for (const e of this._entities) {
+      if (e.layerName === id) {
+        const defaultLayer = TYPE_DEFAULT_LAYER[e.type];
+        e.layerName = defaultLayer;
+        e.mesh.metadata = { ...(e.mesh.metadata ?? {}), editorLayerName: defaultLayer };
+      }
+    }
+    this._layers.delete(id);
+    this._customLayerIds.delete(id);
+    // Clear active layer if it was the removed one
+    if (this._activeLayerName === id) {
+      this._activeLayerName = null;
+    }
+    return true;
+  }
+
+  /**
+   * Returns the IDs of all user-created custom layers.
+   */
+  getCustomLayerIds(): string[] {
+    return Array.from(this._customLayerIds);
   }
 
   /**
@@ -462,7 +535,7 @@ export class MapEditorSystem {
    * Useful for hierarchy panels that only need to list names without reading
    * full property data.
    */
-  listEntitySummaries(): Array<{ id: string; type: EditorPlacementType; label?: string; layerName: EditorLayerName; position: { x: number; y: number; z: number } }> {
+  listEntitySummaries(): Array<{ id: string; type: EditorPlacementType; label?: string; layerName: string; position: { x: number; y: number; z: number } }> {
     return this._entities.map((e) => ({
       id: e.mesh.metadata?.editorEntityId ?? e.mesh.name,
       type: e.type,
@@ -643,7 +716,7 @@ export class MapEditorSystem {
    * Returns the layer currently assigned to the given entity, or null when the
    * entity does not exist.
    */
-  getEntityLayer(entityId: string): EditorLayerName | null {
+  getEntityLayer(entityId: string): string | null {
     return this._findEntityById(entityId)?.layerName ?? null;
   }
 
@@ -674,7 +747,7 @@ export class MapEditorSystem {
    * Visibility and lock state are immediately inherited from the destination
    * layer so moved entities participate in the layer panel consistently.
    */
-  setEntityLayer(entityId: string, layerName: EditorLayerName): boolean {
+  setEntityLayer(entityId: string, layerName: string): boolean {
     const entity = this._findEntityById(entityId);
     const layer = this._layers.get(layerName);
     if (!entity || !layer) return false;
@@ -827,6 +900,7 @@ export class MapEditorSystem {
 
     const layers = Array.from(this._layers.values()).map((l) => ({
       name: l.name,
+      label: l.label,
       isVisible: l.isVisible,
       isLocked: l.isLocked,
       ...(l.owner !== undefined ? { owner: l.owner } : {}),
@@ -846,10 +920,24 @@ export class MapEditorSystem {
    * - Quest markers sharing the same objectiveId (duplicate)
    * - Loot entities referencing unknown loot table IDs (requires context)
    * - NPC spawns referencing unknown spawn template IDs (requires context)
+   *
+   * Delegates to `MapEditorSystem.validateMapData()` with the current live export.
    */
   validateMap(minEntitySpacing: number = 0.5, context?: MapValidationContext): MapValidationReport {
+    return MapEditorSystem.validateMapData(this.exportMap(), minEntitySpacing, context);
+  }
+
+  /**
+   * Static validation helper — run validation rules against a `MapExportData`
+   * object directly, without requiring a live `MapEditorSystem` instance.
+   * Suitable for offline / pack-level validation (e.g. inside `MapPackSystem`).
+   */
+  static validateMapData(
+    data: MapExportData,
+    minEntitySpacing: number = 0.5,
+    context?: MapValidationContext,
+  ): MapValidationReport {
     const issues: MapValidationIssue[] = [];
-    const data = this.exportMap();
     const patrolGroupIds = new Set(data.patrolRoutes.map((route) => route.id));
 
     // ── Missing patrol group ───────────────────────────────────────────────
@@ -973,6 +1061,8 @@ export class MapEditorSystem {
   /**
    * Re-create editor entities from a previously exported layout.
    * Existing entities are preserved; duplicate IDs are skipped.
+   * Custom layers encoded in `data.layers` that are not already present are
+   * automatically recreated before entities are imported.
    */
   importMap(data: MapExportData): void {
     const existingIds = new Set(this._entities.map((e) => e.mesh.metadata?.editorEntityId));
@@ -982,9 +1072,23 @@ export class MapEditorSystem {
       this.notes = data.notes;
     }
 
-    // Restore layer states if present
+    // Restore layer states if present, recreating custom layers as needed
     if (data.layers) {
       for (const saved of data.layers) {
+        // Recreate custom layers that don't exist yet
+        if (!this._layers.has(saved.name) && !this.isBuiltinLayer(saved.name)) {
+          const customLabel = saved.label ?? saved.name;
+          const newLayer: EditorLayer = {
+            name: saved.name,
+            label: customLabel,
+            isVisible: saved.isVisible,
+            isLocked: saved.isLocked,
+            ...(saved.owner !== undefined ? { owner: saved.owner } : {}),
+          };
+          this._layers.set(saved.name, newLayer);
+          this._customLayerIds.add(saved.name);
+          continue;
+        }
         const layer = this._layers.get(saved.name);
         if (!layer) continue;
         layer.isVisible = saved.isVisible;
@@ -1113,11 +1217,17 @@ export class MapEditorSystem {
     this._undoStack = [];
     this._redoStack = [];
     this._activeLayerName = null;
-    // Reset layer states
+    // Reset builtin layer states
     for (const layer of this._layers.values()) {
       layer.isVisible = true;
       layer.isLocked  = false;
+      layer.owner = undefined;
     }
+    // Remove all custom layers
+    for (const id of this._customLayerIds) {
+      this._layers.delete(id);
+    }
+    this._customLayerIds.clear();
     this.notes = "";
   }
 
@@ -1125,13 +1235,13 @@ export class MapEditorSystem {
   // ─── Private helpers ────────────────────────────────────────────────────────
 
   /** Returns the layer name for a given type/entry, falling back to type default. */
-  private _resolveLayerName(type: EditorPlacementType, layerName?: EditorLayerName): EditorLayerName {
+  private _resolveLayerName(type: EditorPlacementType, layerName?: string): string {
     if (layerName && this._layers.has(layerName)) return layerName;
     return TYPE_DEFAULT_LAYER[type];
   }
 
   /** Resolve the layer used for new placements, honoring the active layer target when set. */
-  private _resolvePlacementLayerName(type: EditorPlacementType): EditorLayerName {
+  private _resolvePlacementLayerName(type: EditorPlacementType): string {
     if (this._activeLayerName && this._layers.has(this._activeLayerName)) {
       return this._activeLayerName;
     }

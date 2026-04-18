@@ -3,7 +3,7 @@ import { NullEngine } from '@babylonjs/core/Engines/nullEngine';
 import { Scene } from '@babylonjs/core/scene';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Mesh } from '@babylonjs/core/Meshes/mesh';
-import { MapEditorSystem } from './map-editor-system';
+import { MapEditorSystem, BUILTIN_LAYER_NAMES, type MapExportData } from './map-editor-system';
 
 const disposables: Array<{ scene: Scene; engine: NullEngine }> = [];
 
@@ -1336,5 +1336,261 @@ describe('MapEditorSystem — onEntityMoved', () => {
         expect(received[0].x).toBeCloseTo(7);
         expect(received[0].y).toBeCloseTo(2);
         expect(received[0].z).toBeCloseTo(-4);
+    });
+});
+
+// ─── Phase 3/4 continuation: BUILTIN_LAYER_NAMES + isBuiltinLayer ─────────────
+
+describe('MapEditorSystem — BUILTIN_LAYER_NAMES', () => {
+    it('exports the five expected builtin layer names', () => {
+        expect(BUILTIN_LAYER_NAMES).toContain('terrain');
+        expect(BUILTIN_LAYER_NAMES).toContain('objects');
+        expect(BUILTIN_LAYER_NAMES).toContain('events');
+        expect(BUILTIN_LAYER_NAMES).toContain('npcs');
+        expect(BUILTIN_LAYER_NAMES).toContain('triggers');
+    });
+
+    it('isBuiltinLayer returns true for all five builtin names', () => {
+        const { editor } = makeEditor();
+        for (const name of BUILTIN_LAYER_NAMES) {
+            expect(editor.isBuiltinLayer(name)).toBe(true);
+        }
+    });
+
+    it('isBuiltinLayer returns false for unknown strings', () => {
+        const { editor } = makeEditor();
+        expect(editor.isBuiltinLayer('custom')).toBe(false);
+        expect(editor.isBuiltinLayer('')).toBe(false);
+        expect(editor.isBuiltinLayer('TERRAIN')).toBe(false);
+    });
+});
+
+// ─── Phase 3/4 continuation: custom layers ────────────────────────────────────
+
+describe('MapEditorSystem — addCustomLayer', () => {
+    it('returns true and adds a new custom layer', () => {
+        const { editor } = makeEditor();
+        expect(editor.addCustomLayer('vfx', 'VFX')).toBe(true);
+        const layer = editor.getLayer('vfx');
+        expect(layer).not.toBeNull();
+        expect(layer!.name).toBe('vfx');
+        expect(layer!.label).toBe('VFX');
+        expect(layer!.isVisible).toBe(true);
+        expect(layer!.isLocked).toBe(false);
+    });
+
+    it('returns false for an empty id', () => {
+        const { editor } = makeEditor();
+        expect(editor.addCustomLayer('', 'Label')).toBe(false);
+    });
+
+    it('returns false for id longer than 64 characters', () => {
+        const { editor } = makeEditor();
+        expect(editor.addCustomLayer('a'.repeat(65), 'Label')).toBe(false);
+    });
+
+    it('returns false when id already exists (builtin)', () => {
+        const { editor } = makeEditor();
+        expect(editor.addCustomLayer('terrain', 'My Terrain')).toBe(false);
+    });
+
+    it('returns false when id already exists (custom)', () => {
+        const { editor } = makeEditor();
+        editor.addCustomLayer('vfx', 'VFX');
+        expect(editor.addCustomLayer('vfx', 'VFX2')).toBe(false);
+    });
+
+    it('uses id as label when label is empty', () => {
+        const { editor } = makeEditor();
+        editor.addCustomLayer('vfx', '');
+        expect(editor.getLayer('vfx')!.label).toBe('vfx');
+    });
+
+    it('custom layer appears in getLayers()', () => {
+        const { editor } = makeEditor();
+        editor.addCustomLayer('vfx', 'VFX');
+        const names = editor.getLayers().map((l) => l.name);
+        expect(names).toContain('vfx');
+    });
+
+    it('fires onLayerChanged after adding', () => {
+        const { editor } = makeEditor();
+        const changes: string[] = [];
+        editor.onLayerChanged = (l) => changes.push(l.name);
+        editor.addCustomLayer('vfx', 'VFX');
+        expect(changes).toContain('vfx');
+    });
+
+    it('getCustomLayerIds returns custom layer ids', () => {
+        const { editor } = makeEditor();
+        editor.addCustomLayer('vfx', 'VFX');
+        editor.addCustomLayer('audio', 'Audio');
+        const ids = editor.getCustomLayerIds();
+        expect(ids).toContain('vfx');
+        expect(ids).toContain('audio');
+        expect(ids).not.toContain('terrain');
+    });
+
+    it('allows placing entities on a custom layer', () => {
+        const { editor } = makeEditor();
+        editor.addCustomLayer('vfx', 'VFX');
+        editor.setActiveLayer('vfx');
+        const mesh = editor.placeEntity(new Vector3(0, 0, 0), 'marker');
+        expect(mesh.metadata?.editorLayerName).toBe('vfx');
+    });
+});
+
+describe('MapEditorSystem — removeCustomLayer', () => {
+    it('returns true and removes a custom layer', () => {
+        const { editor } = makeEditor();
+        editor.addCustomLayer('vfx', 'VFX');
+        expect(editor.removeCustomLayer('vfx')).toBe(true);
+        expect(editor.getLayer('vfx')).toBeNull();
+    });
+
+    it('returns false for a builtin layer', () => {
+        const { editor } = makeEditor();
+        expect(editor.removeCustomLayer('terrain')).toBe(false);
+    });
+
+    it('returns false when id does not exist', () => {
+        const { editor } = makeEditor();
+        expect(editor.removeCustomLayer('nonexistent')).toBe(false);
+    });
+
+    it('reassigns entities to their type-default layer on removal', () => {
+        const { editor } = makeEditor();
+        editor.addCustomLayer('vfx', 'VFX');
+        editor.setActiveLayer('vfx');
+        const mesh = editor.placeEntity(new Vector3(0, 0, 0), 'marker');
+        const entityId = mesh.metadata?.editorEntityId as string;
+        editor.removeCustomLayer('vfx');
+        // marker default is "objects"
+        expect(editor.getEntityLayer(entityId)).toBe('objects');
+    });
+
+    it('clears activeLayerName when the removed layer was active', () => {
+        const { editor } = makeEditor();
+        editor.addCustomLayer('vfx', 'VFX');
+        editor.setActiveLayer('vfx');
+        editor.removeCustomLayer('vfx');
+        expect(editor.activeLayerName).toBeNull();
+    });
+
+    it('is no longer in getCustomLayerIds after removal', () => {
+        const { editor } = makeEditor();
+        editor.addCustomLayer('vfx', 'VFX');
+        editor.removeCustomLayer('vfx');
+        expect(editor.getCustomLayerIds()).not.toContain('vfx');
+    });
+});
+
+describe('MapEditorSystem — custom layer export/import round-trip', () => {
+    it('exports custom layer with label in layers array', () => {
+        const { editor } = makeEditor();
+        editor.addCustomLayer('vfx', 'VFX Effects');
+        const data = editor.exportMap();
+        const saved = data.layers?.find((l) => l.name === 'vfx');
+        expect(saved).toBeDefined();
+        expect(saved?.label).toBe('VFX Effects');
+    });
+
+    it('importMap recreates a custom layer from exported data', () => {
+        const { editor: e1 } = makeEditor();
+        e1.addCustomLayer('vfx', 'VFX');
+        const data = e1.exportMap();
+
+        const { editor: e2 } = makeEditor();
+        e2.importMap(data);
+        const layer = e2.getLayer('vfx');
+        expect(layer).not.toBeNull();
+        expect(layer!.label).toBe('VFX');
+        expect(e2.isBuiltinLayer('vfx')).toBe(false);
+    });
+
+    it('custom layers are removed by clearAll', () => {
+        const { editor } = makeEditor();
+        editor.addCustomLayer('vfx', 'VFX');
+        editor.clearAll();
+        expect(editor.getCustomLayerIds()).toHaveLength(0);
+        expect(editor.getLayer('vfx')).toBeNull();
+    });
+
+    it('getLayerEntityCounts includes custom layer keys', () => {
+        const { editor } = makeEditor();
+        editor.addCustomLayer('vfx', 'VFX');
+        editor.setActiveLayer('vfx');
+        editor.placeEntity(new Vector3(0, 0, 0), 'marker');
+        const counts = editor.getLayerEntityCounts();
+        expect(counts['vfx']).toBe(1);
+    });
+});
+
+// ─── Phase 3/4 continuation: static validateMapData ──────────────────────────
+
+describe('MapEditorSystem — static validateMapData', () => {
+    const emptyMap: MapExportData = { version: 1, entries: [], patrolRoutes: [] };
+
+    it('returns valid for an empty map', () => {
+        const report = MapEditorSystem.validateMapData(emptyMap);
+        expect(report.isValid).toBe(true);
+        expect(report.issues).toHaveLength(0);
+    });
+
+    it('detects orphaned quest marker in static mode', () => {
+        const data: MapExportData = {
+            version: 1,
+            entries: [{ id: 'qm1', type: 'quest-marker', position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } }],
+            patrolRoutes: [],
+        };
+        const report = MapEditorSystem.validateMapData(data);
+        expect(report.isValid).toBe(false);
+        expect(report.issues.some((i) => i.code === 'orphaned-quest-marker')).toBe(true);
+    });
+
+    it('detects patrol route too short in static mode', () => {
+        const data: MapExportData = {
+            version: 1,
+            entries: [],
+            patrolRoutes: [{ id: 'pg1', waypoints: [{ x: 0, y: 0, z: 0 }] }],
+        };
+        const report = MapEditorSystem.validateMapData(data);
+        expect(report.isValid).toBe(false);
+        expect(report.issues.some((i) => i.code === 'patrol-route-too-short')).toBe(true);
+    });
+
+    it('detects entity overlap in static mode', () => {
+        const data: MapExportData = {
+            version: 1,
+            entries: [
+                { id: 'e1', type: 'marker', position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } },
+                { id: 'e2', type: 'marker', position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } },
+            ],
+            patrolRoutes: [],
+        };
+        const report = MapEditorSystem.validateMapData(data);
+        expect(report.isValid).toBe(false);
+        expect(report.issues.some((i) => i.code === 'entity-overlap')).toBe(true);
+    });
+
+    it('detects missing loot table with context in static mode', () => {
+        const data: MapExportData = {
+            version: 1,
+            entries: [{ id: 'lt1', type: 'loot', position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, properties: { lootTableId: 'unknown_table' } }],
+            patrolRoutes: [],
+        };
+        const report = MapEditorSystem.validateMapData(data, 0.5, { knownLootTableIds: new Set(['real_table']) });
+        expect(report.isValid).toBe(false);
+        expect(report.issues.some((i) => i.code === 'missing-loot-table')).toBe(true);
+    });
+
+    it('produces the same result as instance validateMap', () => {
+        const { editor } = makeEditor();
+        editor.toggle();
+        editor.placeEntity(new Vector3(0, 0, 0), 'quest-marker');
+        const instanceReport = editor.validateMap();
+        const staticReport = MapEditorSystem.validateMapData(editor.exportMap());
+        expect(staticReport.isValid).toBe(instanceReport.isValid);
+        expect(staticReport.issues.length).toBe(instanceReport.issues.length);
     });
 });

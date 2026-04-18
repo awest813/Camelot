@@ -1,5 +1,5 @@
 import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Button, InputText } from "@babylonjs/gui/2D";
-import type { EditorPlacementType, EditorEntityProperties, EditorLayerName } from "../systems/map-editor-system";
+import type { EditorPlacementType, EditorEntityProperties } from "../systems/map-editor-system";
 
 // ── Design tokens (aligned with UIManager) ──────────────────────────────────
 const P = {
@@ -19,7 +19,7 @@ const P = {
   LAYER_CHIP_ACTIVE:"rgba(80, 56, 10, 0.98)",
 };
 
-const LAYER_OPTIONS: Array<{ name: EditorLayerName; label: string }> = [
+const LAYER_OPTIONS: Array<{ name: string; label: string }> = [
   { name: "terrain", label: "Terrain" },
   { name: "objects", label: "Objects" },
   { name: "events", label: "Events" },
@@ -49,7 +49,7 @@ const FIELDS_BY_TYPE: Record<EditorPlacementType, Array<{ key: keyof EditorEntit
  */
 export class MapEditorPropertyPanel {
   /** Fired when the user clicks Apply with the entity ID and merged properties. */
-  public onApply: ((entityId: string, properties: EditorEntityProperties, layerName: EditorLayerName) => void) | null = null;
+  public onApply: ((entityId: string, properties: EditorEntityProperties, layerName: string) => void) | null = null;
 
   /** Fired when the user clicks Delete with the entity ID to remove. */
   public onDelete: ((entityId: string) => void) | null = null;
@@ -69,9 +69,9 @@ export class MapEditorPropertyPanel {
 
   private _currentEntityId: string | null = null;
   private _currentType: EditorPlacementType | null = null;
-  private _currentLayerName: EditorLayerName = "objects";
+  private _currentLayerName: string = "objects";
   private _inputMap: Map<keyof EditorEntityProperties, InputText> = new Map();
-  private _layerChipMap: Map<EditorLayerName, Button> = new Map();
+  private _layerChipMap: Map<string, Button> = new Map();
 
   constructor(ui: AdvancedDynamicTexture) {
     this._ui = ui;
@@ -247,7 +247,7 @@ export class MapEditorPropertyPanel {
     entityType: EditorPlacementType,
     properties: Readonly<EditorEntityProperties>,
     position?: { x: number; y: number; z: number },
-    layerName: EditorLayerName = "objects",
+    layerName: string = "objects",
   ): void {
     this._currentEntityId = entityId;
     this._currentType     = entityType;
@@ -339,7 +339,7 @@ export class MapEditorPropertyPanel {
     label.paddingLeft = "8px";
     this._layerStack.addControl(label);
 
-    const rows: EditorLayerName[][] = [
+    const rows: string[][] = [
       ["terrain", "objects", "events"],
       ["npcs", "triggers"],
     ];
