@@ -15,9 +15,12 @@
  * ```
  *
  * The tooltip element is appended to `document.body` and positioned via
- * `position: fixed` relative to the hovered element.  A CSS class
- * `tooltip--visible` triggers the fade-in animation.
+ * `position: fixed` relative to the hovered element.  Positioning is handled
+ * by `@floating-ui/dom` with flip, shift, and offset middleware so the tooltip
+ * automatically avoids viewport edges, scroll containers, and transforms.
  */
+
+import { computePosition, flip, shift, offset } from "@floating-ui/dom";
 
 /** Options accepted by `TooltipUI` constructor. */
 export interface TooltipOptions {
@@ -68,9 +71,9 @@ export class TooltipUI {
       this.detach(element);
     }
 
-    const onEnter = (e: MouseEvent) => this._scheduleShow(element, content, e);
+    const onEnter = (_e: MouseEvent) => this._scheduleShow(element, content);
     const onLeave = () => this._scheduleHide();
-    const onFocus = () => this._scheduleShow(element, content, null);
+    const onFocus = () => this._scheduleShow(element, content);
     const onBlur  = () => this._scheduleHide();
 
     element.addEventListener("mouseenter", onEnter as EventListener);
@@ -161,12 +164,12 @@ export class TooltipUI {
     this._tooltipEl = el;
   }
 
-  private _scheduleShow(target: Element, content: string, event: MouseEvent | null): void {
+  private _scheduleShow(target: Element, content: string): void {
     this._cancelTimers();
     this._hideTimer = null;
     this._showTimer = setTimeout(() => {
       this._activeTarget = target;
-      this._showContent(content, target, event);
+      this._showContent(content, target);
     }, this._showDelay);
   }
 
@@ -177,7 +180,7 @@ export class TooltipUI {
     }, this._hideDelay);
   }
 
-  private _showContent(content: string, target: Element, event: MouseEvent | null): void {
+  private _showContent(content: string, target: Element): void {
     this._ensureDom();
     if (!this._tooltipEl) return;
 
@@ -185,7 +188,7 @@ export class TooltipUI {
     this._tooltipEl.style.display = "block";
     this._tooltipEl.classList.add("tooltip--visible");
 
-    this._position(target, event);
+    this._position(target);
   }
 
   private _hide(): void {
@@ -195,35 +198,28 @@ export class TooltipUI {
     this._activeTarget = null;
   }
 
-  private _position(target: Element, event: MouseEvent | null): void {
+  /**
+   * Position the tooltip relative to the reference element using floating-ui.
+   * Uses flip (try opposite side), shift (slide along axis), and offset
+   * middleware so the tooltip stays visible regardless of viewport edges,
+   * scroll containers, or CSS transforms.
+   */
+  private _position(target: Element): void {
     if (!this._tooltipEl) return;
 
-    const OFFSET = 10;
-    const tipW = this._tooltipEl.offsetWidth  || 180;
-    const tipH = this._tooltipEl.offsetHeight || 32;
-    const vpW  = window.innerWidth  || 800;
-    const vpH  = window.innerHeight || 600;
+    const tooltip = this._tooltipEl;
 
-    let x: number;
-    let y: number;
-
-    if (event) {
-      x = event.clientX + OFFSET;
-      y = event.clientY + OFFSET;
-    } else {
-      const rect = target.getBoundingClientRect();
-      x = rect.left + rect.width / 2 - tipW / 2;
-      y = rect.bottom + OFFSET;
-    }
-
-    // Keep within viewport.
-    if (x + tipW > vpW - OFFSET) x = vpW - tipW - OFFSET;
-    if (y + tipH > vpH - OFFSET) y = vpH - tipH - OFFSET;
-    if (x < OFFSET) x = OFFSET;
-    if (y < OFFSET) y = OFFSET;
-
-    this._tooltipEl.style.left = `${x}px`;
-    this._tooltipEl.style.top  = `${y}px`;
+    computePosition(target as HTMLElement, tooltip, {
+      placement: "bottom",
+      middleware: [
+        offset(10),
+        flip(),
+        shift({ padding: 10 }),
+      ],
+    }).then(({ x, y }) => {
+      tooltip.style.left = `${x}px`;
+      tooltip.style.top  = `${y}px`;
+    });
   }
 
   private _cancelTimers(): void {
