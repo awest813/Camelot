@@ -133,6 +133,8 @@ import { BarterUI } from "./ui/barter-ui";
 import type { Item } from "./systems/inventory-system";
 import { ScreenshotSystem } from "./systems/screenshot-system";
 import { UIAnimator } from "./ui/ui-animator";
+import { MarkRecallSystem } from "./systems/mark-recall-system";
+import { TrainerSystem } from "./systems/trainer-system";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -295,6 +297,10 @@ export class Game {
   public animationSystem: AnimationSystem;
   public petSystem: PetSystem;
   public petUI: PetUI;
+
+  // v24 systems
+  public markRecallSystem: MarkRecallSystem;
+  public trainerSystem: TrainerSystem;
 
   /** Fantasy asset loader — streams BabylonJS CDN models (weapons, structures, creatures). */
   public fantasyAssets: FantasyAssetLoader;
@@ -1396,6 +1402,7 @@ export class Game {
       this.player.maxCarryWeight = this.attributeSystem.carryWeight;
       this.ui.showNotification(`Character Level ${newLevel}!`, 4000);
       this.eventBus.emit("player:levelUp", { newLevel });
+      this.trainerSystem?.onCharacterLevelUp();
       this.saveSystem.markDirty();
     };
     this.saveSystem.setPlayerLevelSystem(this.playerLevelSystem);
@@ -1657,6 +1664,27 @@ export class Game {
       this.canvas.requestPointerLock();
       this.player.camera.attachControl(this.canvas, true);
     };
+
+    // ── v24: Mark & Recall ────────────────────────────────────────────────
+    this.markRecallSystem = new MarkRecallSystem();
+    this.markRecallSystem.onMark = (_pos, _cellId) => {
+      this.ui.showNotification("Position Marked.", 2000);
+    };
+    this.markRecallSystem.onRecall = (pos, _cellId) => {
+      this.player.camera.position.set(pos.x, pos.y, pos.z);
+      this.ui.showNotification("Recalled to marked position.", 2000);
+    };
+    this.saveSystem.setMarkRecallSystem(this.markRecallSystem);
+
+    // ── v24: Trainer System ───────────────────────────────────────────────
+    this.trainerSystem = new TrainerSystem();
+    this.trainerSystem.onTrainingComplete = (_trainerId, skillId, newLevel, goldSpent) => {
+      this.skillProgressionSystem.setSkillLevel(skillId, newLevel);
+      this._consumeInventoryGold(goldSpent);
+      this.ui.showNotification(`${skillId} raised to ${newLevel}!  (−${goldSpent}g)`, 3000);
+      this.saveSystem.markDirty();
+    };
+    this.saveSystem.setTrainerSystem(this.trainerSystem);
 
     // ── Stable UI ─────────────────────────────────────────────────────────
     this.stableUI = new StableUI();
