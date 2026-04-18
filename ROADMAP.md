@@ -400,6 +400,39 @@ A dedicated cinematic camera sequence engine and first-class dialogue-camera int
 
 ---
 
+### Gameplay Depth — Release Y (Pickpocket + Item Condition) ✅
+
+Two new Oblivion/Morrowind-depth systems that add stealth-economy depth and
+equipment-management realism.  SAVE_VERSION bumped to 25.
+
+1. ✅ **PickpocketSystem** (`src/systems/pickpocket-system.ts`, 57 tests) — Oblivion/Morrowind-style
+   item theft from NPC inventories: register per-NPC pickpocketable items with `registerNpcInventory()`;
+   `canAttempt(npcId, isCrouching, isDetected, itemId?, sneakLevel?, npcAwareness?)` performs a
+   non-mutating eligibility check (gates: unknown NPC, not crouching, already detected, empty inventory,
+   unknown item) and returns the estimated `successChance`; `getSuccessChance(npcId, itemId, sneakLevel,
+   npcAwareness?)` computes `sneakLevel × 1.5 − npcAwareness − weight × 5 − value / 10` clamped to
+   [5, 90]; `attempt(npcId, itemId, sneakLevel, npcAwareness, isCrouching, isDetected, rng?)` rolls
+   against the chance, removes the item from the NPC inventory on success, and tracks
+   `totalAttempts`/`totalSuccesses`/`totalCaught`; players caught (failed roll when chance < 50) trigger
+   `onCaught(npcId)` for the game layer to call `CrimeSystem.commitCrime()`; `onPickpocketSuccess` fires
+   with `sneakXpAwarded = 15` for `SkillProgressionSystem` integration; save-state persistence
+   (SAVE_VERSION 25) persists cumulative stats (NPC inventories are re-registered at runtime).
+
+2. ✅ **ItemConditionSystem** (`src/systems/item-condition-system.ts`, 70 tests) — weapon and armor
+   durability with degradation and repair: `initItem(itemId, initialCondition?)` registers an item at
+   [0, 100] condition (default 100); `degradeItem(itemId, amount?)` reduces condition (default 1 per
+   call) and fires `onItemDegraded(itemId, old, new)` — `onItemBroken(itemId)` fires the first time
+   condition transitions from > 0 to 0; five named `ConditionTier` bands — `flawless` (80–100),
+   `good` (60–79), `worn` (40–59), `damaged` (20–39), `broken` (0–19) — returned by
+   `getConditionTier(itemId)`; `getDamageMult(itemId)` / `getArmorMult(itemId)` return a linear
+   effectiveness multiplier [0.5 at 0 → 1.0 at 100] for combat integration; `repairItem(itemId, amount)`
+   flat-repair with `onItemRepaired` callback; `repairWithKit(itemId, armorerSkill)` scales repair
+   amount as `10 + skill × 0.5` (skill 0 → +10, skill 100 → +60); `repairAll(armorerSkill)` repairs
+   all registered items at once; `getBrokenItems()` / `getAllConditions()` queries; save-state
+   persistence (SAVE_VERSION 25) round-trips all condition values.
+
+---
+
 ### Content GUI — Release X (Editor Enhancements + Electron Plan)
 
 Editor shell improvements and Electron desktop packaging groundwork:

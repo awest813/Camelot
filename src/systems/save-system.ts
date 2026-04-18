@@ -40,9 +40,11 @@ import type { EventManagerSystem } from "./event-manager-system";
 import type { PetSystem } from "./pet-system";
 import type { MarkRecallSystem } from "./mark-recall-system";
 import type { TrainerSystem } from "./trainer-system";
+import type { PickpocketSystem } from "./pickpocket-system";
+import type { ItemConditionSystem } from "./item-condition-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 24;
+const SAVE_VERSION = 25;
 /** Oldest save version that can still be loaded (forward-compat window). */
 const SAVE_VERSION_MIN = 5;
 
@@ -117,6 +119,9 @@ interface ParsedSaveData {
   // v24 additions
   markRecall?: unknown;
   trainer?: unknown;
+  // v25 additions
+  pickpocket?: unknown;
+  itemCondition?: unknown;
 }
 
 interface EquipmentEntry {
@@ -187,6 +192,9 @@ export interface SaveData {
   // v24 additions
   markRecall?: any;
   trainer?: any;
+  // v25 additions
+  pickpocket?: any;
+  itemCondition?: any;
 }
 
 export class SaveSystem {
@@ -266,6 +274,9 @@ export class SaveSystem {
   // ── v24 optional systems ──────────────────────────────────────────────────
   private _markRecallSystem: MarkRecallSystem | null = null;
   private _trainerSystem: TrainerSystem | null = null;
+  // ── v25 optional systems ──────────────────────────────────────────────────
+  private _pickpocketSystem: PickpocketSystem | null = null;
+  private _itemConditionSystem: ItemConditionSystem | null = null;
 
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
@@ -386,6 +397,11 @@ export class SaveSystem {
   public setMarkRecallSystem(s: MarkRecallSystem): void       { this._markRecallSystem = s; }
   public setTrainerSystem(s: TrainerSystem): void             { this._trainerSystem = s; }
 
+  // ── v25 system injection ──────────────────────────────────────────────────
+
+  public setPickpocketSystem(s: PickpocketSystem): void       { this._pickpocketSystem = s; }
+  public setItemConditionSystem(s: ItemConditionSystem): void { this._itemConditionSystem = s; }
+
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
     for (const [slot, item] of this._equipment.getEquipped()) {
@@ -467,6 +483,8 @@ export class SaveSystem {
     if (this._petSystem)              data.pets             = this._petSystem.getSaveState();
     if (this._markRecallSystem)       data.markRecall       = this._markRecallSystem.getSaveState();
     if (this._trainerSystem)          data.trainer          = this._trainerSystem.getSaveState();
+    if (this._pickpocketSystem)       data.pickpocket       = this._pickpocketSystem.getSaveState();
+    if (this._itemConditionSystem)    data.itemCondition    = this._itemConditionSystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -677,6 +695,12 @@ export class SaveSystem {
       this._markRecallSystem.restoreFromSave(data.markRecall as any);
     if (this._trainerSystem && data.trainer)
       this._trainerSystem.restoreFromSave(data.trainer as any);
+
+    // v25 systems
+    if (this._pickpocketSystem && data.pickpocket)
+      this._pickpocketSystem.restoreFromSave(data.pickpocket as any);
+    if (this._itemConditionSystem && data.itemCondition)
+      this._itemConditionSystem.restoreFromSave(data.itemCondition as any);
 
     // Restore player name (v15+; keep default "Hero" for older saves)
     if (typeof data.player.name === "string" && data.player.name.trim()) {
