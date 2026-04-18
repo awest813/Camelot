@@ -186,11 +186,13 @@ export class RecentProjectsSystem {
     this.onChanged?.();
   }
 
+  private static _idCounter = 0;
+
   private _generateId(): string {
-    // Use crypto.randomUUID where available, fall back to a timestamp-based id.
+    // Use crypto.randomUUID where available, fall back to a counter-based id.
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
       return crypto.randomUUID();
     }
-    return `proj_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    return `proj_${Date.now()}_${++RecentProjectsSystem._idCounter}_${Math.random().toString(36).slice(2, 8)}`;
   }
 }
