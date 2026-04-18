@@ -1,5 +1,16 @@
 import { animateMini, type DOMKeyframesDefinition } from "motion";
 
+// ── Animation constants ───────────────────────────────────────────────────────
+
+/** Duration (seconds) for panel entrance animations. */
+const PANEL_IN_DURATION = 0.22;
+/** Duration (seconds) for panel exit animations. */
+const PANEL_OUT_DURATION = 0.16;
+/** Cubic-bezier easing for panel entrance — smooth decelerate. */
+const PANEL_IN_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+/** Cubic-bezier easing for panel exit — smooth accelerate. */
+const PANEL_OUT_EASE: [number, number, number, number] = [0.4, 0, 1, 1];
+
 export interface UIAnimatorOptions {
   /**
    * When true, all animations are skipped and callbacks fire immediately.
@@ -45,7 +56,7 @@ export class UIAnimator {
   public panelIn(element: HTMLElement): void {
     if (this._reducedMotion) return;
     const keyframes: DOMKeyframesDefinition = { opacity: [0, 1], y: [10, 0], scale: [0.97, 1] };
-    animateMini(element, keyframes, { duration: 0.22, ease: [0.22, 1, 0.36, 1] });
+    animateMini(element, keyframes, { duration: PANEL_IN_DURATION, ease: PANEL_IN_EASE });
   }
 
   /**
@@ -59,6 +70,6 @@ export class UIAnimator {
       return;
     }
     const keyframes: DOMKeyframesDefinition = { opacity: [1, 0], y: [0, 6], scale: [1, 0.97] };
-    animateMini(element, keyframes, { duration: 0.16, ease: [0.4, 0, 1, 1] }).then(done);
+    animateMini(element, keyframes, { duration: PANEL_OUT_DURATION, ease: PANEL_OUT_EASE }).then(done);
   }
 }

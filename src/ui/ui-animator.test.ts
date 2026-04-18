@@ -54,6 +54,26 @@ describe("UIAnimator", () => {
       a.panelIn(el);
       expect(mockAnimate).toHaveBeenCalledOnce();
     });
+
+    it("honours prefers-reduced-motion when matchMedia reports reduce", () => {
+      const original = window.matchMedia;
+      window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as typeof window.matchMedia;
+      const a = new UIAnimator();
+      window.matchMedia = original;
+      const el = makeEl();
+      a.panelIn(el);
+      expect(mockAnimate).not.toHaveBeenCalled();
+    });
+
+    it("animates normally when matchMedia reports no reduced-motion preference", () => {
+      const original = window.matchMedia;
+      window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as typeof window.matchMedia;
+      const a = new UIAnimator();
+      window.matchMedia = original;
+      const el = makeEl();
+      a.panelIn(el);
+      expect(mockAnimate).toHaveBeenCalledOnce();
+    });
   });
 
   describe("panelIn()", () => {
@@ -145,6 +165,25 @@ describe("UIAnimator", () => {
       const el = makeEl();
       a.panelOut(el, vi.fn());
       expect(mockAnimate).not.toHaveBeenCalled();
+    });
+
+    it("calling panelOut a second time fires a second animation", () => {
+      const a = new UIAnimator({ reducedMotion: false });
+      const el = makeEl();
+      const done1 = vi.fn();
+      const done2 = vi.fn();
+      a.panelOut(el, done1);
+      a.panelOut(el, done2);
+      expect(mockAnimate).toHaveBeenCalledTimes(2);
+      expect(done1).toHaveBeenCalledOnce();
+      expect(done2).toHaveBeenCalledOnce();
+    });
+
+    it("panelIn on an element not yet in the DOM still calls animate()", () => {
+      const a = new UIAnimator({ reducedMotion: false });
+      const detached = document.createElement("div");
+      a.panelIn(detached);
+      expect(mockAnimate).toHaveBeenCalledOnce();
     });
   });
 

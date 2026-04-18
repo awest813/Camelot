@@ -1,6 +1,13 @@
 import { $, $N } from "@mathigon/boost";
 import type { ElementView } from "@mathigon/boost";
 
+// ── Duration constants ────────────────────────────────────────────────────────
+
+/** Default fade-in duration in milliseconds. */
+export const FADE_IN_DURATION_MS = 300;
+/** Default fade-out duration in milliseconds. */
+export const FADE_OUT_DURATION_MS = 200;
+
 /**
  * dom-utils — thin wrappers around Boost.js that keep the rest of the
  * codebase using plain `HTMLElement` references.
@@ -57,7 +64,7 @@ export function makeEl<K extends keyof HTMLElementTagNameMap>(
  *
  * @returns A `Promise` that resolves when the transition finishes.
  */
-export function boostFadeIn(element: HTMLElement, durationMs = 300): Promise<void> {
+export function boostFadeIn(element: HTMLElement, durationMs = FADE_IN_DURATION_MS): Promise<void> {
   const view = $(element) as ElementView | undefined;
   if (!view) return Promise.resolve();
   return view.enter("fade", durationMs).promise;
@@ -70,7 +77,7 @@ export function boostFadeIn(element: HTMLElement, durationMs = 300): Promise<voi
  *
  * @returns A `Promise` that resolves when the transition finishes.
  */
-export function boostFadeOut(element: HTMLElement, durationMs = 200): Promise<void> {
+export function boostFadeOut(element: HTMLElement, durationMs = FADE_OUT_DURATION_MS): Promise<void> {
   const view = $(element) as ElementView | undefined;
   if (!view) return Promise.resolve();
   return view.exit("fade", durationMs).promise;

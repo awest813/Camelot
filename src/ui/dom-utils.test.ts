@@ -44,7 +44,7 @@ import { $, $N } from "@mathigon/boost";
 const mock$ = $ as ReturnType<typeof vi.fn>;
 const mock$N = $N as ReturnType<typeof vi.fn>;
 
-import { makeEl, boostFadeIn, boostFadeOut } from "./dom-utils";
+import { makeEl, boostFadeIn, boostFadeOut, FADE_IN_DURATION_MS, FADE_OUT_DURATION_MS } from "./dom-utils";
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -109,6 +109,17 @@ describe("dom-utils", () => {
       makeEl("div");
       expect(mock$).not.toHaveBeenCalled();
     });
+
+    it("sets innerHTML from attrs.html", () => {
+      const el = makeEl("div", { html: "<strong>bold</strong>" });
+      expect(el.innerHTML).toBe("<strong>bold</strong>");
+    });
+
+    it("coerces numeric attributes to strings via setAttribute", () => {
+      const el = makeEl("input", { tabindex: 1, maxlength: 50 });
+      expect(el.getAttribute("tabindex")).toBe("1");
+      expect(el.getAttribute("maxlength")).toBe("50");
+    });
   });
 
   // ── boostFadeIn ────────────────────────────────────────────────────────────
@@ -132,7 +143,7 @@ describe("dom-utils", () => {
       const el = document.createElement("div");
       document.body.appendChild(el);
       await boostFadeIn(el);
-      expect(enterMock).toHaveBeenCalledWith("fade", 300);
+      expect(enterMock).toHaveBeenCalledWith("fade", FADE_IN_DURATION_MS);
     });
 
     it("returns a Promise", () => {
@@ -170,7 +181,7 @@ describe("dom-utils", () => {
       const el = document.createElement("div");
       document.body.appendChild(el);
       await boostFadeOut(el);
-      expect(exitMock).toHaveBeenCalledWith("fade", 200);
+      expect(exitMock).toHaveBeenCalledWith("fade", FADE_OUT_DURATION_MS);
     });
 
     it("returns a Promise", () => {
@@ -184,6 +195,13 @@ describe("dom-utils", () => {
       const el = document.createElement("div");
       document.body.appendChild(el);
       await expect(boostFadeOut(el)).resolves.toBeUndefined();
+    });
+
+    it("rapid sequential calls both start animations independently", async () => {
+      const el = document.createElement("div");
+      document.body.appendChild(el);
+      await Promise.all([boostFadeOut(el, 50), boostFadeOut(el, 50)]);
+      expect(exitMock).toHaveBeenCalledTimes(2);
     });
   });
 
