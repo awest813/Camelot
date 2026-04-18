@@ -278,9 +278,9 @@ export class OffscreenSimulationSystem {
     let best: OffscreenScheduleBlock | null = null;
     let bestDist = Infinity;
     for (const block of entry.scheduleBlocks) {
-      const dist = ((hour - block.startHour) % 24 + 24) % 24;
-      if (dist < bestDist) {
-        bestDist = dist;
+      const hoursDelta = ((hour - block.startHour) % 24 + 24) % 24;
+      if (hoursDelta < bestDist) {
+        bestDist = hoursDelta;
         best = block;
       }
     }

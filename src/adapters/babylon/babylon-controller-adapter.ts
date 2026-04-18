@@ -173,7 +173,8 @@ export class BabylonCharacterControllerAdapter {
   update(dt: number): void {
     const speed = this.effectiveSpeed;
 
-    // Rotate input by yaw to get world-space movement direction
+    // Rotate input by yaw to get world-space movement direction.
+    // Apply 2D rotation matrix: [cos(θ), sin(θ); -sin(θ), cos(θ)]
     const sinY = Math.sin(this._yaw);
     const cosY = Math.cos(this._yaw);
     const worldX = this._inputX * cosY + this._inputZ * sinY;
