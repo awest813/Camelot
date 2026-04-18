@@ -1,5 +1,6 @@
 import type { AttributeName } from "../systems/attribute-system";
 import type { AttributeBonuses } from "../systems/player-level-system";
+import type { UIAnimator } from "./ui-animator";
 
 /** Per-attribute display metadata. */
 interface AttributeMeta {
@@ -49,10 +50,16 @@ export class LevelUpUI {
   private _rowEls: Map<AttributeName, HTMLButtonElement> = new Map();
   private _selectionEl: HTMLParagraphElement | null = null;
   private _confirmBtn: HTMLButtonElement | null = null;
+  private _animator: UIAnimator | null = null;
 
   private _bonuses: AttributeBonuses | null = null;
   private _selected: AttributeName[] = [];
   private _newLevel: number = 1;
+
+  /** Attach a UIAnimator to enable entrance / exit animations. */
+  public setAnimator(animator: UIAnimator): void {
+    this._animator = animator;
+  }
 
   /** Open the dialog for the given new character level and available bonuses. */
   public open(newLevel: number, bonuses: AttributeBonuses): void {
@@ -62,7 +69,10 @@ export class LevelUpUI {
     this._selected = [];
     this._ensureDom();
     this._refresh();
-    if (this._root) this._root.style.display = "grid";
+    if (this._root) {
+      this._root.style.display = "grid";
+      this._animator?.panelIn(this._root);
+    }
     this.isVisible = true;
     // Move keyboard focus to the first attribute button for accessibility.
     const firstAttrBtn = this._rowEls.get("strength");
@@ -71,8 +81,14 @@ export class LevelUpUI {
 
   public close(): void {
     if (!this._root) return;
-    this._root.style.display = "none";
     this.isVisible = false;
+    if (this._animator) {
+      this._animator.panelOut(this._root, () => {
+        if (this._root) this._root.style.display = "none";
+      });
+    } else {
+      this._root.style.display = "none";
+    }
   }
 
   // ── Private helpers ─────────────────────────────────────────────────────────

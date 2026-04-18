@@ -5,6 +5,7 @@ import {
   SPELL_COMPONENT_EFFECTS,
   SPELL_COMPONENT_SCHOOLS,
 } from "../systems/spell-making-system";
+import type { UIAnimator } from "./ui-animator";
 
 export interface SpellMakingForgeRequest {
   name: string;
@@ -50,9 +51,15 @@ export class SpellMakingUI {
     duration: HTMLInputElement;
     damageType: HTMLSelectElement;
   }> = [];
+  private _animator: UIAnimator | null = null;
 
   constructor(computeCost: (components: SpellComponent[]) => number) {
     this._computeCost = computeCost;
+  }
+
+  /** Attach a UIAnimator to enable entrance / exit animations. */
+  public setAnimator(animator: UIAnimator): void {
+    this._animator = animator;
   }
 
   public open(): void {
@@ -61,14 +68,21 @@ export class SpellMakingUI {
     if (!this._root) return;
     this._resetDefaults();
     this._root.style.display = "grid";
+    this._animator?.panelIn(this._root);
     this.isVisible = true;
   }
 
   public close(): void {
     if (!this._root) return;
-    this._root.style.display = "none";
     this.isVisible = false;
     this.onClose?.();
+    if (this._animator) {
+      this._animator.panelOut(this._root, () => {
+        if (this._root) this._root.style.display = "none";
+      });
+    } else {
+      this._root.style.display = "none";
+    }
   }
 
   public showStatus(message: string, isError: boolean = false): void {

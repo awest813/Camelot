@@ -8,6 +8,8 @@ export interface GuardEncounterView {
   canPersuade: boolean;
 }
 
+import type { UIAnimator } from "./ui-animator";
+
 /**
  * Guard challenge modal used when CrimeSystem raises an arrest interaction.
  */
@@ -21,6 +23,12 @@ export class GuardEncounterUI {
   private _bountyEl: HTMLParagraphElement | null = null;
   private _payBtn: HTMLButtonElement | null = null;
   private _persuadeBtn: HTMLButtonElement | null = null;
+  private _animator: UIAnimator | null = null;
+
+  /** Attach a UIAnimator to enable entrance / exit animations. */
+  public setAnimator(animator: UIAnimator): void {
+    this._animator = animator;
+  }
 
   public open(view: GuardEncounterView): void {
     if (typeof document === "undefined") return;
@@ -41,6 +49,7 @@ export class GuardEncounterUI {
     this.showStatus("Choose your response.");
 
     this._root.style.display = "grid";
+    this._animator?.panelIn(this._root);
     this.isVisible = true;
 
     if (this._payBtn && this._payBtn.getAttribute("aria-disabled") !== "true") {
@@ -55,8 +64,14 @@ export class GuardEncounterUI {
 
   public close(): void {
     if (!this._root) return;
-    this._root.style.display = "none";
     this.isVisible = false;
+    if (this._animator) {
+      this._animator.panelOut(this._root, () => {
+        if (this._root) this._root.style.display = "none";
+      });
+    } else {
+      this._root.style.display = "none";
+    }
   }
 
   public showStatus(message: string, isError: boolean = false): void {
