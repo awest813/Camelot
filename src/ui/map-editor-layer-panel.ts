@@ -6,7 +6,7 @@ import {
   TextBlock,
   Button,
 } from "@babylonjs/gui/2D";
-import type { EditorLayer, EditorLayerName } from "../systems/map-editor-system";
+import type { EditorLayer } from "../systems/map-editor-system";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const L = {
@@ -25,8 +25,8 @@ const L = {
   HIDDEN_TEXT:   "rgba(100, 100, 100, 0.6)",
 };
 
-/** Colors and icons per layer */
-const LAYER_META: Record<EditorLayerName, { icon: string; color: string }> = {
+/** Colors and icons per layer (builtin layers). Custom layers fall back to a generic icon/color. */
+const LAYER_META: Record<string, { icon: string; color: string }> = {
   terrain:  { icon: "⛰",  color: "#9B8860" },
   objects:  { icon: "📦", color: "#5EC45E" },
   events:   { icon: "◎",  color: "#26E64D" },
@@ -44,23 +44,23 @@ const LAYER_META: Record<EditorLayerName, { icon: string; color: string }> = {
  */
 export class MapEditorLayerPanel {
   /** Fired when the user toggles layer visibility. */
-  public onLayerVisibilityChange: ((name: EditorLayerName, visible: boolean) => void) | null = null;
+  public onLayerVisibilityChange: ((name: string, visible: boolean) => void) | null = null;
 
   /** Fired when the user toggles layer lock. */
-  public onLayerLockChange: ((name: EditorLayerName, locked: boolean) => void) | null = null;
+  public onLayerLockChange: ((name: string, locked: boolean) => void) | null = null;
 
   /** Fired when the user claims, reassigns, or clears a layer owner. */
-  public onLayerOwnerChange: ((name: EditorLayerName, owner: string) => void) | null = null;
+  public onLayerOwnerChange: ((name: string, owner: string) => void) | null = null;
 
   /** Fired when the user marks a layer as the active placement target. */
-  public onLayerActivate: ((name: EditorLayerName) => void) | null = null;
+  public onLayerActivate: ((name: string) => void) | null = null;
 
   /**
    * The current author name; used to visually distinguish foreign-author
    * layers (shown with a muted badge).  Set before calling `refresh()`.
    */
   public currentAuthor: string = "";
-  public activeLayerName: EditorLayerName | null = null;
+  public activeLayerName: string | null = null;
 
   private readonly _ui: AdvancedDynamicTexture;
   private readonly _panel: Rectangle;
@@ -146,7 +146,7 @@ export class MapEditorLayerPanel {
    * @param layers  Current layer states from `mapEditorSystem.getLayers()`.
    * @param counts  Entity count per layer from `mapEditorSystem.getLayerEntityCounts()`.
    */
-  refresh(layers: ReadonlyArray<EditorLayer>, counts: Record<EditorLayerName, number>): void {
+  refresh(layers: ReadonlyArray<EditorLayer>, counts: Record<string, number>): void {
     this._listStack.clearControls();
     for (const layer of layers) {
       this._listStack.addControl(this._buildRow(layer, counts[layer.name] ?? 0));
@@ -156,7 +156,7 @@ export class MapEditorLayerPanel {
   // ── Private helpers ───────────────────────────────────────────────────────
 
   private _buildRow(layer: EditorLayer, count: number): Rectangle {
-    const { icon, color } = LAYER_META[layer.name];
+    const { icon, color } = LAYER_META[layer.name] ?? { icon: "◼", color: "#AAAAAA" };
     const currentAuthor = this.currentAuthor.trim();
     const isForeign =
       currentAuthor !== "" &&
