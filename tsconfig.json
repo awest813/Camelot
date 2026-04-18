@@ -22,7 +22,12 @@
         "skipLibCheck": true, // skip type-checking of .d.ts files (it speeds up transpiling)
         "strictPropertyInitialization": false,
         "paths": {
-            "@/*": ["src/*"]
+            "@/*": ["src/*"],
+            // Redirect @mathigon/boost's internal '/src' import to the compiled
+            // dist types. The published Boost.js types accidentally reference
+            // @mathigon/euclid/src (source .ts) instead of the built .d.ts,
+            // which causes TypeScript to type-check euclid's source files.
+            "@mathigon/euclid/src": ["node_modules/@mathigon/euclid/dist/index"]
         }
     },
     "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "tests/**/*.ts", "tests/**/*.tsx", "src/**/*.d.ts", "**/*.ts", "**/*.glsl", "**/*.vue"],
