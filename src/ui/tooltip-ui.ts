@@ -71,9 +71,9 @@ export class TooltipUI {
       this.detach(element);
     }
 
-    const onEnter = (e: MouseEvent) => this._scheduleShow(element, content, e);
+    const onEnter = (_e: MouseEvent) => this._scheduleShow(element, content);
     const onLeave = () => this._scheduleHide();
-    const onFocus = () => this._scheduleShow(element, content, null);
+    const onFocus = () => this._scheduleShow(element, content);
     const onBlur  = () => this._scheduleHide();
 
     element.addEventListener("mouseenter", onEnter as EventListener);
@@ -164,12 +164,12 @@ export class TooltipUI {
     this._tooltipEl = el;
   }
 
-  private _scheduleShow(target: Element, content: string, event: MouseEvent | null): void {
+  private _scheduleShow(target: Element, content: string): void {
     this._cancelTimers();
     this._hideTimer = null;
     this._showTimer = setTimeout(() => {
       this._activeTarget = target;
-      this._showContent(content, target, event);
+      this._showContent(content, target);
     }, this._showDelay);
   }
 
@@ -180,7 +180,7 @@ export class TooltipUI {
     }, this._hideDelay);
   }
 
-  private _showContent(content: string, target: Element, _event: MouseEvent | null): void {
+  private _showContent(content: string, target: Element): void {
     this._ensureDom();
     if (!this._tooltipEl) return;
 
