@@ -259,7 +259,7 @@ export class LeveledListSystem {
  * Leveled weapon lists — resolve to item IDs compatible with LootTableSystem
  * item templates.  Modelled on Morrowind's leveled-item breakpoints.
  */
-export const LEVELED_WEAPON_LISTS: LeveledList[] = [
+const LEVELED_WEAPON_LISTS: LeveledList[] = [
   {
     id: "ll_weapon_melee",
     calculateAllLevels: false,
@@ -284,7 +284,7 @@ export const LEVELED_WEAPON_LISTS: LeveledList[] = [
 /**
  * Leveled armor lists — resolve to item IDs by armor class and player level.
  */
-export const LEVELED_ARMOR_LISTS: LeveledList[] = [
+const LEVELED_ARMOR_LISTS: LeveledList[] = [
   {
     id: "ll_armor_light",
     calculateAllLevels: false,
@@ -311,7 +311,7 @@ export const LEVELED_ARMOR_LISTS: LeveledList[] = [
  * Leveled creature lists — resolve to NPC archetype IDs compatible with
  * NpcArchetypeSystem.  Controls which enemy type spawns based on player level.
  */
-export const LEVELED_CREATURE_LISTS: LeveledList[] = [
+const LEVELED_CREATURE_LISTS: LeveledList[] = [
   {
     id: "ll_creature_undead",
     calculateAllLevels: false,
