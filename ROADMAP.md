@@ -445,6 +445,16 @@ Editor shell improvements and Electron desktop packaging groundwork:
 
 ---
 
+### Gameplay Depth — Release Z (Skyrim Features) ✅
+
+Two signature Skyrim-style systems.  SAVE_VERSION bumped to 26.
+
+1. ✅ **DragonShoutSystem** (`src/systems/dragon-shout-system.ts`, 57 tests) — Skyrim-style Thu'um / Dragon Shout engine: 8 built-in shouts — Unrelenting Force, Whirlwind Sprint, Become Ethereal, Fire Breath, Ice Form, Slow Time, Clear Skies, Elemental Fury — each composed of up to three dragon-script Words of Power with their English translations; `learnWord(shoutId, wordIndex)` discovers a word at a Word Wall and fires `onWordLearned`; `unlockWord(shoutId, wordIndex)` spends one Dragon Soul to activate the word (enforces sequential unlocking; fails when no souls available); `gainDragonSoul(count?)` awards dragon souls and fires `onDragonSoulGained`; `equipShout(shoutId)` arms the shout; `useShout(gameTimeMinutes)` activates the highest unlocked tier — returns a discriminated `ShoutUseResult` with `wordCount`, `tier` effects record, or a failure reason (`no_shout_equipped` / `no_words_unlocked` / `on_cooldown`); tier-scaled real-time cooldowns tracked in in-game minutes; `cooldownRemaining(shoutId, gameTimeMinutes)` returns seconds remaining; `isShoutReady(gameTimeMinutes)` convenience bool; `onShoutUsed` callback delivers structured `effects` record to the game layer; `registerShout()` / `removeShout()` for mod-defined shouts; save-state persistence (SAVE_VERSION 26) round-trips dragon souls, equipped shout, per-word learned/unlocked flags, and last-used timestamps.
+
+2. ✅ **FollowerSystem** (`src/systems/follower-system.ts`, 57 tests) — Skyrim-style human companion system: 8 built-in follower templates — Lydia, Aela the Huntress, Jenassa, J'zargo, Farkas, Borgakh the Steel Heart, Marcurio, Uthgerd the Unbroken — each with a `combatRole` (warrior/archer/mage/rogue), `level`, `carryWeightBonus`, `hireCost`, and `homeLocationId`; `canRecruit(templateId, playerGold)` non-mutating eligibility check returns `FollowerRecruitCheck` with `reason` (`unknown_template` / `already_have_follower` / `insufficient_gold` / `follower_deceased`); `recruitFollower(templateId, playerGold?)` spawns a follower with level-scaled `maxHealth` (`150 + level × 10`) and `attackDamage` (`20 + level × 2`), sets command to `follow`, fires `onFollowerRecruited`; enforces `MAX_FOLLOWERS = 1`; `dismissFollower()` returns the follower home and fires `onFollowerDismissed(templateId, name, homeLocation)`; `commandFollower(command)` issues `follow` / `wait` / `trade` orders and fires `onCommandIssued`; `followerTakeDamage(amount)` reduces health, fires `onFollowerDied` and marks the follower deceased when health hits zero; `followerHeal(amount)` clamps to `maxHealth`; `activeCarryWeightBonus` exposes the template's carry-weight contribution; `registerFollowerTemplate()` / `removeFollowerTemplate()` for mod-defined followers; save-state persistence (SAVE_VERSION 26) round-trips active follower state (health, command, alive flag) and the deceased-id set.
+
+---
+
 ## Mid-Term (3–5 Releases)
 
 ### World Building Depth
