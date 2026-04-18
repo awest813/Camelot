@@ -5,6 +5,8 @@ export interface SaddlebagItemView {
   stackable: boolean;
 }
 
+import type { UIAnimator } from "./ui-animator";
+
 /**
  * HTML-driven saddlebag inventory dialog.
  *
@@ -28,6 +30,12 @@ export class SaddlebagUI {
   private _capacityEl: HTMLParagraphElement | null = null;
   private _listEl: HTMLDivElement | null = null;
   private _statusEl: HTMLParagraphElement | null = null;
+  private _animator: UIAnimator | null = null;
+
+  /** Attach a UIAnimator to enable entrance / exit animations. */
+  public setAnimator(animator: UIAnimator): void {
+    this._animator = animator;
+  }
 
   /**
    * Open the saddlebag dialog for the given horse.
@@ -48,14 +56,21 @@ export class SaddlebagUI {
     this._renderItems(items);
 
     this._root.style.display = "grid";
+    this._animator?.panelIn(this._root);
     this.isVisible = true;
   }
 
   public close(): void {
     if (!this._root) return;
-    this._root.style.display = "none";
     this.isVisible = false;
     this.onClose?.();
+    if (this._animator) {
+      this._animator.panelOut(this._root, () => {
+        if (this._root) this._root.style.display = "none";
+      });
+    } else {
+      this._root.style.display = "none";
+    }
   }
 
   /** Refresh the list with updated item data. */

@@ -1,3 +1,6 @@
+import type { UIAnimator } from "./ui-animator";
+import { makeEl } from "./dom-utils";
+
 export type GuardEncounterAction = "pay_fine" | "go_to_jail" | "resist_arrest" | "persuade";
 
 export interface GuardEncounterView {
@@ -21,6 +24,12 @@ export class GuardEncounterUI {
   private _bountyEl: HTMLParagraphElement | null = null;
   private _payBtn: HTMLButtonElement | null = null;
   private _persuadeBtn: HTMLButtonElement | null = null;
+  private _animator: UIAnimator | null = null;
+
+  /** Attach a UIAnimator to enable entrance / exit animations. */
+  public setAnimator(animator: UIAnimator): void {
+    this._animator = animator;
+  }
 
   public open(view: GuardEncounterView): void {
     if (typeof document === "undefined") return;
@@ -41,6 +50,7 @@ export class GuardEncounterUI {
     this.showStatus("Choose your response.");
 
     this._root.style.display = "grid";
+    this._animator?.panelIn(this._root);
     this.isVisible = true;
 
     if (this._payBtn && this._payBtn.getAttribute("aria-disabled") !== "true") {
@@ -55,8 +65,14 @@ export class GuardEncounterUI {
 
   public close(): void {
     if (!this._root) return;
-    this._root.style.display = "none";
     this.isVisible = false;
+    if (this._animator) {
+      this._animator.panelOut(this._root, () => {
+        if (this._root) this._root.style.display = "none";
+      });
+    } else {
+      this._root.style.display = "none";
+    }
   }
 
   public showStatus(message: string, isError: boolean = false): void {
@@ -69,50 +85,34 @@ export class GuardEncounterUI {
   private _ensureDom(): void {
     if (this._root || typeof document === "undefined") return;
 
-    const root = document.createElement("div");
-    root.className = "guard-encounter";
-    root.setAttribute("role", "dialog");
-    root.setAttribute("aria-modal", "true");
-    root.setAttribute("aria-labelledby", "guard-encounter-title");
+    const root = makeEl("div", {
+      class: "guard-encounter",
+      role: "dialog",
+      "aria-modal": "true",
+      "aria-labelledby": "guard-encounter-title",
+    });
     root.style.display = "none";
 
-    const panel = document.createElement("section");
-    panel.className = "guard-encounter__panel";
-    root.appendChild(panel);
+    const panel = makeEl("section", { class: "guard-encounter__panel" }, root);
 
-    const title = document.createElement("h2");
-    title.id = "guard-encounter-title";
-    title.className = "guard-encounter__title";
-    title.textContent = "Guard Challenge";
-    panel.appendChild(title);
+    makeEl("h2", {
+      id: "guard-encounter-title",
+      class: "guard-encounter__title",
+      text: "Guard Challenge",
+    }, panel);
 
-    const header = document.createElement("h3");
-    header.className = "guard-encounter__line";
-    panel.appendChild(header);
-    this._headerEl = header;
+    this._headerEl = makeEl("h3", { class: "guard-encounter__line" }, panel);
+    this._bountyEl = makeEl("p",  { class: "guard-encounter__meta" }, panel);
+    this._statusEl = makeEl("p",  { class: "guard-encounter__status" }, panel);
 
-    const bounty = document.createElement("p");
-    bounty.className = "guard-encounter__meta";
-    panel.appendChild(bounty);
-    this._bountyEl = bounty;
-
-    const status = document.createElement("p");
-    status.className = "guard-encounter__status";
-    panel.appendChild(status);
-    this._statusEl = status;
-
-    const actions = document.createElement("div");
-    actions.className = "guard-encounter__actions";
-    panel.appendChild(actions);
+    const actions = makeEl("div", { class: "guard-encounter__actions" }, panel);
 
     const makeBtn = (
       label: string,
       action: GuardEncounterAction,
       classes: string = "guard-encounter__btn",
     ): HTMLButtonElement => {
-      const button = document.createElement("button");
-      button.className = classes;
-      button.textContent = label;
+      const button = makeEl("button", { class: classes, text: label }, actions);
       button.addEventListener("click", (e) => {
         if (button.getAttribute("aria-disabled") === "true") {
           e.preventDefault();
@@ -121,7 +121,6 @@ export class GuardEncounterUI {
         }
         this.onResolve?.(action);
       });
-      actions.appendChild(button);
       return button;
     };
 

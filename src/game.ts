@@ -132,6 +132,7 @@ import { ModManifestUI } from "./ui/mod-manifest-ui";
 import { BarterUI } from "./ui/barter-ui";
 import type { Item } from "./systems/inventory-system";
 import { ScreenshotSystem } from "./systems/screenshot-system";
+import { UIAnimator } from "./ui/ui-animator";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -1705,6 +1706,13 @@ export class Game {
         this.saddlebagUI.showStatus(`Took ${entry.name}.`);
       }
     };
+
+    // ── UI animations (Motion library) ─────────────────────────────────────────
+    const uiAnimator = new UIAnimator();
+    this.levelUpUI.setAnimator(uiAnimator);
+    this.spellMakingUI.setAnimator(uiAnimator);
+    this.guardEncounterUI.setAnimator(uiAnimator);
+    this.saddlebagUI.setAnimator(uiAnimator);
 
     this._wireOnboardingTutorialUi();
 
