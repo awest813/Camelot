@@ -184,3 +184,52 @@ A new GitHub Actions workflow (`electron-build.yml`) will:
 - Feature detection (`typeof window.camelotEditor !== "undefined"`) gates
   all native behaviour, so the same renderer code runs in both environments.
 - Minimum Electron version: 28+ (for ESM support in the main process).
+
+---
+
+## DevConsole (Planned — Shell Layer)
+
+A developer console panel embedded in the Electron shell for debugging and
+live inspection.  It does **not** exist in the browser build.
+
+### Goals
+
+1. **Live system inspection** — Query headless system state (NPC schedules,
+   quest progress, faction standings, active effects, offscreen simulation)
+   without opening the in-game debug overlay.
+2. **Command execution** — Execute simple commands: `give <itemId> <qty>`,
+   `teleport <x> <y> <z>`, `setTime <hour>`, `spawn <archetypeId>`,
+   `advanceTime <hours>`, `toggleGodMode`.
+3. **Log streaming** — Stream `console.log` / `console.warn` / `console.error`
+   output from the renderer process into a scrollable panel with filtering.
+4. **Autocomplete** — Tab-completion for known command names, item IDs,
+   archetype IDs, and quest IDs drawn from the content registry.
+
+### Architecture
+
+- The DevConsole lives in the **main process** as a separate `BrowserWindow`
+  or as a sidebar panel inside the editor window (TBD).
+- Communicates with the renderer via IPC:
+  - `devConsole:execute` → Renderer evals the command string against exposed
+    system APIs and returns a result object.
+  - `devConsole:subscribe-logs` → Renderer hooks `console` and forwards
+    entries to the main process for display.
+- The renderer exposes a `DevConsoleBridge` through the preload script:
+  ```ts
+  interface DevConsoleBridge {
+    execute(command: string): Promise<{ ok: boolean; output: string }>;
+    onLog(callback: (entry: LogEntry) => void): void;
+  }
+  ```
+
+### Security
+
+- The DevConsole is only available when Electron is running in development
+  mode (`process.env.NODE_ENV === "development"`) or when an explicit
+  `--dev-console` flag is passed.
+- Commands are sandboxed — they can only call explicitly allowlisted system
+  methods.  No `eval()` or arbitrary code execution.
+
+### Keybinding
+
+- **F13** (or **Ctrl+`**) toggles the DevConsole panel visibility.

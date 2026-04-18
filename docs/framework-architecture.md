@@ -63,8 +63,47 @@ Camelot now separates RPG domain logic from rendering/runtime concerns.
 4. Quest and inventory/faction state produce save snapshot.
 5. Save engine serializes snapshot with current schema version.
 
+## Babylon Adapter Layer (`src/adapters/babylon/`)
+
+The adapter layer provides an explicit boundary between the headless core
+(entities, systems, framework) and the Babylon.js runtime.  Each adapter
+encapsulates a single Babylon-specific concern:
+
+| Adapter | Purpose |
+|---|---|
+| `BabylonInputAdapter` | Maps keyboard/mouse events to named `InputAction`s. Supports headless simulation for testing, rebinding at runtime, and modifier-key guards. |
+| `BabylonCharacterControllerAdapter` | Pure-TypeScript first-person movement state (position, velocity, crouch, sprint, swim, mount, jump, gravity). Babylon reads the state each frame and applies it to the camera/physics body. |
+| `BabylonSceneHost` | Scene-level visual configuration (lighting, sky, fog, shadows, post-processing) stored as pure data. Can be validated and snapshot/restored without a live engine. |
+
+All adapters are **incrementally adoptable** — `game.ts` can delegate to them
+at any pace without a rewrite.
+
+### Barrel Import
+
+```ts
+import {
+  BabylonInputAdapter,
+  BabylonCharacterControllerAdapter,
+  BabylonSceneHost,
+} from "./adapters/babylon";
+```
+
+## Offscreen Simulation (`src/systems/offscreen-simulation-system.ts`)
+
+Simulates NPC state while they are outside the active cell / chunk radius
+(unloaded from the Babylon scene):
+
+- Advances each offscreen NPC's schedule according to elapsed game time.
+- Regenerates health and merchant gold proportionally to time passed.
+- Provides a reconciled `OffscreenNpcState` snapshot when the NPC comes back
+  into view, including expected position, behavior, and health.
+
+This is a **headless core** system with zero Babylon dependencies.
+
 ## Immediate Extension Points
 
 - Add richer dialogue conditions/effects (skill checks, random branches).
 - Add quest graph validation diagnostics and authoring tools.
 - Add mod schema validator + manifest generation script.
+- Extract remaining inline Babylon code from `game.ts` into adapter classes.
+- Wire `OffscreenSimulationSystem` into `WorldManager` chunk lifecycle.
