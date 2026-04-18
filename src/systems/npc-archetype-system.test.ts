@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { NpcArchetypeSystem } from "./npc-archetype-system";
+import { NpcScheduleSystem } from "./npc-schedule-system";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { NpcArchetypeDefinition } from "../framework/content/content-types";
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
@@ -319,5 +320,84 @@ describe("NpcArchetypeSystem", () => {
     const scene = new Scene(engine);
     const npc = sys.spawnNpc("archetype_guard", scene, new Vector3(0, 0, 0));
     expect(npc!.startingEquipmentIds).toHaveLength(0);
+  });
+});
+
+describe("NpcArchetypeSystem — scheduleSystem wiring", () => {
+  it("scheduleSystem defaults to null", () => {
+    const sys = new NpcArchetypeSystem();
+    expect(sys.scheduleSystem).toBeNull();
+  });
+
+  it("applies scheduleBlocks when scheduleSystem is set and archetype has a scheduleId", () => {
+    const archSys = new NpcArchetypeSystem();
+    const schedSys = new NpcScheduleSystem(false);
+    schedSys.registerSchedule({
+      id: "sched_guard",
+      blocks: [
+        { startHour: 6, endHour: 22, behavior: "patrol" },
+        { startHour: 22, endHour: 6, behavior: "sleep"  },
+      ],
+    });
+    archSys.scheduleSystem = schedSys;
+
+    const archetypeWithSchedule: NpcArchetypeDefinition = {
+      id: "arch_guard_sched",
+      name: "Scheduled Guard",
+      role: "guard",
+      factionId: "guards",
+      isHostile: false,
+      isMerchant: false,
+      baseHealth: 100,
+      level: 1,
+      scheduleId: "sched_guard",
+    };
+    archSys.registerArchetype(archetypeWithSchedule);
+
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const npc = archSys.spawnNpc("arch_guard_sched", scene, new Vector3(0, 0, 0));
+    expect(npc).not.toBeNull();
+    expect(npc!.scheduleBlocks).toHaveLength(2);
+    expect(npc!.scheduleBlocks[0].behavior).toBe("patrol");
+    expect(npc!.scheduleBlocks[1].behavior).toBe("sleep");
+  });
+
+  it("leaves scheduleBlocks empty when no scheduleSystem is attached", () => {
+    const archSys = new NpcArchetypeSystem();
+    // No scheduleSystem attached
+
+    const archetypeWithScheduleId: NpcArchetypeDefinition = {
+      id: "arch_no_sched_sys",
+      name: "Guard",
+      role: "guard",
+      factionId: "",
+      isHostile: false,
+      isMerchant: false,
+      baseHealth: 100,
+      level: 1,
+      scheduleId: "sched_guard",
+    };
+    archSys.registerArchetype(archetypeWithScheduleId);
+
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const npc = archSys.spawnNpc("arch_no_sched_sys", scene, new Vector3(0, 0, 0));
+    expect(npc).not.toBeNull();
+    expect(npc!.scheduleBlocks).toHaveLength(0);
+  });
+
+  it("leaves scheduleBlocks empty when archetype has no scheduleId", () => {
+    const archSys = new NpcArchetypeSystem();
+    archSys.scheduleSystem = new NpcScheduleSystem(); // built-ins registered
+
+    // Archetype without scheduleId
+    archSys.registerArchetype(GUARD_ARCHETYPE);
+
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const npc = archSys.spawnNpc("archetype_guard", scene, new Vector3(0, 0, 0));
+    expect(npc).not.toBeNull();
+    expect(npc!.scheduleBlocks).toHaveLength(0);
   });
 });

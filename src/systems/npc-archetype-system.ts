@@ -2,6 +2,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import { NPC } from "../entities/npc";
 import type { NpcArchetypeDefinition } from "../framework/content/content-types";
+import type { NpcScheduleSystem } from "./npc-schedule-system";
 
 /**
  * Data-driven NPC factory.
@@ -17,6 +18,13 @@ import type { NpcArchetypeDefinition } from "../framework/content/content-types"
  */
 export class NpcArchetypeSystem {
   private _archetypes: Map<string, NpcArchetypeDefinition> = new Map();
+
+  /**
+   * Optional schedule registry.  When set, `spawnNpc()` will automatically
+   * apply the schedule named by `NpcArchetypeDefinition.scheduleId` (if any)
+   * to every spawned NPC instance.
+   */
+  public scheduleSystem: NpcScheduleSystem | null = null;
 
   // ── Registry ──────────────────────────────────────────────────────────────
 
@@ -140,6 +148,11 @@ export class NpcArchetypeSystem {
     }
     if (def.damageWeaknesses) {
       npc.damageWeaknesses = { ...def.damageWeaknesses };
+    }
+
+    // Apply daily schedule blocks from the registered schedule system
+    if (def.scheduleId && this.scheduleSystem) {
+      this.scheduleSystem.applySchedule(npc, def.scheduleId);
     }
 
     return npc;
