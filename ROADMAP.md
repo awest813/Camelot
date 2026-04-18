@@ -398,6 +398,18 @@ A dedicated cinematic camera sequence engine and first-class dialogue-camera int
 
 ---
 
+### Content GUI — Release X (Editor Enhancements + Electron Plan)
+
+Editor shell improvements and Electron desktop packaging groundwork:
+
+1. ✅ **RecentProjectsSystem** (`src/systems/recent-projects-system.ts`, 34 tests) — headless project history tracker: `addProject()` prepends entries with auto-generated IDs and ISO-8601 timestamps; de-duplicates by `filePath` (moves existing entry to front and refreshes timestamp); caps list at `MAX_RECENT_PROJECTS` (10) with oldest-eviction; `removeProject()` / `clear()` / `getProject()` / `getProjects()` CRUD; `restore()` loads from `localStorage` with malformed-data resilience; `getSnapshot()` / `restoreSnapshot()` for testing; `onChanged` callback fires after every mutation.
+
+2. ✅ **Recent Projects on Welcome Dashboard** (`src/ui/standalone-editor-shell.ts`, 19 new tests → 71 total) — "Recent Projects" section added below the featured tool cards on the welcome dashboard: heading, `role="list"` container with `aria-live="polite"`, "No recent projects." placeholder; `updateRecentProjects(entries)` renders per-project rows with name, optional file path, formatted date, open button (`onRecentProjectOpen(id)`) and remove button (`onRecentProjectRemove(id)`); open/remove buttons disabled when no callback is provided; fully accessible with per-button `aria-label` attributes.
+
+3. ✅ **Electron Desktop Plan** (`docs/electron-plan.md`) — six-phase implementation plan for wrapping the Camelot Editor in Electron: scaffold, native file dialogs, native recent projects, application menus, packaging/distribution, optional auto-update; architecture overview with main process, preload bridge, and renderer integration; security hardened with `contextIsolation: true` and `nodeIntegration: false`; feature-detection gates ensure browser version continues working unchanged.
+
+---
+
 ## Mid-Term (3–5 Releases)
 
 ### World Building Depth

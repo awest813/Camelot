@@ -483,4 +483,201 @@ describe("StandaloneEditorShell", () => {
       expect(btn?.getAttribute("aria-label")).toBeTruthy();
     });
   });
+
+  // ── Recent projects ──────────────────────────────────────────────────────
+
+  describe("recent projects", () => {
+    it("renders a Recent Projects heading on the welcome dashboard", () => {
+      const shell = makeShell();
+      shell.open();
+      const heading = document.querySelector(".standalone-editor__recent-heading");
+      expect(heading?.textContent).toBe("Recent Projects");
+    });
+
+    it("shows 'No recent projects.' placeholder by default", () => {
+      const shell = makeShell();
+      shell.open();
+      const empty = document.querySelector(".standalone-editor__recent-empty");
+      expect(empty?.textContent).toBe("No recent projects.");
+    });
+
+    it("renders a recent-list container with role='list'", () => {
+      const shell = makeShell();
+      shell.open();
+      const list = document.querySelector(".standalone-editor__recent-list");
+      expect(list?.getAttribute("role")).toBe("list");
+    });
+
+    it("updateRecentProjects() renders project cards", () => {
+      const shell = makeShell();
+      shell.open();
+      shell.updateRecentProjects([
+        { id: "a", name: "Alpha", lastOpenedAt: "2025-06-01T00:00:00Z" },
+        { id: "b", name: "Beta", lastOpenedAt: "2025-05-01T00:00:00Z" },
+      ]);
+      const items = document.querySelectorAll(".standalone-editor__recent-item");
+      expect(items.length).toBe(2);
+    });
+
+    it("each recent item carries data-project-id", () => {
+      const shell = makeShell();
+      shell.open();
+      shell.updateRecentProjects([
+        { id: "proj1", name: "P", lastOpenedAt: "2025-01-01T00:00:00Z" },
+      ]);
+      const item = document.querySelector<HTMLElement>(".standalone-editor__recent-item");
+      expect(item?.getAttribute("data-project-id")).toBe("proj1");
+    });
+
+    it("each recent item shows the project name", () => {
+      const shell = makeShell();
+      shell.open();
+      shell.updateRecentProjects([
+        { id: "x", name: "My Mod", lastOpenedAt: "2025-01-01T00:00:00Z" },
+      ]);
+      const name = document.querySelector(".standalone-editor__recent-name");
+      expect(name?.textContent).toBe("My Mod");
+    });
+
+    it("shows the file path when present", () => {
+      const shell = makeShell();
+      shell.open();
+      shell.updateRecentProjects([
+        { id: "x", name: "A", lastOpenedAt: "2025-01-01T00:00:00Z", filePath: "/home/user/a.json" },
+      ]);
+      const pathEl = document.querySelector(".standalone-editor__recent-path");
+      expect(pathEl?.textContent).toBe("/home/user/a.json");
+    });
+
+    it("does not render a path element when filePath is absent", () => {
+      const shell = makeShell();
+      shell.open();
+      shell.updateRecentProjects([
+        { id: "x", name: "A", lastOpenedAt: "2025-01-01T00:00:00Z" },
+      ]);
+      const pathEl = document.querySelector(".standalone-editor__recent-path");
+      expect(pathEl).toBeNull();
+    });
+
+    it("renders a date span for each item", () => {
+      const shell = makeShell();
+      shell.open();
+      shell.updateRecentProjects([
+        { id: "x", name: "A", lastOpenedAt: "2025-06-15T12:00:00Z" },
+      ]);
+      const dateEl = document.querySelector(".standalone-editor__recent-date");
+      expect(dateEl?.textContent).toBeTruthy();
+    });
+
+    it("clicking a recent item fires onRecentProjectOpen with the project ID", () => {
+      const onRecentProjectOpen = vi.fn();
+      const shell = makeShell({ onRecentProjectOpen });
+      shell.open();
+      shell.updateRecentProjects([
+        { id: "abc", name: "X", lastOpenedAt: "2025-01-01T00:00:00Z" },
+      ]);
+      const openBtn = document.querySelector<HTMLButtonElement>(".standalone-editor__recent-open")!;
+      openBtn.click();
+      expect(onRecentProjectOpen).toHaveBeenCalledWith("abc");
+    });
+
+    it("open button is disabled when no onRecentProjectOpen callback is provided", () => {
+      const shell = makeShell();
+      shell.open();
+      shell.updateRecentProjects([
+        { id: "abc", name: "X", lastOpenedAt: "2025-01-01T00:00:00Z" },
+      ]);
+      const openBtn = document.querySelector<HTMLButtonElement>(".standalone-editor__recent-open")!;
+      expect(openBtn.disabled).toBe(true);
+    });
+
+    it("clicking the remove button fires onRecentProjectRemove", () => {
+      const onRecentProjectRemove = vi.fn();
+      const shell = makeShell({ onRecentProjectRemove });
+      shell.open();
+      shell.updateRecentProjects([
+        { id: "xyz", name: "Y", lastOpenedAt: "2025-01-01T00:00:00Z" },
+      ]);
+      const removeBtn = document.querySelector<HTMLButtonElement>(".standalone-editor__recent-remove")!;
+      removeBtn.click();
+      expect(onRecentProjectRemove).toHaveBeenCalledWith("xyz");
+    });
+
+    it("remove button is disabled when no onRecentProjectRemove callback is provided", () => {
+      const shell = makeShell();
+      shell.open();
+      shell.updateRecentProjects([
+        { id: "xyz", name: "Y", lastOpenedAt: "2025-01-01T00:00:00Z" },
+      ]);
+      const removeBtn = document.querySelector<HTMLButtonElement>(".standalone-editor__recent-remove")!;
+      expect(removeBtn.disabled).toBe(true);
+    });
+
+    it("calling updateRecentProjects with empty array shows the placeholder", () => {
+      const shell = makeShell();
+      shell.open();
+      shell.updateRecentProjects([
+        { id: "a", name: "A", lastOpenedAt: "2025-01-01T00:00:00Z" },
+      ]);
+      shell.updateRecentProjects([]);
+      const empty = document.querySelector(".standalone-editor__recent-empty");
+      expect(empty?.textContent).toBe("No recent projects.");
+      expect(document.querySelectorAll(".standalone-editor__recent-item").length).toBe(0);
+    });
+
+    it("updateRecentProjects replaces previous items", () => {
+      const shell = makeShell();
+      shell.open();
+      shell.updateRecentProjects([
+        { id: "a", name: "A", lastOpenedAt: "2025-01-01T00:00:00Z" },
+      ]);
+      shell.updateRecentProjects([
+        { id: "b", name: "B", lastOpenedAt: "2025-01-01T00:00:00Z" },
+        { id: "c", name: "C", lastOpenedAt: "2025-01-01T00:00:00Z" },
+      ]);
+      const items = document.querySelectorAll(".standalone-editor__recent-item");
+      expect(items.length).toBe(2);
+    });
+
+    it("updateRecentProjects before open() silently no-ops", () => {
+      const shell = makeShell();
+      expect(() => {
+        shell.updateRecentProjects([
+          { id: "a", name: "A", lastOpenedAt: "2025-01-01T00:00:00Z" },
+        ]);
+      }).not.toThrow();
+    });
+
+    it("each recent item has role='listitem'", () => {
+      const shell = makeShell();
+      shell.open();
+      shell.updateRecentProjects([
+        { id: "a", name: "A", lastOpenedAt: "2025-01-01T00:00:00Z" },
+      ]);
+      const item = document.querySelector(".standalone-editor__recent-item");
+      expect(item?.getAttribute("role")).toBe("listitem");
+    });
+
+    it("open button has an appropriate aria-label", () => {
+      const onRecentProjectOpen = vi.fn();
+      const shell = makeShell({ onRecentProjectOpen });
+      shell.open();
+      shell.updateRecentProjects([
+        { id: "a", name: "My World", lastOpenedAt: "2025-01-01T00:00:00Z" },
+      ]);
+      const openBtn = document.querySelector<HTMLButtonElement>(".standalone-editor__recent-open")!;
+      expect(openBtn.getAttribute("aria-label")).toContain("My World");
+    });
+
+    it("remove button has an appropriate aria-label", () => {
+      const onRecentProjectRemove = vi.fn();
+      const shell = makeShell({ onRecentProjectRemove });
+      shell.open();
+      shell.updateRecentProjects([
+        { id: "a", name: "My World", lastOpenedAt: "2025-01-01T00:00:00Z" },
+      ]);
+      const removeBtn = document.querySelector<HTMLButtonElement>(".standalone-editor__recent-remove")!;
+      expect(removeBtn.getAttribute("aria-label")).toContain("My World");
+    });
+  });
 });

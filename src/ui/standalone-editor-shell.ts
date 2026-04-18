@@ -1,4 +1,5 @@
 import type { EditorToolId } from "./editor-hub-ui";
+import type { RecentProjectEntry } from "../systems/recent-projects-system";
 
 // ── Tool catalogue ────────────────────────────────────────────────────────────
 
@@ -156,6 +157,10 @@ export interface StandaloneEditorShellCallbacks {
   onSave?: () => void;
   /** Fired when the user clicks the Export toolbar button. */
   onExport?: () => void;
+  /** Fired when the user clicks a recent-project card on the welcome dashboard. */
+  onRecentProjectOpen?: (projectId: string) => void;
+  /** Fired when the user clicks the ✕ remove button on a recent-project card. */
+  onRecentProjectRemove?: (projectId: string) => void;
 }
 
 /**
@@ -205,6 +210,9 @@ export class StandaloneEditorShell {
   private readonly _navBtns = new Map<EditorToolId, HTMLElement>();
 
   private _activeToolId: EditorToolId | null = null;
+
+  /** Container element for recent project cards on the welcome dashboard. */
+  private _recentList: HTMLElement | null = null;
 
   constructor(callbacks: StandaloneEditorShellCallbacks) {
     this._cb = callbacks;
@@ -277,6 +285,85 @@ export class StandaloneEditorShell {
     if (next) {
       next.classList.add("standalone-editor__nav-item--active");
       next.setAttribute("aria-current", "page");
+    }
+  }
+
+  /**
+   * Update the recent-projects list on the welcome dashboard.
+   *
+   * Call this after the shell is opened and whenever the underlying
+   * `RecentProjectsSystem` changes.  Replaces all existing recent-project
+   * cards with the supplied entries.
+   */
+  updateRecentProjects(projects: ReadonlyArray<RecentProjectEntry>): void {
+    if (!this._recentList) return;
+
+    // Clear existing children.
+    this._recentList.innerHTML = "";
+
+    if (projects.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "standalone-editor__recent-empty";
+      empty.textContent = "No recent projects.";
+      this._recentList.appendChild(empty);
+      return;
+    }
+
+    for (const proj of projects) {
+      const row = document.createElement("div");
+      row.className = "standalone-editor__recent-item";
+      row.setAttribute("role", "listitem");
+      row.setAttribute("data-project-id", proj.id);
+
+      // Open button (entire row is clickable).
+      const openBtn = document.createElement("button");
+      openBtn.className = "standalone-editor__recent-open";
+      openBtn.setAttribute("aria-label", `Open project ${proj.name}`);
+
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "standalone-editor__recent-name";
+      nameSpan.textContent = proj.name;
+      openBtn.appendChild(nameSpan);
+
+      if (proj.filePath) {
+        const pathSpan = document.createElement("span");
+        pathSpan.className = "standalone-editor__recent-path";
+        pathSpan.textContent = proj.filePath;
+        openBtn.appendChild(pathSpan);
+      }
+
+      const dateSpan = document.createElement("span");
+      dateSpan.className = "standalone-editor__recent-date";
+      dateSpan.textContent = this._formatDate(proj.lastOpenedAt);
+      openBtn.appendChild(dateSpan);
+
+      if (this._cb.onRecentProjectOpen) {
+        const handler = this._cb.onRecentProjectOpen;
+        openBtn.addEventListener("click", () => handler(proj.id));
+      } else {
+        openBtn.disabled = true;
+      }
+
+      row.appendChild(openBtn);
+
+      // Remove button.
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "standalone-editor__recent-remove";
+      removeBtn.textContent = "✕";
+      removeBtn.setAttribute("aria-label", `Remove ${proj.name} from recent projects`);
+
+      if (this._cb.onRecentProjectRemove) {
+        const handler = this._cb.onRecentProjectRemove;
+        removeBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          handler(proj.id);
+        });
+      } else {
+        removeBtn.disabled = true;
+      }
+
+      row.appendChild(removeBtn);
+      this._recentList.appendChild(row);
     }
   }
 
@@ -522,6 +609,30 @@ export class StandaloneEditorShell {
 
     welcome.appendChild(grid);
 
+    // Recent projects section
+    const recentSection = document.createElement("div");
+    recentSection.className = "standalone-editor__recent";
+    recentSection.setAttribute("aria-label", "Recent projects");
+
+    const recentHeading = document.createElement("h2");
+    recentHeading.className = "standalone-editor__recent-heading";
+    recentHeading.textContent = "Recent Projects";
+    recentSection.appendChild(recentHeading);
+
+    const recentList = document.createElement("div");
+    recentList.className = "standalone-editor__recent-list";
+    recentList.setAttribute("role", "list");
+    recentList.setAttribute("aria-live", "polite");
+
+    const emptyMsg = document.createElement("p");
+    emptyMsg.className = "standalone-editor__recent-empty";
+    emptyMsg.textContent = "No recent projects.";
+    recentList.appendChild(emptyMsg);
+
+    this._recentList = recentList;
+    recentSection.appendChild(recentList);
+    welcome.appendChild(recentSection);
+
     // Tip row
     const tip = document.createElement("p");
     tip.className   = "standalone-editor__welcome-tip";
@@ -557,5 +668,22 @@ export class StandaloneEditorShell {
     bar.appendChild(text);
 
     return bar;
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  /** Format an ISO-8601 timestamp as a short human-readable date string. */
+  private _formatDate(iso: string): string {
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return iso;
+      return d.toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch {
+      return iso;
+    }
   }
 }
