@@ -96,45 +96,64 @@ The in-engine **Map Editor** (activated with F2) lets you author world content w
 - **Property panel**: select any placed entity to open the in-editor property panel; configure label, loot table ID, spawn template, objective ID, dialogue trigger, or structure ID. Press Apply to commit changes or Delete to remove the entity.
 - **Layer-targeted editing**: the layer panel can now mark an active placement layer so new entities land directly in `terrain`, `objects`, `events`, `npcs`, or `triggers`, while still honoring each layer's visibility/lock state.
 
-### Phase 3 — Validation + Data Safety (active)
+### Phase 3 — Validation + Data Safety (complete)
 
-- **Built-in map validation reports** now catch key authoring issues: orphaned NPC patrol references, under-defined patrol routes, and overlapping placements.
+- **Built-in map validation** catches eight categories of authoring issues:
+  - `missing-patrol-group` — NPC spawn references a patrol group that no longer exists.
+  - `patrol-route-too-short` — Patrol group has fewer than two waypoints.
+  - `entity-overlap` — Two entities occupy the same or nearly the same world position.
+  - `orphaned-quest-marker` — Quest marker has no `objectiveId` set.
+  - `duplicate-objective-id` — Multiple quest markers share the same `objectiveId`.
+  - `unknown-objective-id` — Quest marker `objectiveId` not found in the quest system (requires validation context).
+  - `missing-loot-table` — Loot entity references an unknown loot table ID (requires validation context).
+  - `missing-spawn-template` — NPC spawn references an unknown spawn template ID (requires validation context).
+- `MapEditorSystem.validateMapData()` is a **static helper** — run validation offline against any exported `MapExportData` without a live editor instance (useful for pack-level CI gates).
 - Validation is scriptable in tests and can be used as a pre-export quality gate for map content.
 
 ## Controls
 
-| Key / Button | Action                              |
-| ------------ | ----------------------------------- |
-| WASD         | Move                                |
-| Mouse        | Look                                |
-| Left Click   | Melee attack (Stamina)              |
-| Right Click  | Magic attack (Magicka)              |
-| E            | Interact / pick up / talk           |
-| I            | Toggle inventory                    |
-| J            | Toggle quest log                    |
-| K            | Toggle skill tree                   |
-| **T**        | **Wait / Rest (choose 1–24 hours)** |
-| **X**        | **Open Spellmaking Altar**          |
-| 1 / 2 / 3    | Melee archetype select              |
-| 4 / 5 / 6    | Magic archetype select              |
-| 7 / 8 / 9 / 0 | Quick-slot consumable use         |
-| Y            | Open fast travel menu               |
-| **P**        | **Toggle pet companion panel**      |
-| **F**        | **Toggle follower panel**           |
-| **O**        | **Mount / dismount horse**          |
-| **Shift+O**  | **Browse stable (unmounted) / open saddlebag (mounted)** |
-| M            | Toggle audio mute                   |
-| F5           | Quick save                          |
-| F9           | Quick load                          |
-| Esc          | Pause menu                          |
-| **F2**       | **Toggle map editor mode**          |
-| **G**        | **Cycle editor gizmo mode (editor)** |
-| **T**        | **Cycle editor placement type (editor)** |
-| **N**        | **Place entity (editor)**           |
-| **P**        | **Start new NPC patrol group (editor)** |
-| **H**        | **Cycle terrain tool (editor)**     |
-| **[ / ]**    | **Terrain sculpt step (editor)**    |
-| **F4**       | **Export map to JSON (editor)**     |
+### Gameplay
+
+| Key / Button   | Action                                                   |
+| -------------- | -------------------------------------------------------- |
+| WASD           | Move                                                     |
+| Mouse          | Look                                                     |
+| Left Click     | Melee attack (Stamina)                                   |
+| Right Click    | Magic attack (Magicka)                                   |
+| E              | Interact / pick up / talk                                |
+| I              | Toggle inventory                                         |
+| J              | Toggle quest log                                         |
+| K              | Toggle skill tree                                        |
+| T              | Wait / Rest (choose 1–24 hours)                          |
+| X              | Open Spellmaking Altar                                   |
+| 1 / 2 / 3      | Melee archetype select                                   |
+| 4 / 5 / 6      | Magic archetype select                                   |
+| 7 / 8 / 9 / 0  | Quick-slot consumable use                                |
+| Y              | Open fast travel menu                                    |
+| P              | Toggle pet companion panel                               |
+| F              | Toggle follower panel                                    |
+| O              | Mount / dismount horse                                   |
+| Shift+O        | Browse stable (unmounted) / open saddlebag (mounted)     |
+| M              | Toggle audio mute                                        |
+| F5             | Quick save                                               |
+| F9             | Quick load                                               |
+| Esc            | Pause menu                                               |
+
+### Map Editor (active while F2 mode is on — these keys override their gameplay bindings)
+
+| Key / Button      | Action                                  |
+| ----------------- | --------------------------------------- |
+| **F2**            | Toggle map editor mode                  |
+| **G**             | Cycle gizmo mode (position / rotation / scale) |
+| **T**             | Cycle placement type (marker → loot → npc-spawn → quest-marker → structure) |
+| **N**             | Place entity at view position           |
+| **P**             | Start new NPC patrol group              |
+| **H**             | Cycle terrain tool (none → sculpt → paint) |
+| **[ / ]**         | Decrease / increase terrain sculpt step |
+| **F4**            | Export map layout to JSON file          |
+| **Ctrl+Z**        | Undo last editor action                 |
+| **Ctrl+Y** / **Ctrl+Shift+Z** | Redo                      |
+| **Ctrl+M**        | Toggle scene notes panel                |
 
 ## Tech Stack
 
@@ -212,10 +231,9 @@ npm run test:watch
 
 The full roadmap lives in [`ROADMAP.md`](./ROADMAP.md). Key upcoming focus areas:
 
-- **Map Editor Phase 4** (active): standalone editor shell exploration and broader creator workflows beyond the in-runtime layer/panel toolset.
+- **Map Editor Phase 4** (active): standalone editor shell, serialized map packs, and broader creator workflows beyond the in-runtime layer/panel toolset.
 - **Framework-first consolidation**: wiring framework state as source-of-truth for all demo systems.
-- **Content tooling**: quest authoring utilities, mod validation CLI.
-- **Map Editor Phase 3+**: serialized map packs, collaboration workflows, standalone editor shell.
+- **Content tooling**: quest authoring utilities, mod validation CLI, collaboration workflows.
 
 ---
 
