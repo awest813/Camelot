@@ -135,6 +135,9 @@ import { ScreenshotSystem } from "./systems/screenshot-system";
 import { UIAnimator } from "./ui/ui-animator";
 import { MarkRecallSystem } from "./systems/mark-recall-system";
 import { TrainerSystem } from "./systems/trainer-system";
+import { FollowerSystem } from "./systems/follower-system";
+import type { ActiveFollowerState } from "./systems/follower-system";
+import { FollowerUI } from "./ui/follower-ui";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -302,6 +305,10 @@ export class Game {
   public markRecallSystem: MarkRecallSystem;
   public trainerSystem: TrainerSystem;
 
+  // v26 systems
+  public followerSystem: FollowerSystem;
+  public followerUI: FollowerUI;
+
   /** Fantasy asset loader — streams BabylonJS CDN models (weapons, structures, creatures). */
   public fantasyAssets: FantasyAssetLoader;
 
@@ -344,6 +351,9 @@ export class Game {
   // Cache for pet HUD dirty-checking
   private _lastPetHealth: number = -1;
   private _lastPetId: string | null = null;
+  // Cache for follower HUD dirty-checking
+  private _lastFollowerHealth: number = -1;
+  private _lastFollowerId: string | null = null;
   private _helpOverlayEl: HTMLDivElement | null = null;
   private _helpOverlayVisible: boolean = false;
   private _activeGuardChallenge: { guard: NPC; factionId: string; bounty: number } | null = null;
@@ -1688,6 +1698,54 @@ export class Game {
     };
     this.saveSystem.setTrainerSystem(this.trainerSystem);
 
+    // ── v26: Follower System ──────────────────────────────────────────────
+    this.followerSystem = new FollowerSystem();
+    this.followerSystem.onFollowerRecruited = (_templateId, name) => {
+      this.ui.showNotification(`${name} has joined you.`, 3000);
+    };
+    this.followerSystem.onFollowerDismissed = (_templateId, name, homeLocation) => {
+      this.ui.showNotification(`${name} has returned to ${homeLocation}.`, 3000);
+    };
+    this.followerSystem.onFollowerDied = (_templateId, name) => {
+      this.ui.showNotification(`${name} has fallen in battle and cannot be rehired!`, 4000);
+    };
+    this.followerSystem.onCommandIssued = (command) => {
+      this.ui.showNotification(`Follower command: ${command}`, 1500);
+    };
+    this.followerSystem.onFollowerDamaged = (_amount, remaining) => {
+      if (remaining <= 0) {
+        this.ui.showNotification("Your follower needs help!", 2000);
+      }
+    };
+    this.saveSystem.setFollowerSystem(this.followerSystem);
+
+    // ── v26: Follower UI ──────────────────────────────────────────────────
+    this.followerUI = new FollowerUI();
+    this.followerUI.onRecruit = (templateId) => {
+      const playerGold = this._getInventoryGold();
+      const follower = this.followerSystem.recruitFollower(templateId, playerGold);
+      if (follower) {
+        const tmpl = this.followerSystem.getFollowerTemplate(templateId);
+        if (tmpl && tmpl.hireCost > 0) {
+          this._consumeInventoryGold(tmpl.hireCost);
+        }
+        this._refreshFollowerUI();
+      }
+    };
+    this.followerUI.onDismiss = () => {
+      this.followerSystem.dismissFollower();
+      this._refreshFollowerUI();
+    };
+    this.followerUI.onCommand = (command) => {
+      this.followerSystem.commandFollower(command);
+      this._refreshFollowerUI();
+    };
+    this.followerUI.onClose = () => {
+      this.interactionSystem.isBlocked = false;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
+
     // ── Stable UI ─────────────────────────────────────────────────────────
     this.stableUI = new StableUI();
     this.stableUI.onClose = () => {
@@ -2859,6 +2917,37 @@ export class Game {
                         }
                     }
                 }
+            } else if (kbInfo.event.key === "f" || kbInfo.event.key === "F") {
+                // F: Open/close follower panel
+                if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+                    if (this.followerUI.isVisible) {
+                        this.followerUI.close();
+                        this.interactionSystem.isBlocked = false;
+                        this.canvas.requestPointerLock();
+                        this.player.camera.attachControl(this.canvas, true);
+                    } else {
+                        const activeFollower = this.followerSystem.getActiveFollower();
+                        const deceasedIds: string[] = [];
+                        for (const templateId of this.followerSystem.registeredTemplateIds) {
+                            if (this.followerSystem.isFollowerDeceased(templateId)) {
+                                deceasedIds.push(templateId);
+                            }
+                        }
+                        const templates = this.followerSystem.registeredTemplateIds.map(id =>
+                            this.followerSystem.getFollowerTemplate(id)
+                        ).filter((t): t is NonNullable<typeof t> => t !== undefined);
+
+                        this.followerUI.open(
+                            templates,
+                            activeFollower,
+                            deceasedIds,
+                            this._getInventoryGold()
+                        );
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    }
+                }
             } else if (kbInfo.event.key === "o" || kbInfo.event.key === "O") {
                 // O: Mount/Dismount · Shift+O: Stable (unmounted) or Saddlebag (mounted)
                 if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
@@ -3502,6 +3591,17 @@ export class Game {
         }
       }
 
+      // Follower HUD — update when active follower or health changes
+      {
+        const af = this.followerSystem?.getActiveFollower() ?? null;
+        const afId = af?.templateId ?? null;
+        if (afId !== this._lastFollowerId || (af && af.health !== this._lastFollowerHealth)) {
+          this._lastFollowerId     = afId;
+          this._lastFollowerHealth = af?.health ?? -1;
+          this.followerUI?.updateHUD(af);
+        }
+      }
+
       // Update clock display every frame (cheap text update)
       this.ui.updateClock(this.timeSystem.timeString);
 
@@ -3783,6 +3883,27 @@ export class Game {
       const available = this._getInventoryGold();
       if (available < amount) return false;
       return this.inventorySystem.removeItem(GOLD_ITEM_ID, amount);
+  }
+
+  private _refreshFollowerUI(): void {
+      const activeFollower = this.followerSystem.getActiveFollower();
+      const deceasedIds: string[] = [];
+      for (const templateId of this.followerSystem.registeredTemplateIds) {
+          if (this.followerSystem.isFollowerDeceased(templateId)) {
+              deceasedIds.push(templateId);
+          }
+      }
+      const templates = this.followerSystem.registeredTemplateIds.map(id =>
+          this.followerSystem.getFollowerTemplate(id)
+      ).filter((t): t is NonNullable<typeof t> => t !== undefined);
+
+      this.followerUI.refresh(
+          templates,
+          activeFollower,
+          deceasedIds,
+          this._getInventoryGold()
+      );
+      this.followerUI.updateHUD(activeFollower);
   }
 
   private _refreshGuardEncounterView(statusMessage?: string, isError: boolean = false): void {

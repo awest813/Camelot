@@ -118,6 +118,8 @@ The in-engine **Map Editor** (activated with F2) lets you author world content w
 | 4 / 5 / 6    | Magic archetype select              |
 | 7 / 8 / 9 / 0 | Quick-slot consumable use         |
 | Y            | Open fast travel menu               |
+| **P**        | **Toggle pet companion panel**      |
+| **F**        | **Toggle follower panel**           |
 | **O**        | **Mount / dismount horse**          |
 | **Shift+O**  | **Browse stable (unmounted) / open saddlebag (mounted)** |
 | M            | Toggle audio mute                   |
