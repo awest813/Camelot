@@ -162,6 +162,13 @@ interface PatrolGroup {
   lineMesh: LinesMesh | null;
 }
 
+/** Half-extent of the editor grid in world units (grid spans ±GRID_HALF_EXTENT). */
+const GRID_HALF_EXTENT = 50;
+/** Y offset applied to grid lines so they sit just above terrain at y=0. */
+const GRID_Y_OFFSET = 0.05;
+/** Y offset applied to patrol-route line segments to lift them clear of terrain. */
+const PATROL_LINE_Y_OFFSET = 0.1;
+
 /** Colours used for each placement type in the editor viewport. */
 const PLACEMENT_COLORS: Record<EditorPlacementType, Color3> = {
   marker:       new Color3(0.25, 0.70, 1.00),
@@ -634,6 +641,15 @@ export class MapEditorSystem {
   adjustTerrainSculptStep(delta: number): number {
     this.terrainSculptStep = Math.min(4, Math.max(0.1, this.terrainSculptStep + delta));
     return this.terrainSculptStep;
+  }
+
+  /**
+   * Adjust the grid snap size by `delta` and clamp it to [0.25, 16].
+   * Returns the new snap size.
+   */
+  adjustSnapSize(delta: number): number {
+    this.snapSize = Math.min(16, Math.max(0.25, this.snapSize + delta));
+    return this.snapSize;
   }
 
   /** Advance to the next placement type and return it. */
@@ -1231,7 +1247,6 @@ export class MapEditorSystem {
     this.notes = "";
   }
 
-
   // ─── Private helpers ────────────────────────────────────────────────────────
 
   /** Returns the layer name for a given type/entry, falling back to type default. */
@@ -1311,10 +1326,11 @@ export class MapEditorSystem {
     group.lineMesh?.dispose();
 
     const lines: Vector3[][] = [];
+    const lift = new Vector3(0, PATROL_LINE_Y_OFFSET, 0);
     for (let i = 0; i < group.waypoints.length; i++) {
       const from = group.waypoints[i];
       const to   = group.waypoints[(i + 1) % group.waypoints.length];
-      lines.push([from.add(new Vector3(0, 0.1, 0)), to.add(new Vector3(0, 0.1, 0))]);
+      lines.push([from.add(lift), to.add(lift)]);
     }
 
     const lineMesh = MeshBuilder.CreateLineSystem(
@@ -1517,10 +1533,9 @@ export class MapEditorSystem {
 
   private _createGridMesh(): Mesh {
     const lines: Vector3[][] = [];
-    const half = 50;
-    for (let i = -half; i <= half; i++) {
-      lines.push([new Vector3(-half, 0.05, i), new Vector3(half, 0.05, i)]);
-      lines.push([new Vector3(i, 0.05, -half), new Vector3(i, 0.05, half)]);
+    for (let i = -GRID_HALF_EXTENT; i <= GRID_HALF_EXTENT; i++) {
+      lines.push([new Vector3(-GRID_HALF_EXTENT, GRID_Y_OFFSET, i), new Vector3(GRID_HALF_EXTENT, GRID_Y_OFFSET, i)]);
+      lines.push([new Vector3(i, GRID_Y_OFFSET, -GRID_HALF_EXTENT), new Vector3(i, GRID_Y_OFFSET, GRID_HALF_EXTENT)]);
     }
     const grid = MeshBuilder.CreateLineSystem("editor_grid", { lines, updatable: false }, this.scene);
     grid.color = new Color3(0.2, 0.6, 0.9);

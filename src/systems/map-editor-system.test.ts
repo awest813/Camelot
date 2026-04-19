@@ -79,6 +79,15 @@ describe('MapEditorSystem — Phase 1 (terrain tools)', () => {
         expect(editor.adjustTerrainSculptStep(10)).toBe(4);
     });
 
+    it('adjustSnapSize clamps between 0.25 and 16 and returns new value', () => {
+        const { editor } = makeEditor();
+
+        expect(editor.adjustSnapSize(-100)).toBe(0.25);
+        expect(editor.adjustSnapSize(100)).toBe(16);
+        editor.snapSize = 2;
+        expect(editor.adjustSnapSize(1)).toBe(3);
+    });
+
     it('sculpt tool raises chunk mesh Y position by terrainSculptStep', () => {
         const { editor, scene } = makeEditor();
         const chunk = new Mesh('chunk_0,0', scene);
