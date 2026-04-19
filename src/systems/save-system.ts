@@ -44,9 +44,10 @@ import type { PickpocketSystem } from "./pickpocket-system";
 import type { ItemConditionSystem } from "./item-condition-system";
 import type { DragonShoutSystem } from "./dragon-shout-system";
 import type { FollowerSystem } from "./follower-system";
+import type { PerkSystem } from "./perk-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 26;
+const SAVE_VERSION = 27;
 /** Oldest save version that can still be loaded (forward-compat window). */
 const SAVE_VERSION_MIN = 5;
 
@@ -127,6 +128,8 @@ interface ParsedSaveData {
   // v26 additions
   dragonShouts?: unknown;
   follower?: unknown;
+  // v27 additions
+  perks?: unknown;
 }
 
 interface EquipmentEntry {
@@ -203,6 +206,8 @@ export interface SaveData {
   // v26 additions
   dragonShouts?: any;
   follower?: any;
+  // v27 additions
+  perks?: any;
 }
 
 export class SaveSystem {
@@ -288,6 +293,8 @@ export class SaveSystem {
   // ── v26 optional systems ──────────────────────────────────────────────────
   private _dragonShoutSystem: DragonShoutSystem | null = null;
   private _followerSystem: FollowerSystem | null = null;
+  // ── v27 optional systems ──────────────────────────────────────────────────
+  private _perkSystem: PerkSystem | null = null;
 
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
@@ -418,6 +425,10 @@ export class SaveSystem {
   public setDragonShoutSystem(s: DragonShoutSystem): void { this._dragonShoutSystem = s; }
   public setFollowerSystem(s: FollowerSystem): void       { this._followerSystem = s; }
 
+  // ── v27 system injection ──────────────────────────────────────────────────
+
+  public setPerkSystem(s: PerkSystem): void               { this._perkSystem = s; }
+
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
     for (const [slot, item] of this._equipment.getEquipped()) {
@@ -503,6 +514,7 @@ export class SaveSystem {
     if (this._itemConditionSystem)    data.itemCondition    = this._itemConditionSystem.getSaveState();
     if (this._dragonShoutSystem)      data.dragonShouts     = this._dragonShoutSystem.getSaveState();
     if (this._followerSystem)         data.follower         = this._followerSystem.getSaveState();
+    if (this._perkSystem)             data.perks            = this._perkSystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -596,6 +608,10 @@ export class SaveSystem {
     this._player.healthRegen = 0.5;
     this._player.magickaRegen = 2;
     this._player.staminaRegen = 5;
+    // Reset perk-modified fields so PerkSystem can re-apply them cleanly.
+    this._player.perkPowerAttackStaminaMultiplier = 1.0;
+    this._player.perkSneakAttackMultiplier = 1.0;
+    this._player.perkHealingMultiplier = 1.0;
 
     // Restore inventory
     this._inventory.items = data.inventory;
@@ -725,6 +741,10 @@ export class SaveSystem {
       this._dragonShoutSystem.restoreFromSave(data.dragonShouts as any);
     if (this._followerSystem && data.follower)
       this._followerSystem.restoreFromSave(data.follower as any);
+
+    // v27 systems
+    if (this._perkSystem && data.perks)
+      this._perkSystem.restoreFromSave(data.perks as any);
 
     // Restore player name (v15+; keep default "Hero" for older saves)
     if (typeof data.player.name === "string" && data.player.name.trim()) {

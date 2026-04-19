@@ -138,6 +138,7 @@ import { TrainerSystem } from "./systems/trainer-system";
 import { FollowerSystem } from "./systems/follower-system";
 import type { ActiveFollowerState } from "./systems/follower-system";
 import { FollowerUI } from "./ui/follower-ui";
+import { PerkSystem } from "./systems/perk-system";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -308,6 +309,9 @@ export class Game {
   // v26 systems
   public followerSystem: FollowerSystem;
   public followerUI: FollowerUI;
+
+  // v27 systems
+  public perkSystem!: PerkSystem;
 
   /** Fantasy asset loader — streams BabylonJS CDN models (weapons, structures, creatures). */
   public fantasyAssets: FantasyAssetLoader;
@@ -1413,6 +1417,8 @@ export class Game {
       this.ui.showNotification(`Character Level ${newLevel}!`, 4000);
       this.eventBus.emit("player:levelUp", { newLevel });
       this.trainerSystem.onCharacterLevelUp();
+      // Grant one perk point per character level-up.
+      this.perkSystem.addPerkPoints(1);
       this.saveSystem.markDirty();
     };
     this.saveSystem.setPlayerLevelSystem(this.playerLevelSystem);
@@ -1718,6 +1724,16 @@ export class Game {
       }
     };
     this.saveSystem.setFollowerSystem(this.followerSystem);
+
+    // ── v27: Perk System ──────────────────────────────────────────────────
+    this.perkSystem = new PerkSystem(this.player, this.skillProgressionSystem);
+    this.perkSystem.onPerkUnlocked = (_id, name) => {
+      this.ui.showNotification(`Perk unlocked: ${name}!`, 3500);
+      this.saveSystem.markDirty();
+    };
+    this.saveSystem.setPerkSystem(this.perkSystem);
+    // Wire sneak-attack detection into combat.
+    this.combatSystem.setStealthSystem(this.stealthSystem);
 
     // ── v26: Follower UI ──────────────────────────────────────────────────
     this.followerUI = new FollowerUI();

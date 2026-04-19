@@ -49,6 +49,14 @@ export class Player {
    */
   public critChance: number = 0;
 
+  // Perk bonuses — reset to base values on save-load before perks are re-applied.
+  /** Multiplier applied to power attack stamina cost. PerkSystem reduces this below 1.0. */
+  public perkPowerAttackStaminaMultiplier: number = 1.0;
+  /** Additive bonus applied to sneak attack damage as a multiplier offset (1.0 = normal; 2.0 = double). */
+  public perkSneakAttackMultiplier: number = 1.0;
+  /** Multiplier applied to healing spell magnitude. PerkSystem increases this above 1.0. */
+  public perkHealingMultiplier: number = 1.0;
+
   // Level & experience
   public level: number = 1;
   public experience: number = 0;
