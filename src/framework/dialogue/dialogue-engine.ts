@@ -226,6 +226,8 @@ export class DialogueSession {
         return this._context.getInventoryCount(condition.itemId) >= condition.minQuantity;
       case "skill_min":
         return (this._context.getSkillLevel?.(condition.skillId) ?? 0) >= condition.min;
+      case "random_chance":
+        return Math.random() < Math.max(0, Math.min(1, condition.chance));
       default:
         return false;
     }

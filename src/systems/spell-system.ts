@@ -349,9 +349,11 @@ export class SpellSystem {
     // Self-targeted spells
     if (spell.delivery === "self") {
       if (spell.heal) {
-        const actual = Math.min(spell.heal, this._player.maxHealth - this._player.health);
-        this._player.health = Math.min(this._player.maxHealth, this._player.health + spell.heal);
-        return { success: true, heal: actual };
+        const healingMultiplier = (this._player as unknown as { perkHealingMultiplier?: number }).perkHealingMultiplier ?? 1.0;
+        const scaledHeal = spell.heal * healingMultiplier;
+        const actual = Math.min(scaledHeal, this._player.maxHealth - this._player.health);
+        this._player.health = Math.min(this._player.maxHealth, this._player.health + scaledHeal);
+        return { success: true, heal: Math.round(actual) };
       }
       return { success: true };
     }

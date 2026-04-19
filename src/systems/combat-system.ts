@@ -358,6 +358,8 @@ export class CombatSystem {
   private _skillSystem: SkillProgressionSystem | null;
   private _attributeSystem: AttributeSystem | null;
   private _activeEffectsSystem: ActiveEffectsSystem | null;
+  /** Optional sneak-system reference for sneak-attack detection. */
+  private _stealthSystem: { canSneakAttack(npc: NPC): boolean } | null = null;
 
   // Scratch vectors — reused every frame to avoid GC pressure
   private _currentVel: Vector3 = new Vector3();
@@ -418,6 +420,10 @@ export class CombatSystem {
     this._skillSystem = opts?.skillSystem ?? null;
     this._attributeSystem = opts?.attributeSystem ?? null;
     this._activeEffectsSystem = opts?.activeEffectsSystem ?? null;
+  }
+
+  public setStealthSystem(s: { canSneakAttack(npc: NPC): boolean } | null): void {
+    this._stealthSystem = s;
   }
 
   public setScalingSystems(opts: {
@@ -643,6 +649,13 @@ export class CombatSystem {
         const isCrit = effectiveCritChance > 0 && Math.random() < effectiveCritChance;
         const critMultiplier = isCrit ? CRIT_DAMAGE_MULTIPLIER : 1.0;
 
+        // Sneak-attack multiplier: applied when the perk is unlocked and the
+        // player is undetected (canSneakAttack returns true).
+        const sneakMult = (
+          (this.player.perkSneakAttackMultiplier ?? 1.0) > 1.0 &&
+          this._stealthSystem?.canSneakAttack(npc)
+        ) ? this.player.perkSneakAttackMultiplier : 1.0;
+
         const rawMeleeDmg = Math.max(
           1,
           Math.round(
@@ -652,6 +665,7 @@ export class CombatSystem {
             * fatigueFactor
             * critMultiplier
             * this._weaponSkillMultiplier()
+            * sneakMult
           )
         );
         const meleeDmg = applyDamageWithResistance(rawMeleeDmg, npc, "physical", weaponProfile.armorPenFraction);
@@ -725,7 +739,10 @@ export class CombatSystem {
     }
 
     const staminaCost = this._scaledMeleeStaminaCost(
-      meleeProfile.staminaCost * weaponProfile.staminaCostMultiplier * POWER_ATTACK_STAMINA_MULTIPLIER
+      meleeProfile.staminaCost
+      * weaponProfile.staminaCostMultiplier
+      * POWER_ATTACK_STAMINA_MULTIPLIER
+      * (this.player.perkPowerAttackStaminaMultiplier ?? 1.0)
     );
     if (this.player.stamina < staminaCost) {
       this._ui.showNotification("Not enough stamina for a power attack!");

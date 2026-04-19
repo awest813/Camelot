@@ -297,4 +297,139 @@ describe("DialogueEngine", () => {
     const state = (ctx as unknown as { _state: { givenItems: Array<{ itemId: string; quantity: number }> } })._state;
     expect(state.givenItems).toEqual([{ itemId: "health_potion", quantity: 2 }]);
   });
+
+  // ── random_chance condition ─────────────────────────────────────────────────
+
+  it("random_chance: always blocks when chance is 0", () => {
+    const engine = new DialogueEngine([
+      {
+        id: "luck",
+        startNodeId: "start",
+        nodes: [
+          {
+            id: "start",
+            speaker: "Gambler",
+            text: "Try your luck.",
+            choices: [
+              {
+                id: "impossible",
+                text: "Never wins.",
+                conditions: [{ type: "random_chance", chance: 0 }],
+                endsDialogue: true,
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+    const session = engine.createSession("luck", makeContext());
+    // Evaluate many times — should always be unavailable at chance=0
+    for (let i = 0; i < 20; i++) {
+      const node = session.getCurrentNode();
+      expect(node?.choices.find(c => c.id === "impossible")?.isAvailable).toBe(false);
+    }
+  });
+
+  it("random_chance: always succeeds when chance is 1", () => {
+    const engine = new DialogueEngine([
+      {
+        id: "luck",
+        startNodeId: "start",
+        nodes: [
+          {
+            id: "start",
+            speaker: "Gambler",
+            text: "Try your luck.",
+            choices: [
+              {
+                id: "certain",
+                text: "Always wins.",
+                conditions: [{ type: "random_chance", chance: 1 }],
+                endsDialogue: true,
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+    const session = engine.createSession("luck", makeContext());
+    const result = session.choose("certain");
+    expect(result.success).toBe(true);
+  });
+
+  it("random_chance: clamps out-of-range values (chance > 1 treated as 1)", () => {
+    // Math.random() is always [0,1), so Math.random() < 2 is always true
+    // and Math.random() < -1 is always false. The engine clamps to [0,1].
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const engine = new DialogueEngine([
+      {
+        id: "luck",
+        startNodeId: "start",
+        nodes: [
+          {
+            id: "start",
+            speaker: "Gambler",
+            text: "Try your luck.",
+            choices: [
+              {
+                id: "over",
+                text: "Over 1.",
+                conditions: [{ type: "random_chance", chance: 2 }],
+                endsDialogue: true,
+              },
+              {
+                id: "negative",
+                text: "Below 0.",
+                conditions: [{ type: "random_chance", chance: -1 }],
+                endsDialogue: true,
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+    const session = engine.createSession("luck", makeContext());
+    const node = session.getCurrentNode();
+    // chance=2 clamped to 1 → always true; 0.5 < 1 = true
+    expect(node?.choices.find(c => c.id === "over")?.isAvailable).toBe(true);
+    // chance=-1 clamped to 0 → always false; 0.5 < 0 = false
+    expect(node?.choices.find(c => c.id === "negative")?.isAvailable).toBe(false);
+    vi.restoreAllMocks();
+  });
+
+  it("random_chance: uses Math.random for evaluation", () => {
+    vi.spyOn(Math, "random").mockReturnValueOnce(0.3).mockReturnValueOnce(0.8);
+    const engine = new DialogueEngine([
+      {
+        id: "luck",
+        startNodeId: "start",
+        nodes: [
+          {
+            id: "start",
+            speaker: "Gambler",
+            text: "Try your luck.",
+            choices: [
+              {
+                id: "risky",
+                text: "50/50 shot.",
+                conditions: [{ type: "random_chance", chance: 0.5 }],
+                endsDialogue: true,
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+    const session = engine.createSession("luck", makeContext());
+
+    // First call: Math.random() = 0.3 → 0.3 < 0.5 → available
+    const node1 = session.getCurrentNode();
+    expect(node1?.choices.find(c => c.id === "risky")?.isAvailable).toBe(true);
+
+    // Second call: Math.random() = 0.8 → 0.8 < 0.5 → not available
+    const node2 = session.getCurrentNode();
+    expect(node2?.choices.find(c => c.id === "risky")?.isAvailable).toBe(false);
+
+    vi.restoreAllMocks();
+  });
 });

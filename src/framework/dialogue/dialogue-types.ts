@@ -3,7 +3,14 @@ export type DialogueChoiceCondition =
   | { type: "faction_min"; factionId: string; min: number }
   | { type: "quest_status"; questId: string; status: "inactive" | "active" | "completed" }
   | { type: "has_item"; itemId: string; minQuantity: number }
-  | { type: "skill_min"; skillId: string; min: number };
+  | { type: "skill_min"; skillId: string; min: number }
+  /**
+   * Succeeds with the given probability on each evaluation.
+   * `chance` is a value in [0, 1] — e.g. 0.6 means 60% success.
+   * The result is re-rolled every time the choice is displayed, so the same
+   * choice can become available or unavailable between visits to the same node.
+   */
+  | { type: "random_chance"; chance: number };
 
 export type DialogueChoiceEffect =
   | { type: "set_flag"; flag: string; value: boolean }
