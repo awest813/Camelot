@@ -1,0 +1,91 @@
+
+/* Polish styles for Camelot */
+
+.onboarding-tip {
+  backdrop-filter: blur(12px) !important;
+  background: rgba(8, 6, 4, 0.88) !important;
+  border: 1px solid rgba(212, 160, 23, 0.6) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+.character-create__checkbox-row {
+  background: rgba(40, 30, 15, 0.4) !important;
+  padding: 10px 14px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(212, 160, 23, 0.15) !important;
+  transition: background var(--transition-fast), border-color var(--transition-fast) !important;
+}
+
+.character-create__checkbox-row:hover {
+  background: rgba(60, 45, 20, 0.6) !important;
+  border-color: rgba(212, 160, 23, 0.3) !important;
+}
+
+.character-create__checkbox-row input {
+  appearance: none !important;
+  width: 20px !important;
+  height: 20px !important;
+  border: 2px solid rgba(212, 160, 23, 0.5) !important;
+  border-radius: 4px !important;
+  background: rgba(0, 0, 0, 0.4) !important;
+  cursor: pointer !important;
+  position: relative !important;
+}
+
+.character-create__checkbox-row input:checked {
+  background: #D4A017 !important;
+  border-color: #f2dca8 !important;
+}
+
+.character-create__checkbox-row input:checked::after {
+  content: "✓" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  color: #1a120a !important;
+  font-size: 14px !important;
+  font-weight: bold !important;
+}
+
+.active-effect-hud__pill.is-expiring {
+  animation: active-effect-pulse 1s infinite ease-in-out !important;
+  border-color: rgba(255, 100, 100, 0.6) !important;
+}
+
+@keyframes active-effect-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(0.98); }
+}
+.character-create__button {
+  background: linear-gradient(180deg, rgba(140, 100, 25, 0.95), rgba(90, 60, 15, 0.98)) !important;
+  color: #fff4d6 !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(212, 160, 23, 0.8) !important;
+}
+
+.character-create__button:hover:enabled {
+  filter: brightness(1.15) !important;
+  transform: translateY(-1px) !important;
+}
+
+.active-effect-hud__pill {
+  backdrop-filter: blur(8px) !important;
+  background: rgba(12, 10, 8, 0.85) !important;
+  border: 1px solid rgba(212, 160, 23, 0.25) !important;
+}
+
+.level-up__attr-btn.is-selected {
+  border-color: #D4A017 !important;
+  background: rgba(212, 160, 23, 0.18) !important;
+  box-shadow: 0 0 20px rgba(212, 160, 23, 0.15) !important;
+}
+
+.level-up__attr-bonus--5 {
+  color: #ffd700 !important;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5) !important;
+  font-weight: 800 !important;
+}

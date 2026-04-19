@@ -4,6 +4,7 @@ import { RACES, type RaceDefinition } from "../systems/race-system";
 import { shouldSkipOnboardingTips } from "../onboarding-preferences";
 import { WorldSeed, type WorldType, type BiomeScale, type StructureDensity } from "../world/world-seed";
 import type { BiomeType } from "../world/world-manager";
+import type { UIAnimator } from "./ui-animator";
 
 export interface CharacterCreationResult {
   name: string;
@@ -82,6 +83,14 @@ const heritageLabel = (heritage: RaceDefinition["heritage"]): string => {
 type CreationStep = "welcome" | "world" | "name" | "race" | "birthsign" | "class";
 
 export class CharacterCreationUI {
+  private _animator: UIAnimator | null = null;
+  private _stepContainer: HTMLDivElement | null = null;
+
+  /** Attach a UIAnimator to enable entrance / exit animations. */
+  public setAnimator(animator: UIAnimator): void {
+    this._animator = animator;
+  }
+
   public async open(): Promise<CharacterCreationResult> {
     return new Promise<CharacterCreationResult>((resolve) => {
       const root = document.createElement("div");
@@ -189,6 +198,9 @@ export class CharacterCreationUI {
       actions.appendChild(continueButton);
 
       document.body.appendChild(root);
+      if (this._animator) {
+        this._animator.panelIn(panel);
+      }
 
       let step: CreationStep = "welcome";
       let skipGameplayTips = shouldSkipOnboardingTips();
@@ -204,8 +216,27 @@ export class CharacterCreationUI {
       let structureDensity: StructureDensity = "normal";
       let startingBiome: BiomeType | null = null;
 
+      this._stepContainer = cards;
+
       const clearCards = () => {
         while (cards.firstChild) cards.removeChild(cards.firstChild);
+      };
+
+      /** 
+       * Helper to transition between steps with a smooth animation.
+       * Invokes the render callback after the container fades out.
+       */
+      const transitionTo = (nextStep: CreationStep, renderFn: () => void) => {
+        if (this._animator && step !== nextStep) {
+          this._animator.panelOut(cards, () => {
+            step = nextStep;
+            renderFn();
+            this._animator?.panelIn(cards);
+          });
+        } else {
+          step = nextStep;
+          renderFn();
+        }
       };
 
       const setAllStepPills = (active: CreationStep) => {
@@ -651,6 +682,10 @@ export class CharacterCreationUI {
           biomeVisualGrid.appendChild(tile);
         }
 
+        if (this._animator) {
+          this._animator.staggerIn([...wtCardEls, ...biomeTileEls], 0.03);
+        }
+
         detailsTitle.textContent = "World seed";
         detailsBody.textContent =
           "A seed is a number or phrase that deterministically shapes your entire world. " +
@@ -723,6 +758,10 @@ export class CharacterCreationUI {
           suggestGrid.appendChild(btn);
         }
 
+        if (this._animator) {
+          this._animator.staggerIn(Array.from(suggestGrid.children), 0.02);
+        }
+
         detailsTitle.textContent = "Your name";
         detailsBody.textContent =
           "Your name will be known across the realm. Pick a zodiac-inspired name for a touch of destiny, or forge your own legend.";
@@ -768,6 +807,10 @@ export class CharacterCreationUI {
           cards.appendChild(card);
         }
 
+        if (this._animator) {
+          this._animator.staggerIn(Array.from(cards.children), 0.04);
+        }
+
         setDetails(selectedRace);
       };
 
@@ -808,6 +851,10 @@ export class CharacterCreationUI {
             renderBirthsigns();
           });
           cards.appendChild(card);
+        }
+
+        if (this._animator) {
+          this._animator.staggerIn(Array.from(cards.children), 0.04);
         }
 
         setDetails(selectedBirthsign);
@@ -852,69 +899,35 @@ export class CharacterCreationUI {
           cards.appendChild(card);
         }
 
+        if (this._animator) {
+          this._animator.staggerIn(Array.from(cards.children), 0.04);
+        }
+
         setDetails(selectedClass);
       };
 
       backButton.addEventListener("click", () => {
         if (backButton.getAttribute("aria-disabled") === "true") return;
-        if (step === "world") {
-          step = "welcome";
-          renderWelcome();
-        } else if (step === "name") {
-          step = "world";
-          renderWorld();
-        } else if (step === "race") {
-          step = "name";
-          renderName();
-        } else if (step === "birthsign") {
-          step = "race";
-          renderRaces();
-        } else if (step === "class") {
-          step = "birthsign";
-          renderBirthsigns();
-        }
+        if (step === "world")          transitionTo("welcome",   renderWelcome);
+        else if (step === "name")      transitionTo("world",     renderWorld);
+        else if (step === "race")      transitionTo("name",      renderName);
+        else if (step === "birthsign") transitionTo("race",      renderRaces);
+        else if (step === "class")     transitionTo("birthsign", renderBirthsigns);
       });
 
       continueButton.addEventListener("click", () => {
         if (continueButton.getAttribute("aria-disabled") === "true") return;
-        if (step === "welcome") {
-          step = "world";
-          renderWorld();
-          return;
-        }
-        if (step === "world") {
-          step = "name";
-          renderName();
-          return;
-        }
-        if (step === "name") {
-          if (!enteredName.trim()) return;
-          step = "race";
-          renderRaces();
-          return;
-        }
-        if (step === "race") {
-          if (!selectedRace) return;
-          step = "birthsign";
-          renderBirthsigns();
-          return;
-        }
-        if (step === "birthsign") {
-          if (!selectedBirthsign) return;
-          step = "class";
-          renderClasses();
-          return;
-        }
+
+        if (step === "welcome")   { transitionTo("world",     renderWorld);     return; }
+        if (step === "world")     { transitionTo("name",      renderName);      return; }
+        if (step === "name")      { if (!enteredName.trim()) return; transitionTo("race", renderRaces); return; }
+        if (step === "race")      { if (!selectedRace) return; transitionTo("birthsign", renderBirthsigns); return; }
+        if (step === "birthsign") { if (!selectedBirthsign) return; transitionTo("class", renderClasses); return; }
 
         if (!enteredName.trim() || !selectedRace || !selectedBirthsign || !selectedClass) return;
 
         const trimmed = worldSeedString.trim();
-        // 0xffffffff is the max unsigned 32-bit value; WorldSeed stores seedValue as a
-        // plain JS number (64-bit float) and WorldSeed.hashString() returns an unsigned
-        // 32-bit integer via `>>> 0`, so the full [0, 0xffffffff] range is valid.
         const rawSeed = trimmed || String(Math.floor(Math.random() * 0xffffffff));
-        // Use numeric type when the input is a pure integer so WorldSeed stores
-        // the value verbatim rather than hashing it.
         const seedArg: string | number = /^\d+$/.test(rawSeed) ? Number(rawSeed) : rawSeed;
         const builtSeed = new WorldSeed(seedArg, {
           worldType,
@@ -923,15 +936,24 @@ export class CharacterCreationUI {
           startingBiome,
         });
 
-        root.remove();
-        resolve({
+        const result: CharacterCreationResult = {
           name: enteredName.trim(),
           raceId: selectedRace.id,
           birthsignId: selectedBirthsign.id,
           classId: selectedClass.id,
           skipGameplayTips,
           worldSeed: builtSeed,
-        });
+        };
+
+        if (this._animator) {
+          this._animator.panelOut(panel, () => {
+            root.remove();
+            resolve(result);
+          });
+        } else {
+          root.remove();
+          resolve(result);
+        }
       });
 
       renderWelcome();

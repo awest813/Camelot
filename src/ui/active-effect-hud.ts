@@ -204,6 +204,13 @@ export class ActiveEffectHUD {
 
     entry.countdown.textContent = formatDuration(effect.duration);
     this._setBarProgress(entry.bar, effect.duration, effect.totalDuration);
+
+    // Subtle pulse when near expiration (< 5s)
+    if (effect.duration <= 5) {
+      entry.pill.classList.add("is-expiring");
+    } else {
+      entry.pill.classList.remove("is-expiring");
+    }
   }
 
   private _setBarProgress(bar: HTMLDivElement, remaining: number, total: number): void {

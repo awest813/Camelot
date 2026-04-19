@@ -1,6 +1,7 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Grid, Button } from "@babylonjs/gui/2D";
+import { LinearGradient } from "@babylonjs/gui/2D/controls/linearGradient";
 import { Item } from "../systems/inventory-system";
 import { Quest } from "../systems/quest-system";
 import { EquipSlot } from "../systems/equipment-system";
@@ -84,6 +85,8 @@ export class UIManager {
   public saveButton: Button;
   public loadButton: Button;
   public quitButton: Button;
+
+  private _hpPulseObs: any = null;
 
   // Interaction
   public interactionLabel: TextBlock;
@@ -1142,7 +1145,7 @@ export class UIManager {
     container.width = "192px";
     container.height = "22px";
     container.cornerRadius = 6;
-    container.color = "rgba(212, 160, 23, 0.28)";
+    container.color = "rgba(212, 160, 23, 0.45)";
     container.thickness = 1;
     container.background = trackColor;
     parent.addControl(container);
@@ -1152,28 +1155,72 @@ export class UIManager {
     bar.height = "100%";
     bar.cornerRadius = 5;
     bar.thickness = 0;
-    bar.background = fillColor;
+    
+    // Create a vertical gradient for the bar fill
+    const gradient = new LinearGradient(0, 0, 0, 1);
+    gradient.addColorStop(0, fillColor);
+    gradient.addColorStop(1, this._darkenColor(fillColor, 0.35));
+    bar.backgroundGradient = gradient;
+    
     bar.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     container.addControl(bar);
+
+    // Subtle top sheen/highlight
+    const sheen = new Rectangle();
+    sheen.width = "100%";
+    sheen.height = "40%";
+    sheen.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    sheen.background = "rgba(255, 252, 240, 0.12)";
+    sheen.thickness = 0;
+    sheen.cornerRadius = 5;
+    container.addControl(sheen);
 
     // Label overlaid on top of bar
     const labelText = new TextBlock();
     labelText.text = label;
-    labelText.color = "rgba(255, 252, 245, 0.9)";
-    labelText.fontSize = 10;
+    labelText.color = "#FFF8E7";
+    labelText.fontSize = 11;
     labelText.fontWeight = "bold";
     labelText.width = "100%";
     labelText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    labelText.paddingLeft = "8px";
-    labelText.shadowColor = "rgba(0,0,0,0.55)";
-    labelText.shadowBlur = 3;
+    labelText.paddingLeft = "10px";
+    labelText.shadowColor = "rgba(0,0,0,0.7)";
+    labelText.shadowBlur = 4;
     container.addControl(labelText);
 
     return { container, bar };
   }
 
+  /** Helper to darken a hex or rgba color. */
+  private _darkenColor(color: string, amount: number): string {
+    if (color.startsWith("rgba")) {
+      return color.replace(/[\d.]+\)$/, (m) => (parseFloat(m) * (1 - amount)).toString() + ")");
+    }
+    // Simple hex darken fallback (assuming valid hex)
+    return color; 
+  }
+
   public updateHealth(current: number, max: number): void {
+    const percent = max > 0 ? (current / max) : 0;
     this.healthBar.width = clampPercentage(current, max);
+
+    // Low health pulse effect
+    if (percent > 0 && percent < 0.25) {
+      if (!this._hpPulseObs) {
+        let time = 0;
+        this._hpPulseObs = this.scene.onBeforeRenderObservable.add(() => {
+          time += this.scene.getEngine().getDeltaTime() * 0.006;
+          const pulse = 0.7 + Math.sin(time) * 0.3;
+          this.healthBar.alpha = pulse;
+        });
+      }
+    } else {
+      if (this._hpPulseObs) {
+        this.scene.onBeforeRenderObservable.remove(this._hpPulseObs);
+        this._hpPulseObs = null;
+        this.healthBar.alpha = 1.0;
+      }
+    }
   }
 
   public updateMagicka(current: number, max: number): void {

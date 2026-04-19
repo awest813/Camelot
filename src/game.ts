@@ -223,6 +223,7 @@ export class Game {
   public levelUpUI: LevelUpUI;
   public stableUI: StableUI;
   public saddlebagUI: SaddlebagUI;
+  public uiAnimator: UIAnimator = new UIAnimator();
 
   // v2 systems (Oblivion-lite)
   public attributeSystem: AttributeSystem;
@@ -1239,6 +1240,11 @@ export class Game {
     this.saveSystem.setSpellMakingSystem(this.spellMakingSystem);
 
     this.spellMakingUI = new SpellMakingUI((components) => this.spellMakingSystem.computeCost(components));
+    this.spellMakingUI.setAnimator(this.uiAnimator);
+
+    this.levelUpUI = new LevelUpUI();
+    this.levelUpUI.setAnimator(this.uiAnimator);
+
     this.spellMakingUI.onForge = ({ name, components }) => {
       this.barterSystem.playerGold = this._getInventoryGold();
       const result = this.spellMakingSystem.forgeSpell(name, components, this.barterSystem);
@@ -3117,6 +3123,7 @@ export class Game {
     this.player.camera.detachControl();
 
     const creator = new CharacterCreationUI();
+    creator.setAnimator(this.uiAnimator);
     const selection = await creator.open();
 
     // Apply player name

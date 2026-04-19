@@ -72,6 +72,10 @@ export class LevelUpUI {
     if (this._root) {
       this._root.style.display = "grid";
       this._animator?.panelIn(this._root);
+      if (this._animator) {
+        const items = this._root.querySelectorAll(".level-up__item");
+        this._animator.staggerIn(Array.from(items), 0.035);
+      }
     }
     this.isVisible = true;
     // Move keyboard focus to the first attribute button for accessibility.

@@ -72,4 +72,20 @@ export class UIAnimator {
     const keyframes: DOMKeyframesDefinition = { opacity: [1, 0], y: [0, 6], scale: [1, 0.97] };
     animateMini(element, keyframes, { duration: PANEL_OUT_DURATION, ease: PANEL_OUT_EASE }).then(done);
   }
+
+  /**
+   * Animate a collection of elements with a staggered delay for a professional entrance.
+   */
+  public staggerIn(elements: (HTMLElement | Element)[], staggerDelay: number = 0.04): void {
+    if (this._reducedMotion) return;
+    elements.forEach((el, i) => {
+      if (!(el instanceof HTMLElement)) return;
+      const keyframes: DOMKeyframesDefinition = { opacity: [0, 1], y: [12, 0], scale: [0.92, 1] };
+      animateMini(el, keyframes, { 
+        duration: PANEL_IN_DURATION + 0.1, 
+        delay: i * staggerDelay,
+        ease: PANEL_IN_EASE 
+      });
+    });
+  }
 }
