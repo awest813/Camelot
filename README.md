@@ -64,6 +64,7 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 - **Class System**: choose a character class (Warrior, Mage, Thief, Battlemage, etc.) that defines two favored attributes, five major skills (1.5× XP, start higher), and five minor skills (1.25× XP).
 - **Horse / Stable System**: purchase and ride horses from stable NPCs; each horse has its own speed multiplier and saddlebag inventory; O to mount/dismount, Shift+O to browse stable or open saddlebag.
 - **Disease System**: contract one of seven Oblivion-style diseases (Rust Chancre, Swamp Rot, Witbane, Collywobbles, Brain Rot, Yellow Tick, Porphyric Hemophilia) through combat hits; each disease weakens one or more attributes until cured by a Cure Disease potion or shrine; Argonians are immune.
+- **Standing Stones**: Skyrim-style Guardian Stones scattered across the wilderness. Touching a stone swaps your current blessing at any time (one active stone at a time, stackable with your birthsign). The three Guardian Stones (Warrior / Mage / Thief) grant +20% XP to their skill family; other stones provide passive bonuses (Atronach's 50% spell absorption with stunted magicka, Steed's carry weight, Lady's regen, Apprentice's doubled magicka regen, Lord's armor + magic resist, Lover's 15% XP to all skills) or once-per-day powers (Ritual reanimation, Shadow invisibility, Tower lock opening, Serpent paralysis).
 
 ### UI + Quality of Life
 
