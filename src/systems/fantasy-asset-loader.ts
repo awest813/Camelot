@@ -7,7 +7,16 @@
  *
  * Asset sources:
  *   BabylonJS Assets CDN  — https://assets.babylonjs.com/meshes/
+ *   Source repository      — https://github.com/BabylonJS/Assets (CC BY 4.0)
  *   Kenney NL / Quaternius — procedural fallbacks where required
+ *
+ * Licensing:
+ *   Assets from BabylonJS/Assets are licensed under Creative Commons
+ *   Attribution 4.0 International (CC BY 4.0) unless otherwise noted in
+ *   the asset folder.  See https://creativecommons.org/licenses/by/4.0/
+ *
+ * See docs/asset-catalogue.md for the full catalogue of available assets,
+ * their CDN URLs, categories, and usage guidance.
  *
  * All loads are fire-and-forget. Failures are silent and the asset simply
  * remains unavailable; callers should always code a procedural fallback.
@@ -35,42 +44,80 @@ export type FantasyAssetKey =
   | "hauntedHouse"    // Haunted house — ruins/fort structure variant
   | "village"         // Village scene — settlement cluster
   | "valleyVillage"   // Valley village with terrain — large settlement
-  | "graveYardScene"; // Graveyard scene — cemetery near ruins
+  | "graveYardScene"  // Graveyard scene — cemetery near ruins
+  // ── Additional assets from BabylonJS Assets CDN (CC BY 4.0) ───────────────
+  | "pirateFort"      // Fort structure — bandit camp / ruins variant
+  | "cannon"          // Cannon prop — fort / siege decoration
+  | "explodingBarrel" // Exploding barrel — interactive prop / dungeon hazard
+  | "skull"           // Skull — dungeon decoration / necromancer prop
+  | "bothHousesScene" // Two-house scene — small settlement variant
+  | "houseScene"      // Single house scene — hamlet / farmstead structure
+  | "lamp"            // Oil lamp — interior lighting prop
+  | "candle"          // Candle — interior / shrine decoration
+  | "fish"            // Fish — market stall / fishing prop
+  | "seagull"         // Seagull — ambient coastal creature
+  | "hexTile"         // Hex tile — modular terrain / board piece
+  | "elfRun"          // Elf run animation — NPC locomotion variant
+  | "elfDie"          // Elf death animation — NPC death variant
+  | "dude";           // Animated humanoid — generic NPC / villager
 
 const CDN      = "https://assets.babylonjs.com/meshes/";
 const CDN_DEMO = CDN + "Demos/weaponsDemo/meshes/";
+const CDN_ELF  = CDN + "Elf/";
 
 /** CDN URL for each asset key. */
 const ASSET_URLS: Record<FantasyAssetKey, string> = {
-  elfAnimated:   CDN      + "Elf_allAnimations.gltf",
+  elfAnimated:    CDN_ELF  + "Elf_allAnimations.gltf",
   // Weapons: confirmed at both root and Demos sub-path; use Demos path as primary
-  runeSword:     CDN_DEMO + "runeSword.glb",
-  frostAxe:      CDN_DEMO + "frostAxe.glb",
-  moltenDagger:  CDN_DEMO + "moltenDagger.glb",
-  mausoleum:     CDN      + "mausoleumLarge.glb",
-  obelisk:       CDN      + "obelisk1.glb",
-  cottage:       CDN      + "cottage.glb",
-  inn:           CDN      + "inn.glb",
-  dragon:        CDN      + "dragon.glb",
-  hauntedHouse:  CDN      + "haunted_house.glb",
-  village:       CDN      + "village.glb",
-  valleyVillage: CDN      + "valleyvillage.glb",
-  graveYardScene: CDN     + "graveyardScene.glb",
+  runeSword:      CDN_DEMO + "runeSword.glb",
+  frostAxe:       CDN_DEMO + "frostAxe.glb",
+  moltenDagger:   CDN_DEMO + "moltenDagger.glb",
+  mausoleum:      CDN      + "mausoleumLarge.glb",
+  obelisk:        CDN      + "obelisk1.glb",
+  cottage:        CDN      + "cottage.glb",
+  inn:            CDN      + "inn.glb",
+  dragon:         CDN      + "Georgia-Tech-Dragon/dragon.glb",
+  hauntedHouse:   CDN      + "haunted_house.glb",
+  village:        CDN      + "village.glb",
+  valleyVillage:  CDN      + "valleyvillage.glb",
+  graveYardScene: CDN      + "graveyardScene.glb",
+  // Additional assets from BabylonJS Assets CDN (CC BY 4.0)
+  pirateFort:     CDN      + "pirateFort/pirateFort.glb",
+  cannon:         CDN      + "pirateFort/cannon.glb",
+  explodingBarrel: CDN     + "ExplodingBarrel.glb",
+  skull:          CDN      + "skull.babylon",
+  bothHousesScene: CDN     + "both_houses_scene.glb",
+  houseScene:     CDN      + "house_scene.glb",
+  lamp:           CDN      + "lamp.babylon",
+  candle:         CDN      + "candle.babylon",
+  fish:           CDN      + "fish.glb",
+  seagull:        CDN      + "seagulf.glb",
+  hexTile:        CDN      + "hexTile.glb",
+  elfRun:         CDN_ELF  + "Elf_run.gltf",
+  elfDie:         CDN_ELF  + "Elf_die.gltf",
+  dude:           CDN      + "Dude/dude.babylon",
 };
 
 // ── Scale overrides (world-unit scale applied after load) ────────────────────
 
 const ASSET_SCALE: Partial<Record<FantasyAssetKey, number>> = {
-  elfAnimated:   1.0,
-  mausoleum:     1.0,
-  obelisk:       1.0,
-  cottage:       1.0,
-  inn:           1.0,
-  dragon:        2.0,
-  hauntedHouse:  1.0,
-  village:       1.0,
-  valleyVillage: 1.0,
+  elfAnimated:    1.0,
+  mausoleum:      1.0,
+  obelisk:        1.0,
+  cottage:        1.0,
+  inn:            1.0,
+  dragon:         2.0,
+  hauntedHouse:   1.0,
+  village:        1.0,
+  valleyVillage:  1.0,
   graveYardScene: 1.0,
+  pirateFort:     1.0,
+  cannon:         1.0,
+  explodingBarrel: 1.0,
+  skull:          0.5,
+  bothHousesScene: 1.0,
+  houseScene:     1.0,
+  dude:           1.0,
 };
 
 // ── Internal state per asset ──────────────────────────────────────────────────

@@ -548,6 +548,19 @@ All Phase 3/4 continuation items delivered (82 new tests):
 - 🧭 Investigate co-op/multiplayer architecture feasibility.
 - 🧭 Define authority model and synchronization boundaries.
 
+### NPC Steering & Movement Quality
+
+- 🧭 **Yuka steering behaviors** — Adopt the [Yuka](https://github.com/Mugen87/yuka) library's steering module (seek, flee, arrive, wander, pursuit, obstacle avoidance, separation, flocking) to replace straight-line waypoint following with smooth, natural NPC movement. See `docs/yuka-evaluation.md` for the full evaluation. Yuka fills the gap between `NavigationSystem` navmesh paths and physics-based movement without duplicating existing behavior-tree or state-machine capabilities.
+- 🧭 **YukaSteeringAdapter** — Thin adapter in `src/adapters/` that converts Babylon.js `Vector3` ↔ Yuka `Vector3` and exposes `FollowPathBehavior` + `SeparationBehavior` for NPC path-following.
+
+### Dynamic Economy
+
+- 🧭 **DynamicMarketSystem** — Agent-based free-market simulation inspired by [economia](https://github.com/Jimimimi/economia) / bazaarBot. Autonomous merchant agents post buy/sell orders; prices emerge from supply and demand; belief-range updating narrows price estimates over time. Integrates as an optional multiplier into `BarterSystem` pricing. See `docs/dynamic-economy-design.md` for the full design.
+
+### Asset Expansion
+
+- ✅ **BabylonJS Assets CDN catalogue** — Expanded `FantasyAssetLoader` with 14 additional assets from the [BabylonJS/Assets](https://github.com/BabylonJS/Assets) repository (CC BY 4.0): fort, cannon, barrel, skull, houses, lamp, candle, fish, seagull, hex tile, elf animation variants, and animated humanoid. See `docs/asset-catalogue.md` for the full catalogue and integration guide.
+
 ---
 
 ## Contribution Focus

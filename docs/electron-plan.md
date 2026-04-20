@@ -192,6 +192,66 @@ A new GitHub Actions workflow (`electron-build.yml`) will:
 A developer console panel embedded in the Electron shell for debugging and
 live inspection.  It does **not** exist in the browser build.
 
+### Architectural Blueprint — BabylonNativePlayground
+
+The design draws heavily from the
+[BabylonNativePlayground](https://github.com/CedricGuillemet/BabylonNativePlayground)
+project, which demonstrates bidirectional JS↔C++ communication with a full
+native scene inspector.  Key patterns adapted for our Electron context:
+
+1. **Binary buffer scene serialisation (JS → Main)** — The Playground
+   serialises the entire scene graph (nodes, meshes, materials, lights,
+   cameras, stats) into a compact binary buffer that the native side reads
+   without JSON parse overhead.  For our Electron DevConsole, we adapt
+   this as a **structured JSON snapshot** sent over IPC:
+   ```ts
+   interface SceneSnapshot {
+     nodes: NodeInfo[];         // name, type, enabled, position
+     meshes: MeshInfo[];        // vertexCount, faceCount, materialId
+     lights: LightInfo[];       // type, intensity, color
+     cameras: CameraInfo[];     // position, target, fov
+     stats: StatsInfo;          // fps, drawCalls, totalVertices
+     systems: SystemsInfo;      // NPC states, quest progress, factions
+   }
+   ```
+   The renderer serialises this snapshot on a configurable interval
+   (default 500 ms) and sends it to the main process via
+   `devConsole:scene-snapshot` IPC.  The main process renders the data
+   in ImGui-style panels (or an HTML-based inspector window).
+
+2. **Command buffer dispatch (Main → JS)** — The Playground sends
+   property edits and debug toggles from the native inspector back to
+   JavaScript as a serialised command buffer.  Our DevConsole adapts
+   this as a **typed command protocol**:
+   ```ts
+   type DevCommand =
+     | { type: "give"; itemId: string; qty: number }
+     | { type: "teleport"; x: number; y: number; z: number }
+     | { type: "setTime"; hour: number }
+     | { type: "spawn"; archetypeId: string }
+     | { type: "advanceTime"; hours: number }
+     | { type: "toggleGodMode" }
+     | { type: "setProperty"; path: string; value: unknown }
+     | { type: "toggleDebug"; feature: string; enabled: boolean };
+   ```
+   Commands are dispatched via `devConsole:execute` IPC and validated
+   against an allowlist before execution.
+
+3. **Panel layout** — The Playground's ImGui inspector has four panels
+   that map directly to our DevConsole:
+
+   | Playground Panel | DevConsole Equivalent |
+   |------------------|----------------------|
+   | Scene Explorer | **System Explorer** — tree view of all active systems, NPC entities, quest states, faction standings |
+   | Properties | **Inspector** — editable property grid for the selected system/entity (NPC health, quest progress, merchant gold) |
+   | Stats | **Performance** — FPS graph, draw calls, vertex count, frame timing, memory usage |
+   | Debug | **Toggles** — grid, bounding boxes, navmesh overlay, world axes, fog, shadows, weather override |
+
+4. **Playground loader analogy** — The Playground loads any public
+   playground snippet by hash.  Our DevConsole equivalent is loading any
+   `.bundle.json` content pack and hot-injecting it into the running
+   game for rapid content testing.
+
 ### Goals
 
 1. **Live system inspection** — Query headless system state (NPC schedules,
@@ -204,6 +264,9 @@ live inspection.  It does **not** exist in the browser build.
    output from the renderer process into a scrollable panel with filtering.
 4. **Autocomplete** — Tab-completion for known command names, item IDs,
    archetype IDs, and quest IDs drawn from the content registry.
+5. **Scene snapshot** — Periodic structured snapshot of the scene graph and
+   all system states, displayed in an explorer/inspector panel layout
+   inspired by the BabylonNativePlayground's ImGui inspector.
 
 ### Architecture
 
@@ -214,11 +277,17 @@ live inspection.  It does **not** exist in the browser build.
     system APIs and returns a result object.
   - `devConsole:subscribe-logs` → Renderer hooks `console` and forwards
     entries to the main process for display.
+  - `devConsole:scene-snapshot` → Renderer serialises and sends a periodic
+    snapshot of the scene graph and system states.
+  - `devConsole:set-snapshot-interval` → Main process configures the
+    snapshot frequency (default 500 ms, 0 = disabled).
 - The renderer exposes a `DevConsoleBridge` through the preload script:
   ```ts
   interface DevConsoleBridge {
     execute(command: string): Promise<{ ok: boolean; output: string }>;
     onLog(callback: (entry: LogEntry) => void): void;
+    getSceneSnapshot(): Promise<SceneSnapshot>;
+    setSnapshotInterval(ms: number): void;
   }
   ```
 
@@ -229,6 +298,8 @@ live inspection.  It does **not** exist in the browser build.
   `--dev-console` flag is passed.
 - Commands are sandboxed — they can only call explicitly allowlisted system
   methods.  No `eval()` or arbitrary code execution.
+- Scene snapshots are read-only views; mutations go through the typed
+  command protocol.
 
 ### Keybinding
 
