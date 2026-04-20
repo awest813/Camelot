@@ -44,7 +44,7 @@ import { $, $N } from "@mathigon/boost";
 const mock$ = $ as ReturnType<typeof vi.fn>;
 const mock$N = $N as ReturnType<typeof vi.fn>;
 
-import { makeEl, boostFadeIn, boostFadeOut, FADE_IN_DURATION_MS, FADE_OUT_DURATION_MS } from "./dom-utils";
+import { makeEl, boostFadeIn, boostFadeOut, sanitizeHtml, FADE_IN_DURATION_MS, FADE_OUT_DURATION_MS } from "./dom-utils";
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -226,6 +226,43 @@ describe("dom-utils", () => {
         const el = makeEl(tag);
         expect(el.tagName.toLowerCase()).toBe(tag);
       }
+    });
+  });
+
+  // ── sanitizeHtml ───────────────────────────────────────────────────────────
+
+  describe("sanitizeHtml()", () => {
+    it("passes through safe HTML unchanged", () => {
+      const safe = '<span style="color:red">Hello</span>';
+      expect(sanitizeHtml(safe)).toBe(safe);
+    });
+
+    it("strips <script> tags and their content", () => {
+      const dirty = '<span>ok</span><script>alert(1)</script>';
+      const result = sanitizeHtml(dirty);
+      expect(result).not.toContain("<script>");
+      expect(result).not.toContain("alert(1)");
+      expect(result).toContain("<span>ok</span>");
+    });
+
+    it("strips javascript: URIs from href attributes", () => {
+      const dirty = '<a href="javascript:alert(1)">click</a>';
+      const result = sanitizeHtml(dirty);
+      expect(result).not.toContain("javascript:");
+    });
+
+    it("strips inline event handlers", () => {
+      const dirty = '<img src="x" onerror="alert(1)">';
+      const result = sanitizeHtml(dirty);
+      expect(result).not.toContain("onerror");
+    });
+
+    it("preserves plain text without modification", () => {
+      expect(sanitizeHtml("whiterun_home")).toBe("whiterun_home");
+    });
+
+    it("returns an empty string for an empty input", () => {
+      expect(sanitizeHtml("")).toBe("");
     });
   });
 });

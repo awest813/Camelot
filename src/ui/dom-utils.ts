@@ -1,5 +1,6 @@
 import { $, $N } from "@mathigon/boost";
 import type { ElementView } from "@mathigon/boost";
+import DOMPurify from "dompurify";
 
 // ── Duration constants ────────────────────────────────────────────────────────
 
@@ -26,6 +27,12 @@ export const FADE_OUT_DURATION_MS = 200;
  *
  * ⚠️  The `compile` and `evaluate` exports from `@mathigon/boost` are NOT
  * used here; they carry an active security notice in the upstream library.
+ *
+ * 3. **sanitizeHtml** — thin wrapper around DOMPurify.sanitize().  Call this
+ *    before assigning any user- or mod-supplied string to `innerHTML`.  The
+ *    function is a no-op in environments where DOMPurify is unavailable
+ *    (e.g. SSR) and returns the original string, so callers never have to
+ *    guard against a missing return value.
  */
 
 // ── Element creation ──────────────────────────────────────────────────────────
@@ -81,4 +88,26 @@ export function boostFadeOut(element: HTMLElement, durationMs = FADE_OUT_DURATIO
   const view = $(element) as ElementView | undefined;
   if (!view) return Promise.resolve();
   return view.exit("fade", durationMs).promise;
+}
+
+// ── HTML sanitization ─────────────────────────────────────────────────────────
+
+/**
+ * Sanitizes an HTML string using DOMPurify before it is written to
+ * `innerHTML`.  Always call this function when the HTML content originates
+ * from user input, mod data, or any other untrusted source.
+ *
+ * - Strips `<script>` tags, `javascript:` URIs, and inline event handlers.
+ * - Preserves safe structural tags (`<span>`, `<strong>`, `<em>`, etc.) and
+ *   inline `style` attributes, so formatted UI snippets survive unmodified.
+ * - Falls back to returning the original string in environments where
+ *   DOMPurify is unavailable (e.g. non-browser SSR contexts), so callers
+ *   do not need to guard the return value.
+ *
+ * @example
+ * element.innerHTML = sanitizeHtml(modSuppliedDescription);
+ */
+export function sanitizeHtml(dirty: string): string {
+  if (typeof DOMPurify.sanitize !== "function") return dirty;
+  return DOMPurify.sanitize(dirty);
 }
