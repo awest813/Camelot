@@ -12,8 +12,7 @@
  *   3. Ultimate RPG                 — rigged + animated humanoid characters
  *   4. Animated Monster             — rigged + animated creatures
  *   5. Modular Character Outfits    — armour/clothing pieces for equipment visuals
- *   6. Universal Animation Library  — standalone animation clips (retargetable)
- *   7. Universal Animation Library 2 — additional animation clips
+ *   6. Universal Animation Library 1 & 2 — standalone animation clips (retargetable)
  *
  * Usage:
  *   import { getQuaterniusEntry, getKeysByPack } from "./quaternius-asset-manifest";
