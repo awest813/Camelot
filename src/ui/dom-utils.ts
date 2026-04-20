@@ -100,14 +100,16 @@ export function boostFadeOut(element: HTMLElement, durationMs = FADE_OUT_DURATIO
  * - Strips `<script>` tags, `javascript:` URIs, and inline event handlers.
  * - Preserves safe structural tags (`<span>`, `<strong>`, `<em>`, etc.) and
  *   inline `style` attributes, so formatted UI snippets survive unmodified.
- * - Falls back to returning the original string in environments where
- *   DOMPurify is unavailable (e.g. non-browser SSR contexts), so callers
- *   do not need to guard the return value.
+ * - Falls back to returning an **empty string** in environments where
+ *   DOMPurify is unavailable (e.g. non-browser SSR contexts), preventing
+ *   unsanitized content from ever reaching the DOM.  In practice, all
+ *   supported environments (browser + jsdom test runner) provide the DOM API
+ *   that DOMPurify requires, so this fallback should never be reached.
  *
  * @example
  * element.innerHTML = sanitizeHtml(modSuppliedDescription);
  */
 export function sanitizeHtml(dirty: string): string {
-  if (typeof DOMPurify.sanitize !== "function") return dirty;
+  if (typeof DOMPurify.sanitize !== "function") return "";
   return DOMPurify.sanitize(dirty);
 }
