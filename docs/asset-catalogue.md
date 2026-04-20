@@ -45,49 +45,49 @@ These assets are registered in `FantasyAssetLoader` and ready to use via their
 | `elfRun` | Elf run cycle — locomotion animation variant | `Elf/Elf_run.gltf` | glTF |
 | `elfDie` | Elf death animation — NPC death variant | `Elf/Elf_die.gltf` | glTF |
 | `dude` | Animated humanoid — generic NPC / villager | `Dude/dude.babylon` | Babylon |
-| `dragon` | Georgia Tech dragon — rare world encounter (scale 2×) | `Georgia-Tech-Dragon/dragon.glb` | glB |
-| `seagull` | Seagull — ambient coastal creature | `seagulf.glb` | glB |
-| `fish` | Fish — market stall / fishing prop | `fish.glb` | glB |
+| `dragon` | Georgia Tech dragon — rare world encounter (scale 2×) | `Georgia-Tech-Dragon/dragon.glb` | GLB |
+| `seagull` | Seagull — ambient coastal creature | `seagulf.glb` | GLB |
+| `fish` | Fish — market stall / fishing prop | `fish.glb` | GLB |
 
 ### Weapons
 
 | Key | Description | CDN Path | Format |
 |-----|-------------|----------|--------|
-| `runeSword` | Rune-inscribed longsword — high-tier loot | `Demos/weaponsDemo/meshes/runeSword.glb` | glB |
-| `frostAxe` | Frost-enchanted axe — ice dungeon loot | `Demos/weaponsDemo/meshes/frostAxe.glb` | glB |
-| `moltenDagger` | Molten obsidian dagger — assassin loot | `Demos/weaponsDemo/meshes/moltenDagger.glb` | glB |
+| `runeSword` | Rune-inscribed longsword — high-tier loot | `Demos/weaponsDemo/meshes/runeSword.glb` | GLB |
+| `frostAxe` | Frost-enchanted axe — ice dungeon loot | `Demos/weaponsDemo/meshes/frostAxe.glb` | GLB |
+| `moltenDagger` | Molten obsidian dagger — assassin loot | `Demos/weaponsDemo/meshes/moltenDagger.glb` | GLB |
 
 ### Structures
 
 | Key | Description | CDN Path | Format |
 |-----|-------------|----------|--------|
-| `cottage` | Thatched roof cottage — settlement building | `cottage.glb` | glB |
-| `inn` | Roadside inn — settlement building | `inn.glb` | glB |
-| `hauntedHouse` | Haunted house — ruins/fort variant | `haunted_house.glb` | glB |
-| `mausoleum` | Stone mausoleum — graveyard structure | `mausoleumLarge.glb` | glB |
-| `pirateFort` | Fort structure — bandit camp / ruins | `pirateFort/pirateFort.glb` | glB |
-| `houseScene` | Single house scene — hamlet / farmstead | `house_scene.glb` | glB |
-| `bothHousesScene` | Two-house scene — small settlement | `both_houses_scene.glb` | glB |
+| `cottage` | Thatched roof cottage — settlement building | `cottage.glb` | GLB |
+| `inn` | Roadside inn — settlement building | `inn.glb` | GLB |
+| `hauntedHouse` | Haunted house — ruins/fort variant | `haunted_house.glb` | GLB |
+| `mausoleum` | Stone mausoleum — graveyard structure | `mausoleumLarge.glb` | GLB |
+| `pirateFort` | Fort structure — bandit camp / ruins | `pirateFort/pirateFort.glb` | GLB |
+| `houseScene` | Single house scene — hamlet / farmstead | `house_scene.glb` | GLB |
+| `bothHousesScene` | Two-house scene — small settlement | `both_houses_scene.glb` | GLB |
 
 ### Scenes & Settlements
 
 | Key | Description | CDN Path | Format |
 |-----|-------------|----------|--------|
-| `village` | Village cluster — settlement scene | `village.glb` | glB |
-| `valleyVillage` | Valley village with terrain — large settlement | `valleyvillage.glb` | glB |
-| `graveYardScene` | Graveyard scene — cemetery near ruins | `graveyardScene.glb` | glB |
+| `village` | Village cluster — settlement scene | `village.glb` | GLB |
+| `valleyVillage` | Valley village with terrain — large settlement | `valleyvillage.glb` | GLB |
+| `graveYardScene` | Graveyard scene — cemetery near ruins | `graveyardScene.glb` | GLB |
 
 ### Props & Decorations
 
 | Key | Description | CDN Path | Format |
 |-----|-------------|----------|--------|
-| `obelisk` | Ancient obelisk — shrine / standing stone | `obelisk1.glb` | glB |
-| `cannon` | Cannon — fort / siege decoration | `pirateFort/cannon.glb` | glB |
-| `explodingBarrel` | Barrel — interactive prop / dungeon hazard | `ExplodingBarrel.glb` | glB |
+| `obelisk` | Ancient obelisk — shrine / standing stone | `obelisk1.glb` | GLB |
+| `cannon` | Cannon — fort / siege decoration | `pirateFort/cannon.glb` | GLB |
+| `explodingBarrel` | Barrel — interactive prop / dungeon hazard | `ExplodingBarrel.glb` | GLB |
 | `skull` | Skull — dungeon / necromancer decoration (scale 0.5×) | `skull.babylon` | Babylon |
 | `lamp` | Oil lamp — interior lighting prop | `lamp.babylon` | Babylon |
 | `candle` | Candle — interior / shrine decoration | `candle.babylon` | Babylon |
-| `hexTile` | Hex tile — modular terrain piece | `hexTile.glb` | glB |
+| `hexTile` | Hex tile — modular terrain piece | `hexTile.glb` | GLB |
 
 ---
 
