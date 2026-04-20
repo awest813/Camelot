@@ -38,6 +38,7 @@ function makeUI() {
   return {
     showNotification: (msg: string) => notes.push(msg),
     notifications: notes,
+    showHealFlash: () => {},
   } as any;
 }
 

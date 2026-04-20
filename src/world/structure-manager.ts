@@ -13,6 +13,7 @@ import { Loot } from "../entities/loot";
 import { BiomeType } from "./world-manager";
 import type { WorldSeed } from "./world-seed";
 
+interface StructureSpawn {
   bodies: PhysicsAggregate[];
   npcs: NPC[];
 }

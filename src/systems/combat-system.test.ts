@@ -91,7 +91,8 @@ describe('CombatSystem', () => {
                 position: new Vector3(0, 0, 0),
                 getForwardRay: vi.fn(() => ({
                     direction: new Vector3(0, 0, 1)
-                }))
+                })),
+                getDirection: vi.fn(() => new Vector3(0, 0, 1))
             },
             raycastForward: vi.fn(() => mockScene.pickWithRay()),
             getForwardDirection: vi.fn(() => new Vector3(0, 0, 1))
@@ -147,6 +148,9 @@ describe('CombatSystem', () => {
             showNotification: vi.fn(),
             showDamageNumber: vi.fn(),
             showHitFlash: vi.fn(),
+            applyHitStop: vi.fn(),
+            shakeCamera: vi.fn(),
+            showSpark: vi.fn(),
         };
 
         combatSystem = new CombatSystem(mockScene, mockPlayer, mockNpcs, mockUI);
@@ -566,6 +570,9 @@ describe('CombatSystem', () => {
         combatSystem.updateNPCAI(0.016);
         expect(mockNpcs[0].isAttackTelegraphing).toBe(true);
 
+        // Advance block timer past the perfect-block window (< 0.3 s)
+        combatSystem.update(0.31);
+
         // Resolve telegraph — player is inside strike window while blocking
         combatSystem.updateNPCAI(0.25);
 
@@ -586,9 +593,9 @@ describe('CombatSystem', () => {
 
         combatSystem.beginBlock();
         combatSystem.updateNPCAI(0.016);
+        // Advance block timer past the perfect-block window (< 0.3 s)
+        combatSystem.update(0.31);
         combatSystem.updateNPCAI(0.25);
-
-        // Stamina should be reduced by the block cost (12 by default)
         expect(mockPlayer.stamina).toBeLessThan(100);
         expect(mockPlayer.notifyResourceSpent).toHaveBeenCalledWith('stamina');
     });
@@ -884,6 +891,8 @@ describe('CombatSystem', () => {
 
         skilledBlock.beginBlock();
         skilledBlock.updateNPCAI(0.016);
+        // Advance block timer past the perfect-block window (< 0.3 s)
+        skilledBlock.update(0.31);
         skilledBlock.updateNPCAI(0.25);
 
         // With 80% block reduction: round(10 * (1 - 0.80)) = round(2.0) = 2 damage
@@ -909,6 +918,8 @@ describe('CombatSystem', () => {
 
         skilledBlock.beginBlock();
         skilledBlock.updateNPCAI(0.016);
+        // Advance block timer past the perfect-block window (< 0.3 s)
+        skilledBlock.update(0.31);
         skilledBlock.updateNPCAI(0.25);
 
         // Block skill 100 → stamina cost = 4 → 100 - 4 = 96

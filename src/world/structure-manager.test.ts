@@ -110,6 +110,10 @@ vi.mock('../entities/npc', () => ({
     attackDamage = 0;
     xpReward = 0;
     patrolPoints: any[] = [];
+    isDead = false;
+    isAggressive = false;
+    isInDialogue = false;
+    mesh = { dispose: vi.fn() };
     constructor(_scene: any, _pos: any, _name: string) {}
   },
 }));

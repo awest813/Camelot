@@ -8,6 +8,7 @@ describe("CrimeSystem", () => {
   let mockPlayer: any;
   let mockNpc: any;
   let mockUI: any;
+  let mockScene: any;
 
   beforeEach(() => {
     mockPlayer = {
@@ -22,12 +23,15 @@ describe("CrimeSystem", () => {
       mesh: {
         name: "GuardNPC",
         position: new Vector3(0, 0, 5),
+        // NPC faces toward the player (−Z direction from z=5 toward z=0)
+        getDirection: vi.fn(() => new Vector3(0, 0, -1)),
       },
     };
 
     mockUI = { showNotification: vi.fn() };
+    mockScene = { pickWithRay: vi.fn(() => null) };
 
-    crimeSystem = new CrimeSystem(mockPlayer, [mockNpc], mockUI);
+    crimeSystem = new CrimeSystem(mockPlayer, [mockNpc], mockUI, mockScene);
   });
 
   it("starts with zero bounty", () => {
@@ -153,7 +157,7 @@ describe("CrimeSystem", () => {
     crimeSystem.commitCrime("theft", "town_guard", 480);
     const saved = crimeSystem.getSaveState();
 
-    const restored = new CrimeSystem(mockPlayer, [mockNpc], mockUI);
+    const restored = new CrimeSystem(mockPlayer, [mockNpc], mockUI, mockScene);
     restored.restoreFromSave(saved);
     expect(restored.getBounty("town_guard")).toBe(25);
   });

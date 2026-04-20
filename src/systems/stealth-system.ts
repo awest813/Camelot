@@ -57,6 +57,7 @@ const SNEAK_ATTACK_MAX_DETECTION = 30;
  *   5. Call `pushNoise(level, duration)` when the player makes an audible action.
  *   6. Set `shadowFactor` each frame to reflect how well-lit the player's position is.
  */
+export class StealthSystem {
   private _player: Player;
   private _npcs: NPC[];
   private _ui: UIManager;
