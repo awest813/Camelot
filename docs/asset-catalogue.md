@@ -307,26 +307,26 @@ yet been integrated into `FantasyAssetLoader`.
 
 | Asset | CDN Path | Notes |
 |-------|----------|-------|
-| `HVGirl.glb` | `meshes/HVGirl.glb` | Animated female character |
-| `alien.glb` | `meshes/alien.glb` | Could serve as a Daedra/demon variant |
-| `Rabbit.babylon` | `meshes/Rabbit.babylon` | Wildlife / pet candidate |
-| `shark.glb` | `meshes/shark.glb` | Underwater encounter creature |
+| `HVGirl.glb` | `HVGirl.glb` | Animated female character |
+| `alien.glb` | `alien.glb` | Could serve as a Daedra/demon variant |
+| `Rabbit.babylon` | `Rabbit.babylon` | Wildlife / pet candidate |
+| `shark.glb` | `shark.glb` | Underwater encounter creature |
 
 ### Environments
 
 | Asset | CDN Path | Notes |
 |-------|----------|-------|
-| `snowField.glb` | `meshes/Demos/Snow_Man_Scene/snowField.glb` | Snowy terrain patch |
-| `underwaterScene.glb` | `meshes/Demos/UnderWaterScene/underwaterScene.glb` | Underwater dungeon environment |
-| `underwaterSceneNavMesh.glb` | `meshes/Demos/UnderWaterScene/navMesh/underwaterSceneNavMesh.glb` | Pre-built navmesh for underwater area |
+| `snowField.glb` | `Demos/Snow_Man_Scene/snowField.glb` | Snowy terrain patch |
+| `underwaterScene.glb` | `Demos/UnderWaterScene/underwaterScene.glb` | Underwater dungeon environment |
+| `underwaterSceneNavMesh.glb` | `Demos/UnderWaterScene/navMesh/underwaterSceneNavMesh.glb` | Pre-built navmesh for underwater area |
 
 ### Props
 
 | Asset | CDN Path | Notes |
 |-------|----------|-------|
-| `D20_Animation.glb` | `meshes/D20_Animation.glb` | Animated die — gambling / tavern prop |
-| `pumpkinBucketCarved.glb` | `meshes/pumpkinBucketCarved.glb` | Seasonal decoration |
-| `SheenChair.glb` | `meshes/SheenChair.glb` | Furniture — interior prop |
+| `D20_Animation.glb` | `D20_Animation.glb` | Animated die — gambling / tavern prop |
+| `pumpkinBucketCarved.glb` | `pumpkinBucketCarved.glb` | Seasonal decoration |
+| `SheenChair.glb` | `SheenChair.glb` | Furniture — interior prop |
 
 ---
 
