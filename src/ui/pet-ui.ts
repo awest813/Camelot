@@ -265,7 +265,7 @@ export class PetUI {
     // ── Hint ─────────────────────────────────────────────────────────────────
     const hint = document.createElement("p");
     Object.assign(hint.style, { margin: "0", fontSize: "10px", color: C.DIM });
-    hint.textContent = "[P] to close  ·  Only one companion may be active at a time";
+    hint.textContent = "[P] or [Esc] to close  ·  Only one companion may be active at a time";
 
     // ── Pet list ─────────────────────────────────────────────────────────────
     const listEl = document.createElement("div");

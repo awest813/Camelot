@@ -299,7 +299,7 @@ export class FollowerUI {
     // ── Hint ─────────────────────────────────────────────────────────────────
     const hint = document.createElement("p");
     Object.assign(hint.style, { margin: "0", fontSize: "10px", color: C.DIM });
-    hint.textContent = "[F] to close  ·  Only one follower may be active at a time";
+    hint.textContent = "[F] or [Esc] to close  ·  Only one follower may be active at a time";
 
     // ── Active follower section ──────────────────────────────────────────────
     const activeBlock = document.createElement("div");
