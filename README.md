@@ -119,11 +119,20 @@ The in-engine **Map Editor** (activated with F2) lets you author world content w
 | WASD           | Move                                                     |
 | Mouse          | Look                                                     |
 | Left Click     | Melee attack (Stamina)                                   |
-| Right Click    | Magic attack (Magicka)                                   |
+| Right Click    | Block / parry (hold)                                     |
+| Q              | Cast equipped spell (Magicka) / charge staff             |
+| Z              | Cycle equipped spell                                     |
+| R              | Draw bow (hold); release to fire                         |
+| C              | Toggle crouch / sneak                                    |
 | E              | Interact / pick up / talk                                |
 | I              | Toggle inventory                                         |
 | J              | Toggle quest log                                         |
 | K              | Toggle skill tree                                        |
+| U              | Toggle attribute panel                                   |
+| L              | Open alchemy workbench                                   |
+| B              | Open enchanting altar                                    |
+| V              | Activate racial power                                    |
+| H              | Show fame / infamy status and active effects             |
 | T              | Wait / Rest (choose 1–24 hours)                          |
 | X              | Open Spellmaking Altar                                   |
 | 1 / 2 / 3      | Melee archetype select                                   |
@@ -135,9 +144,11 @@ The in-engine **Map Editor** (activated with F2) lets you author world content w
 | O              | Mount / dismount horse                                   |
 | Shift+O        | Browse stable (unmounted) / open saddlebag (mounted)     |
 | M              | Toggle audio mute                                        |
+| F1             | Toggle controls / help overlay                           |
+| F3             | Toggle debug overlay                                     |
 | F5             | Quick save                                               |
 | F9             | Quick load                                               |
-| Esc            | Pause menu                                               |
+| Esc            | Pause menu / close open panel                            |
 
 ### Map Editor (active while F2 mode is on — these keys override their gameplay bindings)
 

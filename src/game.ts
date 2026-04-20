@@ -2355,6 +2355,11 @@ export class Game {
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.followerUI.isVisible) {
+                    this.followerUI.close();
+                    this.interactionSystem.isBlocked = false;
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
                 } else if (this.stableUI.isVisible) {
                     this.stableUI.close();
                 } else if (this.saddlebagUI.isVisible) {
