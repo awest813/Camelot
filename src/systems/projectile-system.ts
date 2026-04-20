@@ -151,6 +151,13 @@ export class ProjectileSystem {
     this._npcs = value;
   }
 
+  public removeNPC(npc: NPC): void {
+    const idx = this._npcs.indexOf(npc);
+    if (idx !== -1) {
+      this._npcs.splice(idx, 1);
+    }
+  }
+
   // ── State ─────────────────────────────────────────────────────────────────
 
   public get cooldownRemaining(): number {

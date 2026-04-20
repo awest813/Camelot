@@ -221,6 +221,13 @@ export class SpellSystem {
   public get npcs(): NPC[] { return this._npcs; }
   public set npcs(value: NPC[]) { this._npcs = value; }
 
+  public removeNPC(npc: NPC): void {
+    const idx = this._npcs.indexOf(npc);
+    if (idx !== -1) {
+      this._npcs.splice(idx, 1);
+    }
+  }
+
   /** Wire up skill progression so spells award XP to the appropriate school. */
   public setSkillSystem(system: SkillProgressionSystem | null): void {
     this._skillSystem = system;

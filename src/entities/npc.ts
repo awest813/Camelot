@@ -106,6 +106,8 @@ export class NPC {
   public health: number = 100;
   public maxHealth: number = 100;
   public isDead: boolean = false;
+  /** True when the NPC is actively engaged in a dialogue session with the player. */
+  public isInDialogue: boolean = false;
 
   // ─── AI State Machine ───────────────────────────────────────────────────────
 
@@ -279,6 +281,9 @@ export class NPC {
    * 0 means the NPC never flees; applied by CombatSystem during CHASE/ATTACK.
    */
   public fleesBelowHealthPct: number = 0;
+
+  /** Probability [0, 1] that the NPC dodges a player's melee attack. */
+  public dodgeChance: number = 0.05;
 
   /** Item IDs the NPC was spawned carrying (used by inventory integration). */
   public startingEquipmentIds: string[] = [];

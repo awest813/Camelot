@@ -101,6 +101,11 @@ export class UIManager {
   public xpBar: Rectangle;
   private _xpLevelLabel: TextBlock;
 
+  // Camera Shake & Hit-stop
+  private _cameraTrauma: number = 0;
+  private _initialCameraRotation: Vector3 | null = null;
+  public onHitStopRequested: ((durationMs: number) => void) | null = null;
+
   // Notifications
   public notificationPanel: StackPanel;
 
@@ -1236,25 +1241,110 @@ export class UIManager {
     this._xpLevelLabel.text = `Lv.${level}`;
   }
 
+  /**
+   * Apply a trauma-based camera shake.
+   * Higher intensity (> 0.5) creates violent shaking; lower (< 0.3) is subtle.
+   */
+  public shakeCamera(intensity: number = 0.5): void {
+    this._cameraTrauma = Math.min(1.0, this._cameraTrauma + intensity);
+    
+    if (!this._cameraShakeObs) {
+      this._cameraShakeObs = this.scene.onBeforeRenderObservable.add(() => {
+        const camera = this.scene.activeCamera;
+        if (!camera || this._cameraTrauma <= 0) {
+          if (this._cameraTrauma <= 0 && this._cameraShakeObs) {
+            this.scene.onBeforeRenderObservable.remove(this._cameraShakeObs);
+            this._cameraShakeObs = null;
+            // Smoothly lerp back to 0 roll/z if needed
+            camera?.rotation.set(camera.rotation.x, camera.rotation.y, 0);
+          }
+          return;
+        }
+
+        const dt = this.scene.getEngine().getDeltaTime() / 1000;
+        const shake = Math.pow(this._cameraTrauma, 2); // Squared trauma for more visceral curves
+        
+        // Use multiple sine waves at different frequencies for an organic "rumble" 
+        // rather than pure white-noise jitter.
+        const time = performance.now() * 0.001;
+        const yaw   = (Math.sin(time * 50) + Math.sin(time * 26) * 0.5) * 0.04 * shake;
+        const pitch = (Math.cos(time * 48) + Math.sin(time * 19) * 0.5) * 0.04 * shake;
+        const roll  = (Math.sin(time * 30)) * 0.03 * shake;
+        
+        camera.rotation.y += yaw;
+        camera.rotation.x += pitch;
+        camera.rotation.z += roll;
+
+        // Decay trauma over time
+        this._cameraTrauma = Math.max(0, this._cameraTrauma - 1.4 * dt);
+        
+        // Return roll to zero
+        camera.rotation.z *= 0.85;
+      });
+    }
+  }
+
+  /**
+   * Spawns a brief "spark" or impact flare at a world position.
+   * Used for perfect blocks and critical hits.
+   */
+  public showSpark(position: Vector3, color: string = "#FFD700"): void {
+    const spark = MeshBuilder.CreateSphere("impact_spark", { diameter: 0.15 }, this.scene);
+    spark.position = position.clone();
+    
+    const mat = new StandardMaterial("spark_mat", this.scene);
+    mat.emissiveColor = Color3.FromHexString(color);
+    mat.disableLighting = true;
+    spark.material = mat;
+
+    let scale = 1.0;
+    const obs = this.scene.onBeforeRenderObservable.add(() => {
+      scale += 0.4;
+      mat.alpha -= 0.15;
+      spark.scaling.setAll(scale);
+      
+      if (mat.alpha <= 0) {
+        this.scene.onBeforeRenderObservable.remove(obs);
+        spark.dispose();
+      }
+    });
+  }
+
+  /**
+   * Briefly pause or slow time for impact.
+   * @param durationMs Milliseconds to freeze/slow time.
+   */
+  public applyHitStop(durationMs: number = 80): void {
+    this.onHitStopRequested?.(durationMs);
+  }
+
   /** Flash a translucent color overlay to signal being hit or dealing damage. */
   public showHitFlash(color: string = "red"): void {
     const flash = new Rectangle();
     flash.width = "100%";
     flash.height = "100%";
     flash.background = color;
-    flash.alpha = 0.28;
+    flash.thickness = 0;
+    flash.alpha = 0.45;
     flash.isPointerBlocker = false;
-    flash.zIndex = 50;
+    flash.zIndex = 1;
     this._ui.addControl(flash);
-    let elapsedMs = 0;
+
+    let t = 0;
     const obs = this.scene.onBeforeRenderObservable.add(() => {
-      elapsedMs += this.scene.getEngine().getDeltaTime();
-      if (elapsedMs >= 150) {
+      t += this.scene.getEngine().getDeltaTime() / 420;
+      flash.alpha = Math.max(0, 0.45 * (1 - t));
+      if (t >= 1) {
         this.scene.onBeforeRenderObservable.remove(obs);
         this._ui.removeControl(flash);
         flash.dispose();
       }
     });
+  }
+
+  /** Special curative flash (green/white) for healing events. */
+  public showHealFlash(): void {
+    this.showHitFlash("rgba(120, 255, 150, 0.35)");
   }
 
   /**

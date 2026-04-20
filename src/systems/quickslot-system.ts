@@ -170,6 +170,7 @@ export class QuickSlotSystem {
     this._applyStatRestore("magicka", "magicka", "maxMagicka", "Magicka", item);
     this._applyStatRestore("stamina", "stamina", "maxStamina", "Stamina", item);
     this._inventory.removeItem(item.id, 1);
+    this._ui.showHealFlash();
     this.onItemConsumed?.(item, source);
   }
 

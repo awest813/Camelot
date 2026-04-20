@@ -13,6 +13,7 @@ export class FixedStepLoop {
   private readonly _maxSubSteps: number;
   private readonly _maxAccumulatedSeconds: number;
   private _accumulator = 0;
+  public timeScale = 1.0;
 
   constructor(options: FixedStepLoopOptions = {}) {
     this._fixedDeltaSeconds = options.fixedDeltaSeconds ?? 1 / 60;
@@ -23,7 +24,7 @@ export class FixedStepLoop {
   public tick(frameDeltaSeconds: number, onStep: (fixedDeltaSeconds: number) => void): number {
     if (!Number.isFinite(frameDeltaSeconds) || frameDeltaSeconds <= 0) return 0;
 
-    this._accumulator += Math.min(frameDeltaSeconds, this._maxAccumulatedSeconds);
+    this._accumulator += Math.min(frameDeltaSeconds * this.timeScale, this._maxAccumulatedSeconds);
 
     let steps = 0;
     while (this._accumulator >= this._fixedDeltaSeconds && steps < this._maxSubSteps) {

@@ -1,4 +1,5 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Ray } from "@babylonjs/core/Culling/ray";
 import { NPC, AIState } from "../entities/npc";
 import { Player } from "../entities/player";
 import { UIManager } from "../ui/ui-manager";
@@ -48,6 +49,7 @@ export class CrimeSystem {
   private _player: Player;
   private _npcs: NPC[];
   private _ui: UIManager;
+  private _scene: any;
 
   private _bounties: Map<string, number> = new Map();
   private _crimes: CrimeEvent[] = [];
@@ -59,10 +61,11 @@ export class CrimeSystem {
    */
   public onGuardChallenge: ((guard: NPC, factionId: string, bounty: number) => void) | null = null;
 
-  constructor(player: Player, npcs: NPC[], ui: UIManager) {
+  constructor(player: Player, npcs: NPC[], ui: UIManager, scene: any) {
     this._player = player;
     this._npcs   = npcs;
     this._ui     = ui;
+    this._scene  = scene;
   }
 
   // ── NPC list ───────────────────────────────────────────────────────────────
@@ -73,6 +76,13 @@ export class CrimeSystem {
 
   public set npcs(value: NPC[]) {
     this._npcs = value;
+  }
+
+  public removeNPC(npc: NPC): void {
+    const idx = this._npcs.indexOf(npc);
+    if (idx !== -1) {
+      this._npcs.splice(idx, 1);
+    }
   }
 
   // ── Crime reporting ────────────────────────────────────────────────────────
@@ -249,7 +259,29 @@ export class CrimeSystem {
   private _findNearbyWitnesses(): NPC[] {
     return this._npcs.filter((npc) => {
       if (npc.isDead) return false;
-      return Vector3.Distance(this._player.camera.position, npc.mesh.position) <= WITNESS_RADIUS;
+      const playerPos = this._player.camera.position;
+      const npcPos    = npc.mesh.position;
+      const toPlayer  = playerPos.subtract(npcPos);
+      const dist      = toPlayer.length();
+
+      if (dist > WITNESS_RADIUS) return false;
+
+      // NPCs only witness crimes if they are roughly facing the player (+/- 90 degrees)
+      const npcForward = npc.mesh.getDirection ? npc.mesh.getDirection(new Vector3(0, 0, 1)) : new Vector3(0, 0, 1);
+      const dot = Vector3.Dot(npcForward, toPlayer.normalize());
+      if (dot < 0) return false; // NPC is facing away
+
+      // Raycast LoS check to ensure they aren't looking through a wall
+      const ray = new Ray(
+        npcPos.add(new Vector3(0, 1.3, 0)),
+        toPlayer.normalize(),
+        dist
+      );
+      const hit = this._scene.pickWithRay(ray, (mesh: any) => {
+        return mesh !== npc.mesh && mesh.name !== "player_camera_helper" && mesh.checkCollisions;
+      });
+
+      return !hit || !hit.hit;
     });
   }
 }

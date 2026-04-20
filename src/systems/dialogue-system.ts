@@ -25,6 +25,7 @@ export class DialogueSystem {
   private _isInDialogue: boolean = false;
   private _choiceCount: number = 0;
   private _activeSession: DialogueSession | null = null;
+  private _activeNpc: NPC | null = null;
 
   // Scratch vectors for performance optimization
   private _direction: Vector3 = new Vector3();
@@ -125,6 +126,8 @@ export class DialogueSystem {
   public startDialogue(npc: NPC): void {
     if (this._isInDialogue) return;
     this._isInDialogue = true;
+    this._activeNpc = npc;
+    npc.isInDialogue = true;
     this._activeSession = null;
     if (this.onTalkStart) this.onTalkStart(npc.mesh.name);
 
@@ -275,6 +278,10 @@ export class DialogueSystem {
 
   private _endDialogue(): void {
     this._isInDialogue = false;
+    if (this._activeNpc) {
+        this._activeNpc.isInDialogue = false;
+        this._activeNpc = null;
+    }
     this._activeSession = null;
 
     // Hide UI

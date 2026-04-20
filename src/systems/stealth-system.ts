@@ -1,4 +1,5 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Ray } from "@babylonjs/core/Culling/ray";
 import { NPC, AIState } from "../entities/npc";
 import { Player } from "../entities/player";
 import { UIManager } from "../ui/ui-manager";
@@ -56,10 +57,10 @@ const SNEAK_ATTACK_MAX_DETECTION = 30;
  *   5. Call `pushNoise(level, duration)` when the player makes an audible action.
  *   6. Set `shadowFactor` each frame to reflect how well-lit the player's position is.
  */
-export class StealthSystem {
   private _player: Player;
   private _npcs: NPC[];
   private _ui: UIManager;
+  private _scene: any; // Using any for Scene to avoid full core import here if not already present, though it's imported at top typically
 
   public isCrouching: boolean = false;
   public movementMode: MovementMode = "walking";
@@ -79,10 +80,11 @@ export class StealthSystem {
   /** Fired once when an NPC's detection level first reaches 100. */
   public onDetected: ((npc: NPC) => void) | null = null;
 
-  constructor(player: Player, npcs: NPC[], ui: UIManager) {
+  constructor(player: Player, npcs: NPC[], ui: UIManager, scene: any) {
     this._player = player;
     this._npcs = npcs;
     this._ui = ui;
+    this._scene = scene;
   }
 
   // ── NPC list hot-swap ─────────────────────────────────────────────────────
@@ -93,6 +95,14 @@ export class StealthSystem {
 
   public set npcs(value: NPC[]) {
     this._npcs = value;
+  }
+
+  public removeNPC(npc: NPC): void {
+    const idx = this._npcs.indexOf(npc);
+    if (idx !== -1) {
+      this._npcs.splice(idx, 1);
+    }
+    this._detectionLevels.delete(npc);
   }
 
   // ── Noise ─────────────────────────────────────────────────────────────────
@@ -226,7 +236,21 @@ export class StealthSystem {
     const dot   = Vector3.Dot(npcForward, toPlayer.normalize());
     const angle = Math.acos(Math.min(1, Math.max(-1, dot)));
 
-    return angle <= DETECTION_CONE_HALF_ANGLE;
+    if (angle > DETECTION_CONE_HALF_ANGLE) return false;
+
+    // Raycast Line of Sight (LoS) check
+    const ray = new Ray(
+      npcPos.add(new Vector3(0, 1.3, 0)), // Eye level
+      toPlayer.normalize(),
+      dist
+    );
+    
+    const hit = this._scene.pickWithRay(ray, (mesh: any) => {
+        // Ignore the NPC itself and the player helper
+        return mesh !== npc.mesh && mesh.name !== "player_camera_helper" && mesh.checkCollisions;
+    });
+
+    return !hit || !hit.hit;
   }
 
   private _canNPCHear(npc: NPC): boolean {

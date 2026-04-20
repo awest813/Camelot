@@ -381,6 +381,8 @@ export class CombatSystem {
   private _weaponArchetype: WeaponArchetype = "sword";
   /** True while the player is actively holding block. */
   private _isBlocking: boolean = false;
+  /** Seconds since block was initiated; used for perfect-block window. */
+  private _blockActiveTimer: number = 0;
   /** True while a staff charge attack is building up. */
   private _isChargingStaff: boolean = false;
   /** Seconds the staff charge has been held [0, STAFF_CHARGE_TIME]. */
@@ -422,6 +424,17 @@ export class CombatSystem {
     this._activeEffectsSystem = opts?.activeEffectsSystem ?? null;
   }
 
+  public removeNPC(npc: NPC): void {
+    const idx = this.npcs.indexOf(npc);
+    if (idx !== -1) {
+      this.npcs.splice(idx, 1);
+    }
+    this._attackReservations.delete(npc);
+    for (let i = 0; i < this._topAttackNpcs.length; i++) {
+        if (this._topAttackNpcs[i] === npc) this._topAttackNpcs[i] = null;
+    }
+  }
+
   public setStealthSystem(s: { canSneakAttack(npc: NPC): boolean } | null): void {
     this._stealthSystem = s;
   }
@@ -437,8 +450,14 @@ export class CombatSystem {
     if (opts.attributeSystem !== undefined) {
       this._attributeSystem = opts.attributeSystem;
     }
-    if (opts.activeEffectsSystem !== undefined) {
+    if (this._activeEffectsSystem !== undefined) {
       this._activeEffectsSystem = opts.activeEffectsSystem;
+    }
+  }
+
+  public update(deltaTime: number): void {
+    if (this._isBlocking) {
+      this._blockActiveTimer += deltaTime;
     }
   }
 
@@ -489,6 +508,7 @@ export class CombatSystem {
    */
   public beginBlock(): void {
     this._isBlocking = true;
+    this._blockActiveTimer = 0;
     this._ui.showNotification("Blocking...", 600);
   }
 
@@ -574,6 +594,10 @@ export class CombatSystem {
         );
         const finalDmg = applyDamageWithResistance(rawDmg, npc, "fire");
         npc.takeDamage(finalDmg);
+        this._ui.applyHitStop(100);
+        this._ui.shakeCamera(0.4);
+
+        // Charged blast always staggers.
 
         // Charged blast always staggers.
         npc.isStaggered = true;
@@ -669,7 +693,24 @@ export class CombatSystem {
           )
         );
         const meleeDmg = applyDamageWithResistance(rawMeleeDmg, npc, "physical", weaponProfile.armorPenFraction);
+        
+        // NPC dodge chance
+        if (Math.random() < npc.dodgeChance) {
+          this._ui.showNotification(`${npc.mesh.name} dodges!`, 800);
+          this._ui.showHitFlash("rgba(200, 200, 200, 0.15)");
+          // Add a physical "sidestep" impulse to make the dodge look active
+          if (npc.physicsAggregate?.body) {
+            const side = this.player.camera.getDirection(Vector3.Right());
+            const dodgeDir = Math.random() > 0.5 ? 1 : -1;
+            npc.physicsAggregate.body.applyImpulse(side.scale(12 * dodgeDir), npc.mesh.position);
+          }
+          return true;
+        }
+
         npc.takeDamage(meleeDmg);
+        this._ui.applyHitStop(isCrit ? 120 : 60);
+        this._ui.shakeCamera(isCrit ? 0.6 : 0.25);
+        if (isCrit) this._ui.showSpark(numberPos, "#FFD700");
 
         // Per-weapon stagger chance on normal melee hits.
         if (
@@ -775,6 +816,9 @@ export class CombatSystem {
         );
         const finalDmg = applyDamageWithResistance(rawDmg, npc, "physical", weaponProfile.armorPenFraction);
         npc.takeDamage(finalDmg);
+
+        this._ui.applyHitStop(140);
+        this._ui.shakeCamera(0.65);
 
         // Stagger: cancel current telegraph and freeze the NPC's AI briefly.
         npc.isStaggered = true;
@@ -1470,27 +1514,40 @@ export class CombatSystem {
     }
 
     if (this._isBlocking) {
+      // Perfect block window: within first 0.3s of blocking.
+      const isPerfect = this._blockActiveTimer < 0.3;
+      
       // Oblivion-style block: scale damage reduction with block skill.
-      const blockReduction = this._blockDamageReduction();
-      const blockCost = this._blockStaminaCost();
-      dmg = Math.max(1, Math.round(dmg * (1 - blockReduction)));
+      const blockReduction = isPerfect ? 1.0 : this._blockDamageReduction();
+      const blockCost = isPerfect ? 0 : this._blockStaminaCost();
+      dmg = Math.max(0, Math.round(dmg * (1 - blockReduction)));
       this.player.stamina = Math.max(0, this.player.stamina - blockCost);
       (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
         .notifyResourceSpent?.("stamina");
-      this._ui.showNotification(`Blocked! ${dmg} damage taken.`, 1500);
-      this._ui.showHitFlash("rgba(80, 120, 200, 0.35)");
+      
+      if (isPerfect) {
+        this._ui.showNotification("Perfect Block!", 1500);
+        this._ui.showHitFlash("rgba(255, 255, 255, 0.5)");
+        this._ui.applyHitStop(110);
+        this._ui.shakeCamera(0.35);
+        this._ui.showSpark(this.player.camera.position.add(this.player.camera.getDirection(Vector3.Forward()).scale(1.2)), "#FFFFFF");
+      } else {
+        this._ui.showNotification(`Blocked! ${dmg} damage taken.`, 1500);
+        this._ui.showHitFlash("rgba(80, 120, 200, 0.35)");
+      }
       if (this.onBlockSuccess) this.onBlockSuccess();
 
       // Award block skill XP for each hit successfully blocked.
       this._skillSystem?.gainXP("block", SKILL_XP_BLOCK_HIT);
 
       // Block counter: chance to stagger the attacker (Oblivion-style shield bash feel).
-      if (Math.random() < BLOCK_COUNTER_STAGGER_CHANCE) {
+      // Perfect block ALWAYS staggers.
+      if (isPerfect || Math.random() < BLOCK_COUNTER_STAGGER_CHANCE) {
         npc.isStaggered = true;
-        npc.staggerTimer = BLOCK_COUNTER_STAGGER_DURATION;
+        npc.staggerTimer = isPerfect ? BLOCK_COUNTER_STAGGER_DURATION * 2.2 : BLOCK_COUNTER_STAGGER_DURATION;
         npc.isAttackTelegraphing = false;
         npc.attackTelegraphTimer = 0;
-        this._ui.showNotification("Counter!", 700);
+        this._ui.showNotification(isPerfect ? "Parry!" : "Counter!", 700);
       }
 
       if (this.player.stamina <= 0) {
@@ -1499,6 +1556,8 @@ export class CombatSystem {
       }
     } else {
       this._ui.showHitFlash("rgba(200, 0, 0, 0.4)");
+      this._ui.shakeCamera(0.4);
+      this._ui.applyHitStop(60);
       this._ui.showNotification(`${npc.mesh.name} attacks you for ${dmg} damage!`, 2000);
     }
 

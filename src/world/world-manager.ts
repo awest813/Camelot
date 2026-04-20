@@ -10,6 +10,12 @@ import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGener
 import { StructureManager } from "./structure-manager";
 import { ObjectPool } from "../systems/object-pool";
 import type { WorldSeed } from "./world-seed";
+import { ChunkManager } from "../systems/chunks/ChunkManager";
+import type { Chunk, ChunkAdapter, ChunkSource, Vec2Like } from "../systems/chunks/ChunkTypes";
+
+export type WorldChunkData = {
+  biome: BiomeType;
+};
 
 export type BiomeType = "plains" | "forest" | "desert" | "tundra";
 
@@ -20,7 +26,7 @@ type LoadQueueEntry = {
   dist: number;
 };
 
-export class WorldManager {
+export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<WorldChunkData> {
   private scene: Scene;
   /** World-unit side-length of each terrain chunk. */
   public readonly chunkSize: number = 50;
@@ -32,36 +38,8 @@ export class WorldManager {
   /** Manages procedural structures (ruins, shrines, towers) per chunk. */
   public structures: StructureManager;
 
-  // Throttle: only run the chunk management sweep every N frames
-  private _frameCounter: number = 0;
-  private _updateInterval: number = 10;
-
-  /**
-   * Load queue: chunks waiting to be created, sorted closest-first.
-   * Drained at most `_loadBudgetPerFrame` entries per `update()` call so that
-   * entering a new area does not spike all chunk geometry into a single frame.
-   */
-  private _loadQueue: LoadQueueEntry[] = [];
-  /** Keys already present in `_loadQueue` — prevents duplicate enqueue. */
-  private _enqueuedKeys: Set<string> = new Set();
-  /** Maximum chunks created per `update()` call to cap per-frame build cost. */
-  private readonly _loadBudgetPerFrame: number = 2;
-  /** Last player chunk position; used by `_processLoadQueue` to skip stale entries. */
-  private _lastPlayerChunkX: number = 0;
-  private _lastPlayerChunkZ: number = 0;
-
-  /** Reuses ephemeral queue-entry objects to avoid chunk-streaming allocations. */
-  private readonly _loadQueueEntryPool = new ObjectPool<LoadQueueEntry>(
-    () => ({ cx: 0, cz: 0, key: "", dist: 0 }),
-    (entry) => {
-      entry.cx = 0;
-      entry.cz = 0;
-      entry.key = "";
-      entry.dist = 0;
-    },
-    32,
-    256,
-  );
+  /** Decoupled chunk lifecycle manager. */
+  private _chunkManager: ChunkManager<WorldChunkData>;
 
   /**
    * Fires immediately after a chunk finishes being built and registered.
@@ -101,6 +79,14 @@ export class WorldManager {
     this._shadows = shadowGenerator;
     this._seed = seed;
     this.structures = new StructureManager(scene, shadowGenerator, seed);
+
+    this._chunkManager = new ChunkManager<WorldChunkData>(this, this, {
+      chunkSize: this.chunkSize,
+      activeRadius: this.loadDistance,
+      preloadRadius: this.loadDistance + 1,
+      maxCachedChunks: 48,
+      loadConcurrency: 2,
+    });
   }
 
   /**
@@ -152,48 +138,45 @@ export class WorldManager {
   }
 
   public update(playerPosition: Vector3): void {
-    // Always track the player's current chunk so the stale-entry filter in
-    // _processLoadQueue uses the most up-to-date position every frame.
-    const chunkX = Math.floor(playerPosition.x / this.chunkSize);
-    const chunkZ = Math.floor(playerPosition.z / this.chunkSize);
-    const chunkChanged = chunkX !== this._lastPlayerChunkX || chunkZ !== this._lastPlayerChunkZ;
-    this._lastPlayerChunkX = chunkX;
-    this._lastPlayerChunkZ = chunkZ;
+    this._chunkManager.update({ x: playerPosition.x, y: playerPosition.z });
+  }
 
-    if (chunkChanged && this._loadQueue.length > 0) {
-      this._pruneStaleQueueEntries(chunkX, chunkZ);
+  // ─── ChunkSource & ChunkAdapter Implementation ──────────────────────────────
+
+  /** @internal Implements ChunkSource */
+  public async loadChunk(coords: Vec2Like, _signal?: AbortSignal): Promise<WorldChunkData> {
+    return { biome: this.getBiome(coords.x, coords.y) };
+  }
+
+  /** @internal Implements ChunkAdapter */
+  public async mount(chunk: Chunk<WorldChunkData>): Promise<void> {
+    this._loadChunk(chunk.coords.x, chunk.coords.y);
+  }
+
+  /** @internal Implements ChunkAdapter */
+  public async unmount(chunk: Chunk<WorldChunkData>): Promise<void> {
+    const key = chunk.key;
+    const data = this.loadedChunks.get(key);
+    if (!data) return;
+
+    const { mesh, body, cx, cz } = data;
+    
+    // Dispose physics body BEFORE the mesh to avoid dangling references
+    body.dispose();
+    // Dispose geometry only — biome materials are shared and must not be destroyed here
+    mesh.dispose(false, false);
+    this.loadedChunks.delete(key);
+
+    // Dispose vegetation meshes for this chunk
+    const veg = this.chunkVegetation.get(key);
+    if (veg) {
+      for (const m of veg) m.dispose(false, false);
+      this.chunkVegetation.delete(key);
     }
 
-    // Always drain the load queue (bounded work every frame regardless of interval)
-    this._processLoadQueue();
-
-    // Run the chunk management sweep every _updateInterval frames
-    if (++this._frameCounter % this._updateInterval !== 0) return;
-
-    this._enqueueMissingChunks(chunkX, chunkZ);
-
-    // Unload chunks that are too far from the player
-    for (const [key, { mesh, body, cx, cz }] of this.loadedChunks) {
-      if (Math.abs(cx - chunkX) > this.unloadDistance || Math.abs(cz - chunkZ) > this.unloadDistance) {
-        // Dispose physics body BEFORE the mesh to avoid dangling references
-        body.dispose();
-        // Dispose geometry only — biome materials are shared and must not be destroyed here
-        mesh.dispose(false, false);
-        this.loadedChunks.delete(key);
-
-        // Dispose vegetation meshes for this chunk
-        const veg = this.chunkVegetation.get(key);
-        if (veg) {
-          // Trunk/crown/cactus/ice materials are shared pools — preserve them.
-          for (const m of veg) m.dispose(false, false);
-          this.chunkVegetation.delete(key);
-        }
-
-        // Dispose structure meshes, physics, and loot for this chunk
-        this.structures.disposeChunk(cx, cz);
-        this.onChunkUnloaded?.(cx, cz);
-      }
-    }
+    // Dispose structure meshes, physics, and loot for this chunk
+    this.structures.disposeChunk(cx, cz);
+    this.onChunkUnloaded?.(cx, cz);
   }
 
   /**
@@ -201,10 +184,6 @@ export class WorldManager {
    * Call this when tearing down the scene to release GPU and physics resources.
    */
   public dispose(): void {
-    // Drain the load queue without spawning anything
-    this._releaseLoadQueueEntries();
-    this._enqueuedKeys.clear();
-
     // Dispose all loaded chunks (physics then mesh)
     for (const [key, { mesh, body, cx, cz }] of this.loadedChunks) {
       body.dispose();
@@ -220,82 +199,24 @@ export class WorldManager {
     }
     this.loadedChunks.clear();
     this.chunkVegetation.clear();
-    this._loadQueueEntryPool.clear();
   }
 
   /**
-   * Drain up to `_loadBudgetPerFrame` entries from the load queue.
-   * Called every frame so chunk creation is spread across many frames
-   * rather than concentrated in a single update sweep.
+   * Toggle visibility of all exterior world meshes.
+   * Useful when transitioning between exterior and interior cells to prevent
+   * world geometry from bleeding through or wasting draw calls.
    */
-  private _processLoadQueue(): void {
-    const budget = Math.min(this._loadBudgetPerFrame, this._loadQueue.length);
-    for (let i = 0; i < budget; i++) {
-      const entry = this._loadQueue.shift()!;
-      this._enqueuedKeys.delete(entry.key);
-      // Skip if the player has moved far enough that this chunk is no longer needed.
-      // Use Chebyshev distance (max of abs-differences) to match the sort metric.
-      const chebyshev = Math.max(
-        Math.abs(entry.cx - this._lastPlayerChunkX),
-        Math.abs(entry.cz - this._lastPlayerChunkZ),
-      );
-      if (chebyshev <= this.loadDistance && !this.loadedChunks.has(entry.key)) {
-        this._loadChunk(entry.cx, entry.cz);
-      }
-      this._loadQueueEntryPool.release(entry);
+  public setVisible(visible: boolean): void {
+    for (const entry of this.loadedChunks.values()) {
+      entry.mesh.isVisible = visible;
     }
+    for (const veg of this.chunkVegetation.values()) {
+      for (const m of veg) m.isVisible = visible;
+    }
+    this.structures.setVisible(visible);
   }
 
-  /** Drop queued chunks that no longer belong near the current player chunk. */
-  private _pruneStaleQueueEntries(chunkX: number, chunkZ: number): void {
-    if (this._loadQueue.length === 0) return;
 
-    const retained: LoadQueueEntry[] = [];
-    for (const entry of this._loadQueue) {
-      entry.dist = Math.max(Math.abs(entry.cx - chunkX), Math.abs(entry.cz - chunkZ));
-      if (entry.dist <= this.loadDistance) {
-        retained.push(entry);
-      } else {
-        this._enqueuedKeys.delete(entry.key);
-        this._loadQueueEntryPool.release(entry);
-      }
-    }
-
-    retained.sort((a, b) => a.dist - b.dist);
-    this._loadQueue = retained;
-  }
-
-  /** Add all missing chunks in load range, reusing queue-entry objects from the pool. */
-  private _enqueueMissingChunks(chunkX: number, chunkZ: number): void {
-    const toEnqueue: LoadQueueEntry[] = [];
-    for (let x = chunkX - this.loadDistance; x <= chunkX + this.loadDistance; x++) {
-      for (let z = chunkZ - this.loadDistance; z <= chunkZ + this.loadDistance; z++) {
-        const key = `${x},${z}`;
-        if (!this.loadedChunks.has(key) && !this._enqueuedKeys.has(key)) {
-          const entry = this._loadQueueEntryPool.acquire();
-          entry.cx = x;
-          entry.cz = z;
-          entry.key = key;
-          entry.dist = Math.max(Math.abs(x - chunkX), Math.abs(z - chunkZ));
-          toEnqueue.push(entry);
-        }
-      }
-    }
-
-    toEnqueue.sort((a, b) => a.dist - b.dist);
-    for (const entry of toEnqueue) {
-      this._enqueuedKeys.add(entry.key);
-      this._loadQueue.push(entry);
-    }
-  }
-
-  /** Return every queued entry object to the pool. */
-  private _releaseLoadQueueEntries(): void {
-    for (const entry of this._loadQueue) {
-      this._loadQueueEntryPool.release(entry);
-    }
-    this._loadQueue = [];
-  }
 
   private _loadChunk(x: number, z: number): void {
     const key = `${x},${z}`;
@@ -362,7 +283,7 @@ export class WorldManager {
     }
   }
 
-  private _getBiomeMaterial(biome: BiomeType): StandardMaterial {
+  public _getBiomeMaterial(biome: BiomeType): StandardMaterial {
     let material = this.biomeMaterials.get(biome);
     if (!material) {
       const cols = this._getBiomeColors(biome);
@@ -438,7 +359,7 @@ export class WorldManager {
     mesh.receiveShadows = true;
   }
 
-  private _spawnVegetation(chunkX: number, chunkZ: number, biome: BiomeType): Mesh[] {
+  public _spawnVegetation(chunkX: number, chunkZ: number, biome: BiomeType): Mesh[] {
     const meshes: Mesh[] = [];
     const centerX = chunkX * this.chunkSize;
     const centerZ = chunkZ * this.chunkSize;

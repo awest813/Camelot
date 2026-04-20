@@ -1011,8 +1011,8 @@ export class Game {
     };
 
     // ── v2 system wiring ──────────────────────────────────────────────────────
-    this.stealthSystem   = new StealthSystem(this.player, this.scheduleSystem.npcs, this.ui);
-    this.crimeSystem     = new CrimeSystem(this.player, this.scheduleSystem.npcs, this.ui);
+    this.stealthSystem   = new StealthSystem(this.player, this.scheduleSystem.npcs, this.ui, this.scene);
+    this.crimeSystem     = new CrimeSystem(this.player, this.scheduleSystem.npcs, this.ui, this.scene);
     this.containerSystem = new ContainerSystem(this.scene, this.player, this.inventorySystem, this.ui);
     this.projectileSystem = new ProjectileSystem(this.scene, this.player, this.scheduleSystem.npcs, this.ui);
     this.projectileSystem.stealthSystem = this.stealthSystem;
@@ -1188,10 +1188,32 @@ export class Game {
     if (this.scheduleSystem.npcs[0]) {
       this.levelScalingSystem.scaleNPC(this.scheduleSystem.npcs[0], this.player.level);
     }
-    // Scale newly spawned structure NPCs
+    // Scale newly spawned structure NPCs and register them for cleanup
     this.world.structures.onNPCSpawn = (npc) => {
       this.scheduleSystem.addNPC(npc);
       this.levelScalingSystem.scaleNPC(npc, this.player.level);
+    };
+
+    this.world.structures.onNPCRemove = (npc) => {
+      this.scheduleSystem.removeNPC(npc);
+      this.combatSystem.removeNPC(npc);
+      this.stealthSystem.removeNPC(npc);
+      this.crimeSystem.removeNPC(npc);
+      this.spellSystem.removeNPC(npc);
+      this.projectileSystem.removeNPC(npc);
+    };
+
+    /** Unified world-state persistence: check if an item belongs to the player or was already taken. */
+    this.world.structures.onCheckLootCollected = (itemId) => {
+      // Check inventory
+      for (const item of this.inventorySystem.items) {
+          if (item.id === itemId) return true;
+      }
+      // Check equipment
+      for (const item of this.equipmentSystem.getEquipped().values()) {
+          if (item.id === itemId) return true;
+      }
+      return false;
     };
 
     // Wire skill XP into spell cast and potion craft callbacks
@@ -1871,6 +1893,14 @@ export class Game {
         // Refresh the attribute panel display
         this.ui.refreshAttributePanel(this.attributeSystem);
       }
+    };
+
+    // Hit-stop effect wired to FixedStepLoop
+    this.ui.onHitStopRequested = (durationMs) => {
+      this.fixedStepLoop.timeScale = 0.05; // heavy slow-mo
+      setTimeout(() => {
+        this.fixedStepLoop.timeScale = 1.0;
+      }, durationMs);
     };
 
     // Level-up awards attribute points
@@ -3517,8 +3547,11 @@ export class Game {
 
       this.interactionSystem.update();
 
-      this.stealthSystem.shadowFactor = this.timeSystem.ambientIntensity;
-      this.stealthSystem.update(deltaTime, this.timeSystem.ambientIntensity);
+      // Combine time-of-day ambient light with current weather scales for more accurate stealth detection
+      const weatherScale = this.weatherSystem?.state === "clear" ? 1.0 : (this.weatherSystem?.fogDensity ? 0.7 : 1.0);
+      const compositeLight = this.timeSystem.ambientIntensity * weatherScale;
+      this.stealthSystem.shadowFactor = compositeLight;
+      this.stealthSystem.update(deltaTime, compositeLight);
       // Sneak XP: trickle XP while actively sneaking near NPCs
       if (this.stealthSystem.isCrouching) {
         this.skillProgressionSystem.gainXP(
@@ -3682,6 +3715,10 @@ export class Game {
           isNew ? `Discovered: ${cellName}` : `Entered: ${cellName}`, 2500
       );
       this.lodSystem?.clear();
+
+      // Sync world visibility with cell type (hide exterior when in interior)
+      const isInterior = this.cellManager.isInterior;
+      this.world.setVisible(!isInterior);
   }
 
   private _beginPortalTransition(portalId: string): void {
@@ -3705,6 +3742,8 @@ export class Game {
           this.fastTravelSystem.discoverLocation(
               cell.id, cell.name, this.player.camera.position.clone()
           );
+          // Sync world visibility with cell type
+          this.world.setVisible(cell.type !== "interior");
       }
   }
 

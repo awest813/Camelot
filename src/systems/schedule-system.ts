@@ -30,6 +30,13 @@ export class ScheduleSystem {
     this.npcs.push(npc);
   }
 
+  public removeNPC(npc: NPC): void {
+    const idx = this.npcs.indexOf(npc);
+    if (idx !== -1) {
+      this.npcs.splice(idx, 1);
+    }
+  }
+
   public update(deltaTime: number): void {
     for (const npc of this.npcs) {
       this._updateNPC(npc, deltaTime);

@@ -13,11 +13,8 @@ import { Loot } from "../entities/loot";
 import { BiomeType } from "./world-manager";
 import type { WorldSeed } from "./world-seed";
 
-interface StructureSpawn {
-  meshes: Mesh[];
-  loot: Loot[];
-  /** Physics aggregates created for this structure; disposed before their meshes on unload. */
   bodies: PhysicsAggregate[];
+  npcs: NPC[];
 }
 
 /**
@@ -39,6 +36,10 @@ export class StructureManager {
   /** Called for each NPC spawned as part of a structure so the caller can
    *  register it with ScheduleSystem / CombatSystem. */
   public onNPCSpawn: ((npc: NPC) => void) | null = null;
+  /** Called when an NPC needs to be removed from external systems. */
+  public onNPCRemove: ((npc: NPC) => void) | null = null;
+  /** Fired with a loot item ID; return true if the item was already collected. */
+  public onCheckLootCollected: ((itemId: string) => boolean) | null = null;
 
   /**
    * Optional world seed — used for seeded placement and randomisation.
@@ -90,7 +91,7 @@ export class StructureManager {
     if (this._chunkStructures.has(key)) return;
 
     if (!this.hasStructureAt(chunkX, chunkZ)) {
-      this._chunkStructures.set(key, { meshes: [], loot: [], bodies: [] });
+      this._chunkStructures.set(key, { meshes: [], loot: [], bodies: [], npcs: [] });
       return;
     }
 
@@ -128,13 +129,29 @@ export class StructureManager {
       for (const body of spawn.bodies) body.dispose();
       for (const m of spawn.meshes) m.dispose(false, false);
       for (const l of spawn.loot) l.dispose();
+      for (const npc of spawn.npcs) {
+        this.onNPCRemove?.(npc);
+        npc.mesh.dispose();
+      }
     }
     this._chunkStructures.clear();
   }
 
   /**
+   * Toggle visibility of all structure-related meshes (walls, props, loot, NPCs).
+   * Used by WorldManager when switching between overworld and interior cells.
+   */
+  public setVisible(visible: boolean): void {
+    for (const spawn of this._chunkStructures.values()) {
+      for (const m of spawn.meshes) m.isVisible = visible;
+      for (const l of spawn.loot) if (l.mesh) l.mesh.isVisible = visible;
+      for (const npc of spawn.npcs) if (npc.mesh) npc.mesh.isVisible = visible;
+    }
+  }
+
+  /**
    * Dispose all meshes, physics, and loot for an unloading chunk.
-   * NPCs are intentionally kept alive — they remain active once spawned.
+   * NPCs are disposed UNLESS they are currently in combat or dialogue.
    */
   public disposeChunk(chunkX: number, chunkZ: number): void {
     const key = `${chunkX},${chunkZ}`;
@@ -146,7 +163,39 @@ export class StructureManager {
     // Materials are shared across all structure instances — preserve them
     for (const m of spawn.meshes) m.dispose(false, false);
     for (const l of spawn.loot) l.dispose();
-    this._chunkStructures.delete(key);
+
+    // Clean up NPCs that aren't "busy" tracking the player or in dialogue.
+    // If they ARE busy, we let them persist (they'll likely never be unloaded
+    // because the player is right there, but safety first).
+    const remainingNPCs: NPC[] = [];
+    for (const npc of spawn.npcs) {
+        if (npc.isDead) {
+            // Corpses are disposed with their chunk — we rely on RespawnSystem
+            // (or future persistence) to know they shouldn't return yet.
+            this.onNPCRemove?.(npc);
+            npc.mesh.dispose();
+            continue;
+        }
+
+        // HEURISTIC: If NPC is aggressive (chasing/attacking), in dialogue, or dead?
+        // Actually, if dead they get cleaned up (rely on RespawnSystem).
+        // If "busy" (dialogue/combat), skip dispose to avoid breaking gameplay flow.
+        if (npc.isAggressive || npc.isInDialogue) {
+            remainingNPCs.push(npc);
+            continue;
+        }
+
+        this.onNPCRemove?.(npc);
+        npc.mesh.dispose();
+    }
+
+    if (remainingNPCs.length > 0) {
+        spawn.npcs = remainingNPCs;
+        // Don't fully delete from map yet if NPCs remain?
+        // Actually, better to keep the entry so they aren't double-spawned later.
+    } else {
+        this._chunkStructures.delete(key);
+    }
   }
 
   // ─── Structure builders ────────────────────────────────────────────────────
@@ -235,7 +284,7 @@ export class StructureManager {
     ];
     if (this.onNPCSpawn) this.onNPCSpawn(guard);
 
-    return { meshes, loot, bodies };
+    return { meshes, loot, bodies, npcs: [guard] };
   }
 
   /**
@@ -287,16 +336,19 @@ export class StructureManager {
     }
 
     // Ancient relic on the altar — equippable off-hand talisman
-    const relic = new Loot(this._scene, new Vector3(origin.x, 1.6, origin.z), {
-      id: `shrine_relic_${cx}_${cz}`,
-      name: "Ancient Relic",
-      description: "A weathered relic found on a desert altar. +3 Damage.",
-      stackable: false,
-      quantity: 1,
-      slot: "offHand",
-      stats: { damage: 3 },
-    });
-    loot.push(relic);
+    const relicId = `shrine_relic_${cx}_${cz}`;
+    if (!this.onCheckLootCollected || !this.onCheckLootCollected(relicId)) {
+      const relic = new Loot(this._scene, new Vector3(origin.x, 1.6, origin.z), {
+        id: relicId,
+        name: "Ancient Relic",
+        description: "A weathered relic found on a desert altar. +3 Damage.",
+        stackable: false,
+        quantity: 1,
+        slot: "offHand",
+        stats: { damage: 3 },
+      });
+      loot.push(relic);
+    }
 
     // ── Fantasy props ──────────────────────────────────────────────────────
 
@@ -326,7 +378,7 @@ export class StructureManager {
     );
     meshes.push(runeSlab);
 
-    return { meshes, loot, bodies };
+    return { meshes, loot, bodies, npcs: [] };
   }
 
   /**
@@ -433,7 +485,7 @@ export class StructureManager {
     ];
     if (this.onNPCSpawn) this.onNPCSpawn(guard);
 
-    return { meshes, loot, bodies };
+    return { meshes, loot, bodies, npcs: [guard] };
   }
 
   // ─── Fantasy props ─────────────────────────────────────────────────────────
@@ -676,15 +728,18 @@ export class StructureManager {
     const body = new PhysicsAggregate(chest, PhysicsShapeType.BOX, { mass: 0 }, this._scene);
     this._shadow(chest);
 
-    const coins = new Loot(this._scene, new Vector3(position.x + 0.6, 1.0, position.z), {
-      id: `chest_gold_${cx}_${cz}_${slot}`,
-      name: "Gold Coins",
-      description: "A handful of gold coins.",
-      stackable: true,
-      quantity: 1 + Math.floor(this._rand(cx, cz, slot + 50) * 5),
-      stats: {},
-    });
-    lootArr.push(coins);
+    const lootId = `chest_gold_${cx}_${cz}_${slot}`;
+    if (!this.onCheckLootCollected || !this.onCheckLootCollected(lootId)) {
+      const coins = new Loot(this._scene, new Vector3(position.x + 0.6, 1.0, position.z), {
+        id: lootId,
+        name: "Gold Coins",
+        description: "A handful of gold coins.",
+        stackable: true,
+        quantity: 1 + Math.floor(this._rand(cx, cz, slot + 50) * 5),
+        stats: {},
+      });
+      lootArr.push(coins);
+    }
     return { mesh: chest, body };
   }
 
