@@ -12,6 +12,10 @@
  *     (position, velocity, crouch, sprint, swim, mount).  Pure TypeScript;
  *     Babylon reads the state each frame and applies it to the camera/physics.
  *
+ *   - **BabylonPhysicsControllerAdapter** — Physics-aware layer on top of the
+ *     character controller: slope constraints, camera elasticity, animation
+ *     state mapping.
+ *
  *   - **BabylonSceneHost** — Scene-level visual configuration (lighting, sky,
  *     fog, shadows, post-processing).  Pure data; can be validated and
  *     snapshot/restored without a live engine.
@@ -29,6 +33,16 @@ export {
   type Vec3,
   type CharacterControllerSnapshot,
 } from "./babylon-controller-adapter";
+
+export {
+  BabylonPhysicsControllerAdapter,
+  type MovementAnimationClip,
+  type SlopeConfig,
+  type CameraElasticityConfig,
+  type PhysicsControllerSnapshot,
+  type GroundProbeResult,
+  type CameraObstructionResult,
+} from "./babylon-physics-controller-adapter";
 
 export {
   BabylonSceneHost,
