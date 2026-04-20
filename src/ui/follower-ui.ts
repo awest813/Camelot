@@ -18,6 +18,7 @@ import type {
   FollowerCombatRole,
   FollowerCommand,
 } from "../systems/follower-system";
+import { sanitizeHtml } from "./dom-utils";
 
 // ── Design tokens (mirrors UIManager) ─────────────────────────────────────
 const C = {
@@ -553,10 +554,10 @@ export class FollowerUI {
       display: "grid", gridTemplateColumns: "1fr 1fr",
       gap: "2px 10px", fontSize: "9px", color: C.DIM,
     });
-    stats.innerHTML = `
+    stats.innerHTML = sanitizeHtml(`
       <span>Carry Weight</span><span style="color:${C.TEXT}">+${tmpl.carryWeightBonus}</span>
       <span>Home</span><span style="color:${C.TEXT};font-size:8px">${tmpl.homeLocationId}</span>
-    `;
+    `);
 
     // ── Action button ─────────────────────────────────────────────────────────
     const actionRow = document.createElement("div");
