@@ -1,7 +1,7 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Grid, Button } from "@babylonjs/gui/2D";
-import { LinearGradient } from "@babylonjs/gui/2D/controls/linearGradient";
+import { LinearGradient } from "@babylonjs/gui/2D/controls/gradient/LinearGradient";
 import { Item } from "../systems/inventory-system";
 import { Quest } from "../systems/quest-system";
 import { EquipSlot } from "../systems/equipment-system";

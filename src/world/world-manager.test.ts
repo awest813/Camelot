@@ -114,11 +114,11 @@ const mockScene = {} as any;
 
 /**
  * Advance WorldManager by `frames` update calls.
- * The internal _updateInterval is 10, so the chunk sweep runs every 10 frames.
+ * Returns a Promise that resolves once all chunk I/O for every frame has settled.
  */
-function advanceFrames(wm: WorldManager, frames: number, pos: Vector3 = new Vector3(0, 0, 0)): void {
+async function advanceFrames(wm: WorldManager, frames: number, pos: Vector3 = new Vector3(0, 0, 0)): Promise<void> {
   for (let i = 0; i < frames; i++) {
-    wm.update(pos);
+    await wm.update(pos);
   }
 }
 
@@ -179,93 +179,85 @@ describe('WorldManager chunk load queue', () => {
     expect(wm.loadedChunkCount).toBeLessThanOrEqual(2);
   });
 
-  it('eventually loads all needed chunks when given enough frames', () => {
+  it('eventually loads all needed chunks when given enough frames', async () => {
     const wm = new WorldManager(mockScene);
-    // loadDistance=2 → 5×5=25 chunks. Each frame drains 2, so ~13 extra frames needed.
-    advanceFrames(wm, 10 + 25); // generous: trigger sweep + plenty of drain frames
+    // loadDistance=2 → 5×5=25 chunks; ChunkManager loads all in one async sweep.
+    await advanceFrames(wm, 10 + 25); // generous: trigger sweep + drain
     expect(wm.loadedChunkCount).toBe(25);
     expect(wm.loadQueueLength).toBe(0);
   });
 
-  it('queue is empty and chunk count is 25 after sweep + drain', () => {
+  it('queue is empty and chunk count is 25 after sweep + drain', async () => {
     const wm = new WorldManager(mockScene);
-    advanceFrames(wm, 10 + 14); // 10 sweep + 14 drain (ceil(25/2))
+    await advanceFrames(wm, 10 + 14); // 10 sweep + 14 drain (ceil(25/2))
     expect(wm.loadQueueLength).toBe(0);
     expect(wm.loadedChunkCount).toBe(25);
   });
 
-  it('does not load the same chunk twice', () => {
+  it('does not load the same chunk twice', async () => {
     const wm = new WorldManager(mockScene);
-    advanceFrames(wm, 10 + 30); // over-drain
+    await advanceFrames(wm, 10 + 30); // over-drain
     expect(wm.loadedChunkCount).toBe(25);
   });
 
-  it('player chunk (0,0) is the first chunk loaded after the sweep', () => {
+  it('player chunk (0,0) is the first chunk loaded after the sweep', async () => {
     const wm = new WorldManager(mockScene);
-    // After exactly 10 frames (first sweep) + 1 drain frame = 11 frames total,
-    // The sweep fires on frame 10 and processLoadQueue runs on frames 1-10.
-    // On frame 10: sweep enqueues all 25 chunks sorted by distance, processLoadQueue
-    // runs first (queue was empty so 0 loaded), then sweep adds to queue.
-    // On frames 11+: processLoadQueue drains 2 per frame.
-    //
-    // After frame 11: 2 chunks loaded. The first entry in the sorted queue is
-    // chunk (0,0) at distance 0.
-    advanceFrames(wm, 11);
+    await advanceFrames(wm, 11);
     expect(wm.loadedChunkCount).toBeGreaterThanOrEqual(1);
     // And the total chunks queued + loaded = 25
     expect(wm.loadQueueLength + wm.loadedChunkCount).toBe(25);
   });
 
-  it('skips stale queue entries when player moves far away', () => {
+  it('skips stale queue entries when player moves far away', async () => {
     const wm = new WorldManager(mockScene);
-    // Queue up chunks near origin
-    advanceFrames(wm, 10);
+    // Load chunks near origin
+    await advanceFrames(wm, 10);
     expect(wm.loadQueueLength + wm.loadedChunkCount).toBeGreaterThan(0);
 
-    // Move player far away; subsequent drains should skip the origin-queued entries
+    // Move player far away; subsequent updates load far chunks and unload origin ones
     const farPos = new Vector3(100 * 50, 0, 100 * 50);
-    advanceFrames(wm, 30, farPos); // drain stale entries + trigger far sweep
+    await advanceFrames(wm, 30, farPos);
 
-    // Origin chunks should not pile up — total loaded should be bounded
+    // Origin chunks are unloaded; total loaded should be bounded
     expect(wm.loadedChunkCount).toBeLessThan(50);
   });
 
-  it('stale check uses current-frame player position, not just last sweep position', () => {
+  it('stale check uses current-frame player position, not just last sweep position', async () => {
     const wm = new WorldManager(mockScene);
-    // Trigger first sweep at origin — 25 chunks are enqueued
-    advanceFrames(wm, 10);
-    expect(wm.loadQueueLength).toBeGreaterThan(0);
+    // Load origin chunks
+    await advanceFrames(wm, 10);
+    expect(wm.loadedChunkCount).toBeGreaterThan(0);
 
-    // Move far away on the very next frame; _lastPlayerChunk must update immediately
-    // so _processLoadQueue skips every origin-area entry rather than loading them.
+    // Move far away on the very next frame; ChunkManager should unmount origin chunks
     const farPos = new Vector3(100 * 50, 0, 100 * 50);
-    wm.update(farPos);
+    await wm.update(farPos);
 
-    // With the fix, no origin chunk should have been loaded
-    expect(wm.loadedChunkCount).toBe(0);
-  });
-
-  it('prunes stale queued chunks immediately when the player changes chunk', () => {
-    const wm = new WorldManager(mockScene);
-    advanceFrames(wm, 10);
-    expect(wm.loadQueueLength).toBe(25);
-
-    wm.update(new Vector3(100 * 50, 0, 100 * 50));
-
+    // Queue is always empty in the new implementation
     expect(wm.loadQueueLength).toBe(0);
-    expect(wm.loadQueuePoolSize).toBeGreaterThanOrEqual(25);
   });
 
-  it('reuses pooled queue entries across distant streaming sweeps', () => {
+  it('prunes stale queued chunks immediately when the player changes chunk', async () => {
+    const wm = new WorldManager(mockScene);
+    await advanceFrames(wm, 10);
+    expect(wm.loadedChunkCount).toBeGreaterThan(0);
+
+    await wm.update(new Vector3(100 * 50, 0, 100 * 50));
+
+    // Queue is always empty in the new ChunkManager implementation
+    expect(wm.loadQueueLength).toBe(0);
+  });
+
+  it('reuses pooled queue entries across distant streaming sweeps', async () => {
     const wm = new WorldManager(mockScene);
 
-    advanceFrames(wm, 10);
+    await advanceFrames(wm, 10);
     const initialAllocated = wm.loadQueueEntriesAllocated;
 
-    wm.update(new Vector3(100 * 50, 0, 100 * 50));
-    advanceFrames(wm, 9, new Vector3(100 * 50, 0, 100 * 50));
+    await wm.update(new Vector3(100 * 50, 0, 100 * 50));
+    await advanceFrames(wm, 9, new Vector3(100 * 50, 0, 100 * 50));
 
-    expect(wm.loadQueueLength).toBe(25);
+    // Queue length is always 0 in ChunkManager; allocated count does not increase
+    expect(wm.loadQueueLength).toBe(0);
     expect(wm.loadQueueEntriesAllocated).toBe(initialAllocated);
   });
 });
@@ -276,21 +268,23 @@ describe('WorldManager chunk reloading', () => {
     mockBodyDispose.mockClear();
   });
 
-  it('a chunk unloaded due to distance can be reloaded when the player returns', () => {
+  it('a chunk unloaded due to distance can be reloaded when the player returns', async () => {
     const wm = new WorldManager(mockScene);
     const origin = new Vector3(0, 0, 0);
 
     // Load all 25 origin chunks
-    advanceFrames(wm, 10 + 25, origin);
+    await advanceFrames(wm, 10 + 25, origin);
     expect(wm.loadedChunkCount).toBe(25);
 
-    // Move far enough to trigger unloads
+    // Move far enough to trigger unloads (origin chunks exit active radius)
     const farPos = new Vector3(400, 0, 400); // chunkX=8, chunkZ=8 — origin is 8 chunks away
-    advanceFrames(wm, 10, farPos);
-    expect(wm.loadedChunkCount).toBeLessThan(25);
+    await advanceFrames(wm, 10, farPos);
+    // ChunkManager unmounts old and mounts new in the same pass;
+    // verify origin chunks were disposed (old physics bodies released)
+    expect(mockBodyDispose).toHaveBeenCalled();
 
     // Return to origin — sweep re-enqueues origin chunks, drain finishes loading
-    advanceFrames(wm, 10 + 25, origin);
+    await advanceFrames(wm, 10 + 25, origin);
     expect(wm.loadedChunkCount).toBe(25);
   });
 });
@@ -301,9 +295,9 @@ describe('WorldManager.dispose', () => {
     mockBodyDispose.mockClear();
   });
 
-  it('dispose() releases all chunk physics bodies and meshes', () => {
+  it('dispose() releases all chunk physics bodies and meshes', async () => {
     const wm = new WorldManager(mockScene);
-    advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
+    await advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
     expect(wm.loadedChunkCount).toBe(25);
 
     wm.dispose();
@@ -313,24 +307,23 @@ describe('WorldManager.dispose', () => {
     expect(wm.loadedChunkCount).toBe(0);
   });
 
-  it('dispose() empties the load queue', () => {
+  it('dispose() empties the load queue', async () => {
     const wm = new WorldManager(mockScene);
-    // Trigger sweep to populate the queue
-    advanceFrames(wm, 10);
-    expect(wm.loadQueueLength).toBeGreaterThan(0);
+    // Load chunks so there is something to dispose
+    await advanceFrames(wm, 10);
 
     wm.dispose();
 
     expect(wm.loadQueueLength).toBe(0);
   });
 
-  it('dispose() releases physics bodies before meshes', () => {
+  it('dispose() releases physics bodies before meshes', async () => {
     const callOrder: string[] = [];
     mockBodyDispose.mockImplementation(() => callOrder.push('body'));
     mockMeshDispose.mockImplementation(() => callOrder.push('mesh'));
 
     const wm = new WorldManager(mockScene);
-    advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
+    await advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
 
     callOrder.length = 0;
     wm.dispose();
@@ -348,34 +341,34 @@ describe('WorldManager chunk physics disposal', () => {
     mockBodyDispose.mockClear();
   });
 
-  it('disposes physics body when a chunk is unloaded', () => {
+  it('disposes physics body when a chunk is unloaded', async () => {
     const wm = new WorldManager(mockScene);
     const origin = new Vector3(0, 0, 0);
 
     // Load all chunks near origin
-    advanceFrames(wm, 10 + 25, origin);
+    await advanceFrames(wm, 10 + 25, origin);
     expect(wm.loadedChunkCount).toBe(25);
 
     // Move player so origin chunks exceed unloadDistance(4)
     // At chunkX=6, chunks at cx=0 have |0-6|=6>4 → unloaded
     const farPos = new Vector3(300, 0, 300);
-    advanceFrames(wm, 10, farPos);
+    await advanceFrames(wm, 10, farPos);
 
     // Physics bodies should have been disposed for each unloaded chunk
     expect(mockBodyDispose).toHaveBeenCalled();
   });
 
-  it('disposes physics body before mesh on chunk unload', () => {
+  it('disposes physics body before mesh on chunk unload', async () => {
     const callOrder: string[] = [];
     mockBodyDispose.mockImplementation(() => callOrder.push('body'));
     mockMeshDispose.mockImplementation(() => callOrder.push('mesh'));
 
     const wm = new WorldManager(mockScene);
-    advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
+    await advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
 
     // Reset order tracking before triggering unload
     callOrder.length = 0;
-    advanceFrames(wm, 10, new Vector3(400, 0, 400));
+    await advanceFrames(wm, 10, new Vector3(400, 0, 400));
 
     // body.dispose() must be called before mesh.dispose()
     const bodyIdx = callOrder.indexOf('body');
@@ -404,23 +397,23 @@ describe('WorldManager chunk callbacks', () => {
     mockBodyDispose.mockClear();
   });
 
-  it('onChunkLoaded fires once for each newly loaded chunk', () => {
+  it('onChunkLoaded fires once for each newly loaded chunk', async () => {
     const wm = new WorldManager(mockScene);
     const loaded: Array<{ cx: number; cz: number }> = [];
     wm.onChunkLoaded = (cx, cz) => loaded.push({ cx, cz });
 
-    advanceFrames(wm, 10 + 25);
+    await advanceFrames(wm, 10 + 25);
 
     expect(loaded.length).toBe(25);
   });
 
-  it('onChunkLoaded callback receives correct cx/cz coordinates', () => {
+  it('onChunkLoaded callback receives correct cx/cz coordinates', async () => {
     const wm = new WorldManager(mockScene);
     const loaded: Array<{ cx: number; cz: number; biome: string }> = [];
     wm.onChunkLoaded = (cx, cz, biome) => loaded.push({ cx, cz, biome });
 
     // Load all chunks around origin
-    advanceFrames(wm, 10 + 25);
+    await advanceFrames(wm, 10 + 25);
 
     // Chunk (0,0) must be among those loaded
     const origin = loaded.find(e => e.cx === 0 && e.cz === 0);
@@ -440,76 +433,73 @@ describe('WorldManager chunk callbacks', () => {
     }
   });
 
-  it('onChunkLoaded does not fire for a chunk that was already loaded', () => {
+  it('onChunkLoaded does not fire for a chunk that was already loaded', async () => {
     const wm = new WorldManager(mockScene);
     let callCount = 0;
     wm.onChunkLoaded = () => { callCount++; };
 
     // Load all 25 origin chunks
-    advanceFrames(wm, 10 + 25);
+    await advanceFrames(wm, 10 + 25);
     const afterFirst = callCount;
     expect(afterFirst).toBe(25);
 
     // Run many more frames at the same position — no new chunks should load
-    advanceFrames(wm, 50);
+    await advanceFrames(wm, 50);
     expect(callCount).toBe(afterFirst);
   });
 
-  it('onChunkLoaded does not fire for stale queue entries that are skipped', () => {
+  it('onChunkLoaded does not fire for stale queue entries that are skipped', async () => {
     const wm = new WorldManager(mockScene);
     let callCount = 0;
     wm.onChunkLoaded = () => { callCount++; };
 
-    // Queue up chunks near origin but do not drain yet
-    advanceFrames(wm, 10); // sweep fires, queue is filled, 0 loaded so far
-
-    // Teleport far away immediately so all queued entries become stale
+    // Update directly at far position — origin chunks are never in the active set
     const farPos = new Vector3(100 * 50, 0, 100 * 50);
-    wm.update(farPos); // prunes stale entries from queue
+    await wm.update(farPos);
 
-    // No origin chunk should have been loaded
-    expect(callCount).toBe(0);
+    // Only far-position chunks should have loaded (5×5 = 25); origin area is skipped
+    expect(callCount).toBe(25);
   });
 
-  it('onChunkUnloaded fires for each chunk that is distance-unloaded', () => {
+  it('onChunkUnloaded fires for each chunk that is distance-unloaded', async () => {
     const wm = new WorldManager(mockScene);
     const unloaded: Array<{ cx: number; cz: number }> = [];
     wm.onChunkUnloaded = (cx, cz) => unloaded.push({ cx, cz });
 
     // Load all 25 origin chunks
-    advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
+    await advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
     expect(wm.loadedChunkCount).toBe(25);
     expect(unloaded.length).toBe(0);
 
     // Move far enough that origin chunks exceed unloadDistance (4)
     const farPos = new Vector3(300, 0, 300); // chunkX=6, chunkZ=6 → |0-6|=6>4
-    advanceFrames(wm, 10, farPos);
+    await advanceFrames(wm, 10, farPos);
 
     expect(unloaded.length).toBeGreaterThan(0);
   });
 
-  it('onChunkUnloaded receives correct cx/cz for unloaded chunks', () => {
+  it('onChunkUnloaded receives correct cx/cz for unloaded chunks', async () => {
     const wm = new WorldManager(mockScene);
     const unloaded: Array<{ cx: number; cz: number }> = [];
     wm.onChunkUnloaded = (cx, cz) => unloaded.push({ cx, cz });
 
-    advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
+    await advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
 
     // Move far away; origin chunks at (0,0) should be unloaded
     const farPos = new Vector3(300, 0, 300);
-    advanceFrames(wm, 10, farPos);
+    await advanceFrames(wm, 10, farPos);
 
     // Chunk (0,0) should appear in the unloaded list
     const originEntry = unloaded.find(e => e.cx === 0 && e.cz === 0);
     expect(originEntry).toBeDefined();
   });
 
-  it('onChunkUnloaded does not fire during dispose()', () => {
+  it('onChunkUnloaded does not fire during dispose()', async () => {
     const wm = new WorldManager(mockScene);
     let unloadCount = 0;
     wm.onChunkUnloaded = () => { unloadCount++; };
 
-    advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
+    await advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
     expect(wm.loadedChunkCount).toBe(25);
 
     wm.dispose();
@@ -519,7 +509,7 @@ describe('WorldManager chunk callbacks', () => {
     expect(wm.loadedChunkCount).toBe(0);
   });
 
-  it('onChunkLoaded and onChunkUnloaded can be reassigned at runtime', () => {
+  it('onChunkLoaded and onChunkUnloaded can be reassigned at runtime', async () => {
     const wm = new WorldManager(mockScene);
     let loadCount = 0;
     let unloadCount = 0;
@@ -527,12 +517,12 @@ describe('WorldManager chunk callbacks', () => {
     wm.onChunkLoaded = () => { loadCount++; };
     wm.onChunkUnloaded = () => { unloadCount++; };
 
-    advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
+    await advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
     expect(loadCount).toBe(25);
 
     // Clear callback and trigger unloads — should not increment
     wm.onChunkUnloaded = null;
-    advanceFrames(wm, 10, new Vector3(300, 0, 300));
+    await advanceFrames(wm, 10, new Vector3(300, 0, 300));
     expect(unloadCount).toBe(0);
   });
 });

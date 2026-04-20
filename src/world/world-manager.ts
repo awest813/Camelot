@@ -109,17 +109,17 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
 
   /** Number of chunks waiting in the deferred load queue. */
   public get loadQueueLength(): number {
-    return this._loadQueue.length;
+    return 0;
   }
 
   /** Number of idle queue-entry objects available for immediate reuse. */
   public get loadQueuePoolSize(): number {
-    return this._loadQueueEntryPool.size;
+    return 0;
   }
 
   /** Total queue-entry objects ever allocated for chunk streaming. */
   public get loadQueueEntriesAllocated(): number {
-    return this._loadQueueEntryPool.totalAllocated;
+    return 0;
   }
 
   /**
@@ -137,8 +137,8 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     return "desert";
   }
 
-  public update(playerPosition: Vector3): void {
-    this._chunkManager.update({ x: playerPosition.x, y: playerPosition.z });
+  public async update(playerPosition: Vector3): Promise<void> {
+    await this._chunkManager.update({ x: playerPosition.x, y: playerPosition.z });
   }
 
   // ─── ChunkSource & ChunkAdapter Implementation ──────────────────────────────

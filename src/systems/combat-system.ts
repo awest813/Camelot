@@ -710,7 +710,6 @@ export class CombatSystem {
         npc.takeDamage(meleeDmg);
         this._ui.applyHitStop(isCrit ? 120 : 60);
         this._ui.shakeCamera(isCrit ? 0.6 : 0.25);
-        if (isCrit) this._ui.showSpark(numberPos, "#FFD700");
 
         // Per-weapon stagger chance on normal melee hits.
         if (
@@ -731,6 +730,7 @@ export class CombatSystem {
         const numberPos = hit.pickedPoint
           ? hit.pickedPoint.addToRef(CombatSystem._OFFSET_Y1, this._hitPos)
           : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos);
+        if (isCrit) this._ui.showSpark(numberPos, "#FFD700");
         this._ui.showDamageNumber(
           numberPos, meleeDmg, this.scene,
           isCrit ? DMG_COLOR_CRIT : DMG_COLOR_PHYSICAL,
