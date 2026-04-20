@@ -4,6 +4,7 @@ import {
   CameraSequenceDefinition,
   CameraScriptingContext,
   CameraScriptStep,
+  SplineWaypoint,
 } from "./camera-scripting-system";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -14,20 +15,23 @@ function makeContext(overrides: Partial<CameraScriptingContext> = {}): CameraScr
   fadeOutCalls: number[];
   fadeInCalls:  number[];
   shakeCalls:   Array<{ intensity: number; durationMs: number }>;
+  setPosCalls:  Array<{ x: number; y: number; z: number }>;
 } {
   const lookAtCalls:  Array<{ x: number; y: number; z: number }> = [];
   const panToCalls:   Array<{ x: number; y: number; z: number; durationMs: number; easing: string }> = [];
   const fadeOutCalls: number[] = [];
   const fadeInCalls:  number[] = [];
   const shakeCalls:   Array<{ intensity: number; durationMs: number }> = [];
+  const setPosCalls:  Array<{ x: number; y: number; z: number }> = [];
 
   return {
-    lookAtCalls, panToCalls, fadeOutCalls, fadeInCalls, shakeCalls,
+    lookAtCalls, panToCalls, fadeOutCalls, fadeInCalls, shakeCalls, setPosCalls,
     cameraLookAt:  (x, y, z)                         => lookAtCalls.push({ x, y, z }),
     cameraPanTo:   (x, y, z, durationMs, easing)     => panToCalls.push({ x, y, z, durationMs, easing }),
     cameraFadeOut: (durationMs)                       => fadeOutCalls.push(durationMs),
     cameraFadeIn:  (durationMs)                       => fadeInCalls.push(durationMs),
     cameraShake:   (intensity, durationMs)            => shakeCalls.push({ intensity, durationMs }),
+    cameraSetPosition: (x, y, z)                     => setPosCalls.push({ x, y, z }),
     ...overrides,
   };
 }
@@ -611,6 +615,179 @@ describe("CameraScriptingSystem", () => {
 
     it("restoreSnapshot handles null/undefined gracefully", () => {
       expect(() => sys.restoreSnapshot(null as unknown as never)).not.toThrow();
+    });
+  });
+
+  // ── Spline path step ──────────────────────────────────────────────────────
+
+  describe("spline_path step", () => {
+    const waypoints: SplineWaypoint[] = [
+      { x: 0, y: 0, z: 0 },
+      { x: 10, y: 5, z: 0 },
+      { x: 20, y: 0, z: 10 },
+      { x: 30, y: 5, z: 10 },
+    ];
+
+    it("is a timed step with default duration 2000ms", () => {
+      sys.registerSequence(makeSeq("spline", [
+        { type: "spline_path", waypoints },
+      ]));
+      sys.play("spline", ctx);
+      expect(sys.isPlaying("spline")).toBe(true);
+      // After 1000ms it should still be playing
+      sys.update(1000, ctx);
+      expect(sys.isPlaying("spline")).toBe(true);
+      // After 2000ms total it completes
+      sys.update(1100, ctx);
+      expect(sys.isPlaying("spline")).toBe(false);
+    });
+
+    it("respects custom durationMs", () => {
+      sys.registerSequence(makeSeq("spline", [
+        { type: "spline_path", waypoints, durationMs: 500 },
+      ]));
+      sys.play("spline", ctx);
+      sys.update(600, ctx);
+      expect(sys.isPlaying("spline")).toBe(false);
+    });
+
+    it("calls cameraSetPosition on play (initial waypoint)", () => {
+      sys.registerSequence(makeSeq("spline", [
+        { type: "spline_path", waypoints },
+      ]));
+      sys.play("spline", ctx);
+      expect(ctx.setPosCalls.length).toBeGreaterThanOrEqual(1);
+      expect(ctx.setPosCalls[0]).toEqual({ x: 0, y: 0, z: 0 });
+    });
+
+    it("calls cameraSetPosition during update", () => {
+      sys.registerSequence(makeSeq("spline", [
+        { type: "spline_path", waypoints, durationMs: 1000 },
+      ]));
+      sys.play("spline", ctx);
+      const initialCalls = ctx.setPosCalls.length;
+      sys.update(500, ctx);
+      expect(ctx.setPosCalls.length).toBeGreaterThan(initialCalls);
+    });
+
+    it("interpolated position is between waypoints", () => {
+      sys.registerSequence(makeSeq("spline", [
+        { type: "spline_path", waypoints, durationMs: 1000 },
+      ]));
+      sys.play("spline", ctx);
+      sys.update(500, ctx); // 50%
+      const midPos = ctx.setPosCalls[ctx.setPosCalls.length - 1];
+      // At 50%, position should be somewhere in the middle
+      expect(midPos.x).toBeGreaterThan(0);
+      expect(midPos.x).toBeLessThan(30);
+    });
+
+    it("calls cameraLookAt when lookAt is specified", () => {
+      sys.registerSequence(makeSeq("spline", [
+        { type: "spline_path", waypoints, durationMs: 1000, lookAt: { x: 15, y: 0, z: 5 } },
+      ]));
+      sys.play("spline", ctx);
+      expect(ctx.lookAtCalls.some(c => c.x === 15 && c.y === 0 && c.z === 5)).toBe(true);
+      sys.update(500, ctx);
+      // lookAt should be called again during update
+      expect(ctx.lookAtCalls.filter(c => c.x === 15).length).toBeGreaterThan(1);
+    });
+
+    it("completes and fires onStepComplete", () => {
+      const cb = vi.fn();
+      sys.onStepComplete = cb;
+      sys.registerSequence(makeSeq("spline", [
+        { type: "spline_path", waypoints, durationMs: 500 },
+      ]));
+      sys.play("spline", ctx);
+      sys.update(600, ctx);
+      // onStepComplete fires for the spline_path step
+      expect(cb).toHaveBeenCalled();
+    });
+
+    it("advances to next step after completion", () => {
+      sys.registerSequence(makeSeq("spline", [
+        { type: "spline_path", waypoints, durationMs: 200 },
+        { type: "look_at", x: 99, y: 99, z: 99 },
+      ]));
+      sys.play("spline", ctx);
+      sys.update(300, ctx);
+      expect(ctx.lookAtCalls.some(c => c.x === 99)).toBe(true);
+    });
+  });
+
+  // ── Catmull-Rom static method ─────────────────────────────────────────────
+
+  describe("CameraScriptingSystem.catmullRom()", () => {
+    const waypoints: SplineWaypoint[] = [
+      { x: 0, y: 0, z: 0 },
+      { x: 10, y: 10, z: 0 },
+      { x: 20, y: 0, z: 10 },
+    ];
+
+    it("returns first waypoint at t=0", () => {
+      const pos = CameraScriptingSystem.catmullRom(waypoints, 0);
+      expect(pos.x).toBeCloseTo(0);
+      expect(pos.y).toBeCloseTo(0);
+      expect(pos.z).toBeCloseTo(0);
+    });
+
+    it("returns last waypoint at t=1", () => {
+      const pos = CameraScriptingSystem.catmullRom(waypoints, 1);
+      expect(pos.x).toBeCloseTo(20);
+      expect(pos.y).toBeCloseTo(0);
+      expect(pos.z).toBeCloseTo(10);
+    });
+
+    it("returns interpolated position at t=0.5", () => {
+      const pos = CameraScriptingSystem.catmullRom(waypoints, 0.5);
+      expect(pos.x).toBeGreaterThan(0);
+      expect(pos.x).toBeLessThan(20);
+    });
+
+    it("handles single waypoint", () => {
+      const pos = CameraScriptingSystem.catmullRom([{ x: 5, y: 5, z: 5 }], 0.5);
+      expect(pos).toEqual({ x: 5, y: 5, z: 5 });
+    });
+
+    it("handles empty waypoints", () => {
+      const pos = CameraScriptingSystem.catmullRom([], 0.5);
+      expect(pos).toEqual({ x: 0, y: 0, z: 0 });
+    });
+
+    it("clamps t below 0 to first waypoint", () => {
+      const pos = CameraScriptingSystem.catmullRom(waypoints, -0.5);
+      expect(pos.x).toBeCloseTo(0);
+    });
+
+    it("clamps t above 1 to last waypoint", () => {
+      const pos = CameraScriptingSystem.catmullRom(waypoints, 1.5);
+      expect(pos.x).toBeCloseTo(20);
+    });
+
+    it("produces smooth curve (no sharp jumps)", () => {
+      const steps = 20;
+      const positions: SplineWaypoint[] = [];
+      for (let i = 0; i <= steps; i++) {
+        positions.push(CameraScriptingSystem.catmullRom(waypoints, i / steps));
+      }
+      // Check that consecutive positions don't jump too far
+      for (let i = 1; i < positions.length; i++) {
+        const dx = positions[i].x - positions[i - 1].x;
+        const dy = positions[i].y - positions[i - 1].y;
+        const dz = positions[i].z - positions[i - 1].z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        expect(dist).toBeLessThan(5); // no jumps > 5 units
+      }
+    });
+
+    it("passes through start and end points exactly for two waypoints", () => {
+      const two: SplineWaypoint[] = [
+        { x: 0, y: 0, z: 0 },
+        { x: 10, y: 10, z: 10 },
+      ];
+      expect(CameraScriptingSystem.catmullRom(two, 0)).toEqual({ x: 0, y: 0, z: 0 });
+      expect(CameraScriptingSystem.catmullRom(two, 1)).toEqual({ x: 10, y: 10, z: 10 });
     });
   });
 });

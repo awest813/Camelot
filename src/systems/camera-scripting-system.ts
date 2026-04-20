@@ -40,9 +40,25 @@
 /** Easing function applied to timed camera moves. */
 export type CameraEasing = "linear" | "ease_in" | "ease_out" | "ease_in_out";
 
+/** A 3D waypoint used in spline paths. */
+export interface SplineWaypoint {
+  x: number;
+  y: number;
+  z: number;
+}
+
 export type CameraScriptStep =
   | { type: "look_at"; x: number; y: number; z: number }
   | { type: "pan_to"; x: number; y: number; z: number; durationMs?: number; easing?: CameraEasing }
+  | {
+      type: "spline_path";
+      /** Ordered waypoints the camera follows using Catmull-Rom interpolation. Minimum 2. */
+      waypoints: SplineWaypoint[];
+      /** Total duration of the spline traversal in ms. Default: 2000. */
+      durationMs?: number;
+      /** Optional look-at target that the camera faces throughout the spline. */
+      lookAt?: SplineWaypoint;
+    }
   | { type: "fade_out"; durationMs?: number }
   | { type: "fade_in"; durationMs?: number }
   | { type: "shake"; intensity?: number; durationMs?: number }
@@ -68,6 +84,12 @@ export interface CameraScriptingContext {
   cameraLookAt?: (x: number, y: number, z: number) => void;
   /** Smoothly move the camera to the given world-space position. */
   cameraPanTo?: (x: number, y: number, z: number, durationMs: number, easing: CameraEasing) => void;
+  /**
+   * Move the camera to a position on a spline path.
+   * Called every frame during a `spline_path` step with the interpolated position.
+   * If not provided, falls back to `cameraPanTo` for the final waypoint.
+   */
+  cameraSetPosition?: (x: number, y: number, z: number) => void;
   /** Fade the viewport to black over the given duration. */
   cameraFadeOut?: (durationMs: number) => void;
   /** Fade the viewport back in from black over the given duration. */
@@ -83,6 +105,8 @@ export interface PlayingSequenceState {
   /** Remaining milliseconds for the current timed step; `null` when no timer is active. */
   remainingMs: number | null;
   paused: boolean;
+  /** Total duration for a spline_path step (set once when the step begins). */
+  splineDurationMs?: number;
 }
 
 export interface CameraScriptingSaveState {
@@ -259,10 +283,25 @@ export class CameraScriptingSystem {
       if (state.remainingMs === null) continue;
 
       state.remainingMs -= deltaMs;
+
+      // Spline interpolation — update camera position each frame
+      const def = this._sequences.get(state.sequenceId);
+      if (def) {
+        const step = def.steps[state.stepIndex];
+        if (step.type === "spline_path" && state.splineDurationMs) {
+          const elapsed = state.splineDurationMs - Math.max(0, state.remainingMs);
+          const t = Math.min(1, elapsed / state.splineDurationMs);
+          const pos = CameraScriptingSystem.catmullRom(step.waypoints, t);
+          context.cameraSetPosition?.(pos.x, pos.y, pos.z);
+          if (step.lookAt) {
+            context.cameraLookAt?.(step.lookAt.x, step.lookAt.y, step.lookAt.z);
+          }
+        }
+      }
+
       if (state.remainingMs > 0) continue;
 
       // Timer expired — complete current step and advance.
-      const def = this._sequences.get(state.sequenceId);
       if (!def) continue;
 
       const completedStep = def.steps[state.stepIndex];
@@ -363,6 +402,21 @@ export class CameraScriptingSystem {
         break;
       }
 
+      case "spline_path": {
+        const dur = step.durationMs ?? 2000;
+        state.splineDurationMs = dur;
+        state.remainingMs = dur;
+        // Set initial position to first waypoint
+        if (step.waypoints.length > 0) {
+          const wp = step.waypoints[0];
+          context.cameraSetPosition?.(wp.x, wp.y, wp.z);
+          if (step.lookAt) {
+            context.cameraLookAt?.(step.lookAt.x, step.lookAt.y, step.lookAt.z);
+          }
+        }
+        break;
+      }
+
       case "fade_out": {
         const dur = step.durationMs ?? 500;
         context.cameraFadeOut?.(dur);
@@ -402,6 +456,7 @@ export class CameraScriptingSystem {
     context: CameraScriptingContext,
   ): void {
     state.remainingMs = null;
+    state.splineDurationMs = undefined;
     state.stepIndex++;
 
     if (state.stepIndex < def.steps.length) {
@@ -417,5 +472,50 @@ export class CameraScriptingSystem {
       this._playing.delete(state.sequenceId);
       this.onSequenceComplete?.(state.sequenceId);
     }
+  }
+
+  // ── Spline math ──────────────────────────────────────────────────────────
+
+  /**
+   * Evaluate a Catmull-Rom spline at parameter `t` (0–1) across the given
+   * waypoints.  The first and last waypoints are duplicated internally to
+   * ensure the curve starts and ends at the first/last point.
+   *
+   * @param waypoints  Array of at least 2 waypoints.
+   * @param t          Normalised time parameter (0 = first waypoint, 1 = last).
+   * @returns          Interpolated {x, y, z} position on the spline.
+   */
+  public static catmullRom(
+    waypoints: ReadonlyArray<SplineWaypoint>,
+    t: number,
+  ): SplineWaypoint {
+    if (waypoints.length === 0) return { x: 0, y: 0, z: 0 };
+    if (waypoints.length === 1) return { ...waypoints[0] };
+    if (t <= 0) return { ...waypoints[0] };
+    if (t >= 1) return { ...waypoints[waypoints.length - 1] };
+
+    // Pad with duplicated endpoints so the curve passes through first/last
+    const pts = [waypoints[0], ...waypoints, waypoints[waypoints.length - 1]];
+
+    // Map t to segment index
+    const segmentCount = pts.length - 3; // number of valid Catmull-Rom segments
+    const scaledT = t * segmentCount;
+    const segment = Math.min(Math.floor(scaledT), segmentCount - 1);
+    const localT = scaledT - segment;
+
+    const p0 = pts[segment];
+    const p1 = pts[segment + 1];
+    const p2 = pts[segment + 2];
+    const p3 = pts[segment + 3];
+
+    // Catmull-Rom basis matrix evaluation
+    const t2 = localT * localT;
+    const t3 = t2 * localT;
+
+    return {
+      x: 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * localT + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+      y: 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * localT + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
+      z: 0.5 * ((2 * p1.z) + (-p0.z + p2.z) * localT + (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * t2 + (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * t3),
+    };
   }
 }
