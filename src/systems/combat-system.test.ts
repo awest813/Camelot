@@ -1244,4 +1244,60 @@ describe('CombatSystem', () => {
         expect(telegraphCall).toBeDefined();
     });
 
+    // ─── setScalingSystems guard ─────────────────────────────────────────────
+
+    it('setScalingSystems preserves activeEffectsSystem when not provided in opts', () => {
+        const mockActiveEffects = { totalMagnitude: vi.fn(() => 0) } as any;
+
+        // Wire an activeEffectsSystem via the constructor opts path
+        const combat = new CombatSystem(
+            mockScene, mockPlayer, mockNpcs, mockUI,
+            undefined, { activeEffectsSystem: mockActiveEffects }
+        );
+
+        // Calling setScalingSystems without activeEffectsSystem must NOT overwrite it.
+        const skills = new SkillProgressionSystem();
+        combat.setScalingSystems({ skillSystem: skills });
+
+        // Trigger a blocked NPC hit — the activeEffectsSystem's totalMagnitude should
+        // be consulted for resist_damage, proving the reference was preserved.
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 10;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+
+        combat.updateNPCAI(0.016);
+        combat.updateNPCAI(0.25);
+
+        expect(mockActiveEffects.totalMagnitude).toHaveBeenCalledWith('resist_damage');
+    });
+
+    it('setScalingSystems can update activeEffectsSystem when explicitly supplied', () => {
+        const first  = { totalMagnitude: vi.fn(() => 0) } as any;
+        const second = { totalMagnitude: vi.fn(() => 0) } as any;
+
+        const combat = new CombatSystem(
+            mockScene, mockPlayer, mockNpcs, mockUI,
+            undefined, { activeEffectsSystem: first }
+        );
+
+        // Replace with second system explicitly.
+        combat.setScalingSystems({ activeEffectsSystem: second });
+
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 10;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+
+        combat.updateNPCAI(0.016);
+        combat.updateNPCAI(0.25);
+
+        expect(second.totalMagnitude).toHaveBeenCalledWith('resist_damage');
+        expect(first.totalMagnitude).not.toHaveBeenCalled();
+    });
+
 });
