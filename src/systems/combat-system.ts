@@ -450,7 +450,7 @@ export class CombatSystem {
     if (opts.attributeSystem !== undefined) {
       this._attributeSystem = opts.attributeSystem;
     }
-    if (this._activeEffectsSystem !== undefined) {
+    if (opts.activeEffectsSystem !== undefined) {
       this._activeEffectsSystem = opts.activeEffectsSystem;
     }
   }
@@ -596,8 +596,6 @@ export class CombatSystem {
         npc.takeDamage(finalDmg);
         this._ui.applyHitStop(100);
         this._ui.shakeCamera(0.4);
-
-        // Charged blast always staggers.
 
         // Charged blast always staggers.
         npc.isStaggered = true;
