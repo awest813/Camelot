@@ -143,6 +143,8 @@ describe("FastTravelUI", () => {
       expect(btn.disabled).toBe(false);
       expect(btn.getAttribute("aria-disabled")).toBe("false");
       expect(btn.title).toContain("Travel to Whiterun");
+      expect(btn.style.opacity).toBe("");
+      expect(btn.style.cursor).toBe("");
     });
 
     it("open() with empty array shows empty message", () => {
@@ -154,9 +156,11 @@ describe("FastTravelUI", () => {
     it("travel button is disabled when options list is empty", () => {
       ui.open([]);
       const btn = document.querySelector(".fast-travel__btn--primary") as HTMLButtonElement;
-      expect(btn.disabled).toBe(true);
+      expect(btn.disabled).toBe(false); // native disabled breaks tooltip
       expect(btn.getAttribute("aria-disabled")).toBe("true");
       expect(btn.title).toBe("No destinations available.");
+      expect(btn.style.opacity).toBe("0.5");
+      expect(btn.style.cursor).toBe("not-allowed");
     });
 
     it("status prompts exploration when no options", () => {

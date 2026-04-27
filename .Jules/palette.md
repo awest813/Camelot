@@ -5,3 +5,7 @@
 ## 2025-04-08 - Accessible Custom Toggles with aria-expanded
 **Learning:** Missing `aria-expanded` attributes on custom HTML UI toggles (e.g. accordion triggers that expand/collapse content sections) creates an accessibility failure, as screen readers cannot interpret the open/closed state. The toggle state must be explicitly managed within its click listener. Additionally, linking the toggle element to the controlled content using `aria-controls` is essential.
 **Action:** Always verify custom disclosure or accordion components use `aria-expanded` and `aria-controls`. Set an initial state and dynamically update `aria-expanded` via `setAttribute` whenever the layout toggles between visible or hidden states.
+
+## 2025-04-27 - Disabled Button Tooltips with Native Attributes
+**Learning:** In fast travel and similar HTML overlays, using the native `disabled` property on action buttons (like 'Travel') completely blocks pointer events, which prevents informative `title` tooltips from displaying. This leaves users confused as to why the action is restricted.
+**Action:** Replace `disabled = true` with `aria-disabled="true"`, visual styling (`opacity: 0.5`, `cursor: not-allowed`), and manual click interception in the event handler to preserve tooltip visibility and improve overall UX discoverability.
