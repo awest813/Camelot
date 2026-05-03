@@ -121,6 +121,7 @@ export class SaddlebagUI {
     this._capacityEl = capacity;
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className = "saddlebag__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close saddlebag");
@@ -142,6 +143,7 @@ export class SaddlebagUI {
     panel.appendChild(actions);
 
     const doneBtn = document.createElement("button");
+    doneBtn.type = "button";
     doneBtn.className = "saddlebag__btn saddlebag__btn--primary";
     doneBtn.textContent = "Done";
     doneBtn.addEventListener("click", () => this.close());
@@ -173,6 +175,7 @@ export class SaddlebagUI {
       row.appendChild(nameEl);
 
       const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
       removeBtn.className = "saddlebag__row-remove";
       removeBtn.textContent = "Take";
       removeBtn.setAttribute("aria-label", `Take ${item.name} from saddlebag`);
