@@ -1,5 +1,8 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Grid, Button } from "@babylonjs/gui/2D";
 import { LinearGradient } from "@babylonjs/gui/2D/controls/gradient/LinearGradient";
 import { Item } from "../systems/inventory-system";
@@ -104,6 +107,7 @@ export class UIManager {
   // Camera Shake & Hit-stop
   private _cameraTrauma: number = 0;
   private _initialCameraRotation: Vector3 | null = null;
+  private _cameraShakeObs: any = null;
   public onHitStopRequested: ((durationMs: number) => void) | null = null;
 
   // Notifications
@@ -1250,7 +1254,7 @@ export class UIManager {
     
     if (!this._cameraShakeObs) {
       this._cameraShakeObs = this.scene.onBeforeRenderObservable.add(() => {
-        const camera = this.scene.activeCamera;
+        const camera = this.scene.activeCamera as any;
         if (!camera || this._cameraTrauma <= 0) {
           if (this._cameraTrauma <= 0 && this._cameraShakeObs) {
             this.scene.onBeforeRenderObservable.remove(this._cameraShakeObs);

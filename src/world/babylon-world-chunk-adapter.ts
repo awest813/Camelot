@@ -35,7 +35,7 @@ export class BabylonWorldAdapter implements ChunkAdapter<WorldChunkData> {
 
   public async mount(chunk: Chunk<WorldChunkData>): Promise<void> {
     if (!chunk.data) return;
-    const { x, z } = chunk.coords;
+    const { x, y: z } = chunk.coords;
     const { biome } = chunk.data;
     const chunkSize = this._worldManager.chunkSize;
 
@@ -79,7 +79,7 @@ export class BabylonWorldAdapter implements ChunkAdapter<WorldChunkData> {
       v.dispose(false, false);
     }
 
-    const { x, z } = chunk.coords;
+    const { x, y: z } = chunk.coords;
     this._worldManager.structures.disposeChunk(x, z);
     this._worldManager.onChunkUnloaded?.(x, z);
     
