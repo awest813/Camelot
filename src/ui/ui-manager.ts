@@ -3,6 +3,7 @@ import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import type { Observer } from "@babylonjs/core/Misc/observable";
 import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Grid, Button } from "@babylonjs/gui/2D";
 import { LinearGradient } from "@babylonjs/gui/2D/controls/gradient/LinearGradient";
 import { Item } from "../systems/inventory-system";
@@ -51,6 +52,16 @@ const clampPercentage = (current: number, max: number): string => {
   if (max <= 0) return "0%";
   const percent = (current / max) * 100;
   return `${Math.min(100, Math.max(0, percent))}%`;
+};
+
+type RotatableCamera = {
+  rotation: Vector3;
+};
+
+const hasRotatableCamera = (camera: unknown): camera is RotatableCamera => {
+  if (!camera || typeof camera !== "object") return false;
+  const rotation = (camera as { rotation?: unknown }).rotation;
+  return rotation instanceof Vector3;
 };
 
 export class UIManager {
@@ -107,7 +118,7 @@ export class UIManager {
   // Camera Shake & Hit-stop
   private _cameraTrauma: number = 0;
   private _initialCameraRotation: Vector3 | null = null;
-  private _cameraShakeObs: any = null;
+  private _cameraShakeObs: Observer<Scene> | null = null;
   public onHitStopRequested: ((durationMs: number) => void) | null = null;
 
   // Notifications
@@ -1254,13 +1265,13 @@ export class UIManager {
     
     if (!this._cameraShakeObs) {
       this._cameraShakeObs = this.scene.onBeforeRenderObservable.add(() => {
-        const camera = this.scene.activeCamera as any;
-        if (!camera || this._cameraTrauma <= 0) {
+        const camera = this.scene.activeCamera;
+        if (!hasRotatableCamera(camera) || this._cameraTrauma <= 0) {
           if (this._cameraTrauma <= 0 && this._cameraShakeObs) {
             this.scene.onBeforeRenderObservable.remove(this._cameraShakeObs);
             this._cameraShakeObs = null;
             // Smoothly lerp back to 0 roll/z if needed
-            camera?.rotation.set(camera.rotation.x, camera.rotation.y, 0);
+            if (hasRotatableCamera(camera)) camera.rotation.set(camera.rotation.x, camera.rotation.y, 0);
           }
           return;
         }

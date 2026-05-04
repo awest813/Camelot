@@ -1,5 +1,7 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Ray } from "@babylonjs/core/Culling/ray";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import type { Scene } from "@babylonjs/core/scene";
 import { NPC, AIState } from "../entities/npc";
 import { Player } from "../entities/player";
 import { UIManager } from "../ui/ui-manager";
@@ -61,7 +63,7 @@ export class StealthSystem {
   private _player: Player;
   private _npcs: NPC[];
   private _ui: UIManager;
-  private _scene: any; // Using any for Scene to avoid full core import here if not already present, though it's imported at top typically
+  private _scene: Scene | null;
 
   public isCrouching: boolean = false;
   public movementMode: MovementMode = "walking";
@@ -81,7 +83,7 @@ export class StealthSystem {
   /** Fired once when an NPC's detection level first reaches 100. */
   public onDetected: ((npc: NPC) => void) | null = null;
 
-  constructor(player: Player, npcs: NPC[], ui: UIManager, scene: any = null) {
+  constructor(player: Player, npcs: NPC[], ui: UIManager, scene: Scene | null = null) {
     this._player = player;
     this._npcs = npcs;
     this._ui = ui;
@@ -239,6 +241,8 @@ export class StealthSystem {
 
     if (angle > DETECTION_CONE_HALF_ANGLE) return false;
 
+    if (!this._scene) return true;
+
     // Raycast Line of Sight (LoS) check
     const ray = new Ray(
       npcPos.add(new Vector3(0, 1.3, 0)), // Eye level
@@ -246,7 +250,7 @@ export class StealthSystem {
       dist
     );
     
-    const hit = this._scene.pickWithRay(ray, (mesh: any) => {
+    const hit = this._scene.pickWithRay(ray, (mesh: AbstractMesh) => {
         // Ignore the NPC itself and the player helper
         return mesh !== npc.mesh && mesh.name !== "player_camera_helper" && mesh.checkCollisions;
     });
