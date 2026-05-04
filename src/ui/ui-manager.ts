@@ -58,6 +58,8 @@ type RotatableCamera = {
   rotation: Vector3;
 };
 
+// Active cameras in tests/runtime can differ, so detect the rotation contract
+// instead of coupling camera shake to one Babylon.js camera subclass.
 const hasRotatableCamera = (camera: unknown): camera is RotatableCamera => {
   if (!camera || typeof camera !== "object") return false;
   const rotation = (camera as { rotation?: unknown }).rotation;

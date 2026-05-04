@@ -83,6 +83,10 @@ export class StealthSystem {
   /** Fired once when an NPC's detection level first reaches 100. */
   public onDetected: ((npc: NPC) => void) | null = null;
 
+  /**
+   * Scene is optional for headless tests; without one, sight checks skip raycast
+   * occlusion and treat an in-cone target as visible.
+   */
   constructor(player: Player, npcs: NPC[], ui: UIManager, scene: Scene | null = null) {
     this._player = player;
     this._npcs = npcs;
