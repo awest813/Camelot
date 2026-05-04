@@ -253,6 +253,7 @@ export class PetUI {
     title.textContent = "COMPANIONS";
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     _styleButton(closeBtn, "×", { fontSize: "18px", padding: "0 6px" });
     closeBtn.setAttribute("aria-label", "Close companions panel");
     closeBtn.addEventListener("click", () => {
@@ -374,6 +375,7 @@ export class PetUI {
 
     if (!pet.isDead) {
       const btn = document.createElement("button");
+      btn.type = "button";
       if (isActive) {
         _styleButton(btn, "Dismiss");
         btn.setAttribute("aria-label", `Dismiss ${pet.name}`);
