@@ -509,6 +509,7 @@ export class DialogueCreatorUI {
       case "quest_status": return `quest "${c.questId}" == ${c.status}`;
       case "has_item":     return `has item "${c.itemId}" × ${c.minQuantity}`;
       case "skill_min":    return `skill "${c.skillId}" ≥ ${c.min}`;
+      default:             return "unknown condition";
     }
   }
 

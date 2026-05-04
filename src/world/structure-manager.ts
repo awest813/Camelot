@@ -14,6 +14,8 @@ import { BiomeType } from "./world-manager";
 import type { WorldSeed } from "./world-seed";
 
 interface StructureSpawn {
+  meshes: Mesh[];
+  loot: Loot[];
   bodies: PhysicsAggregate[];
   npcs: NPC[];
 }

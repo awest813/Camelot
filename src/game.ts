@@ -1897,9 +1897,9 @@ export class Game {
 
     // Hit-stop effect wired to FixedStepLoop
     this.ui.onHitStopRequested = (durationMs) => {
-      this.fixedStepLoop.timeScale = 0.05; // heavy slow-mo
+      this._gameplayLoop.timeScale = 0.05; // heavy slow-mo
       setTimeout(() => {
-        this.fixedStepLoop.timeScale = 1.0;
+        this._gameplayLoop.timeScale = 1.0;
       }, durationMs);
     };
 
