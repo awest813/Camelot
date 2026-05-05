@@ -9,3 +9,6 @@
 ## 2025-04-10 - Button type Accessibility
 **Learning:** Buttons created dynamically with `document.createElement("button")` default to `type="submit"` which can cause unwanted form submissions.
 **Action:** Always set `type="button"` on dynamically created buttons that are not intended to submit forms.
+## 2026-05-05 - Button type Accessibility
+**Learning:** Buttons created dynamically with `document.createElement("button")` default to `type="submit"` which can cause unwanted form submissions. This is a common pattern in HTML-based UI overlays.
+**Action:** Always set `type="button"` on dynamically created buttons that are not intended to submit forms. Use `btn.type = "button";`.
