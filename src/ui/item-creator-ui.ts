@@ -69,6 +69,7 @@ export class ItemCreatorUI {
     title.textContent = "Item Creator";
     header.appendChild(title);
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className = "item-creator__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close item creator");
@@ -170,6 +171,7 @@ export class ItemCreatorUI {
 
     for (const tag of ITEM_TAGS) {
       const chip = document.createElement("button");
+      chip.type = "button";
       chip.className   = "item-creator__chip";
       chip.textContent = tag;
       chip.dataset.tag = tag;
@@ -189,6 +191,7 @@ export class ItemCreatorUI {
     customInp.className   = "item-creator__input item-creator__input--sm";
     customInp.placeholder = "Custom tag…";
     const addBtn = document.createElement("button");
+    addBtn.type = "button";
     addBtn.className   = "item-creator__btn item-creator__btn--sm";
     addBtn.textContent = "Add Tag";
     addBtn.addEventListener("click", () => {
@@ -226,6 +229,7 @@ export class ItemCreatorUI {
       pill.className = "item-creator__tag-pill";
       pill.textContent = tag;
       const rm = document.createElement("button");
+      rm.type = "button";
       rm.className   = "item-creator__tag-rm";
       rm.textContent = "✕";
       rm.setAttribute("aria-label", `Remove tag "${tag}"`);
@@ -317,6 +321,7 @@ export class ItemCreatorUI {
 
   private _makeBtn(label: string, cls: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement("button");
+    btn.type = "button";
     btn.className   = cls;
     btn.textContent = label;
     btn.addEventListener("click", onClick);

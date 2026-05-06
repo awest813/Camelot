@@ -78,6 +78,7 @@ export class FastTravelUI {
     titleWrap.appendChild(subtitle);
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className = "fast-travel__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close fast travel map");
@@ -100,6 +101,7 @@ export class FastTravelUI {
     panel.appendChild(actions);
 
     const travelBtn = document.createElement("button");
+    travelBtn.type = "button";
     travelBtn.className = "fast-travel__btn fast-travel__btn--primary";
     travelBtn.textContent = "Travel";
     travelBtn.addEventListener("click", () => {
@@ -110,6 +112,7 @@ export class FastTravelUI {
     this._travelBtn = travelBtn;
 
     const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
     cancelBtn.className = "fast-travel__btn";
     cancelBtn.textContent = "Cancel";
     cancelBtn.addEventListener("click", () => this.close());
@@ -137,6 +140,7 @@ export class FastTravelUI {
 
     for (const option of this._options) {
       const row = document.createElement("button");
+      row.type = "button";
       row.className = "fast-travel__row";
       const selected = option.id === this._selectedId;
       if (selected) row.classList.add("is-selected");
