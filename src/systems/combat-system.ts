@@ -89,7 +89,8 @@ const MAX_COMBO_STACK = 3;
 /**
  * Bonus damage fraction added per combo stack level.
  * Stack 1 = +0 % (first hit builds the chain but earns no bonus).
- * Stack 2 = +15 %, Stack 3 = +30 %, capped at Stack 3 = +45 % (stack 3 bonus on 4th+ hit).
+ * Stack 2 = +15 % (multiplier 1.15), Stack 3 = +30 % (1.30),
+ * capped: 4th+ hit still uses the stack 3 bonus of +45 % (multiplier 1.45).
  */
 const COMBO_DAMAGE_BONUS_PER_STACK = 0.15;
 /** Seconds between hits before the combo streak resets automatically. */
@@ -2024,8 +2025,9 @@ export class CombatSystem {
     playerFwd.y = 0;
     if (playerFwd.lengthSquared() < 0.001) return false;
 
-    // Positive dot product means the NPC faces the same direction as the player —
-    // i.e., the player is behind the NPC.
+    // Threshold 0.5 = cos(60°): accepts strikes within ~120° cone behind the NPC.
+    // Positive dot product means NPC faces the same direction as the player's attack —
+    // i.e., the player is attacking from behind.
     return Vector3.Dot(npcFwd.normalize(), playerFwd.normalize()) > 0.5;
   }
 
@@ -2108,7 +2110,12 @@ export class CombatSystem {
       existing.remainingDuration = Math.max(existing.remainingDuration, eff.duration);
       existing.damagePerTick = Math.max(existing.damagePerTick, eff.damagePerTick);
     } else {
-      const icon = eff.type === "burn" ? "🔥" : eff.type === "freeze" ? "❄" : "⚡";
+      const EFFECT_ICONS: Partial<Record<StatusEffect["type"], string>> = {
+        burn:   "🔥",
+        freeze: "❄",
+        shock:  "⚡",
+      };
+      const icon = EFFECT_ICONS[eff.type] ?? "💥";
       this._ui.showNotification(`${icon} ${eff.type}!`, 1200);
       this._playerStatusEffects.push({
         type: eff.type,
