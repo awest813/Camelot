@@ -288,6 +288,35 @@ export class NPC {
   /** Item IDs the NPC was spawned carrying (used by inventory integration). */
   public startingEquipmentIds: string[] = [];
 
+  // ─── NPC Combat Archetype ───────────────────────────────────────────────────
+
+  /**
+   * How this NPC delivers its telegraphed attack:
+   *   "melee"  — default physical close-range hit (respects player armor rating).
+   *   "ranged" — projectile / bow shot; physical damage at extended range.
+   *   "magic"  — elemental blast; bypasses player armor, uses npcMagicDamageType.
+   */
+  public npcAttackArchetype: "melee" | "ranged" | "magic" = "melee";
+
+  /**
+   * Elemental type of the NPC's magic attack.  Only used when
+   * npcAttackArchetype is "magic".  Applies to resistance calculations
+   * against the player's active effects.
+   */
+  public npcMagicDamageType: DamageType = "fire";
+
+  /**
+   * Optional status effect applied to the player when a non-blocked
+   * telegraphed attack lands.  Works for any npcAttackArchetype.
+   * null = no status effect (default).
+   */
+  public attackStatusEffect: {
+    type: StatusEffect["type"];
+    damagePerTick: number;
+    tickInterval: number;
+    duration: number;
+  } | null = null;
+
   // ─── Visuals ────────────────────────────────────────────────────────────────
 
   /** Current "resting" diffuse colour — restored after a hit-flash. */

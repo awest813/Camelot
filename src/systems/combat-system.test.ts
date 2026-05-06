@@ -1300,4 +1300,503 @@ describe('CombatSystem', () => {
         expect(first.totalMagnitude).not.toHaveBeenCalled();
     });
 
+    // ─── Dagger weapon archetype ─────────────────────────────────────────────
+
+    it('dagger has a faster swing cooldown than sword', () => {
+        mockScene.pickWithRay.mockReturnValue(null);
+
+        // Sword cooldown reference
+        combatSystem.setWeaponArchetype('sword');
+        combatSystem.meleeAttack();
+        expect(combatSystem.meleeAttack()).toBe(false);
+
+        // Advance just enough for sword to be almost off cooldown (sword ≈ 0.38 s for soldier)
+        combatSystem.updateNPCAI(0.30);
+        expect(combatSystem.meleeAttack()).toBe(false); // sword still on cooldown
+
+        // Dagger should recover much faster — after the same 0.30 s it is off cooldown
+        combatSystem.updateNPCAI(5.0); // clear cooldown fully
+        mockPlayer.stamina = 200;
+        combatSystem.setWeaponArchetype('dagger');
+        combatSystem.meleeAttack();
+        combatSystem.updateNPCAI(0.30); // dagger cooldown (0.45 × 0.55 = 0.25 s) has expired
+        expect(combatSystem.meleeAttack()).toBe(true);
+    });
+
+    it('dagger applies a higher crit-chance bonus than sword', () => {
+        // WEAPON_PROFILES.dagger.critChanceBonus = 0.18
+        // WEAPON_PROFILES.sword.critChanceBonus = 0.10
+        // Verify via the exported WEAPON_PROFILES table accessible through (any)
+        const profiles = (combatSystem as any).constructor;
+        // Access the internal profiles constant via a forced reflect on a fresh instance.
+        // Indirect check: with player critChance = 0, dagger's 0.18 bonus means
+        // Math.random() < 0.18 triggers a crit; sword needs < 0.10.
+
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        mockPlayer.critChance = 0;
+        combatSystem.setWeaponArchetype('dagger');
+        combatSystem.updateNPCAI(5.0);
+        mockPlayer.stamina = 200;
+
+        // Force crit: random = 0.17 < dagger bonus 0.18 → crit
+        vi.spyOn(Math, 'random').mockReturnValue(0.17);
+        (mockNpcs[0].takeDamage as ReturnType<typeof vi.fn>).mockClear();
+        combatSystem.meleeAttack();
+
+        const dmgWithDaggerCrit = (mockNpcs[0].takeDamage as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0];
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Critical Hit!', 1000);
+
+        // With sword the same roll (0.17) should NOT crit (bonus = 0.10)
+        combatSystem.updateNPCAI(5.0);
+        mockPlayer.stamina = 200;
+        combatSystem.setWeaponArchetype('sword');
+        (mockNpcs[0].takeDamage as ReturnType<typeof vi.fn>).mockClear();
+        (mockUI.showNotification as ReturnType<typeof vi.fn>).mockClear();
+        combatSystem.meleeAttack();
+
+        expect(mockUI.showNotification).not.toHaveBeenCalledWith('Critical Hit!', 1000);
+        vi.restoreAllMocks();
+    });
+
+    // ─── Greatsword weapon archetype ─────────────────────────────────────────
+
+    it('cannot block while greatsword is equipped', () => {
+        combatSystem.setWeaponArchetype('greatsword');
+        combatSystem.beginBlock();
+        expect(combatSystem.isBlocking).toBe(false);
+        expect(mockUI.showNotification).toHaveBeenCalledWith(
+            'Cannot block with a two-handed weapon!', 1200
+        );
+    });
+
+    it('greatsword sweep hits all NPCs inside the forward arc simultaneously', () => {
+        combatSystem.setWeaponArchetype('greatsword');
+        combatSystem.updateNPCAI(5.0); // clear cooldown
+
+        // Player at (0,0,0), forward = (0,0,1) (mock default).
+        // Arc half-angle ≈ 40° (Math.PI / 4.5 ≈ 0.698 rad), cos ≈ 0.766.
+        // Greatsword range = 3.5.
+
+        const npcInArc1 = {
+            ...mockNpcs[0],
+            mesh: { name: 'arcNpc1', position: new Vector3(0, 0, 2), lookAt: vi.fn() },
+            takeDamage: vi.fn(),
+            setStateColor: vi.fn(),
+            physicsAggregate: {
+                body: { applyImpulse: vi.fn(), getLinearVelocityToRef: vi.fn(), setLinearVelocity: vi.fn() }
+            },
+        };
+        const npcInArc2 = {
+            ...mockNpcs[0],
+            mesh: { name: 'arcNpc2', position: new Vector3(1, 0, 2), lookAt: vi.fn() },
+            takeDamage: vi.fn(),
+            setStateColor: vi.fn(),
+            physicsAggregate: {
+                body: { applyImpulse: vi.fn(), getLinearVelocityToRef: vi.fn(), setLinearVelocity: vi.fn() }
+            },
+        };
+        // (3, 0, 0.5): dot ≈ 0.164 < cos(40°) → outside arc
+        const npcOutsideArc = {
+            ...mockNpcs[0],
+            mesh: { name: 'arcNpc3', position: new Vector3(3, 0, 0.5), lookAt: vi.fn() },
+            takeDamage: vi.fn(),
+            setStateColor: vi.fn(),
+            physicsAggregate: {
+                body: { applyImpulse: vi.fn(), getLinearVelocityToRef: vi.fn(), setLinearVelocity: vi.fn() }
+            },
+        };
+
+        combatSystem.npcs = [npcInArc1, npcInArc2, npcOutsideArc] as any[];
+        mockPlayer.stamina = 500;
+
+        const ok = combatSystem.meleeAttack();
+        expect(ok).toBe(true);
+
+        // Both in-arc NPCs are damaged; out-of-arc NPC is not
+        expect(npcInArc1.takeDamage).toHaveBeenCalled();
+        expect(npcInArc2.takeDamage).toHaveBeenCalled();
+        expect(npcOutsideArc.takeDamage).not.toHaveBeenCalled();
+
+        // Greatsword sweep does NOT use the raycast
+        expect(mockScene.pickWithRay).not.toHaveBeenCalled();
+    });
+
+    it('greatsword deals more damage per hit than sword', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        // Sword baseline
+        combatSystem.setWeaponArchetype('sword');
+        combatSystem.meleeAttack();
+        const swordDmg: number = (mockNpcs[0].takeDamage as ReturnType<typeof vi.fn>).mock.calls[0][0];
+
+        combatSystem.updateNPCAI(5.0);
+        mockPlayer.stamina = 500;
+        (mockNpcs[0].takeDamage as ReturnType<typeof vi.fn>).mockClear();
+
+        // Greatsword — use single NPC list with raycast for a fair comparison
+        combatSystem.setWeaponArchetype('greatsword');
+        // Override npcs so the arc sweep picks it up
+        combatSystem.npcs = [mockNpcs[0]] as any[];
+        combatSystem.meleeAttack();
+        const gsDmg: number = (mockNpcs[0].takeDamage as ReturnType<typeof vi.fn>).mock.calls[0][0];
+
+        expect(gsDmg).toBeGreaterThan(swordDmg);
+    });
+
+    // ─── Combo momentum system ────────────────────────────────────────────────
+
+    it('first hit builds the combo stack to 1 without applying a bonus', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        combatSystem.meleeAttack();
+        expect(combatSystem.comboStack).toBe(1);
+
+        // First hit uses comboMult = f(0) = 1.0 (no bonus), just base damage
+        const dealt = (mockNpcs[0].takeDamage as ReturnType<typeof vi.fn>).mock.calls[0][0];
+        expect(dealt).toBe(10); // base MELEE_DAMAGE with no multipliers
+    });
+
+    it('second consecutive hit applies a +15 % combo bonus', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        // First hit
+        combatSystem.meleeAttack();
+        expect(combatSystem.comboStack).toBe(1);
+
+        // Clear melee cooldown but keep within combo window
+        combatSystem.updateNPCAI(0.5);
+        mockPlayer.stamina = 200;
+        (mockNpcs[0].takeDamage as ReturnType<typeof vi.fn>).mockClear();
+
+        // Second hit — comboMult = 1.0 + 1×0.15 = 1.15
+        combatSystem.meleeAttack();
+        expect(combatSystem.comboStack).toBe(2);
+
+        const secondDmg = (mockNpcs[0].takeDamage as ReturnType<typeof vi.fn>).mock.calls[0][0];
+        // round(10 * 1.15) = 12  (>10)
+        expect(secondDmg).toBeGreaterThan(10);
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Combo ×2!', 800);
+    });
+
+    it('combo stack resets when the combo window expires between hits', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        combatSystem.meleeAttack();
+        expect(combatSystem.comboStack).toBe(1);
+
+        // Advance past the 2-second COMBO_WINDOW
+        combatSystem.updateNPCAI(2.5);
+        expect(combatSystem.comboStack).toBe(0);
+    });
+
+    it('combo stack resets when the player misses via hit-chance', () => {
+        const attrs = new AttributeSystem({ agility: 40 });
+        const skills = new SkillProgressionSystem();
+        skills.setSkillLevel("blade", 0); // low skill → misses possible
+
+        const missNpc = {
+            ...mockNpcs[0],
+            mesh: { ...mockNpcs[0].mesh, position: new Vector3(0, 0, 2) },
+            takeDamage: vi.fn(),
+        };
+
+        const missCombat = new CombatSystem(
+            mockScene, mockPlayer, [missNpc as any], mockUI,
+            undefined, { skillSystem: skills, attributeSystem: attrs }
+        );
+
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: missNpc.mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        // First swing: force a hit so the combo stack reaches 1.
+        // stamina = 200 → fatigueFactor > 1 → hitChance = 1.0 (guaranteed hit)
+        vi.spyOn(Math, 'random').mockReturnValue(0.0);
+        mockPlayer.stamina = 200;
+        missCombat.meleeAttack();
+        expect(missCombat.comboStack).toBe(1);
+
+        // Second swing: stamina = 50 (half of maxStamina 100) → fatigueFactor = 0.5
+        // → hitChance ≈ 0.275.  Math.random = 0.99 ≥ 0.275 → MISS → combo reset.
+        vi.spyOn(Math, 'random').mockReturnValue(0.99);
+        missCombat.updateNPCAI(0.5);
+        mockPlayer.stamina = 50; // low so hitChance < 1.0 and miss is possible
+        missCombat.meleeAttack();
+        expect(missCombat.comboStack).toBe(0);
+
+        vi.restoreAllMocks();
+    });
+
+    it('combo stack resets when the player takes an unblocked NPC hit', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        // Build combo to 1
+        combatSystem.meleeAttack();
+        expect(combatSystem.comboStack).toBe(1);
+
+        // Set up NPC to telegraph and land an unblocked hit
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 5;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+
+        // Do NOT block — hit lands and resets combo
+        combatSystem.updateNPCAI(0.016); // telegraph
+        combatSystem.updateNPCAI(0.25);  // resolve
+
+        expect(combatSystem.comboStack).toBe(0);
+    });
+
+    // ─── Riposte mechanic ─────────────────────────────────────────────────────
+
+    it('riposte window opens after a perfect block', () => {
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 10;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+
+        // Begin block immediately so blockActiveTimer = 0 < 0.3 → perfect
+        combatSystem.beginBlock();
+        combatSystem.updateNPCAI(0.016); // start telegraph
+        combatSystem.updateNPCAI(0.25);  // resolve within perfect window
+
+        expect(combatSystem.riposteReady).toBe(true);
+    });
+
+    it('riposte bypasses melee cooldown and deals bonus damage', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        // Artificially set riposte state and put melee on a long cooldown
+        (combatSystem as any)._riposteReady = true;
+        (combatSystem as any)._riposteTimer = 1.5;
+        (combatSystem as any)._meleeCooldownRemaining = 5.0;
+
+        mockPlayer.stamina = 200;
+        const ok = combatSystem.meleeAttack();
+        expect(ok).toBe(true); // riposte ignores cooldown
+
+        const dealt = (mockNpcs[0].takeDamage as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0];
+        // round(10 * RIPOSTE_DAMAGE_MULTIPLIER 1.75) = 18
+        expect(dealt).toBeGreaterThan(10);
+
+        expect(combatSystem.riposteReady).toBe(false); // consumed
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Riposte!', 1200);
+    });
+
+    it('riposte window expires if not used in time', () => {
+        (combatSystem as any)._riposteReady = true;
+        (combatSystem as any)._riposteTimer = 0.5;
+
+        // Advance past the riposte window
+        combatSystem.updateNPCAI(0.6);
+        expect(combatSystem.riposteReady).toBe(false);
+    });
+
+    it('blocked hit does not reset the combo streak', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        // Build a combo hit
+        combatSystem.meleeAttack();
+        expect(combatSystem.comboStack).toBe(1);
+
+        // Set up NPC to telegraph while player is blocking
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 5;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+
+        combatSystem.beginBlock();
+        combatSystem.updateNPCAI(0.016);
+        combatSystem.update(0.31); // past perfect-block window
+        combatSystem.updateNPCAI(0.25);
+
+        // Block happened but combo should NOT be reset
+        expect(combatSystem.comboStack).toBe(1);
+    });
+
+    // ─── NPC combat archetypes ────────────────────────────────────────────────
+
+    it('magic NPC attack bypasses player armor rating', () => {
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 10;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+        mockNpcs[0].npcAttackArchetype = 'magic' as any;
+
+        mockPlayer.bonusArmor = 100; // AR 100 halves physical damage
+        mockPlayer.health = 100;
+
+        combatSystem.updateNPCAI(0.016);
+        combatSystem.updateNPCAI(0.25);
+
+        // Magic bypasses armor: full 10 damage, not 5
+        expect(mockPlayer.health).toBe(90);
+    });
+
+    it('ranged NPC attack is reduced by 15 % before applying player armor', () => {
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 20;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+        mockNpcs[0].npcAttackArchetype = 'ranged' as any;
+
+        mockPlayer.bonusArmor = 0;
+        mockPlayer.health = 100;
+
+        combatSystem.updateNPCAI(0.016);
+        combatSystem.updateNPCAI(0.25);
+
+        // round(20 * 0.85 * 100/100) = round(17) = 17
+        expect(mockPlayer.health).toBe(83);
+    });
+
+    it('NPC with attackStatusEffect applies a player DoT on unblocked hit', () => {
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 5;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+        (mockNpcs[0] as any).attackStatusEffect = {
+            type: 'burn',
+            damagePerTick: 3,
+            tickInterval: 1.0,
+            duration: 4.0,
+        };
+
+        // Trigger telegraph and resolve without blocking
+        combatSystem.updateNPCAI(0.016);
+        combatSystem.updateNPCAI(0.25);
+
+        const effects = combatSystem.playerStatusEffects;
+        expect(effects).toHaveLength(1);
+        expect(effects[0].type).toBe('burn');
+        expect(effects[0].damagePerTick).toBe(3);
+    });
+
+    it('NPC attackStatusEffect is NOT applied when the player blocks the hit', () => {
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 5;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+        (mockNpcs[0] as any).attackStatusEffect = {
+            type: 'burn',
+            damagePerTick: 3,
+            tickInterval: 1.0,
+            duration: 4.0,
+        };
+
+        combatSystem.beginBlock();
+        combatSystem.updateNPCAI(0.016);
+        combatSystem.update(0.31); // past perfect window
+        combatSystem.updateNPCAI(0.25);
+
+        expect(combatSystem.playerStatusEffects).toHaveLength(0);
+    });
+
+    // ─── Player status effects ────────────────────────────────────────────────
+
+    it('player status effects tick and deal damage over time', () => {
+        // Inject a burn effect with tickTimer = 0.5 s
+        (combatSystem as any)._playerStatusEffects = [{
+            type: 'burn',
+            damagePerTick: 4,
+            tickInterval: 1.0,
+            tickTimer: 0.5,
+            remainingDuration: 5.0,
+        }];
+        mockPlayer.health = 100;
+
+        // Advance 0.6 s — tick fires at 0.5 s mark
+        combatSystem.updateNPCAI(0.6);
+        expect(mockPlayer.health).toBe(96); // 100 − 4 = 96
+        expect(mockPlayer.notifyDamageTaken).toHaveBeenCalled();
+    });
+
+    it('player status effects expire after their duration', () => {
+        (combatSystem as any)._playerStatusEffects = [{
+            type: 'burn',
+            damagePerTick: 2,
+            tickInterval: 1.0,
+            tickTimer: 1.0,
+            remainingDuration: 1.5,
+        }];
+
+        // Advance well past the 1.5 s duration
+        combatSystem.updateNPCAI(3.0);
+        expect(combatSystem.playerStatusEffects).toHaveLength(0);
+    });
+
+    it('clearPlayerStatusEffects removes all active DoT effects', () => {
+        (combatSystem as any)._playerStatusEffects = [
+            { type: 'burn',  damagePerTick: 2, tickInterval: 1, tickTimer: 1, remainingDuration: 5 },
+            { type: 'shock', damagePerTick: 3, tickInterval: 1, tickTimer: 1, remainingDuration: 5 },
+        ];
+        expect(combatSystem.playerStatusEffects).toHaveLength(2);
+
+        combatSystem.clearPlayerStatusEffects();
+        expect(combatSystem.playerStatusEffects).toHaveLength(0);
+    });
+
+    it('applying the same status effect type refreshes rather than double-stacks', () => {
+        (combatSystem as any)._playerStatusEffects = [{
+            type: 'burn',
+            damagePerTick: 2,
+            tickInterval: 1.0,
+            tickTimer: 1.0,
+            remainingDuration: 2.0,
+        }];
+
+        // Apply a stronger, longer burn
+        (combatSystem as any)._applyPlayerStatusEffect({
+            type: 'burn',
+            damagePerTick: 5,
+            tickInterval: 1.0,
+            duration: 6.0,
+        });
+
+        const effects = combatSystem.playerStatusEffects;
+        expect(effects).toHaveLength(1); // still one entry
+        expect(effects[0].damagePerTick).toBe(5);    // upgraded
+        expect(effects[0].remainingDuration).toBe(6.0); // refreshed
+    });
+
 });

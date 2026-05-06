@@ -3,7 +3,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
-import { NPC, AIState, DamageType } from "../entities/npc";
+import { NPC, AIState, DamageType, StatusEffect } from "../entities/npc";
 import { Player } from "../entities/player";
 import { UIManager } from "../ui/ui-manager";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
@@ -82,6 +82,27 @@ const SKILL_XP_BLOCK_HIT = 4;
 /** XP granted to the destruction skill on a magic projectile hit. */
 const SKILL_XP_MAGIC_HIT = 8;
 
+// ─── Combo system ──────────────────────────────────────────────────────────────
+
+/** Maximum combo stack depth. At stack 3 every additional hit still applies the ×3 bonus. */
+const MAX_COMBO_STACK = 3;
+/**
+ * Bonus damage fraction added per combo stack level.
+ * Stack 1 = +0 % (first hit builds the chain but earns no bonus).
+ * Stack 2 = +15 % (multiplier 1.15), Stack 3 = +30 % (1.30),
+ * capped: 4th+ hit still uses the stack 3 bonus of +45 % (multiplier 1.45).
+ */
+const COMBO_DAMAGE_BONUS_PER_STACK = 0.15;
+/** Seconds between hits before the combo streak resets automatically. */
+const COMBO_WINDOW = 2.0;
+
+// ─── Riposte system ───────────────────────────────────────────────────────────
+
+/** Seconds after a perfect block during which a riposte can be triggered. */
+const RIPOSTE_WINDOW = 1.5;
+/** Damage multiplier bonus applied to a riposte strike (on top of normal damage). */
+const RIPOSTE_DAMAGE_MULTIPLIER = 1.75;
+
 // ─── Damage number colors ─────────────────────────────────────────────────────
 
 /** Normal physical hit damage number color. */
@@ -140,8 +161,12 @@ export type MagicArchetype = "spark" | "bolt" | "surge";
  * These are independent of the combat stance (MeleeArchetype) — the stance
  * controls rhythm (speed vs. power), while the weapon archetype controls the
  * type of physical attack (blade, impact, ranged, etc.).
+ *
+ * **Overhaul additions:**
+ *  dagger     — fastest weapon; short range; high crit; backstab bonus when striking from behind.
+ *  greatsword — two-handed; cannot block; slowest + heaviest damage; sweeping arc hits multiple NPCs.
  */
-export type WeaponArchetype = "sword" | "axe" | "mace" | "bow" | "staff";
+export type WeaponArchetype = "sword" | "axe" | "mace" | "bow" | "staff" | "dagger" | "greatsword";
 
 interface WeaponProfile {
   /** Multiplier applied to the base melee damage value (MELEE_DAMAGE). */
@@ -176,6 +201,24 @@ interface WeaponProfile {
   staggerChance: number;
   /** Duration in seconds of the stagger applied by a normal melee hit. */
   staggerDuration: number;
+  /**
+   * Whether the player can hold block while this weapon is equipped.
+   * Two-handed weapons (greatsword) set this to false.
+   */
+  canBlock: boolean;
+  /**
+   * Damage multiplier applied when striking from behind the NPC (backstab).
+   * 1.0 = no bonus (most weapons).  Dagger uses 2.5 for high backstab reward.
+   * Relies on the NPC mesh exposing a `forward` property (BabylonJS Mesh.forward).
+   * Falls back to 1.0 when the facing cannot be determined (e.g., in tests).
+   */
+  backstabMultiplier: number;
+  /**
+   * Half-angle (radians) of the forward arc swept by this weapon on each attack.
+   * 0 = single-target raycast (all weapons except greatsword).
+   * > 0 = multi-target cone sweep; all NPCs inside the cone take damage.
+   */
+  sweepArcHalfAngle: number;
 }
 
 // ─── Staff charge constants ────────────────────────────────────────────────────
@@ -197,12 +240,16 @@ const STAFF_CHARGE_COOLDOWN = 1.2;
  * Per-weapon-type combat profiles.
  *
  * Design intent:
- *  sword  — fast, balanced; strong crit, light armor pen, moderate stagger
- *  axe    — harder-hitting; better armor pen, slightly slower, low stagger
- *  mace   — heaviest strikes; excellent armor pen, slow, high stagger chance
- *  bow    — long-range precision; best crit chance, minimal armor pen
- *  staff  — hybrid caster tool; weak melee fallback, governed by destruction skill;
- *           Q-press triggers a charged destruction blast (see beginStaffCharge)
+ *  sword      — fast, balanced; strong crit, light armor pen, moderate stagger
+ *  axe        — harder-hitting; better armor pen, slightly slower, low stagger
+ *  mace       — heaviest strikes; excellent armor pen, slow, high stagger chance
+ *  bow        — long-range precision; best crit chance, minimal armor pen
+ *  staff      — hybrid caster tool; weak melee fallback, governed by destruction skill;
+ *               Q-press triggers a charged destruction blast (see beginStaffCharge)
+ *  dagger     — fastest weapon; short range; very high crit; 2.5× backstab bonus
+ *               when striking the NPC from behind (Mesh.forward check)
+ *  greatsword — two-handed, cannot block; slowest + heaviest strikes; 80° sweep arc
+ *               hits every NPC in front of the player simultaneously
  */
 const WEAPON_PROFILES: Record<WeaponArchetype, WeaponProfile> = {
   sword: {
@@ -216,6 +263,9 @@ const WEAPON_PROFILES: Record<WeaponArchetype, WeaponProfile> = {
     cooldownMultiplier:    0.85,
     staggerChance:         0.15,
     staggerDuration:       0.20,
+    canBlock:              true,
+    backstabMultiplier:    1.0,
+    sweepArcHalfAngle:     0,
   },
   axe: {
     damageMultiplier: 1.20,
@@ -228,6 +278,9 @@ const WEAPON_PROFILES: Record<WeaponArchetype, WeaponProfile> = {
     cooldownMultiplier:    1.15,
     staggerChance:         0.10,
     staggerDuration:       0.15,
+    canBlock:              true,
+    backstabMultiplier:    1.0,
+    sweepArcHalfAngle:     0,
   },
   mace: {
     damageMultiplier: 1.45,
@@ -240,6 +293,9 @@ const WEAPON_PROFILES: Record<WeaponArchetype, WeaponProfile> = {
     cooldownMultiplier:    1.40,
     staggerChance:         0.40,
     staggerDuration:       0.45,
+    canBlock:              true,
+    backstabMultiplier:    1.0,
+    sweepArcHalfAngle:     0,
   },
   bow: {
     damageMultiplier: 0.85,
@@ -252,6 +308,9 @@ const WEAPON_PROFILES: Record<WeaponArchetype, WeaponProfile> = {
     cooldownMultiplier:    1.00,
     staggerChance:         0.00,
     staggerDuration:       0.00,
+    canBlock:              true,
+    backstabMultiplier:    1.0,
+    sweepArcHalfAngle:     0,
   },
   staff: {
     damageMultiplier: 0.60,
@@ -264,6 +323,40 @@ const WEAPON_PROFILES: Record<WeaponArchetype, WeaponProfile> = {
     cooldownMultiplier:    1.50,
     staggerChance:         0.05,
     staggerDuration:       0.10,
+    canBlock:              true,
+    backstabMultiplier:    1.0,
+    sweepArcHalfAngle:     0,
+  },
+  dagger: {
+    damageMultiplier: 0.62,
+    critChanceBonus: 0.18,
+    armorPenFraction: 0.12,
+    attackRange: 1.7,
+    skillId: "blade",
+    label: "Dagger",
+    staminaCostMultiplier: 0.55,
+    cooldownMultiplier:    0.55,
+    staggerChance:         0.04,
+    staggerDuration:       0.08,
+    canBlock:              true,
+    backstabMultiplier:    2.5,
+    sweepArcHalfAngle:     0,
+  },
+  greatsword: {
+    damageMultiplier: 1.85,
+    critChanceBonus: 0.06,
+    armorPenFraction: 0.22,
+    attackRange: 3.5,
+    skillId: "blade",
+    label: "Greatsword",
+    staminaCostMultiplier: 1.90,
+    cooldownMultiplier:    1.95,
+    staggerChance:         0.60,
+    staggerDuration:       0.60,
+    canBlock:              false,
+    backstabMultiplier:    1.0,
+    /** ~80° total arc (40° half-angle each side). */
+    sweepArcHalfAngle:     Math.PI / 4.5,
   },
 };
 
@@ -390,6 +483,22 @@ export class CombatSystem {
   /** Remaining cooldown after a staff charge release (prevents instant re-charge). */
   private _staffChargeCooldown: number = 0;
 
+  // ─── Combo system ──────────────────────────────────────────────────────────
+  /** Current consecutive-hit streak (0–MAX_COMBO_STACK). */
+  private _comboStack: number = 0;
+  /** Seconds remaining before the combo window expires and the stack resets. */
+  private _comboTimer: number = 0;
+
+  // ─── Riposte system ────────────────────────────────────────────────────────
+  /** True after a perfect block; the next melee attack may riposte. */
+  private _riposteReady: boolean = false;
+  /** Countdown to riposte window expiry. */
+  private _riposteTimer: number = 0;
+
+  // ─── Player status effects ─────────────────────────────────────────────────
+  /** Elemental DoT effects currently afflicting the player (applied by NPC attacks). */
+  private _playerStatusEffects: StatusEffect[] = [];
+
   private static readonly _OFFSET_Y1 = new Vector3(0, 1, 0);
   private static readonly _OFFSET_Y2 = new Vector3(0, 2, 0);
 
@@ -494,6 +603,31 @@ export class CombatSystem {
     return this._weaponArchetype;
   }
 
+  // ─── Combo / riposte getters ───────────────────────────────────────────────
+
+  /** Current combo stack level (0 = no streak, up to MAX_COMBO_STACK). */
+  public get comboStack(): number {
+    return this._comboStack;
+  }
+
+  /**
+   * True when a perfect block was just executed and the next melee attack within
+   * RIPOSTE_WINDOW seconds will land as a riposte (bonus damage, ignores cooldown).
+   */
+  public get riposteReady(): boolean {
+    return this._riposteReady;
+  }
+
+  /** Read-only view of active player status effects (burns, freezes, etc.). */
+  public get playerStatusEffects(): ReadonlyArray<StatusEffect> {
+    return this._playerStatusEffects;
+  }
+
+  /** Remove all player status effects (e.g. on rest or cure spell). */
+  public clearPlayerStatusEffects(): void {
+    this._playerStatusEffects = [];
+  }
+
   // ─── Blocking ──────────────────────────────────────────────────────────────
 
   /** True while the player is holding block (right-click held). */
@@ -503,10 +637,15 @@ export class CombatSystem {
 
   /**
    * Begin blocking.  Call on right-click POINTERDOWN.
+   * Two-handed weapons (greatsword) cannot block; the call is silently rejected.
    * While blocking, 50 % of incoming NPC melee damage is absorbed and each
    * absorbed hit drains stamina (matching Oblivion's block system).
    */
   public beginBlock(): void {
+    if (!WEAPON_PROFILES[this._weaponArchetype].canBlock) {
+      this._ui.showNotification("Cannot block with a two-handed weapon!", 1200);
+      return;
+    }
     this._isBlocking = true;
     this._blockActiveTimer = 0;
     this._ui.showNotification("Blocking...", 600);
@@ -630,7 +769,10 @@ export class CombatSystem {
   public meleeAttack(): boolean {
     const meleeProfile = MELEE_PROFILES[this._meleeArchetype];
     const weaponProfile = WEAPON_PROFILES[this._weaponArchetype];
-    if (this._meleeCooldownRemaining > 0) {
+
+    // Riposte bypasses the normal cooldown gate.
+    const isRiposte = this._riposteReady;
+    if (!isRiposte && this._meleeCooldownRemaining > 0) {
       return false;
     }
 
@@ -653,112 +795,158 @@ export class CombatSystem {
     (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
       .notifyResourceSpent?.("stamina");
 
+    // Consume riposte state before any further checks.
+    if (isRiposte) {
+      this._riposteReady = false;
+      this._riposteTimer = 0;
+    }
+
     // Oblivion-style hit chance: low weapon skill / agility / fatigue can cause a miss.
     // Only active when skill and attribute systems are wired up (backward-compatible).
     const hitChance = this._hitChance();
     if (hitChance < 1.0 && Math.random() >= hitChance) {
       this._ui.showNotification("Miss!", 600);
+      this._resetCombo();
       return true;
     }
 
-    const hit = this.player.raycastForward(weaponProfile.attackRange);
-    if (hit && hit.pickedMesh) {
-      const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
-      if (npc && !npc.isDead) {
-        // Critical hit: combine base player critChance with weapon's bonus.
-        const baseCritChance = (this.player as unknown as { critChance?: number }).critChance ?? 0;
-        const effectiveCritChance = baseCritChance + weaponProfile.critChanceBonus;
-        const isCrit = effectiveCritChance > 0 && Math.random() < effectiveCritChance;
-        const critMultiplier = isCrit ? CRIT_DAMAGE_MULTIPLIER : 1.0;
+    // Capture combo multiplier from the PREVIOUS stack (before this hit builds it).
+    const comboMult = this._comboMultiplier();
+    const riposteMult = isRiposte ? RIPOSTE_DAMAGE_MULTIPLIER : 1.0;
 
-        // Sneak-attack multiplier: applied when the perk is unlocked and the
-        // player is undetected (canSneakAttack returns true).
-        const sneakMult = (
-          (this.player.perkSneakAttackMultiplier ?? 1.0) > 1.0 &&
-          this._stealthSystem?.canSneakAttack(npc)
-        ) ? this.player.perkSneakAttackMultiplier : 1.0;
+    // ── Determine which NPCs are hit ───────────────────────────────────────
+    // Greatsword uses an arc sweep; all other weapons use a forward raycast.
+    let hitNpcs: NPC[] = [];
+    let singleHitPoint: Vector3 | null = null;
 
-        const rawMeleeDmg = Math.max(
-          1,
-          Math.round(
-            (MELEE_DAMAGE + this.player.bonusDamage + this._strengthBonus())
-            * meleeProfile.damageMultiplier
-            * weaponProfile.damageMultiplier
-            * fatigueFactor
-            * critMultiplier
-            * this._weaponSkillMultiplier()
-            * sneakMult
-          )
-        );
-        const meleeDmg = applyDamageWithResistance(rawMeleeDmg, npc, "physical", weaponProfile.armorPenFraction);
-        
-        // NPC dodge chance
-        if (Math.random() < npc.dodgeChance) {
-          this._ui.showNotification(`${npc.mesh.name} dodges!`, 800);
-          this._ui.showHitFlash("rgba(200, 200, 200, 0.15)");
-          // Add a physical "sidestep" impulse to make the dodge look active
-          if (npc.physicsAggregate?.body) {
-            const side = this.player.camera.getDirection(Vector3.Right());
-            const dodgeDir = Math.random() > 0.5 ? 1 : -1;
-            npc.physicsAggregate.body.applyImpulse(side.scale(12 * dodgeDir), npc.mesh.position);
-          }
-          return true;
-        }
+    if (weaponProfile.sweepArcHalfAngle > 0) {
+      hitNpcs = this._sweepHitNPCs(weaponProfile.attackRange, weaponProfile.sweepArcHalfAngle);
+    } else {
+      const hit = this.player.raycastForward(weaponProfile.attackRange);
+      singleHitPoint = hit?.pickedPoint ?? null;
+      const npc = hit?.pickedMesh ? this.npcs.find(n => n.mesh === hit.pickedMesh) : null;
+      if (npc && !npc.isDead) hitNpcs = [npc];
+    }
 
-        npc.takeDamage(meleeDmg);
-        this._ui.applyHitStop(isCrit ? 120 : 60);
-        this._ui.shakeCamera(isCrit ? 0.6 : 0.25);
+    let anyHitLanded = false;
 
-        // Per-weapon stagger chance on normal melee hits.
-        if (
-          !npc.isDead &&
-          !npc.isStaggered &&
-          weaponProfile.staggerChance > 0 &&
-          Math.random() < weaponProfile.staggerChance
-        ) {
-          npc.isStaggered = true;
-          npc.staggerTimer = weaponProfile.staggerDuration;
-          npc.isAttackTelegraphing = false;
-          npc.attackTelegraphTimer = 0;
-        }
-
-        // Award skill XP for a successful hit.
-        this._skillSystem?.gainXP(weaponProfile.skillId, SKILL_XP_MELEE_HIT);
-
-        const numberPos = hit.pickedPoint
-          ? hit.pickedPoint.addToRef(CombatSystem._OFFSET_Y1, this._hitPos)
-          : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos);
-        if (isCrit) this._ui.showSpark(numberPos, "#FFD700");
-        this._ui.showDamageNumber(
-          numberPos, meleeDmg, this.scene,
-          isCrit ? DMG_COLOR_CRIT : DMG_COLOR_PHYSICAL,
-        );
-        this._ui.showHitFlash(isCrit ? "rgba(255, 215, 0, 0.35)" : "rgba(255, 200, 0, 0.25)");
-
-        if (isCrit) {
-          this._ui.showNotification("Critical Hit!", 1000);
-        }
-
+    for (const npc of hitNpcs) {
+      // NPC dodge chance
+      if (Math.random() < npc.dodgeChance) {
+        this._ui.showNotification(`${npc.mesh.name} dodges!`, 800);
+        this._ui.showHitFlash("rgba(200, 200, 200, 0.15)");
         if (npc.physicsAggregate?.body) {
-          const forward = this.player.getForwardDirection(1);
-          const impulsePoint = hit.pickedPoint
-            ? hit.pickedPoint
-            : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y1, this._hitPos);
-          npc.physicsAggregate.body.applyImpulse(forward.scale(10), impulsePoint);
+          const side = this.player.camera.getDirection(Vector3.Right());
+          const dodgeDir = Math.random() > 0.5 ? 1 : -1;
+          npc.physicsAggregate.body.applyImpulse(side.scale(12 * dodgeDir), npc.mesh.position);
         }
+        continue;
+      }
 
-        if (npc.isDead) {
-          this._ui.showNotification(`${npc.mesh.name} defeated!`);
-          if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
-        } else {
-          // A direct hit skips the ALERT window — immediately give chase.
-          // Don't re-transition if already chasing/attacking (would reset path).
-          if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
-            this._transitionTo(npc, AIState.CHASE);
-          }
+      anyHitLanded = true;
+
+      // Critical hit: combine base player critChance with weapon's bonus.
+      const baseCritChance = (this.player as unknown as { critChance?: number }).critChance ?? 0;
+      const effectiveCritChance = baseCritChance + weaponProfile.critChanceBonus;
+      const isCrit = effectiveCritChance > 0 && Math.random() < effectiveCritChance;
+      const critMultiplier = isCrit ? CRIT_DAMAGE_MULTIPLIER : 1.0;
+
+      // Sneak-attack multiplier: applied when the perk is unlocked and the
+      // player is undetected (canSneakAttack returns true).
+      const sneakMult = (
+        (this.player.perkSneakAttackMultiplier ?? 1.0) > 1.0 &&
+        this._stealthSystem?.canSneakAttack(npc)
+      ) ? this.player.perkSneakAttackMultiplier : 1.0;
+
+      // Backstab: bonus when striking the NPC from behind (dagger excels here).
+      const backstabMult = this._isBackstabAngle(npc) ? weaponProfile.backstabMultiplier : 1.0;
+
+      const rawMeleeDmg = Math.max(
+        1,
+        Math.round(
+          (MELEE_DAMAGE + this.player.bonusDamage + this._strengthBonus())
+          * meleeProfile.damageMultiplier
+          * weaponProfile.damageMultiplier
+          * fatigueFactor
+          * critMultiplier
+          * this._weaponSkillMultiplier()
+          * sneakMult
+          * backstabMult
+          * comboMult
+          * riposteMult
+        )
+      );
+      const meleeDmg = applyDamageWithResistance(rawMeleeDmg, npc, "physical", weaponProfile.armorPenFraction);
+
+      npc.takeDamage(meleeDmg);
+      this._ui.applyHitStop(isCrit ? 120 : 60);
+      this._ui.shakeCamera(isCrit ? 0.6 : 0.25);
+
+      // Per-weapon stagger chance on normal melee hits.
+      if (
+        !npc.isDead &&
+        !npc.isStaggered &&
+        weaponProfile.staggerChance > 0 &&
+        Math.random() < weaponProfile.staggerChance
+      ) {
+        npc.isStaggered = true;
+        npc.staggerTimer = weaponProfile.staggerDuration;
+        npc.isAttackTelegraphing = false;
+        npc.attackTelegraphTimer = 0;
+      }
+
+      // Award skill XP for a successful hit.
+      this._skillSystem?.gainXP(weaponProfile.skillId, SKILL_XP_MELEE_HIT);
+
+      const hitPoint = hitNpcs.length === 1 ? singleHitPoint : null;
+      const numberPos = hitPoint
+        ? hitPoint.addToRef(CombatSystem._OFFSET_Y1, this._hitPos)
+        : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos);
+      if (isCrit) this._ui.showSpark(numberPos, "#FFD700");
+      this._ui.showDamageNumber(
+        numberPos, meleeDmg, this.scene,
+        isCrit ? DMG_COLOR_CRIT : DMG_COLOR_PHYSICAL,
+      );
+      this._ui.showHitFlash(isCrit ? "rgba(255, 215, 0, 0.35)" : "rgba(255, 200, 0, 0.25)");
+
+      if (isCrit) {
+        this._ui.showNotification("Critical Hit!", 1000);
+      }
+      if (backstabMult > 1.0) {
+        this._ui.showNotification("Backstab!", 900);
+      }
+
+      if (npc.physicsAggregate?.body) {
+        const forward = this.player.getForwardDirection(1);
+        const impulsePoint = hitPoint
+          ? hitPoint
+          : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y1, this._hitPos);
+        npc.physicsAggregate.body.applyImpulse(forward.scale(10), impulsePoint);
+      }
+
+      if (npc.isDead) {
+        this._ui.showNotification(`${npc.mesh.name} defeated!`);
+        if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
+      } else {
+        // A direct hit skips the ALERT window — immediately give chase.
+        // Don't re-transition if already chasing/attacking (would reset path).
+        if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
+          this._transitionTo(npc, AIState.CHASE);
         }
       }
     }
+
+    // Build combo and show feedback once per swing (not per-NPC in a sweep).
+    if (anyHitLanded) {
+      this._registerComboHit();
+      if (this._comboStack > 1) {
+        this._ui.showNotification(`Combo ×${this._comboStack}!`, 800);
+      }
+      if (isRiposte) {
+        this._ui.showNotification("Riposte!", 1200);
+      }
+    }
+
     return true;
   }
 
@@ -1045,6 +1233,25 @@ export class CombatSystem {
       this._staffChargeTimer = Math.min(STAFF_CHARGE_TIME, this._staffChargeTimer + deltaTime);
     }
     this._staffChargeCooldown = Math.max(0, this._staffChargeCooldown - deltaTime);
+
+    // ── Combo window decay ──────────────────────────────────────────────────
+    if (this._comboStack > 0) {
+      this._comboTimer = Math.max(0, this._comboTimer - deltaTime);
+      if (this._comboTimer <= 0) {
+        this._comboStack = 0;
+      }
+    }
+
+    // ── Riposte window decay ────────────────────────────────────────────────
+    if (this._riposteReady) {
+      this._riposteTimer = Math.max(0, this._riposteTimer - deltaTime);
+      if (this._riposteTimer <= 0) {
+        this._riposteReady = false;
+      }
+    }
+
+    // ── Player status effects (DoT from NPC attacks) ────────────────────────
+    this._tickPlayerStatusEffects(deltaTime);
   }
 
   // ─── State machine implementation ──────────────────────────────────────────
@@ -1499,10 +1706,21 @@ export class CombatSystem {
       return;
     }
 
-    // Oblivion-style armor rating: player's bonusArmor acts as an armor rating value.
-    // Formula: damage × 100 / (100 + armorRating) — provides diminishing-return protection.
-    const playerAR = Math.max(0, this.player.bonusArmor);
-    let dmg = Math.max(1, Math.round(npc.attackDamage * 100 / (100 + playerAR)));
+    // ── NPC attack archetype — determines how damage is computed ─────────────
+    // "melee"  : physical, respects player armor rating (bonusArmor).
+    // "ranged" : physical, slightly reduced (×0.85), still respects armor.
+    // "magic"  : elemental, bypasses player armor; uses npcMagicDamageType.
+    const npcArchetype = npc.npcAttackArchetype;
+    let dmg: number;
+    if (npcArchetype === "magic") {
+      dmg = Math.max(1, npc.attackDamage);
+    } else {
+      const playerAR = Math.max(0, this.player.bonusArmor);
+      const rawDmg = npcArchetype === "ranged"
+        ? Math.round(npc.attackDamage * 0.85)
+        : npc.attackDamage;
+      dmg = Math.max(1, Math.round(rawDmg * 100 / (100 + playerAR)));
+    }
 
     // Apply resist_damage from active magical effects (potions, spells, enchantments).
     const resistPct = Math.min(100, Math.max(0,
@@ -1529,6 +1747,9 @@ export class CombatSystem {
         this._ui.applyHitStop(110);
         this._ui.shakeCamera(0.35);
         this._ui.showSpark(this.player.camera.position.add(this.player.camera.getDirection(Vector3.Forward()).scale(1.2)), "#FFFFFF");
+        // Open riposte window after a perfect block.
+        this._riposteReady = true;
+        this._riposteTimer = RIPOSTE_WINDOW;
       } else {
         this._ui.showNotification(`Blocked! ${dmg} damage taken.`, 1500);
         this._ui.showHitFlash("rgba(80, 120, 200, 0.35)");
@@ -1553,10 +1774,17 @@ export class CombatSystem {
         this._ui.showNotification("Block broken!", 1200);
       }
     } else {
+      // Unblocked hit — reset the player's combo streak.
+      this._resetCombo();
       this._ui.showHitFlash("rgba(200, 0, 0, 0.4)");
       this._ui.shakeCamera(0.4);
       this._ui.applyHitStop(60);
       this._ui.showNotification(`${npc.mesh.name} attacks you for ${dmg} damage!`, 2000);
+
+      // Apply NPC status effect to the player (burn, freeze, shock, etc.).
+      if (npc.attackStatusEffect) {
+        this._applyPlayerStatusEffect(npc.attackStatusEffect);
+      }
     }
 
     this.player.health = Math.max(0, this.player.health - dmg);
@@ -1752,5 +1980,150 @@ export class CombatSystem {
   private _faceTarget(npc: NPC, target: Vector3): void {
     this._lookAtTarget.set(target.x, npc.mesh.position.y, target.z);
     npc.mesh.lookAt(this._lookAtTarget);
+  }
+
+  // ─── Combo helpers ─────────────────────────────────────────────────────────
+
+  /**
+   * Damage multiplier derived from the current combo stack.
+   * Called BEFORE _registerComboHit so the bonus reflects the streak so far
+   * (first hit earns no bonus; the second hit benefits from the first, etc.).
+   */
+  private _comboMultiplier(): number {
+    return 1.0 + this._comboStack * COMBO_DAMAGE_BONUS_PER_STACK;
+  }
+
+  /** Increment the combo stack and reset the decay timer. */
+  private _registerComboHit(): void {
+    this._comboStack = Math.min(MAX_COMBO_STACK, this._comboStack + 1);
+    this._comboTimer = COMBO_WINDOW;
+  }
+
+  /** Reset the combo streak (called on miss or unblocked player hit). */
+  private _resetCombo(): void {
+    this._comboStack = 0;
+    this._comboTimer = 0;
+  }
+
+  // ─── Backstab helper ───────────────────────────────────────────────────────
+
+  /**
+   * Returns true when the player is attacking the NPC from behind.
+   * Uses BabylonJS `Mesh.forward` to read the NPC's facing direction.
+   * Gracefully returns false when the NPC mesh does not expose `forward`
+   * (e.g., plain objects in unit tests).
+   */
+  private _isBackstabAngle(npc: NPC): boolean {
+    const meshForward = (npc.mesh as unknown as { forward?: Vector3 }).forward;
+    if (!meshForward) return false;
+
+    const npcFwd = meshForward.clone();
+    npcFwd.y = 0;
+    if (npcFwd.lengthSquared() < 0.001) return false;
+
+    const playerFwd = this.player.getForwardDirection(1);
+    playerFwd.y = 0;
+    if (playerFwd.lengthSquared() < 0.001) return false;
+
+    // Threshold 0.5 = cos(60°): accepts strikes within ~120° cone behind the NPC.
+    // Positive dot product means NPC faces the same direction as the player's attack —
+    // i.e., the player is attacking from behind.
+    return Vector3.Dot(npcFwd.normalize(), playerFwd.normalize()) > 0.5;
+  }
+
+  // ─── Greatsword sweep helper ───────────────────────────────────────────────
+
+  /**
+   * Returns all living NPCs within `range` metres that also lie inside a
+   * forward cone of ±`sweepArcHalfAngle` radians.  Used by the greatsword's
+   * multi-target sweep attack instead of a single raycast.
+   */
+  private _sweepHitNPCs(range: number, sweepArcHalfAngle: number): NPC[] {
+    const results: NPC[] = [];
+    const playerPos = this.player.camera.position;
+    const forward = this.player.getForwardDirection(1);
+    forward.y = 0;
+    if (forward.lengthSquared() < 0.001) return results;
+    forward.normalize();
+
+    const cosHalf = Math.cos(sweepArcHalfAngle);
+
+    for (const npc of this.npcs) {
+      if (npc.isDead) continue;
+      const toNpc = npc.mesh.position.subtract(playerPos);
+      toNpc.y = 0;
+      const dist = toNpc.length();
+      if (dist > range || dist < 0.001) continue;
+      toNpc.normalize();
+      if (Vector3.Dot(forward, toNpc) >= cosHalf) {
+        results.push(npc);
+      }
+    }
+    return results;
+  }
+
+  // ─── Player status effect helpers ──────────────────────────────────────────
+
+  /**
+   * Tick active player DoT effects.  Called each frame by _tickPlayerAttackCooldowns.
+   * Effects that expire are removed; damage ticks are applied directly to player.health.
+   */
+  private _tickPlayerStatusEffects(deltaTime: number): void {
+    if (this._playerStatusEffects.length === 0) return;
+    const surviving: StatusEffect[] = [];
+
+    for (const effect of this._playerStatusEffects) {
+      effect.remainingDuration -= deltaTime;
+      effect.tickTimer -= deltaTime;
+
+      if (effect.tickTimer <= 0) {
+        effect.tickTimer += effect.tickInterval;
+        if (effect.damagePerTick > 0) {
+          this.player.health = Math.max(0, this.player.health - effect.damagePerTick);
+          (this.player as unknown as { notifyDamageTaken?: () => void }).notifyDamageTaken?.();
+          if (this.onPlayerHit) this.onPlayerHit();
+          this._ui.showNotification(
+            `${effect.type} deals ${effect.damagePerTick} damage!`, 800
+          );
+        }
+      }
+
+      if (effect.remainingDuration > 0) surviving.push(effect);
+    }
+
+    this._playerStatusEffects = surviving;
+  }
+
+  /**
+   * Apply or refresh a status effect on the player.
+   * If an effect of the same type is already active its duration and damage are
+   * each kept at the higher value (no double-stacking of the same type).
+   */
+  private _applyPlayerStatusEffect(eff: {
+    type: StatusEffect["type"];
+    damagePerTick: number;
+    tickInterval: number;
+    duration: number;
+  }): void {
+    const existing = this._playerStatusEffects.find(e => e.type === eff.type);
+    if (existing) {
+      existing.remainingDuration = Math.max(existing.remainingDuration, eff.duration);
+      existing.damagePerTick = Math.max(existing.damagePerTick, eff.damagePerTick);
+    } else {
+      const EFFECT_ICONS: Partial<Record<StatusEffect["type"], string>> = {
+        burn:   "🔥",
+        freeze: "❄",
+        shock:  "⚡",
+      };
+      const icon = EFFECT_ICONS[eff.type] ?? "💥";
+      this._ui.showNotification(`${icon} ${eff.type}!`, 1200);
+      this._playerStatusEffects.push({
+        type: eff.type,
+        damagePerTick: eff.damagePerTick,
+        tickInterval: eff.tickInterval,
+        tickTimer: eff.tickInterval,
+        remainingDuration: eff.duration,
+      });
+    }
   }
 }
