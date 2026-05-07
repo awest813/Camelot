@@ -152,6 +152,7 @@ export class WaitUI {
     spinnerRow.className = "wait-ui__spinner-row";
 
     const decBtn = document.createElement("button");
+    decBtn.title = "Decrease hours";
     decBtn.className = "wait-ui__dec-btn";
     decBtn.type = "button";
     decBtn.textContent = "▼";
@@ -180,6 +181,7 @@ export class WaitUI {
     spinnerRow.appendChild(hoursInput);
 
     const incBtn = document.createElement("button");
+    incBtn.title = "Increase hours";
     incBtn.className = "wait-ui__inc-btn";
     incBtn.type = "button";
     incBtn.textContent = "▲";
@@ -246,7 +248,7 @@ export class WaitUI {
         this._decBtn.style.opacity = "0.5";
         this._decBtn.style.cursor = "not-allowed";
       } else {
-        this._decBtn.removeAttribute("title");
+        this._decBtn.setAttribute("title", "Decrease hours");
         this._decBtn.style.opacity = "";
         this._decBtn.style.cursor = "";
       }
@@ -260,7 +262,7 @@ export class WaitUI {
         this._incBtn.style.opacity = "0.5";
         this._incBtn.style.cursor = "not-allowed";
       } else {
-        this._incBtn.removeAttribute("title");
+        this._incBtn.setAttribute("title", "Increase hours");
         this._incBtn.style.opacity = "";
         this._incBtn.style.cursor = "";
       }

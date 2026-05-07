@@ -9,3 +9,6 @@
 ## 2025-04-10 - Button type Accessibility
 **Learning:** Buttons created dynamically with `document.createElement("button")` default to `type="submit"` which can cause unwanted form submissions.
 **Action:** Always set `type="button"` on dynamically created buttons that are not intended to submit forms.
+## 2024-05-18 - Tooltips vs aria-disabled on UI buttons
+**Learning:** When using \`aria-disabled\` for UI elements like buttons, it is important not to strip the \`title\` property when removing the disabled state, otherwise the button loses its tooltip text in the default active state.
+**Action:** When re-enabling HTML buttons that were previously marked as \`aria-disabled="true"\`, restore their descriptive \`title\` via \`setAttribute("title", "...")\` instead of completely removing the attribute with \`removeAttribute("title")\`.
