@@ -523,3 +523,154 @@ describe("CraftingUI", () => {
     });
   });
 });
+
+// ── Tests: discovery integration ──────────────────────────────────────────────
+
+describe("CraftingUI — discovery integration", () => {
+  let ui:  CraftingUI;
+  let sys: CraftingSystem;
+
+  const hiddenRecipe: CraftingRecipe = {
+    id: "secret_blade",
+    label: "Secret Blade",
+    category: "weapon",
+    knownByDefault: false,
+    requiredMaterials: [{ materialId: "iron_ingot", quantity: 2 }],
+    outputItemId: "secret_blade",
+    outputItemName: "Secret Blade",
+  };
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    ui = new CraftingUI();
+    sys = new CraftingSystem();
+    sys.addRecipe(makeSword());     // known by default
+    sys.addRecipe(hiddenRecipe);    // not discovered yet
+  });
+
+  it("does not show undiscovered recipes in the list", () => {
+    ui.show();
+    ui.update(sys, FULL_MATS, 15);
+    const rows = document.querySelectorAll("[data-recipe-id='secret_blade']");
+    expect(rows.length).toBe(0);
+  });
+
+  it("shows known recipes in the list", () => {
+    ui.show();
+    ui.update(sys, FULL_MATS, 15);
+    const rows = document.querySelectorAll("[data-recipe-id='iron_sword']");
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it("shows newly discovered recipe after update", () => {
+    ui.show();
+    ui.update(sys, FULL_MATS, 15);
+    sys.discoverRecipe("secret_blade");
+    ui.update(sys, FULL_MATS, 15);
+    const rows = document.querySelectorAll("[data-recipe-id='secret_blade']");
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it("tab filter counts only discovered recipes in category", () => {
+    ui.show();
+    ui.update(sys, FULL_MATS, 15);
+    const tabs = document.querySelectorAll<HTMLButtonElement>(".crafting-ui__tab");
+    tabs[1].click(); // Weapon tab
+    const rows = document.querySelectorAll(".crafting-ui__recipe-row");
+    // only iron_sword is known; secret_blade is hidden
+    expect(rows.length).toBe(1);
+  });
+});
+
+// ── Tests: quality / station / tier display ────────────────────────────────────
+
+describe("CraftingUI — detail pane: quality, station, tier", () => {
+  let ui:  CraftingUI;
+  let sys: CraftingSystem;
+
+  const stationedRecipe: CraftingRecipe = {
+    id: "forge_sword",
+    label: "Forge Sword",
+    category: "weapon",
+    stationId: "forge",
+    tier: "steel",
+    requiredMaterials: [{ materialId: "steel_ingot", quantity: 2 }],
+    outputItemId: "forge_sword",
+    outputItemName: "Forge Sword",
+    requiredSkill: 25,
+    craftingXp: 20,
+  };
+
+  const MATS: MaterialInventory = { steel_ingot: 5 };
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    ui = new CraftingUI();
+    sys = new CraftingSystem();
+    sys.addRecipe(stationedRecipe);
+  });
+
+  function selectRecipe(id: string): void {
+    const row = document.querySelector<HTMLElement>(`[data-recipe-id='${id}']`);
+    row?.click();
+  }
+
+  it("shows quality preview in the detail pane", () => {
+    ui.show();
+    ui.update(sys, MATS, 25);
+    selectRecipe("forge_sword");
+    const qualityEl = document.querySelector(".crafting-ui__detail-quality");
+    expect(qualityEl).not.toBeNull();
+    expect(qualityEl?.textContent).toContain("Base"); // surplus=0
+  });
+
+  it("quality preview reflects higher skill", () => {
+    ui.show();
+    ui.update(sys, MATS, 75); // surplus=50 → exquisite
+    selectRecipe("forge_sword");
+    const qualityEl = document.querySelector(".crafting-ui__detail-quality");
+    expect(qualityEl?.textContent).toContain("Exquisite");
+  });
+
+  it("shows required station in the detail pane", () => {
+    ui.show();
+    ui.update(sys, MATS, 25);
+    selectRecipe("forge_sword");
+    const stationEl = document.querySelector(".crafting-ui__detail-station");
+    expect(stationEl).not.toBeNull();
+    expect(stationEl?.textContent).toContain("Forge");
+    expect(stationEl?.getAttribute("data-station-id")).toBe("forge");
+  });
+
+  it("omits station line when recipe has no stationId", () => {
+    const sys2 = new CraftingSystem();
+    sys2.addRecipe(makeSword()); // no stationId
+    ui.show();
+    ui.update(sys2, FULL_MATS, 15);
+    const rows = document.querySelectorAll<HTMLElement>("[data-recipe-id='iron_sword']");
+    rows[0].click();
+    const stationEl = document.querySelector(".crafting-ui__detail-station");
+    expect(stationEl).toBeNull();
+  });
+
+  it("shows tier in the detail pane with XP multiplier", () => {
+    ui.show();
+    ui.update(sys, MATS, 25);
+    selectRecipe("forge_sword");
+    const tierEl = document.querySelector(".crafting-ui__detail-tier");
+    expect(tierEl).not.toBeNull();
+    expect(tierEl?.textContent).toContain("Steel");
+    expect(tierEl?.getAttribute("data-tier")).toBe("steel");
+  });
+
+  it("omits tier line when recipe has no tier", () => {
+    const sys2 = new CraftingSystem();
+    sys2.addRecipe(makeSword()); // no tier
+    ui.show();
+    ui.update(sys2, FULL_MATS, 15);
+    const rows = document.querySelectorAll<HTMLElement>("[data-recipe-id='iron_sword']");
+    rows[0].click();
+    const tierEl = document.querySelector(".crafting-ui__detail-tier");
+    expect(tierEl).toBeNull();
+  });
+});

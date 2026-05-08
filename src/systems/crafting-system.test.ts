@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { CraftingSystem } from "./crafting-system";
+import { CraftingSystem, computeItemQuality } from "./crafting-system";
 import type {
   CraftingRecipe,
   MaterialInventory,
   CraftingSnapshot,
+  CraftingSystemState,
 } from "./crafting-system";
 
 // ── Fixture helpers ───────────────────────────────────────────────────────────
@@ -480,6 +481,409 @@ describe("CraftingSystem — snapshot / restore", () => {
     const spy = vi.fn();
     sys.onItemCrafted = spy;
     sys.restoreSnapshot([{ id: "iron_sword", craftCount: 5 }]);
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+// ── Tests: computeItemQuality ─────────────────────────────────────────────────
+
+describe("computeItemQuality", () => {
+  it("returns base for surplus 0", () => {
+    expect(computeItemQuality(0, 0)).toBe("base");
+  });
+
+  it("returns base for surplus 9", () => {
+    expect(computeItemQuality(9, 0)).toBe("base");
+  });
+
+  it("returns fine for surplus 10", () => {
+    expect(computeItemQuality(10, 0)).toBe("fine");
+  });
+
+  it("returns fine for surplus 24", () => {
+    expect(computeItemQuality(24, 0)).toBe("fine");
+  });
+
+  it("returns superior for surplus 25", () => {
+    expect(computeItemQuality(25, 0)).toBe("superior");
+  });
+
+  it("returns exquisite for surplus 50", () => {
+    expect(computeItemQuality(50, 0)).toBe("exquisite");
+  });
+
+  it("returns masterwork for surplus 75", () => {
+    expect(computeItemQuality(75, 0)).toBe("masterwork");
+  });
+
+  it("accounts for requiredSkill in surplus calculation", () => {
+    // skill=35, required=25 → surplus=10 → fine
+    expect(computeItemQuality(35, 25)).toBe("fine");
+  });
+
+  it("clamps to base when skill is below required (craft blocked, but quality is base)", () => {
+    // craft is blocked upstream; quality for negative surplus should still be base
+    expect(computeItemQuality(10, 20)).toBe("base");
+  });
+});
+
+// ── Tests: discovery ──────────────────────────────────────────────────────────
+
+describe("CraftingSystem — discovery", () => {
+  const hiddenRecipe: CraftingRecipe = {
+    id: "secret_blade",
+    label: "Secret Blade",
+    category: "weapon",
+    knownByDefault: false,
+    requiredMaterials: [{ materialId: "iron_ingot", quantity: 1 }],
+    outputItemId: "secret_blade",
+    outputItemName: "Secret Blade",
+  };
+
+  it("recipes with knownByDefault true (default) are auto-discovered", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(ironSwordRecipe);
+    expect(sys.isDiscovered("iron_sword")).toBe(true);
+  });
+
+  it("recipes with knownByDefault false are not discovered by default", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(hiddenRecipe);
+    expect(sys.isDiscovered("secret_blade")).toBe(false);
+  });
+
+  it("discoverRecipe marks a recipe as discovered", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(hiddenRecipe);
+    sys.discoverRecipe("secret_blade");
+    expect(sys.isDiscovered("secret_blade")).toBe(true);
+  });
+
+  it("craft fails with recipe_unknown before discovery", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(hiddenRecipe);
+    const outcome = sys.craft("secret_blade", { iron_ingot: 5 });
+    expect(outcome.success).toBe(false);
+    if (!outcome.success) expect(outcome.reason).toBe("recipe_unknown");
+  });
+
+  it("canCraft returns false for undiscovered recipe", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(hiddenRecipe);
+    expect(sys.canCraft("secret_blade", { iron_ingot: 5 })).toBe(false);
+  });
+
+  it("craft succeeds after discovery", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(hiddenRecipe);
+    sys.discoverRecipe("secret_blade");
+    const outcome = sys.craft("secret_blade", { iron_ingot: 5 });
+    expect(outcome.success).toBe(true);
+  });
+
+  it("getKnownRecipes returns only discovered recipes", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(ironSwordRecipe);
+    sys.addRecipe(hiddenRecipe);
+    const known = sys.getKnownRecipes();
+    expect(known.map((r) => r.id)).toEqual(["iron_sword"]);
+  });
+
+  it("getKnownRecipes includes recipe after discoverRecipe", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(hiddenRecipe);
+    sys.discoverRecipe("secret_blade");
+    expect(sys.getKnownRecipes().map((r) => r.id)).toContain("secret_blade");
+  });
+
+  it("getKnownRecipesByCategory filters by category over known set", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(ironSwordRecipe);     // weapon, known
+    sys.addRecipe(leatherArmorRecipe);  // armor, known
+    sys.addRecipe(hiddenRecipe);        // weapon, unknown
+    const weapons = sys.getKnownRecipesByCategory("weapon");
+    expect(weapons.map((r) => r.id)).toEqual(["iron_sword"]);
+  });
+
+  it("recipes getter still returns all (including undiscovered)", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(ironSwordRecipe);
+    sys.addRecipe(hiddenRecipe);
+    expect(sys.recipes).toHaveLength(2);
+  });
+
+  it("removeRecipe clears discovery for that recipe", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(ironSwordRecipe);
+    sys.removeRecipe("iron_sword");
+    expect(sys.isDiscovered("iron_sword")).toBe(false);
+  });
+
+  it("clear() removes all discoveries", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(ironSwordRecipe);
+    sys.clear();
+    expect(sys.isDiscovered("iron_sword")).toBe(false);
+  });
+
+  it("discoverRecipe on unknown id is safe and applied when recipe is added later", () => {
+    const sys = new CraftingSystem();
+    sys.discoverRecipe("secret_blade");
+    sys.addRecipe({ ...hiddenRecipe, knownByDefault: false });
+    expect(sys.isDiscovered("secret_blade")).toBe(true);
+  });
+});
+
+// ── Tests: crafting stations ──────────────────────────────────────────────────
+
+describe("CraftingSystem — stations", () => {
+  const forgeRecipe: CraftingRecipe = {
+    id: "iron_sword",
+    label: "Iron Sword",
+    category: "weapon",
+    stationId: "forge",
+    requiredMaterials: [{ materialId: "iron_ingot", quantity: 2 }],
+    outputItemId: "iron_sword",
+    outputItemName: "Iron Sword",
+  };
+
+  const noStationRecipe: CraftingRecipe = {
+    id: "leather_bag",
+    label: "Leather Bag",
+    category: "misc",
+    requiredMaterials: [{ materialId: "leather", quantity: 3 }],
+    outputItemId: "leather_bag",
+    outputItemName: "Leather Bag",
+  };
+
+  it("getRecipesByStation returns recipes requiring that station", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(forgeRecipe);
+    sys.addRecipe(noStationRecipe);
+    const forgeRecipes = sys.getRecipesByStation("forge");
+    expect(forgeRecipes.map((r) => r.id)).toEqual(["iron_sword"]);
+  });
+
+  it("getRecipesByStation returns empty when no matching recipes", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(noStationRecipe);
+    expect(sys.getRecipesByStation("forge")).toHaveLength(0);
+  });
+
+  it("craft fails with wrong_station when wrong station provided", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(forgeRecipe);
+    const outcome = sys.craft("iron_sword", { iron_ingot: 5 }, 0, "workbench");
+    expect(outcome.success).toBe(false);
+    if (!outcome.success) {
+      expect(outcome.reason).toBe("wrong_station");
+      expect(outcome.message).toContain("Forge");
+    }
+  });
+
+  it("craft fails with wrong_station when no station provided for station-gated recipe", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(forgeRecipe);
+    const outcome = sys.craft("iron_sword", { iron_ingot: 5 }, 0);
+    expect(outcome.success).toBe(false);
+    if (!outcome.success) expect(outcome.reason).toBe("wrong_station");
+  });
+
+  it("craft succeeds when correct station is provided", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(forgeRecipe);
+    const outcome = sys.craft("iron_sword", { iron_ingot: 5 }, 0, "forge");
+    expect(outcome.success).toBe(true);
+  });
+
+  it("canCraft returns false when wrong station provided", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(forgeRecipe);
+    expect(sys.canCraft("iron_sword", { iron_ingot: 5 }, 0, "workbench")).toBe(false);
+  });
+
+  it("canCraft returns true when correct station provided", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(forgeRecipe);
+    expect(sys.canCraft("iron_sword", { iron_ingot: 5 }, 0, "forge")).toBe(true);
+  });
+
+  it("recipe with no stationId can be crafted at any station or no station", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(noStationRecipe);
+    expect(sys.canCraft("leather_bag", { leather: 3 }, 0)).toBe(true);
+    expect(sys.canCraft("leather_bag", { leather: 3 }, 0, "forge")).toBe(true);
+    expect(sys.canCraft("leather_bag", { leather: 3 }, 0, "workbench")).toBe(true);
+  });
+});
+
+// ── Tests: quality in craft result ───────────────────────────────────────────
+
+describe("CraftingSystem — craft quality", () => {
+  it("result includes quality field", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(ironSwordRecipe); // requiredSkill 0
+    const outcome = sys.craft("iron_sword", makeInventory(), 0);
+    expect(outcome.success).toBe(true);
+    if (outcome.success) expect(outcome.result.quality).toBeDefined();
+  });
+
+  it("returns base quality when skill equals requiredSkill", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(ironSwordRecipe); // requiredSkill 0
+    const outcome = sys.craft("iron_sword", makeInventory(), 0);
+    expect(outcome.success).toBe(true);
+    if (outcome.success) expect(outcome.result.quality).toBe("base");
+  });
+
+  it("returns fine quality at surplus 10", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(steelSwordRecipe); // requiredSkill 25
+    const outcome = sys.craft("steel_sword", makeInventory(), 35);
+    expect(outcome.success).toBe(true);
+    if (outcome.success) expect(outcome.result.quality).toBe("fine");
+  });
+
+  it("returns superior quality at surplus 25", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(steelSwordRecipe); // requiredSkill 25
+    const outcome = sys.craft("steel_sword", makeInventory(), 50);
+    expect(outcome.success).toBe(true);
+    if (outcome.success) expect(outcome.result.quality).toBe("superior");
+  });
+
+  it("returns exquisite quality at surplus 50", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(steelSwordRecipe); // requiredSkill 25
+    const outcome = sys.craft("steel_sword", makeInventory(), 75);
+    expect(outcome.success).toBe(true);
+    if (outcome.success) expect(outcome.result.quality).toBe("exquisite");
+  });
+
+  it("returns masterwork quality at surplus 75", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(steelSwordRecipe); // requiredSkill 25
+    const outcome = sys.craft("steel_sword", makeInventory(), 100);
+    expect(outcome.success).toBe(true);
+    if (outcome.success) expect(outcome.result.quality).toBe("masterwork");
+  });
+});
+
+// ── Tests: XP tier scaling ────────────────────────────────────────────────────
+
+describe("CraftingSystem — XP tier scaling", () => {
+  it("no tier → xpAwarded equals craftingXp", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(ironSwordRecipe); // craftingXp 15, no tier
+    const outcome = sys.craft("iron_sword", makeInventory());
+    expect(outcome.success).toBe(true);
+    if (outcome.success) expect(outcome.result.xpAwarded).toBe(15);
+  });
+
+  it("iron tier → 1.0× multiplier", () => {
+    const sys = new CraftingSystem();
+    const recipe: CraftingRecipe = { ...ironSwordRecipe, id: "t1", tier: "iron", craftingXp: 10 };
+    sys.addRecipe(recipe);
+    const outcome = sys.craft("t1", makeInventory());
+    expect(outcome.success).toBe(true);
+    if (outcome.success) expect(outcome.result.xpAwarded).toBe(10);
+  });
+
+  it("steel tier → 1.2× multiplier (rounded)", () => {
+    const sys = new CraftingSystem();
+    const recipe: CraftingRecipe = { ...ironSwordRecipe, id: "t2", tier: "steel", craftingXp: 10 };
+    sys.addRecipe(recipe);
+    const outcome = sys.craft("t2", makeInventory());
+    expect(outcome.success).toBe(true);
+    if (outcome.success) expect(outcome.result.xpAwarded).toBe(12);
+  });
+
+  it("daedric tier → 2.5× multiplier", () => {
+    const sys = new CraftingSystem();
+    const recipe: CraftingRecipe = { ...ironSwordRecipe, id: "t3", tier: "daedric", craftingXp: 20 };
+    sys.addRecipe(recipe);
+    const outcome = sys.craft("t3", makeInventory());
+    expect(outcome.success).toBe(true);
+    if (outcome.success) expect(outcome.result.xpAwarded).toBe(50);
+  });
+});
+
+// ── Tests: getSystemState / restoreSystemState ────────────────────────────────
+
+describe("CraftingSystem — getSystemState / restoreSystemState", () => {
+  const hiddenRecipe: CraftingRecipe = {
+    id: "secret_blade",
+    label: "Secret Blade",
+    category: "weapon",
+    knownByDefault: false,
+    requiredMaterials: [{ materialId: "iron_ingot", quantity: 1 }],
+    outputItemId: "secret_blade",
+    outputItemName: "Secret Blade",
+  };
+
+  it("getSystemState captures craft counts and discovered ids", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(ironSwordRecipe);
+    sys.addRecipe(hiddenRecipe);
+    sys.discoverRecipe("secret_blade");
+    sys.craft("iron_sword", makeInventory());
+
+    const state = sys.getSystemState();
+    expect(state.recipeSnapshots.find((s) => s.id === "iron_sword")?.craftCount).toBe(1);
+    expect(state.discoveredRecipeIds).toContain("iron_sword");
+    expect(state.discoveredRecipeIds).toContain("secret_blade");
+  });
+
+  it("restoreSystemState restores craft counts", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(ironSwordRecipe);
+    const state: CraftingSystemState = {
+      recipeSnapshots: [{ id: "iron_sword", craftCount: 4 }],
+      discoveredRecipeIds: ["iron_sword"],
+    };
+    sys.restoreSystemState(state);
+    expect(sys.getTotalCrafted("iron_sword")).toBe(4);
+  });
+
+  it("restoreSystemState restores discovery set", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe({ ...hiddenRecipe, knownByDefault: false });
+    const state: CraftingSystemState = {
+      recipeSnapshots: [],
+      discoveredRecipeIds: ["secret_blade"],
+    };
+    sys.restoreSystemState(state);
+    expect(sys.isDiscovered("secret_blade")).toBe(true);
+  });
+
+  it("round-trips system state correctly", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(ironSwordRecipe);
+    sys.addRecipe(hiddenRecipe);
+    sys.discoverRecipe("secret_blade");
+    sys.craft("iron_sword", makeInventory());
+    sys.craft("iron_sword", makeInventory());
+
+    const state = sys.getSystemState();
+
+    const sys2 = new CraftingSystem();
+    sys2.addRecipe(ironSwordRecipe);
+    sys2.addRecipe({ ...hiddenRecipe, knownByDefault: false });
+    sys2.restoreSystemState(state);
+
+    expect(sys2.getTotalCrafted("iron_sword")).toBe(2);
+    expect(sys2.isDiscovered("secret_blade")).toBe(true);
+  });
+
+  it("does not fire onItemCrafted during restoreSystemState", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(ironSwordRecipe);
+    const spy = vi.fn();
+    sys.onItemCrafted = spy;
+    sys.restoreSystemState({
+      recipeSnapshots: [{ id: "iron_sword", craftCount: 3 }],
+      discoveredRecipeIds: ["iron_sword"],
+    });
     expect(spy).not.toHaveBeenCalled();
   });
 });
