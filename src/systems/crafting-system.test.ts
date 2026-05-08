@@ -559,12 +559,12 @@ describe("CraftingSystem — discovery", () => {
     expect(sys.isDiscovered("secret_blade")).toBe(true);
   });
 
-  it("craft fails with recipe_unknown before discovery", () => {
+  it("craft fails with not_discovered before discovery", () => {
     const sys = new CraftingSystem();
     sys.addRecipe(hiddenRecipe);
     const outcome = sys.craft("secret_blade", { iron_ingot: 5 });
     expect(outcome.success).toBe(false);
-    if (!outcome.success) expect(outcome.reason).toBe("recipe_unknown");
+    if (!outcome.success) expect(outcome.reason).toBe("not_discovered");
   });
 
   it("canCraft returns false for undiscovered recipe", () => {

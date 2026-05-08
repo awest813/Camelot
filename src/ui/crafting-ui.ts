@@ -7,6 +7,7 @@ import type {
 } from "../systems/crafting-system";
 import {
   CRAFTING_STATION_LABELS,
+  CRAFTING_TIER_LABELS,
   CRAFTING_TIER_XP_MULTIPLIERS,
   ITEM_QUALITY_LABELS,
   computeItemQuality,
@@ -397,7 +398,7 @@ export class CraftingUI {
     if (recipe.tier) {
       const tierEl = document.createElement("p");
       tierEl.className = "crafting-ui__detail-tier";
-      tierEl.textContent = `Tier: ${recipe.tier.charAt(0).toUpperCase() + recipe.tier.slice(1)} (${CRAFTING_TIER_XP_MULTIPLIERS[recipe.tier]}× XP)`;
+      tierEl.textContent = `Tier: ${CRAFTING_TIER_LABELS[recipe.tier]} (${CRAFTING_TIER_XP_MULTIPLIERS[recipe.tier]}× XP)`;
       tierEl.setAttribute("data-tier", recipe.tier);
       this._detailEl.appendChild(tierEl);
     }

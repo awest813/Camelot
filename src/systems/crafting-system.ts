@@ -65,6 +65,17 @@ export const CRAFTING_TIER_XP_MULTIPLIERS: Record<CraftingTier, number> = {
   daedric: 2.5,
 };
 
+/** Human-readable display names for each material tier. */
+export const CRAFTING_TIER_LABELS: Record<CraftingTier, string> = {
+  iron:    "Iron",
+  steel:   "Steel",
+  dwarven: "Dwarven",
+  elven:   "Elven",
+  glass:   "Glass",
+  ebony:   "Ebony",
+  daedric: "Daedric",
+};
+
 // ── Quality ───────────────────────────────────────────────────────────────────
 
 /**
@@ -197,7 +208,7 @@ export interface CraftingResult {
 /** Reason why a recipe cannot be crafted. */
 export type CraftingFailReason =
   | "unknown_recipe"
-  | "recipe_unknown"
+  | "not_discovered"
   | "wrong_station"
   | "missing_materials"
   | "skill_too_low";
@@ -556,7 +567,7 @@ export class CraftingSystem {
     if (!this._discovered.has(recipe.id)) {
       return {
         success: false,
-        reason: "recipe_unknown",
+        reason: "not_discovered",
         message: `Recipe "${recipe.id}" has not been discovered yet.`,
       };
     }
