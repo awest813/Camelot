@@ -5,6 +5,13 @@ import type {
   CraftingSystem,
   MaterialInventory,
 } from "../systems/crafting-system";
+import {
+  CRAFTING_STATION_LABELS,
+  CRAFTING_TIER_LABELS,
+  CRAFTING_TIER_XP_MULTIPLIERS,
+  ITEM_QUALITY_LABELS,
+  computeItemQuality,
+} from "../systems/crafting-system";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -119,11 +126,11 @@ export class CraftingUI {
     this._lastMaterials = materials;
     this._lastSkill     = skill;
 
-    // Gather recipes for the active tab.
+    // Gather discovered recipes for the active tab.
     const recipes: CraftingRecipe[] =
       this._activeFilter === "all"
-        ? system.recipes
-        : system.getRecipesByCategory(this._activeFilter);
+        ? system.getKnownRecipes()
+        : system.getKnownRecipesByCategory(this._activeFilter);
 
     this._lastRecipes = recipes;
     this._renderTabs();
@@ -369,6 +376,31 @@ export class CraftingUI {
         (skill >= requiredSkill ? " skill-met" : " skill-missing");
       skillEl.textContent = `Required skill: ${requiredSkill} (yours: ${skill})`;
       this._detailEl.appendChild(skillEl);
+    }
+
+    // Quality preview
+    const quality = computeItemQuality(skill, requiredSkill);
+    const qualityEl = document.createElement("p");
+    qualityEl.className = "crafting-ui__detail-quality";
+    qualityEl.textContent = `Expected quality: ${ITEM_QUALITY_LABELS[quality]}`;
+    this._detailEl.appendChild(qualityEl);
+
+    // Required station
+    if (recipe.stationId) {
+      const stationEl = document.createElement("p");
+      stationEl.className = "crafting-ui__detail-station";
+      stationEl.textContent = `Requires: ${CRAFTING_STATION_LABELS[recipe.stationId]}`;
+      stationEl.setAttribute("data-station-id", recipe.stationId);
+      this._detailEl.appendChild(stationEl);
+    }
+
+    // Material tier
+    if (recipe.tier) {
+      const tierEl = document.createElement("p");
+      tierEl.className = "crafting-ui__detail-tier";
+      tierEl.textContent = `Tier: ${CRAFTING_TIER_LABELS[recipe.tier]} (${CRAFTING_TIER_XP_MULTIPLIERS[recipe.tier]}× XP)`;
+      tierEl.setAttribute("data-tier", recipe.tier);
+      this._detailEl.appendChild(tierEl);
     }
 
     // Materials section
