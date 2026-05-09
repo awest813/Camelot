@@ -249,6 +249,7 @@ export class EditorHubUI {
     header.appendChild(logoWrap);
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className   = "editor-hub__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close editor hub");
@@ -290,6 +291,7 @@ export class EditorHubUI {
 
   private _buildToolCard(tool: ToolEntry): HTMLElement {
     const card = document.createElement("button");
+    card.type = "button";
     card.className        = "editor-hub__tool-card";
     card.style.setProperty("--tool-accent", tool.accentVar);
     card.setAttribute("aria-label", `Open ${tool.label}`);

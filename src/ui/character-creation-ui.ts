@@ -187,12 +187,14 @@ export class CharacterCreationUI {
       panel.appendChild(actions);
 
       const backButton = document.createElement("button");
+      backButton.type = "button";
       backButton.className = "character-create__button character-create__button--secondary";
       backButton.textContent = "Back";
       setBtnDisabled(backButton, true);
       actions.appendChild(backButton);
 
       const continueButton = document.createElement("button");
+      continueButton.type = "button";
       continueButton.className = "character-create__button";
       continueButton.textContent = "Continue";
       actions.appendChild(continueButton);

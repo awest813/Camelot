@@ -123,6 +123,7 @@ export class StableUI {
     titleWrap.appendChild(subtitle);
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className = "stable__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close stable");
@@ -149,6 +150,7 @@ export class StableUI {
     panel.appendChild(actions);
 
     const buyBtn = document.createElement("button");
+    buyBtn.type = "button";
     buyBtn.className = "stable__btn stable__btn--primary";
     buyBtn.textContent = "Purchase";
     buyBtn.addEventListener("click", () => this._handlePurchase());
@@ -156,6 +158,7 @@ export class StableUI {
     this._buyBtn = buyBtn;
 
     const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
     cancelBtn.className = "stable__btn";
     cancelBtn.textContent = "Leave";
     cancelBtn.addEventListener("click", () => this.close());
@@ -180,6 +183,7 @@ export class StableUI {
 
     for (const horse of this._horses) {
       const row = document.createElement("button");
+      row.type = "button";
       row.className = "stable__row";
       const selected = horse.id === this._selectedId;
       if (selected) row.classList.add("is-selected");

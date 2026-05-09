@@ -72,6 +72,7 @@ export class ModManifestUI {
     header.appendChild(title);
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className   = "mod-manifest__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close mod manifest editor");
@@ -114,6 +115,7 @@ export class ModManifestUI {
     listHeader.appendChild(h3);
 
     const addBtn = document.createElement("button");
+    addBtn.type = "button";
     addBtn.className   = "mod-manifest__btn mod-manifest__btn--sm";
     addBtn.textContent = "+ Add Mod";
     addBtn.addEventListener("click", () => {
@@ -233,6 +235,7 @@ export class ModManifestUI {
 
     // Up button
     const upBtn = document.createElement("button");
+    upBtn.type = "button";
     upBtn.className   = "mod-manifest__btn mod-manifest__btn--icon";
     upBtn.textContent = "▲";
     upBtn.disabled    = index === 0;
@@ -245,6 +248,7 @@ export class ModManifestUI {
 
     // Down button
     const downBtn = document.createElement("button");
+    downBtn.type = "button";
     downBtn.className   = "mod-manifest__btn mod-manifest__btn--icon";
     downBtn.textContent = "▼";
     downBtn.disabled    = index === total - 1;
@@ -257,6 +261,7 @@ export class ModManifestUI {
 
     // Remove button
     const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
     removeBtn.className   = "mod-manifest__btn mod-manifest__btn--danger";
     removeBtn.textContent = "✕";
     removeBtn.setAttribute("aria-label", `Remove mod ${index + 1}`);
@@ -277,12 +282,14 @@ export class ModManifestUI {
     footer.className = "mod-manifest__footer";
 
     const validateBtn = document.createElement("button");
+    validateBtn.type = "button";
     validateBtn.className   = "mod-manifest__btn mod-manifest__btn--primary";
     validateBtn.textContent = "✓ Validate";
     validateBtn.addEventListener("click", () => this._doValidate());
     footer.appendChild(validateBtn);
 
     const exportBtn = document.createElement("button");
+    exportBtn.type = "button";
     exportBtn.className   = "mod-manifest__btn";
     exportBtn.textContent = "⬇ Export JSON";
     exportBtn.addEventListener("click", () => {
@@ -297,6 +304,7 @@ export class ModManifestUI {
     footer.appendChild(exportBtn);
 
     const importBtn = document.createElement("button");
+    importBtn.type = "button";
     importBtn.className   = "mod-manifest__btn";
     importBtn.textContent = "⬆ Import JSON";
     importBtn.addEventListener("click", () => {
@@ -319,6 +327,7 @@ export class ModManifestUI {
     footer.appendChild(importBtn);
 
     const resetBtn = document.createElement("button");
+    resetBtn.type = "button";
     resetBtn.className   = "mod-manifest__btn mod-manifest__btn--danger";
     resetBtn.textContent = "↺ Reset";
     resetBtn.addEventListener("click", () => {

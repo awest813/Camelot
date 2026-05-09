@@ -91,6 +91,7 @@ export class SpawnCreatorUI {
     header.appendChild(title);
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className = "spawn-creator__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close spawn creator");
@@ -175,6 +176,7 @@ export class SpawnCreatorUI {
     listHeader.appendChild(h3);
 
     const addBtn = document.createElement("button");
+    addBtn.type = "button";
     addBtn.className   = "spawn-creator__btn spawn-creator__btn--sm";
     addBtn.textContent = "+ Add Entry";
     addBtn.addEventListener("click", () => {
@@ -234,6 +236,7 @@ export class SpawnCreatorUI {
     row1.appendChild(idLabel);
 
     const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
     removeBtn.className   = "spawn-creator__btn spawn-creator__btn--sm spawn-creator__btn--danger";
     removeBtn.textContent = "Remove";
     removeBtn.addEventListener("click", () => {
@@ -399,6 +402,7 @@ export class SpawnCreatorUI {
 
     const makeBtn = (label: string, cls: string, cb: () => void): HTMLButtonElement => {
       const btn = document.createElement("button");
+      btn.type = "button";
       btn.className   = `spawn-creator__btn ${cls}`;
       btn.textContent = label;
       btn.addEventListener("click", cb);

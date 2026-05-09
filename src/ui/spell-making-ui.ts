@@ -126,6 +126,7 @@ export class SpellMakingUI {
     titleWrap.appendChild(subtitle);
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className = "spell-making__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close spellmaking altar");
@@ -189,6 +190,7 @@ export class SpellMakingUI {
     panel.appendChild(actions);
 
     const forgeBtn = document.createElement("button");
+    forgeBtn.type = "button";
     forgeBtn.className = "spell-making__btn spell-making__btn--primary";
     forgeBtn.textContent = "Forge Spell";
     forgeBtn.addEventListener("click", () => this._emitForgeRequest());
@@ -196,6 +198,7 @@ export class SpellMakingUI {
     this._forgeButton = forgeBtn;
 
     const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
     cancelBtn.className = "spell-making__btn";
     cancelBtn.textContent = "Cancel";
     cancelBtn.addEventListener("click", () => this.close());

@@ -98,6 +98,7 @@ export class ContentBundleUI {
     header.appendChild(titleWrap);
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className   = "content-bundle__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close content bundle dashboard");
@@ -128,6 +129,7 @@ export class ContentBundleUI {
     metaSection.appendChild(metaGrid);
 
     const applyMetaBtn = document.createElement("button");
+    applyMetaBtn.type = "button";
     applyMetaBtn.className   = "content-bundle__btn content-bundle__btn--secondary";
     applyMetaBtn.textContent = "Apply Metadata";
     applyMetaBtn.addEventListener("click", () => this._applyMeta());
@@ -168,17 +170,20 @@ export class ContentBundleUI {
     actions.className = "content-bundle__actions";
 
     const validateBtn = document.createElement("button");
+    validateBtn.type = "button";
     validateBtn.className   = "content-bundle__btn content-bundle__btn--primary";
     validateBtn.textContent = "✔ Validate All";
     validateBtn.addEventListener("click", () => this._runValidation());
     this._validateBtn = validateBtn;
 
     const exportBtn = document.createElement("button");
+    exportBtn.type = "button";
     exportBtn.className   = "content-bundle__btn content-bundle__btn--export";
     exportBtn.textContent = "⬇ Export Bundle";
     exportBtn.addEventListener("click", () => this._exportBundle());
 
     const closeActionBtn = document.createElement("button");
+    closeActionBtn.type = "button";
     closeActionBtn.className   = "content-bundle__btn content-bundle__btn--close";
     closeActionBtn.textContent = "Close";
     closeActionBtn.addEventListener("click", () => this.close());
@@ -291,6 +296,7 @@ export class ContentBundleUI {
     const config = this._sys.getPlayFromHereConfig(sysReport.systemId);
     if (config) {
       const playBtn = document.createElement("button");
+      playBtn.type = "button";
       playBtn.className   = "content-bundle__play-btn";
       playBtn.textContent = "▶ Open";
       playBtn.title       = `Open ${config.label}`;

@@ -130,6 +130,7 @@ export class AssetBrowserUI {
     header.appendChild(titleWrap);
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className   = "asset-browser__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close asset browser");
@@ -155,6 +156,7 @@ export class AssetBrowserUI {
     typeRow.className = "asset-browser__type-row";
     for (const type of ALL_TYPES) {
       const chip = document.createElement("button");
+      chip.type = "button";
       chip.className        = "asset-browser__type-chip asset-browser__type-chip--active";
       chip.textContent      = `${TYPE_ICON[type]} ${type}`;
       chip.style.setProperty("--chip-color", TYPE_COLOR[type]);
@@ -178,6 +180,7 @@ export class AssetBrowserUI {
 
     // Favorites toggle
     const favBtn = document.createElement("button");
+    favBtn.type = "button";
     favBtn.className   = "asset-browser__fav-btn";
     favBtn.textContent = "⭐ Favorites only";
     favBtn.setAttribute("aria-pressed", "false");
@@ -230,12 +233,14 @@ export class AssetBrowserUI {
     actions.className = "asset-browser__actions";
 
     const importBtn = document.createElement("button");
+    importBtn.type = "button";
     importBtn.className   = "asset-browser__btn asset-browser__btn--secondary";
     importBtn.textContent = "📂 Import Bundle";
     importBtn.title       = "Load a .bundle.json file to register its assets";
     importBtn.addEventListener("click", () => this.onImportBundle?.());
 
     const closeActionBtn = document.createElement("button");
+    closeActionBtn.type = "button";
     closeActionBtn.className   = "asset-browser__btn asset-browser__btn--close";
     closeActionBtn.textContent = "Close";
     closeActionBtn.addEventListener("click", () => this.close());
@@ -332,6 +337,7 @@ export class AssetBrowserUI {
 
     // Favorite star
     const favBtn = document.createElement("button");
+    favBtn.type = "button";
     favBtn.className   = `asset-browser__fav-star${isFav ? " asset-browser__fav-star--on" : ""}`;
     favBtn.textContent = isFav ? "⭐" : "☆";
     favBtn.title       = isFav ? "Remove from favorites" : "Add to favorites";
@@ -449,12 +455,14 @@ export class AssetBrowserUI {
     btnRow.className = "asset-browser__detail-btn-row";
 
     const insertBtn = document.createElement("button");
+    insertBtn.type = "button";
     insertBtn.className   = "asset-browser__btn asset-browser__btn--primary";
     insertBtn.textContent = "↗ Insert";
     insertBtn.title       = "Insert this asset into the active editor";
     insertBtn.addEventListener("click", () => this.onInsert?.(asset));
 
     const exportBtn = document.createElement("button");
+    exportBtn.type = "button";
     exportBtn.className   = "asset-browser__btn asset-browser__btn--secondary";
     exportBtn.textContent = "⬇ Export Selected";
     exportBtn.title       = "Export this asset and its transitive dependencies as a minimal .bundle.json";
@@ -491,6 +499,7 @@ export class AssetBrowserUI {
         chip.appendChild(label);
 
         const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
         removeBtn.className   = "asset-browser__tag-remove";
         removeBtn.textContent = "×";
         removeBtn.setAttribute("aria-label", `Remove tag "${tag}"`);
@@ -527,6 +536,7 @@ export class AssetBrowserUI {
     tagInput.setAttribute("aria-label", "New tag");
 
     const addBtn = document.createElement("button");
+    addBtn.type = "button";
     addBtn.className   = "asset-browser__btn asset-browser__btn--tag-add";
     addBtn.textContent = "+ Add";
 

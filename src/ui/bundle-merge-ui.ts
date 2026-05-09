@@ -72,6 +72,7 @@ export class BundleMergeUI {
     header.appendChild(titleWrap);
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className   = "bundle-merge__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close bundle merge assistant");
@@ -136,6 +137,7 @@ export class BundleMergeUI {
     actions.className = "bundle-merge__actions";
 
     const allBaseBtn = document.createElement("button");
+    allBaseBtn.type = "button";
     allBaseBtn.className   = "bundle-merge__btn bundle-merge__btn--secondary";
     allBaseBtn.textContent = "All → Keep Base";
     allBaseBtn.addEventListener("click", () => {
@@ -144,6 +146,7 @@ export class BundleMergeUI {
     });
 
     const allIncBtn = document.createElement("button");
+    allIncBtn.type = "button";
     allIncBtn.className   = "bundle-merge__btn bundle-merge__btn--secondary";
     allIncBtn.textContent = "All → Keep Incoming";
     allIncBtn.addEventListener("click", () => {
@@ -152,6 +155,7 @@ export class BundleMergeUI {
     });
 
     const mergeBtn = document.createElement("button");
+    mergeBtn.type = "button";
     mergeBtn.className   = "bundle-merge__btn bundle-merge__btn--primary";
     mergeBtn.textContent = "⬇ Build & Export Merge";
     mergeBtn.disabled    = true;
@@ -159,6 +163,7 @@ export class BundleMergeUI {
     this._mergeBtn = mergeBtn;
 
     const closeActionBtn = document.createElement("button");
+    closeActionBtn.type = "button";
     closeActionBtn.className   = "bundle-merge__btn bundle-merge__btn--close";
     closeActionBtn.textContent = "Close";
     closeActionBtn.addEventListener("click", () => this.close());
@@ -202,6 +207,7 @@ export class BundleMergeUI {
     wrap.appendChild(label);
 
     const btn = document.createElement("button");
+    btn.type = "button";
     btn.className   = "bundle-merge__btn bundle-merge__btn--file";
     btn.textContent = "📂 Choose .bundle.json";
     btn.addEventListener("click", () => {
