@@ -5,10 +5,13 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
-import { NPC } from "../entities/npc";
+import { AIState, NPC } from "../entities/npc";
 import { Player } from "../entities/player";
 import { UIManager } from "../ui/ui-manager";
 import { StealthSystem } from "./stealth-system";
+import { applyDamageWithResistance, WEAPON_PROFILES } from "./combat-shared";
+import type { SkillProgressionSystem } from "./skill-progression-system";
+import type { AttributeSystem } from "./attribute-system";
 
 const ARROW_SPEED          = 40;
 const BASE_ARROW_DAMAGE    = 15;
@@ -17,6 +20,13 @@ const ARROW_STAMINA_COST   = 8;
 const BOW_COOLDOWN         = 0.8;   // seconds between shots
 const MAX_ACTIVE_ARROWS    = 10;    // pool cap
 const ARROW_HIT_RADIUS     = 1.2;   // distance for NPC hit detection
+/** XP granted to marksman when an arrow damages an NPC (mirrors melee hit XP cadence). */
+const SKILL_XP_MARKSMAN_HIT = 6;
+/** Critical damage multiplier — matches melee {@link CRIT_DAMAGE_MULTIPLIER} in combat-system. */
+const ARROW_CRIT_DAMAGE_MULTIPLIER = 2.0;
+/** Physical damage number colour (matches combat-system). */
+const DMG_COLOR_ARROW_PHYSICAL = "#FF6030";
+const DMG_COLOR_ARROW_CRIT = "#FFD700";
 /** How far forward from the camera the arrow spawns to avoid clipping. */
 const ARROW_SPAWN_FORWARD  = 0.8;
 /** Slight downward eye-level offset so arrows don't clip the top of the FOV. */
@@ -64,8 +74,11 @@ interface ActiveArrow {
   mesh: any;
   aggregate: any;
   lifetime: number;
-  /** Base damage dealt on hit — multiplied by the sneak-attack bonus at hit time if applicable. */
-  damage: number;
+  /**
+   * Raw damage before crit, sneak multiplier, and NPC armor / resistances.
+   * Built from arrow type, draw strength, marksman skill, and bow weapon profile.
+   */
+  baseDamage: number;
   /** Skip the first N frames after spawn to avoid self-collision. */
   skipFrames: number;
   /**
@@ -106,6 +119,9 @@ export class ProjectileSystem {
   private _player: Player;
   private _npcs: NPC[];
   private _ui: UIManager;
+  private _skillSystem: SkillProgressionSystem | null = null;
+  private _attributeSystem: AttributeSystem | null = null;
+  private _hitPos: Vector3 = new Vector3();
 
   private _activeArrows: ActiveArrow[] = [];
   private _cooldownRemaining: number = 0;
@@ -134,11 +150,27 @@ export class ProjectileSystem {
    */
   public stealthSystem: StealthSystem | null = null;
 
-  constructor(scene: Scene, player: Player, npcs: NPC[], ui: UIManager) {
+  /** Same contract as {@link CombatSystem.onNPCDeath} — fired when an arrow kill lands. */
+  public onNPCDeath: ((npcName: string, xpReward: number, npc: NPC) => void) | null = null;
+
+  private static readonly _DMG_OFFSET_Y2 = new Vector3(0, 2, 0);
+
+  constructor(
+    scene: Scene,
+    player: Player,
+    npcs: NPC[],
+    ui: UIManager,
+    opts?: {
+      skillSystem?: SkillProgressionSystem | null;
+      attributeSystem?: AttributeSystem | null;
+    }
+  ) {
     this._scene  = scene;
     this._player = player;
     this._npcs   = npcs;
     this._ui     = ui;
+    this._skillSystem = opts?.skillSystem ?? null;
+    this._attributeSystem = opts?.attributeSystem ?? null;
   }
 
   // ── NPC list hot-swap ─────────────────────────────────────────────────────
@@ -155,6 +187,18 @@ export class ProjectileSystem {
     const idx = this._npcs.indexOf(npc);
     if (idx !== -1) {
       this._npcs.splice(idx, 1);
+    }
+  }
+
+  public setScalingSystems(opts: {
+    skillSystem?: SkillProgressionSystem | null;
+    attributeSystem?: AttributeSystem | null;
+  }): void {
+    if (opts.skillSystem !== undefined) {
+      this._skillSystem = opts.skillSystem;
+    }
+    if (opts.attributeSystem !== undefined) {
+      this._attributeSystem = opts.attributeSystem;
     }
   }
 
@@ -199,7 +243,7 @@ export class ProjectileSystem {
       this._ui.showNotification("No arrows!", 1500);
       return false;
     }
-    if (this._player.stamina < ARROW_STAMINA_COST) {
+    if (this._player.stamina < this._arrowStaminaCost()) {
       this._ui.showNotification("Not enough stamina!", 1500);
       return false;
     }
@@ -242,7 +286,7 @@ export class ProjectileSystem {
       return false;
     }
 
-    if (this._player.stamina < ARROW_STAMINA_COST) {
+    if (this._player.stamina < this._arrowStaminaCost()) {
       this._ui.showNotification("Not enough stamina!", 1500);
       return false;
     }
@@ -271,8 +315,12 @@ export class ProjectileSystem {
     origin.y += ARROW_SPAWN_Y_OFFSET; // slight below eye-level
     const forward = this._player.getForwardDirection(1).normalize();
 
-    // Spread decreases with archery skill (0 spread at skill 100)
-    const spread = Math.max(0, (100 - this.archerySkill) / 1000);
+    const bowProf = WEAPON_PROFILES.bow;
+    const marksLevel = this._marksmanLevel();
+    const skillBonus = marksLevel * 0.2;
+
+    // Spread tightens with effective marksman level (saved skill or archerySkill fallback).
+    const spread = Math.max(0, (100 - marksLevel) / 1000);
     const direction = new Vector3(
       forward.x + (Math.random() - 0.5) * spread,
       forward.y + (Math.random() - 0.5) * spread,
@@ -301,11 +349,13 @@ export class ProjectileSystem {
     aggregate.body.setMotionType(PhysicsMotionType.DYNAMIC);
     aggregate.body.applyImpulse(direction.scale(launchSpeed * 0.1), mesh.position);
 
-    const skillBonus  = this.archerySkill * 0.2;
-    const damage = Math.max(1, Math.round(
-      (BASE_ARROW_DAMAGE + skillBonus + this._player.bonusDamage)
+    const baseDamage = Math.max(1, Math.round(
+      (BASE_ARROW_DAMAGE + skillBonus + this._player.bonusDamage + this._agilityRangedBonus())
       * arrowProfile.damageMultiplier
-      * drawFraction,
+      * drawFraction
+      * bowProf.damageMultiplier
+      * this._fatigueFactor()
+      * this._marksmanMultiplier(),
     ));
 
     // Mark the arrow as a potential sneak shot; the actual multiplier is applied
@@ -316,15 +366,16 @@ export class ProjectileSystem {
       mesh,
       aggregate,
       lifetime:   ARROW_LIFETIME,
-      damage,
+      baseDamage,
       skipFrames: 1,
       isSneakShot,
     });
 
     // Deduct resources
-    this._player.stamina = Math.max(0, this._player.stamina - ARROW_STAMINA_COST);
+    const staminaCost = this._arrowStaminaCost();
+    this._player.stamina = Math.max(0, this._player.stamina - staminaCost);
     this._player.notifyResourceSpent("stamina");
-    this._cooldownRemaining = BOW_COOLDOWN;
+    this._cooldownRemaining = this._scaledBowCooldown(BOW_COOLDOWN);
     if (this.arrowCount > 0) this.arrowCount--;
 
     return true;
@@ -362,29 +413,71 @@ export class ProjectileSystem {
       for (const npc of this._npcs) {
         if (npc.isDead) continue;
         if (Vector3.Distance(arrow.mesh.position, npc.mesh.position) < ARROW_HIT_RADIUS) {
-          // Apply per-NPC sneak attack multiplier: only bonus if this exact NPC
-          // is below the detection threshold when hit.
-          let finalDamage = arrow.damage;
+          const bowProf = WEAPON_PROFILES.bow;
+
+          let raw = arrow.baseDamage;
           let isSneakAttack = false;
           if (
             arrow.isSneakShot &&
             this.stealthSystem &&
             this.stealthSystem.getDetectionLevel(npc) < SNEAK_ATTACK_DETECTION_THRESHOLD
           ) {
-            finalDamage = Math.round(finalDamage * BOW_SNEAK_ATTACK_MULTIPLIER);
+            raw = Math.round(raw * BOW_SNEAK_ATTACK_MULTIPLIER);
             isSneakAttack = true;
           }
 
+          const baseCrit =
+            (this._player as unknown as { critChance?: number }).critChance ?? 0;
+          const effectiveCritChance = baseCrit + bowProf.critChanceBonus;
+          const isCrit = effectiveCritChance > 0 && Math.random() < effectiveCritChance;
+          if (isCrit) {
+            raw = Math.round(raw * ARROW_CRIT_DAMAGE_MULTIPLIER);
+          }
+
+          const finalDamage = applyDamageWithResistance(
+            raw,
+            npc,
+            "physical",
+            bowProf.armorPenFraction,
+          );
+
           npc.takeDamage(finalDamage);
+          this._skillSystem?.gainXP("marksman", SKILL_XP_MARKSMAN_HIT);
+
+          const numPos = npc.mesh.position.addToRef(ProjectileSystem._DMG_OFFSET_Y2, this._hitPos);
+          this._ui.showDamageNumber(
+            numPos,
+            finalDamage,
+            this._scene,
+            isCrit ? DMG_COLOR_ARROW_CRIT : DMG_COLOR_ARROW_PHYSICAL,
+          );
+          this._ui.applyHitStop(isCrit ? 85 : 45);
+          this._ui.shakeCamera(isCrit ? 0.38 : 0.2);
+          this._ui.showHitFlash(
+            isCrit ? "rgba(255, 215, 0, 0.32)" : "rgba(255, 120, 60, 0.22)",
+          );
+
           if (isSneakAttack) {
             this._ui.showNotification(
-              `Sneak Attack! ×${BOW_SNEAK_ATTACK_MULTIPLIER} — ${npc.mesh.name} -${finalDamage}hp`,
-              1800,
+              `Sneak shot! ${npc.mesh.name} — ${finalDamage}`,
+              1600,
             );
-          } else {
-            this._ui.showNotification(`Arrow hit ${npc.mesh.name}! -${finalDamage}hp`, 1500);
+          } else if (isCrit) {
+            this._ui.showNotification("Critical shot!", 900);
           }
+
           npc.isAggressive = true;
+          if (!npc.isDead && npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
+            npc.aiState = AIState.CHASE;
+          }
+
+          if (npc.isDead) {
+            this._ui.showNotification(`${npc.mesh.name} defeated!`);
+            if (this.onNPCDeath) {
+              this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
+            }
+          }
+
           hit = true;
           break;
         }
@@ -408,6 +501,48 @@ export class ProjectileSystem {
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
+
+  private _marksmanMultiplier(): number {
+    return this._skillSystem?.multiplier("marksman") ?? 1;
+  }
+
+  /** Mirrors melee cadence scaling from CombatSystem — higher marksman → cheaper shots. */
+  private _marksmanCadenceMultiplier(): number {
+    const m = this._marksmanMultiplier();
+    return 1 + (m - 1) * 0.6;
+  }
+
+  private _fatigueFactor(): number {
+    const maxStamina = (this._player as unknown as { maxStamina?: number }).maxStamina ?? 100;
+    if (maxStamina <= 0) return 1.0;
+    return Math.max(0.5, this._player.stamina / maxStamina);
+  }
+
+  /** Small agility-derived bonus — bows reward dexterity without duplicating strength melee scaling. */
+  private _agilityRangedBonus(): number {
+    if (!this._attributeSystem) return 0;
+    return (this._attributeSystem.get("agility") - 40) * 0.15;
+  }
+
+  private _marksmanLevel(): number {
+    return this._skillSystem?.getSkill("marksman")?.level ?? this.archerySkill;
+  }
+
+  private _scaledArrowStaminaCost(base: number): number {
+    const scaled = base / this._marksmanCadenceMultiplier();
+    return Math.max(1, Math.round(scaled));
+  }
+
+  private _scaledBowCooldown(base: number): number {
+    const scaled = base / this._marksmanCadenceMultiplier();
+    return Math.max(base * 0.5, scaled);
+  }
+
+  private _arrowStaminaCost(): number {
+    const bow = WEAPON_PROFILES.bow;
+    const base = Math.max(1, Math.round(ARROW_STAMINA_COST * bow.staminaCostMultiplier));
+    return this._scaledArrowStaminaCost(base);
+  }
 
   private _disposeArrow(arrow: ActiveArrow): void {
     if (arrow.mesh.isDisposed()) return;

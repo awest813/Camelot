@@ -1171,6 +1171,10 @@ export class Game {
       skillSystem: this.skillProgressionSystem,
       attributeSystem: this.attributeSystem,
     });
+    this.projectileSystem.setScalingSystems({
+      skillSystem: this.skillProgressionSystem,
+      attributeSystem: this.attributeSystem,
+    });
 
     this.fastTravelSystem = new FastTravelSystem();
     // Seed the starting village as a discovered location
@@ -2080,6 +2084,7 @@ export class Game {
             }
         }
     };
+    this.projectileSystem.onNPCDeath = this.combatSystem.onNPCDeath;
     this.combatSystem.onPlayerHit = () => {
         this.audioSystem.playPlayerHit();
         // Small chance to contract a random disease on each hit (Oblivion-style).
@@ -2269,18 +2274,32 @@ export class Game {
         if (this._isCombatInputBlocked()) return;
 
         if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
-            if (pointerInfo.event.button === 0) { // Left Click — melee attack
-                const attacked = this.combatSystem.meleeAttack();
-                if (attacked) {
-                  this.audioSystem.playMeleeAttack();
-                  // Blade skill XP on every successful swing (hit or miss)
-                  this.skillProgressionSystem.gainXP("blade", 4 * this.classSystem.xpMultiplierFor("blade"));
+            if (pointerInfo.event.button === 0) { // Left click — melee, or bow draw when bow is equipped
+                if (this.combatSystem.activeWeaponArchetype === "bow") {
+                    const drawing = this.projectileSystem.beginDraw();
+                    if (drawing) {
+                        this.stealthSystem.pushNoise(0.4);
+                    }
+                } else {
+                    const attacked = this.combatSystem.meleeAttack();
+                    if (attacked) {
+                      this.audioSystem.playMeleeAttack();
+                      this.skillProgressionSystem.gainXP("blade", 4 * this.classSystem.xpMultiplierFor("blade"));
+                    }
                 }
             } else if (pointerInfo.event.button === 2) { // Right Click held — begin block
                 pointerInfo.event.preventDefault();
                 this.combatSystem.beginBlock();
             }
         } else if (pointerInfo.type === PointerEventTypes.POINTERUP) {
+            if (pointerInfo.event.button === 0 && this.combatSystem.activeWeaponArchetype === "bow") {
+                if (this.projectileSystem.isDrawing) {
+                    const fired = this.projectileSystem.releaseArrow();
+                    if (fired) {
+                        this.audioSystem.playMeleeAttack();
+                    }
+                }
+            }
             if (pointerInfo.event.button === 2) { // Right Click released — stop blocking
                 this.combatSystem.endBlock();
             }
@@ -3088,7 +3107,6 @@ export class Game {
                     const fired = this.projectileSystem.releaseArrow();
                     if (fired) {
                         this.audioSystem.playMeleeAttack(); // reuse existing SFX placeholder
-                        this.skillProgressionSystem.gainXP("marksman", 5 * this.classSystem.xpMultiplierFor("marksman"));
                     }
                 }
             }

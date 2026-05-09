@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ProjectileSystem } from "./projectile-system";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { AIState } from "../entities/npc";
 
 // ── Babylon mocks ─────────────────────────────────────────────────────────────
 
@@ -54,7 +55,13 @@ describe("ProjectileSystem", () => {
 
   beforeEach(() => {
     mockScene = {};
-    mockUI = { showNotification: vi.fn() };
+    mockUI = {
+      showNotification: vi.fn(),
+      showDamageNumber: vi.fn(),
+      applyHitStop: vi.fn(),
+      shakeCamera: vi.fn(),
+      showHitFlash: vi.fn(),
+    };
 
     mockPlayer = {
       stamina: 100,
@@ -67,6 +74,9 @@ describe("ProjectileSystem", () => {
     mockNpc = {
       isDead: false,
       isAggressive: false,
+      aiState: AIState.IDLE,
+      xpReward: 25,
+      armorRating: 0,
       mesh: { name: "Goblin", position: new Vector3(0, 0, 1.0) },
       takeDamage: vi.fn(),
     };
@@ -319,7 +329,7 @@ describe("ProjectileSystem", () => {
     projectileSystem.update(0.1);
 
     expect(mockUI.showNotification).toHaveBeenCalledWith(
-      expect.stringContaining("Sneak Attack"),
+      expect.stringContaining("Sneak shot"),
       expect.any(Number),
     );
   });

@@ -43,6 +43,12 @@ const POWER_ATTACK_STAGGER_DURATION = 0.6;
  */
 const FATIGUE_DAMAGE_MIN_FACTOR = 0.5;
 /**
+ * Forward ray distance for a bow melee bash (left-click). The bow weapon profile
+ * uses a long nominal attack range for ranged shots via ProjectileSystem — without
+ * this cap, a raycast would behave like a hitscan bow.
+ */
+const BOW_MELEE_BASH_RANGE = 2.5;
+/**
  * Base hit-chance at blade skill 0 (55 %).  Linearly increases to 100 % at skill 50,
  * capped at HIT_CHANCE_MAX above that.  Only applied when both skill and attribute
  * systems are attached (preserves backward-compatible behaviour in tests / bare combats).
@@ -114,112 +120,22 @@ const DMG_COLOR_MAGIC = "#88CCFF";
 /** Power attack damage number — orange-red, heftier than normal. */
 const DMG_COLOR_POWER = "#FF8C00";
 
-/**
- * Applies NPC-specific resistance, weakness, and armor rating to a raw damage amount.
- *
- * Resistance/weakness pass:
- *   damage = baseDamage × max(0, 1 − resistance + weakness)
- *
- * Armor rating pass (physical damage only — Oblivion-style):
- *   effectiveAR = armorRating × (1 − armorPenFraction)
- *   damage = damage × 100 / (100 + effectiveAR)
- *
- * Resistance values are clamped to [0, 1] so that full immunity is the maximum.
- * A missing entry defaults to 0 (no modification).
- *
- * **Minimum damage floor**: The result is always at least 1.
- * Even a fully resistant NPC takes 1 point of damage per hit, ensuring attacks
- * are never silently ignored and preserving gameplay feedback.
- */
-function applyDamageWithResistance(
-  baseDamage: number,
-  npc: NPC,
-  type: DamageType,
-  armorPenFraction: number = 0,
-): number {
-  const resistance = Math.min(1, Math.max(0, npc.damageResistances?.[type] ?? 0));
-  const weakness = Math.max(0, npc.damageWeaknesses?.[type] ?? 0);
-  let damage = baseDamage * (1 - resistance + weakness);
+import {
+  applyDamageWithResistance,
+  WEAPON_PROFILES,
+  type WeaponArchetype,
+  type WeaponProfile,
+} from "./combat-shared";
 
-  // Oblivion-style armor rating: higher AR means proportionally less physical damage.
-  // armorPenFraction [0,1] reduces the effective armor rating before this calculation.
-  if (type === "physical" && npc.armorRating > 0) {
-    const penClamped = Math.min(1, Math.max(0, armorPenFraction));
-    const effectiveAR = npc.armorRating * (1 - penClamped);
-    damage *= 100 / (100 + effectiveAR);
-  }
-
-  return Math.max(1, Math.round(damage));
-}
+export {
+  applyDamageWithResistance,
+  WEAPON_PROFILES,
+  type WeaponArchetype,
+  type WeaponProfile,
+};
 
 export type MeleeArchetype = "duelist" | "soldier" | "bruiser";
 export type MagicArchetype = "spark" | "bolt" | "surge";
-
-/**
- * Weapon-type archetypes used for per-weapon stat differentiation.
- *
- * These are independent of the combat stance (MeleeArchetype) — the stance
- * controls rhythm (speed vs. power), while the weapon archetype controls the
- * type of physical attack (blade, impact, ranged, etc.).
- *
- * **Overhaul additions:**
- *  dagger     — fastest weapon; short range; high crit; backstab bonus when striking from behind.
- *  greatsword — two-handed; cannot block; slowest + heaviest damage; sweeping arc hits multiple NPCs.
- */
-export type WeaponArchetype = "sword" | "axe" | "mace" | "bow" | "staff" | "dagger" | "greatsword";
-
-interface WeaponProfile {
-  /** Multiplier applied to the base melee damage value (MELEE_DAMAGE). */
-  damageMultiplier: number;
-  /** Flat crit-chance bonus added on top of the player's base critChance. */
-  critChanceBonus: number;
-  /**
-   * Fraction [0,1] of the target's armor rating that is bypassed.
-   * 0 = no penetration (full armor applies), 1 = complete armor bypass.
-   */
-  armorPenFraction: number;
-  /** Forward raycast distance in metres used for melee hit detection. */
-  attackRange: number;
-  /** Skill ID governing proficiency scaling for this weapon type. */
-  skillId: ProgressionSkillId;
-  /** Human-readable display name. */
-  label: string;
-  /**
-   * Multiplier applied to the melee archetype's base stamina cost for this weapon.
-   * < 1.0 = cheaper to swing (sword), > 1.0 = more expensive (mace).
-   */
-  staminaCostMultiplier: number;
-  /**
-   * Multiplier applied to the melee archetype's base attack cooldown for this weapon.
-   * < 1.0 = faster swings (sword), > 1.0 = slower swings (mace).
-   */
-  cooldownMultiplier: number;
-  /**
-   * Probability [0, 1] that a successful normal melee hit staggers the target.
-   * Stagger briefly interrupts the NPC's AI (shorter than a power-attack stagger).
-   */
-  staggerChance: number;
-  /** Duration in seconds of the stagger applied by a normal melee hit. */
-  staggerDuration: number;
-  /**
-   * Whether the player can hold block while this weapon is equipped.
-   * Two-handed weapons (greatsword) set this to false.
-   */
-  canBlock: boolean;
-  /**
-   * Damage multiplier applied when striking from behind the NPC (backstab).
-   * 1.0 = no bonus (most weapons).  Dagger uses 2.5 for high backstab reward.
-   * Relies on the NPC mesh exposing a `forward` property (BabylonJS Mesh.forward).
-   * Falls back to 1.0 when the facing cannot be determined (e.g., in tests).
-   */
-  backstabMultiplier: number;
-  /**
-   * Half-angle (radians) of the forward arc swept by this weapon on each attack.
-   * 0 = single-target raycast (all weapons except greatsword).
-   * > 0 = multi-target cone sweep; all NPCs inside the cone take damage.
-   */
-  sweepArcHalfAngle: number;
-}
 
 // ─── Staff charge constants ────────────────────────────────────────────────────
 
@@ -235,130 +151,6 @@ const STAFF_CHARGE_DAMAGE_BASE = 40;
 const STAFF_MIN_CHARGE = 0.15;
 /** Cooldown in seconds after releasing a staff charge. */
 const STAFF_CHARGE_COOLDOWN = 1.2;
-
-/**
- * Per-weapon-type combat profiles.
- *
- * Design intent:
- *  sword      — fast, balanced; strong crit, light armor pen, moderate stagger
- *  axe        — harder-hitting; better armor pen, slightly slower, low stagger
- *  mace       — heaviest strikes; excellent armor pen, slow, high stagger chance
- *  bow        — long-range precision; best crit chance, minimal armor pen
- *  staff      — hybrid caster tool; weak melee fallback, governed by destruction skill;
- *               Q-press triggers a charged destruction blast (see beginStaffCharge)
- *  dagger     — fastest weapon; short range; very high crit; 2.5× backstab bonus
- *               when striking the NPC from behind (Mesh.forward check)
- *  greatsword — two-handed, cannot block; slowest + heaviest strikes; 80° sweep arc
- *               hits every NPC in front of the player simultaneously
- */
-const WEAPON_PROFILES: Record<WeaponArchetype, WeaponProfile> = {
-  sword: {
-    damageMultiplier: 1.0,
-    critChanceBonus: 0.10,
-    armorPenFraction: 0.10,
-    attackRange: 3.0,
-    skillId: "blade",
-    label: "Sword",
-    staminaCostMultiplier: 0.80,
-    cooldownMultiplier:    0.85,
-    staggerChance:         0.15,
-    staggerDuration:       0.20,
-    canBlock:              true,
-    backstabMultiplier:    1.0,
-    sweepArcHalfAngle:     0,
-  },
-  axe: {
-    damageMultiplier: 1.20,
-    critChanceBonus: 0.05,
-    armorPenFraction: 0.25,
-    attackRange: 2.8,
-    skillId: "blade",
-    label: "Axe",
-    staminaCostMultiplier: 1.10,
-    cooldownMultiplier:    1.15,
-    staggerChance:         0.10,
-    staggerDuration:       0.15,
-    canBlock:              true,
-    backstabMultiplier:    1.0,
-    sweepArcHalfAngle:     0,
-  },
-  mace: {
-    damageMultiplier: 1.45,
-    critChanceBonus: 0.02,
-    armorPenFraction: 0.50,
-    attackRange: 2.5,
-    skillId: "blunt",
-    label: "Mace",
-    staminaCostMultiplier: 1.40,
-    cooldownMultiplier:    1.40,
-    staggerChance:         0.40,
-    staggerDuration:       0.45,
-    canBlock:              true,
-    backstabMultiplier:    1.0,
-    sweepArcHalfAngle:     0,
-  },
-  bow: {
-    damageMultiplier: 0.85,
-    critChanceBonus: 0.15,
-    armorPenFraction: 0.05,
-    attackRange: 25.0,
-    skillId: "marksman",
-    label: "Bow",
-    staminaCostMultiplier: 1.00,
-    cooldownMultiplier:    1.00,
-    staggerChance:         0.00,
-    staggerDuration:       0.00,
-    canBlock:              true,
-    backstabMultiplier:    1.0,
-    sweepArcHalfAngle:     0,
-  },
-  staff: {
-    damageMultiplier: 0.60,
-    critChanceBonus: 0.02,
-    armorPenFraction: 0.00,
-    attackRange: 3.0,
-    skillId: "destruction",
-    label: "Staff",
-    staminaCostMultiplier: 1.20,
-    cooldownMultiplier:    1.50,
-    staggerChance:         0.05,
-    staggerDuration:       0.10,
-    canBlock:              true,
-    backstabMultiplier:    1.0,
-    sweepArcHalfAngle:     0,
-  },
-  dagger: {
-    damageMultiplier: 0.62,
-    critChanceBonus: 0.18,
-    armorPenFraction: 0.12,
-    attackRange: 1.7,
-    skillId: "blade",
-    label: "Dagger",
-    staminaCostMultiplier: 0.55,
-    cooldownMultiplier:    0.55,
-    staggerChance:         0.04,
-    staggerDuration:       0.08,
-    canBlock:              true,
-    backstabMultiplier:    2.5,
-    sweepArcHalfAngle:     0,
-  },
-  greatsword: {
-    damageMultiplier: 1.85,
-    critChanceBonus: 0.06,
-    armorPenFraction: 0.22,
-    attackRange: 3.5,
-    skillId: "blade",
-    label: "Greatsword",
-    staminaCostMultiplier: 1.90,
-    cooldownMultiplier:    1.95,
-    staggerChance:         0.60,
-    staggerDuration:       0.60,
-    canBlock:              false,
-    backstabMultiplier:    1.0,
-    /** ~80° total arc (40° half-angle each side). */
-    sweepArcHalfAngle:     Math.PI / 4.5,
-  },
-};
 
 interface MeleeProfile {
   staminaCost: number;
@@ -819,10 +611,15 @@ export class CombatSystem {
     let hitNpcs: NPC[] = [];
     let singleHitPoint: Vector3 | null = null;
 
+    const meleeReach =
+      this._weaponArchetype === "bow"
+        ? BOW_MELEE_BASH_RANGE
+        : weaponProfile.attackRange;
+
     if (weaponProfile.sweepArcHalfAngle > 0) {
       hitNpcs = this._sweepHitNPCs(weaponProfile.attackRange, weaponProfile.sweepArcHalfAngle);
     } else {
-      const hit = this.player.raycastForward(weaponProfile.attackRange);
+      const hit = this.player.raycastForward(meleeReach);
       singleHitPoint = hit?.pickedPoint ?? null;
       const npc = hit?.pickedMesh ? this.npcs.find(n => n.mesh === hit.pickedMesh) : null;
       if (npc && !npc.isDead) hitNpcs = [npc];
@@ -961,6 +758,13 @@ export class CombatSystem {
   public powerAttack(): boolean {
     const meleeProfile = MELEE_PROFILES[this._meleeArchetype];
     const weaponProfile = WEAPON_PROFILES[this._weaponArchetype];
+    if (this._weaponArchetype === "bow") {
+      this._ui.showNotification(
+        "Power attacks require a melee weapon. Hold R or click to charge a shot.",
+        2400,
+      );
+      return false;
+    }
     if (this._meleeCooldownRemaining > 0) {
       return false;
     }
