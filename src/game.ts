@@ -55,6 +55,7 @@ import { PersuasionSystem } from "./systems/persuasion-system";
 import { GameEventBus } from "./systems/event-bus";
 import { LootTableSystem, STARTER_LOOT_TABLES } from "./systems/loot-table-system";
 import { NpcArchetypeSystem } from "./systems/npc-archetype-system";
+import { NpcScheduleSystem, SCHED_GUARD } from "./systems/npc-schedule-system";
 import { FixedStepLoop } from "./systems/fixed-step-loop";
 import { AlchemySystem } from "./systems/alchemy-system";
 import { AlchemyUI } from "./ui/alchemy-ui";
@@ -244,6 +245,8 @@ export class Game {
   public eventBus: GameEventBus;
   public lootTableSystem: LootTableSystem;
   public npcArchetypeSystem: NpcArchetypeSystem;
+  /** Named schedule definitions; linked to {@link npcArchetypeSystem} for archetype `scheduleId`. */
+  public npcScheduleSystem: NpcScheduleSystem;
 
   // v4 systems (Oblivion-lite: alchemy)
   public alchemySystem: AlchemySystem;
@@ -1032,8 +1035,16 @@ export class Game {
     for (const t of STARTER_LOOT_TABLES) this.lootTableSystem.registerTable(t);
 
     // NPC archetype factory — pre-load archetypes from base content
+    this.npcScheduleSystem = new NpcScheduleSystem();
     this.npcArchetypeSystem = new NpcArchetypeSystem();
+    this.npcArchetypeSystem.scheduleSystem = this.npcScheduleSystem;
     this.npcArchetypeSystem.registerAll(frameworkBaseContent.npcArchetypes);
+
+    // Demo guard: day/night schedule (patrol vs sleep) driven by TimeSystem → DailyScheduleSystem.
+    const demoGuard = this.scheduleSystem.npcs.find((n) => n.mesh.name === "Guard");
+    if (demoGuard) {
+      this.npcScheduleSystem.applySchedule(demoGuard, SCHED_GUARD);
+    }
 
     this.spellSystem     = new SpellSystem(this.player, this.scheduleSystem.npcs, this.ui, this.scene);
     // Seed the player with the two starter spells

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { ScheduleSystem } from './schedule-system';
-import { NPC, AIState } from '../entities/npc';
+import { NPC, AIState, type ScheduleBlock } from '../entities/npc';
 
 describe('ScheduleSystem', () => {
   it('should add an NPC to the schedule system', () => {
@@ -94,5 +94,80 @@ describe('ScheduleSystem', () => {
 
     expect(npc.waitTime).toBeCloseTo(0.5, 5);
     expect(setLinearVelocity).toHaveBeenCalledWith(expect.objectContaining({ x: 0, y: -2, z: 0 }));
+  });
+
+  it('uses normal patrol movement when the active schedule block is "patrol"', () => {
+    const scheduleSystem = new ScheduleSystem();
+    scheduleSystem.currentHour = 12;
+    const setLinearVelocity = vi.fn();
+
+    const patrolBlocks: ScheduleBlock[] = [
+      { startHour: 6, endHour: 22, behavior: 'patrol' },
+      { startHour: 22, endHour: 6, behavior: 'sleep' },
+    ];
+
+    const npc = {
+      isDead: false,
+      isAggressive: false,
+      aiState: AIState.PATROL,
+      scheduleBlocks: patrolBlocks,
+      patrolPoints: [new Vector3(10, 0, 0), new Vector3(0, 0, 0)],
+      currentPatrolIndex: 0,
+      waitTime: 0,
+      patrolWaitMin: 1,
+      patrolWaitMax: 3,
+      patrolLookAroundAngle: Math.PI / 3,
+      mesh: { position: new Vector3(5, 0, 0), lookAt: vi.fn() },
+      moveSpeed: 2,
+      physicsAggregate: {
+        body: {
+          getLinearVelocityToRef: (v: Vector3) => v.set(0, -1, 0),
+          setLinearVelocity,
+        },
+      },
+    } as unknown as NPC;
+
+    scheduleSystem.addNPC(npc);
+    scheduleSystem.update(0.016);
+
+    expect(setLinearVelocity).toHaveBeenCalled();
+  });
+
+  it('does not move along patrol during a scheduled "sleep" block', () => {
+    const scheduleSystem = new ScheduleSystem();
+    scheduleSystem.currentHour = 23;
+    const setLinearVelocity = vi.fn();
+
+    const npc = {
+      isDead: false,
+      isAggressive: false,
+      aiState: AIState.IDLE,
+      scheduleBlocks: [
+        { startHour: 6, endHour: 22, behavior: 'patrol' },
+        { startHour: 22, endHour: 6, behavior: 'sleep' },
+      ] as ScheduleBlock[],
+      homePosition: null,
+      spawnPosition: new Vector3(0, 0, 0),
+      patrolPoints: [new Vector3(0, 0, 0), new Vector3(10, 0, 0)],
+      currentPatrolIndex: 0,
+      waitTime: 0,
+      patrolWaitMin: 1,
+      patrolWaitMax: 3,
+      patrolLookAroundAngle: Math.PI / 3,
+      mesh: { position: new Vector3(0, 0, 0), lookAt: vi.fn() },
+      moveSpeed: 2,
+      physicsAggregate: {
+        body: {
+          getLinearVelocityToRef: (v: Vector3) => v.set(0, -1, 0),
+          setLinearVelocity,
+        },
+      },
+    } as unknown as NPC;
+
+    scheduleSystem.addNPC(npc);
+    scheduleSystem.update(0.016);
+
+    // At spawn: sleep uses _moveTowardTarget which stops horizontal when "arrived"
+    expect(setLinearVelocity).toHaveBeenCalledWith(expect.objectContaining({ x: 0, y: -1, z: 0 }));
   });
 });
