@@ -10,6 +10,7 @@ import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPi
 import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
@@ -356,6 +357,9 @@ export class Game {
   // Last LOD culled count for the debug overlay (updated from lodSystem.update())
   private _lastLodCulled: number = 0;
 
+  /** Throttles expensive scene queries in the debug HUD (see `update()`). */
+  private _debugOverlayFrameSkip: number = 0;
+
   // Death feedback: true while health is at 0 so the notification fires once per "death"
   private _playerAtZeroHP: boolean = false;
 
@@ -409,6 +413,18 @@ export class Game {
   private _refreshHelpOverlayIfVisible(): void {
     if (!this._helpOverlayVisible || !this._helpOverlayEl) return;
     this._helpOverlayEl.textContent = buildHelpOverlayLines(this.mapEditorSystem.isEnabled).join("\n");
+  }
+
+  /**
+   * Register a CDN prop spawned on the terrain for distance culling (root uses world-space position).
+   * Parented loot overlays skip this — their world origin is not on the root transform.
+   */
+  private _registerFantasyChunkLod(
+    root: AbstractMesh,
+    tier: "structure" | "scene" | "prop" | "boss",
+  ): void {
+    const dist = tier === "boss" ? 210 : tier === "scene" ? 185 : tier === "structure" ? 145 : 88;
+    this.lodSystem.register(root, dist);
   }
 
   private _refreshEditorToolbar(): void {
@@ -473,9 +489,9 @@ export class Game {
     this.player.magicka        = this.player.maxMagicka;
     this.player.stamina        = this.player.maxStamina;
 
-    // Notify player of location changes; clear LOD registry on cell transition
-    // so stale mesh references from the previous cell don't linger.
-    // (onCellChanged is wired fully in the v8 block below once fastTravelSystem is ready)
+    // Notify player of location changes (full wiring in the v8 block once
+    // fastTravelSystem is ready). Exterior CDN props stay in LodSystem across
+    // interior transitions; disposed meshes are pruned in lodSystem.update().
 
     // Test NPC
     const npc = new NPC(this.scene, new Vector3(10, 2, 10), "Guard");
@@ -1062,7 +1078,7 @@ export class Game {
 
     // ── v4 system wiring (browser optimisation) ──────────────────────────────
     // LOD system: run the visibility pass every 5 frames for performance.
-    // WorldManager and CellManager wire their spawned meshes in via onMeshSpawned.
+    // Registered meshes are pruned when disposed; no global clear on cell travel.
     this.lodSystem = new LodSystem(5);
 
     // Register v3 systems with save
@@ -1555,10 +1571,10 @@ export class Game {
     this.animationSystem = new AnimationSystem(this.scene);
 
     // ── Fantasy Asset Loader ───────────────────────────────────────────────
-    // Kick off background CDN downloads so assets are ready when the world
-    // generates.  Uses BabylonJS Assets CDN — elf, weapons, obelisk, dragon, etc.
+    // Preload Babylon CDN models only; Quaternius packs load on first `getInstance`
+    // to avoid startup bandwidth, decode work, and memory spikes from ~80+ local GLBs.
     this.fantasyAssets = new FantasyAssetLoader(this.scene);
-    this.fantasyAssets.preloadAll();
+    this.fantasyAssets.preloadRemoteCdnAssets();
 
     // ── CDN model world placement via chunk lifecycle ──────────────────────
     // Deterministic seeding: same chunk always produces same props.
@@ -1580,6 +1596,7 @@ export class Game {
           root.rotation.y = _chunkRand(cx, cz, 4) * Math.PI * 2;
           root.scaling.setAll(s);
           this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "structure");
         });
       }
 
@@ -1593,6 +1610,7 @@ export class Game {
           root.rotation.y = _chunkRand(cx, cz, 8) * Math.PI * 2;
           root.scaling.setAll(1.0);
           this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "structure");
         });
       }
 
@@ -1620,6 +1638,7 @@ export class Game {
           root.rotation.y = _chunkRand(cx, cz, 12) * Math.PI * 2;
           root.scaling.setAll(2.5);
           this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "boss");
         });
       }
 
@@ -1633,6 +1652,7 @@ export class Game {
           root.rotation.y = _chunkRand(cx, cz, 16) * Math.PI * 2;
           root.scaling.setAll(1.0);
           this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "structure");
         });
       }
 
@@ -1646,6 +1666,7 @@ export class Game {
           root.rotation.y = _chunkRand(cx, cz, 20) * Math.PI * 2;
           root.scaling.setAll(1.2);
           this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "structure");
         });
       }
 
@@ -1659,6 +1680,7 @@ export class Game {
           root.rotation.y = _chunkRand(cx, cz, 24) * Math.PI * 2;
           root.scaling.setAll(1.0);
           this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "scene");
         });
       }
 
@@ -1673,6 +1695,7 @@ export class Game {
           root.rotation.y = fortRot;
           root.scaling.setAll(1.0);
           this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "structure");
         });
         const rad = 6 + _chunkRand(cx, cz, 44) * 4;
         const cannonX = fx + Math.cos(fortRot + 0.7) * rad;
@@ -1683,6 +1706,7 @@ export class Game {
           root.rotation.y = fortRot + Math.PI * 0.35;
           root.scaling.setAll(1.0);
           this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "prop");
         });
       }
 
@@ -1697,6 +1721,7 @@ export class Game {
           const s = 0.85 + _chunkRand(cx, cz, 49) * 0.35;
           root.scaling.setAll(s);
           this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "structure");
         });
       }
 
@@ -1710,6 +1735,7 @@ export class Game {
           root.rotation.y = _chunkRand(cx, cz, 53) * Math.PI * 2;
           root.scaling.setAll(0.9 + _chunkRand(cx, cz, 54) * 0.25);
           this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "prop");
         });
       }
 
@@ -1722,6 +1748,7 @@ export class Game {
           root.rotation.y = _chunkRand(cx, cz, 58) * Math.PI * 2;
           root.scaling.setAll(1.0);
           this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "prop");
         });
       }
 
@@ -1734,6 +1761,7 @@ export class Game {
           root.rotation.y = _chunkRand(cx, cz, 62) * Math.PI * 2;
           root.scaling.setAll(1.0);
           this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "prop");
         });
       }
 
@@ -1746,6 +1774,7 @@ export class Game {
           root.rotation.y = _chunkRand(cx, cz, 66) * Math.PI * 2;
           root.scaling.setAll(1.0);
           this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "prop");
         });
       }
 
@@ -1758,6 +1787,7 @@ export class Game {
           root.rotation.y = _chunkRand(cx, cz, 70) * Math.PI * 2;
           root.scaling.setAll(1.0);
           this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "prop");
         });
       }
 
@@ -1771,6 +1801,45 @@ export class Game {
           root.rotation.y = _chunkRand(cx, cz, 74) * Math.PI * 2;
           root.scaling.setAll(0.55 + _chunkRand(cx, cz, 75) * 0.5);
           this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "prop");
+        });
+      }
+
+      // ── Extra BabylonJS CDN samples (underwater / shoreline) ───────────────
+      if (biome === "forest" && _chunkRand(cx, cz, 76) < 0.017) {
+        const ux = worldX + (_chunkRand(cx, cz, 77) - 0.5) * this.world.chunkSize * 0.65;
+        const uz = worldZ + (_chunkRand(cx, cz, 78) - 0.5) * this.world.chunkSize * 0.65;
+        this.fantasyAssets.getInstance("underwaterScene", (root) => {
+          if (!root) return;
+          root.position.set(ux, -0.5, uz);
+          root.rotation.y = _chunkRand(cx, cz, 79) * Math.PI * 2;
+          root.scaling.setAll(1.0);
+          this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "scene");
+        });
+      }
+      if ((biome === "forest" || biome === "plains") && _chunkRand(cx, cz, 80) < 0.02) {
+        const opx = worldX + (_chunkRand(cx, cz, 81) - 0.5) * this.world.chunkSize * 0.72;
+        const opz = worldZ + (_chunkRand(cx, cz, 82) - 0.5) * this.world.chunkSize * 0.72;
+        this.fantasyAssets.getInstance("octopusCustomRig", (root) => {
+          if (!root) return;
+          root.position.set(opx, 0.4, opz);
+          root.rotation.y = _chunkRand(cx, cz, 83) * Math.PI * 2;
+          root.scaling.setAll(1.0);
+          this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "prop");
+        });
+      }
+      if (biome === "plains" && _chunkRand(cx, cz, 84) < 0.014) {
+        const bx = worldX + (_chunkRand(cx, cz, 85) - 0.5) * this.world.chunkSize * 0.8;
+        const bz = worldZ + (_chunkRand(cx, cz, 86) - 0.5) * this.world.chunkSize * 0.8;
+        this.fantasyAssets.getInstance("babylonBuoy", (root) => {
+          if (!root) return;
+          root.position.set(bx, 0, bz);
+          root.rotation.y = _chunkRand(cx, cz, 87) * Math.PI * 2;
+          root.scaling.setAll(1.0);
+          this.shadowGenerator?.addShadowCaster(root, true);
+          this._registerFantasyChunkLod(root, "prop");
         });
       }
     };
@@ -3917,14 +3986,15 @@ export class Game {
           this.ui.updateStealthHUD(null);
       }
 
-      // Update debug overlay (rate-limited to every ~60 frames)
-      if (this.ui.isDebugVisible) {
+      if (!this.ui.isDebugVisible) {
+          this._debugOverlayFrameSkip = 0;
+      } else if (++this._debugOverlayFrameSkip >= 12) {
+          this._debugOverlayFrameSkip = 0;
           const eng = this.engine;
+          const drawCounter = (eng as { _drawCalls?: { current: number } })._drawCalls;
           this.ui.updateDebugOverlay({
               fps:           eng.getFps(),
-              // _drawCalls is a private Babylon.js PerfCounter; no public API
-              // is currently available. This may break on major engine upgrades.
-              drawCalls:     eng._drawCalls?.current ?? 0,
+              drawCalls:     drawCounter?.current ?? 0,
               activeMeshes:  this.scene.getActiveMeshes().length,
               totalVertices: this.scene.getTotalVertices(),
               playerPos: {
@@ -3960,7 +4030,9 @@ export class Game {
       this.ui.showNotification(
           isNew ? `Discovered: ${cellName}` : `Entered: ${cellName}`, 2500
       );
-      this.lodSystem?.clear();
+
+      // LodSystem prunes disposed meshes in update(); chunk CDN props keep stable
+      // refs for the exterior world, so we do not clear the registry here.
 
       // Sync world visibility with cell type (hide exterior when in interior)
       const isInterior = this.cellManager.isInterior;
@@ -4051,13 +4123,11 @@ export class Game {
                       targetIsInterior ? loc.name : (this.cellManager.currentCell?.name ?? "Exterior World"),
                       this.player.camera.position.clone(),
                   );
-                  this.lodSystem?.clear();
                   applyTimeAndClose();
               },
           });
       } else {
           this.player.camera.position.copyFrom(dest);
-          this.lodSystem?.clear();
           applyTimeAndClose();
       }
   }

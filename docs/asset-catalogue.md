@@ -26,7 +26,11 @@ assetLoader.getInstance("qKnight", (root, meshes) => {
   }
 });
 
-// Preload the entire catalogue
+// Preload Babylon CDN models only (recommended at startup — avoids loading every
+// self-hosted Quaternius GLB at once)
+assetLoader.preloadRemoteCdnAssets();
+
+// Preload the entire catalogue (CDN + Quaternius — higher startup cost)
 assetLoader.preloadAll();
 ```
 
@@ -307,6 +311,9 @@ These assets are registered in `FantasyAssetLoader` and ready to use via their
 | `d20Animated` | Animated twenty-sided die | `D20_Animation.glb` | GLB |
 | `pumpkinCarved` | Carved pumpkin bucket | `pumpkinBucketCarved.glb` | GLB |
 | `sheenChair` | Sheen chair furniture | `SheenChair.glb` | GLB |
+| `underwaterScene` | Underwater demo environment (sunken vista) | `Demos/UnderWaterScene/underwaterScene.glb` | GLB |
+| `octopusCustomRig` | Rigged octopus | `octopus_customRig.glb` | GLB |
+| `babylonBuoy` | Buoy prop | `babylonBuoy.glb` | GLB |
 
 ---
 
@@ -320,7 +327,6 @@ yet been integrated into `FantasyAssetLoader`.
 
 | Asset | CDN Path | Notes |
 |-------|----------|-------|
-| `underwaterScene.glb` | `Demos/UnderWaterScene/underwaterScene.glb` | Underwater dungeon environment |
 | `underwaterSceneNavMesh.glb` | `Demos/UnderWaterScene/navMesh/underwaterSceneNavMesh.glb` | Pre-built navmesh for underwater area |
 
 ---
