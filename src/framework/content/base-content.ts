@@ -448,11 +448,11 @@ export const frameworkBaseContent: RpgContentBundle = {
           choices: [
             {
               id: "train",
-              text: "Train me in the Blade. (One session, gold cost scales with your current skill.)",
+              text: "Train me in the Blade. (One session; gold scales with your current skill.)",
+              endsDialogue: true,
               effects: [
                 { type: "emit_event", eventId: "trainer:train", payload: { trainerId: "trainer_blade_master" } },
               ],
-              nextNodeId: "after_train",
             },
             {
               id: "cost",
@@ -474,19 +474,13 @@ export const frameworkBaseContent: RpgContentBundle = {
             {
               id: "train",
               text: "All right — train me.",
+              endsDialogue: true,
               effects: [
                 { type: "emit_event", eventId: "trainer:train", payload: { trainerId: "trainer_blade_master" } },
               ],
-              nextNodeId: "after_train",
             },
             { id: "back", text: "I'll think about it.", nextNodeId: "greet" },
           ],
-        },
-        {
-          id: "after_train",
-          speaker: "Blade Instructor",
-          text: "Good. Hold that guard higher next time.",
-          choices: [{ id: "bye", text: "Thanks.", endsDialogue: true }],
         },
       ],
     },
@@ -502,10 +496,10 @@ export const frameworkBaseContent: RpgContentBundle = {
             {
               id: "train",
               text: "Help me improve my Alchemy.",
+              endsDialogue: true,
               effects: [
                 { type: "emit_event", eventId: "trainer:train", payload: { trainerId: "trainer_alchemy_sage" } },
               ],
-              nextNodeId: "after_train",
             },
             {
               id: "leave",
@@ -513,12 +507,6 @@ export const frameworkBaseContent: RpgContentBundle = {
               endsDialogue: true,
             },
           ],
-        },
-        {
-          id: "after_train",
-          speaker: "Alchemy Tutor",
-          text: "Remember: shared effects make potions. Opposing ones make lessons.",
-          choices: [{ id: "bye", text: "Understood.", endsDialogue: true }],
         },
       ],
     },
@@ -534,10 +522,10 @@ export const frameworkBaseContent: RpgContentBundle = {
             {
               id: "train",
               text: "Train my Destruction magic.",
+              endsDialogue: true,
               effects: [
                 { type: "emit_event", eventId: "trainer:train", payload: { trainerId: "trainer_destruction_mage" } },
               ],
-              nextNodeId: "after_train",
             },
             {
               id: "leave",
@@ -545,12 +533,6 @@ export const frameworkBaseContent: RpgContentBundle = {
               endsDialogue: true,
             },
           ],
-        },
-        {
-          id: "after_train",
-          speaker: "Battlemage",
-          text: "Channel cleaner. The weave will thank you.",
-          choices: [{ id: "bye", text: "I'll keep at it.", endsDialogue: true }],
         },
       ],
     },
