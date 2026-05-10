@@ -297,13 +297,9 @@ describe("Playtest — new game to 12 gameplay hours", () => {
       w.playerLevel.attachToAttributeSystem(w.attrs);
       w.skills.onSkillLevelUp = (skillId, newLevel) => {
         w.playerLevel.handleSkillLevelUp(skillId);
-        ui.showNotification(`${skillId} increased to ${newLevel}`, 3000);
+        w.ui.showNotification(`${skillId} increased to ${newLevel}`, 3000);
       };
     });
-
-    // alias for brevity in closures
-    let ui: ReturnType<typeof makeMockUI>;
-    beforeEach(() => { ui = w.ui; });
 
     it("blade XP accumulates from melee combat hits", () => {
       const baseLevel = w.skills.getSkill("blade").level;
