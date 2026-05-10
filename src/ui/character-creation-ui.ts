@@ -930,7 +930,10 @@ export class CharacterCreationUI {
 
         const trimmed = worldSeedString.trim();
         const rawSeed = trimmed || String(Math.floor(Math.random() * 0xffffffff));
-        const seedArg: string | number = /^\d+$/.test(rawSeed) ? Number(rawSeed) : rawSeed;
+        const isNumericSeed = /^\d+$/.test(rawSeed);
+        const numericSeedCandidate = isNumericSeed ? Number(rawSeed) : NaN;
+        const seedArg: string | number =
+          isNumericSeed && Number.isSafeInteger(numericSeedCandidate) ? numericSeedCandidate : rawSeed;
         const builtSeed = new WorldSeed(seedArg, {
           worldType,
           biomeScale,
