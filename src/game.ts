@@ -79,6 +79,7 @@ import { ClassSystem } from "./systems/class-system";
 import { RaceSystem } from "./systems/race-system";
 import { PlayerLevelSystem } from "./systems/player-level-system";
 import { CharacterCreationUI } from "./ui/character-creation-ui";
+import { CharacterSheetUI } from "./ui/character-sheet-ui";
 import { TutorialSystem } from "./systems/tutorial-system";
 import {
   hasCompletedOnboardingTips,
@@ -221,6 +222,8 @@ export class Game {
   public spellMakingUI: SpellMakingUI;
   public guardEncounterUI: GuardEncounterUI;
   public levelUpUI: LevelUpUI;
+  /** Tab-open HTML overlay — identity, attributes, skills, reputation. */
+  public characterSheetUI!: CharacterSheetUI;
   public stableUI: StableUI;
   public saddlebagUI: SaddlebagUI;
   public uiAnimator: UIAnimator = new UIAnimator();
@@ -342,6 +345,7 @@ export class Game {
   private _lastStamina: number = -1;
   private _lastExperience: number = -1;
   private _lastLevel: number = -1;
+  private _lastCharacterLevel: number = -1;
 
   // Last LOD culled count for the debug overlay (updated from lodSystem.update())
   private _lastLodCulled: number = 0;
@@ -1438,8 +1442,11 @@ export class Game {
       // Grant one perk point per character level-up.
       this.perkSystem.addPerkPoints(1);
       this.saveSystem.markDirty();
+      if (this.characterSheetUI.isVisible) this._refreshCharacterSheet();
     };
     this.saveSystem.setPlayerLevelSystem(this.playerLevelSystem);
+
+    this.characterSheetUI = new CharacterSheetUI();
 
     // ── v18 DailyScheduleSystem ───────────────────────────────────────────────
     // Connects TimeSystem → ScheduleSystem so NPC daily behaviours are driven
@@ -2434,6 +2441,12 @@ export class Game {
                     this.editorLayout.setVisible("properties", false);
                     this.editorLayout.clearSelection();
                     this.ui.showNotification("Map editor mode disabled", 1800);
+                } else if (this.characterSheetUI.isVisible) {
+                    this.characterSheetUI.hide();
+                    this.ui.setCharacterSheetOpen(false);
+                    this.interactionSystem.isBlocked = false;
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
                 } else if (this.inventorySystem.isOpen) {
                     this.inventorySystem.toggleInventory();
                 } else if (this.questSystem.isLogOpen) {
@@ -2579,6 +2592,47 @@ export class Game {
                         this.player.camera.attachControl(this.canvas, true);
                     }
                 }
+            } else if (kbInfo.event.key === "Tab") {
+                const tabEv = kbInfo.event as KeyboardEvent;
+                if (tabEv.repeat) return;
+                tabEv.preventDefault();
+                if (this.characterSheetUI.isVisible) {
+                    this.characterSheetUI.hide();
+                    this.ui.setCharacterSheetOpen(false);
+                    if (!this.mapEditorSystem.isEnabled && !this.isPaused) {
+                        this.interactionSystem.isBlocked = false;
+                        this.canvas.requestPointerLock();
+                        this.player.camera.attachControl(this.canvas, true);
+                    }
+                    return;
+                }
+                if (
+                    this.isPaused ||
+                    this.dialogueSystem.isInDialogue ||
+                    this.mapEditorSystem.isEnabled ||
+                    this.levelUpUI.isVisible ||
+                    this.inventorySystem.isOpen ||
+                    this.questSystem.isLogOpen ||
+                    this.skillTreeSystem.isOpen ||
+                    this.ui.isAttributePanelOpen ||
+                    this.guardEncounterUI.isVisible ||
+                    this.spellMakingUI.isVisible ||
+                    this._barterUI.isVisible ||
+                    this.fastTravelUI.isVisible ||
+                    this.stableUI.isVisible ||
+                    this.saddlebagUI.isVisible ||
+                    this.petUI.isVisible ||
+                    this.followerUI.isVisible ||
+                    this.interactionSystem.isBlocked
+                ) {
+                    return;
+                }
+                this._refreshCharacterSheet();
+                this.characterSheetUI.show();
+                this.ui.setCharacterSheetOpen(true);
+                this.interactionSystem.isBlocked = true;
+                document.exitPointerLock();
+                this.player.camera.detachControl();
             } else if (kbInfo.event.key === "1") {
                 if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMeleeArchetype("duelist");
             } else if (kbInfo.event.key === "2") {
@@ -3256,6 +3310,10 @@ export class Game {
               this.ui.toggleSkillTree(false);
               // Pointer lock already released by togglePause path; no re-attachment needed here
           }
+          if (this.characterSheetUI.isVisible) {
+              this.characterSheetUI.hide();
+              this.ui.setCharacterSheetOpen(false);
+          }
           this.interactionSystem.isBlocked = true;
           this.ui.setInteractionText("");
           document.exitPointerLock();
@@ -3403,7 +3461,8 @@ export class Game {
       this.dialogueSystem.isInDialogue ||
       this.inventorySystem.isOpen ||
       this.questSystem.isLogOpen ||
-      this.mapEditorSystem.isEnabled
+      this.mapEditorSystem.isEnabled ||
+      this.characterSheetUI.isVisible
     ) {
       return false;
     }
@@ -3745,16 +3804,17 @@ export class Game {
           this.ui.updateStamina(this.player.stamina, this.player.maxStamina);
       }
 
-      if (this.player.experience !== this._lastExperience || this.player.level !== this._lastLevel) {
+      if (this.player.experience !== this._lastExperience || this.player.level !== this._lastLevel || this.playerLevelSystem.characterLevel !== this._lastCharacterLevel) {
           this._lastExperience = this.player.experience;
           this._lastLevel = this.player.level;
-          this.ui.updateXP(this.player.experience, this.player.experienceToNextLevel, this.player.level);
+          this._lastCharacterLevel = this.playerLevelSystem.characterLevel;
+          this.ui.updateXP(this.player.experience, this.player.experienceToNextLevel, this.player.level, this.playerLevelSystem.characterLevel);
       }
 
       // Refresh the stats panel every frame while inventory is open so live values
       // (health regen, damage taken, equipment changes) are always current.
       if (this.inventorySystem.isOpen) {
-          this.ui.updateStats(this.player);
+          this.ui.updateStats(this.player, this.playerLevelSystem.characterLevel);
       }
 
       // Pet HUD — update when active pet or health changes
@@ -4230,6 +4290,29 @@ export class Game {
       }
   }
 
+  /** Push latest progression snapshot into the Character Sheet DOM overlay. */
+  private _refreshCharacterSheet(): void {
+    this.characterSheetUI.update({
+      name:            this.player.name,
+      level:           this.playerLevelSystem.characterLevel,
+      xpLevel:         this.player.level,
+      raceName:        this.raceSystem.chosenRace?.name,
+      className:       this.classSystem.chosenClass?.name,
+      birthsignName:   this.birthsignSystem.chosenBirthsign?.name,
+      specialization:  this.classSystem.chosenClass?.specialization,
+      attributes:      this.attributeSystem.getAll(),
+      skills:          this.skillProgressionSystem.getAllSkills(),
+      maxHealth:       this.attributeSystem.maxHealth,
+      maxMagicka:      this.attributeSystem.maxMagicka,
+      maxStamina:      this.attributeSystem.maxStamina,
+      carryWeight:     this.attributeSystem.carryWeight,
+      fame:            this.fameSystem.fame,
+      infamy:          this.fameSystem.infamy,
+      fameLabel:       this.fameSystem.fameLabel,
+      infamyLabel:     this.fameSystem.infamyLabel,
+    });
+  }
+
   private _isCombatInputBlocked(): boolean {
       return (
           this.isPaused ||
@@ -4245,6 +4328,7 @@ export class Game {
           this.stableUI.isVisible ||
           this.saddlebagUI.isVisible ||
           this.petUI.isVisible ||
+          this.characterSheetUI.isVisible ||
           this.dialogueSystem.isInDialogue ||
           this.interactionSystem.isBlocked
       );

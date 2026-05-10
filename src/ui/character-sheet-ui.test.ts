@@ -19,6 +19,7 @@ function makeData(overrides: Partial<CharacterSheetData> = {}): CharacterSheetDa
   return {
     name:           "Aldric the Bold",
     level:          5,
+    xpLevel:        12,
     raceName:       "Nord",
     className:      "Warrior",
     birthsignName:  "The Warrior",
@@ -144,6 +145,15 @@ describe("CharacterSheetUI", () => {
         document.querySelectorAll(".character-sheet-ui__identity-row .character-sheet-ui__row-value"),
       ).map((el) => el.textContent);
       expect(values).toContain("7");
+    });
+
+    it("displays the combat XP level", () => {
+      ui.show();
+      ui.update(makeData({ xpLevel: 22 }));
+      const values = Array.from(
+        document.querySelectorAll(".character-sheet-ui__identity-row .character-sheet-ui__row-value"),
+      ).map((el) => el.textContent);
+      expect(values).toContain("22");
     });
 
     it("displays the race name", () => {
