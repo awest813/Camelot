@@ -727,6 +727,12 @@ export class UIManager {
 
       tree.skills.forEach((skill, skillIdx) => {
         const isMax  = skill.currentRank >= skill.maxRank;
+        // NOTE (audit finding): prerequisites are not checked here — canBuy only
+        // guards against no skill points and max rank.  Skills with unmet
+        // prerequisites appear as "[+] Upgrade" in this BabylonJS panel even
+        // though SkillTreeSystem.purchaseSkill() will still reject the purchase
+        // and emit a "Requires: …" notification.  The HTML SkillTreeUI in
+        // src/ui/skill-tree-ui.ts handles prerequisites correctly.
         const canBuy = !isMax && skillPoints > 0;
 
         const card = new Rectangle();
