@@ -51,7 +51,7 @@ export interface NpcAIProfile {
 }
 
 /** Damage categories matched by the combat system's resistance calculations. */
-export type DamageType = "physical" | "fire" | "frost" | "shock";
+export type DamageType = "physical" | "fire" | "frost" | "shock" | "magic" | "poison";
 
 /** Data-driven template for spawning and configuring NPCs. */
 export interface NpcArchetypeDefinition {

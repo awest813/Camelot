@@ -45,8 +45,10 @@ export enum AIState {
  * - fire: flame spells and burning effects
  * - frost: ice spells and cold effects
  * - shock: lightning spells and electrical effects
+ * - magic: untyped arcane spell damage (SpellSystem, custom spells)
+ * - poison: poison spells and toxins
  */
-export type DamageType = "physical" | "fire" | "frost" | "shock";
+export type DamageType = "physical" | "fire" | "frost" | "shock" | "magic" | "poison";
 
 /**
  * A time-limited damage-over-time (DoT) or debuff applied to an NPC.
