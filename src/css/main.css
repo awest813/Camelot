@@ -3324,6 +3324,284 @@ body::before {
   }
 }
 
+/* ── Crafting workbench (HTML overlay) ───────────────────────────────────────── */
+
+.crafting-ui {
+  position: fixed;
+  inset: 0;
+  z-index: 28;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(12px, 3vw, 28px);
+  box-sizing: border-box;
+  background: rgba(2, 2, 6, 0.88);
+  backdrop-filter: blur(5px);
+  color: #eee0c0;
+  font-family: Inter, "Segoe UI", Roboto, sans-serif;
+}
+
+.crafting-ui__header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(212, 160, 23, 0.25);
+  margin-bottom: 12px;
+}
+
+.crafting-ui__title {
+  margin: 0;
+  font-size: clamp(1.1rem, 2.2vw, 1.35rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #f8f0dc;
+  text-shadow: 0 0 12px rgba(212, 160, 23, 0.25);
+}
+
+.crafting-ui__close {
+  position: absolute;
+  top: clamp(12px, 3vw, 24px);
+  right: clamp(12px, 3vw, 24px);
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 6, 4, 0.85);
+  color: #e8dcc4;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.crafting-ui__close:hover {
+  background: rgba(212, 160, 23, 0.12);
+  border-color: rgba(212, 160, 23, 0.45);
+}
+
+.crafting-ui__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.crafting-ui__tab {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 6, 4, 0.75);
+  color: #d8c8a8;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.crafting-ui__tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.crafting-ui__tab.is-active {
+  border-color: rgba(212, 160, 23, 0.55);
+  background: rgba(212, 160, 23, 0.14);
+  color: #fde68a;
+}
+
+.crafting-ui__body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 14px;
+}
+
+@media (max-width: 720px) {
+  .crafting-ui__body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.crafting-ui__list,
+.crafting-ui__detail {
+  min-height: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(212, 160, 23, 0.22);
+  background: rgba(6, 4, 2, 0.94);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.crafting-ui__list {
+  overflow: auto;
+  padding: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212, 160, 23, 0.4) rgba(14, 10, 4, 0.9);
+}
+
+.crafting-ui__detail {
+  overflow: auto;
+  padding: 14px 16px;
+}
+
+.crafting-ui__empty,
+.crafting-ui__detail-hint {
+  margin: 0;
+  color: rgba(238, 224, 192, 0.65);
+  font-size: 0.9rem;
+}
+
+.crafting-ui__recipe-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(10, 8, 6, 0.65);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.crafting-ui__recipe-row:hover {
+  border-color: rgba(212, 160, 23, 0.28);
+  background: rgba(18, 14, 8, 0.85);
+}
+
+.crafting-ui__recipe-row.is-selected {
+  border-color: rgba(212, 160, 23, 0.55);
+  box-shadow: 0 0 0 1px rgba(212, 160, 23, 0.12);
+}
+
+.crafting-ui__recipe-row.can-craft .crafting-ui__avail-indicator {
+  color: var(--status-ok);
+}
+
+.crafting-ui__recipe-row.cannot-craft .crafting-ui__avail-indicator {
+  color: var(--status-error);
+}
+
+.crafting-ui__recipe-name {
+  font-weight: 600;
+  color: #f5ead2;
+}
+
+.crafting-ui__category-badge {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(212, 160, 23, 0.12);
+  color: #e8d49a;
+}
+
+.crafting-ui__craft-count {
+  font-size: 0.78rem;
+  color: rgba(238, 224, 192, 0.55);
+}
+
+.crafting-ui__avail-indicator {
+  font-weight: 700;
+  width: 1.25rem;
+  text-align: center;
+}
+
+.crafting-ui__detail-title {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+  color: #fff6e4;
+}
+
+.crafting-ui__detail-desc {
+  margin: 0 0 10px;
+  color: rgba(238, 224, 192, 0.75);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.crafting-ui__detail-output,
+.crafting-ui__detail-quality,
+.crafting-ui__detail-tier,
+.crafting-ui__mats-label {
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+}
+
+.crafting-ui__detail-skill.skill-met {
+  color: var(--status-ok);
+}
+
+.crafting-ui__detail-skill.skill-missing {
+  color: var(--status-error);
+}
+
+.crafting-ui__detail-station.station-met {
+  color: var(--status-ok);
+}
+
+.crafting-ui__detail-station.station-missing {
+  color: #e8b060;
+}
+
+.crafting-ui__mats-list {
+  margin: 0 0 14px;
+  padding-left: 1.1rem;
+}
+
+.crafting-ui__mat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+  font-size: 0.86rem;
+}
+
+.crafting-ui__mat-row.mat-ok .crafting-ui__mat-qty {
+  color: var(--status-ok);
+}
+
+.crafting-ui__mat-row.mat-missing .crafting-ui__mat-qty {
+  color: var(--status-error);
+}
+
+.crafting-ui__craft-btn {
+  margin-top: 6px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(212, 160, 23, 0.5);
+  background: linear-gradient(180deg, rgba(212, 160, 23, 0.22) 0%, rgba(120, 80, 10, 0.35) 100%);
+  color: #fff6d6;
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: filter var(--transition-fast), border-color var(--transition-fast);
+}
+
+.crafting-ui__craft-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.crafting-ui__craft-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: grayscale(0.25);
+}
+
+.crafting-ui__craft-blocker {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: rgba(224, 96, 96, 0.95);
+}
+
+.crafting-ui__detail-count {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  color: rgba(238, 224, 192, 0.55);
+}
+
 /* ── Editor Hub ──────────────────────────────────────────────────────────────── */
 
 .editor-hub {

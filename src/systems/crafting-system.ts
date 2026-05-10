@@ -199,7 +199,11 @@ export interface CraftingResult {
   quantity: number;
   /** Crafting XP awarded (after tier scaling). */
   xpAwarded: number;
-  /** Quality of the crafted item, determined by skill surplus. */
+  /**
+   * Quality of the crafted item, determined by skill surplus.
+   * The game layer should attach this to the created inventory item if items
+   * track quality (e.g. `item.quality = result.quality`).
+   */
   quality: ItemQuality;
 }
 
@@ -265,7 +269,8 @@ export interface CraftingSystemState {
  * ```ts
  * craftingSystem.onItemCrafted = (result) => {
  *   inventory.addItem({ id: result.outputItemId, name: result.outputItemName, quantity: result.quantity });
- *   skillProgression.addXp("armorer", result.xpAwarded);
+ *   // If items track quality, persist `result.quality` (e.g. on `stats`) when creating the stack.
+ *   // skillProgression.gainXP(<skillId>, result.xpAwarded);
  *   hud.notify(`Crafted ${result.outputItemName} (${result.quality})!`);
  * };
  *
@@ -284,6 +289,56 @@ export class CraftingSystem {
   private _recipes: Map<string, CraftingRecord> = new Map();
   private _discovered: Set<string> = new Set();
 
+  /** Validates recipe shape; throws on invalid data. Exposed for tests. */
+  public static assertValidRecipe(recipe: CraftingRecipe): void {
+    const id = recipe.id?.trim() ?? "";
+    if (!id) {
+      throw new Error("CraftingRecipe.id must be a non-empty string.");
+    }
+    if (!recipe.label?.trim()) {
+      throw new Error(`CraftingRecipe "${id}": label must be non-empty.`);
+    }
+    if (!Array.isArray(recipe.requiredMaterials)) {
+      throw new Error(`CraftingRecipe "${id}": requiredMaterials must be an array.`);
+    }
+    for (const m of recipe.requiredMaterials) {
+      const mid = m.materialId?.trim() ?? "";
+      if (!mid) {
+        throw new Error(`CraftingRecipe "${id}": each material must have a non-empty materialId.`);
+      }
+      const q = m.quantity;
+      if (!Number.isFinite(q) || !Number.isInteger(q) || q < 1) {
+        throw new Error(
+          `CraftingRecipe "${id}": material "${mid}" quantity must be a positive integer.`,
+        );
+      }
+    }
+    if (!recipe.outputItemId?.trim()) {
+      throw new Error(`CraftingRecipe "${id}": outputItemId must be non-empty.`);
+    }
+    if (!recipe.outputItemName?.trim()) {
+      throw new Error(`CraftingRecipe "${id}": outputItemName must be non-empty.`);
+    }
+    const outQ = recipe.outputQuantity ?? 1;
+    if (!Number.isFinite(outQ) || !Number.isInteger(outQ) || outQ < 1) {
+      throw new Error(`CraftingRecipe "${id}": outputQuantity must be an integer ≥ 1.`);
+    }
+    const reqSk = recipe.requiredSkill ?? 0;
+    if (!Number.isFinite(reqSk) || reqSk < 0 || !Number.isInteger(reqSk)) {
+      throw new Error(`CraftingRecipe "${id}": requiredSkill must be a non-negative integer.`);
+    }
+    const xp = recipe.craftingXp ?? 10;
+    if (!Number.isFinite(xp) || xp < 0 || !Number.isInteger(xp)) {
+      throw new Error(`CraftingRecipe "${id}": craftingXp must be a non-negative integer.`);
+    }
+    if (recipe.stationId !== undefined && !(recipe.stationId in CRAFTING_STATION_LABELS)) {
+      throw new Error(`CraftingRecipe "${id}": unknown stationId "${String(recipe.stationId)}".`);
+    }
+    if (recipe.tier !== undefined && !(recipe.tier in CRAFTING_TIER_XP_MULTIPLIERS)) {
+      throw new Error(`CraftingRecipe "${id}": unknown tier "${String(recipe.tier)}".`);
+    }
+  }
+
   // ── Callback ──────────────────────────────────────────────────────────────
 
   /**
@@ -296,13 +351,16 @@ export class CraftingSystem {
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
   /**
-   * Register a crafting recipe.  Silently replaces any existing recipe with
-   * the same id, resetting its runtime state.
+   * Register a crafting recipe.  Replaces any existing recipe with the same id,
+   * resetting its runtime state.
    *
    * If `recipe.knownByDefault` is not explicitly `false` the recipe is
    * automatically added to the discovery set.
+   *
+   * @throws Error if the recipe fails validation (bad quantities, unknown tier/station, etc.).
    */
   public addRecipe(recipe: CraftingRecipe): void {
+    CraftingSystem.assertValidRecipe(recipe);
     this._recipes.set(recipe.id, { recipe, craftCount: 0 });
     if (recipe.knownByDefault !== false) {
       this._discovered.add(recipe.id);
@@ -400,6 +458,27 @@ export class CraftingSystem {
     const record = this._recipes.get(recipeId);
     if (!record) return false;
     return this._checkRequirements(record.recipe, materials, skill, stationId) === null;
+  }
+
+  /**
+   * When the recipe cannot be crafted, returns the same failure object `craft()`
+   * would return (without side effects). Useful for UI hints.
+   */
+  public whyCannotCraft(
+    recipeId: string,
+    materials: MaterialInventory,
+    skill: number = 0,
+    stationId?: CraftingStationId,
+  ): CraftingFailure | null {
+    const record = this._recipes.get(recipeId);
+    if (!record) {
+      return {
+        success: false,
+        reason: "unknown_recipe",
+        message: `Recipe "${recipeId}" is not registered.`,
+      };
+    }
+    return this._checkRequirements(record.recipe, materials, skill, stationId);
   }
 
   /**

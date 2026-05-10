@@ -639,7 +639,32 @@ describe("CraftingUI — detail pane: quality, station, tier", () => {
     const stationEl = document.querySelector(".crafting-ui__detail-station");
     expect(stationEl).not.toBeNull();
     expect(stationEl?.textContent).toContain("Forge");
+    expect(stationEl?.textContent).toContain("no bench");
+    expect(stationEl?.classList.contains("station-missing")).toBe(true);
     expect(stationEl?.getAttribute("data-station-id")).toBe("forge");
+  });
+
+  it("treats station as satisfied when update passes matching stationId", () => {
+    ui.show();
+    ui.update(sys, MATS, 25, "forge");
+    expect(ui.activeStationId).toBe("forge");
+    const row = document.querySelector(".crafting-ui__recipe-row");
+    expect(row?.classList.contains("can-craft")).toBe(true);
+    selectRecipe("forge_sword");
+    const stationEl = document.querySelector(".crafting-ui__detail-station");
+    expect(stationEl?.classList.contains("station-met")).toBe(true);
+    expect(stationEl?.textContent).toContain("Station:");
+    const craftBtn = document.querySelector<HTMLButtonElement>(".crafting-ui__craft-btn");
+    expect(craftBtn?.disabled).toBe(false);
+  });
+
+  it("shows craft blocker message when requirements fail", () => {
+    ui.show();
+    ui.update(sys, MATS, 25);
+    selectRecipe("forge_sword");
+    const blocker = document.querySelector(".crafting-ui__craft-blocker");
+    expect(blocker).not.toBeNull();
+    expect(blocker?.textContent).toMatch(/forge/i);
   });
 
   it("omits station line when recipe has no stationId", () => {
