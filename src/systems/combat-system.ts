@@ -216,7 +216,7 @@ const MAGIC_PROFILES: Record<MagicArchetype, MagicProfile> = {
 const MAGIC_ARCHETYPE_DAMAGE_TYPE: Record<MagicArchetype, DamageType> = {
   spark: "shock",
   bolt:  "fire",
-  surge: "fire",
+  surge: "shock",
 };
 
 // State colour palette

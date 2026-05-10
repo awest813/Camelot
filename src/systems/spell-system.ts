@@ -1,15 +1,18 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
-import type { NPC } from "../entities/npc";
+import type { NPC, DamageType } from "../entities/npc";
 import type { Player } from "../entities/player";
 import type { UIManager } from "../ui/ui-manager";
 import type { SkillProgressionSystem } from "./skill-progression-system";
+import { applyDamageWithResistance } from "./combat-shared";
 
 // ── Spell types ───────────────────────────────────────────────────────────────
 
 export type SpellSchool = "destruction" | "restoration" | "illusion" | "conjuration" | "alteration";
 export type SpellDelivery = "touch" | "target" | "self";
-export type DamageType = "fire" | "frost" | "shock" | "magic" | "poison";
+
+/** Re-export for spell-making UI and custom spell data. */
+export type { DamageType };
 
 export interface SpellDefinition {
   id: string;
@@ -128,12 +131,12 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
   {
     id: "poison_touch",
     name: "Poison Touch",
-    description: "Poisons the target for 8 damage per second over 6 seconds on touch.",
+    description: "Deals 8 poison damage on touch, then 2 poison damage per second for 6 seconds.",
     school: "destruction",
     delivery: "touch",
     magickaCost: 35,
     cooldown: 1.0,
-    damage: 5,
+    damage: 8,
     damageType: "poison",
     duration: 6,
   },
@@ -173,7 +176,8 @@ const SKILL_XP_SPELL_RESTORATION = 6;
  *     no BabylonJS mesh required for the core logic.
  *   - Optional `scene` reference is used only for visual hit particles
  *     (nullable to support headless tests).
- *   - `castSpell()` checks magicka and cooldown, applies damage/heal,
+ *   - `castSpell()` checks magicka and cooldown, applies damage/heal with the same
+ *     resistance rules as melee and magic projectiles (`applyDamageWithResistance`),
  *     then fires the optional `onSpellCast` hook for audio/VFX.
  *
  * Usage:
@@ -310,7 +314,7 @@ export class SpellSystem {
     }
 
     if (this._player.magicka < spell.magickaCost) {
-      this._ui.showNotification("Not enough Magicka!", 1500);
+      this._ui.showNotification("Not enough magicka!", 1500);
       return { success: false, reason: "insufficient_magicka" };
     }
 
@@ -330,11 +334,13 @@ export class SpellSystem {
       }
     }
 
-    const msg = result.hitNpc
-      ? `${spell.name} → ${result.hitNpc} (${result.damage ?? 0} dmg)`
-      : result.heal
-        ? `${spell.name} → healed ${result.heal} HP`
-        : `${spell.name} cast`;
+    const msg = result.damage != null && result.hitNpc
+      ? `${spell.name} → ${result.hitNpc} (${result.damage} dmg)`
+      : result.heal && result.hitNpc
+        ? `${spell.name} → ${result.hitNpc} (+${result.heal} HP)`
+        : result.heal
+          ? `${spell.name} → healed ${result.heal} HP`
+          : `${spell.name} cast`;
     this._ui.showNotification(msg, 1500);
 
     this.onSpellCast?.(spell, result);
@@ -352,6 +358,18 @@ export class SpellSystem {
 
   // ── Private helpers ───────────────────────────────────────────────────────
 
+  /**
+   * Raw spell hit damage before NPC resistances — spell magnitude plus attribute
+   * and equipment bonuses, scaled by the destruction skill multiplier (matches
+   * {@link CombatSystem} staff / magic projectile scaling intent).
+   */
+  private _scaledSpellHitDamage(spell: SpellDefinition): number {
+    const destructionMult = this._skillSystem?.multiplier("destruction") ?? 1;
+    const gearBonus = this._player.bonusMagicDamage ?? 0;
+    const base = (spell.damage ?? 0) + this.magicDamageBonus + gearBonus;
+    return Math.max(1, Math.round(base * destructionMult));
+  }
+
   private _resolveEffect(spell: SpellDefinition): SpellCastResult {
     // Self-targeted spells
     if (spell.delivery === "self") {
@@ -365,48 +383,58 @@ export class SpellSystem {
       return { success: true };
     }
 
-    // Touch / target spells
     const range = spell.delivery === "touch" ? TOUCH_RANGE : (spell.range ?? 20);
     const playerPos = this._player.camera.position;
 
     if (spell.damage) {
-      const baseDamage = spell.damage + this.magicDamageBonus;
+      const rawHit = this._scaledSpellHitDamage(spell);
+      const damageType: DamageType = spell.damageType ?? "magic";
       let hitNpcName: string | undefined;
+      let reportedDamage: number | undefined;
 
       if (spell.aoeRadius && spell.aoeRadius > 0) {
-        // AoE: find a point in front of the camera and damage all in radius
         const forward = this._player.camera.getForwardRay
           ? this._player.camera.getForwardRay(range).direction
           : new Vector3(0, 0, 1);
-        const impactPoint = playerPos.add(forward.scale(Math.min(range, 25)));
+        const impactPoint = playerPos.add(forward.scale(range));
 
         for (const npc of this._npcs) {
           if (npc.isDead) continue;
           const dist = Vector3.Distance(npc.mesh.position, impactPoint);
           if (dist <= spell.aoeRadius) {
-            npc.takeDamage(baseDamage);
+            const finalDmg = applyDamageWithResistance(rawHit, npc, damageType);
+            npc.takeDamage(finalDmg);
             this._applySpellDoT(spell, npc);
-            hitNpcName = hitNpcName ?? npc.mesh.name;
+            if (hitNpcName === undefined) {
+              hitNpcName = npc.mesh.name;
+              reportedDamage = finalDmg;
+            }
           }
         }
       } else {
-        // Single target: find nearest NPC within range + facing cone
         const target = this._findTargetNpc(playerPos, range);
         if (target) {
-          target.takeDamage(baseDamage);
+          const finalDmg = applyDamageWithResistance(rawHit, target, damageType);
+          target.takeDamage(finalDmg);
           this._applySpellDoT(spell, target);
           hitNpcName = target.mesh.name;
+          reportedDamage = finalDmg;
         }
       }
 
-      return { success: true, damage: baseDamage, hitNpc: hitNpcName };
+      return { success: true, damage: reportedDamage, hitNpc: hitNpcName };
     }
 
-    if (spell.heal) {
-      // Heal-other: find nearest NPC (friendly) or default to self
-      const actual = Math.min(spell.heal, this._player.maxHealth - this._player.health);
-      this._player.health = Math.min(this._player.maxHealth, this._player.health + spell.heal);
-      return { success: true, heal: actual };
+    if (spell.heal && (spell.delivery === "target" || spell.delivery === "touch")) {
+      const target = this._findTargetNpc(playerPos, range);
+      if (target) {
+        const healingMultiplier = (this._player as unknown as { perkHealingMultiplier?: number }).perkHealingMultiplier ?? 1.0;
+        const scaledHeal = spell.heal * healingMultiplier;
+        const actual = Math.min(scaledHeal, target.maxHealth - target.health);
+        target.health = Math.min(target.maxHealth, target.health + scaledHeal);
+        return { success: true, heal: Math.round(actual), hitNpc: target.mesh.name };
+      }
+      return { success: true, heal: 0 };
     }
 
     return { success: true };

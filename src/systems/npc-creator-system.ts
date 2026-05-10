@@ -14,7 +14,7 @@ export const NPC_ROLES: NpcRole[] = [
   "bandit", "healer", "trainer", "beggar",
 ];
 
-export const DAMAGE_TYPES: DamageType[] = ["physical", "fire", "frost", "shock"];
+export const DAMAGE_TYPES: DamageType[] = ["physical", "fire", "frost", "shock", "magic", "poison"];
 
 export const NPC_VOICE_TYPES: NpcVoiceType[] = [
   "neutral", "male_warrior", "female_warrior", "old_man", "old_woman",

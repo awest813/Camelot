@@ -21,6 +21,7 @@ function makePlayer(scene: Scene) {
     maxHealth: 100,
     magicka: 200,
     maxMagicka: 200,
+    bonusMagicDamage: 0,
     notifyResourceSpent: vi.fn(),
   } as any;
 }
@@ -29,16 +30,22 @@ function makeUI() {
   return { showNotification: vi.fn() } as any;
 }
 
-function makeNPC(z = 5, alive = true) {
+function makeNPC(z = 5, alive = true, overrides: Record<string, unknown> = {}) {
   const { Vector3 } = require("@babylonjs/core/Maths/math.vector");
   return {
     isDead: !alive,
     // Place NPCs along the +Z axis so they are within the camera's default
     // forward-facing targeting cone (camera at origin facing +Z).
     mesh: { name: "Bandit", position: new Vector3(0, 0, z) },
+    health: 100,
+    maxHealth: 100,
     takeDamage: vi.fn(),
     applyStatusEffect: vi.fn(),
     statusEffects: [],
+    damageResistances: {},
+    damageWeaknesses: {},
+    armorRating: 0,
+    ...overrides,
   } as any;
 }
 
@@ -165,6 +172,42 @@ describe("SpellSystem", () => {
     const called = npc.takeDamage.mock.calls[0][0] as number;
     const flamesDef = DEFAULT_SPELLS.find(s => s.id === "flames")!;
     expect(called).toBe(flamesDef.damage! + 10);
+  });
+
+  it("bonusMagicDamage from equipment adds to spell damage", () => {
+    player.bonusMagicDamage = 7;
+    sys.learnSpell("flames");
+    sys.equipSpell("flames");
+    sys.castSpell();
+    const called = npc.takeDamage.mock.calls[0][0] as number;
+    const flamesDef = DEFAULT_SPELLS.find(s => s.id === "flames")!;
+    expect(called).toBe(flamesDef.damage! + 7);
+  });
+
+  it("spell damage respects NPC fire resistance", () => {
+    const resistant = makeNPC(5, true, { damageResistances: { fire: 0.5 } });
+    sys.npcs = [resistant];
+    sys.learnSpell("flames");
+    sys.equipSpell("flames");
+    sys.castSpell();
+    const called = resistant.takeDamage.mock.calls[0][0] as number;
+    expect(called).toBe(4);
+  });
+
+  it("castSpell heal_other restores an NPC in the targeting cone", () => {
+    const { Vector3 } = require("@babylonjs/core/Maths/math.vector");
+    const targetNpc = makeNPC(5, true, {
+      health: 40,
+      maxHealth: 100,
+      mesh: { name: "Villager", position: new Vector3(0, 0, 5) },
+    });
+    sys.npcs = [targetNpc];
+    sys.learnSpell("heal_other");
+    sys.equipSpell("heal_other");
+    const result = sys.castSpell();
+    expect(result.heal).toBe(15);
+    expect(result.hitNpc).toBe("Villager");
+    expect(targetNpc.health).toBe(55);
   });
 
   // ── Cooldown ───────────────────────────────────────────────────────────────
