@@ -138,6 +138,62 @@ describe("CraftingSystem — CRUD", () => {
   });
 });
 
+// ── Tests: recipe validation ──────────────────────────────────────────────────
+
+describe("CraftingSystem — recipe validation", () => {
+  it("rejects non-positive material quantities", () => {
+    const sys = new CraftingSystem();
+    const bad: CraftingRecipe = {
+      ...ironSwordRecipe,
+      id: "bad_mat",
+      requiredMaterials: [{ materialId: "iron_ingot", quantity: 0 }],
+    };
+    expect(() => sys.addRecipe(bad)).toThrow(/positive integer/);
+  });
+
+  it("rejects invalid outputQuantity", () => {
+    const sys = new CraftingSystem();
+    const bad: CraftingRecipe = { ...ironSwordRecipe, id: "bad_out", outputQuantity: 0 };
+    expect(() => sys.addRecipe(bad)).toThrow(/outputQuantity/);
+  });
+
+  it("rejects unknown stationId", () => {
+    const sys = new CraftingSystem();
+    const bad = { ...ironSwordRecipe, id: "bad_st", stationId: "ocean" } as CraftingRecipe;
+    expect(() => sys.addRecipe(bad)).toThrow(/stationId/);
+  });
+
+  it("rejects unknown tier", () => {
+    const sys = new CraftingSystem();
+    const bad = { ...ironSwordRecipe, id: "bad_tier", tier: "mithril" } as CraftingRecipe;
+    expect(() => sys.addRecipe(bad)).toThrow(/tier/);
+  });
+});
+
+// ── Tests: whyCannotCraft ──────────────────────────────────────────────────────
+
+describe("CraftingSystem — whyCannotCraft", () => {
+  it("returns null when the recipe is craftable", () => {
+    const sys = new CraftingSystem();
+    sys.addRecipe(ironSwordRecipe);
+    expect(sys.whyCannotCraft("iron_sword", makeInventory(), 0)).toBeNull();
+  });
+
+  it("returns unknown_recipe for missing id", () => {
+    const sys = new CraftingSystem();
+    const r = sys.whyCannotCraft("nope", makeInventory(), 0);
+    expect(r?.reason).toBe("unknown_recipe");
+  });
+
+  it("returns wrong_station when active bench does not match", () => {
+    const sys = new CraftingSystem();
+    const r: CraftingRecipe = { ...ironSwordRecipe, id: "forge_only", stationId: "forge" };
+    sys.addRecipe(r);
+    const fail = sys.whyCannotCraft("forge_only", makeInventory(), 0, "workbench");
+    expect(fail?.reason).toBe("wrong_station");
+  });
+});
+
 // ── Tests: canCraft ───────────────────────────────────────────────────────────
 
 describe("CraftingSystem — canCraft", () => {

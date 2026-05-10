@@ -2,6 +2,7 @@ import type {
   CraftingCategory,
   CraftingMaterial,
   CraftingRecipe,
+  CraftingStationId,
   CraftingSystem,
   MaterialInventory,
 } from "../systems/crafting-system";
@@ -33,31 +34,36 @@ const CATEGORY_TABS: Array<{ key: CraftingCategory | "all"; label: string }> = [
  * scrollable recipe list on the left (filterable by category tab) and a
  * detail pane on the right showing material requirements and the "Craft"
  * button.  Material rows are coloured green when available and red when
- * insufficient.  The button is disabled when any material is missing or the
- * player's skill level is too low.
+ * insufficient.  The button is disabled when requirements are not met (materials,
+ * skill, or wrong / missing crafting station).
  *
- * Call `update(system, materials, skill)` whenever the inventory or skill
- * changes to keep the panel in sync without re-creating the DOM.
+ * Call `update(system, materials, skill, stationId)` when inventory, skill, or
+ * the active workbench changes. Pass `stationId` when recipes declare a
+ * `stationId` so availability and the Craft button stay accurate.
  *
  * Wire-up example:
  * ```ts
  * const ui = new CraftingUI();
  *
  * ui.onCraft = (recipeId) => {
- *   const outcome = craftingSystem.craft(recipeId, player.materials, player.craftingSkill);
+ *   const outcome = craftingSystem.craft(
+ *     recipeId, player.materials, player.armorerSkill, player.activeCraftingStation,
+ *   );
  *   if (outcome.success) {
  *     player.addItem(outcome.result.outputItemId, outcome.result.quantity);
- *     player.deductMaterials(outcome.result.recipeId);
- *     skillProgressionSystem.gainXP("alchemy", outcome.result.xpAwarded);
+ *     player.deductMaterialsForRecipe(recipeId);
+ *     // Map crafting XP to your progression system (not Alchemy).
  *   }
- *   ui.update(craftingSystem, player.materials, player.craftingSkill);
+ *   ui.update(craftingSystem, player.materials, player.armorerSkill, player.activeCraftingStation);
  * };
  *
  * // Open / close via keybinding (C):
  * window.addEventListener("keydown", (e) => {
  *   if (e.key === "c" || e.key === "C") {
  *     ui.isVisible ? ui.hide() : ui.show();
- *     if (ui.isVisible) ui.update(craftingSystem, player.materials, player.craftingSkill);
+ *     if (ui.isVisible) {
+ *       ui.update(craftingSystem, player.materials, player.armorerSkill, player.activeCraftingStation);
+ *     }
  *   }
  * });
  * ```
@@ -87,6 +93,8 @@ export class CraftingUI {
   private _lastMaterials:  MaterialInventory   = {};
   /** Cached skill level from the last `update()` call. */
   private _lastSkill:      number              = 0;
+  /** Active crafting station from the last `update()` call, if any. */
+  private _lastStationId:  CraftingStationId | undefined = undefined;
   /** Cached system reference from the last `update()` call. */
   private _lastSystem:     CraftingSystem | null = null;
 
@@ -113,11 +121,13 @@ export class CraftingUI {
    * @param system    — The {@link CraftingSystem} providing the recipe list.
    * @param materials — The player's current material inventory (read-only).
    * @param skill     — The player's current crafting skill level (default 0).
+   * @param stationId — Active crafting station, when the UI is bound to a bench.
    */
   public update(
     system: CraftingSystem,
     materials: MaterialInventory,
     skill: number = 0,
+    stationId?: CraftingStationId,
   ): void {
     if (typeof document === "undefined") return;
     this._ensureDom();
@@ -125,6 +135,15 @@ export class CraftingUI {
     this._lastSystem    = system;
     this._lastMaterials = materials;
     this._lastSkill     = skill;
+    this._lastStationId = stationId;
+
+    if (this._root) {
+      if (stationId !== undefined) {
+        this._root.setAttribute("data-active-station", stationId);
+      } else {
+        this._root.removeAttribute("data-active-station");
+      }
+    }
 
     // Gather discovered recipes for the active tab.
     const recipes: CraftingRecipe[] =
@@ -134,8 +153,8 @@ export class CraftingUI {
 
     this._lastRecipes = recipes;
     this._renderTabs();
-    this._renderList(recipes, system, materials, skill);
-    this._refreshDetail(system, materials, skill);
+    this._renderList(recipes, system, materials, skill, stationId);
+    this._refreshDetail(system, materials, skill, stationId);
   }
 
   /**
@@ -154,6 +173,14 @@ export class CraftingUI {
     return this._selectedId;
   }
 
+  /**
+   * Workbench passed to the last `update()`, if any.
+   * Exposed for test access.
+   */
+  public get activeStationId(): CraftingStationId | undefined {
+    return this._lastStationId;
+  }
+
   /** Remove the DOM element entirely and reset state. */
   public destroy(): void {
     this._root?.remove();
@@ -166,6 +193,7 @@ export class CraftingUI {
     this._lastRecipes  = [];
     this._lastMaterials = {};
     this._lastSkill    = 0;
+    this._lastStationId = undefined;
     this._lastSystem   = null;
     this.isVisible     = false;
   }
@@ -247,7 +275,7 @@ export class CraftingUI {
         this._activeFilter = tab.key;
         this._selectedId   = null;
         if (this._lastSystem) {
-          this.update(this._lastSystem, this._lastMaterials, this._lastSkill);
+          this.update(this._lastSystem, this._lastMaterials, this._lastSkill, this._lastStationId);
         } else {
           this._renderTabs();
         }
@@ -261,6 +289,7 @@ export class CraftingUI {
     system: CraftingSystem,
     materials: MaterialInventory,
     skill: number,
+    stationId?: CraftingStationId,
   ): void {
     if (!this._listEl) return;
     this._listEl.innerHTML = "";
@@ -274,7 +303,7 @@ export class CraftingUI {
     }
 
     for (const recipe of recipes) {
-      const canCraft = system.canCraft(recipe.id, materials, skill);
+      const canCraft = system.canCraft(recipe.id, materials, skill, stationId);
       const craftCount = system.getTotalCrafted(recipe.id);
       const isSelected = recipe.id === this._selectedId;
 
@@ -311,8 +340,8 @@ export class CraftingUI {
 
       item.addEventListener("click", () => {
         this._selectedId = recipe.id;
-        this._renderList(recipes, system, materials, skill);
-        this._refreshDetail(system, materials, skill);
+        this._renderList(recipes, system, materials, skill, stationId);
+        this._refreshDetail(system, materials, skill, stationId);
       });
 
       this._listEl.appendChild(item);
@@ -323,6 +352,7 @@ export class CraftingUI {
     system: CraftingSystem,
     materials: MaterialInventory,
     skill: number,
+    stationId?: CraftingStationId,
   ): void {
     if (!this._detailEl) return;
     this._detailEl.innerHTML = "";
@@ -388,9 +418,19 @@ export class CraftingUI {
     // Required station
     if (recipe.stationId) {
       const stationEl = document.createElement("p");
-      stationEl.className = "crafting-ui__detail-station";
-      stationEl.textContent = `Requires: ${CRAFTING_STATION_LABELS[recipe.stationId]}`;
+      const needLabel = CRAFTING_STATION_LABELS[recipe.stationId];
+      const atBench   = stationId === recipe.stationId;
+      stationEl.className =
+        "crafting-ui__detail-station" + (atBench ? " station-met" : " station-missing");
       stationEl.setAttribute("data-station-id", recipe.stationId);
+      if (atBench) {
+        stationEl.textContent = `Station: ${needLabel}`;
+      } else if (stationId === undefined) {
+        stationEl.textContent = `Requires: ${needLabel} (no bench selected)`;
+      } else {
+        stationEl.textContent =
+          `Requires: ${needLabel} (at ${CRAFTING_STATION_LABELS[stationId]})`;
+      }
       this._detailEl.appendChild(stationEl);
     }
 
@@ -418,7 +458,7 @@ export class CraftingUI {
     }
 
     // Craft button
-    const canCraft = system.canCraft(recipe.id, materials, skill);
+    const canCraft = system.canCraft(recipe.id, materials, skill, stationId);
     const craftBtn = document.createElement("button");
     craftBtn.className = "crafting-ui__craft-btn";
     craftBtn.type = "button";
@@ -431,6 +471,16 @@ export class CraftingUI {
       }
     });
     this._detailEl.appendChild(craftBtn);
+
+    if (!canCraft) {
+      const blocker = system.whyCannotCraft(recipe.id, materials, skill, stationId);
+      if (blocker) {
+        const hint = document.createElement("p");
+        hint.className = "crafting-ui__craft-blocker";
+        hint.textContent = blocker.message;
+        this._detailEl.appendChild(hint);
+      }
+    }
 
     // Craft count
     const craftCount = system.getTotalCrafted(recipe.id);
