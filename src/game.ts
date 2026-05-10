@@ -379,21 +379,7 @@ export class Game {
   private _toggleHelpOverlay(): void {
     if (!this._helpOverlayEl) {
       const panel = document.createElement("div");
-      panel.style.position = "fixed";
-      panel.style.top = "12px";
-      panel.style.left = "12px";
-      panel.style.maxWidth = "420px";
-      panel.style.padding = "10px 12px";
-      panel.style.borderRadius = "8px";
-      panel.style.background = "rgba(16, 22, 30, 0.86)";
-      panel.style.color = "#dbe9ff";
-      panel.style.fontFamily = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-      panel.style.fontSize = "12px";
-      panel.style.lineHeight = "1.4";
-      panel.style.whiteSpace = "pre-wrap";
-      panel.style.zIndex = "2200";
-      panel.style.border = "1px solid rgba(170, 205, 255, 0.2)";
-      panel.style.pointerEvents = "none";
+      panel.className = "game-help-overlay";
       panel.style.display = "none";
       document.body.appendChild(panel);
       this._helpOverlayEl = panel;
@@ -1650,6 +1636,118 @@ export class Game {
           root.position.set(gx, 0, gz);
           root.rotation.y = _chunkRand(cx, cz, 24) * Math.PI * 2;
           root.scaling.setAll(1.0);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
+
+      // ── Pirate fort + cannon in desert (bandit camp) ─────────────────────
+      if (biome === "desert" && _chunkRand(cx, cz, 40) < 0.048) {
+        const fx = worldX + (_chunkRand(cx, cz, 41) - 0.5) * this.world.chunkSize * 0.62;
+        const fz = worldZ + (_chunkRand(cx, cz, 42) - 0.5) * this.world.chunkSize * 0.62;
+        const fortRot = _chunkRand(cx, cz, 43) * Math.PI * 2;
+        this.fantasyAssets.getInstance("pirateFort", (root) => {
+          if (!root) return;
+          root.position.set(fx, 0, fz);
+          root.rotation.y = fortRot;
+          root.scaling.setAll(1.0);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+        const rad = 6 + _chunkRand(cx, cz, 44) * 4;
+        const cannonX = fx + Math.cos(fortRot + 0.7) * rad;
+        const cannonZ = fz + Math.sin(fortRot + 0.7) * rad;
+        this.fantasyAssets.getInstance("cannon", (root) => {
+          if (!root) return;
+          root.position.set(cannonX, 0, cannonZ);
+          root.rotation.y = fortRot + Math.PI * 0.35;
+          root.scaling.setAll(1.0);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
+
+      // ── Tundra snow-field patch (ground dressing) ─────────────────────────
+      if (biome === "tundra" && _chunkRand(cx, cz, 45) < 0.085) {
+        const sx = worldX + (_chunkRand(cx, cz, 46) - 0.5) * this.world.chunkSize * 0.75;
+        const sz = worldZ + (_chunkRand(cx, cz, 47) - 0.5) * this.world.chunkSize * 0.75;
+        this.fantasyAssets.getInstance("snowField", (root) => {
+          if (!root) return;
+          root.position.set(sx, 0, sz);
+          root.rotation.y = _chunkRand(cx, cz, 48) * Math.PI * 2;
+          const s = 0.85 + _chunkRand(cx, cz, 49) * 0.35;
+          root.scaling.setAll(s);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
+
+      // ── Forest / plains wildlife & props ──────────────────────────────────
+      if ((biome === "forest" || biome === "plains") && _chunkRand(cx, cz, 50) < 0.055) {
+        const rx = worldX + (_chunkRand(cx, cz, 51) - 0.5) * this.world.chunkSize * 0.85;
+        const rz = worldZ + (_chunkRand(cx, cz, 52) - 0.5) * this.world.chunkSize * 0.85;
+        this.fantasyAssets.getInstance("rabbit", (root) => {
+          if (!root) return;
+          root.position.set(rx, 0, rz);
+          root.rotation.y = _chunkRand(cx, cz, 53) * Math.PI * 2;
+          root.scaling.setAll(0.9 + _chunkRand(cx, cz, 54) * 0.25);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
+
+      if (biome === "forest" && _chunkRand(cx, cz, 55) < 0.038) {
+        const px = worldX + (_chunkRand(cx, cz, 56) - 0.5) * this.world.chunkSize * 0.55;
+        const pz = worldZ + (_chunkRand(cx, cz, 57) - 0.5) * this.world.chunkSize * 0.55;
+        this.fantasyAssets.getInstance("pumpkinCarved", (root) => {
+          if (!root) return;
+          root.position.set(px, 0, pz);
+          root.rotation.y = _chunkRand(cx, cz, 58) * Math.PI * 2;
+          root.scaling.setAll(1.0);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
+
+      if (biome === "plains" && _chunkRand(cx, cz, 59) < 0.032) {
+        const dx = worldX + (_chunkRand(cx, cz, 60) - 0.5) * this.world.chunkSize * 0.5;
+        const dz = worldZ + (_chunkRand(cx, cz, 61) - 0.5) * this.world.chunkSize * 0.5;
+        this.fantasyAssets.getInstance("d20Animated", (root) => {
+          if (!root) return;
+          root.position.set(dx, 0.15, dz);
+          root.rotation.y = _chunkRand(cx, cz, 62) * Math.PI * 2;
+          root.scaling.setAll(1.0);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
+
+      if (biome === "plains" && _chunkRand(cx, cz, 63) < 0.028) {
+        const cx3 = worldX + (_chunkRand(cx, cz, 64) - 0.5) * this.world.chunkSize * 0.45;
+        const cz3 = worldZ + (_chunkRand(cx, cz, 65) - 0.5) * this.world.chunkSize * 0.45;
+        this.fantasyAssets.getInstance("sheenChair", (root) => {
+          if (!root) return;
+          root.position.set(cx3, 0, cz3);
+          root.rotation.y = _chunkRand(cx, cz, 66) * Math.PI * 2;
+          root.scaling.setAll(1.0);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
+
+      if (biome === "desert" && _chunkRand(cx, cz, 67) < 0.022) {
+        const ax = worldX + (_chunkRand(cx, cz, 68) - 0.5) * this.world.chunkSize * 0.7;
+        const az = worldZ + (_chunkRand(cx, cz, 69) - 0.5) * this.world.chunkSize * 0.7;
+        this.fantasyAssets.getInstance("alien", (root) => {
+          if (!root) return;
+          root.position.set(ax, 0.2, az);
+          root.rotation.y = _chunkRand(cx, cz, 70) * Math.PI * 2;
+          root.scaling.setAll(1.0);
+          this.shadowGenerator?.addShadowCaster(root, true);
+        });
+      }
+
+      // ── Skull scatter (desert / tundra) ─────────────────────────────────────
+      if ((biome === "desert" || biome === "tundra") && _chunkRand(cx, cz, 71) < 0.065) {
+        const kx = worldX + (_chunkRand(cx, cz, 72) - 0.5) * this.world.chunkSize * 0.9;
+        const kz = worldZ + (_chunkRand(cx, cz, 73) - 0.5) * this.world.chunkSize * 0.9;
+        this.fantasyAssets.getInstance("skull", (root) => {
+          if (!root) return;
+          root.position.set(kx, 0, kz);
+          root.rotation.y = _chunkRand(cx, cz, 74) * Math.PI * 2;
+          root.scaling.setAll(0.55 + _chunkRand(cx, cz, 75) * 0.5);
           this.shadowGenerator?.addShadowCaster(root, true);
         });
       }

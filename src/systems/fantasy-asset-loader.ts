@@ -65,6 +65,15 @@ export type FantasyAssetKey =
   | "elfRun"          // Elf run animation — NPC locomotion variant
   | "elfDie"          // Elf death animation — NPC death variant
   | "dude"            // Animated humanoid — generic NPC / villager
+  // ── More BabylonJS Assets CDN samples (CC BY 4.0) ───────────────────────────
+  | "hvGirl"          // Animated female humanoid — NPC / settlement ambience
+  | "alien"           // Alien creature — rare oddity / Daedric stand-in prop
+  | "rabbit"          // Rabbit — forest / plains wildlife
+  | "shark"           // Shark — decorative aquatic / trophy prop
+  | "snowField"       // Snow terrain patch — tundra ground dressing
+  | "d20Animated"     // Animated D20 — camp / tavern gambling prop
+  | "pumpkinCarved"   // Carved pumpkin bucket — seasonal forest prop
+  | "sheenChair"      // Sheen chair — interior / exterior furniture
   // ── Quaternius: Fantasy Props Mega Kit (CC0) ──────────────────────────────
   | "qBarrel"         // Wooden barrel — tavern / warehouse prop
   | "qCrate"          // Wooden crate — warehouse / dungeon prop
@@ -214,6 +223,14 @@ const ASSET_URLS: Record<FantasyAssetKey, string> = {
   elfRun:         CDN_ELF  + "Elf_run.gltf",
   elfDie:         CDN_ELF  + "Elf_die.gltf",
   dude:           CDN      + "Dude/dude.babylon",
+  hvGirl:         CDN      + "HVGirl.glb",
+  alien:          CDN      + "alien.glb",
+  rabbit:         CDN      + "Rabbit.babylon",
+  shark:          CDN      + "shark.glb",
+  snowField:      CDN      + "Demos/Snow_Man_Scene/snowField.glb",
+  d20Animated:    CDN      + "D20_Animation.glb",
+  pumpkinCarved:  CDN      + "pumpkinBucketCarved.glb",
+  sheenChair:     CDN      + "SheenChair.glb",
   // ── Quaternius: Fantasy Props Mega Kit (CC0) ──────────────────────────────
   // NOTE: ASSET_URLS for Quaternius assets use lazy getters (resolved at load
   // time) so setQuaterniusBasePath() can be called before preload.
@@ -348,6 +365,14 @@ const ASSET_SCALE: Partial<Record<FantasyAssetKey, number>> = {
   qWolf:          0.7,
   qBat:           0.4,
   qGhost:         1.0,
+  hvGirl:         0.04,
+  alien:          0.45,
+  rabbit:         0.42,
+  shark:          0.22,
+  snowField:      0.038,
+  d20Animated:    0.55,
+  pumpkinCarved:  0.75,
+  sheenChair:     0.85,
 };
 
 // ── Internal state per asset ──────────────────────────────────────────────────

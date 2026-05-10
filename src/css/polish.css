@@ -89,3 +89,58 @@
   text-shadow: 0 0 10px rgba(255, 215, 0, 0.5) !important;
   font-weight: 800 !important;
 }
+
+/* ── In-game help overlay (DOM) ─────────────────────────────────────────────── */
+
+.game-help-overlay {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  max-width: 420px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  z-index: 2200;
+  pointer-events: none;
+  white-space: pre-wrap;
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #e8eef8;
+  border: 1px solid rgba(212, 175, 88, 0.35);
+  background:
+    linear-gradient(145deg, rgba(18, 14, 10, 0.94) 0%, rgba(8, 6, 4, 0.92) 100%),
+    url("https://assets.babylonjs.com/textures/leather.jpg") center / cover;
+  background-blend-mode: normal, luminosity;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ── Character creation: typography & backdrop ─────────────────────────────── */
+
+.character-create__title {
+  font-family: "Cinzel", "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.character-create {
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -10%, rgba(212, 160, 23, 0.12), transparent 55%),
+    radial-gradient(circle at 20% 80%, rgba(40, 72, 110, 0.12), transparent 45%),
+    url("https://assets.babylonjs.com/textures/floor.png") center / 420px repeat,
+    radial-gradient(circle at top, rgba(32, 22, 8, 0.94), rgba(4, 3, 2, 0.97)) !important;
+  background-blend-mode: screen, multiply, soft-light, normal;
+}
+
+.character-create__panel {
+  border-color: rgba(212, 160, 23, 0.5) !important;
+  box-shadow: 0 28px 64px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255, 230, 180, 0.08) !important;
+}
+
+/* ── Fast travel: Babylon wood texture underlay ─────────────────────────────── */
+
+.fast-travel {
+  background:
+    radial-gradient(circle at top, rgba(8, 10, 18, 0.92), rgba(3, 4, 8, 0.96)),
+    url("https://assets.babylonjs.com/textures/wood.jpg") center / 480px repeat !important;
+  background-blend-mode: multiply, soft-light;
+}
