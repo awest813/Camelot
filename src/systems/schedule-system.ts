@@ -50,7 +50,9 @@ export class ScheduleSystem {
     // Determine active schedule behavior (if any)
     const scheduledBehavior = this._getScheduledBehavior(npc);
 
-    if (scheduledBehavior) {
+    // "patrol" blocks use the same waypoint logic as the default path; only
+    // sleep / work / wander need bespoke handling here.
+    if (scheduledBehavior && scheduledBehavior !== "patrol") {
       this._applyScheduledBehavior(npc, scheduledBehavior, deltaTime);
       return;
     }
@@ -127,7 +129,7 @@ export class ScheduleSystem {
 
   private _applyScheduledBehavior(
     npc: NPC,
-    behavior: ScheduleBehaviorType,
+    behavior: Exclude<ScheduleBehaviorType, "patrol">,
     deltaTime: number,
   ): void {
     switch (behavior) {
@@ -139,9 +141,6 @@ export class ScheduleSystem {
         break;
       case "wander":
         this._applyWanderBehavior(npc, deltaTime);
-        break;
-      case "patrol":
-        // Fall through to regular patrol logic handled above
         break;
     }
   }
