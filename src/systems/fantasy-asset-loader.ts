@@ -74,6 +74,9 @@ export type FantasyAssetKey =
   | "d20Animated"     // Animated D20 — camp / tavern gambling prop
   | "pumpkinCarved"   // Carved pumpkin bucket — seasonal forest prop
   | "sheenChair"      // Sheen chair — interior / exterior furniture
+  | "underwaterScene" // Underwater demo environment — rare sunken vista
+  | "octopusCustomRig" // Rigged octopus — shoreline / oddity encounter
+  | "babylonBuoy"     // Buoy — shoreline / marker prop
   // ── Quaternius: Fantasy Props Mega Kit (CC0) ──────────────────────────────
   | "qBarrel"         // Wooden barrel — tavern / warehouse prop
   | "qCrate"          // Wooden crate — warehouse / dungeon prop
@@ -231,6 +234,9 @@ const ASSET_URLS: Record<FantasyAssetKey, string> = {
   d20Animated:    CDN      + "D20_Animation.glb",
   pumpkinCarved:  CDN      + "pumpkinBucketCarved.glb",
   sheenChair:     CDN      + "SheenChair.glb",
+  underwaterScene: CDN     + "Demos/UnderWaterScene/underwaterScene.glb",
+  octopusCustomRig: CDN    + "octopus_customRig.glb",
+  babylonBuoy:    CDN     + "babylonBuoy.glb",
   // ── Quaternius: Fantasy Props Mega Kit (CC0) ──────────────────────────────
   // NOTE: ASSET_URLS for Quaternius assets use lazy getters (resolved at load
   // time) so setQuaterniusBasePath() can be called before preload.
@@ -323,6 +329,17 @@ const ASSET_URLS: Record<FantasyAssetKey, string> = {
   get qAnimSit()         { return qAnims()    + "Sit.glb"; },
 };
 
+/**
+ * Keys whose resolved URL is absolute (`http(s)://`) — Babylon CDN assets only.
+ * Self-hosted Quaternius models (relative paths) are excluded so they load on demand.
+ */
+export function getRemoteCdnAssetKeys(): FantasyAssetKey[] {
+  return (Object.keys(ASSET_URLS) as FantasyAssetKey[]).filter((key) => {
+    const url = ASSET_URLS[key];
+    return typeof url === "string" && /^https?:\/\//i.test(url);
+  });
+}
+
 // ── Scale overrides (world-unit scale applied after load) ────────────────────
 
 const ASSET_SCALE: Partial<Record<FantasyAssetKey, number>> = {
@@ -373,6 +390,9 @@ const ASSET_SCALE: Partial<Record<FantasyAssetKey, number>> = {
   d20Animated:    0.55,
   pumpkinCarved:  0.75,
   sheenChair:     0.85,
+  underwaterScene: 0.022,
+  octopusCustomRig: 0.32,
+  babylonBuoy:    1.0,
 };
 
 // ── Internal state per asset ──────────────────────────────────────────────────
@@ -416,6 +436,15 @@ export class FantasyAssetLoader {
    */
   public preloadAll(): void {
     this.preload(Object.keys(ASSET_URLS) as FantasyAssetKey[]);
+  }
+
+  /**
+   * Preload Babylon CDN models only (excludes self-hosted Quaternius packs).
+   * Prefer this at startup to avoid dozens of parallel local GLB parses and
+   * memory spikes; Quaternius assets load when `getInstance` first requests them.
+   */
+  public preloadRemoteCdnAssets(): void {
+    this.preload(getRemoteCdnAssetKeys());
   }
 
   /**

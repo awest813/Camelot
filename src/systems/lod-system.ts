@@ -1,8 +1,8 @@
-import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
 export interface LodEntry {
-  mesh: Mesh;
+  mesh: AbstractMesh;
   /**
    * Distance beyond which the mesh is hidden (distance-culled).
    * Squared internally for performance.
@@ -26,7 +26,7 @@ export interface LodEntry {
  */
 export interface LodLevel {
   /** One of the detail meshes for this object. */
-  mesh: Mesh;
+  mesh: AbstractMesh;
   /**
    * Maximum distance (in world units) at which this mesh should be visible.
    * When the player is further than the last level's `maxDistance`, all
@@ -106,7 +106,7 @@ export class LodSystem {
    * @param cullDistance - Distance in world units beyond which the mesh is
    *   hidden.  Must be a positive finite number; invalid values are clamped to 1.
    */
-  public register(mesh: Mesh, cullDistance: number): void {
+  public register(mesh: AbstractMesh, cullDistance: number): void {
     if (this._entries.some(e => e.mesh === mesh)) return;
     const safeDist = Number.isFinite(cullDistance) && cullDistance > 0 ? cullDistance : 1;
     this._entries.push({ mesh, cullDistance: safeDist });
@@ -116,7 +116,7 @@ export class LodSystem {
    * Unregister a mesh and restore its visibility before removing it from the
    * tracking list.  Safe to call with a mesh that was never registered.
    */
-  public unregister(mesh: Mesh): void {
+  public unregister(mesh: AbstractMesh): void {
     const idx = this._entries.findIndex(e => e.mesh === mesh);
     if (idx === -1) return;
     const entry = this._entries[idx];
@@ -153,7 +153,7 @@ export class LodSystem {
    * Unregister a multi-level LOD group by its first mesh reference and restore
    * all mesh visibilities.  Safe to call with a mesh that was never registered.
    */
-  public unregisterLevels(firstMesh: Mesh): void {
+  public unregisterLevels(firstMesh: AbstractMesh): void {
     const idx = this._levelGroups.findIndex(g => g.levels[0]?.mesh === firstMesh);
     if (idx === -1) return;
     for (const level of this._levelGroups[idx].levels) {
