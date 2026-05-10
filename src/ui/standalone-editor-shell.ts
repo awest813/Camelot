@@ -317,6 +317,7 @@ export class StandaloneEditorShell {
 
       // Open button (entire row is clickable).
       const openBtn = document.createElement("button");
+      openBtn.type = "button";
       openBtn.className = "standalone-editor__recent-open";
       openBtn.setAttribute("aria-label", `Open project ${proj.name}`);
 
@@ -348,6 +349,7 @@ export class StandaloneEditorShell {
 
       // Remove button.
       const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
       removeBtn.className = "standalone-editor__recent-remove";
       removeBtn.textContent = "✕";
       removeBtn.setAttribute("aria-label", `Remove ${proj.name} from recent projects`);
@@ -428,6 +430,7 @@ export class StandaloneEditorShell {
 
     for (const fa of fileActions) {
       const btn = document.createElement("button");
+      btn.type = "button";
       btn.className = "standalone-editor__title-btn";
       btn.setAttribute("aria-label", fa.label);
       btn.title = fa.label;
@@ -457,6 +460,7 @@ export class StandaloneEditorShell {
 
     // Close button
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className   = "standalone-editor__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close editor shell");
@@ -496,6 +500,7 @@ export class StandaloneEditorShell {
 
       for (const tool of tools) {
         const btn = document.createElement("button");
+        btn.type = "button";
         btn.className = "standalone-editor__nav-item";
         btn.setAttribute("aria-label", `Open ${tool.label} (${tool.shortcut})`);
         btn.setAttribute("data-tool-id", tool.id);
@@ -572,6 +577,7 @@ export class StandaloneEditorShell {
       if (!tool) continue;
 
       const card = document.createElement("button");
+      card.type = "button";
       card.className = "standalone-editor__welcome-card";
       card.style.setProperty("--card-accent", tool.accent);
       card.setAttribute("role", "listitem");

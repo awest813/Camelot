@@ -89,6 +89,7 @@ export class QuestCreatorUI {
     header.appendChild(title);
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className = "quest-creator__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close quest creator");
@@ -186,6 +187,7 @@ export class QuestCreatorUI {
     section.appendChild(h3);
 
     const addBtn = document.createElement("button");
+    addBtn.type = "button";
     addBtn.className = "quest-creator__btn quest-creator__btn--sm";
     addBtn.textContent = "+ Add Node";
     addBtn.addEventListener("click", () => {
@@ -393,6 +395,7 @@ export class QuestCreatorUI {
 
   private _makeBtn(label: string, cls: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement("button");
+    btn.type = "button";
     btn.className = cls;
     btn.textContent = label;
     btn.addEventListener("click", onClick);
@@ -437,6 +440,7 @@ export class QuestCreatorUI {
     row1.appendChild(idLabel);
 
     const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
     removeBtn.className = "quest-creator__btn quest-creator__btn--sm quest-creator__btn--danger";
     removeBtn.textContent = "Remove";
     removeBtn.addEventListener("click", () => {

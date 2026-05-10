@@ -103,6 +103,7 @@ export class NpcCreatorUI {
     title.textContent = "NPC Creator";
     header.appendChild(title);
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className = "npc-creator__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close NPC creator");
@@ -325,6 +326,7 @@ export class NpcCreatorUI {
       inp.id = `npcc_ai_${field}`;
       lbl.htmlFor = inp.id;
       const setBtn = document.createElement("button");
+      setBtn.type = "button";
       setBtn.className   = "npc-creator__btn npc-creator__btn--sm";
       setBtn.textContent = "Set";
       setBtn.addEventListener("click", () => {
@@ -333,6 +335,7 @@ export class NpcCreatorUI {
         this._renderAIProfile();
       });
       const clrBtn = document.createElement("button");
+      clrBtn.type = "button";
       clrBtn.className   = "npc-creator__btn npc-creator__btn--sm npc-creator__btn--danger";
       clrBtn.textContent = "Clear";
       clrBtn.addEventListener("click", () => {
@@ -561,6 +564,7 @@ export class NpcCreatorUI {
     vInp.placeholder = vPlaceholder;
     vInp.type        = "text";
     const btn = document.createElement("button");
+    btn.type = "button";
     btn.className   = "npc-creator__btn npc-creator__btn--sm";
     btn.textContent = btnLabel;
     btn.addEventListener("click", () => {
@@ -599,6 +603,7 @@ export class NpcCreatorUI {
     valInp.step        = "0.05";
 
     const btn = document.createElement("button");
+    btn.type = "button";
     btn.className   = "npc-creator__btn npc-creator__btn--sm";
     btn.textContent = btnLabel;
     btn.addEventListener("click", () => {
@@ -622,6 +627,7 @@ export class NpcCreatorUI {
     valEl.className   = "npc-creator__kv-val";
     valEl.textContent = value;
     const rmBtn = document.createElement("button");
+    rmBtn.type = "button";
     rmBtn.className   = "npc-creator__btn npc-creator__btn--sm npc-creator__btn--danger";
     rmBtn.textContent = "✕";
     rmBtn.setAttribute("aria-label", "Remove");
@@ -634,6 +640,7 @@ export class NpcCreatorUI {
 
   private _makeBtn(label: string, cls: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement("button");
+    btn.type = "button";
     btn.className   = cls;
     btn.textContent = label;
     btn.addEventListener("click", onClick);

@@ -76,6 +76,7 @@ export class LootTableCreatorUI {
     title.textContent = "Loot Table Creator";
     header.appendChild(title);
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className   = "loot-table-creator__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close loot table creator");
@@ -190,6 +191,7 @@ export class LootTableCreatorUI {
     sectionHeader.appendChild(h3);
 
     const addBtn = document.createElement("button");
+    addBtn.type = "button";
     addBtn.className   = "loot-table-creator__btn loot-table-creator__btn--sm";
     addBtn.textContent = "+ Add Entry";
     addBtn.addEventListener("click", () => {
@@ -241,6 +243,7 @@ export class LootTableCreatorUI {
     row1.appendChild(keyLabel);
 
     const upBtn = document.createElement("button");
+    upBtn.type = "button";
     upBtn.className   = "loot-table-creator__btn loot-table-creator__btn--sm";
     upBtn.textContent = "↑";
     upBtn.setAttribute("aria-label", "Move entry up");
@@ -252,6 +255,7 @@ export class LootTableCreatorUI {
     row1.appendChild(upBtn);
 
     const downBtn = document.createElement("button");
+    downBtn.type = "button";
     downBtn.className   = "loot-table-creator__btn loot-table-creator__btn--sm";
     downBtn.textContent = "↓";
     downBtn.setAttribute("aria-label", "Move entry down");
@@ -263,6 +267,7 @@ export class LootTableCreatorUI {
     row1.appendChild(downBtn);
 
     const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
     removeBtn.className   = "loot-table-creator__btn loot-table-creator__btn--sm loot-table-creator__btn--danger";
     removeBtn.textContent = "Remove";
     removeBtn.addEventListener("click", () => {
@@ -547,6 +552,7 @@ export class LootTableCreatorUI {
 
   private _makeBtn(label: string, cls: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement("button");
+    btn.type = "button";
     btn.className   = cls;
     btn.textContent = label;
     btn.addEventListener("click", onClick);

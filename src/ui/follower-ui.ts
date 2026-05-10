@@ -287,6 +287,7 @@ export class FollowerUI {
     title.textContent = "FOLLOWERS";
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     _styleButton(closeBtn, "×", { fontSize: "18px", padding: "0 6px" });
     closeBtn.setAttribute("aria-label", "Close followers panel");
     closeBtn.addEventListener("click", () => {
@@ -435,18 +436,21 @@ export class FollowerUI {
 
     if (follower.isAlive) {
       const followBtn = document.createElement("button");
+      followBtn.type = "button";
       _styleButton(followBtn, "Follow", { fontSize: "10px", padding: "3px 8px" });
       followBtn.disabled = follower.command === "follow";
       followBtn.setAttribute("aria-label", "Command follower to follow");
       followBtn.addEventListener("click", () => this.onCommand?.("follow"));
 
       const waitBtn = document.createElement("button");
+      waitBtn.type = "button";
       _styleButton(waitBtn, "Wait", { fontSize: "10px", padding: "3px 8px" });
       waitBtn.disabled = follower.command === "wait";
       waitBtn.setAttribute("aria-label", "Command follower to wait");
       waitBtn.addEventListener("click", () => this.onCommand?.("wait"));
 
       const tradeBtn = document.createElement("button");
+      tradeBtn.type = "button";
       _styleButton(tradeBtn, "Trade", { fontSize: "10px", padding: "3px 8px" });
       tradeBtn.disabled = follower.command === "trade";
       tradeBtn.setAttribute("aria-label", "Open trade with follower");
@@ -462,6 +466,7 @@ export class FollowerUI {
 
     if (follower.isAlive) {
       const dismissBtn = document.createElement("button");
+      dismissBtn.type = "button";
       _styleButton(dismissBtn, "Dismiss Follower");
       dismissBtn.setAttribute("aria-label", `Dismiss ${follower.name}`);
       dismissBtn.addEventListener("click", () => {
@@ -566,6 +571,7 @@ export class FollowerUI {
 
     if (!isDeceased) {
       const btn = document.createElement("button");
+      btn.type = "button";
       _styleButton(btn, tmpl.hireCost > 0 ? `Recruit (${tmpl.hireCost} 🪙)` : "Recruit");
       btn.disabled = hasActive || !canAfford;
       btn.setAttribute("aria-label", `Recruit ${tmpl.name}`);

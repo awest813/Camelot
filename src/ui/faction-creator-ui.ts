@@ -84,6 +84,7 @@ export class FactionCreatorUI {
     title.textContent = "Faction Creator";
     header.appendChild(title);
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className   = "faction-creator__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close faction creator");
@@ -197,6 +198,7 @@ export class FactionCreatorUI {
     header.appendChild(h3);
 
     const addBtn = document.createElement("button");
+    addBtn.type = "button";
     addBtn.className   = "faction-creator__btn faction-creator__btn--sm";
     addBtn.textContent = "+ Add Relation";
     addBtn.addEventListener("click", () => {
@@ -288,6 +290,7 @@ export class FactionCreatorUI {
 
     // Remove button
     const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
     removeBtn.className   = "faction-creator__btn faction-creator__btn--sm faction-creator__btn--danger";
     removeBtn.textContent = "Remove";
     removeBtn.addEventListener("click", () => {
@@ -453,6 +456,7 @@ export class FactionCreatorUI {
 
   private _makeBtn(label: string, cls: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement("button");
+    btn.type = "button";
     btn.className   = cls;
     btn.textContent = label;
     btn.addEventListener("click", onClick);

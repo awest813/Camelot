@@ -120,6 +120,7 @@ export class DialogueCreatorUI {
     this._startInput.addEventListener("input", () => this._flushMeta());
 
     const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
     closeBtn.className = "dlg-creator__close-btn";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close dialogue creator");
@@ -164,6 +165,7 @@ export class DialogueCreatorUI {
     listHeader.appendChild(sectionTitle);
 
     const addBtn = document.createElement("button");
+    addBtn.type = "button";
     addBtn.className = "dlg-creator__btn dlg-creator__btn--sm";
     addBtn.textContent = "+ Add Node";
     addBtn.addEventListener("click", () => {
@@ -278,6 +280,7 @@ export class DialogueCreatorUI {
     topRow.appendChild(titleEl);
 
     const delBtn = document.createElement("button");
+    delBtn.type = "button";
     delBtn.className = "dlg-creator__btn dlg-creator__btn--sm dlg-creator__btn--danger";
     delBtn.textContent = "Delete Node";
     delBtn.addEventListener("click", () => {
@@ -342,6 +345,7 @@ export class DialogueCreatorUI {
     choicesHeader.appendChild(choiceTitle);
 
     const addChoiceBtn = document.createElement("button");
+    addChoiceBtn.type = "button";
     addChoiceBtn.className = "dlg-creator__btn dlg-creator__btn--sm";
     addChoiceBtn.textContent = "+ Add Choice";
     addChoiceBtn.addEventListener("click", () => {
@@ -382,6 +386,7 @@ export class DialogueCreatorUI {
     headerRow.appendChild(choiceId);
 
     const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
     removeBtn.className = "dlg-creator__btn dlg-creator__btn--sm dlg-creator__btn--danger";
     removeBtn.textContent = "✕";
     removeBtn.setAttribute("aria-label", "Remove choice");
@@ -485,6 +490,7 @@ export class DialogueCreatorUI {
       row.appendChild(tag);
 
       const rmBtn = document.createElement("button");
+      rmBtn.type = "button";
       rmBtn.className   = "dlg-creator__btn dlg-creator__btn--sm dlg-creator__btn--danger";
       rmBtn.textContent = "✕";
       rmBtn.setAttribute("aria-label", "Remove condition");
@@ -536,6 +542,7 @@ export class DialogueCreatorUI {
     arg2.type        = "text";
 
     const addBtn = document.createElement("button");
+    addBtn.type = "button";
     addBtn.className   = "dlg-creator__btn dlg-creator__btn--sm";
     addBtn.textContent = "+ Condition";
     addBtn.addEventListener("click", () => {
@@ -591,6 +598,7 @@ export class DialogueCreatorUI {
       row.appendChild(tag);
 
       const rmBtn = document.createElement("button");
+      rmBtn.type = "button";
       rmBtn.className   = "dlg-creator__btn dlg-creator__btn--sm dlg-creator__btn--danger";
       rmBtn.textContent = "✕";
       rmBtn.setAttribute("aria-label", "Remove effect");
@@ -641,6 +649,7 @@ export class DialogueCreatorUI {
     arg2.type        = "text";
 
     const addBtn = document.createElement("button");
+    addBtn.type = "button";
     addBtn.className   = "dlg-creator__btn dlg-creator__btn--sm";
     addBtn.textContent = "+ Effect";
     addBtn.addEventListener("click", () => {
@@ -743,6 +752,7 @@ export class DialogueCreatorUI {
 
   private _makeBtn(label: string, cls: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement("button");
+    btn.type = "button";
     btn.className   = cls;
     btn.textContent = label;
     btn.addEventListener("click", onClick);
