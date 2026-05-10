@@ -437,6 +437,123 @@ export const frameworkBaseContent: RpgContentBundle = {
         },
       ],
     },
+    {
+      id: "trainer_blade_intro",
+      startNodeId: "greet",
+      nodes: [
+        {
+          id: "greet",
+          speaker: "Blade Instructor",
+          text: "Footwork wins fights — not just strength. I can sharpen your blade work for the right price.",
+          choices: [
+            {
+              id: "train",
+              text: "Train me in the Blade. (One session, gold cost scales with your current skill.)",
+              effects: [
+                { type: "emit_event", eventId: "trainer:train", payload: { trainerId: "trainer_blade_master" } },
+              ],
+              nextNodeId: "after_train",
+            },
+            {
+              id: "cost",
+              text: "What do you charge?",
+              nextNodeId: "cost_reply",
+            },
+            {
+              id: "leave",
+              text: "Maybe another time.",
+              endsDialogue: true,
+            },
+          ],
+        },
+        {
+          id: "cost_reply",
+          speaker: "Blade Instructor",
+          text: "Simple: a base fee plus a little extra for each rank you already have. I can take you up to journeyman level — then you'll need a real duelist.",
+          choices: [
+            {
+              id: "train",
+              text: "All right — train me.",
+              effects: [
+                { type: "emit_event", eventId: "trainer:train", payload: { trainerId: "trainer_blade_master" } },
+              ],
+              nextNodeId: "after_train",
+            },
+            { id: "back", text: "I'll think about it.", nextNodeId: "greet" },
+          ],
+        },
+        {
+          id: "after_train",
+          speaker: "Blade Instructor",
+          text: "Good. Hold that guard higher next time.",
+          choices: [{ id: "bye", text: "Thanks.", endsDialogue: true }],
+        },
+      ],
+    },
+    {
+      id: "trainer_alchemy_intro",
+      startNodeId: "greet",
+      nodes: [
+        {
+          id: "greet",
+          speaker: "Alchemy Tutor",
+          text: "Mortar and pestle, heat and timing — alchemy rewards patience. I sell no bottles here; I teach understanding.",
+          choices: [
+            {
+              id: "train",
+              text: "Help me improve my Alchemy.",
+              effects: [
+                { type: "emit_event", eventId: "trainer:train", payload: { trainerId: "trainer_alchemy_sage" } },
+              ],
+              nextNodeId: "after_train",
+            },
+            {
+              id: "leave",
+              text: "I'll practice on my own.",
+              endsDialogue: true,
+            },
+          ],
+        },
+        {
+          id: "after_train",
+          speaker: "Alchemy Tutor",
+          text: "Remember: shared effects make potions. Opposing ones make lessons.",
+          choices: [{ id: "bye", text: "Understood.", endsDialogue: true }],
+        },
+      ],
+    },
+    {
+      id: "trainer_destruction_intro",
+      startNodeId: "greet",
+      nodes: [
+        {
+          id: "greet",
+          speaker: "Battlemage",
+          text: "Power without control is just noise. I drill mages until their sparks go where they intend.",
+          choices: [
+            {
+              id: "train",
+              text: "Train my Destruction magic.",
+              effects: [
+                { type: "emit_event", eventId: "trainer:train", payload: { trainerId: "trainer_destruction_mage" } },
+              ],
+              nextNodeId: "after_train",
+            },
+            {
+              id: "leave",
+              text: "Not today.",
+              endsDialogue: true,
+            },
+          ],
+        },
+        {
+          id: "after_train",
+          speaker: "Battlemage",
+          text: "Channel cleaner. The weave will thank you.",
+          choices: [{ id: "bye", text: "I'll keep at it.", endsDialogue: true }],
+        },
+      ],
+    },
   ],
   quests: [
     {
@@ -850,6 +967,56 @@ export const frameworkBaseContent: RpgContentBundle = {
       respawns: false,
       voiceType: "neutral",
       personalityTraits: ["cunning"],
+    },
+    {
+      id: "archetype_trainer_blade",
+      name: "Blade Instructor",
+      description: "A retired sellsword who coaches footwork and striking for coin.",
+      role: "trainer",
+      factionId: "merchants_guild",
+      isHostile: false,
+      isMerchant: false,
+      dialogueId: "trainer_blade_intro",
+      baseHealth: 95,
+      level: 4,
+      skills: { "one_handed": 70, "block": 45, "heavy_armor": 40 },
+      disposition: 55,
+      respawns: false,
+      voiceType: "neutral",
+      personalityTraits: ["brave"],
+    },
+    {
+      id: "archetype_trainer_alchemy",
+      name: "Alchemy Tutor",
+      description: "An apothecary who prefers teaching synthesis to hawking bottles.",
+      role: "trainer",
+      factionId: "mages_college",
+      isHostile: false,
+      isMerchant: false,
+      dialogueId: "trainer_alchemy_intro",
+      baseHealth: 60,
+      level: 3,
+      skills: { "alchemy": 75, "speechcraft": 40 },
+      disposition: 58,
+      respawns: false,
+      voiceType: "neutral",
+      personalityTraits: ["cunning"],
+    },
+    {
+      id: "archetype_trainer_destruction",
+      name: "Battlemage Instructor",
+      description: "A war-mage who drills students in controlled destructive force.",
+      role: "trainer",
+      factionId: "mages_college",
+      isHostile: false,
+      isMerchant: false,
+      dialogueId: "trainer_destruction_intro",
+      baseHealth: 85,
+      level: 5,
+      skills: { "destruction": 80, "restoration": 35, "block": 30 },
+      disposition: 48,
+      respawns: false,
+      voiceType: "neutral",
     },
   ],
 };

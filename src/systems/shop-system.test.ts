@@ -125,6 +125,26 @@ describe("ShopSystem", () => {
     });
   });
 
+  // ── getShopByMerchantId ───────────────────────────────────────────────────
+
+  describe("getShopByMerchantId", () => {
+    it("returns undefined when no shop uses the merchant id", () => {
+      expect(sys.getShopByMerchantId("merchant_unknown")).toBeUndefined();
+    });
+
+    it("returns the shop registered for a merchant id", () => {
+      sys.registerShop(IRON_FORGE);
+      const s = sys.getShopByMerchantId("merchant_iron_forge");
+      expect(s?.id).toBe("shop_iron_forge");
+    });
+
+    it("returns the first shop when iterating registration order", () => {
+      sys.registerShop({ ...GENERAL_STORE, id: "shop_a", merchantId: "merchant_shared" });
+      sys.registerShop({ ...IRON_FORGE, id: "shop_b", merchantId: "merchant_shared" });
+      expect(sys.getShopByMerchantId("merchant_shared")!.id).toBe("shop_a");
+    });
+  });
+
   // ── registeredIds ──────────────────────────────────────────────────────────
 
   describe("registeredIds", () => {

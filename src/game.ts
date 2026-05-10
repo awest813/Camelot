@@ -49,6 +49,7 @@ import { CrimeSystem } from "./systems/crime-system";
 import { ContainerSystem } from "./systems/container-system";
 import { ProjectileSystem } from "./systems/projectile-system";
 import { BarterSystem } from "./systems/barter-system";
+import { ShopSystem, type ShopDef } from "./systems/shop-system";
 import { CellManager } from "./world/cell-manager";
 import { SpellSystem } from "./systems/spell-system";
 import { PersuasionSystem } from "./systems/persuasion-system";
@@ -237,6 +238,8 @@ export class Game {
   public containerSystem: ContainerSystem;
   public projectileSystem: ProjectileSystem;
   public barterSystem: BarterSystem;
+  /** Registered storefronts linked to {@link barterSystem} merchants (hours, categories). */
+  public shopSystem: ShopSystem;
   public cellManager: CellManager;
 
   // v3 systems (Oblivion-lite depth)
@@ -1010,6 +1013,7 @@ export class Game {
     this.projectileSystem = new ProjectileSystem(this.scene, this.player, this.scheduleSystem.npcs, this.ui);
     this.projectileSystem.stealthSystem = this.stealthSystem;
     this.barterSystem    = new BarterSystem(this.inventorySystem, this.ui);
+    this.shopSystem      = new ShopSystem();
     this.barterSystem.onTransaction = () => {
       this._mirrorBarterGoldToInventory();
       this._syncInventoryGoldToFramework();
@@ -2139,6 +2143,56 @@ export class Game {
       openHour: 9,
       closeHour: 18,
     });
+
+    const starterShops: ShopDef[] = [
+      {
+        id: "shop_trader_elan",
+        name: "Trader Elan's Stall",
+        type: "general",
+        merchantId: "merchant_01",
+        factionId: "town",
+        openHour: 8,
+        closeHour: 20,
+        description: "Roadside trader with potions and arrows.",
+      },
+      {
+        id: "shop_village_general",
+        name: "Village General Goods",
+        type: "general",
+        merchantId: "merchant_general_01",
+        factionId: "merchants_guild",
+        openHour: 7,
+        closeHour: 21,
+      },
+      {
+        id: "shop_roadside_arms",
+        name: "Roadside Arms",
+        type: "weapons",
+        merchantId: "merchant_weapons_01",
+        factionId: "merchants_guild",
+        openHour: 8,
+        closeHour: 19,
+      },
+      {
+        id: "shop_shield_hauberk",
+        name: "Shield & Hauberk",
+        type: "armor",
+        merchantId: "merchant_armor_01",
+        factionId: "merchants_guild",
+        openHour: 8,
+        closeHour: 19,
+      },
+      {
+        id: "shop_stillwater_reagents",
+        name: "Stillwater Reagents",
+        type: "alchemist",
+        merchantId: "merchant_alchemist_01",
+        factionId: "mages_college",
+        openHour: 9,
+        closeHour: 18,
+      },
+    ];
+    this.shopSystem.registerAll(starterShops);
 
     this._barterUI.onBuy = (itemId) => {
       const mid = this.barterSystem.activeMerchantId;
@@ -4086,6 +4140,35 @@ export class Game {
   }
 
   private _handleDialogueHostEvent(eventId: string, payload?: Record<string, unknown>): void {
+      if (eventId === "trainer:train") {
+        const trainerId = typeof payload?.trainerId === "string" ? payload.trainerId : "";
+        if (!trainerId) return;
+        const def = this.trainerSystem.getTrainer(trainerId);
+        if (!def) {
+          this.ui.showNotification("That trainer is not available.", 2000);
+          return;
+        }
+        const skillState = this.skillProgressionSystem.getSkill(def.skillId);
+        const currentLevel = skillState?.level ?? 0;
+        const skillName = skillState?.name ?? def.skillId;
+        const gold = this._getInventoryGold();
+        const result = this.trainerSystem.train(trainerId, currentLevel, gold);
+        if (!result.success) {
+          const cost = this.trainerSystem.getCost(trainerId, currentLevel);
+          const reasonMsg: Record<string, string> = {
+            unknown_trainer: "That trainer is not available.",
+            skill_at_cap: `Your ${skillName} is as high as I can train you.`,
+            session_limit_reached:
+              "You've trained enough for now. Gain a character level, then return.",
+            insufficient_gold: `You need ${cost ?? 0} gold for the next lesson.`,
+          };
+          this.ui.showNotification(
+            reasonMsg[result.reason] ?? `Cannot train (${result.reason}).`,
+            3200,
+          );
+        }
+        return;
+      }
       if (eventId === "barter:open") {
         const merchantId = typeof payload?.merchantId === "string" ? payload.merchantId : "merchant_01";
         if (this._barterUI.isVisible) {
@@ -4120,6 +4203,11 @@ export class Game {
       if (!merchantId) return;
 
       const hour = this.timeSystem.hour;
+      const shop = this.shopSystem.getShopByMerchantId(merchantId);
+      if (shop && !this.shopSystem.isOpen(shop.id, hour)) {
+        this.ui.showNotification(`${shop.name} is closed right now.`, 2600);
+        return;
+      }
       if (!this.barterSystem.openBarter(merchantId, hour)) {
         return;
       }

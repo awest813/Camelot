@@ -89,6 +89,17 @@ export class ShopSystem {
     return this._shops.get(id);
   }
 
+  /**
+   * Returns the shop tied to a BarterSystem `merchantId`, or `undefined`.
+   * When multiple shops share a merchant (unusual), the first match wins.
+   */
+  public getShopByMerchantId(merchantId: string): Readonly<ShopDef> | undefined {
+    for (const shop of this._shops.values()) {
+      if (shop.merchantId === merchantId) return shop;
+    }
+    return undefined;
+  }
+
   /** All registered shop IDs. */
   public get registeredIds(): string[] {
     return Array.from(this._shops.keys());
