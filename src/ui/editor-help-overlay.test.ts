@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { buildHelpOverlayLines, summarizeValidationReport } from "./editor-help-overlay";
 
 describe("buildHelpOverlayLines", () => {
+  it("includes Character Sheet (Tab) in gameplay overlay", () => {
+    const lines = buildHelpOverlayLines(false);
+    expect(lines.join("\n")).toContain("Tab: Character Sheet");
+  });
+
   it("returns gameplay-focused controls when editor is disabled", () => {
     const lines = buildHelpOverlayLines(false);
     expect(lines[0]).toBe("Gameplay Controls");

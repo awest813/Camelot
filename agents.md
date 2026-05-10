@@ -7,6 +7,7 @@ This document is for AI coding agents and contributors who need to change how ne
 - **UI**: `src/ui/character-creation-ui.ts` — `CharacterCreationUI.open()` returns a `CharacterCreationResult` (`name`, `raceId`, `birthsignId`, `classId`, `skipGameplayTips`).
 - **Flow**: Welcome (copy + optional “skip gameplay tips”) → Name → Race → Birthsign → Class → resolve.
 - **Styling**: `src/css/main.css` — `.character-create*` and `.onboarding-tip*`.
+- **Character sheet**: Tab toggles `CharacterSheetUI` (`src/ui/character-sheet-ui.ts`) — full summary with character level vs combat XP level, attributes, skills, reputation; calls `Game._refreshCharacterSheet()` when opened.
 - **Game integration**: `Game._runCharacterCreation()` in `src/game.ts` applies choices via `raceSystem.chooseRace`, `birthsignSystem.chooseBirthsign`, `classSystem.chooseClass`, sets `player.name`, then persists skip preference and may start onboarding.
 
 ## Systems touched by choices

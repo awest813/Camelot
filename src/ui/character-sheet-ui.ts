@@ -10,8 +10,10 @@ import type { ProgressionSkill } from "../systems/skill-progression-system";
 export interface CharacterSheetData {
   /** Character display name. */
   name?:              string;
-  /** Current character level (from PlayerLevelSystem). */
+  /** Oblivion-style character level (major-skill cycles via PlayerLevelSystem). */
   level?:             number;
+  /** Combat XP tier from the demo Player entity (`player.level`). */
+  xpLevel?:           number;
   /** Display name of the chosen race. */
   raceName?:          string;
   /** Display name of the chosen class. */
@@ -76,9 +78,10 @@ const ATTRIBUTE_ORDER: Array<{ key: AttributeName; label: string }> = [
  *   ui.update({
  *     name:          player.name,
  *     level:         playerLevelSystem.characterLevel,
+ *     xpLevel:       player.level,
  *     raceName:      raceSystem.chosenRace?.name,
  *     className:     classSystem.chosenClass?.name,
- *     birthsignName: birthsignSystem.chosenSign?.name,
+ *     birthsignName: birthsignSystem.chosenBirthsign?.name,
  *     specialization: classSystem.chosenClass?.specialization,
  *     attributes:    attributeSystem.getAll(),
  *     skills:        skillProgressionSystem.getAllSkills(),
@@ -243,7 +246,8 @@ export class CharacterSheetUI {
 
     const rows: Array<{ label: string; value: string | number | undefined }> = [
       { label: "Name",           value: data.name         },
-      { label: "Level",          value: data.level        },
+      { label: "Character level", value: data.level       },
+      { label: "Combat XP level", value: data.xpLevel     },
       { label: "Race",           value: data.raceName     },
       { label: "Class",          value: data.className    },
       { label: "Birthsign",      value: data.birthsignName },

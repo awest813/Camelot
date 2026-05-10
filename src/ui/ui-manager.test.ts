@@ -128,10 +128,10 @@ describe('UIManager', () => {
         });
 
         it('should clamp xp bar and keep level label in sync', () => {
-            uiManager.updateXP(999, 100, 8);
+            uiManager.updateXP(999, 100, 8, 3);
             expect(uiManager.xpBar.width).toBe('100%');
 
-            uiManager.updateXP(-5, 100, 9);
+            uiManager.updateXP(-5, 100, 9, 4);
             expect(uiManager.xpBar.width).toBe('0%');
         });
     });

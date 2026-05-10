@@ -116,6 +116,8 @@ export class UIManager {
   // XP Bar
   public xpBar: Rectangle;
   private _xpLevelLabel: TextBlock;
+  /** True while the HTML Character Sheet overlay is open (hides crosshair with other blocking panels). */
+  private _characterSheetOpen: boolean = false;
 
   // Camera Shake & Hit-stop
   private _cameraTrauma: number = 0;
@@ -269,7 +271,7 @@ export class UIManager {
     // ── XP Bar ────────────────────────────────────────────────────────────────
     const xpRow = new StackPanel();
     xpRow.isVertical = false;
-    xpRow.height = "16px";
+    xpRow.height = "28px";
     xpRow.width = "630px";
     xpRow.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
     xpRow.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
@@ -277,16 +279,18 @@ export class UIManager {
     this._ui.addControl(xpRow);
 
     this._xpLevelLabel = new TextBlock();
-    this._xpLevelLabel.text = "Lv.1";
+    this._xpLevelLabel.text = "CL 1\nLv.1";
     this._xpLevelLabel.color = T.TITLE;
-    this._xpLevelLabel.fontSize = 11;
+    this._xpLevelLabel.fontSize = 10;
     this._xpLevelLabel.fontWeight = "bold";
-    this._xpLevelLabel.width = "44px";
+    this._xpLevelLabel.lineSpacing = "-2px";
+    this._xpLevelLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    this._xpLevelLabel.width = "56px";
     this._xpLevelLabel.height = "100%";
     xpRow.addControl(this._xpLevelLabel);
 
     const xpBarContainer = new Rectangle();
-    xpBarContainer.width = "580px";
+    xpBarContainer.width = "568px";
     xpBarContainer.height = "8px";
     xpBarContainer.cornerRadius = 5;
     xpBarContainer.color = "rgba(212, 160, 23, 0.45)";
@@ -913,9 +917,16 @@ export class UIManager {
       this.questLogPanel.isVisible ||
       this.skillTreePanel.isVisible ||
       !!this.attributePanel?.isVisible ||
-      this.isWaitDialogOpen;
+      this.isWaitDialogOpen ||
+      this._characterSheetOpen;
 
     this.toggleCrosshair(!hasBlockingPanelOpen);
+  }
+
+  /** Notify the HUD when the DOM Character Sheet is toggled so the crosshair stays hidden with other overlays. */
+  public setCharacterSheetOpen(open: boolean): void {
+    this._characterSheetOpen = open;
+    this._syncCrosshairVisibility();
   }
 
   public updateQuestLog(quests: Quest[]): void {
@@ -1000,8 +1011,10 @@ export class UIManager {
     this.crosshair.scaleY = scale;
   }
 
-  public updateStats(player: Player): void {
-    this.statsText.text = `Stats:\nLv: ${player.level}  XP: ${Math.floor(player.experience)}/${player.experienceToNextLevel}\nHP: ${Math.floor(player.health)} / ${player.maxHealth}\nMP: ${Math.floor(player.magicka)} / ${player.maxMagicka}\nSP: ${Math.floor(player.stamina)} / ${player.maxStamina}\nDMG Bonus: +${player.bonusDamage}\nArmor: ${player.bonusArmor}`;
+  public updateStats(player: Player, characterLevel: number): void {
+    this.statsText.text =
+      `Stats:\nCharacter Lv: ${characterLevel}  Combat Lv: ${player.level}  XP: ${Math.floor(player.experience)}/${player.experienceToNextLevel}\n` +
+      `HP: ${Math.floor(player.health)} / ${player.maxHealth}\nMP: ${Math.floor(player.magicka)} / ${player.maxMagicka}\nSP: ${Math.floor(player.stamina)} / ${player.maxStamina}\nDMG Bonus: +${player.bonusDamage}\nArmor: ${player.bonusArmor}`;
   }
 
   public setEquippedIds(ids: Set<string>): void {
@@ -1260,9 +1273,9 @@ export class UIManager {
     this.staminaBar.width = clampPercentage(current, max);
   }
 
-  public updateXP(current: number, max: number, level: number): void {
+  public updateXP(current: number, max: number, xpLevel: number, characterLevel: number): void {
     this.xpBar.width = clampPercentage(current, max);
-    this._xpLevelLabel.text = `Lv.${level}`;
+    this._xpLevelLabel.text = `CL ${characterLevel}\nLv.${xpLevel}`;
   }
 
   /**
