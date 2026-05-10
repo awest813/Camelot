@@ -15,26 +15,26 @@ import { AttributeSystem, ATTRIBUTE_NAMES, type AttributeName } from "../systems
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
-  PANEL_BG:     "rgba(6, 4, 2, 0.95)",
-  PANEL_BORDER: "#6B4F12",
-  TITLE:        "#D4A017",
-  TEXT:         "#EEE0C0",
-  DIM:          "#998877",
+  PANEL_BG:     "rgba(8, 5, 2, 0.94)",
+  PANEL_BORDER: "#8B6914",
+  TITLE:        "#E8C656",
+  TEXT:         "#F2E8D8",
+  DIM:          "#A89880",
   GOOD:         "#5EC45E",
   HP_FILL:      "#CC1A1A",
-  HP_BG:        "rgba(60, 4, 4, 0.7)",
+  HP_BG:        "rgba(60, 4, 4, 0.72)",
   MP_FILL:      "#1A4ACC",
-  MP_BG:        "rgba(4, 12, 60, 0.7)",
+  MP_BG:        "rgba(4, 12, 60, 0.72)",
   SP_FILL:      "#1A8840",
-  SP_BG:        "rgba(4, 28, 12, 0.7)",
-  XP_FILL:      "#D4A017",
-  XP_BG:        "rgba(30, 18, 0, 0.7)",
-  BTN_BG:       "rgba(28, 20, 6, 0.95)",
-  BTN_HOVER:    "rgba(80, 56, 10, 0.98)",
-  SLOT_BG:      "rgba(20, 14, 4, 0.85)",
-  SLOT_HOVER:   "rgba(50, 36, 8, 0.90)",
-  EQUIP_BG:     "rgba(40, 28, 0, 0.85)",
-  EQUIP_BORDER: "#D4A017",
+  SP_BG:        "rgba(4, 28, 12, 0.72)",
+  XP_FILL:      "#E8C656",
+  XP_BG:        "rgba(30, 18, 0, 0.75)",
+  BTN_BG:       "rgba(32, 22, 8, 0.96)",
+  BTN_HOVER:    "rgba(72, 52, 14, 0.98)",
+  SLOT_BG:      "rgba(22, 16, 6, 0.88)",
+  SLOT_HOVER:   "rgba(52, 38, 10, 0.92)",
+  EQUIP_BG:     "rgba(44, 30, 4, 0.88)",
+  EQUIP_BORDER: "#E8C656",
 };
 
 /** Subset of `T` for panels that should match the main HUD (e.g. dialogue). */
@@ -1133,18 +1133,25 @@ export class UIManager {
   public showNotification(text: string, duration: number = 3000): void {
     const rect = new Rectangle();
     rect.width = "100%";
-    rect.height = "38px";
-    rect.cornerRadius = 6;
-    rect.color = T.PANEL_BORDER;
-    rect.thickness = 1;
-    rect.background = "rgba(8, 5, 0, 0.92)";
-    rect.paddingBottom = "4px";
+    rect.height = "40px";
+    rect.cornerRadius = 8;
+    rect.color = "rgba(232, 198, 86, 0.55)";
+    rect.thickness = 2;
+    rect.background = "rgba(14, 10, 4, 0.96)";
+    rect.paddingBottom = "5px";
+    rect.shadowOffsetX = 0;
+    rect.shadowOffsetY = 2;
+    rect.shadowBlur = 10;
+    rect.shadowColor = "rgba(0,0,0,0.55)";
 
     const label = new TextBlock();
     label.text = text;
     label.color = T.TITLE;
     label.fontSize = 14;
     label.fontWeight = "bold";
+    label.shadowColor = "rgba(0,0,0,0.75)";
+    label.shadowBlur = 4;
+    label.shadowOffsetY = 1;
     rect.addControl(label);
 
     this.notificationPanel.addControl(rect);

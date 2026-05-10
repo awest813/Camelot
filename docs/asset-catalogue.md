@@ -295,6 +295,19 @@ These assets are registered in `FantasyAssetLoader` and ready to use via their
 | `candle` | Candle — interior / shrine decoration | `candle.babylon` | Babylon |
 | `hexTile` | Hex tile — modular terrain piece | `hexTile.glb` | GLB |
 
+### Extra characters, props & dressing (integrated)
+
+| Key | Description | CDN Path | Format |
+|-----|-------------|----------|--------|
+| `hvGirl` | Animated female humanoid | `HVGirl.glb` | GLB |
+| `alien` | Alien creature (rare desert prop) | `alien.glb` | GLB |
+| `rabbit` | Rabbit wildlife | `Rabbit.babylon` | Babylon |
+| `shark` | Shark model (preload; decorative use) | `shark.glb` | GLB |
+| `snowField` | Snow terrain patch — tundra dressing | `Demos/Snow_Man_Scene/snowField.glb` | GLB |
+| `d20Animated` | Animated twenty-sided die | `D20_Animation.glb` | GLB |
+| `pumpkinCarved` | Carved pumpkin bucket | `pumpkinBucketCarved.glb` | GLB |
+| `sheenChair` | Sheen chair furniture | `SheenChair.glb` | GLB |
+
 ---
 
 ## Additional CDN Assets (Not Yet Integrated)
@@ -303,30 +316,12 @@ The BabylonJS Assets CDN contains many more models that could be added to the
 catalogue.  Below are candidates that may be useful for Camelot but have not
 yet been integrated into `FantasyAssetLoader`.
 
-### Characters
-
-| Asset | CDN Path | Notes |
-|-------|----------|-------|
-| `HVGirl.glb` | `HVGirl.glb` | Animated female character |
-| `alien.glb` | `alien.glb` | Could serve as a Daedra/demon variant |
-| `Rabbit.babylon` | `Rabbit.babylon` | Wildlife / pet candidate |
-| `shark.glb` | `shark.glb` | Underwater encounter creature |
-
 ### Environments
 
 | Asset | CDN Path | Notes |
 |-------|----------|-------|
-| `snowField.glb` | `Demos/Snow_Man_Scene/snowField.glb` | Snowy terrain patch |
 | `underwaterScene.glb` | `Demos/UnderWaterScene/underwaterScene.glb` | Underwater dungeon environment |
 | `underwaterSceneNavMesh.glb` | `Demos/UnderWaterScene/navMesh/underwaterSceneNavMesh.glb` | Pre-built navmesh for underwater area |
-
-### Props
-
-| Asset | CDN Path | Notes |
-|-------|----------|-------|
-| `D20_Animation.glb` | `D20_Animation.glb` | Animated die — gambling / tavern prop |
-| `pumpkinBucketCarved.glb` | `pumpkinBucketCarved.glb` | Seasonal decoration |
-| `SheenChair.glb` | `SheenChair.glb` | Furniture — interior prop |
 
 ---
 
