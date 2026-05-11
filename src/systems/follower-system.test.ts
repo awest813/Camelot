@@ -515,3 +515,360 @@ describe("FollowerSystem — getSaveState / restoreFromSave", () => {
     expect(sys2.hasFollower).toBe(true);
   });
 });
+
+// ── Stance (Phase 2 — Avowed-inspired companion synergy) ─────────────────────
+
+import {
+  ROLE_ABILITIES,
+  BUILTIN_COMBOS,
+} from "./follower-system";
+import type {
+  FollowerStance,
+  FollowerAbilityResult,
+  ComboResult,
+  ComboTrigger,
+} from "./follower-system";
+
+describe("FollowerSystem — stance", () => {
+  it("initial stance is 'aggressive'", () => {
+    const sys = new FollowerSystem();
+    expect(sys.followerStance).toBe("aggressive");
+  });
+
+  it("setFollowerStance returns false when no follower is active", () => {
+    const sys = new FollowerSystem();
+    expect(sys.setFollowerStance("defensive")).toBe(false);
+  });
+
+  it("setFollowerStance changes the stance when a follower is active", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate());
+    sys.recruitFollower("test_follower");
+    sys.setFollowerStance("defensive");
+    expect(sys.followerStance).toBe("defensive");
+  });
+
+  it("setFollowerStance fires onStanceChanged callback", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate());
+    sys.recruitFollower("test_follower");
+    const cb = vi.fn();
+    sys.onStanceChanged = cb;
+    sys.setFollowerStance("stealth");
+    expect(cb).toHaveBeenCalledWith("stealth");
+  });
+
+  it("setFollowerStance does NOT fire callback when stance is unchanged", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate());
+    sys.recruitFollower("test_follower");
+    sys.setFollowerStance("defensive");
+    const cb = vi.fn();
+    sys.onStanceChanged = cb;
+    sys.setFollowerStance("defensive"); // same stance
+    expect(cb).not.toHaveBeenCalled();
+  });
+
+  it("setFollowerStance returns false when follower is dead", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate());
+    sys.recruitFollower("test_follower");
+    sys.followerTakeDamage(9999);
+    expect(sys.setFollowerStance("stealth")).toBe(false);
+  });
+});
+
+// ── Abilities (Phase 2) ───────────────────────────────────────────────────────
+
+describe("FollowerSystem — triggerFollowerAbility()", () => {
+  it("returns null when no follower is active", () => {
+    const sys = new FollowerSystem();
+    expect(sys.triggerFollowerAbility(10)).toBeNull();
+  });
+
+  it("triggers warrior ability (shield_bash) for warrior follower", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    sys.recruitFollower("test_follower");
+    const result = sys.triggerFollowerAbility(10);
+    expect(result).not.toBeNull();
+    expect(result!.ability.id).toBe("shield_bash");
+  });
+
+  it("triggers archer ability for archer follower", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "archer" }));
+    sys.recruitFollower("test_follower");
+    const result = sys.triggerFollowerAbility(10);
+    expect(result!.ability.id).toBe("arrow_volley");
+  });
+
+  it("triggers mage ability for mage follower", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "mage" }));
+    sys.recruitFollower("test_follower");
+    const result = sys.triggerFollowerAbility(10);
+    expect(result!.ability.id).toBe("arcane_surge");
+  });
+
+  it("triggers rogue ability for rogue follower", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "rogue" }));
+    sys.recruitFollower("test_follower");
+    const result = sys.triggerFollowerAbility(10);
+    expect(result!.ability.id).toBe("smoke_bomb");
+  });
+
+  it("fires onAbilityUsed callback", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    sys.recruitFollower("test_follower");
+    const cb = vi.fn();
+    sys.onAbilityUsed = cb;
+    sys.triggerFollowerAbility(10);
+    expect(cb).toHaveBeenCalledOnce();
+    const arg = cb.mock.calls[0][0] as FollowerAbilityResult;
+    expect(arg.ability.id).toBe("shield_bash");
+    expect(arg.templateId).toBe("test_follower");
+  });
+
+  it("respects ability cooldown — returns null on second call within cooldown", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    sys.recruitFollower("test_follower");
+    sys.triggerFollowerAbility(10); // uses ability
+    const second = sys.triggerFollowerAbility(11); // 1 hour later, warrior CD = 2h
+    expect(second).toBeNull();
+  });
+
+  it("fires again after cooldown has elapsed", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    sys.recruitFollower("test_follower");
+    sys.triggerFollowerAbility(10); // warrior CD = 2h
+    const result = sys.triggerFollowerAbility(12.1); // past cooldown
+    expect(result).not.toBeNull();
+  });
+
+  it("abilityCooldownRemaining is 0 before first use", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    sys.recruitFollower("test_follower");
+    expect(sys.abilityCooldownRemaining(10)).toBe(0);
+  });
+
+  it("abilityCooldownRemaining reports remaining hours after use", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    sys.recruitFollower("test_follower");
+    sys.triggerFollowerAbility(10); // CD = 2h
+    const remaining = sys.abilityCooldownRemaining(11);
+    expect(remaining).toBeCloseTo(1, 5);
+  });
+
+  it("returns null when follower is dead", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    sys.recruitFollower("test_follower");
+    sys.followerTakeDamage(9999);
+    expect(sys.triggerFollowerAbility(10)).toBeNull();
+  });
+});
+
+// ── Combo synergy (Phase 2) ───────────────────────────────────────────────────
+
+describe("FollowerSystem — notifyPlayerAction() combo synergy", () => {
+  it("returns null when no follower is active", () => {
+    const sys = new FollowerSystem();
+    expect(sys.notifyPlayerAction("power_attack", 10)).toBeNull();
+  });
+
+  it("fires a synergy combo when player action matches follower role", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    sys.recruitFollower("test_follower");
+    const result = sys.notifyPlayerAction("power_attack", 10);
+    expect(result).not.toBeNull();
+    expect(result!.comboId).toBe("momentum_surge");
+  });
+
+  it("fires onComboTriggered callback", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    sys.recruitFollower("test_follower");
+    const cb = vi.fn();
+    sys.onComboTriggered = cb;
+    sys.notifyPlayerAction("power_attack", 10);
+    expect(cb).toHaveBeenCalledOnce();
+    const r = cb.mock.calls[0][0] as ComboResult;
+    expect(r.comboId).toBe("momentum_surge");
+  });
+
+  it("returns null when player action does not match any registered combo", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    sys.recruitFollower("test_follower");
+    // warrior combos don't include cast_spell
+    const result = sys.notifyPlayerAction("cast_spell", 10);
+    expect(result).toBeNull();
+  });
+
+  it("returns null when follower role does not match the combo", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "archer" }));
+    sys.recruitFollower("test_follower");
+    // archer + power_attack has no built-in combo
+    const result = sys.notifyPlayerAction("power_attack", 10);
+    expect(result).toBeNull();
+  });
+
+  it("respects combo cooldown — does not fire before cooldown elapses", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    sys.recruitFollower("test_follower");
+    sys.notifyPlayerAction("power_attack", 10); // momentum_surge CD = 4h
+    const second = sys.notifyPlayerAction("power_attack", 12); // 2h later
+    expect(second).toBeNull();
+  });
+
+  it("fires again after combo cooldown elapses", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    sys.recruitFollower("test_follower");
+    sys.notifyPlayerAction("power_attack", 10); // CD = 4h
+    const result = sys.notifyPlayerAction("power_attack", 14.1);
+    expect(result).not.toBeNull();
+  });
+
+  it("returns null when follower is dead", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    sys.recruitFollower("test_follower");
+    sys.followerTakeDamage(9999);
+    expect(sys.notifyPlayerAction("power_attack", 10)).toBeNull();
+  });
+
+  it("archer + arrow_shot triggers rain_of_arrows", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "archer" }));
+    sys.recruitFollower("test_follower");
+    const result = sys.notifyPlayerAction("arrow_shot", 10);
+    expect(result!.comboId).toBe("rain_of_arrows");
+  });
+
+  it("mage + cast_spell triggers arcane_resonance", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "mage" }));
+    sys.recruitFollower("test_follower");
+    const result = sys.notifyPlayerAction("cast_spell", 10);
+    expect(result!.comboId).toBe("arcane_resonance");
+  });
+
+  it("rogue + sneak_attack triggers shadow_strike", () => {
+    const sys = new FollowerSystem();
+    sys.registerFollowerTemplate(makeTemplate({ combatRole: "rogue" }));
+    sys.recruitFollower("test_follower");
+    const result = sys.notifyPlayerAction("sneak_attack", 10);
+    expect(result!.comboId).toBe("shadow_strike");
+  });
+});
+
+// ── registerComboTrigger / removeComboTrigger ─────────────────────────────────
+
+describe("FollowerSystem — registerComboTrigger / removeComboTrigger", () => {
+  const customCombo: ComboTrigger = {
+    comboId:       "custom_combo",
+    comboName:     "Custom Combo",
+    description:   "Custom synergy for testing.",
+    playerAction:  "power_attack",
+    followerRole:  "warrior",
+    cooldownHours: 1,
+  };
+
+  it("registers a custom combo trigger", () => {
+    const sys = new FollowerSystem();
+    sys.registerComboTrigger(customCombo);
+    expect(sys.getComboTrigger("custom_combo")).toBeDefined();
+  });
+
+  it("removeComboTrigger removes by id", () => {
+    const sys = new FollowerSystem();
+    sys.registerComboTrigger(customCombo);
+    sys.removeComboTrigger("custom_combo");
+    expect(sys.getComboTrigger("custom_combo")).toBeUndefined();
+  });
+
+  it("removeComboTrigger returns true when existing, false when unknown", () => {
+    const sys = new FollowerSystem();
+    sys.registerComboTrigger(customCombo);
+    expect(sys.removeComboTrigger("custom_combo")).toBe(true);
+    expect(sys.removeComboTrigger("custom_combo")).toBe(false);
+  });
+
+  it("registeredComboIds includes built-in combos", () => {
+    const sys = new FollowerSystem();
+    expect(sys.registeredComboIds).toContain("momentum_surge");
+    expect(sys.registeredComboIds).toContain("rain_of_arrows");
+  });
+});
+
+// ── Save / restore with v28 additions ────────────────────────────────────────
+
+describe("FollowerSystem — save/restore (stance + ability + combo cooldowns)", () => {
+  it("saves and restores stance", () => {
+    const a = new FollowerSystem();
+    a.registerFollowerTemplate(makeTemplate());
+    a.recruitFollower("test_follower");
+    a.setFollowerStance("stealth");
+    const saved = a.getSaveState();
+
+    const b = new FollowerSystem();
+    b.restoreFromSave(saved);
+    expect(b.followerStance).toBe("stealth");
+  });
+
+  it("defaults stance to 'aggressive' on old saves without stance field", () => {
+    const sys = new FollowerSystem();
+    sys.restoreFromSave({
+      activeFollower: null,
+      deceasedFollowerIds: [],
+      // no stance field — old save format
+    });
+    expect(sys.followerStance).toBe("aggressive");
+  });
+
+  it("saves and restores abilityLastUsedAtHours", () => {
+    const a = new FollowerSystem();
+    a.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    a.recruitFollower("test_follower");
+    a.triggerFollowerAbility(8);
+    const saved = a.getSaveState();
+
+    const b = new FollowerSystem();
+    b.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    b.restoreFromSave(saved);
+
+    // Ability should still be on cooldown at hour 9
+    expect(b.triggerFollowerAbility(9)).toBeNull();
+    // Off cooldown at 10.1 (CD = 2h)
+    const result = b.triggerFollowerAbility(10.1);
+    expect(result).not.toBeNull();
+  });
+
+  it("saves and restores comboLastUsedAtHours", () => {
+    const a = new FollowerSystem();
+    a.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    a.recruitFollower("test_follower");
+    a.notifyPlayerAction("power_attack", 10); // momentum_surge CD = 4h
+    const saved = a.getSaveState();
+
+    const b = new FollowerSystem();
+    b.registerFollowerTemplate(makeTemplate({ combatRole: "warrior" }));
+    b.restoreFromSave(saved);
+
+    // Still on cooldown at hour 12
+    expect(b.notifyPlayerAction("power_attack", 12)).toBeNull();
+    // Off cooldown at 14.1
+    expect(b.notifyPlayerAction("power_attack", 14.1)).not.toBeNull();
+  });
+});
