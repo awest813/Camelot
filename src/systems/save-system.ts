@@ -45,9 +45,11 @@ import type { ItemConditionSystem } from "./item-condition-system";
 import type { DragonShoutSystem } from "./dragon-shout-system";
 import type { FollowerSystem } from "./follower-system";
 import type { PerkSystem } from "./perk-system";
+import type { SurvivalSystem } from "./survival-system";
+import type { DynamicWorldEventSystem } from "./dynamic-world-event-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 27;
+const SAVE_VERSION = 28;
 /** Oldest save version that can still be loaded (forward-compat window). */
 const SAVE_VERSION_MIN = 5;
 
@@ -130,6 +132,9 @@ interface ParsedSaveData {
   follower?: unknown;
   // v27 additions
   perks?: unknown;
+  // v28 additions
+  survival?: unknown;
+  dynamicWorldEvents?: unknown;
 }
 
 interface EquipmentEntry {
@@ -208,6 +213,9 @@ export interface SaveData {
   follower?: any;
   // v27 additions
   perks?: any;
+  // v28 additions
+  survival?: any;
+  dynamicWorldEvents?: any;
 }
 
 export class SaveSystem {
@@ -295,6 +303,9 @@ export class SaveSystem {
   private _followerSystem: FollowerSystem | null = null;
   // ── v27 optional systems ──────────────────────────────────────────────────
   private _perkSystem: PerkSystem | null = null;
+  // ── v28 optional systems ──────────────────────────────────────────────────
+  private _survivalSystem: SurvivalSystem | null = null;
+  private _dynamicWorldEventSystem: DynamicWorldEventSystem | null = null;
 
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
@@ -429,6 +440,11 @@ export class SaveSystem {
 
   public setPerkSystem(s: PerkSystem): void               { this._perkSystem = s; }
 
+  // ── v28 system injection ──────────────────────────────────────────────────
+
+  public setSurvivalSystem(s: SurvivalSystem): void           { this._survivalSystem = s; }
+  public setDynamicWorldEventSystem(s: DynamicWorldEventSystem): void { this._dynamicWorldEventSystem = s; }
+
   public save(): void {
     const equipmentEntries: EquipmentEntry[] = [];
     for (const [slot, item] of this._equipment.getEquipped()) {
@@ -515,6 +531,8 @@ export class SaveSystem {
     if (this._dragonShoutSystem)      data.dragonShouts     = this._dragonShoutSystem.getSaveState();
     if (this._followerSystem)         data.follower         = this._followerSystem.getSaveState();
     if (this._perkSystem)             data.perks            = this._perkSystem.getSaveState();
+    if (this._survivalSystem)         data.survival         = this._survivalSystem.getSaveState();
+    if (this._dynamicWorldEventSystem) data.dynamicWorldEvents = this._dynamicWorldEventSystem.getSnapshot();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     this._ui.showNotification("Game Saved!", 2500);
@@ -745,6 +763,12 @@ export class SaveSystem {
     // v27 systems
     if (this._perkSystem && data.perks)
       this._perkSystem.restoreFromSave(data.perks as any);
+
+    // v28 systems
+    if (this._survivalSystem && data.survival)
+      this._survivalSystem.restoreFromSave(data.survival as any);
+    if (this._dynamicWorldEventSystem && data.dynamicWorldEvents)
+      this._dynamicWorldEventSystem.restoreSnapshot(data.dynamicWorldEvents as any);
 
     // Restore player name (v15+; keep default "Hero" for older saves)
     if (typeof data.player.name === "string" && data.player.name.trim()) {

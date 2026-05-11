@@ -56,6 +56,74 @@ export type FollowerCombatRole = "warrior" | "archer" | "mage" | "rogue";
 /** Standing order the player can issue. */
 export type FollowerCommand = "follow" | "wait" | "trade";
 
+/**
+ * Tactical stance the follower adopts in combat (Avowed-style companion stance).
+ *   aggressive — charges enemies and uses abilities offensively.
+ *   defensive   — stays near the player and prioritises protection.
+ *   stealth     — moves quietly and holds attacks until the player strikes.
+ */
+export type FollowerStance = "aggressive" | "defensive" | "stealth";
+
+/** A player combat action that can trigger companion synergy combos. */
+export type PlayerCombatAction =
+  | "power_attack"   // heavy melee swing
+  | "cast_spell"     // cast a magical spell
+  | "sneak_attack"   // land a sneak/backstab hit
+  | "arrow_shot";    // fire an arrow
+
+/** Definition of a follower role's signature ability. */
+export interface FollowerAbilityDefinition {
+  /** Stable unique ability id. */
+  id: string;
+  /** Display name shown in the HUD. */
+  name: string;
+  /** Short description of the ability's effect. */
+  description: string;
+  /** Cooldown in in-game hours before the ability can be used again. */
+  cooldownHours: number;
+}
+
+/** Data delivered to `onAbilityUsed` when a follower ability triggers. */
+export interface FollowerAbilityResult {
+  /** The ability that fired. */
+  ability: FollowerAbilityDefinition;
+  /** Template id of the follower that used the ability. */
+  templateId: string;
+  /** Follower name. */
+  name: string;
+}
+
+/**
+ * Definition of a player + follower action combo that creates a synergy burst.
+ *
+ * Avowed-style: landing a particular player action while the follower's role
+ * matches triggers a bonus effect (e.g. player power-attack + warrior follower
+ * → Momentum Surge that boosts the next hit).
+ */
+export interface ComboTrigger {
+  /** Stable unique combo id. */
+  comboId: string;
+  /** Display name of the synergy effect. */
+  comboName: string;
+  /** Short description of the bonus effect. */
+  description: string;
+  /** Player action required to trigger this combo. */
+  playerAction: PlayerCombatAction;
+  /** Follower combat role required for the combo. */
+  followerRole: FollowerCombatRole;
+  /** Cooldown in in-game hours before this combo can fire again. */
+  cooldownHours: number;
+}
+
+/** Data delivered to `onComboTriggered` when a synergy combo fires. */
+export interface ComboResult {
+  comboId:     string;
+  comboName:   string;
+  description: string;
+  templateId:  string;
+  followerName: string;
+}
+
 /** Template definition for a potential follower. */
 export interface FollowerTemplate {
   /** Unique identifier (e.g. "lydia"). */
@@ -135,6 +203,12 @@ export interface FollowerSaveState {
   } | null;
   /** Set of template ids whose followers have died (cannot be rehired). */
   deceasedFollowerIds: string[];
+  /** Current tactical stance (added in v28; defaults to "aggressive" on old saves). */
+  stance?: FollowerStance;
+  /** In-game hours when the follower's ability was last used. */
+  abilityLastUsedAtHours?: number | null;
+  /** Per-combo last-used timestamps (in-game hours). */
+  comboLastUsedAtHours?: Record<string, number>;
 }
 
 // ── Built-in follower templates ────────────────────────────────────────────────
@@ -233,6 +307,78 @@ export const BUILTIN_FOLLOWERS: ReadonlyArray<FollowerTemplate> = [
   },
 ] as const;
 
+// ── Built-in follower ability definitions ──────────────────────────────────────
+
+/**
+ * One signature combat ability per follower role.
+ * Triggered via `FollowerSystem.triggerFollowerAbility(gameTimeHours)`.
+ */
+export const ROLE_ABILITIES: Readonly<Record<FollowerCombatRole, FollowerAbilityDefinition>> = {
+  warrior: {
+    id: "shield_bash",
+    name: "Shield Bash",
+    description: "Slams an enemy with a shield, stunning them briefly.",
+    cooldownHours: 2,
+  },
+  archer: {
+    id: "arrow_volley",
+    name: "Arrow Volley",
+    description: "Unleashes a rapid burst of arrows across a wide arc.",
+    cooldownHours: 1,
+  },
+  mage: {
+    id: "arcane_surge",
+    name: "Arcane Surge",
+    description: "Releases a focused blast of raw magical energy.",
+    cooldownHours: 3,
+  },
+  rogue: {
+    id: "smoke_bomb",
+    name: "Smoke Bomb",
+    description: "Throws a smoke bomb that blinds nearby enemies and boosts stealth.",
+    cooldownHours: 2,
+  },
+} as const;
+
+/**
+ * Default synergy combos registered automatically at construction.
+ * Additional combos can be added via `registerComboTrigger()`.
+ */
+export const BUILTIN_COMBOS: ReadonlyArray<ComboTrigger> = [
+  {
+    comboId:      "momentum_surge",
+    comboName:    "Momentum Surge",
+    description:  "Warrior's charge amplifies the player's power attack for bonus damage.",
+    playerAction: "power_attack",
+    followerRole: "warrior",
+    cooldownHours: 4,
+  },
+  {
+    comboId:      "arcane_resonance",
+    comboName:    "Arcane Resonance",
+    description:  "Mage's energy field resonates with the spell cast, amplifying its effect.",
+    playerAction: "cast_spell",
+    followerRole: "mage",
+    cooldownHours: 5,
+  },
+  {
+    comboId:      "shadow_strike",
+    comboName:    "Shadow Strike",
+    description:  "Rogue and player strike simultaneously from the shadows for doubled damage.",
+    playerAction: "sneak_attack",
+    followerRole: "rogue",
+    cooldownHours: 3,
+  },
+  {
+    comboId:      "rain_of_arrows",
+    comboName:    "Rain of Arrows",
+    description:  "Both archer and player fire at once, saturating the target area.",
+    playerAction: "arrow_shot",
+    followerRole: "archer",
+    cooldownHours: 3,
+  },
+] as const;
+
 // ── System ────────────────────────────────────────────────────────────────────
 
 /**
@@ -244,9 +390,18 @@ export class FollowerSystem {
   private _activeFollower: ActiveFollowerState | null    = null;
   private _deceasedIds:   Set<string>                    = new Set();
 
+  // ── v28 additions — stance, abilities, combos ─────────────────────────────
+  private _stance: FollowerStance = "aggressive";
+  private _abilityLastUsedAtHours: number | null = null;
+  private _combos: Map<string, ComboTrigger> = new Map();
+  private _comboLastUsedAtHours: Map<string, number> = new Map();
+
   constructor() {
     for (const def of BUILTIN_FOLLOWERS) {
       this.registerFollowerTemplate(def);
+    }
+    for (const combo of BUILTIN_COMBOS) {
+      this._combos.set(combo.comboId, combo);
     }
   }
 
@@ -294,6 +449,24 @@ export class FollowerSystem {
   public onFollowerDamaged:
     | ((amount: number, remaining: number) => void)
     | null = null;
+
+  /**
+   * Fired when the follower's tactical stance changes.
+   * @param stance The new stance.
+   */
+  public onStanceChanged: ((stance: FollowerStance) => void) | null = null;
+
+  /**
+   * Fired when the follower's role ability is triggered.
+   * @param result Data about the ability that fired.
+   */
+  public onAbilityUsed: ((result: FollowerAbilityResult) => void) | null = null;
+
+  /**
+   * Fired when a player combat action triggers a synergy combo.
+   * @param result Data about the combo that activated.
+   */
+  public onComboTriggered: ((result: ComboResult) => void) | null = null;
 
   // ── Template registration ────────────────────────────────────────────────────
 
@@ -495,6 +668,152 @@ export class FollowerSystem {
     return tmpl?.carryWeightBonus ?? 0;
   }
 
+  /** Current tactical stance of the active follower. */
+  public get followerStance(): FollowerStance {
+    return this._stance;
+  }
+
+  // ── Stance ───────────────────────────────────────────────────────────────────
+
+  /**
+   * Set the active follower's tactical combat stance.
+   *
+   * Fires `onStanceChanged` when the stance changes.
+   * @returns `false` if there is no active (alive) follower.
+   */
+  public setFollowerStance(stance: FollowerStance): boolean {
+    if (!this._activeFollower || !this._activeFollower.isAlive) return false;
+    if (this._stance === stance) return true;
+    this._stance = stance;
+    this.onStanceChanged?.(stance);
+    return true;
+  }
+
+  // ── Abilities ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Trigger the active follower's role-specific combat ability.
+   *
+   * The ability is determined by the follower's `combatRole`; each role has one
+   * built-in signature ability (see {@link ROLE_ABILITIES}).  The call is
+   * gated by the ability's `cooldownHours`.
+   *
+   * @param gameTimeHours Current in-game time in fractional hours [0, 24).
+   * @returns A `FollowerAbilityResult` on success, or `null` if there is no
+   *          active follower or the ability is on cooldown.
+   */
+  public triggerFollowerAbility(gameTimeHours: number): FollowerAbilityResult | null {
+    if (!this._activeFollower || !this._activeFollower.isAlive) return null;
+
+    const tmpl = this._templates.get(this._activeFollower.templateId);
+    const role = tmpl?.combatRole ?? "warrior";
+    const ability = ROLE_ABILITIES[role];
+
+    // Cooldown gate
+    if (this._abilityLastUsedAtHours !== null) {
+      const elapsed = this._hoursDelta(this._abilityLastUsedAtHours, gameTimeHours);
+      if (elapsed < ability.cooldownHours) return null;
+    }
+
+    this._abilityLastUsedAtHours = gameTimeHours;
+
+    const result: FollowerAbilityResult = {
+      ability,
+      templateId: this._activeFollower.templateId,
+      name:       this._activeFollower.name,
+    };
+    this.onAbilityUsed?.(result);
+    return result;
+  }
+
+  /**
+   * Returns the remaining cooldown in in-game hours for the follower's ability,
+   * or 0 if the ability is ready.
+   */
+  public abilityCooldownRemaining(gameTimeHours: number): number {
+    if (this._abilityLastUsedAtHours === null || !this._activeFollower) return 0;
+    const tmpl   = this._templates.get(this._activeFollower.templateId);
+    const role   = tmpl?.combatRole ?? "warrior";
+    const cd     = ROLE_ABILITIES[role].cooldownHours;
+    const elapsed = this._hoursDelta(this._abilityLastUsedAtHours, gameTimeHours);
+    return Math.max(0, cd - elapsed);
+  }
+
+  // ── Combo synergy ─────────────────────────────────────────────────────────────
+
+  /**
+   * Register a synergy combo trigger.
+   * Built-in combos are registered automatically; this allows mod-defined combos.
+   * Registering a duplicate `comboId` replaces the existing entry.
+   */
+  public registerComboTrigger(combo: ComboTrigger): void {
+    this._combos.set(combo.comboId, combo);
+  }
+
+  /**
+   * Remove a combo trigger by id.
+   * @returns `true` if the combo existed and was removed.
+   */
+  public removeComboTrigger(comboId: string): boolean {
+    return this._combos.delete(comboId);
+  }
+
+  /** Returns the combo definition for the given id, or `undefined`. */
+  public getComboTrigger(comboId: string): ComboTrigger | undefined {
+    return this._combos.get(comboId);
+  }
+
+  /** All registered combo trigger ids. */
+  public get registeredComboIds(): ReadonlyArray<string> {
+    return Array.from(this._combos.keys());
+  }
+
+  /**
+   * Notify the follower system of a player combat action.
+   *
+   * If the active follower's role has a matching synergy combo that is off
+   * cooldown, `onComboTriggered` fires and the combo result is returned.
+   *
+   * @param action        Player combat action performed.
+   * @param gameTimeHours Current in-game time in fractional hours [0, 24).
+   * @returns A `ComboResult` if a synergy triggered, otherwise `null`.
+   */
+  public notifyPlayerAction(
+    action: PlayerCombatAction,
+    gameTimeHours: number,
+  ): ComboResult | null {
+    if (!this._activeFollower || !this._activeFollower.isAlive) return null;
+
+    const tmpl = this._templates.get(this._activeFollower.templateId);
+    const role = tmpl?.combatRole ?? "warrior";
+
+    for (const combo of this._combos.values()) {
+      if (combo.playerAction !== action)   continue;
+      if (combo.followerRole  !== role)    continue;
+
+      // Cooldown gate
+      const last = this._comboLastUsedAtHours.get(combo.comboId) ?? null;
+      if (last !== null) {
+        const elapsed = this._hoursDelta(last, gameTimeHours);
+        if (elapsed < combo.cooldownHours) continue;
+      }
+
+      this._comboLastUsedAtHours.set(combo.comboId, gameTimeHours);
+
+      const result: ComboResult = {
+        comboId:      combo.comboId,
+        comboName:    combo.comboName,
+        description:  combo.description,
+        templateId:   this._activeFollower.templateId,
+        followerName: this._activeFollower.name,
+      };
+      this.onComboTriggered?.(result);
+      return result;
+    }
+
+    return null;
+  }
+
   // ── Save / restore ────────────────────────────────────────────────────────────
 
   /** Returns a serialisable save snapshot. */
@@ -502,6 +821,9 @@ export class FollowerSystem {
     return {
       activeFollower: this._activeFollower ? { ...this._activeFollower } : null,
       deceasedFollowerIds: Array.from(this._deceasedIds),
+      stance: this._stance,
+      abilityLastUsedAtHours: this._abilityLastUsedAtHours,
+      comboLastUsedAtHours: Object.fromEntries(this._comboLastUsedAtHours),
     };
   }
 
@@ -532,5 +854,37 @@ export class FollowerSystem {
     } else {
       this._activeFollower = null;
     }
+
+    // Stance (defaults to "aggressive" for old saves without this field)
+    this._stance = (["aggressive","defensive","stealth"] as const).includes(
+      saved.stance as FollowerStance,
+    )
+      ? (saved.stance as FollowerStance)
+      : "aggressive";
+
+    // Ability cooldown
+    this._abilityLastUsedAtHours =
+      typeof saved.abilityLastUsedAtHours === "number"
+        ? saved.abilityLastUsedAtHours
+        : null;
+
+    // Combo cooldowns
+    this._comboLastUsedAtHours.clear();
+    if (saved.comboLastUsedAtHours && typeof saved.comboLastUsedAtHours === "object") {
+      for (const [id, hours] of Object.entries(saved.comboLastUsedAtHours)) {
+        if (typeof hours === "number") this._comboLastUsedAtHours.set(id, hours);
+      }
+    }
+  }
+
+  // ── Private helpers ───────────────────────────────────────────────────────────
+
+  /**
+   * Compute elapsed in-game hours from `from` to `to`, wrapping correctly
+   * across midnight (24-hour boundary).
+   */
+  private _hoursDelta(from: number, to: number): number {
+    if (to >= from) return to - from;
+    return 24 - from + to; // wrapped past midnight
   }
 }
