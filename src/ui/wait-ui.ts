@@ -115,6 +115,7 @@ export class WaitUI {
     closeBtn.type = "button";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Cancel wait");
+    closeBtn.title = "Cancel wait";
     closeBtn.addEventListener("click", () => {
       this.hide();
       this.onClose?.();
@@ -156,6 +157,7 @@ export class WaitUI {
     decBtn.type = "button";
     decBtn.textContent = "▼";
     decBtn.setAttribute("aria-label", "Decrease hours");
+    decBtn.title = "Decrease hours";
     decBtn.addEventListener("click", () => {
       if (decBtn.getAttribute("aria-disabled") === "true") return;
       this._setHours(this._hoursValue - 1);
@@ -184,6 +186,7 @@ export class WaitUI {
     incBtn.type = "button";
     incBtn.textContent = "▲";
     incBtn.setAttribute("aria-label", "Increase hours");
+    incBtn.title = "Increase hours";
     incBtn.addEventListener("click", () => {
       if (incBtn.getAttribute("aria-disabled") === "true") return;
       this._setHours(this._hoursValue + 1);
@@ -246,7 +249,7 @@ export class WaitUI {
         this._decBtn.style.opacity = "0.5";
         this._decBtn.style.cursor = "not-allowed";
       } else {
-        this._decBtn.removeAttribute("title");
+        this._decBtn.setAttribute("title", "Decrease hours");
         this._decBtn.style.opacity = "";
         this._decBtn.style.cursor = "";
       }
@@ -260,7 +263,7 @@ export class WaitUI {
         this._incBtn.style.opacity = "0.5";
         this._incBtn.style.cursor = "not-allowed";
       } else {
-        this._incBtn.removeAttribute("title");
+        this._incBtn.setAttribute("title", "Increase hours");
         this._incBtn.style.opacity = "";
         this._incBtn.style.cursor = "";
       }

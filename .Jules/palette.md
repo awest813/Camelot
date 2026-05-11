@@ -12,3 +12,6 @@
 ## 2026-05-05 - Button type Accessibility
 **Learning:** Buttons created dynamically with `document.createElement("button")` default to `type="submit"` which can cause unwanted form submissions. This is a common pattern in HTML-based UI overlays.
 **Action:** Always set `type="button"` on dynamically created buttons that are not intended to submit forms. Use `btn.type = "button";`.
+## 2026-05-11 - Title Attribute Restoration for Disabled States
+**Learning:** When HTML elements like buttons are temporarily disabled and visually styled to indicate this (e.g. using `aria-disabled`), their default `title` attribute is often overridden to explain why they are disabled (e.g. "Maximum hours reached"). A common mistake when re-enabling the button is to use `removeAttribute('title')`, which strips the tooltip completely for the active state.
+**Action:** When re-enabling an interactive element, explicitly restore its original descriptive `title` attribute via `setAttribute('title', '...')` instead of removing it, ensuring the element remains accessible and informative on hover.
