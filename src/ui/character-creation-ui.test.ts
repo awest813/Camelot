@@ -335,6 +335,13 @@ describe("CharacterCreationUI", () => {
       expect(result.worldSeed!.options.structureDensity).toBe("normal");
     });
 
+    it("treats unsafe-length numeric seed input as string to preserve deterministic hashing", async () => {
+      const bigNumericSeed = "9007199254740993";
+      const result = await completeFlow({ seedInput: bigNumericSeed });
+      expect(result.worldSeed!.seedString).toBe(bigNumericSeed);
+      expect(result.worldSeed!.seedValue).toBe(WorldSeed.hashString(bigNumericSeed));
+    });
+
     it("two flows with the same explicit seed produce the same seedValue", async () => {
       document.body.innerHTML = "";
       const r1 = await completeFlow({ seedInput: "camelot" });
