@@ -9,6 +9,9 @@ Assets come from two sources:
    Licensed **CC0 (Public Domain)** — no attribution required, free for
    commercial use.
 
+See `docs/asset-provenance.md` for source, license, and generated placeholder
+details.
+
 ---
 
 ## How to Use
@@ -65,6 +68,11 @@ const knight = getQuaterniusEntry("qKnight");
 
 All loads are fire-and-forget.  If an asset fails to load, the callback
 receives `null` — callers should always provide a procedural mesh fallback.
+
+Generated placeholder GLBs are checked in under `public/model/quaternius/` for
+all Quaternius catalogue paths. Regenerate them with `npm run assets:filler`.
+They are temporary static stand-ins and should be replaced by the real
+Quaternius models when the pack files are available.
 
 ---
 

@@ -150,6 +150,26 @@ describe("DynamicWorldEventSystem — triggerEvent()", () => {
     expect(second).not.toBeNull();
   });
 
+  it("supports multi-day cooldowns when callers pass monotonic total hours", () => {
+    const sys = makeSys();
+    sys.addTemplate(makeTemplate({ cooldownHours: 72 }));
+
+    sys.triggerEvent("test_event", makeCtx({ gameTimeHours: 10 }), alwaysRng);
+
+    expect(sys.triggerEvent("test_event", makeCtx({ gameTimeHours: 81 }), alwaysRng)).toBeNull();
+    expect(sys.triggerEvent("test_event", makeCtx({ gameTimeHours: 82 }), alwaysRng)).not.toBeNull();
+  });
+
+  it("keeps same-day clock wrap support for short cooldowns", () => {
+    const sys = makeSys();
+    sys.addTemplate(makeTemplate({ cooldownHours: 4 }));
+
+    sys.triggerEvent("test_event", makeCtx({ gameTimeHours: 22 }), alwaysRng);
+
+    expect(sys.triggerEvent("test_event", makeCtx({ gameTimeHours: 1 }), alwaysRng)).toBeNull();
+    expect(sys.triggerEvent("test_event", makeCtx({ gameTimeHours: 2 }), alwaysRng)).not.toBeNull();
+  });
+
   it("respects minLevel gate", () => {
     const sys = makeSys();
     sys.addTemplate(makeTemplate({ minLevel: 10 }));
@@ -354,6 +374,13 @@ describe("DynamicWorldEventSystem — night multiplier", () => {
     expect(chance).toBeCloseTo(0.8, 5);
   });
 
+  it("applies nightMultiplier for monotonic total hours", () => {
+    const sys = makeSys();
+    sys.addTemplate(makeTemplate({ baseChance: 0.4, nightMultiplier: 2.0 }));
+    const chance = sys.computeEffectiveChance("test_event", makeCtx({ gameTimeHours: 50 }));
+    expect(chance).toBeCloseTo(0.8, 5);
+  });
+
   it("does NOT apply nightMultiplier during the day (06:00–18:00)", () => {
     const sys = makeSys();
     sys.addTemplate(makeTemplate({ baseChance: 0.4, nightMultiplier: 2.0 }));
@@ -480,6 +507,15 @@ describe("DynamicWorldEventSystem — query helpers", () => {
 
   it("getLastTriggeredAt returns null for unknown id", () => {
     expect(makeSys().getLastTriggeredAt("none")).toBeNull();
+  });
+
+  it("sanitizes invalid count ranges to at least one spawned entity", () => {
+    const sys = makeSys();
+    sys.addTemplate(makeTemplate({ minCount: 0, maxCount: -5 }));
+
+    const result = sys.triggerEvent("test_event", makeCtx(), alwaysRng);
+
+    expect(result!.count).toBe(1);
   });
 });
 

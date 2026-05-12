@@ -125,7 +125,12 @@ export interface DynamicEventTemplate {
 
 /** Runtime context supplied to `update()` and `triggerEvent()`. */
 export interface DynamicEventContext {
-  /** Current in-game time in fractional hours [0, 24). */
+  /**
+   * Current in-game time in fractional hours.
+   *
+   * Prefer monotonic total game hours for multi-day cooldowns. Clock-of-day
+   * values in [0, 24) remain supported for short cooldowns and older callers.
+   */
   gameTimeHours: number;
   /** Current player level. */
   playerLevel?: number;
@@ -410,8 +415,8 @@ export class DynamicWorldEventSystem {
       chance *= t.weatherBoostMultiplier ?? 1.5;
     }
 
-    // Night multiplier (18:00–06:00)
-    const hour = ctx.gameTimeHours;
+    // Night multiplier (18:00-06:00). Supports monotonic total game hours.
+    const hour = this._clockHour(ctx.gameTimeHours);
     const isNight = hour >= 18 || hour < 6;
     if (isNight && t.nightMultiplier !== undefined) {
       chance *= t.nightMultiplier;
@@ -427,8 +432,8 @@ export class DynamicWorldEventSystem {
     rng: () => number,
   ): DynamicEventResult {
     const t     = record.template;
-    const min   = t.minCount ?? 1;
-    const max   = t.maxCount ?? min;
+    const min   = Math.max(1, Math.floor(t.minCount ?? 1));
+    const max   = Math.max(min, Math.floor(t.maxCount ?? min));
     const count = min + Math.floor(rng() * (max - min + 1));
 
     record.lastTriggeredAt = ctx.gameTimeHours;
@@ -463,6 +468,19 @@ export class DynamicWorldEventSystem {
 
   private _hoursDelta(from: number, to: number): number {
     if (to >= from) return to - from;
-    return 24 - from + to; // wrapped past midnight
+
+    // Backwards-compatible support for callers that pass clock-of-day hours.
+    // This is only reliable for cooldowns shorter than one day; multi-day
+    // cooldowns should pass monotonic total game hours.
+    if (from >= 0 && from < 24 && to >= 0 && to < 24) {
+      return 24 - from + to;
+    }
+
+    return 0;
+  }
+
+  private _clockHour(gameTimeHours: number): number {
+    const hour = gameTimeHours % 24;
+    return hour < 0 ? hour + 24 : hour;
   }
 }

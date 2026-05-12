@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
-    "dev:e2e": "vite --config vite.e2e.config.ts"
+    "dev:e2e": "vite --config vite.e2e.config.ts",
+    "assets:filler": "node tools/generate-filler-assets.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",

@@ -22,12 +22,20 @@ describe("TimeSystem", () => {
     // 120-second day → 12 in-game minutes per real second
     time.update(1);
     expect(time.gameTime).toBeCloseTo(8 * 60 + 12, 1);
+    expect(time.elapsedGameTime).toBeCloseTo(8 * 60 + 12, 1);
   });
 
   it("wraps game time at 24 hours", () => {
     // Advance a full real-time day (120 seconds)
     time.update(120);
     expect(time.gameTime).toBeCloseTo(8 * 60, 1); // back to 08:00
+    expect(time.elapsedGameHours).toBeCloseTo(32, 1);
+  });
+
+  it("advanceHours updates monotonic elapsed time", () => {
+    time.advanceHours(30);
+    expect(time.hour).toBe(14);
+    expect(time.elapsedGameHours).toBeCloseTo(38, 5);
   });
 
   it("isDaytime is true between 06:00 and 20:00", () => {
@@ -95,6 +103,15 @@ describe("TimeSystem", () => {
     const restored = new TimeSystem(120, 0);
     restored.restoreFromSave(saved);
     expect(restored.gameTime).toBeCloseTo(time.gameTime, 1);
+    expect(restored.elapsedGameTime).toBeCloseTo(time.elapsedGameTime, 1);
     expect(restored.hour).toBe(time.hour);
+  });
+
+  it("restores older saves without elapsedGameTime", () => {
+    const restored = new TimeSystem(120, 0);
+    restored.restoreFromSave({ gameTime: 23 * 60 });
+
+    expect(restored.hour).toBe(23);
+    expect(restored.elapsedGameTime).toBe(23 * 60);
   });
 });

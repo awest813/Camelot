@@ -1,6 +1,8 @@
 export interface TimeSnapshot {
   /** In-game minutes since midnight (0 – <1440). */
   gameTime: number;
+  /** Monotonic in-game minutes elapsed since the start of the save. */
+  elapsedGameTime?: number;
 }
 
 /**
@@ -19,6 +21,7 @@ export interface TimeSnapshot {
  */
 export class TimeSystem {
   private _gameTime: number; // in-game minutes since midnight
+  private _elapsedGameTime: number; // monotonic in-game minutes
   private _dayLengthSeconds: number;
   private _lastHour: number = -1;
 
@@ -28,6 +31,7 @@ export class TimeSystem {
   constructor(dayLengthSeconds: number = 120, startHour: number = 8) {
     this._dayLengthSeconds = Math.max(1, dayLengthSeconds);
     this._gameTime = Math.max(0, startHour) * 60;
+    this._elapsedGameTime = this._gameTime;
     // Initialize _lastHour to the start hour so onHourChange doesn't fire
     // on the very first update for a transition that was never a change.
     this._lastHour = Math.floor(this._gameTime / 60);
@@ -38,7 +42,9 @@ export class TimeSystem {
   /** Advance the clock.  Call every frame with deltaTime in real seconds. */
   public update(deltaTime: number): void {
     const minutesPerSecond = (24 * 60) / this._dayLengthSeconds;
-    this._gameTime += deltaTime * minutesPerSecond;
+    const advancedMinutes = Math.max(0, deltaTime) * minutesPerSecond;
+    this._gameTime += advancedMinutes;
+    this._elapsedGameTime += advancedMinutes;
 
     // Wrap to [0, 1440)
     while (this._gameTime >= 24 * 60) {
@@ -60,7 +66,9 @@ export class TimeSystem {
    * regardless of how many hours are skipped.
    */
   public advanceHours(hours: number): void {
-    this._gameTime = (this._gameTime + hours * 60) % (24 * 60);
+    const advancedMinutes = Math.max(0, hours) * 60;
+    this._gameTime = (this._gameTime + advancedMinutes) % (24 * 60);
+    this._elapsedGameTime += advancedMinutes;
     const hour = Math.floor(this._gameTime / 60);
     if (hour !== this._lastHour) {
       this._lastHour = hour;
@@ -73,6 +81,16 @@ export class TimeSystem {
   /** Total in-game minutes since midnight (0 – <1440). */
   public get gameTime(): number {
     return this._gameTime;
+  }
+
+  /** Monotonic in-game minutes elapsed since the start of the save. */
+  public get elapsedGameTime(): number {
+    return this._elapsedGameTime;
+  }
+
+  /** Monotonic in-game hours elapsed since the start of the save. */
+  public get elapsedGameHours(): number {
+    return this._elapsedGameTime / 60;
   }
 
   /** Integer hour of day, 0-23. */
@@ -131,13 +149,16 @@ export class TimeSystem {
   // ── Persistence ───────────────────────────────────────────────────────────
 
   public getSaveState(): TimeSnapshot {
-    return { gameTime: this._gameTime };
+    return { gameTime: this._gameTime, elapsedGameTime: this._elapsedGameTime };
   }
 
   public restoreFromSave(snapshot: TimeSnapshot): void {
     if (typeof snapshot?.gameTime === "number") {
       this._gameTime = snapshot.gameTime;
       this._lastHour = Math.floor(this._gameTime / 60);
+      this._elapsedGameTime = typeof snapshot.elapsedGameTime === "number"
+        ? Math.max(snapshot.elapsedGameTime, this._gameTime)
+        : this._gameTime;
     }
   }
 }

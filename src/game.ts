@@ -6,6 +6,7 @@ import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
+import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
 import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
@@ -143,6 +144,8 @@ import { FollowerSystem } from "./systems/follower-system";
 import type { ActiveFollowerState } from "./systems/follower-system";
 import { FollowerUI } from "./ui/follower-ui";
 import { PerkSystem } from "./systems/perk-system";
+import { DynamicWorldEventSystem } from "./systems/dynamic-world-event-system";
+import type { DynamicEventReward } from "./systems/dynamic-world-event-system";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -324,6 +327,9 @@ export class Game {
   // v27 systems
   public perkSystem!: PerkSystem;
 
+  // v28 systems
+  public dynamicWorldEventSystem!: DynamicWorldEventSystem;
+
   /** Fantasy asset loader — streams BabylonJS CDN models (weapons, structures, creatures). */
   public fantasyAssets: FantasyAssetLoader;
 
@@ -380,6 +386,7 @@ export class Game {
   /** Short post-creation tips; advances on Space or when the hinted action occurs. */
   private readonly _onboardingTutorial = new TutorialSystem();
   private _onboardingTipEl: HTMLDivElement | null = null;
+  private _lastDynamicWorldEventHour = -1;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
     this.scene = scene;
@@ -1344,7 +1351,7 @@ export class Game {
       merchantTemplate,
       500,
       72,
-      this.timeSystem.gameTime,
+      this.timeSystem.elapsedGameTime,
     );
     this.merchantRestockSystem.registerMerchant(
       "merchant_general_01",
@@ -1354,7 +1361,7 @@ export class Game {
       ],
       450,
       72,
-      this.timeSystem.gameTime,
+      this.timeSystem.elapsedGameTime,
     );
     this.merchantRestockSystem.registerMerchant(
       "merchant_weapons_01",
@@ -1364,7 +1371,7 @@ export class Game {
       ],
       800,
       72,
-      this.timeSystem.gameTime,
+      this.timeSystem.elapsedGameTime,
     );
     this.merchantRestockSystem.registerMerchant(
       "merchant_armor_01",
@@ -1374,14 +1381,14 @@ export class Game {
       ],
       650,
       72,
-      this.timeSystem.gameTime,
+      this.timeSystem.elapsedGameTime,
     );
     this.merchantRestockSystem.registerMerchant(
       "merchant_alchemist_01",
       [{ id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 12, weight: 0.3, stats: { ...HEALTH_POTION_STATS } }],
       520,
       72,
-      this.timeSystem.gameTime,
+      this.timeSystem.elapsedGameTime,
     );
     this.merchantRestockSystem.onRestock = (merchantId) => {
       const merchant = this.barterSystem.getMerchant(merchantId);
@@ -1953,6 +1960,62 @@ export class Game {
       this.saveSystem.markDirty();
     };
     this.saveSystem.setPerkSystem(this.perkSystem);
+
+    // ── v28: Dynamic world events ─────────────────────────────────────────
+    this.dynamicWorldEventSystem = new DynamicWorldEventSystem();
+    this.dynamicWorldEventSystem.addTemplate({
+      id: "roadside_bandit_cache",
+      label: "Roadside Bandit Cache",
+      description: "Fresh tracks lead to a small stash left by raiders.",
+      tableId: "treasure_chest",
+      minCount: 1,
+      maxCount: 1,
+      cooldownHours: 36,
+      baseChance: 0.08,
+      hostileFactionIds: ["bandits"],
+      factionThreatMultiplier: 1.75,
+      nightMultiplier: 1.4,
+      rewards: { xp: 20, gold: 15, label: "Recovered a roadside cache" },
+      chainEventId: "hidden_cache_followup",
+    });
+    this.dynamicWorldEventSystem.addTemplate({
+      id: "storm_lost_supplies",
+      label: "Lost Supplies",
+      description: "Bad weather uncovers a dropped bundle near the road.",
+      tableId: "common_loot",
+      minCount: 1,
+      maxCount: 2,
+      cooldownHours: 24,
+      baseChance: 0.05,
+      boostedWeatherIds: ["rain", "storm"],
+      weatherBoostMultiplier: 2.5,
+      rewards: { xp: 10, gold: 8, label: "Found storm-scattered supplies" },
+    });
+    this.dynamicWorldEventSystem.addTemplate({
+      id: "hidden_cache_followup",
+      label: "Hidden Cache",
+      description: "The first stash points toward a better-hidden cache nearby.",
+      tableId: "treasure_chest",
+      minCount: 1,
+      maxCount: 1,
+      cooldownHours: 72,
+      baseChance: 0.12,
+      rewards: { xp: 35, gold: 30, label: "Uncovered a hidden cache" },
+    });
+    this.dynamicWorldEventSystem.onEventFired = (result) => {
+      this.ui.showNotification(`World event: ${result.label}`, 2500);
+      this.eventBus.emit("world:event" as any, {
+        templateId: result.templateId,
+        tableId: result.tableId,
+        count: result.count,
+      });
+    };
+    this.dynamicWorldEventSystem.onRewardGranted = (reward) => {
+      this._grantDynamicWorldEventReward(reward);
+    };
+    this.saveSystem.setDynamicWorldEventSystem(this.dynamicWorldEventSystem);
+    this._lastDynamicWorldEventHour = Math.floor(this.timeSystem.elapsedGameHours);
+
     // Wire sneak-attack detection into combat.
     this.combatSystem.setStealthSystem(this.stealthSystem);
 
@@ -3833,6 +3896,7 @@ export class Game {
 
       // v2 system updates (time must update before schedule so hour is current)
       this.timeSystem.update(deltaTime);
+      this._updateDynamicWorldEventsOnHourChange();
 
       // DailyScheduleSystem syncs ScheduleSystem.currentHour automatically via
       // TimeSystem.onHourChange — no manual per-frame assignment needed here.
@@ -3887,7 +3951,7 @@ export class Game {
       this.swimSystem.update(deltaTime, this.player);
 
       // v10 respawn and merchant restock checks (low-frequency, time-comparison only)
-      const currentGameTime = this.timeSystem.gameTime;
+      const currentGameTime = this.timeSystem.elapsedGameTime;
       this.respawnSystem.update(currentGameTime);
       this.merchantRestockSystem.update(currentGameTime, this.barterSystem);
 
@@ -4095,8 +4159,9 @@ export class Game {
 
       const applyTimeAndClose = () => {
           this.timeSystem.advanceHours(hours);
-          this.respawnSystem.update(this.timeSystem.gameTime);
-          this.merchantRestockSystem.update(this.timeSystem.gameTime, this.barterSystem);
+          this.respawnSystem.update(this.timeSystem.elapsedGameTime);
+          this.merchantRestockSystem.update(this.timeSystem.elapsedGameTime, this.barterSystem);
+          this._updateDynamicWorldEventsOnHourChange();
           this.ui.showNotification(
               `${message} (${hours.toFixed(1)}h passed) — ${this.timeSystem.timeString}`,
               3200,
@@ -4135,6 +4200,51 @@ export class Game {
   private _getInventoryGold(): number {
       const goldEntry = this.inventorySystem.items.find((item) => item.id === GOLD_ITEM_ID);
       return goldEntry?.quantity ?? 0;
+  }
+
+  private _updateDynamicWorldEventsOnHourChange(): void {
+      const elapsedHour = Math.floor(this.timeSystem.elapsedGameHours);
+      if (elapsedHour === this._lastDynamicWorldEventHour) return;
+      this._lastDynamicWorldEventHour = elapsedHour;
+
+      this.dynamicWorldEventSystem.update({
+        gameTimeHours: this.timeSystem.elapsedGameHours,
+        playerLevel: this.playerLevelSystem.characterLevel,
+        activeFactionIds: this.crimeSystem.getTotalBounty() > 0 ? ["bandits"] : [],
+        weatherId: this.weatherSystem.state,
+      });
+  }
+
+  private _grantDynamicWorldEventReward(reward: DynamicEventReward): void {
+      const xp = Math.max(0, Math.floor(reward.xp ?? 0));
+      const gold = Math.max(0, Math.floor(reward.gold ?? 0));
+
+      if (xp > 0) {
+        this.player.addExperience(xp);
+        this.ui.showNotification(`+${xp} XP`, 1800);
+      }
+
+      if (gold > 0) {
+        this.inventorySystem.addItem({
+          id: GOLD_ITEM_ID,
+          name: "Gold Coins",
+          description: "Currency for trade and fines.",
+          stackable: true,
+          quantity: gold,
+          weight: 0.1,
+          stats: { value: 1 },
+        });
+        this._syncInventoryGoldToFramework();
+        this.ui.showNotification(`+${gold} gold`, 1800);
+      }
+
+      if (reward.label) {
+        this.ui.showNotification(reward.label, 2500);
+      }
+
+      if (xp > 0 || gold > 0) {
+        this.saveSystem.markDirty();
+      }
   }
 
   /** Sync framework engine gold count from the live inventory (for dialogue conditions). */
