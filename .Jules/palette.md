@@ -15,3 +15,7 @@
 ## 2026-05-11 - Title Attribute Restoration for Disabled States
 **Learning:** When HTML elements like buttons are temporarily disabled and visually styled to indicate this (e.g. using `aria-disabled`), their default `title` attribute is often overridden to explain why they are disabled (e.g. "Maximum hours reached"). A common mistake when re-enabling the button is to use `removeAttribute('title')`, which strips the tooltip completely for the active state.
 **Action:** When re-enabling an interactive element, explicitly restore its original descriptive `title` attribute via `setAttribute('title', '...')` instead of removing it, ensuring the element remains accessible and informative on hover.
+
+## 2025-04-10 - Wait UI Modal Accessibility and Focus
+**Learning:** Custom HTML DOM modal overlays must immediately receive programmatic focus when opened to ensure screen readers announce the dialog context and keyboard interactions are correctly scoped. Furthermore, linking the modal's visible title to the dialog container using `aria-labelledby` provides better semantic context than a static `aria-label`.
+**Action:** When implementing modal overlays (e.g., `WaitUI`), add `tabindex="-1"` and an `aria-labelledby` attribute to the root dialog element, assign the corresponding `id` to its title heading, and immediately call `root.focus()` during the `show()` method.

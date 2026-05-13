@@ -50,10 +50,24 @@ describe("WaitUI", () => {
       expect(root?.getAttribute("aria-modal")).toBe("true");
     });
 
-    it("root has aria-label", () => {
+    it("root has aria-labelledby pointing to title element", () => {
       ui.show();
       const root = document.querySelector(".wait-ui");
-      expect(root?.getAttribute("aria-label")).toBeTruthy();
+      const titleId = root?.getAttribute("aria-labelledby") ?? "";
+      expect(titleId).toBe("wait-ui-title");
+
+      const titleEl = document.getElementById(titleId);
+      expect(titleEl).not.toBeNull();
+      expect(titleEl?.textContent).toBe("Wait");
+    });
+
+    it("root has tabindex=-1 and receives focus when opened", () => {
+      const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
+      ui.show();
+      const root = document.querySelector(".wait-ui");
+      expect(root?.getAttribute("tabindex")).toBe("-1");
+      expect(focusSpy).toHaveBeenCalled();
+      focusSpy.mockRestore();
     });
 
     it("shows the title 'Wait'", () => {
