@@ -105,10 +105,10 @@ describe("QuickSlotSystem", () => {
     expect(sys.getSlotItemId("7")).toBeNull();
   });
 
-  it("getSlots returns all four keys", () => {
+  it("getSlots returns all ten keys", () => {
     const sys = new QuickSlotSystem(makeInventory(), makePlayer(), makeUI());
     const slots = sys.getSlots();
-    expect(slots.map((s) => s.key)).toEqual(["7", "8", "9", "0"]);
+    expect(slots.map((s) => s.key)).toEqual(["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]);
   });
 
   it("getSlots resolves item reference from inventory", () => {
@@ -259,7 +259,7 @@ describe("QuickSlotSystem", () => {
     it("restoreFromSave handles missing keys gracefully", () => {
       const sys = new QuickSlotSystem(makeInventory(), makePlayer(), makeUI());
       // Provide a partial save (missing "9" and "0")
-      sys.restoreFromSave({ slots: { "7": "item_a", "8": null, "9": null, "0": null } });
+      sys.restoreFromSave({ slots: { "1": null, "2": null, "3": null, "4": null, "5": null, "6": null, "7": "item_a", "8": null, "9": null, "0": null } });
       expect(sys.getSlotItemId("7")).toBe("item_a");
     });
   });

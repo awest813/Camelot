@@ -4,9 +4,9 @@ import type { Player } from "../entities/player";
 
 // ── Quick-slot key type ───────────────────────────────────────────────────────
 
-export type QuickSlotKey = "7" | "8" | "9" | "0";
+export type QuickSlotKey = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "0";
 
-export const QUICK_SLOT_KEYS: readonly QuickSlotKey[] = ["7", "8", "9", "0"] as const;
+export const QUICK_SLOT_KEYS: readonly QuickSlotKey[] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"] as const;
 
 /** Where a consumable was triggered from (HUD quick slot vs inventory click). */
 export type ConsumableUseSource = QuickSlotKey | "inventory";
@@ -55,10 +55,8 @@ export interface QuickSlotSaveState {
  */
 export class QuickSlotSystem {
   private _slots: Record<QuickSlotKey, string | null> = {
-    "7": null,
-    "8": null,
-    "9": null,
-    "0": null,
+    "1": null, "2": null, "3": null, "4": null, "5": null,
+    "6": null, "7": null, "8": null, "9": null, "0": null,
   };
 
   private readonly _inventory: InventorySystem;

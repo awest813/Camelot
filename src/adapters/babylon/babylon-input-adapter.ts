@@ -48,6 +48,14 @@ export type InputAction =
   // Movement / stance
   | "toggleCrouch"
   | "jump"
+  | "sprint"
+  | "sprintRelease"
+  | "autoRun"
+  // Interaction
+  | "interact"
+  // Weapon / equipment
+  | "readyWeapon"
+  | "togglePOV"
   // UI panels
   | "toggleInventory"
   | "toggleQuestLog"
@@ -62,7 +70,14 @@ export type InputAction =
   | "mountDismount"
   | "stableOrSaddlebag"
   | "showFameStatus"
+  | "favoritesMenu"
   // Quick-slots
+  | "quickSlot1"
+  | "quickSlot2"
+  | "quickSlot3"
+  | "quickSlot4"
+  | "quickSlot5"
+  | "quickSlot6"
   | "quickSlot7"
   | "quickSlot8"
   | "quickSlot9"
@@ -112,19 +127,33 @@ export type ActionCallback = (action: InputAction) => void;
 // ── Default bindings ──────────────────────────────────────────────────────────
 
 export const DEFAULT_BINDINGS: readonly InputBinding[] = [
-  // Combat
-  { key: "e", action: "powerAttack", caseInsensitive: true },
+
+  // ── Movement ────────────────────────────────────────────────────────────────
+  { key: "Shift", action: "sprint" },
+  { key: "Shift", action: "sprintRelease", phase: "up" },
+  { key: "c", action: "toggleCrouch", caseInsensitive: true },
+  { key: " ", action: "jump" },
+  { key: "CapsLock", action: "autoRun" },
+
+  // ── Combat ──────────────────────────────────────────────────────────────────
+  // E = Interact/Use; Shift+E = power attack
+  { key: "e", action: "interact", caseInsensitive: true },
+  { key: "e", action: "powerAttack", shift: true, caseInsensitive: true },
+  // Q = Cast spell (KEYUP releases staff charge)
   { key: "q", action: "castSpell", caseInsensitive: true },
   { key: "q", action: "castSpell", phase: "up", caseInsensitive: true },
-  { key: "z", action: "cycleSpell", caseInsensitive: true },
+  // R = Draw/release bow
   { key: "r", action: "drawBow", caseInsensitive: true },
   { key: "r", action: "releaseBow", phase: "up", caseInsensitive: true },
+  // Z = Cycle equipped spell
+  { key: "z", action: "cycleSpell", caseInsensitive: true },
+  // V = Racial power
   { key: "v", action: "racialPower", caseInsensitive: true },
+  // F8 = Favorites menu
+  { key: "F8", action: "favoritesMenu" },
 
-  // Movement / stance
-  { key: "c", action: "toggleCrouch", caseInsensitive: true },
-
-  // UI panels
+  // ── UI panels ───────────────────────────────────────────────────────────────
+  // Tab = Character sheet (stays in legacy handler)
   { key: "i", action: "toggleInventory", caseInsensitive: true },
   { key: "j", action: "toggleQuestLog", caseInsensitive: true },
   { key: "k", action: "toggleSkillTree", caseInsensitive: true },
@@ -133,38 +162,43 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   { key: "b", action: "toggleEnchanting", caseInsensitive: true },
   { key: "x", action: "toggleSpellMaking", caseInsensitive: true },
   { key: "y", action: "toggleFastTravel", caseInsensitive: true },
-  { key: "p", action: "togglePetPanel", caseInsensitive: true },
   { key: "t", action: "toggleWaitDialog", caseInsensitive: true },
+  { key: "p", action: "togglePetPanel", caseInsensitive: true },
+  { key: "h", action: "showFameStatus", caseInsensitive: true },
+  // O = Mount/dismount; Shift+O = Stable/Saddlebag
   { key: "o", action: "mountDismount", caseInsensitive: true },
   { key: "O", action: "stableOrSaddlebag", shift: true },
-  { key: "h", action: "showFameStatus", caseInsensitive: true },
 
-  // Quick-slots
+  // ── Quick-slots (1-0) ───────────────────────────────────────────────────────
+  { key: "1", action: "quickSlot1" },
+  { key: "2", action: "quickSlot2" },
+  { key: "3", action: "quickSlot3" },
+  { key: "4", action: "quickSlot4" },
+  { key: "5", action: "quickSlot5" },
+  { key: "6", action: "quickSlot6" },
   { key: "7", action: "quickSlot7" },
   { key: "8", action: "quickSlot8" },
   { key: "9", action: "quickSlot9" },
   { key: "0", action: "quickSlot0" },
 
-  // Combat archetypes
-  { key: "1", action: "archetype1" },
-  { key: "2", action: "archetype2" },
-  { key: "3", action: "archetype3" },
-  { key: "4", action: "archetype4" },
-  { key: "5", action: "archetype5" },
-  { key: "6", action: "archetype6" },
+  // ── Combat archetypes (Shift + number row) ───────────────────────────────────
+  { key: "!", action: "archetype1" },
+  { key: "@", action: "archetype2" },
+  { key: "#", action: "archetype3" },
+  { key: "$", action: "archetype4" },
+  { key: "%", action: "archetype5" },
+  { key: "^", action: "archetype6" },
 
-  // System
+  // ── System ──────────────────────────────────────────────────────────────────
   { key: "Escape", action: "pause" },
+  { key: "F1", action: "helpOverlay" },
+  { key: "F2", action: "toggleMapEditor" },
+  { key: "F3", action: "toggleDebugOverlay" },
+  { key: "F4", action: "togglePOV" },
   { key: "F5", action: "save" },
   { key: "F9", action: "load" },
   { key: "m", action: "toggleMute", caseInsensitive: true },
-  { key: "F3", action: "toggleDebugOverlay" },
   { key: "PrintScreen", action: "screenshot" },
-  { key: "F1", action: "helpOverlay" },
-  { key: " ", action: "advanceTutorial" },
-
-  // Editor
-  { key: "F2", action: "toggleMapEditor" },
 ];
 
 // ── System ─────────────────────────────────────────────────────────────────────

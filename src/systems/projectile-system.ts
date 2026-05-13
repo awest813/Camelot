@@ -12,6 +12,7 @@ import { StealthSystem } from "./stealth-system";
 import { applyDamageWithResistance, WEAPON_PROFILES } from "./combat-shared";
 import type { SkillProgressionSystem } from "./skill-progression-system";
 import type { AttributeSystem } from "./attribute-system";
+import { ObjectPool } from "./object-pool";
 
 const ARROW_SPEED          = 40;
 const BASE_ARROW_DAMAGE    = 15;
@@ -70,22 +71,18 @@ const ARROW_PROFILES: Record<ArrowType, ArrowProfile> = {
   daedric: { damageMultiplier: 2.0,  speedMultiplier: 1.15, drawTimeMultiplier: 1.25, label: "Daedric Arrow" },
 };
 
+interface PooledArrow {
+  mesh: any;
+  aggregate: any;
+}
+
 interface ActiveArrow {
+  poolIndex: number;
   mesh: any;
   aggregate: any;
   lifetime: number;
-  /**
-   * Raw damage before crit, sneak multiplier, and NPC armor / resistances.
-   * Built from arrow type, draw strength, marksman skill, and bow weapon profile.
-   */
   baseDamage: number;
-  /** Skip the first N frames after spawn to avoid self-collision. */
   skipFrames: number;
-  /**
-   * True if this arrow was fired while the player was crouching.
-   * The final sneak-attack multiplier is evaluated per-NPC at hit time
-   * (only applied when the specific NPC hit is below the detection threshold).
-   */
   isSneakShot: boolean;
 }
 
@@ -125,6 +122,10 @@ export class ProjectileSystem {
 
   private _activeArrows: ActiveArrow[] = [];
   private _cooldownRemaining: number = 0;
+
+  private static readonly _POOL_SIZE = 12;
+
+  private readonly _arrowPool: ObjectPool<PooledArrow>;
 
   /** Draw progress [0-1].  Increases while `_isDrawing` until BOW_DRAW_TIME. */
   private _drawProgress: number = 0;
@@ -171,6 +172,48 @@ export class ProjectileSystem {
     this._ui     = ui;
     this._skillSystem = opts?.skillSystem ?? null;
     this._attributeSystem = opts?.attributeSystem ?? null;
+
+    this._arrowPool = new ObjectPool<PooledArrow>(
+      () => this._createArrowMesh(),
+      (a) => this._resetArrowMesh(a),
+      ProjectileSystem._POOL_SIZE,
+      ProjectileSystem._POOL_SIZE,
+      (a) => this._disposePooledArrow(a),
+    );
+  }
+
+  private _createArrowMesh(): PooledArrow {
+    const mesh = MeshBuilder.CreateCylinder(
+      `arrow_pooled_${Date.now()}_${Math.random()}`,
+      { diameter: 0.05, height: 0.6, tessellation: 4 },
+      this._scene,
+    );
+    const mat = new StandardMaterial(`arrowMat_pooled_${Date.now()}`, this._scene);
+    mat.diffuseColor = new Color3(0.6, 0.45, 0.2);
+    mesh.material = mat;
+    const aggregate = new PhysicsAggregate(
+      mesh,
+      PhysicsShapeType.SPHERE,
+      { mass: 0.1, restitution: 0.0 },
+      this._scene,
+    );
+    aggregate.body.setMotionType(PhysicsMotionType.DYNAMIC);
+    mesh.setEnabled(false);
+    mesh.isVisible = false;
+    return { mesh, aggregate };
+  }
+
+  private _resetArrowMesh(item: PooledArrow): void {
+    item.mesh.setEnabled(false);
+    item.mesh.isVisible = false;
+    item.aggregate.body.disablePreStep = false;
+  }
+
+  private _disposePooledArrow(item: PooledArrow): void {
+    if (!item.mesh.isDisposed()) {
+      try { item.aggregate.dispose(); } catch { }
+      item.mesh.dispose();
+    }
   }
 
   // ── NPC list hot-swap ─────────────────────────────────────────────────────
@@ -302,9 +345,6 @@ export class ProjectileSystem {
    * @param drawFraction  1.0 = full draw (max damage), lower = partial.
    */
   private _spawnArrow(drawFraction: number): boolean {
-    // FIFO pool cap: evict the oldest in-flight arrow when the pool is full.
-    // Keeps active-arrow count bounded to MAX_ACTIVE_ARROWS for performance and
-    // visual clarity (avoids dozens of arrows cluttering the scene at once).
     while (this._activeArrows.length >= MAX_ACTIVE_ARROWS) {
       this._disposeArrow(this._activeArrows.shift()!);
     }
@@ -312,14 +352,13 @@ export class ProjectileSystem {
     const arrowProfile = ARROW_PROFILES[this.equippedArrowType];
 
     const origin  = this._player.camera.position.clone();
-    origin.y += ARROW_SPAWN_Y_OFFSET; // slight below eye-level
+    origin.y += ARROW_SPAWN_Y_OFFSET;
     const forward = this._player.getForwardDirection(1).normalize();
 
     const bowProf = WEAPON_PROFILES.bow;
     const marksLevel = this._marksmanLevel();
     const skillBonus = marksLevel * 0.2;
 
-    // Spread tightens with effective marksman level (saved skill or archerySkill fallback).
     const spread = Math.max(0, (100 - marksLevel) / 1000);
     const direction = new Vector3(
       forward.x + (Math.random() - 0.5) * spread,
@@ -327,26 +366,18 @@ export class ProjectileSystem {
       forward.z,
     ).normalize();
 
-    const mesh = MeshBuilder.CreateCylinder(
-      `arrow_${Date.now()}`,
-      { diameter: 0.05, height: 0.6, tessellation: 4 },
-      this._scene,
-    );
+    const pooled = this._arrowPool.acquire();
+    const mesh = pooled.mesh;
+    const aggregate = pooled.aggregate;
+
     mesh.position = origin.add(forward.scale(ARROW_SPAWN_FORWARD));
     mesh.lookAt(mesh.position.add(direction));
+    mesh.setEnabled(true);
+    mesh.isVisible = true;
 
-    const mat = new StandardMaterial(`arrowMat_${Date.now()}`, this._scene);
-    mat.diffuseColor = new Color3(0.6, 0.45, 0.2);
-    mesh.material = mat;
+
 
     const launchSpeed = ARROW_SPEED * arrowProfile.speedMultiplier;
-    const aggregate = new PhysicsAggregate(
-      mesh,
-      PhysicsShapeType.SPHERE,
-      { mass: 0.1, restitution: 0.0 },
-      this._scene,
-    );
-    aggregate.body.setMotionType(PhysicsMotionType.DYNAMIC);
     aggregate.body.applyImpulse(direction.scale(launchSpeed * 0.1), mesh.position);
 
     const baseDamage = Math.max(1, Math.round(
@@ -358,11 +389,10 @@ export class ProjectileSystem {
       * this._marksmanMultiplier(),
     ));
 
-    // Mark the arrow as a potential sneak shot; the actual multiplier is applied
-    // per-NPC at hit time so we only bonus hits on genuinely unaware targets.
     const isSneakShot = this.stealthSystem?.isCrouching === true;
 
     this._activeArrows.push({
+      poolIndex: 0,
       mesh,
       aggregate,
       lifetime:   ARROW_LIFETIME,
@@ -371,7 +401,6 @@ export class ProjectileSystem {
       isSneakShot,
     });
 
-    // Deduct resources
     const staminaCost = this._arrowStaminaCost();
     this._player.stamina = Math.max(0, this._player.stamina - staminaCost);
     this._player.notifyResourceSpent("stamina");
@@ -546,11 +575,6 @@ export class ProjectileSystem {
 
   private _disposeArrow(arrow: ActiveArrow): void {
     if (arrow.mesh.isDisposed()) return;
-    try {
-      arrow.aggregate.dispose();
-    } catch {
-      // ignore – physics may already be gone
-    }
-    arrow.mesh.dispose();
+    this._arrowPool.release({ mesh: arrow.mesh, aggregate: arrow.aggregate });
   }
 }

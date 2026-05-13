@@ -24,10 +24,8 @@ type SlotEntry = { key: QuickSlotKey; itemId: string | null; item: Item | null }
 
 function makeSystem(slots: Partial<Record<QuickSlotKey, Item | null>> = {}): QuickSlotSystem {
   const resolved: Record<QuickSlotKey, Item | null> = {
-    "7": null,
-    "8": null,
-    "9": null,
-    "0": null,
+    "1": null, "2": null, "3": null, "4": null, "5": null,
+    "6": null, "7": null, "8": null, "9": null, "0": null,
     ...slots,
   };
   return {
@@ -88,16 +86,16 @@ describe("QuickSlotHUD", () => {
       expect(root?.getAttribute("aria-label")).toBeTruthy();
     });
 
-    it("renders exactly 4 slot cells", () => {
+    it("renders exactly 10 slot cells", () => {
       hud.show();
-      expect(document.querySelectorAll(".quickslot-hud__slot").length).toBe(4);
+      expect(document.querySelectorAll(".quickslot-hud__slot").length).toBe(10);
     });
 
-    it("each cell has data-key for keys 7, 8, 9, 0", () => {
+    it("each cell has data-key for all ten keys", () => {
       hud.show();
       const cells = document.querySelectorAll(".quickslot-hud__slot");
       const keys = Array.from(cells).map((c) => c.getAttribute("data-key"));
-      expect(keys).toEqual(["7", "8", "9", "0"]);
+      expect(keys).toEqual(["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]);
     });
 
     it("each cell has role=button", () => {
@@ -396,9 +394,9 @@ describe("QuickSlotHUD", () => {
       expect(document.querySelector(".quickslot-hud")).not.toBeNull();
     });
 
-    it("renders all four slots", () => {
+    it("renders all ten slots", () => {
       hud.update(makeSystem({ "7": makeItem({ name: "Potion" }) }));
-      expect(document.querySelectorAll(".quickslot-hud__slot").length).toBe(4);
+      expect(document.querySelectorAll(".quickslot-hud__slot").length).toBe(10);
     });
   });
 });

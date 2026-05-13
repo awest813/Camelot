@@ -61,6 +61,12 @@ const GRAVITY = -9.81;
 const JUMP_IMPULSE = 6.0;
 const GROUND_Y = 0;
 
+const ACCELERATION = 25.0;
+const DECELERATION = 30.0;
+const AIR_CONTROL = 0.1;
+
+const DUCK_HALF_HEIGHT = 0.6;
+
 // ── System ─────────────────────────────────────────────────────────────────────
 
 export class BabylonCharacterControllerAdapter {
@@ -88,6 +94,19 @@ export class BabylonCharacterControllerAdapter {
   /** Base movement speed (units/second). */
   public baseMoveSpeed = DEFAULT_MOVE_SPEED;
 
+  private _isAutoRunning: boolean = false;
+
+  /** Acceleration/deceleration rates. Public so they can be tuned. */
+  public acceleration = ACCELERATION;
+  public deceleration = DECELERATION;
+
+  /** Stores the desired horizontal velocity direction for smooth interpolation. */
+  private _desiredVelocityX: number = 0;
+  private _desiredVelocityZ: number = 0;
+
+  /** Current duck height fraction [0-1]. 0 = standing, 1 = fully crouched. */
+  private _crouchFraction: number = 0;
+
   // ── Callbacks ─────────────────────────────────────────────────────────────
 
   public onCrouchToggle: ((crouching: boolean) => void) | null = null;
@@ -103,6 +122,8 @@ export class BabylonCharacterControllerAdapter {
   get isSwimming(): boolean { return this._isSwimming; }
   get isMounted(): boolean { return this._isMounted; }
   get isGrounded(): boolean { return this._isGrounded; }
+  get isAutoRunning(): boolean { return this._isAutoRunning; }
+  get crouchFraction(): number { return this._crouchFraction; }
 
   /** Effective speed after all multipliers. */
   get effectiveSpeed(): number {
@@ -125,6 +146,9 @@ export class BabylonCharacterControllerAdapter {
   setMoveInput(x: number, z: number): void {
     this._inputX = Math.max(-1, Math.min(1, x));
     this._inputZ = Math.max(-1, Math.min(1, z));
+    if (Math.abs(x) > 0.1 || Math.abs(z) > 0.1) {
+      this._isAutoRunning = false;
+    }
   }
 
   /** Toggle or set crouch state. */
@@ -140,6 +164,15 @@ export class BabylonCharacterControllerAdapter {
     this._isSprinting = forceState ?? !this._isSprinting;
     if (this._isSprinting) this._isCrouching = false;
     return this._isSprinting;
+  }
+
+  /** Toggle auto-run (always move forward). */
+  toggleAutoRun(): boolean {
+    this._isAutoRunning = !this._isAutoRunning;
+    if (this._isAutoRunning) {
+      this._inputZ = 1;
+    }
+    return this._isAutoRunning;
   }
 
   /** Set swimming state (driven by external water-detection). */
@@ -161,33 +194,67 @@ export class BabylonCharacterControllerAdapter {
     return true;
   }
 
+  /** Get the effective half-height multiplier for camera position. */
+  getEyeHeight(): number {
+    return 1 - this._crouchFraction * (1 - DUCK_HALF_HEIGHT);
+  }
+
   // ── Update ────────────────────────────────────────────────────────────────
 
   /**
    * Advance movement state by `dt` seconds.
    *
-   * The adapter computes the intended velocity vector from input axes, yaw,
-   * speed multipliers, and gravity.  The consuming code (Babylon camera or
-   * physics body) reads `velocity` and applies it.
+   * Uses acceleration-based movement for smooth analog stick feel:
+   * accelerates toward desired speed, decelerates to zero when no input.
+   * Gravity and ground clamping are applied after movement.
    */
   update(dt: number): void {
     const speed = this.effectiveSpeed;
 
-    // Rotate input by yaw to get world-space movement direction.
-    // Apply 2D rotation matrix: [cos(θ), sin(θ); -sin(θ), cos(θ)]
+    // Compute desired world-space velocity from input + yaw
     const sinY = Math.sin(this._yaw);
     const cosY = Math.cos(this._yaw);
-    const worldX = this._inputX * cosY + this._inputZ * sinY;
-    const worldZ = -this._inputX * sinY + this._inputZ * cosY;
+    const rawWorldX = this._inputX * cosY + this._inputZ * sinY;
+    const rawWorldZ = -this._inputX * sinY + this._inputZ * cosY;
 
-    // Normalise if diagonal (prevent sqrt(2) speed boost)
-    const mag = Math.sqrt(worldX * worldX + worldZ * worldZ);
-    if (mag > 1) {
-      this._velocity.x = (worldX / mag) * speed;
-      this._velocity.z = (worldZ / mag) * speed;
+    const mag = Math.sqrt(rawWorldX * rawWorldX + rawWorldZ * rawWorldZ);
+    if (mag > 0.01) {
+      const desiredX = (rawWorldX / mag) * speed;
+      const desiredZ = (rawWorldZ / mag) * speed;
+      this._desiredVelocityX = desiredX;
+      this._desiredVelocityZ = desiredZ;
     } else {
-      this._velocity.x = worldX * speed;
-      this._velocity.z = worldZ * speed;
+      this._desiredVelocityX = 0;
+      this._desiredVelocityZ = 0;
+    }
+
+    const accel = this._isGrounded ? this.acceleration : this.acceleration * AIR_CONTROL;
+
+    // Smoothly interpolate horizontal velocity towards desired
+    if (this._desiredVelocityX !== 0 || this._desiredVelocityZ !== 0) {
+      const dx = this._desiredVelocityX - this._velocity.x;
+      const dz = this._desiredVelocityZ - this._velocity.z;
+      const dMag = Math.sqrt(dx * dx + dz * dz);
+      if (dMag > 0.01) {
+        const maxDelta = accel * dt;
+        const delta = Math.min(maxDelta, dMag);
+        this._velocity.x += (dx / dMag) * delta;
+        this._velocity.z += (dz / dMag) * delta;
+      }
+    } else {
+      // Decelerate to stop
+      const currentSpeed = Math.sqrt(this._velocity.x * this._velocity.x + this._velocity.z * this._velocity.z);
+      if (currentSpeed > 0.01) {
+        const decel = this.deceleration * dt;
+        const reduction = Math.min(decel, currentSpeed);
+        const normX = this._velocity.x / currentSpeed;
+        const normZ = this._velocity.z / currentSpeed;
+        this._velocity.x -= normX * reduction;
+        this._velocity.z -= normZ * reduction;
+      } else {
+        this._velocity.x = 0;
+        this._velocity.z = 0;
+      }
     }
 
     // Gravity
@@ -199,6 +266,15 @@ export class BabylonCharacterControllerAdapter {
     this._position.x += this._velocity.x * dt;
     this._position.y += this._velocity.y * dt;
     this._position.z += this._velocity.z * dt;
+
+    // Animate crouch smoothly
+    const targetCrouch = this._isCrouching ? 1 : 0;
+    if (Math.abs(this._crouchFraction - targetCrouch) > 0.01) {
+      const crouchSpeed = 5.0 * dt;
+      this._crouchFraction += Math.sign(targetCrouch - this._crouchFraction) * Math.min(crouchSpeed, Math.abs(this._crouchFraction - targetCrouch));
+    } else {
+      this._crouchFraction = targetCrouch;
+    }
 
     // Simple ground clamp
     if (this._position.y <= GROUND_Y) {

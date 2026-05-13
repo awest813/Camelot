@@ -128,7 +128,10 @@ describe("BabylonPhysicsControllerAdapter", () => {
     it("returns run when moving fast (sprinting)", () => {
       headless.toggleSprint(true);
       headless.setMoveInput(0, 1);
-      headless.update(1 / 60);
+      // Accelerate over time to reach sprint speed
+      for (let i = 0; i < 20; i++) {
+        headless.update(1 / 60);
+      }
       expect(physics.animationClip).toBe("run");
     });
 

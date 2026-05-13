@@ -25,6 +25,8 @@ import { CombatSystem } from "./systems/combat-system";
 import { DialogueSystem } from "./systems/dialogue-system";
 import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
+import { BabylonInputAdapter } from "./adapters/babylon/babylon-input-adapter";
+import { GamepadInputSystem } from "./systems/gamepad-input-system";
 import { InventorySystem } from "./systems/inventory-system";
 import { EquipmentSystem } from "./systems/equipment-system";
 import { SaveSystem } from "./systems/save-system";
@@ -382,6 +384,13 @@ export class Game {
   private _helpOverlayEl: HTMLDivElement | null = null;
   private _helpOverlayVisible: boolean = false;
   private _activeGuardChallenge: { guard: NPC; factionId: string; bounty: number } | null = null;
+
+  /** Decoupled input action adapter — maps named actions to key/mouse/gamepad events. */
+  private readonly _inputAdapter = new BabylonInputAdapter();
+  /** Gamepad input polling system — feeds controller input into the adapter. */
+  private readonly _gamepadInput = new GamepadInputSystem(this._inputAdapter);
+  /** Tracks whether the current key event was consumed by the input adapter. */
+  private _keyConsumedByAdapter: boolean = false;
 
   /** Short post-creation tips; advances on Space or when the hinted action occurs. */
   private readonly _onboardingTutorial = new TutorialSystem();
@@ -1086,7 +1095,9 @@ export class Game {
     // ── v4 system wiring (browser optimisation) ──────────────────────────────
     // LOD system: run the visibility pass every 5 frames for performance.
     // Registered meshes are pruned when disposed; no global clear on cell travel.
-    this.lodSystem = new LodSystem(5);
+    this.lodSystem = new LodSystem({ updateEveryNFrames: 5 });
+    this.lodSystem.setCamera(this.player.camera);
+    this._gamepadInput.setCamera(this.player.camera);
 
     // Register v3 systems with save
     this.saveSystem.setSpellSystem(this.spellSystem);
@@ -2576,40 +2587,39 @@ export class Game {
         if (this._isCombatInputBlocked()) return;
 
         if (pointerInfo.type === PointerEventTypes.POINTERDOWN) {
-            if (pointerInfo.event.button === 0) { // Left click — melee, or bow draw when bow is equipped
-                if (this.combatSystem.activeWeaponArchetype === "bow") {
-                    const drawing = this.projectileSystem.beginDraw();
-                    if (drawing) {
-                        this.stealthSystem.pushNoise(0.4);
-                    }
-                } else {
-                    const attacked = this.combatSystem.meleeAttack();
-                    if (attacked) {
-                      this.audioSystem.playMeleeAttack();
-                      this.skillProgressionSystem.gainXP("blade", 4 * this.classSystem.xpMultiplierFor("blade"));
-                    }
-                }
-            } else if (pointerInfo.event.button === 2) { // Right Click held — begin block
+            this._inputAdapter.handlePointerEvent(pointerInfo.event.button, "down");
+            if (pointerInfo.event.button === 2) {
                 pointerInfo.event.preventDefault();
-                this.combatSystem.beginBlock();
             }
         } else if (pointerInfo.type === PointerEventTypes.POINTERUP) {
-            if (pointerInfo.event.button === 0 && this.combatSystem.activeWeaponArchetype === "bow") {
-                if (this.projectileSystem.isDrawing) {
-                    const fired = this.projectileSystem.releaseArrow();
-                    if (fired) {
-                        this.audioSystem.playMeleeAttack();
-                    }
-                }
-            }
-            if (pointerInfo.event.button === 2) { // Right Click released — stop blocking
-                this.combatSystem.endBlock();
+            this._inputAdapter.handlePointerEvent(pointerInfo.event.button, "up");
+            // Release bow on left mouse up when arrow is drawn
+            if (pointerInfo.event.button === 0 && this.projectileSystem.isDrawing) {
+                const fired = this.projectileSystem.releaseArrow();
+                if (fired) this.audioSystem.playMeleeAttack();
             }
         }
     });
 
     // Input handling for pause
     this.scene.onKeyboardObservable.add((kbInfo) => {
+        this._keyConsumedByAdapter = false;
+
+        // Forward key events through the input adapter for decoupled action dispatch
+        if (kbInfo.type === KeyboardEventTypes.KEYDOWN || kbInfo.type === KeyboardEventTypes.KEYUP) {
+            const phase = kbInfo.type === KeyboardEventTypes.KEYDOWN ? "down" : "up";
+            const handled = this._inputAdapter.handleKeyEvent(
+                kbInfo.event.key,
+                phase,
+                { shift: kbInfo.event.shiftKey, ctrlOrMeta: kbInfo.event.ctrlKey || kbInfo.event.metaKey },
+            );
+            if (handled !== null) {
+                this._keyConsumedByAdapter = true;
+                kbInfo.event.preventDefault();
+                return;
+            }
+        }
+
         if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
             if (kbInfo.event.key === " " || kbInfo.event.code === "Space") {
                 const keyEv = kbInfo.event as KeyboardEvent;
@@ -3477,9 +3487,536 @@ export class Game {
     this.ui.loadButton.onPointerUpObservable.add(() => this.saveSystem.load());
     this.ui.quitButton.onPointerUpObservable.add(() => window.location.reload());
 
+    // Wire decoupled input adapter after all systems are initialized
+    this._wireInputAdapter();
+    this._gamepadInput.connect();
+
     // Game loop logic will go here
     this.scene.onBeforeRenderObservable.add(() => {
         this.update();
+    });
+  }
+
+  private _wireInputAdapter(): void {
+    const adapter = this._inputAdapter;
+
+    // Combat
+    adapter.onAction("meleeAttack", () => {
+      if (!this._isCombatInputBlocked()) {
+        if (this.combatSystem.activeWeaponArchetype === "bow") {
+          const drawing = this.projectileSystem.beginDraw();
+          if (drawing) this.stealthSystem.pushNoise(0.4);
+        } else {
+          const attacked = this.combatSystem.meleeAttack();
+          if (attacked) {
+            this.audioSystem.playMeleeAttack();
+            this.skillProgressionSystem.gainXP("blade", 4 * this.classSystem.xpMultiplierFor("blade"));
+          }
+        }
+      }
+    });
+    adapter.onAction("powerAttack", () => {
+      if (!this._isCombatInputBlocked()) {
+        const powered = this.combatSystem.powerAttack();
+        if (powered) {
+          this.audioSystem.playMeleeAttack();
+          this.skillProgressionSystem.gainXP("blade", 6 * this.classSystem.xpMultiplierFor("blade"));
+        }
+      }
+    });
+    adapter.onAction("block", () => {
+      if (!this._isCombatInputBlocked()) this.combatSystem.beginBlock();
+    });
+    adapter.onAction("blockRelease", () => {
+      this.combatSystem.endBlock();
+    });
+    adapter.onAction("castSpell", () => {
+      if (this._isCombatInputBlocked()) return;
+
+      // KEYUP = release staff charge
+      if (!this._inputAdapter.isActive("castSpell")) {
+        if (this.combatSystem.isChargingStaff) {
+          const fired = this.combatSystem.releaseStaffCharge();
+          if (fired) {
+            this.skillProgressionSystem.gainXP("destruction", 8 * this.classSystem.xpMultiplierFor("destruction"));
+          }
+        }
+        return;
+      }
+
+      // KEYDOWN = cast or begin charge
+      if (this.combatSystem.activeWeaponArchetype === "staff") {
+        this.combatSystem.beginStaffCharge();
+      } else {
+        this.spellSystem.castSpell();
+      }
+    });
+    adapter.onAction("cycleSpell", () => {
+      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+        const spells = this.spellSystem.knownSpells;
+        if (spells.length > 0) {
+          const current = this.spellSystem.equippedSpell;
+          const idx = current ? spells.findIndex(s => s.id === current.id) : -1;
+          const next = spells[(idx + 1) % spells.length];
+          this.spellSystem.equipSpell(next.id);
+        }
+      }
+    });
+    adapter.onAction("drawBow", () => {
+      if (!this._isCombatInputBlocked()) {
+        const drawing = this.projectileSystem.beginDraw();
+        if (drawing) this.stealthSystem.pushNoise(0.4);
+      }
+    });
+    adapter.onAction("releaseBow", () => {
+      if (this.projectileSystem.isDrawing) {
+        const fired = this.projectileSystem.releaseArrow();
+        if (fired) this.audioSystem.playMeleeAttack();
+      }
+    });
+    adapter.onAction("racialPower", () => {
+      if (!this._isCombatInputBlocked()) {
+        const race = this.raceSystem.chosenRace;
+        if (!race?.power) {
+          this.ui.showNotification("No racial power available.", 2000);
+        } else if (!this.raceSystem.canActivatePower(this.timeSystem.gameTime)) {
+          const mins = Math.ceil(this.raceSystem.powerCooldownRemaining(this.timeSystem.gameTime));
+          this.ui.showNotification(`${race.power.name} is recharging (${mins} game-minutes remaining).`, 2500);
+        } else {
+          this.raceSystem.activatePower(this.timeSystem.gameTime, this.activeEffectsSystem);
+        }
+      }
+    });
+
+    // Movement
+    adapter.onAction("toggleCrouch", () => {
+      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+        const crouching = this.stealthSystem.toggleCrouch();
+        this.ui.showNotification(crouching ? "Sneaking..." : "Standing", 1200);
+      }
+    });
+
+    // UI panels
+    adapter.onAction("toggleInventory", () => {
+      if (!this.isPaused && !this.dialogueSystem.isInDialogue && !this.skillTreeSystem.isOpen) {
+        this.inventorySystem.toggleInventory();
+        if (this.inventorySystem.isOpen) {
+          this.interactionSystem.isBlocked = true;
+          document.exitPointerLock();
+          this.player.camera.detachControl();
+        } else {
+          this.interactionSystem.isBlocked = false;
+          this.canvas.requestPointerLock();
+          this.player.camera.attachControl(this.canvas, true);
+        }
+      }
+    });
+    adapter.onAction("toggleQuestLog", () => {
+      if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue && !this.skillTreeSystem.isOpen) {
+        this.questSystem.toggleQuestLog();
+        if (this.questSystem.isLogOpen) {
+          this.interactionSystem.isBlocked = true;
+          document.exitPointerLock();
+          this.player.camera.detachControl();
+        } else {
+          this.interactionSystem.isBlocked = false;
+          this.canvas.requestPointerLock();
+          this.player.camera.attachControl(this.canvas, true);
+        }
+      }
+    });
+    adapter.onAction("toggleSkillTree", () => {
+      if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue && !this.questSystem.isLogOpen) {
+        this.skillTreeSystem.toggle();
+        if (this.skillTreeSystem.isOpen) {
+          this.interactionSystem.isBlocked = true;
+          document.exitPointerLock();
+          this.player.camera.detachControl();
+        } else {
+          this.interactionSystem.isBlocked = false;
+          this.canvas.requestPointerLock();
+          this.player.camera.attachControl(this.canvas, true);
+        }
+      }
+    });
+    adapter.onAction("toggleAttributePanel", () => {
+      if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue) {
+        const open = !this.ui.isAttributePanelOpen;
+        this.ui.toggleAttributePanel(open);
+        if (open) {
+          this.ui.refreshAttributePanel(this.attributeSystem);
+          this.interactionSystem.isBlocked = true;
+          document.exitPointerLock();
+          this.player.camera.detachControl();
+        } else {
+          this.interactionSystem.isBlocked = false;
+          this.canvas.requestPointerLock();
+          this.player.camera.attachControl(this.canvas, true);
+        }
+      }
+    });
+    adapter.onAction("toggleAlchemy", () => {
+      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+        const open = !this.alchemyUI.isVisible;
+        this.alchemyUI.toggle(open);
+        if (open) {
+          this.interactionSystem.isBlocked = true;
+          document.exitPointerLock();
+          this.player.camera.detachControl();
+        } else {
+          this.interactionSystem.isBlocked = false;
+          this.canvas.requestPointerLock();
+          this.player.camera.attachControl(this.canvas, true);
+        }
+      }
+    });
+    adapter.onAction("toggleEnchanting", () => {
+      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+        const open = !this.enchantingUI.isVisible;
+        this.enchantingUI.toggle(open);
+        if (open) {
+          this.interactionSystem.isBlocked = true;
+          document.exitPointerLock();
+          this.player.camera.detachControl();
+        } else {
+          this.interactionSystem.isBlocked = false;
+          this.canvas.requestPointerLock();
+          this.player.camera.attachControl(this.canvas, true);
+        }
+      }
+    });
+    adapter.onAction("toggleSpellMaking", () => {
+      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+        if (this.spellMakingUI.isVisible) {
+          this.spellMakingUI.close();
+        } else {
+          this.spellMakingUI.open();
+          this.interactionSystem.isBlocked = true;
+          document.exitPointerLock();
+          this.player.camera.detachControl();
+        }
+      }
+    });
+    adapter.onAction("toggleFastTravel", () => {
+      if (this.fastTravelUI.isVisible) {
+        this.fastTravelUI.close();
+        return;
+      }
+      if (!this.isPaused && !this.dialogueSystem.isInDialogue && !this.inventorySystem.isOpen && !this.mapEditorSystem.isEnabled) {
+        const locs = this.fastTravelSystem.discoveredLocations;
+        if (locs.length === 0) {
+          this.ui.showNotification("No locations discovered yet.", 2000);
+        } else {
+          this.fastTravelUI.open(
+            locs.map((loc) => ({
+              id: loc.id,
+              name: loc.name,
+              estimatedHours: this.fastTravelSystem.estimateTravelHours(this.player.camera.position, loc.id) ?? 1,
+            })),
+          );
+          this.interactionSystem.isBlocked = true;
+          document.exitPointerLock();
+          this.player.camera.detachControl();
+        }
+      }
+    });
+    adapter.onAction("togglePetPanel", () => {
+      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+        if (this.petUI.isVisible) {
+          this.petUI.close();
+          this.interactionSystem.isBlocked = false;
+          this.canvas.requestPointerLock();
+          this.player.camera.attachControl(this.canvas, true);
+        } else {
+          if (!this.petSystem.hasPet) {
+            this.ui.showNotification("You have no companions yet.", 2000);
+          } else {
+            this.petUI.open(this.petSystem.pets, this.petSystem.activePet?.id ?? null);
+            this.interactionSystem.isBlocked = true;
+            document.exitPointerLock();
+            this.player.camera.detachControl();
+          }
+        }
+      }
+    });
+    adapter.onAction("toggleWaitDialog", () => {
+      if (this.mapEditorSystem.isEnabled) return;
+      if (!this.isPaused && !this.dialogueSystem.isInDialogue && !this.inventorySystem.isOpen) {
+        const open = !this.ui.isWaitDialogOpen;
+        this.ui.toggleWaitDialog(open);
+        if (open) {
+          this.interactionSystem.isBlocked = true;
+          document.exitPointerLock();
+          this.player.camera.detachControl();
+        } else {
+          this.interactionSystem.isBlocked = false;
+          this.canvas.requestPointerLock();
+          this.player.camera.attachControl(this.canvas, true);
+        }
+      }
+    });
+    adapter.onAction("mountDismount", () => {
+      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+        if (this.horseSystem.isMounted) {
+          this.horseSystem.dismountHorse();
+        } else {
+          const owned = this.horseSystem.ownedHorses;
+          if (owned.length === 0) {
+            this.ui.showNotification("You don't own a horse. Visit a stable (Shift+O).", 2500);
+          } else {
+            this.horseSystem.mountHorse(owned[0].id);
+          }
+        }
+      }
+    });
+    adapter.onAction("stableOrSaddlebag", () => {
+      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+        if (this.horseSystem.isMounted) {
+          const horse = this.horseSystem.currentHorse!;
+          if (this.saddlebagUI.isVisible) {
+            this.saddlebagUI.close();
+          } else {
+            const bag = this.horseSystem.getSaddlebag(horse.id) ?? [];
+            this.saddlebagUI.open(
+              horse.name,
+              bag.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, stackable: i.stackable })),
+              bag.length,
+              horse.saddlebagCapacity,
+            );
+            this.interactionSystem.isBlocked = true;
+            document.exitPointerLock();
+            this.player.camera.detachControl();
+          }
+        } else {
+          if (this.stableUI.isVisible) {
+            this.stableUI.close();
+          } else {
+            const stable = this.horseSystem.getStableNPC("Stable Master");
+            if (stable) {
+              const horses = stable.availableHorseIds.map(id => {
+                const h = this.horseSystem.getHorse(id)!;
+                return {
+                  id: h.id, name: h.name, speed: h.speed,
+                  saddlebagCapacity: h.saddlebagCapacity, price: stable.prices[id] ?? 0, isOwned: h.isOwned,
+                };
+              });
+              this.stableUI.open("Stable Master", horses, this._getInventoryGold());
+              this.interactionSystem.isBlocked = true;
+              document.exitPointerLock();
+              this.player.camera.detachControl();
+            } else {
+              this.ui.showNotification("No stable nearby.", 1500);
+            }
+          }
+        }
+      }
+    });
+    adapter.onAction("showFameStatus", () => {
+      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+        const effects = this.activeEffectsSystem.activeEffects;
+        const effectStr = effects.length > 0 ? `  Active effects: ${effects.map(e => e.name).join(", ")}` : "";
+        const customSpellCount = this.spellMakingSystem.customSpells.length;
+        const spellStr = customSpellCount > 0 ? `  Custom spells: ${customSpellCount}` : "";
+        this.ui.showNotification(
+          `Fame: ${this.fameSystem.fame} (${this.fameSystem.fameLabel})` +
+          `  Infamy: ${this.fameSystem.infamy} (${this.fameSystem.infamyLabel})` +
+          `  Sentences: ${this.jailSystem.totalSentences}${effectStr}${spellStr}`,
+          4000,
+        );
+      }
+    });
+
+    // Quick-slots (1-0 all bound)
+    const allQKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"] as const;
+    for (const key of allQKeys) {
+      const action = `quickSlot${key === "0" ? "0" : key}`;
+      adapter.onAction(action as any, () => {
+        if (!this._isCombatInputBlocked()) {
+          this.quickSlotSystem.useSlot(key as any);
+        }
+      });
+    }
+
+    // Combat archetypes
+    const archetypeMap: Record<string, () => void> = {
+      archetype1: () => { if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMeleeArchetype("duelist"); },
+      archetype2: () => { if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMeleeArchetype("soldier"); },
+      archetype3: () => { if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMeleeArchetype("bruiser"); },
+      archetype4: () => { if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMagicArchetype("spark"); },
+      archetype5: () => { if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMagicArchetype("bolt"); },
+      archetype6: () => { if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMagicArchetype("surge"); },
+    };
+    for (const [action, fn] of Object.entries(archetypeMap)) {
+      adapter.onAction(action as any, fn);
+    }
+
+    // System
+    adapter.onAction("pause", () => {
+      if (this.dialogueSystem.isInDialogue) return;
+      if (this.levelUpUI.isVisible) return;
+      if (this.guardEncounterUI.isVisible) { this._resolveGuardEncounter("resist_arrest"); return; }
+      if (this.mapEditorSystem.isEnabled) {
+        this.mapEditorSystem.toggle();
+        this.interactionSystem.isBlocked = false;
+        this.canvas.requestPointerLock();
+        this.player.camera.attachControl(this.canvas, true);
+        this.mapEditorToolbar.hide();
+        this.editorLayout.setVisible("hierarchy", false);
+        this.editorLayout.setVisible("palette", false);
+        this.editorLayout.setVisible("validation", false);
+        this.editorLayout.setVisible("layers", false);
+        this.editorLayout.setVisible("notes", false);
+        this.editorLayout.setVisible("properties", false);
+        this.editorLayout.clearSelection();
+        this.ui.showNotification("Map editor mode disabled", 1800);
+        this._refreshHelpOverlayIfVisible();
+        return;
+      }
+      if (this.characterSheetUI.isVisible) { this.characterSheetUI.hide(); this.ui.setCharacterSheetOpen(false); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.inventorySystem.isOpen) { this.inventorySystem.toggleInventory(); return; }
+      if (this.questSystem.isLogOpen) { this.questSystem.toggleQuestLog(); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.skillTreeSystem.isOpen) { this.skillTreeSystem.toggle(); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.ui.isAttributePanelOpen) { this.ui.toggleAttributePanel(false); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.alchemyUI.isVisible) { this.alchemyUI.toggle(false); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.enchantingUI.isVisible) { this.enchantingUI.toggle(false); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.spellMakingUI.isVisible) { this.spellMakingUI.close(); return; }
+      if (this._barterUI.isVisible) { this._barterUI.onClose?.(); return; }
+      if (this.fastTravelUI.isVisible) { this.fastTravelUI.close(); return; }
+      if (this.petUI.isVisible) { this.petUI.close(); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.followerUI.isVisible) { this.followerUI.close(); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.stableUI.isVisible) { this.stableUI.close(); return; }
+      if (this.saddlebagUI.isVisible) { this.saddlebagUI.close(); return; }
+      if (this.questCreatorUI.isVisible) { this.questCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.dialogueCreatorUI.isVisible) { this.dialogueCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.npcCreatorUI.isVisible) { this.npcCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.itemCreatorUI.isVisible) { this.itemCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.factionCreatorUI.isVisible) { this.factionCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.lootTableCreatorUI.isVisible) { this.lootTableCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.spawnCreatorUI.isVisible) { this.spawnCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.contentBundleUI.isVisible) { this.contentBundleUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.assetBrowserUI.isVisible) { this.assetBrowserUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.bundleMergeUI.isVisible) { this.bundleMergeUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.modManifestUI.isVisible) { this.modManifestUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.editorHubUI.isVisible) { this.editorHubUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.ui.isWaitDialogOpen) { this.ui.toggleWaitDialog(false); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      this.togglePause();
+    });
+    adapter.onAction("save", () => { if (!this.isPaused) this.saveSystem.save(); });
+    adapter.onAction("load", () => { if (!this.isPaused) this.saveSystem.load(); });
+    adapter.onAction("toggleMute", () => {
+      this.audioSystem.toggleMute();
+      this.ui.showNotification(this.audioSystem.isMuted ? "Audio muted" : "Audio unmuted", 1500);
+    });
+    adapter.onAction("toggleDebugOverlay", () => {
+      const shown = this.ui.toggleDebugOverlay();
+      this.ui.showNotification(shown ? "Debug overlay ON" : "Debug overlay OFF", 1200);
+    });
+    adapter.onAction("screenshot", () => {
+      this.screenshotSystem.download(this.canvas);
+      this.ui.showNotification("Screenshot saved", 1500);
+    });
+    adapter.onAction("helpOverlay", () => {
+      this._toggleHelpOverlay();
+    });
+    adapter.onAction("toggleMapEditor", () => {
+      const isEnabled = this.mapEditorSystem.toggle();
+      this.interactionSystem.isBlocked = isEnabled;
+      if (isEnabled) {
+        document.exitPointerLock();
+        this.player.camera.detachControl();
+        this.mapEditorToolbar.show();
+        this.editorLayout.setVisible("hierarchy", true);
+        this.editorLayout.setVisible("palette", true);
+        this.editorLayout.setVisible("layers", true);
+        this._refreshEditorToolbar();
+        this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+      } else {
+        this.canvas.requestPointerLock();
+        this.player.camera.attachControl(this.canvas, true);
+        this.mapEditorToolbar.hide();
+        this.editorLayout.setVisible("hierarchy", false);
+        this.editorLayout.setVisible("palette", false);
+        this.editorLayout.setVisible("validation", false);
+        this.editorLayout.setVisible("layers", false);
+        this.editorLayout.setVisible("notes", false);
+        this.editorLayout.setVisible("properties", false);
+        this.editorLayout.clearSelection();
+      }
+      this.ui.showNotification(isEnabled ? "Map editor mode enabled" : "Map editor mode disabled", 1800);
+      this._refreshHelpOverlayIfVisible();
+    });
+
+    // ── Skyrim/Oblivion-style action handlers ─────────────────────────────
+    adapter.onAction("jump", () => {
+      // Space also advances the onboarding tutorial when active
+      if (this._tryAdvanceOnboardingTutorial()) return;
+
+      if (this._isCombatInputBlocked() || !this.player.camera.applyGravity) return;
+      if (this.player.stamina >= 10) {
+        this.player.stamina = Math.max(0, this.player.stamina - 10);
+        this.player.notifyResourceSpent("stamina");
+        this.player.camera.position.y += 3;
+      }
+    });
+
+    adapter.onAction("sprint", () => {
+      if (this._isCombatInputBlocked()) return;
+      this.stealthSystem.movementMode = "running";
+      if (this.stealthSystem.isCrouching) {
+        this.stealthSystem.isCrouching = false;
+      }
+    });
+    adapter.onAction("sprintRelease", () => {
+      this.stealthSystem.movementMode = "walking";
+    });
+
+    adapter.onAction("autoRun", () => {
+      if (this._isCombatInputBlocked()) return;
+      this.ui.showNotification("Auto-run toggled", 1000);
+    });
+
+    adapter.onAction("interact", () => {
+      if (this.dialogueSystem.isInDialogue) return;
+      if (this.inventorySystem.isOpen) {
+        this.inventorySystem.toggleInventory();
+        return;
+      }
+
+      // Skyrim-style: if nothing is within interact range, jump instead
+      const interactHit = this._raycastInteract();
+      if (interactHit) {
+        this.interactionSystem.interact();
+      } else if (this.player.camera.applyGravity && this.player.stamina >= 10) {
+        this.player.stamina = Math.max(0, this.player.stamina - 10);
+        this.player.notifyResourceSpent("stamina");
+        this.player.camera.position.y += 3;
+      }
+    });
+
+    adapter.onAction("readyWeapon", () => {
+      if (this._isCombatInputBlocked()) return;
+      if (this.combatSystem.activeWeaponArchetype === "bow" && this.projectileSystem.isDrawing) {
+        const fired = this.projectileSystem.releaseArrow();
+        if (fired) this.audioSystem.playMeleeAttack();
+      }
+      this.ui.showNotification("Weapon ready — switch with archetype keys (1-6)", 2000);
+    });
+
+    adapter.onAction("favoritesMenu", () => {
+      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+        this.ui.showNotification("Favorites — assign with quick-slot keys (1-0)", 2500);
+      }
+    });
+
+    adapter.onAction("togglePOV", () => {
+      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+        const curFov = this.player.camera.fov;
+        this.player.camera.fov = curFov >= 1.8 ? 0.8 : 1.8;
+        this.ui.showNotification(
+          curFov >= 1.8 ? "First-person view" : "Third-person view",
+          1200,
+        );
+      }
     });
   }
 
@@ -3976,6 +4513,23 @@ export class Game {
       if (this.isPaused) return;
 
       const frameDelta = this.engine.getDeltaTime() / 1000;
+
+      // Poll gamepad state every frame
+      this._gamepadInput.update(frameDelta);
+
+      // Apply gamepad left stick to camera movement (smooth analog)
+      if (this._gamepadInput.isConnected && !this._isCombatInputBlocked()) {
+        const lx = this._gamepadInput.leftStickX;
+        const ly = this._gamepadInput.leftStickY;
+        if (Math.abs(lx) > 0.15 || Math.abs(ly) > 0.15) {
+          const speed = this.player.camera.speed * frameDelta * 60;
+          const forward = this.player.getForwardDirection(1);
+          const right = Vector3.Cross(forward, Vector3.Up()).normalize();
+          const moveVec = forward.scale(ly * speed).add(right.scale(lx * speed));
+          this.player.camera.position.addInPlace(moveVec);
+        }
+      }
+
       this._gameplayLoop.tick(frameDelta, (deltaTime) => {
           this._updateGameplayStep(deltaTime);
       });
@@ -4611,6 +5165,16 @@ export class Game {
           this.dialogueSystem.isInDialogue ||
           this.interactionSystem.isBlocked
       );
+  }
+
+  /** Check if the player is looking at an interactable object or NPC within 3 units. */
+  private _raycastInteract(): boolean {
+    const hit = this.player.raycastForward(3, true);
+    if (hit?.pickedMesh?.metadata) {
+      const m = hit.pickedMesh.metadata;
+      return m.type === "npc" || m.type === "loot" || m.type === "portal";
+    }
+    return false;
   }
 
   // ── Pet world management ───────────────────────────────────────────────────

@@ -1,100 +1,85 @@
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Matrix } from "@babylonjs/core/Maths/math.vector";
+import type { Camera } from "@babylonjs/core/Cameras/camera";
+import { Plane } from "@babylonjs/core/Maths/math.plane";
 
 export interface LodEntry {
   mesh: AbstractMesh;
-  /**
-   * Distance beyond which the mesh is hidden (distance-culled).
-   * Squared internally for performance.
-   */
   cullDistance: number;
 }
 
-/**
- * A set of meshes representing the same object at decreasing levels of detail.
- * Levels must be supplied in ascending `maxDistance` order.
- *
- * Example for a tree:
- * ```ts
- * lod.registerLevels([
- *   { mesh: highPolyTree,  maxDistance: 40  },   // full detail within  40 u
- *   { mesh: medPolyTree,   maxDistance: 100 },   // medium detail 40–100 u
- *   { mesh: lowPolyTree,   maxDistance: 200 },   // billboard  100–200 u
- *   // beyond 200 u all meshes are hidden (distance-culled)
- * ]);
- * ```
- */
 export interface LodLevel {
-  /** One of the detail meshes for this object. */
   mesh: AbstractMesh;
-  /**
-   * Maximum distance (in world units) at which this mesh should be visible.
-   * When the player is further than the last level's `maxDistance`, all
-   * meshes are hidden.
-   */
   maxDistance: number;
 }
 
-/** Internal record for a multi-level LOD group. */
 interface LodLevelEntry {
   levels: LodLevel[];
 }
 
-/**
- * Simple distance-based LOD / culling system for browser performance.
- *
- * The LOD model used here is conservative:
- *   - Each registered mesh has a `cullDistance`.
- *   - When the player is further than `cullDistance` from a mesh, the mesh is
- *     made invisible.  BabylonJS skips invisible meshes in the render pipeline,
- *     reducing draw calls and vertex throughput significantly for dense scenes.
- *   - Meshes are restored to visible when the player moves back inside the cull
- *     distance.
- *
- * Multi-level LOD:
- *   Use `registerLevels()` to associate multiple meshes (high/medium/low
- *   detail) with a single world object.  On each `update()` call the system
- *   shows only the appropriate detail level and hides the others, so
- *   polygon count decreases gracefully with distance rather than switching
- *   abruptly from full-detail to invisible.
- *
- * Usage:
- *   ```ts
- *   const lod = new LodSystem();
- *   lod.register(treeMesh, 120);      // hide trees beyond 120 units
- *   lod.register(ruinMesh, 200);      // hide ruins beyond 200 units
- *
- *   // Multi-level LOD:
- *   lod.registerLevels([
- *     { mesh: highMesh, maxDistance: 50  },
- *     { mesh: medMesh,  maxDistance: 120 },
- *     { mesh: lowMesh,  maxDistance: 250 },
- *   ]);
- *
- *   // In update loop:
- *   lod.update(player.camera.position);
- *   ```
- *
- * Performance notes:
- *   - `update()` runs the visibility pass only every `updateEveryNFrames` calls
- *     (default 5), amortising the cost across multiple frames.
- *   - Distance comparisons use squared distances to avoid expensive sqrt calls.
- *   - Disposed meshes are silently skipped and cleaned up on the next `update()`
- *     call.
- */
+interface CullPriority {
+  mesh: AbstractMesh;
+  distanceSq: number;
+}
+
+export enum LODQuality {
+  LOW = 0,
+  MEDIUM = 1,
+  HIGH = 2,
+  ULTRA = 3,
+}
+
+export interface LODConfig {
+  updateEveryNFrames: number;
+  frustumCull: boolean;
+  priorityCull: boolean;
+  maxCulledPerFrame: number;
+  distanceThresholds: {
+    near: number;
+    medium: number;
+    far: number;
+    ultraFar: number;
+  };
+}
+
+const DEFAULT_CONFIG: LODConfig = {
+  updateEveryNFrames: 5,
+  frustumCull: true,
+  priorityCull: true,
+  maxCulledPerFrame: 100,
+  distanceThresholds: {
+    near: 30,
+    medium: 80,
+    far: 150,
+    ultraFar: 250,
+  },
+};
+
 export class LodSystem {
   private _entries: LodEntry[] = [];
   private _levelGroups: LodLevelEntry[] = [];
   private _frameCounter: number = 0;
   private readonly _updateInterval: number;
+  private _config: LODConfig;
+  private _camera: Camera | null = null;
+  private _frustumPlanes: Plane[] = [];
 
-  /**
-   * @param updateEveryNFrames - How often (in frames) to run the visibility
-   *   pass.  Higher values reduce CPU overhead at the cost of slightly delayed
-   *   visibility transitions.  Defaults to 5.
-   */
-  constructor(updateEveryNFrames: number = 5) {
-    this._updateInterval = Math.max(1, updateEveryNFrames);
+  constructor(config?: Partial<LODConfig>) {
+    this._config = { ...DEFAULT_CONFIG, ...config };
+    this._updateInterval = Math.max(1, this._config.updateEveryNFrames);
+  }
+
+  public setCamera(camera: Camera): void {
+    this._camera = camera;
+  }
+
+  public setConfig(config: Partial<LODConfig>): void {
+    this._config = { ...this._config, ...config };
+  }
+
+  public getConfig(): Readonly<LODConfig> {
+    return this._config;
   }
 
   /**
@@ -162,8 +147,39 @@ export class LodSystem {
     this._levelGroups.splice(idx, 1);
   }
 
+  private _updateFrustumPlanes(): void {
+    if (!this._camera || !this._config.frustumCull) return;
+    const proj = this._camera.getProjectionMatrix();
+    const view = this._camera.getViewMatrix();
+    const m = proj.multiply(view);
+    const extract = (row: number, sign: number) => {
+      const a = m.m[3 + row] + sign * m.m[row];
+      const b = m.m[7 + row] + sign * m.m[4 + row];
+      const c = m.m[11 + row] + sign * m.m[8 + row];
+      const d = m.m[15 + row] + sign * m.m[12 + row];
+      return new Plane(a, b, c, d);
+    };
+    this._frustumPlanes = [
+      extract(0, -1), extract(0, 1),
+      extract(1, -1), extract(1, 1),
+      extract(2, -1), extract(2, 1),
+    ];
+    for (const p of this._frustumPlanes) p.normalize();
+  }
+
+  private _isInFrustum(mesh: AbstractMesh): boolean {
+    if (!this._config.frustumCull || this._frustumPlanes.length === 0) return true;
+    const pos = mesh.position;
+    const radius = mesh.getBoundingInfo?.()?.boundingSphere?.radius ?? 1;
+    for (const plane of this._frustumPlanes) {
+      const d = plane.normal.x * pos.x + plane.normal.y * pos.y + plane.normal.z * pos.z + plane.d;
+      if (d < -radius) return false;
+    }
+    return true;
+  }
+
   /**
-   * Run the distance-culling pass.  Should be called once per render frame.
+   * Run the distance-culling pass with integrated frustum and priority culling.
    *
    * Returns the number of meshes currently culled (hidden) — useful for the
    * debug/performance overlay.
@@ -176,19 +192,38 @@ export class LodSystem {
       return this._countCulled();
     }
 
+    this._updateFrustumPlanes();
+
+    const cullFarSq = this._config.distanceThresholds.ultraFar ** 2;
+    const candidates: CullPriority[] = [];
+
     // ── Simple binary-cull entries ─────────────────────────────────────────
     const aliveEntries: LodEntry[] = [];
     let culled = 0;
 
     for (const entry of this._entries) {
-      if (entry.mesh.isDisposed()) continue; // drop disposed meshes
+      if (entry.mesh.isDisposed()) continue;
       aliveEntries.push(entry);
 
       const distSq = Vector3.DistanceSquared(entry.mesh.position, playerPosition);
-      const cullSq  = entry.cullDistance * entry.cullDistance;
-      const shouldCull = distSq > cullSq;
-      entry.mesh.isVisible = !shouldCull;
-      if (shouldCull) culled++;
+      const cullSq = entry.cullDistance * entry.cullDistance;
+      const distCulled = distSq > cullSq;
+
+      if (distCulled) {
+        candidates.push({ mesh: entry.mesh, distanceSq: distSq });
+        entry.mesh.isVisible = false;
+        culled++;
+        continue;
+      }
+
+      if (!this._isInFrustum(entry.mesh)) {
+        candidates.push({ mesh: entry.mesh, distanceSq: distSq });
+        entry.mesh.isVisible = false;
+        culled++;
+        continue;
+      }
+
+      entry.mesh.isVisible = true;
     }
 
     this._entries = aliveEntries;
@@ -197,36 +232,45 @@ export class LodSystem {
     const aliveLevelGroups: LodLevelEntry[] = [];
 
     for (const group of this._levelGroups) {
-      // Prune groups where every mesh has been disposed
       const anyAlive = group.levels.some(l => !l.mesh.isDisposed());
       if (!anyAlive) continue;
       aliveLevelGroups.push(group);
 
-      // Use the first non-disposed mesh position as the object's origin
       const originMesh = group.levels.find(l => !l.mesh.isDisposed());
       if (!originMesh) continue;
 
       const distSq = Vector3.DistanceSquared(originMesh.mesh.position, playerPosition);
 
-      // Find the first level whose maxDistance >= sqrt(distSq) — show it, hide
-      // others.  Compare using squared values to avoid an expensive sqrt.
       let chosen = false;
       for (const level of group.levels) {
         if (level.mesh.isDisposed()) continue;
         if (!chosen && distSq <= level.maxDistance * level.maxDistance) {
-          level.mesh.isVisible = true;
+          if (distSq <= cullFarSq && this._isInFrustum(level.mesh)) {
+            level.mesh.isVisible = true;
+          } else {
+            level.mesh.isVisible = false;
+            culled++;
+          }
           chosen = true;
         } else {
           level.mesh.isVisible = false;
           culled++;
         }
       }
-
-      // chosen=false means every level was out of range — meshes were already
-      // hidden in the else branch above; no extra loop needed.
     }
 
     this._levelGroups = aliveLevelGroups;
+
+    // ── Priority-based culling ─────────────────────────────────────────────
+    if (this._config.priorityCull && candidates.length > this._config.maxCulledPerFrame) {
+      candidates.sort((a, b) => b.distanceSq - a.distanceSq);
+      const toRestore = candidates.slice(this._config.maxCulledPerFrame);
+      for (const entry of toRestore) {
+        this._entries.find(e => e.mesh === entry.mesh);
+        entry.mesh.isVisible = false;
+      }
+    }
+
     return culled;
   }
 

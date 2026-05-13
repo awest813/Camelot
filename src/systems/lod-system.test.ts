@@ -32,7 +32,7 @@ describe("LodSystem", () => {
 
   beforeEach(() => {
     // Update interval = 1 so every call to update() runs the pass immediately
-    lod = new LodSystem(1);
+    lod = new LodSystem({ updateEveryNFrames: 1, frustumCull: false });
   });
 
   it("is constructed with zero entries", () => {
@@ -156,7 +156,7 @@ describe("LodSystem", () => {
 
   it("respects updateEveryNFrames throttle", () => {
     // interval = 3 → only frames 3, 6, 9, … actually run the pass
-    const throttled = new LodSystem(3);
+    const throttled = new LodSystem({ updateEveryNFrames: 3, frustumCull: false });
     const mesh = makeMesh(200, 0, 0);
     throttled.register(mesh, 50);
 
