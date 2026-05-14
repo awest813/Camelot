@@ -48,15 +48,8 @@ export class InteractionSystem {
       if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
         const domEvent = kbInfo.event as KeyboardEvent;
         if (domEvent.repeat) return;
-
-        if (domEvent.key === 'e' || domEvent.key === 'E') {
-          domEvent.preventDefault();
-          this.interact();
-        } else if (domEvent.key === 'i' || domEvent.key === 'I') {
-          if (this.dialogueSystem.isInDialogue) return;
-          domEvent.preventDefault();
-          this.inventorySystem.toggleInventory();
-        }
+        // E and I keys are handled by the decoupled input adapter (game.ts _wireInputAdapter).
+        // Only fallback handling remains here for keys not in the adapter.
       }
     });
   }

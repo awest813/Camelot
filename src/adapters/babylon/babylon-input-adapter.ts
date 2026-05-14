@@ -165,9 +165,9 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   { key: "t", action: "toggleWaitDialog", caseInsensitive: true },
   { key: "p", action: "togglePetPanel", caseInsensitive: true },
   { key: "h", action: "showFameStatus", caseInsensitive: true },
-  // O = Mount/dismount; Shift+O = Stable/Saddlebag
+  // O = Mount/dismount; Shift+O = Stable/Saddlebag (shift binding must come first)
+  { key: "o", action: "stableOrSaddlebag", shift: true, caseInsensitive: true },
   { key: "o", action: "mountDismount", caseInsensitive: true },
-  { key: "O", action: "stableOrSaddlebag", shift: true },
 
   // ── Quick-slots (1-0) ───────────────────────────────────────────────────────
   { key: "1", action: "quickSlot1" },
@@ -198,7 +198,7 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   { key: "F5", action: "save" },
   { key: "F9", action: "load" },
   { key: "m", action: "toggleMute", caseInsensitive: true },
-  { key: "PrintScreen", action: "screenshot" },
+  { key: "PrintScreen", action: "screenshot", caseInsensitive: true },
 ];
 
 // ── System ─────────────────────────────────────────────────────────────────────

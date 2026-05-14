@@ -424,7 +424,7 @@ export class Game {
     if (!this._helpOverlayEl) return;
 
     if (this._helpOverlayVisible) {
-      this._helpOverlayEl.textContent = buildHelpOverlayLines(this.mapEditorSystem.isEnabled).join("\n");
+      this._helpOverlayEl.innerHTML = buildHelpOverlayLines(this.mapEditorSystem.isEnabled).join("<br>");
       this._helpOverlayEl.style.display = "block";
     } else {
       this._helpOverlayEl.style.display = "none";
@@ -3661,6 +3661,7 @@ export class Game {
       }
     });
     adapter.onAction("toggleAlchemy", () => {
+      if (this.mapEditorSystem.isEnabled) return;
       if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
         const open = !this.alchemyUI.isVisible;
         this.alchemyUI.toggle(open);
@@ -3676,6 +3677,7 @@ export class Game {
       }
     });
     adapter.onAction("toggleEnchanting", () => {
+      if (this.mapEditorSystem.isEnabled) return;
       if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
         const open = !this.enchantingUI.isVisible;
         this.enchantingUI.toggle(open);
@@ -3691,6 +3693,7 @@ export class Game {
       }
     });
     adapter.onAction("toggleSpellMaking", () => {
+      if (this.mapEditorSystem.isEnabled) return;
       if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
         if (this.spellMakingUI.isVisible) {
           this.spellMakingUI.close();
@@ -4014,6 +4017,7 @@ export class Game {
     });
 
     adapter.onAction("togglePOV", () => {
+      if (this.mapEditorSystem.isEnabled) return;
       if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
         const curFov = this.player.camera.fov;
         this.player.camera.fov = curFov >= 1.8 ? 0.8 : 1.8;
@@ -4042,17 +4046,26 @@ export class Game {
           if (this.questSystem.isLogOpen) {
               this.questSystem.isLogOpen = false;
               this.ui.toggleQuestLog(false);
-              this.interactionSystem.isBlocked = true;
           }
           if (this.skillTreeSystem.isOpen) {
               this.skillTreeSystem.isOpen = false;
               this.ui.toggleSkillTree(false);
-              // Pointer lock already released by togglePause path; no re-attachment needed here
           }
           if (this.characterSheetUI.isVisible) {
               this.characterSheetUI.hide();
               this.ui.setCharacterSheetOpen(false);
           }
+          if (this.alchemyUI.isVisible) { this.alchemyUI.toggle(false); }
+          if (this.enchantingUI.isVisible) { this.enchantingUI.toggle(false); }
+          if (this.spellMakingUI.isVisible) { this.spellMakingUI.close(); }
+          if (this.fastTravelUI.isVisible) { this.fastTravelUI.close(); }
+          if (this.petUI.isVisible) { this.petUI.close(); }
+          if (this.followerUI.isVisible) { this.followerUI.close(); }
+          if (this.stableUI.isVisible) { this.stableUI.close(); }
+          if (this.saddlebagUI.isVisible) { this.saddlebagUI.close(); }
+          if (this.ui.isAttributePanelOpen) { this.ui.toggleAttributePanel(false); }
+          if (this.ui.isWaitDialogOpen) { this.ui.toggleWaitDialog(false); }
+          if (this._barterUI.isVisible) { this._barterUI.onClose?.(); }
           this.interactionSystem.isBlocked = true;
           this.ui.setInteractionText("");
           document.exitPointerLock();
@@ -4096,6 +4109,16 @@ export class Game {
     if (!raceApplied || !birthsignApplied || !classApplied) {
       this._applyDefaultCharacterCreation();
     }
+
+    // Refresh current health/magicka/stamina to match max values after race/birthsign/class bonuses
+    this.player.health   = this.attributeSystem.maxHealth;
+    this.player.magicka  = this.attributeSystem.maxMagicka;
+    this.player.stamina  = this.attributeSystem.maxStamina;
+    // Add birthsign flat bonuses on top (Mage/Apprentice/Atronach magicka, Steed carry, etc.)
+    const signBonuses = this.birthsignSystem.getStatBonuses();
+    this.player.health   += signBonuses.maxHealth;
+    this.player.magicka  += signBonuses.maxMagicka;
+    this.player.stamina  += signBonuses.maxStamina;
 
     if (selection.worldSeed) {
       this.world.setSeed(selection.worldSeed);
@@ -4440,6 +4463,7 @@ export class Game {
       this._updateDynamicWorldEventsOnHourChange();
 
       this.scheduleSystem.update(deltaTime);
+      this.combatSystem.update(deltaTime);
       this.combatSystem.updateNPCAI(deltaTime);
 
       for (const npc of this.scheduleSystem.npcs) {
@@ -4533,11 +4557,19 @@ export class Game {
           this._lastHealth = this.player.health;
           this.ui.updateHealth(this.player.health, this.player.maxHealth);
 
-          if (this.player.health <= 0 && !this._playerAtZeroHP) {
-              this._playerAtZeroHP = true;
-              this.ui.showHitFlash("rgba(180, 0, 0, 0.55)");
-              this.ui.showNotification("You are gravely wounded!", 3500);
-          } else if (this.player.health > 0 && this._playerAtZeroHP) {
+           if (this.player.health <= 0 && !this._playerAtZeroHP) {
+               this._playerAtZeroHP = true;
+               this.ui.showHitFlash("rgba(180, 0, 0, 0.55)");
+               this.ui.showNotification("You have been defeated. You will recover soon.", 4000);
+               // Schedule respawn — restore 50% health after 3 seconds
+               setTimeout(() => {
+                 if (this.player.health <= 0) {
+                   this.player.health = Math.round(this.player.maxHealth * 0.5);
+                   this._playerAtZeroHP = false;
+                   this.ui.showNotification("You feel the will to continue...", 2500);
+                 }
+               }, 4000);
+           } else if (this.player.health > 0 && this._playerAtZeroHP) {
               this._playerAtZeroHP = false;
           }
       }
@@ -5119,6 +5151,7 @@ export class Game {
 
   /** Push latest progression snapshot into the Character Sheet DOM overlay. */
   private _refreshCharacterSheet(): void {
+    const sb = this.birthsignSystem.getStatBonuses();
     this.characterSheetUI.update({
       name:            this.player.name,
       level:           this.playerLevelSystem.characterLevel,
@@ -5129,10 +5162,10 @@ export class Game {
       specialization:  this.classSystem.chosenClass?.specialization,
       attributes:      this.attributeSystem.getAll(),
       skills:          this.skillProgressionSystem.getAllSkills(),
-      maxHealth:       this.attributeSystem.maxHealth,
-      maxMagicka:      this.attributeSystem.maxMagicka,
-      maxStamina:      this.attributeSystem.maxStamina,
-      carryWeight:     this.attributeSystem.carryWeight,
+      maxHealth:       this.attributeSystem.maxHealth + sb.maxHealth,
+      maxMagicka:      this.attributeSystem.maxMagicka + sb.maxMagicka,
+      maxStamina:      this.attributeSystem.maxStamina + sb.maxStamina,
+      carryWeight:     this.attributeSystem.carryWeight + sb.carryWeight,
       fame:            this.fameSystem.fame,
       infamy:          this.fameSystem.infamy,
       fameLabel:       this.fameSystem.fameLabel,
