@@ -72,6 +72,7 @@ export class StealthSystem {
   private _detectionLevels: Map<NPC, number> = new Map();
 
   private _scratchVec = new Vector3();
+  private _scratchDir = new Vector3();
   private _scratchRayOrigin = new Vector3();
   private _raycastFrameCounter: number = 0;
 
@@ -240,7 +241,7 @@ export class StealthSystem {
     if (dist > sightRange) return false;
 
     const npcForward = npc.mesh.getDirection
-      ? npc.mesh.getDirection(this._scratchRayOrigin.set(0, 0, 1))
+      ? npc.mesh.getDirection(this._scratchDir.set(0, 0, 1))
       : new Vector3(0, 0, 1);
 
     const toPlayerNorm = this._scratchVec.normalize();
