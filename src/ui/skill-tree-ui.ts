@@ -266,15 +266,21 @@ export class SkillTreeUI {
       btn.type = "button";
       btn.textContent = "Upgrade";
       btn.setAttribute("aria-label", `Upgrade ${skill.name}`);
-      btn.disabled = !canBuy;
       btn.setAttribute("aria-disabled", canBuy ? "false" : "true");
+
       if (!canBuy) {
         btn.title = isLocked ? "Prerequisites not met." : "Not enough skill points.";
+        btn.style.opacity = "0.5";
+        btn.style.cursor = "not-allowed";
+      } else {
+        btn.setAttribute("title", `Upgrade ${skill.name}`);
+        btn.style.opacity = "";
+        btn.style.cursor = "";
       }
+
       btn.addEventListener("click", () => {
-        if (!btn.disabled) {
-          this.onPurchase?.(treeIndex, skillIndex);
-        }
+        if (btn.getAttribute("aria-disabled") === "true") return;
+        this.onPurchase?.(treeIndex, skillIndex);
       });
       card.appendChild(btn);
     }

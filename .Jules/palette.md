@@ -15,3 +15,7 @@
 ## 2026-05-11 - Title Attribute Restoration for Disabled States
 **Learning:** When HTML elements like buttons are temporarily disabled and visually styled to indicate this (e.g. using `aria-disabled`), their default `title` attribute is often overridden to explain why they are disabled (e.g. "Maximum hours reached"). A common mistake when re-enabling the button is to use `removeAttribute('title')`, which strips the tooltip completely for the active state.
 **Action:** When re-enabling an interactive element, explicitly restore its original descriptive `title` attribute via `setAttribute('title', '...')` instead of removing it, ensuring the element remains accessible and informative on hover.
+
+## 2026-05-14 - Skill Tree Upgrade Button Accessibility
+**Learning:** Using the native `disabled` attribute on UI buttons suppresses pointer events, making hover tooltips invisible and removing the button from tab focus, harming accessibility for users needing to understand why an option like "Upgrade Skill" is unavailable.
+**Action:** Replaced native `disabled` assignment with `aria-disabled="true"`, added inline `opacity: 0.5` and `cursor: not-allowed` styles, dynamically assigned explanatory `title` attributes based on the disabled reason (e.g., "Prerequisites not met"), and explicitly checked `if (btn.getAttribute("aria-disabled") === "true") return;` in click handlers.
