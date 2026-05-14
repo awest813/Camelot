@@ -1874,9 +1874,10 @@ export class CombatSystem {
    */
   private _tickPlayerStatusEffects(deltaTime: number): void {
     if (this._playerStatusEffects.length === 0) return;
-    const surviving: StatusEffect[] = [];
+    let writeIdx = 0;
 
-    for (const effect of this._playerStatusEffects) {
+    for (let i = 0; i < this._playerStatusEffects.length; i++) {
+      const effect = this._playerStatusEffects[i];
       effect.remainingDuration -= deltaTime;
       effect.tickTimer -= deltaTime;
 
@@ -1892,10 +1893,12 @@ export class CombatSystem {
         }
       }
 
-      if (effect.remainingDuration > 0) surviving.push(effect);
+      if (effect.remainingDuration > 0) {
+        this._playerStatusEffects[writeIdx++] = effect;
+      }
     }
 
-    this._playerStatusEffects = surviving;
+    this._playerStatusEffects.length = writeIdx;
   }
 
   /**

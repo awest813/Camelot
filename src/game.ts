@@ -368,6 +368,9 @@ export class Game {
   /** Throttles expensive scene queries in the debug HUD (see `update()`). */
   private _debugOverlayFrameSkip: number = 0;
 
+  /** Frame counter for throttling non-critical subsystem updates. */
+  private _systemTickCounter: number = 0;
+
   // Death feedback: true while health is at 0 so the notification fires once per "death"
   private _playerAtZeroHP: boolean = false;
 
@@ -375,6 +378,8 @@ export class Game {
   private _petMesh: Mesh | null = null;
   private _petPhysicsAggregate: PhysicsAggregate | null = null;
   private _petAttackTimer: number = 0;
+  private _petScratchVec = new Vector3();
+  private _petLookTarget = new Vector3();
   // Cache for pet HUD dirty-checking
   private _lastPetHealth: number = -1;
   private _lastPetId: string | null = null;
@@ -4431,72 +4436,38 @@ export class Game {
       this.audioSystem.updateFootsteps(deltaTime, this.player.camera.position);
       this.world.update(this.player.camera.position);
 
-      // v2 system updates (time must update before schedule so hour is current)
       this.timeSystem.update(deltaTime);
       this._updateDynamicWorldEventsOnHourChange();
-
-      // DailyScheduleSystem syncs ScheduleSystem.currentHour automatically via
-      // TimeSystem.onHourChange — no manual per-frame assignment needed here.
 
       this.scheduleSystem.update(deltaTime);
       this.combatSystem.updateNPCAI(deltaTime);
 
-      // Drive procedural animations from current NPC AI state
       for (const npc of this.scheduleSystem.npcs) {
         const hitReact = npc.justTakenDamageVisual;
-        if (hitReact) {
-          npc.justTakenDamageVisual = false;
-        }
+        if (hitReact) npc.justTakenDamageVisual = false;
         this.animationSystem.updateNPCAnimation(
-          npc.mesh,
-          npc.aiState,
-          npc.isAttackTelegraphing,
-          npc.isStaggered,
-          npc.isDead,
-          hitReact,
+          npc.mesh, npc.aiState, npc.isAttackTelegraphing,
+          npc.isStaggered, npc.isDead, hitReact,
         );
       }
 
-      // Update active companion AI + mood
       this._updatePetAI(deltaTime);
-
       this.interactionSystem.update();
 
-      // Combine time-of-day ambient light with current weather scales for more accurate stealth detection
       const weatherScale = this.weatherSystem?.state === "clear" ? 1.0 : (this.weatherSystem?.fogDensity ? 0.7 : 1.0);
       const compositeLight = this.timeSystem.ambientIntensity * weatherScale;
       this.stealthSystem.shadowFactor = compositeLight;
       this.stealthSystem.update(deltaTime, compositeLight);
-      // Sneak XP: trickle XP while actively sneaking near NPCs
       if (this.stealthSystem.isCrouching) {
         this.skillProgressionSystem.gainXP(
-          "sneak",
-          deltaTime * SNEAK_XP_PER_SECOND * this.classSystem.xpMultiplierFor("sneak"),
+          "sneak", deltaTime * SNEAK_XP_PER_SECOND * this.classSystem.xpMultiplierFor("sneak"),
         );
       }
-      this.crimeSystem.update(deltaTime);
+
       this.projectileSystem.update(deltaTime);
       this.spellSystem.update(deltaTime);
 
-      // v6 atmospheric weather update (fog + light blending)
-      this.weatherSystem.update(deltaTime);
-
-      // v9 active effects tick (DoT heals/damage, duration countdown)
-      this.activeEffectsSystem.update(deltaTime, this.player);
-
-      // v20 swimming — drain breath / apply drowning damage while submerged
-      this.swimSystem.update(deltaTime, this.player);
-
-      // v10 respawn and merchant restock checks (low-frequency, time-comparison only)
-      const currentGameTime = this.timeSystem.elapsedGameTime;
-      this.respawnSystem.update(currentGameTime);
-      this.merchantRestockSystem.update(currentGameTime, this.barterSystem);
-
-      // v4 browser optimisation: distance-based LOD culling
       this._lastLodCulled = this.lodSystem.update(this.player.camera.position);
-
-      // Tick the navmesh rebuild debounce; request a rebuild whenever the player
-      // crosses into a new terrain chunk (new ground meshes may have loaded).
       this.navigationSystem.update(deltaTime);
       this.saveSystem.markDirty();
       this.saveSystem.tickAutosave(deltaTime);
@@ -4507,6 +4478,29 @@ export class Game {
         this._lastNavChunkZ = cz;
         this.navigationSystem.requestRebuild();
       }
+
+      // ── Throttled systems (don't run every frame) ──────────────────────────
+      this._systemTickCounter++;
+      const tick = this._systemTickCounter;
+
+      // weatherSystem: 10 Hz (every 6th frame at 60fps)
+      if (tick % 6 === 0) this.weatherSystem.update(deltaTime);
+
+      // activeEffectsSystem: 30 Hz (every 2nd frame)
+      if (tick % 2 === 0) this.activeEffectsSystem.update(deltaTime, this.player);
+
+      // swimSystem: 20 Hz (every 3rd frame)
+      if (tick % 3 === 0) this.swimSystem.update(deltaTime, this.player);
+
+      // crimeSystem, merchantRestockSystem: ~1 Hz (every 60 frames)
+      if (tick % 60 === 0) {
+        this.crimeSystem.update(deltaTime);
+        const gameTime = this.timeSystem.elapsedGameTime;
+        this.respawnSystem.update(gameTime);
+        this.merchantRestockSystem.update(gameTime, this.barterSystem);
+      }
+
+      if (tick >= 3600) this._systemTickCounter = 0;
   }
 
   update(): void {
@@ -5248,14 +5242,12 @@ export class Game {
     const playerPos = this.player.camera.position;
     const body     = this._petPhysicsAggregate.body;
 
-    // ── Follow player ─────────────────────────────────────────────────────────
     const dx      = playerPos.x - petPos.x;
     const dz      = playerPos.z - petPos.z;
     const distSq  = dx * dx + dz * dz;
     const follow  = pet.followDistance + 0.8;
 
-    const curVel  = new Vector3();
-    body.getLinearVelocityToRef(curVel);
+    body.getLinearVelocityToRef(this._petScratchVec);
 
     if (distSq > follow * follow) {
       const dist  = Math.sqrt(distSq);
@@ -5264,14 +5256,18 @@ export class Game {
       const nz    = (dz / dist) * speed;
       const blend = Math.min(1, 8 * deltaTime);
 
-      body.setLinearVelocity(new Vector3(
-        curVel.x + (nx - curVel.x) * blend,
-        curVel.y,
-        curVel.z + (nz - curVel.z) * blend,
+      const cvx = this._petScratchVec.x;
+      const cvy = this._petScratchVec.y;
+      const cvz = this._petScratchVec.z;
+
+      body.setLinearVelocity(this._petScratchVec.set(
+        cvx + (nx - cvx) * blend,
+        cvy,
+        cvz + (nz - cvz) * blend,
       ));
 
-      // Face movement direction
-      this._petMesh.lookAt(new Vector3(petPos.x + nx, petPos.y, petPos.z + nz));
+      this._petLookTarget.set(petPos.x + nx, petPos.y, petPos.z + nz);
+      this._petMesh.lookAt(this._petLookTarget);
 
       if (dist > pet.followDistance + 5) {
         this.animationSystem.playRun(this._petMesh);
@@ -5279,11 +5275,10 @@ export class Game {
         this.animationSystem.playWalk(this._petMesh);
       }
     } else {
-      body.setLinearVelocity(new Vector3(0, curVel.y, 0));
+      body.setLinearVelocity(this._petScratchVec.set(0, this._petScratchVec.y, 0));
       this.animationSystem.playIdle(this._petMesh);
     }
 
-    // ── Attack nearby hostile NPCs ─────────────────────────────────────────────
     this._petAttackTimer -= deltaTime;
     if (this._petAttackTimer > 0) return;
 
@@ -5311,7 +5306,7 @@ export class Game {
       }
       this._petAttackTimer = Game._PET_ATTACK_COOLDOWN;
     } else {
-      this._petAttackTimer = 0.4; // re-poll soon if no target found
+      this._petAttackTimer = 0.4;
     }
   }
 

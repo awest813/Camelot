@@ -14,6 +14,7 @@ export interface StealthSnapshot {
 
 /** Detection field-of-view half-angle: 36° → 72° total cone. */
 const DETECTION_CONE_HALF_ANGLE = Math.PI / 5;
+const DETECTION_CONE_DOT = Math.cos(DETECTION_CONE_HALF_ANGLE);
 /** Base sight range in full daylight while standing. */
 const BASE_SIGHT_RANGE = 20;
 /** Hearing radius when running. */
@@ -69,6 +70,10 @@ export class StealthSystem {
   public movementMode: MovementMode = "walking";
 
   private _detectionLevels: Map<NPC, number> = new Map();
+
+  private _scratchVec = new Vector3();
+  private _scratchRayOrigin = new Vector3();
+  private _raycastFrameCounter: number = 0;
 
   /**
    * Shadow coverage of the player's position [0-1].
@@ -185,8 +190,10 @@ export class StealthSystem {
     // Decay transient noise level
     this._noiseLevel = Math.max(0, this._noiseLevel - NOISE_DECAY_RATE * deltaTime);
 
+    // Throttle raycast-heavy sight checks to every 3 frames
+    this._raycastFrameCounter++;
+
     for (const npc of this._npcs) {
-      // Skip NPCs already in full combat — they're aware of the player
       if (npc.isDead || npc.aiState === AIState.ATTACK || npc.aiState === AIState.CHASE) {
         this._detectionLevels.delete(npc);
         continue;
@@ -208,7 +215,6 @@ export class StealthSystem {
           this.onDetected?.(npc);
         }
       } else {
-        // Decay while undetectable
         const prev = this._detectionLevels.get(npc) ?? 0;
         const next = Math.max(0, prev - DETECTION_DECAY_RATE * deltaTime);
         this._detectionLevels.set(npc, next);
@@ -216,17 +222,15 @@ export class StealthSystem {
     }
   }
 
-  // ── Private helpers ───────────────────────────────────────────────────────
-
   private _canNPCSee(npc: NPC, ambientIntensity: number): boolean {
     if (npc.isDead) return false;
 
     const playerPos = this._player.camera.position;
     const npcPos    = npc.mesh.position;
-    const toPlayer  = playerPos.subtract(npcPos);
-    const dist      = toPlayer.length();
 
-    // Scale detection range by ambient light, shadow cover, and crouch stance
+    playerPos.subtractToRef(npcPos, this._scratchVec);
+    const dist = this._scratchVec.length();
+
     const shadowClamped = Math.max(0, Math.min(1, this.shadowFactor));
     let sightRange = BASE_SIGHT_RANGE
       * Math.max(0.1, ambientIntensity)
@@ -235,27 +239,23 @@ export class StealthSystem {
 
     if (dist > sightRange) return false;
 
-    // Check NPC forward-facing cone
     const npcForward = npc.mesh.getDirection
-      ? npc.mesh.getDirection(new Vector3(0, 0, 1))
+      ? npc.mesh.getDirection(this._scratchRayOrigin.set(0, 0, 1))
       : new Vector3(0, 0, 1);
 
-    const dot   = Vector3.Dot(npcForward, toPlayer.normalize());
-    const angle = Math.acos(Math.min(1, Math.max(-1, dot)));
+    const toPlayerNorm = this._scratchVec.normalize();
+    const dot = Vector3.Dot(npcForward, toPlayerNorm);
 
-    if (angle > DETECTION_CONE_HALF_ANGLE) return false;
+    if (dot < DETECTION_CONE_DOT) return false;
 
     if (!this._scene) return true;
 
-    // Raycast Line of Sight (LoS) check
-    const ray = new Ray(
-      npcPos.add(new Vector3(0, 1.3, 0)), // Eye level
-      toPlayer.normalize(),
-      dist
-    );
-    
+    if (this._raycastFrameCounter % 3 !== 0) return true;
+
+    this._scratchRayOrigin.set(npcPos.x, npcPos.y + 1.3, npcPos.z);
+    const ray = new Ray(this._scratchRayOrigin, toPlayerNorm, dist);
+
     const hit = this._scene.pickWithRay(ray, (mesh: AbstractMesh) => {
-        // Ignore the NPC itself and the player helper
         return mesh !== npc.mesh && mesh.name !== "player_camera_helper" && mesh.checkCollisions;
     });
 

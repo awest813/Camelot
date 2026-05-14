@@ -357,9 +357,10 @@ export class NPC {
     if (this.isDead || this.statusEffects.length === 0) return 0;
 
     let totalDamage = 0;
-    const remaining: StatusEffect[] = [];
+    let writeIdx = 0;
 
-    for (const effect of this.statusEffects) {
+    for (let i = 0; i < this.statusEffects.length; i++) {
+      const effect = this.statusEffects[i];
       effect.remainingDuration -= deltaTime;
       effect.tickTimer -= deltaTime;
 
@@ -371,11 +372,11 @@ export class NPC {
       }
 
       if (effect.remainingDuration > 0) {
-        remaining.push(effect);
+        this.statusEffects[writeIdx++] = effect;
       }
     }
 
-    this.statusEffects = remaining;
+    this.statusEffects.length = writeIdx;
 
     if (totalDamage > 0) {
       this.takeDamage(totalDamage);
