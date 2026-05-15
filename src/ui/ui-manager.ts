@@ -118,6 +118,16 @@ export class UIManager {
   private _xpLevelLabel: TextBlock;
   /** True while the HTML Character Sheet overlay is open (hides crosshair with other blocking panels). */
   private _characterSheetOpen: boolean = false;
+  private _htmlOverlayCount: number = 0;
+  public get htmlOverlayCount(): number { return this._htmlOverlayCount; }
+  public registerHtmlOverlay(): () => void {
+    this._htmlOverlayCount++;
+    this._syncCrosshairVisibility();
+    return () => {
+      this._htmlOverlayCount--;
+      this._syncCrosshairVisibility();
+    };
+  }
 
   // Camera Shake & Hit-stop
   private _cameraTrauma: number = 0;
@@ -924,7 +934,8 @@ export class UIManager {
       this.skillTreePanel.isVisible ||
       !!this.attributePanel?.isVisible ||
       this.isWaitDialogOpen ||
-      this._characterSheetOpen;
+      this._characterSheetOpen ||
+      this._htmlOverlayCount > 0;
 
     this.toggleCrosshair(!hasBlockingPanelOpen);
   }

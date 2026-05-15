@@ -73,6 +73,7 @@
 }
 
 .active-effect-hud__pill {
+  position: relative;
   backdrop-filter: blur(8px) !important;
   background: rgba(12, 10, 8, 0.85) !important;
   border: 1px solid rgba(212, 160, 23, 0.25) !important;
@@ -144,3 +145,152 @@
     url("https://assets.babylonjs.com/textures/wood.jpg") center / 480px repeat !important;
   background-blend-mode: multiply, soft-light;
 }
+
+/* ── Quick Slot HUD: hotbar strip ──────────────────────────────────────────── */
+
+.quickslot-hud {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  gap: 6px;
+  z-index: 1500;
+  pointer-events: auto;
+}
+
+.quickslot-hud__slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  background: rgba(12, 10, 8, 0.88);
+  border: 1px solid rgba(212, 160, 23, 0.35);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transition: border-color 0.15s, transform 0.1s;
+}
+
+.quickslot-hud__slot:hover {
+  border-color: rgba(212, 160, 23, 0.7);
+  transform: translateY(-2px);
+}
+
+.quickslot-hud__slot:focus {
+  outline: none;
+  border-color: #D4A017;
+  box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.3);
+}
+
+.quickslot-hud__key-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(212, 160, 23, 0.7);
+  line-height: 1;
+  margin-bottom: 2px;
+  font-family: ui-monospace, monospace;
+}
+
+.quickslot-hud__item-name {
+  font-size: 10px;
+  color: #e8eef8;
+  text-align: center;
+  max-width: 58px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.quickslot-hud__qty-badge {
+  position: absolute;
+  bottom: 3px;
+  right: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(180, 80, 20, 0.9);
+  border-radius: 3px;
+  padding: 0 3px;
+  line-height: 1.4;
+  font-family: ui-monospace, monospace;
+}
+
+/* ── Active Effects HUD: effect pills strip ───────────────────────────────── */
+
+.active-effect-hud {
+  position: fixed;
+  top: 80px;
+  right: 16px;
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 1500;
+  pointer-events: none;
+  max-width: 240px;
+}
+
+.active-effect-hud__strip {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.active-effect-hud__pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  color: #e8eef8;
+}
+
+.active-effect-hud__icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.active-effect-hud__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active-effect-hud__countdown {
+  font-size: 10px;
+  opacity: 0.8;
+  flex-shrink: 0;
+  min-width: 28px;
+  text-align: right;
+}
+
+.active-effect-hud__bar-wrap {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 0 0 6px 6px;
+  overflow: hidden;
+}
+
+.active-effect-hud__bar {
+  height: 100%;
+  transition: width 0.3s linear;
+}
+
+.active-effect-hud__pill--heal    { background: rgba(40, 120, 60, 0.85); border: 1px solid rgba(80, 200, 100, 0.4); }
+.active-effect-hud__pill--magicka { background: rgba(40, 60, 140, 0.85); border: 1px solid rgba(80, 120, 240, 0.4); }
+.active-effect-hud__pill--stamina { background: rgba(130, 100, 20, 0.85); border: 1px solid rgba(220, 180, 60, 0.4); }
+.active-effect-hud__pill--fortify { background: rgba(80, 60, 20, 0.85);  border: 1px solid rgba(200, 160, 40, 0.4); }
+.active-effect-hud__pill--harm    { background: rgba(130, 30, 20, 0.85); border: 1px solid rgba(220, 60, 40, 0.4); }
+
+.active-effect-hud__bar { background: rgba(255, 255, 255, 0.35); }

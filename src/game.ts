@@ -145,6 +145,8 @@ import { TrainerSystem } from "./systems/trainer-system";
 import { FollowerSystem } from "./systems/follower-system";
 import type { ActiveFollowerState } from "./systems/follower-system";
 import { FollowerUI } from "./ui/follower-ui";
+import { ActiveEffectHUD } from "./ui/active-effect-hud";
+import { QuickSlotHUD } from "./ui/quickslot-hud";
 import { PerkSystem } from "./systems/perk-system";
 import { DynamicWorldEventSystem } from "./systems/dynamic-world-event-system";
 import type { DynamicEventReward } from "./systems/dynamic-world-event-system";
@@ -388,6 +390,9 @@ export class Game {
   private _lastFollowerId: string | null = null;
   private _helpOverlayEl: HTMLDivElement | null = null;
   private _helpOverlayVisible: boolean = false;
+  public activeEffectHUD: ActiveEffectHUD;
+  public quickSlotHUD: QuickSlotHUD;
+  private _lastSleepNotificationPerNPC: Map<NPC, number> = new Map();
   private _activeGuardChallenge: { guard: NPC; factionId: string; bounty: number } | null = null;
 
   /** Decoupled input action adapter — maps named actions to key/mouse/gamepad events. */
@@ -1497,6 +1502,13 @@ export class Game {
       this.perkSystem.addPerkPoints(1);
       this.saveSystem.markDirty();
       if (this.characterSheetUI.isVisible) this._refreshCharacterSheet();
+      // Auto-open attribute panel on character level-up
+      if (!this.isPaused && !this.ui.isAttributePanelOpen) {
+        this.ui.toggleAttributePanel(true);
+        this.ui.refreshAttributePanel(this.attributeSystem);
+        this.interactionSystem.isBlocked = true;
+        document.exitPointerLock?.();
+      }
     };
     this.saveSystem.setPlayerLevelSystem(this.playerLevelSystem);
 
@@ -1511,10 +1523,16 @@ export class Game {
       this.timeSystem,
     );
     this.dailyScheduleSystem.onNPCSleep = (npc) => {
+      const now = this._systemTickCounter;
+      if ((this._lastSleepNotificationPerNPC.get(npc) ?? -9999) + 1800 > now) return;
+      this._lastSleepNotificationPerNPC.set(npc, now);
       this.ui.showNotification(`${npc.mesh.name} has gone to sleep.`, 2000);
       this.saveSystem.markDirty();
     };
     this.dailyScheduleSystem.onNPCWake = (npc) => {
+      const now = this._systemTickCounter;
+      if ((this._lastSleepNotificationPerNPC.get(npc) ?? -9999) + 1800 > now) return;
+      this._lastSleepNotificationPerNPC.set(npc, now);
       this.ui.showNotification(`${npc.mesh.name} has woken up.`, 2000);
       this.saveSystem.markDirty();
     };
@@ -2062,6 +2080,18 @@ export class Game {
       this.player.camera.attachControl(this.canvas, true);
     };
 
+    // ── Active Effects HUD ──────────────────────────────────────────────────
+    this.activeEffectHUD = new ActiveEffectHUD();
+    this.activeEffectHUD.show();
+
+    // ── Quick Slot HUD ────────────────────────────────────────────────────
+    this.quickSlotHUD = new QuickSlotHUD();
+    this.quickSlotHUD.onAssign = (_key, _currentItemId) => {
+      this.ui.showNotification(`Open item picker for slot ${_key}`, 1500);
+    };
+    this.quickSlotHUD.show();
+    this.quickSlotHUD.update(this.quickSlotSystem);
+
     // ── Stable UI ─────────────────────────────────────────────────────────
     this.stableUI = new StableUI();
     this.stableUI.onClose = () => {
@@ -2176,20 +2206,12 @@ export class Game {
     };
 
     // Level-up awards attribute points
-    this.player.onLevelUp = (newLevel) => {
-      this.ui.showNotification(`Level Up! You are now level ${newLevel}! [U] to spend attributes.`, 4000);
+    this.player.onLevelUp = (_newLevel) => {
+      // Combat XP level-up — no notification (spam). Character level-up
+      // fires via onLevelUpComplete and shows the meaningful notification.
       this.attributeSystem.awardLevelUpPoints(1);
       // Sync magic damage bonus after level-up attribute award
       this.spellSystem.magicDamageBonus = this.attributeSystem.magicDamageBonus;
-      this.eventBus.emit("player:levelUp", { newLevel });
-      // Auto-open attribute panel on level-up
-      if (!this.isPaused && !this.ui.isAttributePanelOpen) {
-        this.ui.toggleAttributePanel(true);
-        this.ui.refreshAttributePanel(this.attributeSystem);
-        this.interactionSystem.isBlocked = true;
-        document.exitPointerLock?.();
-        this.player.camera.detachControl?.();
-      }
     };
 
     // Guard crime challenge is wired in the v9 block above.
@@ -4080,6 +4102,7 @@ export class Game {
   private async _runCharacterCreation(): Promise<void> {
     this.isPaused = true;
     this.interactionSystem.isBlocked = true;
+    this.ui.toggleCrosshair(false);
     document.exitPointerLock();
     this.player.camera.detachControl();
 
@@ -4130,6 +4153,7 @@ export class Game {
     this.ui.showNotification(`Welcome, ${this.player.name}! Character creation complete.`, 2800);
     this.interactionSystem.isBlocked = false;
     this.isPaused = false;
+    this.ui.toggleCrosshair(true);
     this.canvas.requestPointerLock();
     this.player.camera.attachControl(this.canvas, true);
 
@@ -4628,6 +4652,12 @@ export class Game {
           this.ui.updateStealthHUD(this.stealthSystem.stealthLabel);
       } else {
           this.ui.updateStealthHUD(null);
+      }
+
+      // Update active effects HUD (30 Hz, same as activeEffectsSystem)
+      if (this._systemTickCounter % 2 === 0) {
+        this.activeEffectHUD.update(this.activeEffectsSystem.activeEffects);
+        this.quickSlotHUD.update(this.quickSlotSystem);
       }
 
       if (!this.ui.isDebugVisible) {
