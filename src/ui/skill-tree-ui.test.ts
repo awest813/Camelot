@@ -207,13 +207,17 @@ describe("SkillTreeUI", () => {
       ui.show();
       ui.update(makeTrees(), 0, () => true);
       const btns = document.querySelectorAll<HTMLButtonElement>(".skill-tree-ui__upgrade-btn");
-      btns.forEach((btn) => expect(btn.disabled).toBe(true));
+      btns.forEach((btn) => {
+        expect(btn.getAttribute("aria-disabled")).toBe("true");
+        expect(btn.disabled).toBe(false);
+      });
     });
 
     it("enables the upgrade button when skill points > 0 and prereqs are met", () => {
       ui.show();
       ui.update(makeTrees(), 2, () => true);
       const firstBtn = document.querySelector<HTMLButtonElement>(".skill-tree-ui__upgrade-btn");
+      expect(firstBtn?.getAttribute("aria-disabled")).toBe("false");
       expect(firstBtn?.disabled).toBe(false);
     });
 
