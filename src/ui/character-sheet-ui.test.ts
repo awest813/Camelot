@@ -92,6 +92,15 @@ describe("CharacterSheetUI", () => {
       const root = document.querySelector(".character-sheet-ui");
       expect(root?.getAttribute("aria-modal")).toBe("true");
     });
+
+    it("root has aria-labelledby pointing to title", () => {
+      ui.show();
+      const root = document.querySelector(".character-sheet-ui");
+      expect(root?.getAttribute("aria-labelledby")).toBe("character-sheet-ui-title");
+      const title = document.getElementById("character-sheet-ui-title");
+      expect(title).not.toBeNull();
+      expect(title?.textContent).toBe("Character Sheet");
+    });
   });
 
   describe("hide()", () => {

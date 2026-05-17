@@ -169,7 +169,7 @@ export class CharacterSheetUI {
     root.className = "character-sheet-ui";
     root.setAttribute("role", "dialog");
     root.setAttribute("aria-modal", "true");
-    root.setAttribute("aria-label", "Character Sheet");
+    root.setAttribute("aria-labelledby", "character-sheet-ui-title");
     root.style.display = "none";
 
     // ── Header ────────────────────────────────────────────────────────────────
@@ -178,6 +178,7 @@ export class CharacterSheetUI {
     root.appendChild(header);
 
     const titleEl = document.createElement("h2");
+    titleEl.id = "character-sheet-ui-title";
     titleEl.className = "character-sheet-ui__title";
     titleEl.textContent = "Character Sheet";
     header.appendChild(titleEl);

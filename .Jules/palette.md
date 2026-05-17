@@ -19,3 +19,9 @@
 ## 2026-05-14 - Skill Tree Upgrade Button Accessibility
 **Learning:** Using the native `disabled` attribute on UI buttons suppresses pointer events, making hover tooltips invisible and removing the button from tab focus, harming accessibility for users needing to understand why an option like "Upgrade Skill" is unavailable.
 **Action:** Replaced native `disabled` assignment with `aria-disabled="true"`, added inline `opacity: 0.5` and `cursor: not-allowed` styles, dynamically assigned explanatory `title` attributes based on the disabled reason (e.g., "Prerequisites not met"), and explicitly checked `if (btn.getAttribute("aria-disabled") === "true") return;` in click handlers.
+## 2026-05-17 - [Aria-Labelledby for Modal Dialogs]
+**Learning:** In the HTML overlays (, ), while the components had `role="dialog"` and `aria-modal="true"`, they frequently lacked robust linkage to their respective header titles via `aria-labelledby`, relying instead on static `aria-label` attributes.
+**Action:** Always link `aria-labelledby` to a visible header's `id` when a UI overlay functions as a modal dialog to allow screen-readers to dynamically announce the dialog context and prevent repetition between label and visible content.
+## 2024-05-18 - [Aria-Labelledby for Modal Dialogs]
+**Learning:** In the HTML overlays, while the components had `role="dialog"` and `aria-modal="true"`, they frequently lacked robust linkage to their respective header titles via `aria-labelledby`, relying instead on static `aria-label` attributes.
+**Action:** Always link `aria-labelledby` to a visible header ID when a UI overlay functions as a modal dialog to allow screen-readers to dynamically announce the dialog context.

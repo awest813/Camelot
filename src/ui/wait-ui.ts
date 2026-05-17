@@ -98,7 +98,7 @@ export class WaitUI {
     root.className = "wait-ui";
     root.setAttribute("role", "dialog");
     root.setAttribute("aria-modal", "true");
-    root.setAttribute("aria-label", "Wait");
+    root.setAttribute("aria-labelledby", "wait-ui-title");
     root.style.display = "none";
 
     // Header
@@ -106,6 +106,7 @@ export class WaitUI {
     header.className = "wait-ui__header";
 
     const title = document.createElement("h2");
+    title.id = "wait-ui-title";
     title.className = "wait-ui__title";
     title.textContent = "Wait";
     header.appendChild(title);
