@@ -499,3 +499,163 @@ describe("GraphicsSystem", () => {
     expect(gfx.postProcess.fxaa).toBe(false);
   });
 });
+
+// ── Quality tiers ─────────────────────────────────────────────────────────────
+
+import {
+  LOW_TIER_PRESET,
+  MEDIUM_TIER_PRESET,
+  HIGH_TIER_PRESET,
+  ULTRA_TIER_PRESET,
+  presetForTier,
+  detectQualityTier,
+  readNavigatorHardwareHints,
+} from "./graphics-system";
+
+describe("quality tier presets", () => {
+  it("LOW tier disables post-processing and uses a 512² shadow map", () => {
+    expect(LOW_TIER_PRESET.shadow.mapSize).toBe(512);
+    expect(LOW_TIER_PRESET.postProcess.bloom.enabled).toBe(false);
+    expect(LOW_TIER_PRESET.postProcess.fxaa).toBe(false);
+    expect(LOW_TIER_PRESET.performance.postProcessEnabled).toBe(false);
+    expect(LOW_TIER_PRESET.performance.softShadows).toBe(false);
+    expect(LOW_TIER_PRESET.performance.hardwareScalingLevel).toBeGreaterThan(1);
+    expect(LOW_TIER_PRESET.performance.targetFps).toBe(30);
+  });
+
+  it("MEDIUM tier keeps shadows + FXAA but disables bloom", () => {
+    expect(MEDIUM_TIER_PRESET.postProcess.fxaa).toBe(true);
+    expect(MEDIUM_TIER_PRESET.postProcess.bloom.enabled).toBe(false);
+    expect(MEDIUM_TIER_PRESET.performance.softShadows).toBe(true);
+  });
+
+  it("ULTRA tier enables bloom + larger shadow map", () => {
+    expect(ULTRA_TIER_PRESET.shadow.mapSize).toBe(2048);
+    expect(ULTRA_TIER_PRESET.postProcess.bloom.enabled).toBe(true);
+    expect(ULTRA_TIER_PRESET.postProcess.fxaa).toBe(true);
+  });
+
+  it("every tier preset passes validateGraphicsConfig", () => {
+    for (const preset of [LOW_TIER_PRESET, MEDIUM_TIER_PRESET, HIGH_TIER_PRESET, ULTRA_TIER_PRESET]) {
+      const errors = validateGraphicsConfig({
+        shadow:      preset.shadow,
+        postProcess: preset.postProcess,
+        sky:         DEFAULT_SKY,
+        fog:         preset.fog,
+        lighting:    preset.lighting,
+      });
+      expect(errors).toEqual([]);
+    }
+  });
+
+  it("presetForTier returns the matching preset", () => {
+    expect(presetForTier("low")).toBe(LOW_TIER_PRESET);
+    expect(presetForTier("medium")).toBe(MEDIUM_TIER_PRESET);
+    expect(presetForTier("high")).toBe(HIGH_TIER_PRESET);
+    expect(presetForTier("ultra")).toBe(ULTRA_TIER_PRESET);
+  });
+});
+
+describe("detectQualityTier", () => {
+  it("returns 'medium' when no hints are supplied", () => {
+    expect(detectQualityTier()).toBe("medium");
+    expect(detectQualityTier({})).toBe("medium");
+  });
+
+  it("returns 'low' for 2 GB RAM / 2 cores", () => {
+    expect(detectQualityTier({ deviceMemoryGB: 2, hardwareConcurrency: 2 })).toBe("low");
+  });
+
+  it("returns 'low' for 4 GB RAM / 4 cores", () => {
+    expect(detectQualityTier({ deviceMemoryGB: 4, hardwareConcurrency: 4 })).toBe("low");
+  });
+
+  it("returns 'low' when only RAM is low (≤4 GB)", () => {
+    expect(detectQualityTier({ deviceMemoryGB: 3, hardwareConcurrency: 16 })).toBe("low");
+  });
+
+  it("returns 'low' when only core count is low (≤4)", () => {
+    expect(detectQualityTier({ deviceMemoryGB: 32, hardwareConcurrency: 2 })).toBe("low");
+  });
+
+  it("returns 'low' when saveData is set, regardless of hardware", () => {
+    expect(detectQualityTier({ deviceMemoryGB: 32, hardwareConcurrency: 16, saveData: true })).toBe("low");
+  });
+
+  it("returns 'medium' for 8 GB / 8 cores", () => {
+    expect(detectQualityTier({ deviceMemoryGB: 8, hardwareConcurrency: 8 })).toBe("medium");
+  });
+
+  it("returns 'high' for 16 GB / 12 cores", () => {
+    expect(detectQualityTier({ deviceMemoryGB: 16, hardwareConcurrency: 12 })).toBe("high");
+  });
+});
+
+describe("readNavigatorHardwareHints", () => {
+  it("returns empty object when given an empty navigator-like object", () => {
+    expect(readNavigatorHardwareHints({})).toEqual({});
+  });
+
+  it("extracts known fields", () => {
+    const hints = readNavigatorHardwareHints({
+      deviceMemory:        4,
+      hardwareConcurrency: 4,
+      connection:          { saveData: true },
+    });
+    expect(hints).toEqual({
+      deviceMemoryGB:      4,
+      hardwareConcurrency: 4,
+      saveData:            true,
+    });
+  });
+
+  it("omits missing fields", () => {
+    expect(readNavigatorHardwareHints({ hardwareConcurrency: 8 })).toEqual({
+      hardwareConcurrency: 8,
+    });
+  });
+});
+
+describe("GraphicsSystem tier integration", () => {
+  it("defaults to the legacy 'high' tier when no tier override is given", () => {
+    const gfx = new GraphicsSystem();
+    expect(gfx.tier).toBe("high");
+    expect(gfx.shadow.mapSize).toBe(DEFAULT_SHADOW.mapSize);
+    expect(gfx.performance.postProcessEnabled).toBe(true);
+  });
+
+  it("applies the low-tier preset when constructed with tier='low'", () => {
+    const gfx = new GraphicsSystem({ tier: "low" });
+    expect(gfx.tier).toBe("low");
+    expect(gfx.shadow.mapSize).toBe(512);
+    expect(gfx.performance.shadowsEnabled).toBe(true);
+    expect(gfx.performance.softShadows).toBe(false);
+    expect(gfx.performance.postProcessEnabled).toBe(false);
+    expect(gfx.performance.maxParticles).toBe(64);
+    expect(gfx.performance.hardwareScalingLevel).toBeGreaterThan(1);
+    expect(gfx.isValid).toBe(true);
+  });
+
+  it("layers explicit overrides on top of the tier preset", () => {
+    const gfx = new GraphicsSystem({
+      tier: "low",
+      shadow: { mapSize: 1024 },
+      performance: { maxParticles: 16 },
+    });
+    expect(gfx.shadow.mapSize).toBe(1024);
+    expect(gfx.shadow.blurKernel).toBe(LOW_TIER_PRESET.shadow.blurKernel);
+    expect(gfx.performance.maxParticles).toBe(16);
+    expect(gfx.performance.postProcessEnabled).toBe(false);
+  });
+
+  it("autoDetect produces a 'low' GraphicsSystem for 4 GB / 4 core hints", () => {
+    const gfx = GraphicsSystem.autoDetect({ deviceMemoryGB: 4, hardwareConcurrency: 4 });
+    expect(gfx.tier).toBe("low");
+    expect(gfx.shadow.mapSize).toBe(512);
+  });
+
+  it("autoDetect produces a 'high' GraphicsSystem for capable hardware", () => {
+    const gfx = GraphicsSystem.autoDetect({ deviceMemoryGB: 32, hardwareConcurrency: 16 });
+    expect(gfx.tier).toBe("high");
+  });
+});
