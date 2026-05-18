@@ -155,7 +155,7 @@
   transform: translateX(-50%);
   display: none;
   gap: 6px;
-  z-index: 1500;
+  z-index: 18;
   pointer-events: auto;
 }
 

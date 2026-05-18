@@ -864,7 +864,7 @@ body::before {
 .onboarding-tip {
   position: fixed;
   left: 50%;
-  bottom: 22px;
+  bottom: 108px;
   transform: translateX(-50%);
   z-index: 25;
   width: min(520px, calc(100vw - 32px));
@@ -879,6 +879,13 @@ body::before {
   pointer-events: none;
   user-select: none;
   animation: onboarding-tip-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (max-height: 620px) {
+  .onboarding-tip {
+    bottom: 88px;
+    width: min(480px, calc(100vw - 24px));
+  }
 }
 
 @keyframes onboarding-tip-in {
