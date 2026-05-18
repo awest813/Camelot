@@ -118,21 +118,21 @@ export interface LightingConfig {
 
 /** Default shadow map configuration used by the game. */
 export const DEFAULT_SHADOW: ShadowConfig = {
-  mapSize:    2048,
-  blurKernel: 32,
+  mapSize:    1024,
+  blurKernel: 12,
 };
 
 /** Default post-processing preset (clear mid-morning, WebGL renderer). */
 export const DEFAULT_POST_PROCESS: PostProcessConfig = {
   bloom: {
-    enabled:   true,
+    enabled:   false,
     threshold: 0.55,
     weight:    0.35,
-    kernel:    64,
-    scale:     0.65,
+    kernel:    24,
+    scale:     0.5,
   },
-  fxaa:              true,
-  sharpenEdgeAmount: 0.40,
+  fxaa:              false,
+  sharpenEdgeAmount: 0,
   toneMappingType:   "aces",
   exposure:          1.10,
   contrast:          1.18,

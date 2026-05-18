@@ -1615,16 +1615,18 @@ export class Game {
     // Preload Babylon CDN models only; Quaternius packs load on first `getInstance`
     // to avoid startup bandwidth, decode work, and memory spikes from ~80+ local GLBs.
     this.fantasyAssets = new FantasyAssetLoader(this.scene);
-    this.fantasyAssets.preloadRemoteCdnAssets();
+    const remotePropsEnabled = import.meta.env.VITE_ENABLE_REMOTE_PROPS === "true";
+    if (remotePropsEnabled) {
+      this.fantasyAssets.preloadRemoteCdnAssets();
 
-    // ── CDN model world placement via chunk lifecycle ──────────────────────
-    // Deterministic seeding: same chunk always produces same props.
-    const _chunkRand = (cx: number, cz: number, slot: number) =>
-      Math.abs(Math.sin(cx * 311.7 + cz * 127.1 + slot * 59.3)) % 1;
+      // ── CDN model world placement via chunk lifecycle ──────────────────────
+      // Deterministic seeding: same chunk always produces same props.
+      const _chunkRand = (cx: number, cz: number, slot: number) =>
+        Math.abs(Math.sin(cx * 311.7 + cz * 127.1 + slot * 59.3)) % 1;
 
-    this.world.onChunkLoaded = (cx, cz, biome) => {
-      const worldX = cx * this.world.chunkSize;
-      const worldZ = cz * this.world.chunkSize;
+      this.world.onChunkLoaded = (cx, cz, biome) => {
+        const worldX = cx * this.world.chunkSize;
+        const worldZ = cz * this.world.chunkSize;
 
       // ── Obelisks in desert / plains (1-in-8 chance per chunk) ────────────
       if ((biome === "desert" || biome === "plains") && _chunkRand(cx, cz, 0) < 0.125) {
@@ -1883,7 +1885,8 @@ export class Game {
           this._registerFantasyChunkLod(root, "prop");
         });
       }
-    };
+      };
+    }
 
     // ── v23 Pet System ─────────────────────────────────────────────────────
     this.petSystem = new PetSystem();
@@ -4306,12 +4309,17 @@ export class Game {
     // Position the light far away so the shadow frustum covers the visible world.
     sun.position  = new Vector3(80, 120, 50);
 
-    // Shadow generator — high-quality PCSS soft shadows cast by the directional sun
-    const shadows = new ShadowGenerator(this.graphics.shadow.mapSize, sun);
-    shadows.useBlurExponentialShadowMap = true;
-    shadows.blurKernel = this.graphics.shadow.blurKernel;
-    shadows.bias = 0.0005;
-    this.shadowGenerator = shadows;
+    // Shadows are opt-in for high quality captures. The default build keeps
+    // them off so lower-end browsers can hold a playable frame rate.
+    if (import.meta.env.VITE_ENABLE_SHADOWS === "true") {
+      const shadows = new ShadowGenerator(this.graphics.shadow.mapSize, sun);
+      shadows.useBlurExponentialShadowMap = true;
+      shadows.blurKernel = this.graphics.shadow.blurKernel;
+      shadows.bias = 0.0005;
+      this.shadowGenerator = shadows;
+    } else {
+      this.shadowGenerator = null;
+    }
 
     // Atmospheric distance fog — initial values match WeatherSystem's "clear"
     // state so the first frame is consistent before WeatherSystem takes over.
@@ -4372,7 +4380,7 @@ export class Game {
       pipeline.fxaaEnabled = pp.fxaa;
 
       // Sharpen — recover crisp detail that FXAA softens
-      pipeline.sharpenEnabled = true;
+      pipeline.sharpenEnabled = pp.sharpenEdgeAmount > 0;
       pipeline.sharpen.edgeAmount = pp.sharpenEdgeAmount;
 
       // Depth of field — subtle focus falloff for cinematic depth

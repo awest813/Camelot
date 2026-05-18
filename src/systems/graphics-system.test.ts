@@ -490,8 +490,8 @@ describe("GraphicsSystem", () => {
     expect(gfx.postProcess.toneMappingType).toBe("none");
   });
 
-  it("default fxaa is true", () => {
-    expect(new GraphicsSystem().postProcess.fxaa).toBe(true);
+  it("default fxaa is disabled for the performance-first preset", () => {
+    expect(new GraphicsSystem().postProcess.fxaa).toBe(false);
   });
 
   it("fxaa can be disabled via override", () => {

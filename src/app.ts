@@ -48,21 +48,31 @@ class App {
   }
 
   private async _initWebGL2Engine(): Promise<void> {
-    this.engine = new Engine(this.canvas, true, {
+    this.engine = new Engine(this.canvas, false, {
       powerPreference: "high-performance",
       preserveDrawingBuffer: false,
       stencil: true,
       disableWebGL2Support: false,
     });
+    this._applyPerformanceRenderScale();
   }
 
   private async _initWebGPUEngine(): Promise<void> {
     const webgpu = new WebGPUEngine(this.canvas, {
       adaptToDeviceRatio: true,
-      antialias: true,
+      antialias: false,
     });
     await webgpu.initAsync();
     this.engine = webgpu;
+    this._applyPerformanceRenderScale();
+  }
+
+  private _applyPerformanceRenderScale(): void {
+    const configured = Number(import.meta.env.VITE_RENDER_SCALE);
+    const scale = Number.isFinite(configured) && configured >= 1
+      ? Math.min(configured, 3)
+      : 3;
+    this.engine.setHardwareScalingLevel(scale);
   }
 
   private async _setupScene(): Promise<void> {

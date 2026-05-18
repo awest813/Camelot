@@ -20,6 +20,9 @@ declare class CustomErr extends Error {
 
 interface ImportMetaEnv {
   readonly VITE_USE_WEBGPU: string;
+  readonly VITE_RENDER_SCALE?: string;
+  readonly VITE_ENABLE_REMOTE_PROPS?: string;
+  readonly VITE_ENABLE_SHADOWS?: string;
 }
 
 interface ImportMeta {
