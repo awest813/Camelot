@@ -116,7 +116,7 @@ export class AlchemyUI {
 
     // Left column — ingredients
     const leftCol = new Rectangle("alchLeft");
-    leftCol.width     = "50%";
+    leftCol.width     = "340px";
     leftCol.height    = "100%";
     leftCol.thickness = 0;
     leftCol.background = "transparent";
@@ -149,7 +149,7 @@ export class AlchemyUI {
 
     // Right column — crafted potions
     const rightCol = new Rectangle("alchRight");
-    rightCol.width     = "50%";
+    rightCol.width     = "340px";
     rightCol.height    = "100%";
     rightCol.thickness = 0;
     rightCol.background = "transparent";

@@ -23,6 +23,7 @@ interface ImportMetaEnv {
   readonly VITE_RENDER_SCALE?: string;
   readonly VITE_ENABLE_REMOTE_PROPS?: string;
   readonly VITE_ENABLE_SHADOWS?: string;
+  readonly VITE_ENABLE_NAVMESH?: string;
 }
 
 interface ImportMeta {

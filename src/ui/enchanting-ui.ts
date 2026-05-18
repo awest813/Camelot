@@ -425,7 +425,7 @@ export class EnchantingUI {
     stackName: string,
   ): StackPanel {
     const col = new Rectangle(colName);
-    col.width     = "33.33%";
+    col.width     = "252px";
     col.height    = "100%";
     col.thickness = 0;
     col.background = "transparent";

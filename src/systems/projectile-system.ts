@@ -193,7 +193,7 @@ export class ProjectileSystem {
     mesh.material = mat;
     const aggregate = new PhysicsAggregate(
       mesh,
-      PhysicsShapeType.SPHERE,
+      PhysicsShapeType.CYLINDER,
       { mass: 0.1, restitution: 0.0 },
       this._scene,
     );

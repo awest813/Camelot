@@ -26,6 +26,8 @@ const NAV_PARAMS = {
   detailSampleMaxError: 1,
 };
 
+const NAVMESH_ENABLED = import.meta.env.VITE_ENABLE_NAVMESH === "true";
+
 /**
  * NavigationSystem — Recast/Detour integration for NPC pathfinding.
  *
@@ -35,7 +37,7 @@ const NAV_PARAMS = {
  *
  * Lifecycle
  * ---------
- * 1. Construction kicks off async WASM loading (non-blocking).
+ * 1. Construction kicks off async WASM loading when VITE_ENABLE_NAVMESH=true.
  * 2. Once loaded, the plugin builds an initial navmesh from any already-loaded
  *    ground chunk meshes.
  * 3. When terrain changes (new chunks load), call requestRebuild(). The rebuild
@@ -49,6 +51,7 @@ const NAV_PARAMS = {
 export class NavigationSystem {
   private _plugin: RecastJSPlugin | null = null;
   private _scene: Scene;
+  private _enabled: boolean = NAVMESH_ENABLED;
   private _ready: boolean = false;
 
   // Debounced rebuild state
@@ -82,7 +85,7 @@ export class NavigationSystem {
    * to let the debounce handle timing automatically.
    */
   public buildNavMesh(groundMeshes: Mesh[]): void {
-    if (!this._plugin || groundMeshes.length === 0) return;
+    if (!this._enabled || !this._plugin || groundMeshes.length === 0) return;
     try {
       this._plugin.createNavMesh(groundMeshes, NAV_PARAMS);
       this._ready = true;
@@ -98,6 +101,7 @@ export class NavigationSystem {
    * this every frame while chunks load is safe.
    */
   public requestRebuild(): void {
+    if (!this._enabled) return;
     this._rebuildPending = true;
     this._rebuildTimer = 0;
   }
@@ -147,7 +151,7 @@ export class NavigationSystem {
    * Must be called once per frame from Game.update().
    */
   public update(deltaTime: number): void {
-    if (!this._plugin || !this._rebuildPending) return;
+    if (!this._enabled || !this._plugin || !this._rebuildPending) return;
     this._rebuildTimer += deltaTime;
     if (this._rebuildTimer >= NavigationSystem.REBUILD_DELAY) {
       this._rebuildPending = false;
@@ -162,14 +166,16 @@ export class NavigationSystem {
    * Asynchronously load the recast-detour WASM module and initialise the plugin.
    *
    * Uses a dynamic import so the rest of the game initialises synchronously and
-   * pathfinding becomes available in the background. If the package is absent
-   * (e.g. `npm install` not yet run) the warning is logged and NPCs silently use
-   * direct-line movement as a fallback.
+   * pathfinding becomes available in the background. Navmesh pathfinding is
+   * optional because the direct-line fallback is cheaper and robust enough for
+   * the default build.
    *
-   * To enable: `npm install recast-detour`
+   * To enable: set `VITE_ENABLE_NAVMESH=true` and install `recast-detour`.
    * npm: https://www.npmjs.com/package/recast-detour
    */
   private async _init(): Promise<void> {
+    if (!this._enabled) return;
+
     try {
       // recast-detour is a WASM port of the Recast/Detour C++ navigation library,
       // packaged specifically for use with Babylon.js's RecastJSPlugin.
