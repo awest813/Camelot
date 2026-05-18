@@ -144,4 +144,4 @@ const harness: HarnessApi = {
   },
 };
 
-(window as Record<string, unknown>)["__harness"] = harness;
+(window as unknown as { __harness: HarnessApi }).__harness = harness;

@@ -28,10 +28,26 @@ import { test, expect, Page } from "@playwright/test";
 /** URL of the standalone harness served by the Vite dev server. */
 const HARNESS = "/tests/e2e/harness/skill-tree-harness.html";
 
+interface SkillTreeHarness {
+  player: Record<string, number>;
+  system: {
+    purchaseSkill(treeIndex: number, skillIndex: number): boolean;
+    getSaveState(): unknown[];
+    restoreState(state: unknown[]): void;
+    getSkillRank(skillId: string): number;
+  };
+  grantPoints(points: number): void;
+  reset(): void;
+  refresh(): void;
+  getNotifications(): string[];
+}
+
+type HarnessWindow = Window & typeof globalThis & { __harness: SkillTreeHarness };
+
 /** Wait for the harness JavaScript to finish bootstrapping. */
 async function openHarness(page: Page) {
   await page.goto(HARNESS);
-  await page.waitForFunction(() => (window as Record<string, unknown>)["__harness"] !== undefined, {
+  await page.waitForFunction(() => (window as HarnessWindow).__harness !== undefined, {
     timeout: 15_000,
   });
 }
@@ -39,26 +55,26 @@ async function openHarness(page: Page) {
 /** Grant N skill points to the harness player and re-render. */
 async function grantPoints(page: Page, n: number) {
   await page.evaluate((points) => {
-    (window as Record<string, unknown>)["__harness"].grantPoints(points);
+    (window as HarnessWindow).__harness.grantPoints(points);
   }, n);
 }
 
 /** Reset all skill ranks and skill points to 0. */
 async function resetHarness(page: Page) {
   await page.evaluate(() => {
-    (window as Record<string, unknown>)["__harness"].reset();
+    (window as HarnessWindow).__harness.reset();
   });
 }
 
 /** Read accumulated notification strings. */
 async function getNotifications(page: Page): Promise<string[]> {
-  return page.evaluate(() => (window as Record<string, unknown>)["__harness"].getNotifications());
+  return page.evaluate(() => (window as HarnessWindow).__harness.getNotifications());
 }
 
 /** Read the player's current stat snapshot from the harness. */
 async function playerStats(page: Page) {
   return page.evaluate(() => {
-    const p = (window as Record<string, unknown>)["__harness"].player as Record<string, number>;
+    const p = (window as HarnessWindow).__harness.player;
     return {
       skillPoints: p.skillPoints,
       bonusArmor: p.bonusArmor,
@@ -200,7 +216,7 @@ test.describe("Skill Tree Audit — Combat tree", () => {
     await expect(edgeBtn).toBeDisabled();
     // System-level: a forced JS call should still fail and emit a notification
     await page.evaluate(() => {
-      (window as Record<string, unknown>)["__harness"].system.purchaseSkill(0, 1);
+      (window as HarnessWindow).__harness.system.purchaseSkill(0, 1);
     });
     const notifs = await getNotifications(page);
     expect(notifs.some((n) => n.includes("Requires"))).toBe(true);
@@ -474,7 +490,7 @@ test.describe("Skill Tree Audit — notifications", () => {
   test("trying to buy with no points emits a no-points notification", async ({ page }) => {
     // Bypass the disabled button and call the system directly
     await page.evaluate(() => {
-      (window as Record<string, unknown>)["__harness"].system.purchaseSkill(0, 0);
+      (window as HarnessWindow).__harness.system.purchaseSkill(0, 0);
     });
     const notifs = await getNotifications(page);
     expect(notifs.some((n) => n.toLowerCase().includes("no skill points"))).toBe(true);
@@ -484,7 +500,7 @@ test.describe("Skill Tree Audit — notifications", () => {
     await grantPoints(page, 1);
     // warriors_edge requires iron_skin rank 1
     await page.evaluate(() => {
-      (window as Record<string, unknown>)["__harness"].system.purchaseSkill(0, 1);
+      (window as HarnessWindow).__harness.system.purchaseSkill(0, 1);
     });
     const notifs = await getNotifications(page);
     expect(notifs.some((n) => n.includes("Requires"))).toBe(true);
@@ -495,7 +511,7 @@ test.describe("Skill Tree Audit — notifications", () => {
     // 4th purchase attempt is rejected by the max-rank check (not the no-points check).
     await grantPoints(page, 4);
     await page.evaluate(() => {
-      const h = (window as Record<string, unknown>)["__harness"];
+      const h = (window as HarnessWindow).__harness;
       h.system.purchaseSkill(0, 0); // iron_skin rank 1
       h.system.purchaseSkill(0, 0); // iron_skin rank 2
       h.system.purchaseSkill(0, 0); // iron_skin rank 3 (maxed)
@@ -513,7 +529,7 @@ test.describe("Skill Tree Audit — save/restore state", () => {
 
   test("getSaveState returns empty array when nothing is purchased", async ({ page }) => {
     const saved = await page.evaluate(() => {
-      return (window as Record<string, unknown>)["__harness"].system.getSaveState();
+      return (window as HarnessWindow).__harness.system.getSaveState();
     });
     expect(saved).toEqual([]);
   });
@@ -521,12 +537,12 @@ test.describe("Skill Tree Audit — save/restore state", () => {
   test("getSaveState captures purchased ranks", async ({ page }) => {
     await grantPoints(page, 2);
     await page.evaluate(() => {
-      const h = (window as Record<string, unknown>)["__harness"];
+      const h = (window as HarnessWindow).__harness;
       h.system.purchaseSkill(0, 0); // iron_skin rank 1
       h.system.purchaseSkill(0, 0); // iron_skin rank 2
     });
     const saved = await page.evaluate(() => {
-      return (window as Record<string, unknown>)["__harness"].system.getSaveState();
+      return (window as HarnessWindow).__harness.system.getSaveState();
     });
     expect(saved).toContainEqual({ id: "iron_skin", rank: 2 });
     expect(saved.length).toBe(1); // only iron_skin was bought
@@ -534,7 +550,7 @@ test.describe("Skill Tree Audit — save/restore state", () => {
 
   test("restoreState reapplies ranks and updates the UI", async ({ page }) => {
     await page.evaluate(() => {
-      const h = (window as Record<string, unknown>)["__harness"];
+      const h = (window as HarnessWindow).__harness;
       h.system.restoreState([
         { id: "iron_skin", rank: 2 },
         { id: "endurance", rank: 1 },
@@ -555,7 +571,7 @@ test.describe("Skill Tree Audit — save/restore state", () => {
 
   test("restoreState is idempotent (loading twice does not double-apply effects)", async ({ page }) => {
     await page.evaluate(() => {
-      const h = (window as Record<string, unknown>)["__harness"];
+      const h = (window as HarnessWindow).__harness;
       const state = [{ id: "iron_skin", rank: 2 }];
       h.system.restoreState(state);
       // Manually zero bonusArmor between calls (as SaveSystem does)
@@ -568,7 +584,7 @@ test.describe("Skill Tree Audit — save/restore state", () => {
 
   test("getSkillRank returns 0 for unknown skill", async ({ page }) => {
     const rank = await page.evaluate(() => {
-      return (window as Record<string, unknown>)["__harness"].system.getSkillRank("nonexistent");
+      return (window as HarnessWindow).__harness.system.getSkillRank("nonexistent");
     });
     expect(rank).toBe(0);
   });
@@ -576,12 +592,12 @@ test.describe("Skill Tree Audit — save/restore state", () => {
   test("getSkillRank reflects purchased rank", async ({ page }) => {
     await grantPoints(page, 2);
     await page.evaluate(() => {
-      const h = (window as Record<string, unknown>)["__harness"];
+      const h = (window as HarnessWindow).__harness;
       h.system.purchaseSkill(0, 0); // iron_skin 1
       h.system.purchaseSkill(0, 0); // iron_skin 2
     });
     const rank = await page.evaluate(() => {
-      return (window as Record<string, unknown>)["__harness"].system.getSkillRank("iron_skin");
+      return (window as HarnessWindow).__harness.system.getSkillRank("iron_skin");
     });
     expect(rank).toBe(2);
   });
@@ -630,7 +646,7 @@ test.describe("Skill Tree Audit — prerequisite enforcement (UIManager gap)", (
     await grantPoints(page, 3);
     // Directly invoke purchaseSkill to simulate the UIManager gap (bypasses button disable)
     const result = await page.evaluate(() => {
-      return (window as Record<string, unknown>)["__harness"].system.purchaseSkill(0, 1);
+      return (window as HarnessWindow).__harness.system.purchaseSkill(0, 1);
     });
     expect(result).toBe(false);
     const notifs = await getNotifications(page);
@@ -641,11 +657,11 @@ test.describe("Skill Tree Audit — prerequisite enforcement (UIManager gap)", (
     await grantPoints(page, 5);
     // Attempt direct purchase of warriors_edge 5 times — all should fail
     await page.evaluate(() => {
-      const h = (window as Record<string, unknown>)["__harness"];
+      const h = (window as HarnessWindow).__harness;
       for (let i = 0; i < 5; i++) h.system.purchaseSkill(0, 1);
     });
     const rank = await page.evaluate(() => {
-      return (window as Record<string, unknown>)["__harness"].system.getSkillRank("warriors_edge");
+      return (window as HarnessWindow).__harness.system.getSkillRank("warriors_edge");
     });
     expect(rank).toBe(0); // never incremented
     const stats = await playerStats(page);

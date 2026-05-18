@@ -187,7 +187,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
       // Nord: +10 strength, +10 endurance, +10 blade skill
       expect(w.attrs.get("strength")).toBe(50);   // base 40 + 10
       expect(w.attrs.get("endurance")).toBe(50);  // base 40 + 10
-      expect(w.skills.getSkill("blade").level).toBe(10);
+      expect(w.skills.getSkill("blade")!.level).toBe(10);
     });
 
     it("applies Warrior class bonuses to attributes and skills", () => {
@@ -302,7 +302,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
     });
 
     it("blade XP accumulates from melee combat hits", () => {
-      const baseLevel = w.skills.getSkill("blade").level;
+      const baseLevel = w.skills.getSkill("blade")!.level;
 
       // Simulate 10 melee strikes, 6 XP each, with Warrior class multiplier (major skill → 1.5×)
       for (let i = 0; i < 10; i++) {
@@ -312,9 +312,9 @@ describe("Playtest — new game to 12 gameplay hours", () => {
       }
 
       const blade = w.skills.getSkill("blade");
-      expect(blade.xp).toBeGreaterThan(0);
+      expect(blade!.xp).toBeGreaterThan(0);
       // Starting level was 10 (Nord race bonus); may or may not have leveled up yet
-      expect(blade.level).toBeGreaterThanOrEqual(baseLevel);
+      expect(blade!.level).toBeGreaterThanOrEqual(baseLevel);
     });
 
     it("sneak XP accumulates from sneaking near enemies", () => {
@@ -322,18 +322,18 @@ describe("Playtest — new game to 12 gameplay hours", () => {
       // 30 real seconds of active sneaking
       w.skills.gainXP("sneak", SNEAK_XP_PER_SECOND * 30);
 
-      expect(w.skills.getSkill("sneak").xp).toBeGreaterThan(0);
+      expect(w.skills.getSkill("sneak")!.xp).toBeGreaterThan(0);
     });
 
     it("destruction XP gained from casting a fire spell", () => {
-      const beforeXp = w.skills.getSkill("destruction").xp;
-      const beforeLevel = w.skills.getSkill("destruction").level;
+      const beforeXp = w.skills.getSkill("destruction")!.xp;
+      const beforeLevel = w.skills.getSkill("destruction")!.level;
 
       w.skills.gainXP("destruction", 10);
 
       const after = w.skills.getSkill("destruction");
       // xp should increase OR we leveled up (xp resets)
-      const improved = after.xp > beforeXp || after.level > beforeLevel;
+      const improved = after!.xp > beforeXp || after!.level > beforeLevel;
       expect(improved).toBe(true);
     });
 
@@ -479,7 +479,8 @@ describe("Playtest — new game to 12 gameplay hours", () => {
         w.player.camera.position,
         "ruins_alpha",
       );
-      w.time.advanceHours(travelHours);
+      expect(travelHours).not.toBeNull();
+      w.time.advanceHours(travelHours!);
 
       expect(w.time.hour).toBeGreaterThanOrEqual(hourBefore);
     });
@@ -732,11 +733,11 @@ describe("Playtest — new game to 12 gameplay hours", () => {
     });
 
     it("speech skill XP from a persuasion check", () => {
-      const before = w.skills.getSkill("speechcraft").level;
+      const before = w.skills.getSkill("speechcraft")!.level;
       w.skills.gainXP("speechcraft", 15);
 
       const after = w.skills.getSkill("speechcraft");
-      const improved = after.level > before || after.xp > 0;
+      const improved = after!.level > before || after!.xp > 0;
       expect(improved).toBe(true);
     });
   });
@@ -882,7 +883,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
       const restored = new SkillProgressionSystem();
       restored.restoreFromSave(snap);
       const blade = restored.getSkill("blade");
-      expect(blade.xp).toBeGreaterThan(0);
+      expect(blade!.xp).toBeGreaterThan(0);
     });
 
     it("WaitSystem round-trips totalHoursWaited", () => {

@@ -159,13 +159,13 @@ describe("CraftingSystem — recipe validation", () => {
 
   it("rejects unknown stationId", () => {
     const sys = new CraftingSystem();
-    const bad = { ...ironSwordRecipe, id: "bad_st", stationId: "ocean" } as CraftingRecipe;
+    const bad = { ...ironSwordRecipe, id: "bad_st", stationId: "ocean" } as unknown as CraftingRecipe;
     expect(() => sys.addRecipe(bad)).toThrow(/stationId/);
   });
 
   it("rejects unknown tier", () => {
     const sys = new CraftingSystem();
-    const bad = { ...ironSwordRecipe, id: "bad_tier", tier: "mithril" } as CraftingRecipe;
+    const bad = { ...ironSwordRecipe, id: "bad_tier", tier: "mithril" } as unknown as CraftingRecipe;
     expect(() => sys.addRecipe(bad)).toThrow(/tier/);
   });
 });
