@@ -284,6 +284,259 @@ export function validateGraphicsConfig(config: {
   return errors;
 }
 
+// ── Quality tiers ─────────────────────────────────────────────────────────────
+
+/**
+ * Quality tier identifiers.
+ *
+ *   - `low`     — Tuned for low-end machines (2-4 GB RAM, 2-4 cores/threads).
+ *                 Disables bloom/FXAA/sharpening, shrinks the shadow map, and
+ *                 drops the render-scale.  Targets ≥30 FPS on integrated GPUs.
+ *   - `medium`  — Balanced preset for 4-8 GB RAM mid-range hardware.
+ *   - `high`    — Matches the existing `DEFAULT_*` presets.
+ *   - `ultra`   — Increases shadow resolution and enables bloom/FXAA for
+ *                 high-end desktops.
+ */
+export type QualityTier = "low" | "medium" | "high" | "ultra";
+
+/**
+ * Auxiliary, tier-driven knobs that influence renderer setup outside of the
+ * existing config blocks.  These are read by the BabylonJS adapter in
+ * `game.ts` to throttle hardware-scaling, shadow generators, and the
+ * `DefaultRenderingPipeline`.
+ */
+export interface PerformanceConfig {
+  /**
+   * Engine hardware-scaling level (1 / devicePixelRatio multiplier).  Values
+   * `> 1` lower the internal render resolution — a cheap, high-impact win on
+   * iGPUs.  Babylon's `engine.setHardwareScalingLevel(v)`.
+   */
+  hardwareScalingLevel: number;
+  /** Render shadows at all.  `false` skips the entire ShadowGenerator path. */
+  shadowsEnabled: boolean;
+  /**
+   * Use soft (blur-exponential) shadows.  When `false`, shadows fall back to
+   * the cheap PCF/hard path — saves a full-screen blur each frame.
+   */
+  softShadows: boolean;
+  /** Enable the full `DefaultRenderingPipeline` post-process stack. */
+  postProcessEnabled: boolean;
+  /** Cap simultaneously active particle systems (0 disables particles). */
+  maxParticles: number;
+  /** Target frames-per-second; renderer may throttle the run-loop to match. */
+  targetFps: number;
+}
+
+/** Full tier preset: every config block + perf knobs. */
+export interface TierPreset {
+  shadow:      ShadowConfig;
+  postProcess: PostProcessConfig;
+  fog:         FogConfig;
+  lighting:    LightingConfig;
+  performance: PerformanceConfig;
+}
+
+/**
+ * Low-end preset — 2-4 GB RAM, 2-4 cores/threads, integrated GPU.
+ *
+ * Tradeoffs:
+ *   - 512² shadow map (¼ the texels of default, fits in <1 MB VRAM)
+ *   - Hard shadows, no PCF blur
+ *   - No bloom, no FXAA, no sharpening, no vignette
+ *   - 0.75× render scale (Babylon `setHardwareScalingLevel(1/0.75)`)
+ *   - Particles capped at 64
+ *   - Sun intensity nudged up to compensate for cheaper shadows
+ */
+export const LOW_TIER_PRESET: TierPreset = {
+  shadow: {
+    mapSize:    512,
+    blurKernel: 1,
+  },
+  postProcess: {
+    bloom: {
+      enabled:   false,
+      threshold: 0.55,
+      weight:    0.35,
+      kernel:    16,
+      scale:     0.5,
+    },
+    fxaa:              false,
+    sharpenEdgeAmount: 0,
+    toneMappingType:   "aces",
+    exposure:          1.10,
+    contrast:          1.15,
+    vignetteWeight:    0,
+  },
+  fog: {
+    density: 0.006,
+    color:   { r: 0.50, g: 0.60, b: 0.72 },
+  },
+  lighting: {
+    ambientBase: 0.75,
+    sunBase:     1.30,
+  },
+  performance: {
+    hardwareScalingLevel: 1 / 0.75,
+    shadowsEnabled:       true,
+    softShadows:          false,
+    postProcessEnabled:   false,
+    maxParticles:         64,
+    targetFps:            30,
+  },
+};
+
+/** Medium preset — 4-8 GB RAM, mid-range iGPU/entry dGPU. */
+export const MEDIUM_TIER_PRESET: TierPreset = {
+  shadow: {
+    mapSize:    1024,
+    blurKernel: 6,
+  },
+  postProcess: {
+    bloom: { ...DEFAULT_POST_PROCESS.bloom, enabled: false },
+    fxaa:              true,
+    sharpenEdgeAmount: 0,
+    toneMappingType:   "aces",
+    exposure:          1.10,
+    contrast:          1.18,
+    vignetteWeight:    1.5,
+  },
+  fog:      { ...DEFAULT_FOG, color: { ...DEFAULT_FOG.color } },
+  lighting: { ...DEFAULT_LIGHTING },
+  performance: {
+    hardwareScalingLevel: 1.0,
+    shadowsEnabled:       true,
+    softShadows:          true,
+    postProcessEnabled:   true,
+    maxParticles:         256,
+    targetFps:            60,
+  },
+};
+
+/** High preset — matches the existing DEFAULT_* values. */
+export const HIGH_TIER_PRESET: TierPreset = {
+  shadow:      { ...DEFAULT_SHADOW },
+  postProcess: {
+    ...DEFAULT_POST_PROCESS,
+    bloom: { ...DEFAULT_POST_PROCESS.bloom },
+  },
+  fog:      { ...DEFAULT_FOG, color: { ...DEFAULT_FOG.color } },
+  lighting: { ...DEFAULT_LIGHTING },
+  performance: {
+    hardwareScalingLevel: 1.0,
+    shadowsEnabled:       true,
+    softShadows:          true,
+    postProcessEnabled:   true,
+    maxParticles:         512,
+    targetFps:            60,
+  },
+};
+
+/** Ultra preset — high-end desktops. */
+export const ULTRA_TIER_PRESET: TierPreset = {
+  shadow: {
+    mapSize:    2048,
+    blurKernel: 16,
+  },
+  postProcess: {
+    bloom: {
+      enabled:   true,
+      threshold: 0.55,
+      weight:    0.35,
+      kernel:    24,
+      scale:     0.5,
+    },
+    fxaa:              true,
+    sharpenEdgeAmount: 0.3,
+    toneMappingType:   "aces",
+    exposure:          1.10,
+    contrast:          1.18,
+    vignetteWeight:    3.2,
+  },
+  fog:      { ...DEFAULT_FOG, color: { ...DEFAULT_FOG.color } },
+  lighting: { ...DEFAULT_LIGHTING },
+  performance: {
+    hardwareScalingLevel: 1.0,
+    shadowsEnabled:       true,
+    softShadows:          true,
+    postProcessEnabled:   true,
+    maxParticles:         1024,
+    targetFps:            60,
+  },
+};
+
+/** Lookup the full preset for a tier. */
+export function presetForTier(tier: QualityTier): TierPreset {
+  switch (tier) {
+    case "low":    return LOW_TIER_PRESET;
+    case "medium": return MEDIUM_TIER_PRESET;
+    case "high":   return HIGH_TIER_PRESET;
+    case "ultra":  return ULTRA_TIER_PRESET;
+  }
+}
+
+/** Hardware capability hints used to pick a quality tier. */
+export interface HardwareHints {
+  /** Approximate device RAM in GB.  Browser: `navigator.deviceMemory`. */
+  deviceMemoryGB?: number;
+  /** Logical CPU cores/threads.  Browser: `navigator.hardwareConcurrency`. */
+  hardwareConcurrency?: number;
+  /** Network save-data hint.  Browser: `navigator.connection.saveData`. */
+  saveData?: boolean;
+}
+
+/**
+ * Pick a quality tier from hardware hints.
+ *
+ * Heuristic (intentionally conservative — better to start low and let the
+ * user upgrade than to ship a stutter on first paint):
+ *
+ *   - `low`    when RAM ≤ 4 GB **or** cores ≤ 4 **or** `saveData` is set.
+ *   - `medium` when RAM ≤ 8 GB **or** cores ≤ 8.
+ *   - `high`   otherwise.
+ *
+ * Returns `"medium"` when no hints are provided — a safe middle ground that
+ * preserves the existing behaviour without forcing an unknown machine to the
+ * ultra path.
+ */
+export function detectQualityTier(hints: HardwareHints = {}): QualityTier {
+  const { deviceMemoryGB, hardwareConcurrency, saveData } = hints;
+
+  const hasAnyHint =
+    deviceMemoryGB !== undefined ||
+    hardwareConcurrency !== undefined ||
+    saveData !== undefined;
+
+  if (!hasAnyHint) return "medium";
+
+  if (saveData === true) return "low";
+  if (deviceMemoryGB !== undefined && deviceMemoryGB <= 4) return "low";
+  if (hardwareConcurrency !== undefined && hardwareConcurrency <= 4) return "low";
+
+  if (deviceMemoryGB !== undefined && deviceMemoryGB <= 8) return "medium";
+  if (hardwareConcurrency !== undefined && hardwareConcurrency <= 8) return "medium";
+
+  return "high";
+}
+
+/**
+ * Read hardware hints from `navigator` when available.  Returns an empty
+ * object in non-browser environments (Node, Vitest) — callers can then fall
+ * back to a user-selected tier or the `"medium"` default.
+ */
+export function readNavigatorHardwareHints(
+  nav: { deviceMemory?: number; hardwareConcurrency?: number; connection?: { saveData?: boolean } } | undefined =
+    typeof navigator !== "undefined" ? (navigator as any) : undefined,
+): HardwareHints {
+  if (!nav) return {};
+  const hints: HardwareHints = {};
+  if (typeof nav.deviceMemory === "number")        hints.deviceMemoryGB      = nav.deviceMemory;
+  if (typeof nav.hardwareConcurrency === "number") hints.hardwareConcurrency = nav.hardwareConcurrency;
+  if (nav.connection && typeof nav.connection.saveData === "boolean") {
+    hints.saveData = nav.connection.saveData;
+  }
+  return hints;
+}
+
 // ── GraphicsSystem ────────────────────────────────────────────────────────────
 
 /**
@@ -318,32 +571,68 @@ export class GraphicsSystem {
   public readonly sky:         SkyConfig;
   public readonly fog:         FogConfig;
   public readonly lighting:    LightingConfig;
+  public readonly performance: PerformanceConfig;
+  public readonly tier:        QualityTier;
 
   constructor(overrides: {
+    /**
+     * Optional quality tier.  When supplied, the matching {@link TierPreset}
+     * provides the base values; individual `shadow` / `postProcess` / etc.
+     * overrides are then layered on top.
+     *
+     * When omitted, falls back to the legacy `DEFAULT_*` constants so that
+     * existing callers see no behaviour change.
+     */
+    tier?:        QualityTier;
     shadow?:      Partial<ShadowConfig>;
     postProcess?: Partial<PostProcessConfig> & { bloom?: Partial<BloomConfig> };
     sky?:         Partial<SkyConfig>;
     fog?:         Partial<FogConfig>;
     lighting?:    Partial<LightingConfig>;
+    performance?: Partial<PerformanceConfig>;
   } = {}) {
-    this.shadow = { ...DEFAULT_SHADOW, ...overrides.shadow };
+    this.tier = overrides.tier ?? "high";
+    const base = overrides.tier ? presetForTier(overrides.tier) : {
+      shadow:      DEFAULT_SHADOW,
+      postProcess: DEFAULT_POST_PROCESS,
+      fog:         DEFAULT_FOG,
+      lighting:    DEFAULT_LIGHTING,
+      performance: HIGH_TIER_PRESET.performance,
+    };
+
+    this.shadow = { ...base.shadow, ...overrides.shadow };
 
     const bloomOverride = overrides.postProcess?.bloom ?? {};
     const ppOverride    = { ...overrides.postProcess };
     delete (ppOverride as any).bloom;
     this.postProcess = {
-      ...DEFAULT_POST_PROCESS,
+      ...base.postProcess,
       ...ppOverride,
-      bloom: { ...DEFAULT_POST_PROCESS.bloom, ...bloomOverride },
+      bloom: { ...base.postProcess.bloom, ...bloomOverride },
     };
 
-    this.sky      = { ...DEFAULT_SKY,      ...overrides.sky };
+    this.sky      = { ...DEFAULT_SKY, ...overrides.sky };
     this.fog      = {
-      ...DEFAULT_FOG,
+      ...base.fog,
       ...overrides.fog,
-      color: { ...DEFAULT_FOG.color, ...overrides.fog?.color },
+      color: { ...base.fog.color, ...overrides.fog?.color },
     };
-    this.lighting = { ...DEFAULT_LIGHTING, ...overrides.lighting };
+    this.lighting    = { ...base.lighting,    ...overrides.lighting };
+    this.performance = { ...base.performance, ...overrides.performance };
+  }
+
+  /**
+   * Build a GraphicsSystem auto-tuned from runtime hardware hints.  Convenient
+   * one-liner for the boot path:
+   * ```ts
+   * const gfx = GraphicsSystem.autoDetect();
+   * ```
+   * Pass explicit `hints` to override the `navigator`-derived defaults (handy
+   * for tests).
+   */
+  public static autoDetect(hints?: HardwareHints): GraphicsSystem {
+    const resolved = hints ?? readNavigatorHardwareHints();
+    return new GraphicsSystem({ tier: detectQualityTier(resolved) });
   }
 
   /**
