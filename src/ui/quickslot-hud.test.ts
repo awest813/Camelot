@@ -196,6 +196,15 @@ describe("QuickSlotHUD", () => {
         expect(cell.getAttribute("data-item-id")).toBe("");
       });
     });
+
+    it("marks empty slots for compact HUD styling", () => {
+      hud.show();
+      hud.update(makeSystem());
+      const cells = document.querySelectorAll(".quickslot-hud__slot");
+      cells.forEach((cell) => {
+        expect(cell.classList.contains("is-empty")).toBe(true);
+      });
+    });
   });
 
   // ── update() — bound items ───────────────────────────────────────────────────
@@ -213,6 +222,7 @@ describe("QuickSlotHUD", () => {
       hud.update(makeSystem({ "7": makeItem({ id: "hp_01", name: "HP" }) }));
       const cell = document.querySelector('[data-key="7"]');
       expect(cell?.getAttribute("data-item-id")).toBe("hp_01");
+      expect(cell?.classList.contains("is-empty")).toBe(false);
     });
 
     it("updates the aria-label to include the item name", () => {

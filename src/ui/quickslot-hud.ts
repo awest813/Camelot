@@ -164,10 +164,12 @@ export class QuickSlotHUD {
 
     if (snap.itemId === null) {
       if (nameEl) nameEl.textContent = "—";
+      cell.classList.add("is-empty");
       cell.setAttribute("aria-label", `Quick slot ${key}: empty`);
       cell.setAttribute("data-item-id", "");
     } else {
       if (nameEl) nameEl.textContent = snap.itemName;
+      cell.classList.remove("is-empty");
       cell.setAttribute("data-item-id", snap.itemId);
 
       if (snap.stackable && snap.quantity > 1) {

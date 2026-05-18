@@ -150,11 +150,11 @@
 
 .quickslot-hud {
   position: fixed;
-  bottom: 24px;
+  bottom: 56px;
   left: 50%;
   transform: translateX(-50%);
   display: none;
-  gap: 6px;
+  gap: 5px;
   z-index: 18;
   pointer-events: auto;
 }
@@ -164,8 +164,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
+  width: 58px;
+  height: 54px;
   border-radius: 6px;
   cursor: pointer;
   position: relative;
@@ -173,6 +173,17 @@
   border: 1px solid rgba(212, 160, 23, 0.35);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   transition: border-color 0.15s, transform 0.1s;
+}
+
+.quickslot-hud__slot.is-empty {
+  width: 38px;
+  height: 40px;
+  align-self: flex-end;
+  opacity: 0.66;
+}
+
+.quickslot-hud__slot.is-empty .quickslot-hud__item-name {
+  display: none;
 }
 
 .quickslot-hud__slot:hover {
@@ -199,11 +210,28 @@
   font-size: 10px;
   color: #e8eef8;
   text-align: center;
-  max-width: 58px;
+  max-width: 52px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 1.2;
+}
+
+@media (max-width: 760px) {
+  .quickslot-hud {
+    bottom: 48px;
+    gap: 4px;
+  }
+
+  .quickslot-hud__slot {
+    width: 48px;
+    height: 48px;
+  }
+
+  .quickslot-hud__slot.is-empty {
+    width: 30px;
+    height: 36px;
+  }
 }
 
 .quickslot-hud__qty-badge {
