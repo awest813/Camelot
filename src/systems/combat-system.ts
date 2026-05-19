@@ -109,6 +109,38 @@ const RIPOSTE_WINDOW = 1.5;
 /** Damage multiplier bonus applied to a riposte strike (on top of normal damage). */
 const RIPOSTE_DAMAGE_MULTIPLIER = 1.75;
 
+// ─── Combo finisher ───────────────────────────────────────────────────────────
+
+/**
+ * Bonus damage multiplier applied when a melee swing lands while the combo
+ * stack is already saturated (≥ MAX_COMBO_STACK). Stacks multiplicatively
+ * with the existing combo bonus — at stack 3 the finisher hits at
+ * 1.45 × 1.40 ≈ 2.03× base damage. The finisher resets the combo to 0.
+ */
+const FINISHER_DAMAGE_MULTIPLIER = 1.40;
+/** Stagger applied to the target struck by a finisher (guaranteed). */
+const FINISHER_STAGGER_DURATION = 0.45;
+/** Knockback impulse scale on a finisher strike, vs. normal melee (10). */
+const FINISHER_IMPULSE = 16;
+
+// ─── Execute ──────────────────────────────────────────────────────────────────
+
+/**
+ * Health fraction at or below which a power attack instantly kills its target.
+ * 0.15 = 15 %. Magic and normal melee are unaffected; only the committed
+ * heavy swing earns the execution.
+ */
+const EXECUTE_HEALTH_THRESHOLD = 0.15;
+
+// ─── Adrenaline surge ─────────────────────────────────────────────────────────
+
+/**
+ * Stamina restored to the player when a melee or power attack kills an NPC.
+ * Chained kills reward aggressive play without trivialising the stamina
+ * economy — restores roughly one swing's worth.
+ */
+const ADRENALINE_STAMINA_RESTORE = 12;
+
 // ─── Damage number colors ─────────────────────────────────────────────────────
 
 /** Normal physical hit damage number color. */
@@ -119,6 +151,10 @@ const DMG_COLOR_CRIT = "#FFD700";
 const DMG_COLOR_MAGIC = "#88CCFF";
 /** Power attack damage number — orange-red, heftier than normal. */
 const DMG_COLOR_POWER = "#FF8C00";
+/** Finisher damage number — bright cyan-white to read as a special. */
+const DMG_COLOR_FINISHER = "#9FF0FF";
+/** Execution damage number — deep red for the killing blow. */
+const DMG_COLOR_EXECUTE = "#FF2030";
 
 import {
   applyDamageWithResistance,
@@ -403,6 +439,15 @@ export class CombatSystem {
   }
 
   /**
+   * True when the next melee strike will land as a finisher: combo is already
+   * saturated, so the swing deals bonus damage, guarantees a stagger, and
+   * then resets the chain. Surface this in the HUD to telegraph the payoff.
+   */
+  public get finisherReady(): boolean {
+    return this._comboStack >= MAX_COMBO_STACK;
+  }
+
+  /**
    * True when a perfect block was just executed and the next melee attack within
    * RIPOSTE_WINDOW seconds will land as a riposte (bonus damage, ignores cooldown).
    */
@@ -605,6 +650,10 @@ export class CombatSystem {
     // Capture combo multiplier from the PREVIOUS stack (before this hit builds it).
     const comboMult = this._comboMultiplier();
     const riposteMult = isRiposte ? RIPOSTE_DAMAGE_MULTIPLIER : 1.0;
+    // Finisher: when the combo is already saturated, this swing becomes the
+    // climax — extra damage and a guaranteed stagger — and then resets the chain.
+    const isFinisher = this._comboStack >= MAX_COMBO_STACK;
+    const finisherMult = isFinisher ? FINISHER_DAMAGE_MULTIPLIER : 1.0;
 
     // ── Determine which NPCs are hit ───────────────────────────────────────
     // Greatsword uses an arc sweep; all other weapons use a forward raycast.
@@ -671,25 +720,28 @@ export class CombatSystem {
           * backstabMult
           * comboMult
           * riposteMult
+          * finisherMult
         )
       );
       const meleeDmg = applyDamageWithResistance(rawMeleeDmg, npc, "physical", weaponProfile.armorPenFraction);
 
       npc.takeDamage(meleeDmg);
-      this._ui.applyHitStop(isCrit ? 120 : 60);
-      this._ui.shakeCamera(isCrit ? 0.6 : 0.25);
+      this._ui.applyHitStop(isFinisher ? 160 : isCrit ? 120 : 60);
+      this._ui.shakeCamera(isFinisher ? 0.7 : isCrit ? 0.6 : 0.25);
 
-      // Per-weapon stagger chance on normal melee hits.
-      if (
-        !npc.isDead &&
-        !npc.isStaggered &&
-        weaponProfile.staggerChance > 0 &&
-        Math.random() < weaponProfile.staggerChance
-      ) {
-        npc.isStaggered = true;
-        npc.staggerTimer = weaponProfile.staggerDuration;
-        npc.isAttackTelegraphing = false;
-        npc.attackTelegraphTimer = 0;
+      // Stagger: finisher guarantees it; otherwise roll per-weapon chance.
+      if (!npc.isDead && !npc.isStaggered) {
+        const finisherStagger = isFinisher;
+        const rolledStagger =
+          weaponProfile.staggerChance > 0 && Math.random() < weaponProfile.staggerChance;
+        if (finisherStagger || rolledStagger) {
+          npc.isStaggered = true;
+          npc.staggerTimer = finisherStagger
+            ? Math.max(weaponProfile.staggerDuration, FINISHER_STAGGER_DURATION)
+            : weaponProfile.staggerDuration;
+          npc.isAttackTelegraphing = false;
+          npc.attackTelegraphTimer = 0;
+        }
       }
 
       // Award skill XP for a successful hit.
@@ -700,11 +752,20 @@ export class CombatSystem {
         ? hitPoint.addToRef(CombatSystem._OFFSET_Y1, this._hitPos)
         : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos);
       if (isCrit) this._ui.showSpark(numberPos, "#FFD700");
-      this._ui.showDamageNumber(
-        numberPos, meleeDmg, this.scene,
-        isCrit ? DMG_COLOR_CRIT : DMG_COLOR_PHYSICAL,
+      if (isFinisher) this._ui.showSpark(numberPos, DMG_COLOR_FINISHER);
+      const damageColor = isFinisher
+        ? DMG_COLOR_FINISHER
+        : isCrit
+          ? DMG_COLOR_CRIT
+          : DMG_COLOR_PHYSICAL;
+      this._ui.showDamageNumber(numberPos, meleeDmg, this.scene, damageColor);
+      this._ui.showHitFlash(
+        isFinisher
+          ? "rgba(159, 240, 255, 0.4)"
+          : isCrit
+            ? "rgba(255, 215, 0, 0.35)"
+            : "rgba(255, 200, 0, 0.25)",
       );
-      this._ui.showHitFlash(isCrit ? "rgba(255, 215, 0, 0.35)" : "rgba(255, 200, 0, 0.25)");
 
       if (isCrit) {
         this._ui.showNotification("Critical Hit!", 1000);
@@ -718,11 +779,15 @@ export class CombatSystem {
         const impulsePoint = hitPoint
           ? hitPoint
           : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y1, this._hitPos);
-        npc.physicsAggregate.body.applyImpulse(forward.scale(10), impulsePoint);
+        npc.physicsAggregate.body.applyImpulse(
+          forward.scale(isFinisher ? FINISHER_IMPULSE : 10),
+          impulsePoint,
+        );
       }
 
       if (npc.isDead) {
         this._ui.showNotification(`${npc.mesh.name} defeated!`);
+        this._grantAdrenaline();
         if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
       } else {
         // A direct hit skips the ALERT window — immediately give chase.
@@ -735,9 +800,15 @@ export class CombatSystem {
 
     // Build combo and show feedback once per swing (not per-NPC in a sweep).
     if (anyHitLanded) {
-      this._registerComboHit();
-      if (this._comboStack > 1) {
-        this._ui.showNotification(`Combo ×${this._comboStack}!`, 800);
+      if (isFinisher) {
+        // Finisher consumes the saturated chain instead of extending it.
+        this._resetCombo();
+        this._ui.showNotification("Finisher!", 1200);
+      } else {
+        this._registerComboHit();
+        if (this._comboStack > 1) {
+          this._ui.showNotification(`Combo ×${this._comboStack}!`, 800);
+        }
       }
       if (isRiposte) {
         this._ui.showNotification("Riposte!", 1200);
@@ -804,11 +875,17 @@ export class CombatSystem {
             * this._weaponSkillMultiplier()
           )
         );
-        const finalDmg = applyDamageWithResistance(rawDmg, npc, "physical", weaponProfile.armorPenFraction);
+        // Execution: a power attack on an already-broken foe ends the fight.
+        // Bypasses armor/resistance — the heavy swing is committed regardless.
+        const maxHp = Math.max(1, npc.maxHealth);
+        const isExecute = npc.health > 0 && npc.health / maxHp <= EXECUTE_HEALTH_THRESHOLD;
+        const finalDmg = isExecute
+          ? npc.health
+          : applyDamageWithResistance(rawDmg, npc, "physical", weaponProfile.armorPenFraction);
         npc.takeDamage(finalDmg);
 
-        this._ui.applyHitStop(140);
-        this._ui.shakeCamera(0.65);
+        this._ui.applyHitStop(isExecute ? 200 : 140);
+        this._ui.shakeCamera(isExecute ? 0.85 : 0.65);
 
         // Stagger: cancel current telegraph and freeze the NPC's AI briefly.
         npc.isStaggered = true;
@@ -822,20 +899,31 @@ export class CombatSystem {
         const numberPos = hit.pickedPoint
           ? hit.pickedPoint.addToRef(CombatSystem._OFFSET_Y1, this._hitPos)
           : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y2, this._hitPos);
-        this._ui.showDamageNumber(numberPos, finalDmg, this.scene, DMG_COLOR_POWER);
-        this._ui.showHitFlash("rgba(255, 100, 0, 0.45)");
-        this._ui.showNotification("Power Strike!", 1000);
+        this._ui.showDamageNumber(
+          numberPos,
+          finalDmg,
+          this.scene,
+          isExecute ? DMG_COLOR_EXECUTE : DMG_COLOR_POWER,
+        );
+        this._ui.showHitFlash(
+          isExecute ? "rgba(255, 32, 48, 0.55)" : "rgba(255, 100, 0, 0.45)",
+        );
+        this._ui.showNotification(isExecute ? "Execution!" : "Power Strike!", 1000);
 
         if (npc.physicsAggregate?.body) {
           const forward = this.player.getForwardDirection(1);
           const impulsePoint = hit.pickedPoint
             ? hit.pickedPoint
             : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y1, this._hitPos);
-          npc.physicsAggregate.body.applyImpulse(forward.scale(18), impulsePoint);
+          npc.physicsAggregate.body.applyImpulse(
+            forward.scale(isExecute ? 26 : 18),
+            impulsePoint,
+          );
         }
 
         if (npc.isDead) {
           this._ui.showNotification(`${npc.mesh.name} defeated!`);
+          this._grantAdrenaline();
           if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
         } else if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
           this._transitionTo(npc, AIState.CHASE);
@@ -1807,6 +1895,25 @@ export class CombatSystem {
   private _resetCombo(): void {
     this._comboStack = 0;
     this._comboTimer = 0;
+  }
+
+  /**
+   * Adrenaline surge: restore a flat chunk of stamina to the player after a
+   * melee/power-attack kill, and refresh the combo window so a follow-up swing
+   * extends the chain instead of cold-starting it. Capped at maxStamina.
+   */
+  private _grantAdrenaline(): void {
+    const maxSt = (this.player as unknown as { maxStamina?: number }).maxStamina;
+    const cap = typeof maxSt === "number" ? maxSt : this.player.stamina + ADRENALINE_STAMINA_RESTORE;
+    const before = this.player.stamina;
+    const after = Math.min(cap, before + ADRENALINE_STAMINA_RESTORE);
+    if (after > before) {
+      this.player.stamina = after;
+      this._ui.showNotification("Adrenaline!", 900);
+    }
+    if (this._comboStack > 0) {
+      this._comboTimer = COMBO_WINDOW;
+    }
   }
 
   // ─── Backstab helper ───────────────────────────────────────────────────────
