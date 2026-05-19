@@ -1776,6 +1776,129 @@ describe('CombatSystem', () => {
         expect(combatSystem.playerStatusEffects).toHaveLength(0);
     });
 
+    // ─── Combo Finisher ──────────────────────────────────────────────────────
+
+    it('finisherReady becomes true once the combo stack saturates', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        expect(combatSystem.finisherReady).toBe(false);
+
+        // Three connecting hits push the stack to MAX_COMBO_STACK (3).
+        for (let i = 0; i < 3; i++) {
+            combatSystem.meleeAttack();
+            combatSystem.updateNPCAI(1.0); // tick cooldown without expiring combo window
+        }
+        expect(combatSystem.comboStack).toBe(3);
+        expect(combatSystem.finisherReady).toBe(true);
+    });
+
+    it('a finisher swing deals bonus damage, guarantees stagger, and resets the combo', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+        // Mock a generous max stamina so adrenaline / repeated swings don't run dry.
+        mockPlayer.stamina = 200;
+        mockPlayer.maxStamina = 200;
+        // Pre-saturate combo to MAX without going through the swing math.
+        (combatSystem as any)._comboStack = 3;
+        (combatSystem as any)._comboTimer = 2.0;
+
+        // Saturated-combo damage at stack 3 = MELEE_DAMAGE(10) × combo 1.45 × finisher 1.40 ≈ 20.
+        // Without the finisher it would be ~14 (combo only).  Either way > base 10.
+        mockNpcs[0].takeDamage.mockClear();
+        const ok = combatSystem.meleeAttack();
+        expect(ok).toBe(true);
+
+        const dmg = mockNpcs[0].takeDamage.mock.calls[0][0];
+        expect(dmg).toBeGreaterThan(14); // strictly more than a plain combo-3 hit
+        expect(mockNpcs[0].isStaggered).toBe(true); // guaranteed stagger
+        expect(mockNpcs[0].staggerTimer).toBeGreaterThan(0);
+        expect(combatSystem.comboStack).toBe(0); // chain consumed
+        expect(combatSystem.finisherReady).toBe(false);
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Finisher!', 1200);
+    });
+
+    // ─── Execute (power attack) ──────────────────────────────────────────────
+
+    it('power attack executes an NPC at or below 15% health', () => {
+        mockNpcs[0].health = 12;        // 12 / 100 = 12 % ≤ 15 %
+        mockNpcs[0].maxHealth = 100;
+        // Mark the NPC as the picked target.
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        const ok = combatSystem.powerAttack();
+        expect(ok).toBe(true);
+        // takeDamage was called with the NPC's remaining HP — the lethal blow.
+        expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(12);
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Execution!', 1000);
+    });
+
+    it('power attack on a healthy NPC does NOT execute', () => {
+        mockNpcs[0].health = 80;
+        mockNpcs[0].maxHealth = 100;
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        combatSystem.powerAttack();
+
+        // Execution notification must not fire above the threshold.
+        const calls = mockUI.showNotification.mock.calls.map((c: any[]) => c[0]);
+        expect(calls).not.toContain('Execution!');
+        // Final damage is non-lethal (less than current HP).
+        const dmg = mockNpcs[0].takeDamage.mock.calls[0][0];
+        expect(dmg).toBeLessThan(80);
+    });
+
+    // ─── Adrenaline surge ─────────────────────────────────────────────────────
+
+    it('killing an NPC with melee restores adrenaline stamina to the player', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+        // Pre-drain stamina but leave enough for a swing (soldier+sword cost = 12).
+        mockPlayer.stamina = 30;
+        mockPlayer.maxStamina = 100;
+        // takeDamage flips isDead — simulate that for the kill branch.
+        mockNpcs[0].takeDamage.mockImplementation(() => {
+            mockNpcs[0].isDead = true;
+        });
+
+        combatSystem.meleeAttack();
+
+        // 30 − 12 (swing cost) + 12 (adrenaline) = 30.
+        expect(mockPlayer.stamina).toBe(30);
+        const calls = mockUI.showNotification.mock.calls.map((c: any[]) => c[0]);
+        expect(calls).toContain('Adrenaline!');
+    });
+
+    it('adrenaline stamina restore is capped at maxStamina', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+        mockPlayer.stamina = 100;
+        mockPlayer.maxStamina = 100;
+        mockNpcs[0].takeDamage.mockImplementation(() => {
+            mockNpcs[0].isDead = true;
+        });
+
+        combatSystem.meleeAttack();
+
+        // Spent 12 on swing, restored at most 12 from adrenaline, never above max.
+        expect(mockPlayer.stamina).toBeLessThanOrEqual(100);
+        expect(mockPlayer.stamina).toBe(100); // exactly refilled to cap
+    });
+
     it('applying the same status effect type refreshes rather than double-stacks', () => {
         (combatSystem as any)._playerStatusEffects = [{
             type: 'burn',
