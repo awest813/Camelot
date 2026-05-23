@@ -280,7 +280,7 @@ describe("ContainerUI", () => {
       ui.show();
       ui.update(makeSystem());
       const btn = document.querySelector<HTMLButtonElement>(".container-ui__take-all-btn");
-      expect(btn?.disabled).toBe(false);
+      expect(btn?.getAttribute("aria-disabled")).toBe("false");
     });
 
     it("is disabled when container is empty", () => {
@@ -290,14 +290,14 @@ describe("ContainerUI", () => {
       ui.show();
       ui.update(sys);
       const btn = document.querySelector<HTMLButtonElement>(".container-ui__take-all-btn");
-      expect(btn?.disabled).toBe(true);
+      expect(btn?.getAttribute("aria-disabled")).toBe("true");
     });
 
     it("is disabled when no active container", () => {
       ui.show();
       ui.update(makeSystem({ activeContainer: null }));
       const btn = document.querySelector<HTMLButtonElement>(".container-ui__take-all-btn");
-      expect(btn?.disabled).toBe(true);
+      expect(btn?.getAttribute("aria-disabled")).toBe("true");
     });
 
     it("has aria-disabled=false when enabled", () => {
@@ -320,7 +320,7 @@ describe("ContainerUI", () => {
     it("is initially disabled before update() is called", () => {
       ui.show();
       const btn = document.querySelector<HTMLButtonElement>(".container-ui__take-all-btn");
-      expect(btn?.disabled).toBe(true);
+      expect(btn?.getAttribute("aria-disabled")).toBe("true");
     });
   });
 

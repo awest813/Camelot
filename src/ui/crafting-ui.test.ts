@@ -401,7 +401,7 @@ describe("CraftingUI", () => {
       const rows = document.querySelectorAll<HTMLElement>("[data-recipe-id='iron_sword']");
       rows[0].click();
       const craftBtn = document.querySelector<HTMLButtonElement>(".crafting-ui__craft-btn");
-      expect(craftBtn?.disabled).toBe(false);
+      expect(craftBtn?.getAttribute("aria-disabled")).toBe("false");
     });
 
     it("disables the craft button when materials are insufficient", () => {
@@ -410,7 +410,7 @@ describe("CraftingUI", () => {
       const rows = document.querySelectorAll<HTMLElement>("[data-recipe-id='iron_sword']");
       rows[0].click();
       const craftBtn = document.querySelector<HTMLButtonElement>(".crafting-ui__craft-btn");
-      expect(craftBtn?.disabled).toBe(true);
+      expect(craftBtn?.getAttribute("aria-disabled")).toBe("true");
     });
   });
 
@@ -655,7 +655,7 @@ describe("CraftingUI — detail pane: quality, station, tier", () => {
     expect(stationEl?.classList.contains("station-met")).toBe(true);
     expect(stationEl?.textContent).toContain("Station:");
     const craftBtn = document.querySelector<HTMLButtonElement>(".crafting-ui__craft-btn");
-    expect(craftBtn?.disabled).toBe(false);
+    expect(craftBtn?.getAttribute("aria-disabled")).toBe("false");
   });
 
   it("shows craft blocker message when requirements fail", () => {

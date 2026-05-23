@@ -463,10 +463,18 @@ export class CraftingUI {
     craftBtn.className = "crafting-ui__craft-btn";
     craftBtn.type = "button";
     craftBtn.textContent = "Craft";
-    craftBtn.disabled = !canCraft;
     craftBtn.setAttribute("aria-disabled", canCraft ? "false" : "true");
+
+    if (canCraft) {
+      craftBtn.setAttribute("title", "Craft item");
+    } else {
+      craftBtn.setAttribute("title", "Missing required materials or skills");
+      craftBtn.style.opacity = "0.5";
+      craftBtn.style.cursor = "not-allowed";
+    }
+
     craftBtn.addEventListener("click", () => {
-      if (!craftBtn.disabled) {
+      if (craftBtn.getAttribute("aria-disabled") !== "true") {
         this.onCraft?.(recipe.id);
       }
     });

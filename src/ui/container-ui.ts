@@ -149,9 +149,12 @@ export class ContainerUI {
     takeAllBtn.className = "container-ui__take-all-btn";
     takeAllBtn.type = "button";
     takeAllBtn.textContent = "Take All";
-    takeAllBtn.disabled = true;
+    takeAllBtn.setAttribute("aria-disabled", "true");
+    takeAllBtn.setAttribute("title", "No items to take");
+    takeAllBtn.style.opacity = "0.5";
+    takeAllBtn.style.cursor = "not-allowed";
     takeAllBtn.addEventListener("click", () => {
-      if (!takeAllBtn.disabled) {
+      if (takeAllBtn.getAttribute("aria-disabled") !== "true") {
         this.onTakeAll?.();
       }
     });
@@ -193,8 +196,17 @@ export class ContainerUI {
   private _updateTakeAllState(container: Container | null): void {
     if (!this._takeAllBtn) return;
     const hasItems = (container?.contents.length ?? 0) > 0;
-    this._takeAllBtn.disabled = !hasItems;
     this._takeAllBtn.setAttribute("aria-disabled", hasItems ? "false" : "true");
+
+    if (hasItems) {
+      this._takeAllBtn.setAttribute("title", "Take all items");
+      this._takeAllBtn.style.opacity = "";
+      this._takeAllBtn.style.cursor = "";
+    } else {
+      this._takeAllBtn.setAttribute("title", "No items to take");
+      this._takeAllBtn.style.opacity = "0.5";
+      this._takeAllBtn.style.cursor = "not-allowed";
+    }
   }
 
   private _buildItemRow(item: Item): HTMLLIElement {
