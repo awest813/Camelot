@@ -209,6 +209,7 @@ export class WaitUI {
     waitBtn.className = "wait-ui__confirm-btn";
     waitBtn.type = "button";
     waitBtn.textContent = "Wait";
+    waitBtn.setAttribute("aria-label", "Confirm wait");
     waitBtn.addEventListener("click", () => {
       this.onConfirm?.(this._hoursValue);
     });
@@ -218,6 +219,7 @@ export class WaitUI {
     cancelBtn.className = "wait-ui__cancel-btn";
     cancelBtn.type = "button";
     cancelBtn.textContent = "Cancel";
+    cancelBtn.setAttribute("aria-label", "Cancel wait");
     cancelBtn.addEventListener("click", () => {
       this.hide();
       this.onClose?.();

@@ -19,3 +19,6 @@
 ## 2026-05-14 - Skill Tree Upgrade Button Accessibility
 **Learning:** Using the native `disabled` attribute on UI buttons suppresses pointer events, making hover tooltips invisible and removing the button from tab focus, harming accessibility for users needing to understand why an option like "Upgrade Skill" is unavailable.
 **Action:** Replaced native `disabled` assignment with `aria-disabled="true"`, added inline `opacity: 0.5` and `cursor: not-allowed` styles, dynamically assigned explanatory `title` attributes based on the disabled reason (e.g., "Prerequisites not met"), and explicitly checked `if (btn.getAttribute("aria-disabled") === "true") return;` in click handlers.
+## 2024-05-25 - ARIA Labels on Wait UI
+**Learning:** Found a pattern where dynamically created HTML buttons in UI overlays (like `waitBtn` and `cancelBtn`) rely purely on textContent. While this is acceptable for most users, explicitly defining `aria-label`s provides better, more actionable context (e.g., "Confirm wait" instead of just "Wait") for screen readers, aligning with the pattern of explicitly setting attributes for modal interfaces.
+**Action:** Always verify that core action buttons in dynamically generated HTML modals contain explicit `aria-label`s, even if they have visible `textContent`, to ensure screen reader users receive actionable context.
