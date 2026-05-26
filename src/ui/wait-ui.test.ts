@@ -50,16 +50,17 @@ describe("WaitUI", () => {
       expect(root?.getAttribute("aria-modal")).toBe("true");
     });
 
-    it("root has aria-label", () => {
+    it("root has aria-labelledby pointing to title", () => {
       ui.show();
       const root = document.querySelector(".wait-ui");
-      expect(root?.getAttribute("aria-label")).toBeTruthy();
+      expect(root?.getAttribute("aria-labelledby")).toBe("wait-ui-title");
     });
 
-    it("shows the title 'Wait'", () => {
+    it("shows the title 'Wait' and has the correct ID", () => {
       ui.show();
       const title = document.querySelector(".wait-ui__title");
       expect(title?.textContent).toBe("Wait");
+      expect(title?.id).toBe("wait-ui-title");
     });
 
     it("shows a prompt asking how many hours to wait", () => {

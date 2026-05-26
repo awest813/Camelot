@@ -19,3 +19,7 @@
 ## 2026-05-14 - Skill Tree Upgrade Button Accessibility
 **Learning:** Using the native `disabled` attribute on UI buttons suppresses pointer events, making hover tooltips invisible and removing the button from tab focus, harming accessibility for users needing to understand why an option like "Upgrade Skill" is unavailable.
 **Action:** Replaced native `disabled` assignment with `aria-disabled="true"`, added inline `opacity: 0.5` and `cursor: not-allowed` styles, dynamically assigned explanatory `title` attributes based on the disabled reason (e.g., "Prerequisites not met"), and explicitly checked `if (btn.getAttribute("aria-disabled") === "true") return;` in click handlers.
+
+## 2024-05-18 - WaitUI Dialog Accessibility Labeling
+**Learning:** Replaced `aria-label` with `aria-labelledby` linked to the actual title element's ID. This is a common pattern for dialogs to prevent duplicate names and improve screen reader experiences. In the future, always ensure dialog components use `aria-labelledby` pointing to a visible heading element rather than a hardcoded `aria-label`.
+**Action:** When creating new HTML modals or dialogs, generate an ID for the title (e.g. `<h2 id="modal-title">`) and assign `aria-labelledby="modal-title"` to the root container.
