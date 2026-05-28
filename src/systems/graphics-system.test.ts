@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   GraphicsSystem,
   DEFAULT_SHADOW,
@@ -8,6 +8,9 @@ import {
   DEFAULT_LIGHTING,
   isPowerOfTwo,
   validateGraphicsConfig,
+  GRAPHICS_TIER_STORAGE_KEY,
+  readSavedGraphicsTier,
+  persistGraphicsTier,
 } from "./graphics-system";
 
 // ── isPowerOfTwo helper ───────────────────────────────────────────────────────
@@ -656,6 +659,95 @@ describe("GraphicsSystem tier integration", () => {
 
   it("autoDetect produces a 'high' GraphicsSystem for capable hardware", () => {
     const gfx = GraphicsSystem.autoDetect({ deviceMemoryGB: 32, hardwareConcurrency: 16 });
+    expect(gfx.tier).toBe("high");
+  });
+
+  it("fromSavedOrAutoDetect uses the auto-detected tier when no preference is saved", () => {
+    const gfx = GraphicsSystem.fromSavedOrAutoDetect({ deviceMemoryGB: 32, hardwareConcurrency: 16 });
+    expect(gfx.tier).toBe("high");
+  });
+});
+
+// ── Graphics tier persistence ─────────────────────────────────────────────────
+
+describe("readSavedGraphicsTier", () => {
+  let store: Map<string, string>;
+
+  beforeEach(() => {
+    store = new Map();
+    vi.stubGlobal("localStorage", {
+      getItem:    (k: string) => store.get(k) ?? null,
+      setItem:    (k: string, v: string) => { store.set(k, v); },
+      removeItem: (k: string) => { store.delete(k); },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns null when nothing is saved", () => {
+    expect(readSavedGraphicsTier()).toBeNull();
+  });
+
+  it("returns null for an unrecognised value", () => {
+    store.set(GRAPHICS_TIER_STORAGE_KEY, "extreme");
+    expect(readSavedGraphicsTier()).toBeNull();
+  });
+
+  it.each(["low", "medium", "high", "ultra"] as const)("returns '%s' when that tier is saved", (tier) => {
+    store.set(GRAPHICS_TIER_STORAGE_KEY, tier);
+    expect(readSavedGraphicsTier()).toBe(tier);
+  });
+});
+
+describe("persistGraphicsTier", () => {
+  let store: Map<string, string>;
+
+  beforeEach(() => {
+    store = new Map();
+    vi.stubGlobal("localStorage", {
+      getItem:    (k: string) => store.get(k) ?? null,
+      setItem:    (k: string, v: string) => { store.set(k, v); },
+      removeItem: (k: string) => { store.delete(k); },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it.each(["low", "medium", "high", "ultra"] as const)("persists '%s' to localStorage", (tier) => {
+    persistGraphicsTier(tier);
+    expect(store.get(GRAPHICS_TIER_STORAGE_KEY)).toBe(tier);
+  });
+});
+
+describe("GraphicsSystem.fromSavedOrAutoDetect with saved tier", () => {
+  let store: Map<string, string>;
+
+  beforeEach(() => {
+    store = new Map();
+    vi.stubGlobal("localStorage", {
+      getItem:    (k: string) => store.get(k) ?? null,
+      setItem:    (k: string, v: string) => { store.set(k, v); },
+      removeItem: (k: string) => { store.delete(k); },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("uses the saved tier over hardware hints when a valid preference exists", () => {
+    store.set(GRAPHICS_TIER_STORAGE_KEY, "ultra");
+    // Hardware hints alone would pick 'medium' or 'low'; saved preference wins.
+    const gfx = GraphicsSystem.fromSavedOrAutoDetect({ deviceMemoryGB: 4, hardwareConcurrency: 4 });
+    expect(gfx.tier).toBe("ultra");
+  });
+
+  it("falls back to auto-detect when no preference is saved", () => {
+    const gfx = GraphicsSystem.fromSavedOrAutoDetect({ deviceMemoryGB: 32, hardwareConcurrency: 16 });
     expect(gfx.tier).toBe("high");
   });
 });

@@ -636,6 +636,20 @@ export class GraphicsSystem {
   }
 
   /**
+   * Create a GraphicsSystem using the tier the player previously saved to
+   * `localStorage` (via {@link persistGraphicsTier}).  Falls back to
+   * {@link autoDetect} when no saved preference exists.
+   *
+   * This is the preferred factory for the game boot path so that a player's
+   * explicit quality choice survives page reloads.
+   */
+  public static fromSavedOrAutoDetect(hints?: HardwareHints): GraphicsSystem {
+    const saved = readSavedGraphicsTier();
+    if (saved) return new GraphicsSystem({ tier: saved });
+    return GraphicsSystem.autoDetect(hints);
+  }
+
+  /**
    * Validate all configuration values and return human-readable error strings.
    * An empty array means the configuration is valid.
    */
@@ -653,4 +667,33 @@ export class GraphicsSystem {
   public get isValid(): boolean {
     return this.validate().length === 0;
   }
+}
+
+// ── Graphics tier persistence ─────────────────────────────────────────────────
+
+/** `localStorage` key for the player-selected graphics quality tier. */
+export const GRAPHICS_TIER_STORAGE_KEY = "camelot_graphics_tier";
+
+/**
+ * Read the last player-selected {@link QualityTier} from `localStorage`.
+ * Returns `null` when no preference has been saved or the environment does
+ * not provide `localStorage` (e.g. Node / Vitest).
+ */
+export function readSavedGraphicsTier(): QualityTier | null {
+  if (typeof localStorage === "undefined") return null;
+  const raw = localStorage.getItem(GRAPHICS_TIER_STORAGE_KEY);
+  if (raw === "low" || raw === "medium" || raw === "high" || raw === "ultra") {
+    return raw;
+  }
+  return null;
+}
+
+/**
+ * Persist the player's chosen {@link QualityTier} to `localStorage` so that
+ * {@link GraphicsSystem.fromSavedOrAutoDetect} can restore it on the next
+ * page load.
+ */
+export function persistGraphicsTier(tier: QualityTier): void {
+  if (typeof localStorage === "undefined") return;
+  localStorage.setItem(GRAPHICS_TIER_STORAGE_KEY, tier);
 }

@@ -68,7 +68,7 @@ import { EnchantingSystem } from "./systems/enchanting-system";
 import { EnchantingUI } from "./ui/enchanting-ui";
 import { LodSystem } from "./systems/lod-system";
 import { WeatherSystem } from "./systems/weather-system";
-import { GraphicsSystem } from "./systems/graphics-system";
+import { GraphicsSystem, persistGraphicsTier } from "./systems/graphics-system";
 import { QuickSlotSystem, isConsumableItem } from "./systems/quickslot-system";
 import { WaitSystem } from "./systems/wait-system";
 import { SkillProgressionSystem } from "./systems/skill-progression-system";
@@ -150,6 +150,7 @@ import { QuickSlotHUD } from "./ui/quickslot-hud";
 import { PerkSystem } from "./systems/perk-system";
 import { DynamicWorldEventSystem } from "./systems/dynamic-world-event-system";
 import type { DynamicEventReward } from "./systems/dynamic-world-event-system";
+import { GraphicsSettingsUI } from "./ui/graphics-settings-ui";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -176,7 +177,7 @@ export class Game {
   /** Shadow generator driven by the directional sun light. */
   public shadowGenerator: ShadowGenerator | null = null;
   /** Rendering configuration preset (lighting, sky, post-processing, fog). */
-  public readonly graphics: GraphicsSystem = new GraphicsSystem();
+  public readonly graphics: GraphicsSystem = GraphicsSystem.fromSavedOrAutoDetect();
   /** Procedural sky-dome mesh (skybox).  Null before _initPostProcessing() runs. */
   public skyDome: Mesh | null = null;
   /** Procedural sky-dome material.  Null before _initPostProcessing() runs. */
@@ -237,6 +238,7 @@ export class Game {
   public stableUI: StableUI;
   public saddlebagUI: SaddlebagUI;
   public uiAnimator: UIAnimator = new UIAnimator();
+  public graphicsSettingsUI: GraphicsSettingsUI;
 
   // v2 systems (Oblivion-lite)
   public attributeSystem: AttributeSystem;
@@ -492,6 +494,8 @@ export class Game {
   }
 
   init(): void {
+    // Apply the tier's hardware scaling level before the first render.
+    this.engine.setHardwareScalingLevel(this.graphics.performance.hardwareScalingLevel);
     this._setLight();
     this.player = new Player(this.scene, this.canvas);
     // Post-processing and skybox require the camera, so initialise after Player.
@@ -1513,6 +1517,20 @@ export class Game {
     this.saveSystem.setPlayerLevelSystem(this.playerLevelSystem);
 
     this.characterSheetUI = new CharacterSheetUI();
+
+    // ── Graphics Settings UI ──────────────────────────────────────────────────
+    this.graphicsSettingsUI = new GraphicsSettingsUI();
+    this.graphicsSettingsUI.onTierSelect = (tier) => {
+      persistGraphicsTier(tier);
+      location.reload();
+    };
+    this.graphicsSettingsUI.onClose = () => {
+      this.graphicsSettingsUI.hide();
+      this.interactionSystem.isBlocked = false;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
+    this._wireGraphicsSettingsButton();
 
     // ── v18 DailyScheduleSystem ───────────────────────────────────────────────
     // Connects TimeSystem → ScheduleSystem so NPC daily behaviours are driven
@@ -2781,6 +2799,11 @@ export class Game {
                     this.player.camera.attachControl(this.canvas, true);
                 } else if (this.ui.isWaitDialogOpen) {
                     this.ui.toggleWaitDialog(false);
+                    this.interactionSystem.isBlocked = false;
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
+                } else if (this.graphicsSettingsUI.isVisible) {
+                    this.graphicsSettingsUI.hide();
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
@@ -4251,7 +4274,8 @@ export class Game {
       this.inventorySystem.isOpen ||
       this.questSystem.isLogOpen ||
       this.mapEditorSystem.isEnabled ||
-      this.characterSheetUI.isVisible
+      this.characterSheetUI.isVisible ||
+      this.graphicsSettingsUI.isVisible
     ) {
       return false;
     }
@@ -4288,6 +4312,26 @@ export class Game {
     this._onboardingTutorial.start();
   }
 
+  /**
+   * Attach a persistent gear button (⚙) to the DOM that opens the graphics
+   * settings dialog.  The button is always visible so players can adjust
+   * quality without a keyboard shortcut.
+   */
+  private _wireGraphicsSettingsButton(): void {
+    if (typeof document === "undefined") return;
+    const btn = document.createElement("button");
+    btn.className = "graphics-settings-btn";
+    btn.setAttribute("aria-label", "Open graphics settings");
+    btn.textContent = "⚙";
+    btn.addEventListener("click", () => {
+      this.graphicsSettingsUI.show(this.graphics.tier);
+      this.interactionSystem.isBlocked = true;
+      document.exitPointerLock?.();
+      this.player.camera.detachControl();
+    });
+    document.body.appendChild(btn);
+  }
+
   private _setLight(): void {
     // The sky dome covers the entire background, so the clear colour is used
     // only for pixels not covered by any geometry.  Keep a deep sky-blue fallback
@@ -4309,11 +4353,10 @@ export class Game {
     // Position the light far away so the shadow frustum covers the visible world.
     sun.position  = new Vector3(80, 120, 50);
 
-    // Shadows are opt-in for high quality captures. The default build keeps
-    // them off so lower-end browsers can hold a playable frame rate.
-    if (import.meta.env.VITE_ENABLE_SHADOWS === "true") {
+    // Shadows are driven by the active graphics quality tier.
+    if (this.graphics.performance.shadowsEnabled) {
       const shadows = new ShadowGenerator(this.graphics.shadow.mapSize, sun);
-      shadows.useBlurExponentialShadowMap = true;
+      shadows.useBlurExponentialShadowMap = this.graphics.performance.softShadows;
       shadows.blurKernel = this.graphics.shadow.blurKernel;
       shadows.bias = 0.0005;
       this.shadowGenerator = shadows;
@@ -4359,8 +4402,9 @@ export class Game {
     this.skyMaterial = skyMat;
 
     // ── DefaultRenderingPipeline ─────────────────────────────────────────────
-    // Skip on WebGPU to avoid driver-level incompatibilities at startup.
-    if (this.engine.name !== "WebGPU") {
+    // Skip on WebGPU (driver incompatibilities) and when the active quality
+    // tier disables post-processing entirely (e.g. the "low" preset).
+    if (this.engine.name !== "WebGPU" && this.graphics.performance.postProcessEnabled) {
       const pp = this.graphics.postProcess;
       const pipeline = new DefaultRenderingPipeline(
         "defaultPipeline",
@@ -5227,6 +5271,7 @@ export class Game {
           this.saddlebagUI.isVisible ||
           this.petUI.isVisible ||
           this.characterSheetUI.isVisible ||
+          this.graphicsSettingsUI.isVisible ||
           this.dialogueSystem.isInDialogue ||
           this.interactionSystem.isBlocked
       );
