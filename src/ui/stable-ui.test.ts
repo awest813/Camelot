@@ -62,7 +62,8 @@ describe("StableUI", () => {
     it("disables the purchase button when no horses available", () => {
       ui.open("Stable Master", [], 500);
       const btn = document.querySelector(".stable__btn--primary") as HTMLButtonElement;
-      expect(btn.disabled).toBe(true);
+      expect(btn.disabled).toBe(false);
+      expect(btn.getAttribute("aria-disabled")).toBe("true");
     });
 
     it("selects the first unowned horse by default", () => {
@@ -141,7 +142,8 @@ describe("StableUI", () => {
       const horses = [makeHorse({ id: "bay_mare", isOwned: true })];
       ui.open("Stable Master", horses, 500);
       const row = document.querySelector(".stable__row") as HTMLButtonElement;
-      expect(row.disabled).toBe(true);
+      expect(row.disabled).toBe(false);
+      expect(row.getAttribute("aria-disabled")).toBe("true");
     });
   });
 
@@ -150,18 +152,21 @@ describe("StableUI", () => {
       ui.open("Stable Master", [makeHorse({ price: 500 })], 1000);
       const btn = document.querySelector(".stable__btn--primary") as HTMLButtonElement;
       expect(btn.disabled).toBe(false);
+      expect(btn.getAttribute("aria-disabled")).toBe("false");
     });
 
     it("disables the purchase button when player cannot afford selected horse", () => {
       ui.open("Stable Master", [makeHorse({ price: 500 })], 100);
       const btn = document.querySelector(".stable__btn--primary") as HTMLButtonElement;
-      expect(btn.disabled).toBe(true);
+      expect(btn.disabled).toBe(false);
+      expect(btn.getAttribute("aria-disabled")).toBe("true");
     });
 
     it("disables the purchase button when selected horse is already owned", () => {
       ui.open("Stable Master", [makeHorse({ isOwned: true })], 1000);
       const btn = document.querySelector(".stable__btn--primary") as HTMLButtonElement;
-      expect(btn.disabled).toBe(true);
+      expect(btn.disabled).toBe(false);
+      expect(btn.getAttribute("aria-disabled")).toBe("true");
     });
   });
 
@@ -196,9 +201,11 @@ describe("StableUI", () => {
     it("refreshes the purchase button state", () => {
       ui.open("Stable Master", [makeHorse({ price: 600 })], 500);
       const btn = document.querySelector(".stable__btn--primary") as HTMLButtonElement;
-      expect(btn.disabled).toBe(true);
+      expect(btn.disabled).toBe(false);
+      expect(btn.getAttribute("aria-disabled")).toBe("true");
       ui.setPlayerGold(700);
       expect(btn.disabled).toBe(false);
+      expect(btn.getAttribute("aria-disabled")).toBe("false");
     });
   });
 

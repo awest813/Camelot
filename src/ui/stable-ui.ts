@@ -177,7 +177,12 @@ export class StableUI {
       empty.className = "stable__empty";
       empty.textContent = "No horses available at this stable.";
       this._listEl.appendChild(empty);
-      if (this._buyBtn) this._buyBtn.disabled = true;
+      if (this._buyBtn) {
+        this._buyBtn.setAttribute("aria-disabled", "true");
+        this._buyBtn.style.opacity = "0.5";
+        this._buyBtn.style.cursor = "not-allowed";
+        this._buyBtn.setAttribute("title", "No horses available");
+      }
       return;
     }
 
@@ -189,7 +194,17 @@ export class StableUI {
       if (selected) row.classList.add("is-selected");
       if (horse.isOwned) row.classList.add("is-owned");
       row.setAttribute("aria-pressed", selected ? "true" : "false");
-      row.disabled = horse.isOwned;
+      if (horse.isOwned) {
+        row.setAttribute("aria-disabled", "true");
+        row.style.opacity = "0.5";
+        row.style.cursor = "not-allowed";
+        row.setAttribute("title", "Already owned");
+      } else {
+        row.setAttribute("aria-disabled", "false");
+        row.style.opacity = "";
+        row.style.cursor = "";
+        row.setAttribute("title", "Select " + horse.name);
+      }
 
       const nameEl = document.createElement("span");
       nameEl.className = "stable__row-name";
@@ -219,10 +234,22 @@ export class StableUI {
     if (!this._buyBtn) return;
     const selected = this._horses.find(h => h.id === this._selectedId);
     const canAfford = selected != null && !selected.isOwned && this._playerGold >= selected.price;
-    this._buyBtn.disabled = !canAfford;
+    this._buyBtn.setAttribute("aria-disabled", canAfford ? "false" : "true");
+    this._buyBtn.style.opacity = canAfford ? "" : "0.5";
+    this._buyBtn.style.cursor = canAfford ? "" : "not-allowed";
+    if (canAfford) {
+      this._buyBtn.setAttribute("title", "Purchase selected horse");
+    } else if (selected && selected.isOwned) {
+      this._buyBtn.setAttribute("title", "Already owned");
+    } else if (selected) {
+      this._buyBtn.setAttribute("title", "Not enough gold");
+    } else {
+      this._buyBtn.setAttribute("title", "No horse selected");
+    }
   }
 
   private _handlePurchase(): void {
+    if (this._buyBtn?.getAttribute("aria-disabled") === "true") return;
     if (!this._selectedId) return;
     const horse = this._horses.find(h => h.id === this._selectedId);
     if (!horse || horse.isOwned || this._playerGold < horse.price) return;
