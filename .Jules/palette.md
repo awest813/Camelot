@@ -19,3 +19,6 @@
 ## 2026-05-14 - Skill Tree Upgrade Button Accessibility
 **Learning:** Using the native `disabled` attribute on UI buttons suppresses pointer events, making hover tooltips invisible and removing the button from tab focus, harming accessibility for users needing to understand why an option like "Upgrade Skill" is unavailable.
 **Action:** Replaced native `disabled` assignment with `aria-disabled="true"`, added inline `opacity: 0.5` and `cursor: not-allowed` styles, dynamically assigned explanatory `title` attributes based on the disabled reason (e.g., "Prerequisites not met"), and explicitly checked `if (btn.getAttribute("aria-disabled") === "true") return;` in click handlers.
+## 2024-11-20 - [ARIA Disabled Tooltip Preservation]
+**Learning:** When improving accessibility by replacing native `disabled` properties with `aria-disabled="true"`, ensuring `title` tooltips remain accessible, native DOM pointer events (like `mouseenter` and `mouseleave`) will suddenly fire on these dynamically 'disabled' elements.
+**Action:** When migrating UI components to use `aria-disabled`, you must also check and update all pointer event listeners (like hover styling logic) to explicitly check `if (element.getAttribute("aria-disabled") === "true")` so the component visually mimics the native disabled lack of interactivity while remaining accessible.

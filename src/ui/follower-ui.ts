@@ -437,24 +437,24 @@ export class FollowerUI {
     if (follower.isAlive) {
       const followBtn = document.createElement("button");
       followBtn.type = "button";
+      followBtn.setAttribute("aria-disabled", follower.command === "follow" ? "true" : "false");
       _styleButton(followBtn, "Follow", { fontSize: "10px", padding: "3px 8px" });
-      followBtn.disabled = follower.command === "follow";
       followBtn.setAttribute("aria-label", "Command follower to follow");
-      followBtn.addEventListener("click", () => this.onCommand?.("follow"));
+      followBtn.addEventListener("click", () => { if (followBtn.getAttribute("aria-disabled") !== "true") this.onCommand?.("follow"); });
 
       const waitBtn = document.createElement("button");
       waitBtn.type = "button";
+      waitBtn.setAttribute("aria-disabled", follower.command === "wait" ? "true" : "false");
       _styleButton(waitBtn, "Wait", { fontSize: "10px", padding: "3px 8px" });
-      waitBtn.disabled = follower.command === "wait";
       waitBtn.setAttribute("aria-label", "Command follower to wait");
-      waitBtn.addEventListener("click", () => this.onCommand?.("wait"));
+      waitBtn.addEventListener("click", () => { if (waitBtn.getAttribute("aria-disabled") !== "true") this.onCommand?.("wait"); });
 
       const tradeBtn = document.createElement("button");
       tradeBtn.type = "button";
+      tradeBtn.setAttribute("aria-disabled", follower.command === "trade" ? "true" : "false");
       _styleButton(tradeBtn, "Trade", { fontSize: "10px", padding: "3px 8px" });
-      tradeBtn.disabled = follower.command === "trade";
       tradeBtn.setAttribute("aria-label", "Open trade with follower");
-      tradeBtn.addEventListener("click", () => this.onCommand?.("trade"));
+      tradeBtn.addEventListener("click", () => { if (tradeBtn.getAttribute("aria-disabled") !== "true") this.onCommand?.("trade"); });
 
       cmdRow.append(followBtn, waitBtn, tradeBtn);
     }
@@ -572,8 +572,8 @@ export class FollowerUI {
     if (!isDeceased) {
       const btn = document.createElement("button");
       btn.type = "button";
+      btn.setAttribute("aria-disabled", (hasActive || !canAfford) ? "true" : "false");
       _styleButton(btn, tmpl.hireCost > 0 ? `Recruit (${tmpl.hireCost} 🪙)` : "Recruit");
-      btn.disabled = hasActive || !canAfford;
       btn.setAttribute("aria-label", `Recruit ${tmpl.name}`);
       if (hasActive) {
         btn.title = "You already have an active follower. Dismiss them first.";
@@ -581,6 +581,7 @@ export class FollowerUI {
         btn.title = `You need ${tmpl.hireCost} gold to hire this follower.`;
       }
       btn.addEventListener("click", () => {
+        if (btn.getAttribute("aria-disabled") === "true") return;
         this.onRecruit?.(tmpl.id);
       });
       actionRow.appendChild(btn);
@@ -656,13 +657,13 @@ function _styleButton(
     ...overrides,
   });
   btn.addEventListener("mouseenter", () => {
-    if (!btn.disabled) btn.style.background = C.BTN_HVR;
+    if (btn.getAttribute("aria-disabled") !== "true") btn.style.background = C.BTN_HVR;
   });
   btn.addEventListener("mouseleave", () => {
-    btn.style.background = C.BTN_BG;
+    if (!btn.disabled && btn.getAttribute("aria-disabled") !== "true") btn.style.background = C.BTN_BG;
   });
   // Style disabled state
-  if (btn.disabled) {
+  if (btn.disabled || btn.getAttribute("aria-disabled") === "true") {
     btn.style.background = C.BTN_DIS;
     btn.style.cursor = "not-allowed";
     btn.style.opacity = "0.6";
