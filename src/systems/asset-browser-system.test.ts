@@ -245,4 +245,40 @@ describe("AssetBrowserSystem", () => {
     };
     expect(sys.importFromBundle(bundle)).toBe(0);
   });
+
+  it("importFromBundle re-imports asset-list exports (Export Selected round-trip)", () => {
+    const exported = {
+      schemaVersion: 1 as const,
+      exportedAt: new Date().toISOString(),
+      assetCount: 2,
+      assets: [
+        { id: "sword-01", name: "Iron Sword", type: "item", tags: ["weapon"], description: "", dependencies: [] },
+        { id: "q-001", name: "Main Quest", type: "quest", tags: ["quest"], description: "", dependencies: ["sword-01"] },
+      ],
+    };
+    const n = sys.importFromBundle(exported as unknown as ContentBundleExport);
+    expect(n).toBe(2);
+    expect(sys.getById("sword-01")?.type).toBe("item");
+    expect(sys.getById("q-001")?.dependencies).toEqual(["sword-01"]);
+  });
+
+  it("importFromBundle skips malformed asset-list entries", () => {
+    const exported = {
+      assets: [
+        { name: "No ID" }, // missing id
+        { id: "bad-type", type: "starship" }, // unknown type
+        { id: "ok", type: "npc", tags: "not-an-array", dependencies: null },
+      ],
+    };
+    const n = sys.importFromBundle(exported as unknown as ContentBundleExport);
+    expect(n).toBe(1);
+    expect(sys.getById("ok")).toMatchObject({ type: "npc", tags: [], dependencies: [] });
+  });
+
+  it("search filters by tags", () => {
+    sys.register(makeEntry({ id: "a", tags: ["weapon", "boss"] }));
+    sys.register(makeEntry({ id: "b", tags: ["weapon"] }));
+    expect(sys.search({ tags: ["weapon", "boss"] }).map((a) => a.id)).toEqual(["a"]);
+    expect(sys.getAllTags()).toEqual(expect.arrayContaining(["weapon", "boss"]));
+  });
 });

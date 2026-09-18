@@ -28,6 +28,7 @@ import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { BabylonInputAdapter } from "./adapters/babylon/babylon-input-adapter";
 import { GamepadInputSystem } from "./systems/gamepad-input-system";
 import { InventorySystem } from "./systems/inventory-system";
+import type { WeaponArchetype } from "./systems/combat-shared";
 import { EquipmentSystem } from "./systems/equipment-system";
 import { SaveSystem } from "./systems/save-system";
 import { QuestSystem } from "./systems/quest-system";
@@ -69,7 +70,7 @@ import { EnchantingUI } from "./ui/enchanting-ui";
 import { LodSystem } from "./systems/lod-system";
 import { WeatherSystem } from "./systems/weather-system";
 import { GraphicsSystem, persistGraphicsTier } from "./systems/graphics-system";
-import { QuickSlotSystem, isConsumableItem } from "./systems/quickslot-system";
+import { QuickSlotSystem, isConsumableItem, type QuickSlotKey } from "./systems/quickslot-system";
 import { WaitSystem } from "./systems/wait-system";
 import { SkillProgressionSystem } from "./systems/skill-progression-system";
 import { FastTravelSystem } from "./systems/fast-travel-system";
@@ -110,10 +111,10 @@ import { SpawnCreatorSystem } from "./systems/spawn-creator-system";
 import { SpawnCreatorUI } from "./ui/spawn-creator-ui";
 import { ContentBundleSystem } from "./systems/content-bundle-system";
 import { ContentBundleUI } from "./ui/content-bundle-ui";
-import { EditorHubUI } from "./ui/editor-hub-ui";
+import { EditorHubUI, type EditorToolId } from "./ui/editor-hub-ui";
 import { EditorLayout } from "./ui/editor-layout";
 import { buildHelpOverlayLines, summarizeValidationReport } from "./ui/editor-help-overlay";
-import { FastTravelUI } from "./ui/fast-travel-ui";
+import { FastTravelUI, type FastTravelOptionView } from "./ui/fast-travel-ui";
 import { SpellMakingUI } from "./ui/spell-making-ui";
 import { GuardEncounterUI, type GuardEncounterAction } from "./ui/guard-encounter-ui";
 import { LevelUpUI } from "./ui/level-up-ui";
@@ -123,12 +124,19 @@ import { DailyScheduleSystem } from "./systems/daily-schedule-system";
 import { HorseSystem } from "./systems/horse-system";
 import { SwimmingSystem } from "./systems/swimming-system";
 import { DiseaseSystem } from "./systems/disease-system";
+import { SurvivalSystem } from "./systems/survival-system";
+import { TravelEventSystem, type TravelContext } from "./systems/travel-event-system";
+import { AmbientEventSystem } from "./systems/ambient-event-system";
+import { LeveledListSystem, ALL_BUILT_IN_LEVELED_LISTS } from "./systems/leveled-list-system";
 import { EventManagerSystem } from "./systems/event-manager-system";
 import { AnimationSystem } from "./systems/animation-system";
 import { FantasyAssetLoader } from "./systems/fantasy-asset-loader";
 import { PetSystem } from "./systems/pet-system";
 import type { Pet } from "./systems/pet-system";
 import { PetUI } from "./ui/pet-ui";
+import { PickpocketSystem } from "./systems/pickpocket-system";
+import type { PickpocketableItem } from "./systems/pickpocket-system";
+import { PickpocketUI } from "./ui/pickpocket-ui";
 import { AssetBrowserSystem } from "./systems/asset-browser-system";
 import { AssetBrowserUI } from "./ui/asset-browser-ui";
 import { BundleMergeSystem } from "./systems/bundle-merge-system";
@@ -137,6 +145,7 @@ import { WorkspaceDraftSystem } from "./systems/workspace-draft-system";
 import { ModManifestSystem } from "./systems/mod-manifest-system";
 import { ModManifestUI } from "./ui/mod-manifest-ui";
 import { BarterUI } from "./ui/barter-ui";
+import { ContainerUI } from "./ui/container-ui";
 import type { Item } from "./systems/inventory-system";
 import { ScreenshotSystem } from "./systems/screenshot-system";
 import { UIAnimator } from "./ui/ui-animator";
@@ -154,12 +163,50 @@ import { GraphicsSettingsUI } from "./ui/graphics-settings-ui";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
+/** Pseudo fast-travel destination that triggers Mark & Recall teleportation. */
+const MARK_RECALL_TRAVEL_ID = "__recall";
+/** Squared distance beyond which NPC procedural animation updates are skipped. */
+const NPC_ANIMATION_FAR_DISTANCE_SQ = 100 * 100;
 /** Inventory item ID used for player gold (bounty payment check). */
 const GOLD_ITEM_ID = "gold_coins";
 /** Map framework bundle item ids to Babylon inventory ids when they differ. */
 const FRAMEWORK_ITEM_TO_GAME: Readonly<Record<string, string>> = {
   health_potion: "potion_hp_01",
   iron_sword: "sword_01",
+};
+/**
+ * Asset Browser type → hub tool for the "Insert" action (opens the asset's
+ * authoring tool through the same dispatch as the Editor Hub).
+ */
+const ASSET_TYPE_TO_EDITOR_TOOL: Readonly<Record<string, EditorToolId>> = {
+  item: "item",
+  npc: "npc",
+  quest: "quest",
+  dialogue: "dialogue",
+  faction: "faction",
+  lootTable: "lootTable",
+  spawn: "spawn",
+  map: "map",
+};
+
+/**
+ * Item templates for leveled-list drops (LeveledListSystem values).
+ * Stats scale with tier so boss loot stays relevant to the player's level.
+ */
+const LEVEL_ITEM_TEMPLATES: Readonly<Record<string, {
+  name: string; description: string; weight: number; slot: string; stats: Record<string, number>;
+}>> = {
+  iron_sword:      { name: "Iron Sword",      description: "A dependable blade.",            weight: 3.5, slot: "mainHand", stats: { damage: 10, value: 80 } },
+  steel_sword:     { name: "Steel Sword",     description: "Forged with superior steel.",    weight: 4.0, slot: "mainHand", stats: { damage: 16, value: 220 } },
+  silver_sword:    { name: "Silver Sword",    description: "Blessed silver etched with runes.", weight: 4.0, slot: "mainHand", stats: { damage: 22, value: 500 } },
+  daedric_sword:   { name: "Daedric Sword",   description: "A blade of blackened obsidian.", weight: 5.0, slot: "mainHand", stats: { damage: 30, value: 1500 } },
+  iron_bow:        { name: "Iron Bow",        description: "A sturdy shortbow.",             weight: 2.5, slot: "mainHand", stats: { damage: 8, value: 100 } },
+  steel_bow:       { name: "Steel Bow",       description: "A recurve bow with steel limbs.", weight: 3.0, slot: "mainHand", stats: { damage: 13, value: 280 } },
+  elven_bow:       { name: "Elven Bow",       description: "A lightweight bow of moon-metal.", weight: 2.0, slot: "mainHand", stats: { damage: 18, value: 700 } },
+  iron_cuirass:    { name: "Iron Cuirass",    description: "Heavy plated protection.",       weight: 8.0, slot: "chest", stats: { armor: 12, value: 120 } },
+  steel_cuirass:   { name: "Steel Cuirass",   description: "Well-tempered steel plate.",     weight: 10,  slot: "chest", stats: { armor: 18, value: 300 } },
+  orcish_cuirass:  { name: "Orcish Cuirass",  description: "Brutal, functional craftsmanship.", weight: 12, slot: "chest", stats: { armor: 26, value: 800 } },
+  daedric_cuirass: { name: "Daedric Cuirass", description: "Armor carved from raw Oblivion.", weight: 14, slot: "chest", stats: { armor: 36, value: 2000 } },
 };
 /** Merchant / restock health potions: `value` for barter pricing, `heal` for consumable use. */
 const HEALTH_POTION_STATS = { value: 25, heal: 50 } as const;
@@ -176,6 +223,8 @@ export class Game {
 
   /** Shadow generator driven by the directional sun light. */
   public shadowGenerator: ShadowGenerator | null = null;
+  /** Directional sun — its position is offset from the player each frame to keep the shadow frustum centred. */
+  private _sunLight: DirectionalLight | null = null;
   /** Rendering configuration preset (lighting, sky, post-processing, fog). */
   public readonly graphics: GraphicsSystem = GraphicsSystem.fromSavedOrAutoDetect();
   /** Procedural sky-dome mesh (skybox).  Null before _initPostProcessing() runs. */
@@ -245,6 +294,8 @@ export class Game {
   public timeSystem: TimeSystem;
   public stealthSystem: StealthSystem;
   public crimeSystem: CrimeSystem;
+  public pickpocketSystem: PickpocketSystem;
+  public pickpocketUI: PickpocketUI;
   public containerSystem: ContainerSystem;
   public projectileSystem: ProjectileSystem;
   public barterSystem: BarterSystem;
@@ -314,6 +365,12 @@ export class Game {
   // v21 systems
   public diseaseSystem: DiseaseSystem;
 
+  // v28+ survival / flavor-event systems
+  public survivalSystem!: SurvivalSystem;
+  public travelEventSystem!: TravelEventSystem;
+  public ambientEventSystem!: AmbientEventSystem;
+  public leveledListSystem!: LeveledListSystem;
+
   // v22 systems
   public eventManagerSystem: EventManagerSystem;
 
@@ -343,6 +400,7 @@ export class Game {
   public readonly screenshotSystem = new ScreenshotSystem();
 
   private readonly _barterUI = new BarterUI();
+  private readonly _containerUI = new ContainerUI();
   /** When set, open barter after dialogue teardown (pointer lock restored first). */
   private _pendingBarterMerchantId: string | null = null;
 
@@ -350,13 +408,35 @@ export class Game {
 
   private readonly _gameplayLoop = new FixedStepLoop({
     fixedDeltaSeconds: 1 / 60,
-    maxSubSteps: 5,
+    // Two substeps cover 30 fps exactly; beyond that the simulation slows
+    // slightly instead of multiplying AI/stealth cost up to 5× per frame
+    // (which fed a feedback loop — lower fps → more substeps → more load).
+    maxSubSteps: 2,
     maxAccumulatedSeconds: 0.25,
   });
 
   // Chunk tracking for navmesh rebuild triggers
   private _lastNavChunkX: number = NaN;
   private _lastNavChunkZ: number = NaN;
+
+  /** CDN props and chunk-scoped NPCs spawned per chunk key ("cx,cz") — disposed on chunk unload. */
+  private readonly _chunkFantasyContent = new Map<string, { roots: AbstractMesh[]; npcs: NPC[] }>();
+
+  /** Last integer in-game minute rendered to the clock HUD. */
+  private _lastClockMinutes: number = Number.NaN;
+
+  /** Debounce for witnessed-assault crime reports (one per 3s per combat burst). */
+  private _lastAssaultCrimeMs: number = Number.NEGATIVE_INFINITY;
+  /** True once the Bandit Bounty framework quest has been activated by a bandit kill. */
+  private _banditQuestStarted: boolean = false;
+  /** Active difficulty setting (scales NPC→player damage). */
+  private _difficulty: "easy" | "normal" | "hard" = "normal";
+  /** Mesh name of the NPC the player is currently talking to (persuasion pricing). */
+  private _currentDialogueNpcName: string | null = null;
+  /** Mesh name of the NPC currently shown in the pickpocket picker (null when closed). */
+  private _pickpocketTargetId: string | null = null;
+  /** True while the character-creation wizard is up (Escape must not pause beneath it). */
+  private _inCharacterCreation: boolean = false;
 
   // Cached stat values to avoid redundant UI bar updates every frame
   private _lastHealth: number = -1;
@@ -403,6 +483,15 @@ export class Game {
   private readonly _gamepadInput = new GamepadInputSystem(this._inputAdapter);
   /** Tracks whether the current key event was consumed by the input adapter. */
   private _keyConsumedByAdapter: boolean = false;
+  /**
+   * Adapter keys that stay live while the map editor owns the keyboard.
+   * Every editor chord (T/G/P/H/L, F4–F12, Shift+F*, Ctrl+M/Z/Y, [/]) is
+   * handled by the legacy key branches, so while the editor is enabled the
+   * gameplay adapter only sees keys with no editor meaning.
+   */
+  private static readonly _EDITOR_ADAPTER_KEYS: ReadonlySet<string> = new Set([
+    "Escape", "F1", "F3", "PrintScreen", "m", "M",
+  ]);
 
   /** Short post-creation tips; advances on Space or when the hinted action occurs. */
   private readonly _onboardingTutorial = new TutorialSystem();
@@ -453,6 +542,27 @@ export class Game {
   ): void {
     const dist = tier === "boss" ? 210 : tier === "scene" ? 185 : tier === "structure" ? 145 : 88;
     this.lodSystem.register(root, dist);
+  }
+
+  /**
+   * Track a chunk-scoped CDN prop so the chunk unload handler can dispose it.
+   * If the chunk already unloaded while the asset was loading (record identity
+   * mismatch — also covers unload → re-mount windows), the root is discarded
+   * immediately instead of leaking into the scene.
+   */
+  private _trackChunkProp(
+    chunkKey: string,
+    record: { roots: AbstractMesh[]; npcs: NPC[] },
+    root: AbstractMesh,
+    tier: "structure" | "scene" | "prop" | "boss",
+  ): void {
+    if (this._chunkFantasyContent.get(chunkKey) !== record) {
+      root.dispose();
+      return;
+    }
+    record.roots.push(root);
+    this.shadowGenerator?.addShadowCaster(root, true);
+    this._registerFantasyChunkLod(root, tier);
   }
 
   private _refreshEditorToolbar(): void {
@@ -535,7 +645,11 @@ export class Game {
     this.dialogueSystem     = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
     this.inventorySystem    = new InventorySystem(this.player, this.ui, this.canvas);
     this.equipmentSystem    = new EquipmentSystem(this.player, this.inventorySystem, this.ui);
+    // Equipped weapon drives the combat weapon archetype (sword/bow/staff/...).
+    this.equipmentSystem.onEquipmentChanged = () => this._syncWeaponArchetype();
+    this._syncWeaponArchetype();
     this.saveSystem         = new SaveSystem(this.player, this.inventorySystem, this.equipmentSystem, this.ui);
+    this.saveSystem.setCombatSystem(this.combatSystem);
     this.questSystem        = new QuestSystem(this.ui);
     this.questSystem.onOpen = () => {
       if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === "quests") {
@@ -547,6 +661,12 @@ export class Game {
       this._cleanupCollectedLoot();
       this._hydrateCellAfterLoad();
       this._syncInventoryGoldToFramework();
+      // Saved equipment bypasses equip() — re-sync the weapon archetype.
+      this._syncWeaponArchetype();
+      // Don't re-announce the bandit bounty if it's already live/finished.
+      if (this.frameworkRuntime.questEngine.getQuestStatus("quest_bandit_bounty") !== "inactive") {
+        this._banditQuestStarted = true;
+      }
     };
     this.interactionSystem  = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem, this.ui);
     this.interactionSystem.cellManager = this.cellManager;
@@ -566,7 +686,10 @@ export class Game {
     });
     this.frameworkRuntime.questEngine.activateQuest("quest_guard_resolution");
     this.saveSystem.setFrameworkRuntime(this.frameworkRuntime);
-    this.dialogueSystem.dialogueSessionProvider = (targetNpc) => this._createFrameworkDialogueSession(targetNpc.mesh.name);
+    this.dialogueSystem.dialogueSessionProvider = (targetNpc) => {
+      this._currentDialogueNpcName = targetNpc.mesh.name;
+      return this._createFrameworkDialogueSession(targetNpc.mesh.name);
+    };
     this._loadFrameworkMods();
     this.mapEditorSystem = new MapEditorSystem(this.scene);
     this.mapEditorSystem.currentAuthor = this._loadMapEditorAuthor();
@@ -914,6 +1037,11 @@ export class Game {
       this.canvas.requestPointerLock();
       this.player.camera.attachControl(this.canvas, true);
     };
+    // Insert opens the asset's authoring tool (same dispatch as the hub).
+    this.assetBrowserUI.onInsert = (asset) => {
+      const tool = ASSET_TYPE_TO_EDITOR_TOOL[asset.type];
+      if (tool) this._openEditorTool(tool);
+    };
     this.assetBrowserUI.onImportBundle = () => {
       const inp = document.createElement("input");
       inp.type = "file";
@@ -975,62 +1103,12 @@ export class Game {
 
     // ── Editor Hub ─────────────────────────────────────────────────────────────
     this.editorHubUI = new EditorHubUI({
-      onOpen: (tool) => {
-        this.interactionSystem.isBlocked = true;
-        document.exitPointerLock();
-        this.player.camera.detachControl();
-        switch (tool) {
-          case "map":
-            if (!this.mapEditorSystem.isEnabled) {
-              this.mapEditorSystem.toggle();
-              this.mapEditorToolbar.show();
-              this.editorLayout.setVisible("hierarchy", true);
-              this.editorLayout.setVisible("palette", true);
-              this.editorLayout.setVisible("layers", true);
-              this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-              this._refreshEditorToolbar();
-              this.ui.showNotification("Map Editor enabled (F2 to exit)", 2500);
-            }
-            break;
-          case "quest":
-            this.questCreatorUI.open();
-            break;
-          case "dialogue":
-            this.dialogueCreatorUI.open();
-            break;
-          case "npc":
-            this.npcCreatorUI.open();
-            break;
-          case "item":
-            this.itemCreatorUI.open();
-            break;
-          case "faction":
-            this.factionCreatorUI.open();
-            break;
-          case "lootTable":
-            this.lootTableCreatorUI.open();
-            break;
-          case "spawn":
-            this.spawnCreatorUI.open();
-            break;
-          case "bundle":
-            this.contentBundleUI.open();
-            break;
-          case "assets":
-            this.assetBrowserUI.open();
-            break;
-          case "merge":
-            this.bundleMergeUI.open();
-            break;
-          case "modManifest":
-            this.modManifestUI.open();
-            break;
-        }
-      },
+      onOpen: (tool) => this._openEditorTool(tool),
     });
     this.editorHubUI.onClose = () => {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
     };
+    this._seedAssetBrowser();
 
     // ── Fast Travel UI ────────────────────────────────────────────────────────
     this.fastTravelUI = new FastTravelUI();
@@ -1078,6 +1156,42 @@ export class Game {
     this.saveSystem.setContainerSystem(this.containerSystem);
     this.saveSystem.setBarterSystem(this.barterSystem);
     this.saveSystem.setCellManager(this.cellManager);
+    this.saveSystem.setStealthSystem(this.stealthSystem);
+
+    // ── Pickpocket wiring (sneak-thief loop) ────────────────────────────────
+    this.pickpocketSystem = new PickpocketSystem();
+    this.saveSystem.setPickpocketSystem(this.pickpocketSystem);
+    this.pickpocketUI = new PickpocketUI();
+    this.pickpocketSystem.onPickpocketSuccess = (npcId, itemId, xp) => {
+      this._grantPickpocketItem(npcId, itemId);
+      const mult = this.classSystem.xpMultiplierFor("sneak");
+      this.skillProgressionSystem.gainXP("sneak", xp * mult);
+      this.ui.showNotification(`Lifted ${this._pickpocketItemLabel(itemId)}!`, 2200);
+      this.saveSystem.markDirty();
+      this._refreshPickpocketUI(npcId);
+    };
+    this.pickpocketSystem.onPickpocketFailed = (_npcId, _itemId, caught) => {
+      if (!caught) this.ui.showNotification("Your fingers slip — unnoticed. Try again.", 2200);
+    };
+    this.pickpocketSystem.onCaught = (npcId) => {
+      const npc = this.scheduleSystem.npcs.find(n => n.mesh.name === npcId);
+      this.crimeSystem.commitCrime("theft", npc?.factionId ?? "village_guard", this.timeSystem.elapsedGameTime);
+      this.ui.showNotification("Caught pickpocketing!", 2600);
+      if (this.pickpocketUI.isVisible) {
+        this._pickpocketTargetId = null;
+        this.pickpocketUI.hide();
+        this._restoreGameplayInput();
+      }
+    };
+    this.pickpocketUI.onStealItem = (itemId) => this._attemptPickpocketSteal(itemId);
+    this.pickpocketUI.onClose = () => this._restoreGameplayInput();
+    this.interactionSystem.stealthSystem = this.stealthSystem;
+    this.interactionSystem.pickpocketSystem = this.pickpocketSystem;
+    this.interactionSystem.sneakLevelProvider = () =>
+      this.skillProgressionSystem.getSkill("sneak")?.level ?? 0;
+    this.interactionSystem.onPickpocketNpc = (npc) => this._openPickpocketUI(npc);
+    // Seed the starting cast (structure/archetype spawns register on arrival).
+    for (const npc of this.scheduleSystem.npcs) this._registerPickpocketInventory(npc);
 
     // ── v3 system wiring ──────────────────────────────────────────────────────
     this.eventBus        = new GameEventBus();
@@ -1112,6 +1226,10 @@ export class Game {
     this.lodSystem = new LodSystem({ updateEveryNFrames: 5 });
     this.lodSystem.setCamera(this.player.camera);
     this._gamepadInput.setCamera(this.player.camera);
+    // Distance-cull the demo guard's capsule alongside the world props.
+    if (this.scheduleSystem.npcs[0]) {
+      this.lodSystem.register(this.scheduleSystem.npcs[0].mesh, 120);
+    }
 
     // Register v3 systems with save
     this.saveSystem.setSpellSystem(this.spellSystem);
@@ -1182,12 +1300,20 @@ export class Game {
     // Seed slot 7 with the starter health potion (if the player has one)
     this.quickSlotSystem.bindSlot("7", "potion_hp_01");
     this.quickSlotSystem.onItemConsumed = (item, source) => {
+      // Food restores hunger via the survival system (potions restore stats
+      // directly inside QuickSlotSystem).
+      const nutrition = item.stats?.nutrition;
+      if (typeof nutrition === "number" && nutrition > 0) {
+        this.survivalSystem.eat(nutrition);
+        this.ui.showNotification(`Ate ${item.name}.`, 1600);
+      }
       this.eventBus.emit("player:consumeItem" as any, { itemId: item.id, source });
       this.saveSystem.markDirty();
     };
     this.saveSystem.setQuickSlotSystem(this.quickSlotSystem);
 
     this.ui.onInventoryItemClick = (item) => {
+      if (this._tryAssignQuickSlotFromClick(item)) return;
       if (this.quickSlotSystem.tryConsumeFromInventoryRow(item)) {
         this.saveSystem.markDirty();
         return;
@@ -1203,8 +1329,29 @@ export class Game {
     this.ui.onWaitConfirm = (hours) => {
       const result = this.waitSystem.wait(hours, this.timeSystem, this.player);
       if (result.ok) {
+        // Waiting counts as light sleep — resting at an inn restores more.
+        this.survivalSystem.rest(hours * 14);
         this.ui.showNotification(result.message, 2800);
         this.saveSystem.markDirty();
+      }
+    };
+    // Wait-dialog buttons close the panel themselves — restore input like Escape does.
+    this.ui.onWaitDialogClosed = () => this._restoreGameplayInput();
+    // Attribute panel ✕ button closes without going through a game toggle.
+    this.ui.onAttributePanelClosed = () => this._restoreGameplayInput();
+    // Alchemy/enchanting ✕ buttons likewise.
+    this.alchemyUI.onClosed = () => this._restoreGameplayInput();
+    this.enchantingUI.onClosed = () => this._restoreGameplayInput();
+    // Character sheet ✕ button (its Escape path is owned by the game cascade).
+    this.characterSheetUI.onClose = () => {
+      this.ui.setCharacterSheetOpen(false);
+      this._restoreGameplayInput();
+    };
+    // Perk spending from the character sheet (points come from level-ups).
+    this.characterSheetUI.onPerkUnlock = (perkId) => {
+      if (this.perkSystem.unlock(perkId)) {
+        this.saveSystem.markDirty();
+        this._refreshCharacterSheet();
       }
     };
 
@@ -1224,6 +1371,12 @@ export class Game {
       skillSystem: this.skillProgressionSystem,
       attributeSystem: this.attributeSystem,
     });
+    // Lets ranged/magic NPCs fire arrows and bolts at the player.
+    this.combatSystem.setProjectileSystem(this.projectileSystem);
+    // Bolt-riding status effects (burn, freeze, …) land on the player.
+    this.projectileSystem.onPlayerDamaged = (_dmg, _sourceName, effect) => {
+      if (effect) this.combatSystem.applyPlayerStatusEffect(effect);
+    };
     this.projectileSystem.setScalingSystems({
       skillSystem: this.skillProgressionSystem,
       attributeSystem: this.attributeSystem,
@@ -1249,6 +1402,8 @@ export class Game {
     this.world.structures.onNPCSpawn = (npc) => {
       this.scheduleSystem.addNPC(npc);
       this.levelScalingSystem.scaleNPC(npc, this.player.level);
+      this.lodSystem.register(npc.mesh, 120);
+      this._registerPickpocketInventory(npc);
     };
 
     this.world.structures.onNPCRemove = (npc) => {
@@ -1258,6 +1413,8 @@ export class Game {
       this.crimeSystem.removeNPC(npc);
       this.spellSystem.removeNPC(npc);
       this.projectileSystem.removeNPC(npc);
+      this.pickpocketSystem.removeNpcInventory(npc.mesh.name);
+      this.lodSystem.unregister(npc.mesh);
     };
 
     /** Unified world-state persistence: check if an item belongs to the player or was already taken. */
@@ -1506,12 +1663,12 @@ export class Game {
       this.perkSystem.addPerkPoints(1);
       this.saveSystem.markDirty();
       if (this.characterSheetUI.isVisible) this._refreshCharacterSheet();
-      // Auto-open attribute panel on character level-up
-      if (!this.isPaused && !this.ui.isAttributePanelOpen) {
+      // Auto-open attribute panel on character level-up — only when no other
+      // modal owns the screen.
+      if (!this.isPaused && !this.ui.isAttributePanelOpen && !this._isCombatInputBlocked()) {
         this.ui.toggleAttributePanel(true);
         this.ui.refreshAttributePanel(this.attributeSystem);
-        this.interactionSystem.isBlocked = true;
-        document.exitPointerLock?.();
+        this._suspendGameplayInput();
       }
     };
     this.saveSystem.setPlayerLevelSystem(this.playerLevelSystem);
@@ -1524,8 +1681,14 @@ export class Game {
       persistGraphicsTier(tier);
       location.reload();
     };
+    // Difficulty applies immediately — it only scales NPC→player damage.
+    this.graphicsSettingsUI.onDifficultySelect = (difficulty) => {
+      this._difficulty = difficulty;
+      this.combatSystem.difficultyMultiplier =
+        difficulty === "easy" ? 0.6 : difficulty === "hard" ? 1.5 : 1.0;
+      this.ui.showNotification(`Difficulty: ${difficulty[0].toUpperCase()}${difficulty.slice(1)}`, 2400);
+    };
     this.graphicsSettingsUI.onClose = () => {
-      this.graphicsSettingsUI.hide();
       this.interactionSystem.isBlocked = false;
       this.canvas.requestPointerLock();
       this.player.camera.attachControl(this.canvas, true);
@@ -1619,6 +1782,22 @@ export class Game {
     };
     this.saveSystem.setDiseaseSystem(this.diseaseSystem);
 
+    // ── v28: Survival needs (hunger / fatigue / cold) ──────────────────────
+    this.survivalSystem = new SurvivalSystem();
+    this.survivalSystem.onHungerLevelChanged = (level) => {
+      if (level === "hungry") this.ui.showNotification("You are getting hungry. Find some food.", 3000);
+      if (level === "starving") this.ui.showNotification("You are starving!", 3500);
+    };
+    this.survivalSystem.onFatigueLevelChanged = (level) => {
+      if (level === "tired") this.ui.showNotification("You are getting tired. Rest soon (T).", 3000);
+      if (level === "exhausted") this.ui.showNotification("You are exhausted!", 3500);
+    };
+    this.survivalSystem.onColdLevelChanged = (level) => {
+      if (level === "cold") this.ui.showNotification("You are cold. Seek shelter or fire.", 3000);
+      if (level === "freezing") this.ui.showNotification("You are freezing! Health is draining.", 3500);
+    };
+    this.saveSystem.setSurvivalSystem(this.survivalSystem);
+
     // ── v22: Event Manager (Dungeon Master) ───────────────────────────────
     this.eventManagerSystem = new EventManagerSystem();
     this.eventManagerSystem.onEventTriggered = (_id, def) => {
@@ -1645,6 +1824,9 @@ export class Game {
       this.world.onChunkLoaded = (cx, cz, biome) => {
         const worldX = cx * this.world.chunkSize;
         const worldZ = cz * this.world.chunkSize;
+        const chunkKey = `${cx},${cz}`;
+        const chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] } = { roots: [], npcs: [] };
+        this._chunkFantasyContent.set(chunkKey, chunkRecord);
 
       // ── Obelisks in desert / plains (1-in-8 chance per chunk) ────────────
       if ((biome === "desert" || biome === "plains") && _chunkRand(cx, cz, 0) < 0.125) {
@@ -1656,8 +1838,7 @@ export class Game {
           root.position.set(ox, 0, oz);
           root.rotation.y = _chunkRand(cx, cz, 4) * Math.PI * 2;
           root.scaling.setAll(s);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "structure");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
         });
       }
 
@@ -1670,9 +1851,19 @@ export class Game {
           root.position.set(cx2, 0, cz2);
           root.rotation.y = _chunkRand(cx, cz, 8) * Math.PI * 2;
           root.scaling.setAll(1.0);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "structure");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
         });
+        // Homestead: a villager and a visiting instructor rotating per chunk.
+        this._spawnArchetypeNpc("archetype_villager", chunkRecord, cx2 + 2, cz2 + 2);
+        const cottageTrainer = [
+          "archetype_trainer_blade",
+          "archetype_trainer_alchemy",
+          "archetype_trainer_destruction",
+        ][((cx + cz) % 3 + 3) % 3];
+        this._spawnArchetypeNpc(cottageTrainer, chunkRecord, cx2 - 2, cz2 + 1);
+        if (_chunkRand(cx, cz, 91) < 0.3) {
+          this._spawnArchetypeNpc("archetype_guard", chunkRecord, cx2 + 3, cz2 - 2);
+        }
       }
 
       // ── Dragon encounter in tundra (1-in-20 chance — very rare) ──────────
@@ -1687,19 +1878,26 @@ export class Game {
         dragonNpc.aggroRange   = 25;
         dragonNpc.xpReward     = 500;
         dragonNpc.armorRating  = 60;
+        dragonNpc.lootTableId  = "boss_loot";
         // Hide the default capsule — the CDN model provides the visual
         dragonNpc.mesh.isVisible = false;
         this.scheduleSystem.addNPC(dragonNpc);
         this.levelScalingSystem?.scaleNPC(dragonNpc, this.player.level);
+        chunkRecord.npcs.push(dragonNpc);
+        // NOTE: the capsule stays unregistered in LodSystem — visibility toggling
+        // would reveal it; the CDN model root is LOD-tracked via _trackChunkProp.
 
         // Attach CDN dragon model once loaded
         this.fantasyAssets.getInstance("dragon", (root) => {
-          if (!root || dragonNpc.isDead) return;
+          if (!root) return;
+          if (dragonNpc.isDead || this._chunkFantasyContent.get(chunkKey) !== chunkRecord) {
+            root.dispose();
+            return;
+          }
           root.position.set(dx, 0, dz);
           root.rotation.y = _chunkRand(cx, cz, 12) * Math.PI * 2;
           root.scaling.setAll(2.5);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "boss");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "boss");
         });
       }
 
@@ -1712,9 +1910,23 @@ export class Game {
           root.position.set(ix, 0, iz);
           root.rotation.y = _chunkRand(cx, cz, 16) * Math.PI * 2;
           root.scaling.setAll(1.0);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "structure");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
         });
+        // Settle the inn: proprietor, barkeep, and a rotating specialist
+        // shopkeeper (deterministic per chunk) — occasionally a guard.
+        this._spawnArchetypeNpc("archetype_innkeeper", chunkRecord, ix + 2.5, iz + 2.5);
+        this._spawnArchetypeNpc("archetype_barkeeper", chunkRecord, ix - 2.5, iz + 2);
+        const innSpecial = [
+          "archetype_shopkeeper_general",
+          "archetype_shopkeeper_weapons",
+          "archetype_shopkeeper_armor",
+          "archetype_shopkeeper_alchemist",
+          "archetype_merchant",
+        ][((cx + cz) % 5 + 5) % 5];
+        this._spawnArchetypeNpc(innSpecial, chunkRecord, ix + 4, iz - 3);
+        if (_chunkRand(cx, cz, 90) < 0.4) {
+          this._spawnArchetypeNpc("archetype_guard", chunkRecord, ix - 4, iz - 3);
+        }
       }
 
       // ── Haunted house in tundra (1-in-10 chance — Skyrim abandoned shacks) ──
@@ -1726,8 +1938,7 @@ export class Game {
           root.position.set(hx, 0, hz);
           root.rotation.y = _chunkRand(cx, cz, 20) * Math.PI * 2;
           root.scaling.setAll(1.2);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "structure");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
         });
       }
 
@@ -1740,8 +1951,7 @@ export class Game {
           root.position.set(gx, 0, gz);
           root.rotation.y = _chunkRand(cx, cz, 24) * Math.PI * 2;
           root.scaling.setAll(1.0);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "scene");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "scene");
         });
       }
 
@@ -1755,8 +1965,7 @@ export class Game {
           root.position.set(fx, 0, fz);
           root.rotation.y = fortRot;
           root.scaling.setAll(1.0);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "structure");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
         });
         const rad = 6 + _chunkRand(cx, cz, 44) * 4;
         const cannonX = fx + Math.cos(fortRot + 0.7) * rad;
@@ -1766,9 +1975,15 @@ export class Game {
           root.position.set(cannonX, 0, cannonZ);
           root.rotation.y = fortRot + Math.PI * 0.35;
           root.scaling.setAll(1.0);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "prop");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
+        // Garrison the bandit camp: two lookouts, an archer on the edge,
+        // and their chief. Bandits carry bandit_loot (including the
+        // Bandit Bounty quest token).
+        this._spawnArchetypeNpc("archetype_bandit", chunkRecord, fx + 3, fz + 2);
+        this._spawnArchetypeNpc("archetype_bandit", chunkRecord, fx - 3, fz - 2);
+        this._spawnArchetypeNpc("archetype_bandit_archer", chunkRecord, fx, fz + 5);
+        this._spawnArchetypeNpc("archetype_bandit_chief", chunkRecord, fx, fz);
       }
 
       // ── Tundra snow-field patch (ground dressing) ─────────────────────────
@@ -1781,8 +1996,7 @@ export class Game {
           root.rotation.y = _chunkRand(cx, cz, 48) * Math.PI * 2;
           const s = 0.85 + _chunkRand(cx, cz, 49) * 0.35;
           root.scaling.setAll(s);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "structure");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
         });
       }
 
@@ -1795,8 +2009,7 @@ export class Game {
           root.position.set(rx, 0, rz);
           root.rotation.y = _chunkRand(cx, cz, 53) * Math.PI * 2;
           root.scaling.setAll(0.9 + _chunkRand(cx, cz, 54) * 0.25);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "prop");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
 
@@ -1808,8 +2021,7 @@ export class Game {
           root.position.set(px, 0, pz);
           root.rotation.y = _chunkRand(cx, cz, 58) * Math.PI * 2;
           root.scaling.setAll(1.0);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "prop");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
 
@@ -1821,8 +2033,7 @@ export class Game {
           root.position.set(dx, 0.15, dz);
           root.rotation.y = _chunkRand(cx, cz, 62) * Math.PI * 2;
           root.scaling.setAll(1.0);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "prop");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
 
@@ -1834,8 +2045,7 @@ export class Game {
           root.position.set(cx3, 0, cz3);
           root.rotation.y = _chunkRand(cx, cz, 66) * Math.PI * 2;
           root.scaling.setAll(1.0);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "prop");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
 
@@ -1847,8 +2057,7 @@ export class Game {
           root.position.set(ax, 0.2, az);
           root.rotation.y = _chunkRand(cx, cz, 70) * Math.PI * 2;
           root.scaling.setAll(1.0);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "prop");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
 
@@ -1861,8 +2070,7 @@ export class Game {
           root.position.set(kx, 0, kz);
           root.rotation.y = _chunkRand(cx, cz, 74) * Math.PI * 2;
           root.scaling.setAll(0.55 + _chunkRand(cx, cz, 75) * 0.5);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "prop");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
 
@@ -1875,8 +2083,7 @@ export class Game {
           root.position.set(ux, -0.5, uz);
           root.rotation.y = _chunkRand(cx, cz, 79) * Math.PI * 2;
           root.scaling.setAll(1.0);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "scene");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "scene");
         });
       }
       if ((biome === "forest" || biome === "plains") && _chunkRand(cx, cz, 80) < 0.02) {
@@ -1887,8 +2094,7 @@ export class Game {
           root.position.set(opx, 0.4, opz);
           root.rotation.y = _chunkRand(cx, cz, 83) * Math.PI * 2;
           root.scaling.setAll(1.0);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "prop");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
       if (biome === "plains" && _chunkRand(cx, cz, 84) < 0.014) {
@@ -1899,10 +2105,36 @@ export class Game {
           root.position.set(bx, 0, bz);
           root.rotation.y = _chunkRand(cx, cz, 87) * Math.PI * 2;
           root.scaling.setAll(1.0);
-          this.shadowGenerator?.addShadowCaster(root, true);
-          this._registerFantasyChunkLod(root, "prop");
+          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
+      };
+
+      // Dispose chunk-scoped CDN props and NPCs when their chunk unloads so
+      // revisiting an area never accumulates duplicate props or entities.
+      this.world.onChunkUnloaded = (cx, cz) => {
+        const key = `${cx},${cz}`;
+        const record = this._chunkFantasyContent.get(key);
+        if (!record) return;
+        this._chunkFantasyContent.delete(key);
+
+        for (const root of record.roots) {
+          this.lodSystem.unregister(root);
+          this.shadowGenerator?.removeShadowCaster(root, true);
+          // Materials/textures belong to the shared asset template — preserve them.
+          root.dispose();
+        }
+
+        for (const npc of record.npcs) {
+          this.scheduleSystem.removeNPC(npc);
+          this.combatSystem.removeNPC(npc);
+          this.stealthSystem.removeNPC(npc);
+          this.crimeSystem.removeNPC(npc);
+          this.spellSystem.removeNPC(npc);
+          this.projectileSystem.removeNPC(npc);
+          this.lodSystem.unregister(npc.mesh);
+          npc.mesh.dispose();
+        }
       };
     }
 
@@ -2059,11 +2291,30 @@ export class Game {
     });
     this.dynamicWorldEventSystem.onEventFired = (result) => {
       this.ui.showNotification(`World event: ${result.label}`, 2500);
-      this.eventBus.emit("world:event" as any, {
-        templateId: result.templateId,
-        tableId: result.tableId,
-        count: result.count,
-      });
+      // Materialize the event's loot table as findable caches near the player —
+      // the XP/gold reward arrives via onRewardGranted; these are the goods.
+      const context = { playerLevel: this.player.level };
+      const caches = Math.max(1, Math.min(3, result.count));
+      for (let i = 0; i < caches; i++) {
+        const drop = this.lootTableSystem.rollTable(result.tableId, undefined, context).items[0];
+        if (!drop) continue;
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 6 + Math.random() * 6;
+        new Loot(this.scene, new Vector3(
+          this.player.camera.position.x + Math.cos(angle) * dist,
+          0.5,
+          this.player.camera.position.z + Math.sin(angle) * dist,
+        ), {
+          id: drop.id,
+          name: drop.name,
+          description: drop.description ?? "",
+          stackable: drop.stackable ?? false,
+          quantity: drop.quantity ?? 1,
+          weight: drop.weight,
+          stats: drop.stats,
+          slot: drop.slot as any,
+        });
+      }
     };
     this.dynamicWorldEventSystem.onRewardGranted = (reward) => {
       this._grantDynamicWorldEventReward(reward);
@@ -2071,8 +2322,100 @@ export class Game {
     this.saveSystem.setDynamicWorldEventSystem(this.dynamicWorldEventSystem);
     this._lastDynamicWorldEventHour = Math.floor(this.timeSystem.elapsedGameHours);
 
+    // ── Travel events (rolled on fast-travel arrival) ────────────────────────
+    this.travelEventSystem = new TravelEventSystem();
+    this.travelEventSystem.addEvent({
+      id: "travel_wanderer_rumor",
+      label: "Wandering Hunter",
+      description: "A hunter by the road shares rumors of old ruins.",
+      conditions: { biomeIds: ["plains", "forest"] },
+      outcome: { notification: "A wandering hunter trades rumors with you about old ruins nearby." },
+      weight: 2,
+      cooldownHours: 24,
+    });
+    this.travelEventSystem.addEvent({
+      id: "travel_sandstorm_tales",
+      label: "Desert Caravan",
+      description: "A caravan merchant warns of sandstorms ahead.",
+      conditions: { biomeIds: ["desert"] },
+      outcome: { notification: "A caravan merchant warns you: 'The dunes are restless this season.'" },
+      weight: 2,
+      cooldownHours: 24,
+    });
+    this.travelEventSystem.addEvent({
+      id: "travel_storm_refuge",
+      label: "Storm Refuge",
+      description: "You share shelter with a fellow traveler during a downpour.",
+      conditions: { weather: ["rain", "storm"] },
+      outcome: { notification: "You shelter from the storm beside a fellow traveler and swap stories." },
+      weight: 3,
+      cooldownHours: 12,
+    });
+    this.travelEventSystem.addEvent({
+      id: "travel_frost_warning",
+      label: "Frostbitten Scout",
+      description: "A half-frozen scout stumbles out of the snow.",
+      conditions: { biomeIds: ["tundra"], minPlayerLevel: 2 },
+      outcome: { notification: "A frostbitten scout mutters about shapes moving in the whiteout before wandering off." },
+      weight: 2,
+      cooldownHours: 24,
+    });
+
+    // ── Ambient events (hourly flavor) ──────────────────────────────────────
+    this.ambientEventSystem = new AmbientEventSystem();
+    this.ambientEventSystem.addEvent({
+      id: "ambient_wolf_howl",
+      label: "Wolf Howl",
+      conditions: { timeRange: { minHour: 20, maxHour: 5 }, biomeIds: ["forest", "tundra"] },
+      effect: { notification: "A wolf howls somewhere in the dark." },
+      cooldownHours: 8,
+    });
+    this.ambientEventSystem.addEvent({
+      id: "ambient_shooting_star",
+      label: "Shooting Star",
+      conditions: { timeRange: { minHour: 22, maxHour: 4 }, weather: ["clear"] },
+      effect: { notification: "A shooting star streaks across the night sky." },
+      cooldownHours: 12,
+    });
+    this.ambientEventSystem.addEvent({
+      id: "ambient_market_news",
+      label: "Traveling News",
+      conditions: { timeRange: { minHour: 8, maxHour: 18 } },
+      effect: { notification: "You overhear travelers gossiping about bandit trouble on the trade road." },
+      cooldownHours: 10,
+    });
+    this.ambientEventSystem.addEvent({
+      id: "ambient_birdsong",
+      label: "Birdsong",
+      conditions: { timeRange: { minHour: 6, maxHour: 10 }, biomeIds: ["forest", "plains"], weather: ["clear", "overcast"] },
+      effect: { notification: "Birdsong fills the morning air." },
+      cooldownHours: 6,
+    });
+    this.ambientEventSystem.onEventTriggered = (_id, effect) => {
+      if (effect.notification) this.ui.showNotification(effect.notification, 3000);
+    };
+
+    // ── Leveled lists (tiered boss loot) ─────────────────────────────────────
+    this.leveledListSystem = new LeveledListSystem();
+    this.leveledListSystem.registerAll(ALL_BUILT_IN_LEVELED_LISTS);
+    // Persist flavor-event cooldowns so reloading can't reroll one-shots.
+    this.saveSystem.setTravelEventSystem(this.travelEventSystem);
+    this.saveSystem.setAmbientEventSystem(this.ambientEventSystem);
+
     // Wire sneak-attack detection into combat.
     this.combatSystem.setStealthSystem(this.stealthSystem);
+
+    // Suspicion (partial detection) routes NPCs to investigate where the
+    // player was seen/heard — full detection still triggers ALERT.
+    this.stealthSystem.onPartialDetection = (npc, playerPos) => {
+      if (npc.isDead || npc.isAggressive) return;
+      if (!npc.lastKnownPlayerPos) npc.lastKnownPlayerPos = playerPos.clone();
+      else npc.lastKnownPlayerPos.copyFrom(playerPos);
+      if (npc.aiState === AIState.IDLE || npc.aiState === AIState.PATROL) {
+        npc.aiState = AIState.INVESTIGATE;
+        npc.investigateTimer = 0;
+      }
+    };
 
     // ── v26: Follower UI ──────────────────────────────────────────────────
     this.followerUI = new FollowerUI();
@@ -2107,9 +2450,21 @@ export class Game {
 
     // ── Quick Slot HUD ────────────────────────────────────────────────────
     this.quickSlotHUD = new QuickSlotHUD();
-    this.quickSlotHUD.onAssign = (_key, _currentItemId) => {
-      this.ui.showNotification(`Open item picker for slot ${_key}`, 1500);
+    // Quick-slot assign mode: clicking a HUD slot opens the inventory; the
+    // next consumable clicked there is bound to that slot.
+    this.quickSlotHUD.onAssign = (key, _currentItemId) => {
+      if (this.isPaused || this.mapEditorSystem.isEnabled || this.dialogueSystem.isInDialogue) return;
+      this._quickSlotAssignKey = key;
+      this.ui.showNotification(`Pick a consumable in your inventory for slot ${key}.`, 3000);
+      if (!this.inventorySystem.isOpen) {
+        this.inventorySystem.toggleInventory();
+        this.interactionSystem.isBlocked = true;
+        document.exitPointerLock();
+        this.player.camera.detachControl();
+      }
     };
+    // Leaving the inventory cancels a pending quick-slot assignment.
+    this.ui.onInventoryClosed = () => { this._quickSlotAssignKey = null; };
     this.quickSlotHUD.show();
     this.quickSlotHUD.update(this.quickSlotSystem);
 
@@ -2185,6 +2540,9 @@ export class Game {
       this.ui.showNotification(
         `+${xp} XP  |  Fame: ${this.fameSystem.fame} (${this.fameSystem.fameLabel})`, 3000
       );
+    };
+    this.questSystem.onQuestFailed = () => {
+      this.saveSystem.markDirty();
     };
 
     // Crime encounter: present an interactive guard challenge modal.
@@ -2286,6 +2644,9 @@ export class Game {
       inventory: [
         { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 8, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
         { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 4, weight: 1, stats: { value: 15 } },
+        { id: "bread", name: "Loaf of Bread", description: "Hearty bread. Restores hunger.", stackable: true, quantity: 6, weight: 0.2, stats: { value: 5, nutrition: 30 } },
+        { id: "ale", name: "Mug of Ale", description: "Watered-down but filling.", stackable: true, quantity: 6, weight: 0.4, stats: { value: 4, nutrition: 15 } },
+        { id: "stew", name: "Bowl of Stew", description: "Hot and hearty. Restores a lot of hunger.", stackable: true, quantity: 4, weight: 0.5, stats: { value: 8, nutrition: 50 } },
       ],
       gold: 450,
       priceMultiplier: 1.05,
@@ -2408,13 +2769,52 @@ export class Game {
       this.player.camera.attachControl(this.canvas, true);
     };
 
+    // ── Container loot ────────────────────────────────────────────────────
+    this.containerSystem.onContainerOpen = () => {
+      this._containerUI.show();
+      this._containerUI.update(this.containerSystem);
+      this._suspendGameplayInput();
+    };
+    this._containerUI.onTakeItem = (itemId) => {
+      const active = this.containerSystem.activeContainer;
+      if (!active) return;
+      if (this.containerSystem.takeItem(active.id, itemId)) {
+        this.saveSystem.markDirty();
+      }
+      this._containerUI.update(this.containerSystem);
+      if (this.containerSystem.activeContainer?.contents.length === 0) {
+        this._closeContainerUI();
+      }
+    };
+    this._containerUI.onTakeAll = () => {
+      const active = this.containerSystem.activeContainer;
+      if (active) this.containerSystem.takeAll(active.id);
+      this.saveSystem.markDirty();
+      this._closeContainerUI();
+    };
+    this._containerUI.onClose = () => this._closeContainerUI();
+    this.interactionSystem.containerSystem = this.containerSystem;
+
     // Prevent browser context menu from capturing right-click combat input.
     this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
     // Wire quest event callbacks
     this.combatSystem.onNPCDeath = (name, xp, npc) => {
+        // Bandit Bounty: activate on the first bandit kill so that kill counts.
+        if (!this._banditQuestStarted && this._toFrameworkTargetId(name) === "Bandit") {
+            this._banditQuestStarted = true;
+            this.frameworkRuntime.questEngine.activateQuest("quest_bandit_bounty");
+            this.ui.showNotification("📜 New quest: Bandit Bounty — bring proof to collect.", 3500);
+        }
+        // Murder: killing a non-hostile settlement NPC is a crime; witnessed
+        // kills post a bounty and nearby guards will challenge the player.
+        if (this._isSettlementNpc(npc)) {
+            this.crimeSystem.commitCrime("murder", npc.factionId ?? "village_guard", this.timeSystem.elapsedGameTime);
+        }
         this.questSystem.onKill(name);
         this._applyFrameworkQuestEvent("kill", this._toFrameworkTargetId(name));
+        // Killing someone a quest needed alive fails the dependent quests.
+        this._failQuestsForDeadTarget(name, this._toFrameworkTargetId(name));
         this.player.addExperience(xp);
         this.ui.showNotification(`+${xp} XP`, 2000);
         this.audioSystem.playNPCDeath();
@@ -2444,8 +2844,40 @@ export class Game {
                 }
             }
         }
+
+        // Elites (dragons, bandit chiefs) drop tiered gear from the leveled
+        // lists — the reward scales with the player's level.
+        if (/^(DragonBoss|Bandit Chief)/.test(npc.mesh.name)) {
+            const listId = Math.random() < 0.6 ? "ll_weapon_melee" : "ll_armor_heavy";
+            const resolved = this.leveledListSystem.resolve(listId, this.player.level);
+            const template = resolved.value ? LEVEL_ITEM_TEMPLATES[resolved.value] : undefined;
+            if (template) {
+                const eliteDropPos = npc.mesh.position.clone();
+                eliteDropPos.y += 0.6;
+                new Loot(this.scene, eliteDropPos, {
+                    id: resolved.value!,
+                    name: template.name,
+                    description: template.description,
+                    stackable: false,
+                    quantity: 1,
+                    weight: template.weight,
+                    slot: template.slot as any,
+                    stats: { ...template.stats },
+                });
+                this.ui.showNotification(`The elite drops ${template.name}!`, 2600);
+            }
+        }
     };
     this.projectileSystem.onNPCDeath = this.combatSystem.onNPCDeath;
+    this.combatSystem.onNpcDamaged = (npc) => {
+        // Assault: attacking non-hostile settlement NPCs is a crime.
+        // Debounced so a multi-hit combo doesn't stack five bounties.
+        if (npc.isDead || !this._isSettlementNpc(npc)) return;
+        const nowMs = performance.now();
+        if (nowMs - this._lastAssaultCrimeMs < 3000) return;
+        this._lastAssaultCrimeMs = nowMs;
+        this.crimeSystem.commitCrime("assault", npc.factionId ?? "village_guard", this.timeSystem.elapsedGameTime);
+    };
     this.combatSystem.onPlayerHit = () => {
         this.audioSystem.playPlayerHit();
         // Small chance to contract a random disease on each hit (Oblivion-style).
@@ -2484,6 +2916,7 @@ export class Game {
       this.barterSystem.playerGold = this._getInventoryGold();
       this._syncInventoryGoldToFramework();
       this._flushPendingBarter();
+      this._currentDialogueNpcName = null;
     };
 
     // Quest XP and fame callbacks are wired in the v9 block above.
@@ -2656,15 +3089,21 @@ export class Game {
         // Forward key events through the input adapter for decoupled action dispatch
         if (kbInfo.type === KeyboardEventTypes.KEYDOWN || kbInfo.type === KeyboardEventTypes.KEYUP) {
             const phase = kbInfo.type === KeyboardEventTypes.KEYDOWN ? "down" : "up";
-            const handled = this._inputAdapter.handleKeyEvent(
-                kbInfo.event.key,
-                phase,
-                { shift: kbInfo.event.shiftKey, ctrlOrMeta: kbInfo.event.ctrlKey || kbInfo.event.metaKey },
-            );
-            if (handled !== null) {
-                this._keyConsumedByAdapter = true;
-                kbInfo.event.preventDefault();
-                return;
+            if (this.mapEditorSystem.isEnabled && !Game._EDITOR_ADAPTER_KEYS.has(kbInfo.event.key)) {
+                // Editor mode: let the legacy editor branches see every chord;
+                // clear stuck held-actions (sprint, bow draw, …) as we skip.
+                this._inputAdapter.reset();
+            } else {
+                const handled = this._inputAdapter.handleKeyEvent(
+                    kbInfo.event.key,
+                    phase,
+                    { shift: kbInfo.event.shiftKey, ctrlOrMeta: kbInfo.event.ctrlKey || kbInfo.event.metaKey },
+                );
+                if (handled !== null) {
+                    this._keyConsumedByAdapter = true;
+                    kbInfo.event.preventDefault();
+                    return;
+                }
             }
         }
 
@@ -2675,6 +3114,7 @@ export class Game {
                     kbInfo.event.preventDefault();
                 }
             } else if (kbInfo.event.key === "Escape") {
+                if (this._inCharacterCreation) return;
                 if (this.dialogueSystem.isInDialogue) return;
 
                 if (this.levelUpUI.isVisible) {
@@ -2696,6 +3136,7 @@ export class Game {
                     this.editorLayout.setVisible("properties", false);
                     this.editorLayout.clearSelection();
                     this.ui.showNotification("Map editor mode disabled", 1800);
+                    this._refreshHelpOverlayIfVisible();
                 } else if (this.characterSheetUI.isVisible) {
                     this.characterSheetUI.hide();
                     this.ui.setCharacterSheetOpen(false);
@@ -2733,6 +3174,8 @@ export class Game {
                     this.spellMakingUI.close();
                 } else if (this._barterUI.isVisible) {
                     this._barterUI.onClose?.();
+                } else if (this._containerUI.isVisible) {
+                    this._containerUI.onClose?.();
                 } else if (this.fastTravelUI.isVisible) {
                     this.fastTravelUI.close();
                 } else if (this.petUI.isVisible) {
@@ -2742,6 +3185,12 @@ export class Game {
                     this.player.camera.attachControl(this.canvas, true);
                 } else if (this.followerUI.isVisible) {
                     this.followerUI.close();
+                    this.interactionSystem.isBlocked = false;
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
+                } else if (this.pickpocketUI.isVisible) {
+                    this._pickpocketTargetId = null;
+                    this.pickpocketUI.hide();
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
@@ -2804,6 +3253,7 @@ export class Game {
                     this.player.camera.attachControl(this.canvas, true);
                 } else if (this.graphicsSettingsUI.isVisible) {
                     this.graphicsSettingsUI.hide();
+                    this.graphicsSettingsUI.onClose?.();
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
@@ -2878,11 +3328,13 @@ export class Game {
                     this.guardEncounterUI.isVisible ||
                     this.spellMakingUI.isVisible ||
                     this._barterUI.isVisible ||
+                    this._containerUI.isVisible ||
                     this.fastTravelUI.isVisible ||
                     this.stableUI.isVisible ||
                     this.saddlebagUI.isVisible ||
                     this.petUI.isVisible ||
                     this.followerUI.isVisible ||
+                    this.pickpocketUI.isVisible ||
                     this.interactionSystem.isBlocked
                 ) {
                     return;
@@ -2932,27 +3384,14 @@ export class Game {
                     return;
                 }
                 if (!this.isPaused && !this.dialogueSystem.isInDialogue && !this.inventorySystem.isOpen && !this.mapEditorSystem.isEnabled) {
-                    const locs = this.fastTravelSystem.discoveredLocations;
-                    if (locs.length === 0) {
-                        this.ui.showNotification("No locations discovered yet.", 2000);
-                    } else {
-                        this.fastTravelUI.open(
-                            locs.map((loc) => ({
-                                id: loc.id,
-                                name: loc.name,
-                                estimatedHours: this.fastTravelSystem.estimateTravelHours(this.player.camera.position, loc.id) ?? 1,
-                            })),
-                        );
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
-                    }
+                    this._openFastTravelMenu();
                 }
             } else if (kbInfo.event.key === "c" || kbInfo.event.key === "C") {
                 // Toggle crouch / stealth
                 if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
                     const crouching = this.stealthSystem.toggleCrouch();
                     this.ui.showNotification(crouching ? "Sneaking..." : "Standing", 1200);
+                    this._advanceOnboardingStep("sneak");
                 }
             } else if (kbInfo.event.key === "m" || kbInfo.event.key === "M") {
                 this.audioSystem.toggleMute();
@@ -3046,11 +3485,6 @@ export class Game {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const notesVisible = this.editorLayout.getPanelState("notes")?.isVisible ?? false;
                 this.editorLayout.setVisible("notes", !notesVisible);
-            } else if (kbInfo.event.key === "g" || kbInfo.event.key === "G") {
-                if (!this.mapEditorSystem.isEnabled) return;
-                const mode = this.mapEditorSystem.cycleGizmoMode();
-                this.ui.showNotification(`Editor gizmo: ${mode}`, 1400);
-                this._refreshEditorToolbar();
             } else if (kbInfo.event.key === "t" || kbInfo.event.key === "T") {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const ptype = this.mapEditorSystem.cyclePlacementType();
@@ -3208,11 +3642,9 @@ export class Game {
                     // F11 → Editor Hub
                     const isNowOpen = this.editorHubUI.toggle();
                     if (isNowOpen) {
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
+                      this._suspendGameplayInput();
                     } else {
-                        this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+                      this._restoreGameplayInput();
                     }
                 }
             } else if (kbInfo.event.key === "F12") {
@@ -3405,37 +3837,6 @@ export class Game {
                         }
                     }
                 }
-            } else if (kbInfo.event.key === "f" || kbInfo.event.key === "F") {
-                // F: Open/close follower panel
-                if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
-                    if (this.followerUI.isVisible) {
-                        this.followerUI.close();
-                        this.interactionSystem.isBlocked = false;
-                        this.canvas.requestPointerLock();
-                        this.player.camera.attachControl(this.canvas, true);
-                    } else {
-                        const activeFollower = this.followerSystem.getActiveFollower();
-                        const deceasedIds: string[] = [];
-                        for (const templateId of this.followerSystem.registeredTemplateIds) {
-                            if (this.followerSystem.isFollowerDeceased(templateId)) {
-                                deceasedIds.push(templateId);
-                            }
-                        }
-                        const templates = this.followerSystem.registeredTemplateIds.map(id =>
-                            this.followerSystem.getFollowerTemplate(id)
-                        ).filter((t): t is NonNullable<typeof t> => t !== undefined);
-
-                        this.followerUI.open(
-                            templates,
-                            activeFollower,
-                            deceasedIds,
-                            this._getInventoryGold()
-                        );
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
-                    }
-                }
             } else if (kbInfo.event.key === "o" || kbInfo.event.key === "O") {
                 // O: Mount/Dismount · Shift+O: Stable (unmounted) or Saddlebag (mounted)
                 if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
@@ -3538,6 +3939,12 @@ export class Game {
     this.ui.resumeButton.onPointerUpObservable.add(() => this.togglePause());
     this.ui.saveButton.onPointerUpObservable.add(() => this.saveSystem.save());
     this.ui.loadButton.onPointerUpObservable.add(() => this.saveSystem.load());
+    this.ui.exportButton.onPointerUpObservable.add(() => {
+      // Export the CURRENT state, not the last persisted one.
+      this.saveSystem.save(true);
+      this.saveSystem.exportToFile();
+    });
+    this.ui.importButton.onPointerUpObservable.add(() => this._openSaveImportPicker());
     this.ui.quitButton.onPointerUpObservable.add(() => window.location.reload());
 
     // Wire decoupled input adapter after all systems are initialized
@@ -3548,6 +3955,49 @@ export class Game {
     this.scene.onBeforeRenderObservable.add(() => {
         this.update();
     });
+  }
+
+  /** Currently pending quick-slot assign mode (HUD slot clicked, awaiting an inventory pick). */
+  private _quickSlotAssignKey: QuickSlotKey | null = null;
+
+  /**
+   * Assign-mode click: bind the clicked consumable to the pending quick-slot.
+   * @returns true when the click was consumed by assign mode.
+   */
+  private _tryAssignQuickSlotFromClick(item: Item): boolean {
+      const key = this._quickSlotAssignKey;
+      if (!key) return false;
+      if (!isConsumableItem(item)) {
+          this.ui.showNotification(`${item.name} is not a consumable — pick a potion or food.`, 2400);
+          return true;
+      }
+      this.quickSlotSystem.bindSlot(key, item.id);
+      this._quickSlotAssignKey = null;
+      this.quickSlotHUD.update(this.quickSlotSystem);
+      this.ui.showNotification(`Slot ${key} bound to ${item.name}.`, 2200);
+      this.saveSystem.markDirty();
+      return true;
+  }
+
+  /**
+   * Open a browser file picker and import the chosen save JSON
+   * (pause menu → Import Save).  Must run inside the button's user gesture.
+   */
+  private _openSaveImportPicker(): void {
+      if (typeof document === "undefined") return;
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json,application/json";
+      input.style.display = "none";
+      const cleanup = () => input.remove();
+      input.addEventListener("change", () => {
+          const file = input.files?.[0];
+          if (file) void this.saveSystem.importFromFile(file);
+          cleanup();
+      });
+      input.addEventListener("cancel", cleanup);
+      document.body.appendChild(input);
+      input.click();
   }
 
   private _wireInputAdapter(): void {
@@ -3575,6 +4025,11 @@ export class Game {
           this.audioSystem.playMeleeAttack();
           this.skillProgressionSystem.gainXP("blade", 6 * this.classSystem.xpMultiplierFor("blade"));
         }
+      }
+    });
+    adapter.onAction("dodgeRoll", () => {
+      if (!this._isCombatInputBlocked()) {
+        this.combatSystem.tryDodgeRoll();
       }
     });
     adapter.onAction("block", () => {
@@ -3643,173 +4098,150 @@ export class Game {
 
     // Movement
     adapter.onAction("toggleCrouch", () => {
-      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
+        if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
         const crouching = this.stealthSystem.toggleCrouch();
         this.ui.showNotification(crouching ? "Sneaking..." : "Standing", 1200);
+        this._advanceOnboardingStep("sneak");
       }
     });
 
-    // UI panels
+    // UI panels — every toggle closes its own menu first, and only opens when
+    // no other modal owns the screen (prevents stacked menus).
     adapter.onAction("toggleInventory", () => {
-      if (!this.isPaused && !this.dialogueSystem.isInDialogue && !this.skillTreeSystem.isOpen) {
+      if (this.inventorySystem.isOpen) {
         this.inventorySystem.toggleInventory();
-        if (this.inventorySystem.isOpen) {
-          this.interactionSystem.isBlocked = true;
-          document.exitPointerLock();
-          this.player.camera.detachControl();
-        } else {
-          this.interactionSystem.isBlocked = false;
-          this.canvas.requestPointerLock();
-          this.player.camera.attachControl(this.canvas, true);
-        }
+        this._restoreGameplayInput();
+        return;
       }
+      if (this._isCombatInputBlocked()) return;
+      this.inventorySystem.toggleInventory();
+      this._suspendGameplayInput();
     });
     adapter.onAction("toggleQuestLog", () => {
-      if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue && !this.skillTreeSystem.isOpen) {
+      if (this.questSystem.isLogOpen) {
         this.questSystem.toggleQuestLog();
-        if (this.questSystem.isLogOpen) {
-          this.interactionSystem.isBlocked = true;
-          document.exitPointerLock();
-          this.player.camera.detachControl();
-        } else {
-          this.interactionSystem.isBlocked = false;
-          this.canvas.requestPointerLock();
-          this.player.camera.attachControl(this.canvas, true);
-        }
+        this._restoreGameplayInput();
+        return;
       }
+      if (this._isCombatInputBlocked()) return;
+      this.questSystem.toggleQuestLog();
+      this._suspendGameplayInput();
     });
     adapter.onAction("toggleSkillTree", () => {
-      if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue && !this.questSystem.isLogOpen) {
+      if (this.skillTreeSystem.isOpen) {
         this.skillTreeSystem.toggle();
-        if (this.skillTreeSystem.isOpen) {
-          this.interactionSystem.isBlocked = true;
-          document.exitPointerLock();
-          this.player.camera.detachControl();
-        } else {
-          this.interactionSystem.isBlocked = false;
-          this.canvas.requestPointerLock();
-          this.player.camera.attachControl(this.canvas, true);
-        }
+        this._restoreGameplayInput();
+        return;
       }
+      if (this._isCombatInputBlocked()) return;
+      this.skillTreeSystem.toggle();
+      this._suspendGameplayInput();
     });
     adapter.onAction("toggleAttributePanel", () => {
-      if (!this.isPaused && !this.inventorySystem.isOpen && !this.dialogueSystem.isInDialogue) {
-        const open = !this.ui.isAttributePanelOpen;
-        this.ui.toggleAttributePanel(open);
-        if (open) {
-          this.ui.refreshAttributePanel(this.attributeSystem);
-          this.interactionSystem.isBlocked = true;
-          document.exitPointerLock();
-          this.player.camera.detachControl();
-        } else {
-          this.interactionSystem.isBlocked = false;
-          this.canvas.requestPointerLock();
-          this.player.camera.attachControl(this.canvas, true);
-        }
+      if (this.ui.isAttributePanelOpen) {
+        this.ui.toggleAttributePanel(false);
+        this._restoreGameplayInput();
+        return;
       }
+      if (this._isCombatInputBlocked()) return;
+      this.ui.toggleAttributePanel(true);
+      this.ui.refreshAttributePanel(this.attributeSystem);
+      this._suspendGameplayInput();
     });
     adapter.onAction("toggleAlchemy", () => {
-      if (this.mapEditorSystem.isEnabled) return;
-      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
-        const open = !this.alchemyUI.isVisible;
-        this.alchemyUI.toggle(open);
-        if (open) {
-          this.interactionSystem.isBlocked = true;
-          document.exitPointerLock();
-          this.player.camera.detachControl();
-        } else {
-          this.interactionSystem.isBlocked = false;
-          this.canvas.requestPointerLock();
-          this.player.camera.attachControl(this.canvas, true);
-        }
+      if (this.alchemyUI.isVisible) {
+        this.alchemyUI.toggle(false);
+        this._restoreGameplayInput();
+        return;
       }
+      if (this._isCombatInputBlocked()) return;
+      this.alchemyUI.toggle(true);
+      this._suspendGameplayInput();
     });
     adapter.onAction("toggleEnchanting", () => {
-      if (this.mapEditorSystem.isEnabled) return;
-      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
-        const open = !this.enchantingUI.isVisible;
-        this.enchantingUI.toggle(open);
-        if (open) {
-          this.interactionSystem.isBlocked = true;
-          document.exitPointerLock();
-          this.player.camera.detachControl();
-        } else {
-          this.interactionSystem.isBlocked = false;
-          this.canvas.requestPointerLock();
-          this.player.camera.attachControl(this.canvas, true);
-        }
+      if (this.enchantingUI.isVisible) {
+        this.enchantingUI.toggle(false);
+        this._restoreGameplayInput();
+        return;
       }
+      if (this._isCombatInputBlocked()) return;
+      this.enchantingUI.toggle(true);
+      this._suspendGameplayInput();
     });
     adapter.onAction("toggleSpellMaking", () => {
-      if (this.mapEditorSystem.isEnabled) return;
-      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
-        if (this.spellMakingUI.isVisible) {
-          this.spellMakingUI.close();
-        } else {
-          this.spellMakingUI.open();
-          this.interactionSystem.isBlocked = true;
-          document.exitPointerLock();
-          this.player.camera.detachControl();
-        }
+      if (this.spellMakingUI.isVisible) {
+        this.spellMakingUI.close();
+        return;
       }
+      if (this._isCombatInputBlocked()) return;
+      this.spellMakingUI.open();
+      this._suspendGameplayInput();
     });
     adapter.onAction("toggleFastTravel", () => {
       if (this.fastTravelUI.isVisible) {
         this.fastTravelUI.close();
         return;
       }
-      if (!this.isPaused && !this.dialogueSystem.isInDialogue && !this.inventorySystem.isOpen && !this.mapEditorSystem.isEnabled) {
-        const locs = this.fastTravelSystem.discoveredLocations;
-        if (locs.length === 0) {
-          this.ui.showNotification("No locations discovered yet.", 2000);
-        } else {
-          this.fastTravelUI.open(
-            locs.map((loc) => ({
-              id: loc.id,
-              name: loc.name,
-              estimatedHours: this.fastTravelSystem.estimateTravelHours(this.player.camera.position, loc.id) ?? 1,
-            })),
-          );
-          this.interactionSystem.isBlocked = true;
-          document.exitPointerLock();
-          this.player.camera.detachControl();
-        }
-      }
+      if (this._isCombatInputBlocked()) return;
+      this._openFastTravelMenu();
+    });
+    adapter.onAction("markPosition", () => {
+      if (this._isCombatInputBlocked()) return;
+      const p = this.player.camera.position;
+      this.markRecallSystem.mark({ x: p.x, y: p.y, z: p.z });
+      this.saveSystem.markDirty();
     });
     adapter.onAction("togglePetPanel", () => {
-      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
-        if (this.petUI.isVisible) {
-          this.petUI.close();
-          this.interactionSystem.isBlocked = false;
-          this.canvas.requestPointerLock();
-          this.player.camera.attachControl(this.canvas, true);
-        } else {
-          if (!this.petSystem.hasPet) {
-            this.ui.showNotification("You have no companions yet.", 2000);
-          } else {
-            this.petUI.open(this.petSystem.pets, this.petSystem.activePet?.id ?? null);
-            this.interactionSystem.isBlocked = true;
-            document.exitPointerLock();
-            this.player.camera.detachControl();
-          }
+      if (this.petUI.isVisible) {
+        this.petUI.close();
+        this._restoreGameplayInput();
+        return;
+      }
+      if (this._isCombatInputBlocked()) return;
+      if (!this.petSystem.hasPet) {
+        this.ui.showNotification("You have no companions yet.", 2000);
+        return;
+      }
+      this.petUI.open(this.petSystem.pets, this.petSystem.activePet?.id ?? null);
+      this._suspendGameplayInput();
+    });
+    adapter.onAction("toggleFollowerPanel", () => {
+      // In map-editor mode G cycles the gizmo (the adapter consumes the key
+      // before the legacy editor branch can see it).
+      if (this.mapEditorSystem.isEnabled) {
+        const mode = this.mapEditorSystem.cycleGizmoMode();
+        this.ui.showNotification(`Editor gizmo: ${mode}`, 1400);
+        this._refreshEditorToolbar();
+        return;
+      }
+      if (this.followerUI.isVisible) {
+        this.followerUI.close();
+        this._restoreGameplayInput();
+        return;
+      }
+      if (this._isCombatInputBlocked()) return;
+      const activeFollower = this.followerSystem.getActiveFollower();
+      const deceasedIds: string[] = [];
+      for (const templateId of this.followerSystem.registeredTemplateIds) {
+        if (this.followerSystem.isFollowerDeceased(templateId)) {
+          deceasedIds.push(templateId);
         }
       }
+      const templates = this.followerSystem.registeredTemplateIds.map(id =>
+        this.followerSystem.getFollowerTemplate(id)
+      ).filter((t): t is NonNullable<typeof t> => t !== undefined);
+      this.followerUI.open(templates, activeFollower, deceasedIds, this._getInventoryGold());
+      this._suspendGameplayInput();
     });
     adapter.onAction("toggleWaitDialog", () => {
-      if (this.mapEditorSystem.isEnabled) return;
-      if (!this.isPaused && !this.dialogueSystem.isInDialogue && !this.inventorySystem.isOpen) {
-        const open = !this.ui.isWaitDialogOpen;
-        this.ui.toggleWaitDialog(open);
-        if (open) {
-          this.interactionSystem.isBlocked = true;
-          document.exitPointerLock();
-          this.player.camera.detachControl();
-        } else {
-          this.interactionSystem.isBlocked = false;
-          this.canvas.requestPointerLock();
-          this.player.camera.attachControl(this.canvas, true);
-        }
+      if (this.ui.isWaitDialogOpen) {
+        this.ui.toggleWaitDialog(false);
+        this._restoreGameplayInput();
+        return;
       }
+      if (this._isCombatInputBlocked()) return;
+      this.ui.toggleWaitDialog(true);
+      this._suspendGameplayInput();
     });
     adapter.onAction("mountDismount", () => {
       if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
@@ -3908,6 +4340,8 @@ export class Game {
 
     // System
     adapter.onAction("pause", () => {
+      // Character creation owns the screen — Escape must not unpause beneath it.
+      if (this._inCharacterCreation) return;
       if (this.dialogueSystem.isInDialogue) return;
       if (this.levelUpUI.isVisible) return;
       if (this.guardEncounterUI.isVisible) { this._resolveGuardEncounter("resist_arrest"); return; }
@@ -3928,20 +4362,24 @@ export class Game {
         this._refreshHelpOverlayIfVisible();
         return;
       }
-      if (this.characterSheetUI.isVisible) { this.characterSheetUI.hide(); this.ui.setCharacterSheetOpen(false); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.inventorySystem.isOpen) { this.inventorySystem.toggleInventory(); return; }
-      if (this.questSystem.isLogOpen) { this.questSystem.toggleQuestLog(); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.skillTreeSystem.isOpen) { this.skillTreeSystem.toggle(); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.ui.isAttributePanelOpen) { this.ui.toggleAttributePanel(false); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.alchemyUI.isVisible) { this.alchemyUI.toggle(false); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.enchantingUI.isVisible) { this.enchantingUI.toggle(false); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.characterSheetUI.isVisible) { this.characterSheetUI.hide(); this.ui.setCharacterSheetOpen(false); this._restoreGameplayInput(); return; }
+      // Closing the inventory must clear isBlocked like the I-key path does.
+      if (this.inventorySystem.isOpen) { this.inventorySystem.toggleInventory(); this._restoreGameplayInput(); return; }
+      if (this.questSystem.isLogOpen) { this.questSystem.toggleQuestLog(); this._restoreGameplayInput(); return; }
+      if (this.skillTreeSystem.isOpen) { this.skillTreeSystem.toggle(); this._restoreGameplayInput(); return; }
+      if (this.ui.isAttributePanelOpen) { this.ui.toggleAttributePanel(false); this._restoreGameplayInput(); return; }
+      if (this.alchemyUI.isVisible) { this.alchemyUI.toggle(false); this._restoreGameplayInput(); return; }
+      if (this.enchantingUI.isVisible) { this.enchantingUI.toggle(false); this._restoreGameplayInput(); return; }
       if (this.spellMakingUI.isVisible) { this.spellMakingUI.close(); return; }
       if (this._barterUI.isVisible) { this._barterUI.onClose?.(); return; }
+      if (this._containerUI.isVisible) { this._containerUI.onClose?.(); return; }
       if (this.fastTravelUI.isVisible) { this.fastTravelUI.close(); return; }
-      if (this.petUI.isVisible) { this.petUI.close(); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.followerUI.isVisible) { this.followerUI.close(); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.petUI.isVisible) { this.petUI.close(); this._restoreGameplayInput(); return; }
+      if (this.followerUI.isVisible) { this.followerUI.close(); this._restoreGameplayInput(); return; }
+      if (this.pickpocketUI.isVisible) { this._pickpocketTargetId = null; this.pickpocketUI.hide(); this._restoreGameplayInput(); return; }
       if (this.stableUI.isVisible) { this.stableUI.close(); return; }
       if (this.saddlebagUI.isVisible) { this.saddlebagUI.close(); return; }
+      if (this.graphicsSettingsUI.isVisible) { this.graphicsSettingsUI.hide(); this.graphicsSettingsUI.onClose?.(); return; }
       if (this.questCreatorUI.isVisible) { this.questCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
       if (this.dialogueCreatorUI.isVisible) { this.dialogueCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
       if (this.npcCreatorUI.isVisible) { this.npcCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
@@ -3953,8 +4391,8 @@ export class Game {
       if (this.assetBrowserUI.isVisible) { this.assetBrowserUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
       if (this.bundleMergeUI.isVisible) { this.bundleMergeUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
       if (this.modManifestUI.isVisible) { this.modManifestUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.editorHubUI.isVisible) { this.editorHubUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.ui.isWaitDialogOpen) { this.ui.toggleWaitDialog(false); this.interactionSystem.isBlocked = false; this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      if (this.editorHubUI.isVisible) { this.editorHubUI.close(); this._restoreGameplayInput(); return; }
+      if (this.ui.isWaitDialogOpen) { this.ui.toggleWaitDialog(false); this._restoreGameplayInput(); return; }
       this.togglePause();
     });
     adapter.onAction("save", () => { if (!this.isPaused) this.saveSystem.save(); });
@@ -4085,6 +4523,15 @@ export class Game {
           this._gameplayLoop.reset();
           if (this.mapEditorSystem.isEnabled) {
               this.mapEditorSystem.toggle();
+              this.mapEditorToolbar.hide();
+              this.editorLayout.setVisible("hierarchy", false);
+              this.editorLayout.setVisible("palette", false);
+              this.editorLayout.setVisible("validation", false);
+              this.editorLayout.setVisible("layers", false);
+              this.editorLayout.setVisible("notes", false);
+              this.editorLayout.setVisible("properties", false);
+              this.editorLayout.clearSelection();
+              this._refreshHelpOverlayIfVisible();
           }
           // Close any open overlays
           if (this.inventorySystem.isOpen) {
@@ -4109,11 +4556,13 @@ export class Game {
           if (this.fastTravelUI.isVisible) { this.fastTravelUI.close(); }
           if (this.petUI.isVisible) { this.petUI.close(); }
           if (this.followerUI.isVisible) { this.followerUI.close(); }
+          if (this.pickpocketUI.isVisible) { this._pickpocketTargetId = null; this.pickpocketUI.hide(); }
           if (this.stableUI.isVisible) { this.stableUI.close(); }
           if (this.saddlebagUI.isVisible) { this.saddlebagUI.close(); }
           if (this.ui.isAttributePanelOpen) { this.ui.toggleAttributePanel(false); }
           if (this.ui.isWaitDialogOpen) { this.ui.toggleWaitDialog(false); }
           if (this._barterUI.isVisible) { this._barterUI.onClose?.(); }
+          if (this._containerUI.isVisible) { this._containerUI.onClose?.(); }
           this.interactionSystem.isBlocked = true;
           this.ui.setInteractionText("");
           document.exitPointerLock();
@@ -4126,6 +4575,7 @@ export class Game {
   }
 
   private async _runCharacterCreation(): Promise<void> {
+    this._inCharacterCreation = true;
     this.isPaused = true;
     this.interactionSystem.isBlocked = true;
     this.ui.toggleCrosshair(false);
@@ -4175,6 +4625,7 @@ export class Game {
 
     persistSkipOnboardingTips(selection.skipGameplayTips);
     this._startOnboardingTutorialIfNeeded();
+    this._inCharacterCreation = false;
 
     this.ui.showNotification(`Welcome, ${this.player.name}! Character creation complete.`, 2800);
     this.interactionSystem.isBlocked = false;
@@ -4268,19 +4719,34 @@ export class Game {
   /** @returns true if Space was consumed to advance onboarding */
   private _tryAdvanceOnboardingTutorial(): boolean {
     if (!this._onboardingTutorial.isActive) return false;
+    // Space must never skip a tip while any blocking overlay owns the screen.
+    // `_isCombatInputBlocked()` covers pause, dialogue, editor, inventory, quest
+    // log, skill tree, level-up, guard encounter, spellmaking, barter, container,
+    // fast travel, stable, saddlebag, pet, pickpocket, character sheet, graphics
+    // settings, and any overlay that sets `interactionSystem.isBlocked`.
+    if (this._isCombatInputBlocked()) return false;
     if (
-      this.isPaused ||
-      this.dialogueSystem.isInDialogue ||
-      this.inventorySystem.isOpen ||
-      this.questSystem.isLogOpen ||
-      this.mapEditorSystem.isEnabled ||
-      this.characterSheetUI.isVisible ||
-      this.graphicsSettingsUI.isVisible
+      this.ui.isAttributePanelOpen ||
+      this.ui.isWaitDialogOpen ||
+      this.alchemyUI.isVisible ||
+      this.enchantingUI.isVisible ||
+      this.spellMakingUI.isVisible ||
+      this.editorHubUI.isVisible
     ) {
       return false;
     }
     this._onboardingTutorial.advance();
     return true;
+  }
+
+  /**
+   * Auto-advance the onboarding tutorial when the player performs the action
+   * the active step teaches (e.g. crouching during the sneak step).
+   */
+  private _advanceOnboardingStep(stepId: string): void {
+    if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === stepId) {
+      this._onboardingTutorial.advance();
+    }
   }
 
   private _startOnboardingTutorialIfNeeded(): void {
@@ -4304,6 +4770,11 @@ export class Game {
       advanceHint: "Use E on something, or press Space to continue.",
     });
     this._onboardingTutorial.addStep({
+      id: "sneak",
+      message: "Press C to crouch and sneak. Stay undetected and press E behind an NPC to pickpocket.",
+      advanceHint: "Try crouching with C, or press Space to continue.",
+    });
+    this._onboardingTutorial.addStep({
       id: "quests",
       message: "Press J to open the quest log and track objectives.",
       advanceHint: "Open the log with J, or press Space to finish tips.",
@@ -4324,10 +4795,9 @@ export class Game {
     btn.setAttribute("aria-label", "Open graphics settings");
     btn.textContent = "⚙";
     btn.addEventListener("click", () => {
-      this.graphicsSettingsUI.show(this.graphics.tier);
-      this.interactionSystem.isBlocked = true;
-      document.exitPointerLock?.();
-      this.player.camera.detachControl();
+      if (this._inCharacterCreation || this.graphicsSettingsUI.isVisible || this._isCombatInputBlocked()) return;
+      this.graphicsSettingsUI.show(this.graphics.tier, this._difficulty);
+      this._suspendGameplayInput();
     });
     document.body.appendChild(btn);
   }
@@ -4351,7 +4821,9 @@ export class Game {
     sun.diffuse   = new Color3(1.0, 0.92, 0.72);
     sun.specular  = new Color3(0.55, 0.48, 0.30);
     // Position the light far away so the shadow frustum covers the visible world.
+    // update() keeps it offset from the player so the frustum stays centred.
     sun.position  = new Vector3(80, 120, 50);
+    this._sunLight = sun;
 
     // Shadows are driven by the active graphics quality tier.
     if (this.graphics.performance.shadowsEnabled) {
@@ -4359,6 +4831,11 @@ export class Game {
       shadows.useBlurExponentialShadowMap = this.graphics.performance.softShadows;
       shadows.blurKernel = this.graphics.shadow.blurKernel;
       shadows.bias = 0.0005;
+      // Halve the shadow-map render rate — a one-frame-old shadow is
+      // imperceptible and the caster pass is a large share of frame time.
+      if (shadows.getShadowMap()) {
+        shadows.getShadowMap()!.refreshRate = 2;
+      }
       this.shadowGenerator = shadows;
     } else {
       this.shadowGenerator = null;
@@ -4439,7 +4916,7 @@ export class Game {
       pipeline.imageProcessing.vignetteEnabled = true;
       pipeline.imageProcessing.vignetteWeight  = pp.vignetteWeight;
       pipeline.imageProcessing.vignetteBlendMode = ImageProcessingConfiguration.VIGNETTEMODE_MULTIPLY;
-      pipeline.imageProcessing.colorCurvesEnabled = true;
+      pipeline.imageProcessing.colorCurvesEnabled = false;
 
       this.renderingPipeline = pipeline;
     }
@@ -4507,11 +4984,210 @@ export class Game {
       return entityName.split("_")[0];
   }
 
+  /**
+   * True when the victim is a non-hostile settlement NPC (villager, merchant,
+   * guard…) whose death counts as murder. Structure guards (Ruin/Tower),
+   * dragon bosses, and anything already aggressive are excluded.
+   */
+  private _isSettlementNpc(npc: NPC): boolean {
+      // Natural hostiles are never "settlement" victims, whatever their state.
+      if (npc.factionId === "bandits") return false;
+      if (/^(RuinGuard|TowerGuard|DragonBoss)/.test(npc.mesh.name)) return false;
+      // Actively fighting NPCs are combat kills; suspicion (ALERT after
+      // spotting a sneaking player) does NOT make a civilian kill lawful.
+      if (
+          npc.aiState === AIState.CHASE ||
+          npc.aiState === AIState.ATTACK ||
+          npc.aiState === AIState.FLEE
+      ) return false;
+      return true;
+  }
+
+  /**
+   * Spawn an archetype NPC and register it as chunk-scoped world content:
+   * schedule/combat/stealth/crime systems (shared NPC list), level scaling,
+   * LOD culling, and disposal with its chunk via `chunkRecord`.
+   */
+  private _spawnArchetypeNpc(
+      archetypeId: string,
+      chunkRecord: { npcs: NPC[] },
+      x: number,
+      z: number,
+  ): boolean {
+      const npc = this.npcArchetypeSystem.spawnNpc(archetypeId, this.scene, new Vector3(x, 2, z));
+      if (!npc) return false;
+      this.scheduleSystem.addNPC(npc);
+      this.levelScalingSystem?.scaleNPC(npc, this.player.level);
+      this._registerPickpocketInventory(npc);
+      this.lodSystem.register(npc.mesh, 120);
+      chunkRecord.npcs.push(npc);
+      return true;
+  }
+
+  /** Map the equipped main-hand item to a combat weapon archetype (default: sword). */
+  private _syncWeaponArchetype(): void {
+      const weapon = this.equipmentSystem.getEquipped().get("mainHand");
+      this.combatSystem.setWeaponArchetype(this._weaponArchetypeForItem(weapon));
+  }
+
+  private _weaponArchetypeForItem(item: Item | undefined): WeaponArchetype {
+      if (!item) return "sword";
+      const hay = `${item.id} ${item.name}`.toLowerCase();
+      if (hay.includes("bow")) return "bow";
+      if (hay.includes("staff")) return "staff";
+      if (hay.includes("dagger")) return "dagger";
+      if (hay.includes("greatsword") || hay.includes("great_") || hay.includes("two-handed") || hay.includes("two_handed")) return "greatsword";
+      if (hay.includes("mace") || hay.includes("hammer")) return "mace";
+      if (hay.includes("axe")) return "axe";
+      return "sword";
+  }
+
   private _toFrameworkInventoryItemId(itemId: string): string | null {
       if (itemId === "potion_hp_01") return "health_potion";
       if (itemId === "sword_01") return "iron_sword";
       if (itemId === "guard_token") return "guard_token";
       return null;
+  }
+
+  /**
+   * Open an editor tool: suspends gameplay input, then dispatches to the
+   * matching creator UI. Shared by the Editor Hub and Asset Browser Insert.
+   */
+  private _openEditorTool(tool: EditorToolId): void {
+      this.interactionSystem.isBlocked = true;
+      document.exitPointerLock();
+      this.player.camera.detachControl();
+      switch (tool) {
+        case "map":
+          if (!this.mapEditorSystem.isEnabled) {
+            this.mapEditorSystem.toggle();
+            this.mapEditorToolbar.show();
+            this.editorLayout.setVisible("hierarchy", true);
+            this.editorLayout.setVisible("palette", true);
+            this.editorLayout.setVisible("layers", true);
+            this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+            this._refreshEditorToolbar();
+            this.ui.showNotification("Map Editor enabled (F2 to exit)", 2500);
+          }
+          break;
+        case "quest":
+          this.questCreatorUI.open();
+          break;
+        case "dialogue":
+          this.dialogueCreatorUI.open();
+          break;
+        case "npc":
+          this.npcCreatorUI.open();
+          break;
+        case "item":
+          this.itemCreatorUI.open();
+          break;
+        case "faction":
+          this.factionCreatorUI.open();
+          break;
+        case "lootTable":
+          this.lootTableCreatorUI.open();
+          break;
+        case "spawn":
+          this.spawnCreatorUI.open();
+          break;
+        case "bundle":
+          this.contentBundleUI.open();
+          break;
+        case "assets":
+          this.assetBrowserUI.open();
+          break;
+        case "merge":
+          this.bundleMergeUI.open();
+          break;
+        case "modManifest":
+          this.modManifestUI.open();
+          break;
+      }
+  }
+
+  /**
+   * Register shipped base content so the Asset Browser opens populated
+   * instead of empty (bundle imports add to the same registry).
+   */
+  private _seedAssetBrowser(): void {
+      const bundle = frameworkBaseContent;
+      for (const d of bundle.dialogues) {
+          this.assetBrowserSystem.register({
+              id: d.id,
+              name: `Dialogue: ${d.id}`,
+              type: "dialogue",
+              tags: ["dialogue"],
+              description: `${d.nodes.length} dialogue nodes.`,
+              dependencies: [],
+          });
+      }
+      for (const q of bundle.quests) {
+          this.assetBrowserSystem.register({
+              id: q.id,
+              name: q.name,
+              type: "quest",
+              tags: ["quest"],
+              description: q.description ?? "",
+              dependencies: [],
+          });
+      }
+      for (const i of bundle.items) {
+          this.assetBrowserSystem.register({
+              id: i.id,
+              name: i.name,
+              type: "item",
+              tags: ["item", ...(i.tags ?? [])],
+              description: i.description,
+              dependencies: [],
+          });
+      }
+      for (const f of bundle.factions) {
+          this.assetBrowserSystem.register({
+              id: f.id,
+              name: f.name,
+              type: "faction",
+              tags: ["faction"],
+              description: f.description ?? "",
+              dependencies: [],
+          });
+      }
+      for (const n of bundle.npcArchetypes) {
+          this.assetBrowserSystem.register({
+              id: n.id,
+              name: n.name,
+              type: "npc",
+              tags: ["npc", n.role],
+              description: n.description ?? "",
+              dependencies: [],
+          });
+      }
+      this.editorHubUI.setBadge("assets", this.assetBrowserSystem.size);
+  }
+
+  /**
+   * Fail quests that needed the killed NPC alive: framework quests with an
+   * incomplete "talk" node targeting them, and legacy quests with a matching
+   * incomplete talk objective. (E.g. killing the Guard fails "Parley with
+   * the Guard" and "The Guard's Plea" while "Eliminate the Guard" completes.)
+   */
+  private _failQuestsForDeadTarget(npcName: string, frameworkTargetId: string): void {
+      for (const questId of this.frameworkRuntime.questEngine.getActiveQuestIds()) {
+          const definition = this.frameworkRuntime.questEngine.getQuestDefinition(questId);
+          const state = this.frameworkRuntime.questEngine.getQuestState(questId);
+          if (!definition || !state) continue;
+          const neededAlive = definition.nodes.some(n =>
+              n.triggerType === "talk" && n.targetId === frameworkTargetId &&
+              !state.nodes[n.id]?.completed);
+          if (neededAlive && this.frameworkRuntime.questEngine.failQuest(questId)) {
+              this.ui.showNotification(`Quest failed: ${definition.name} — ${npcName} is dead.`, 4000);
+          }
+      }
+      for (const quest of this.questSystem.getActiveQuests()) {
+          const neededAlive = quest.objectives.some(o =>
+              !o.completed && o.type === "talk" && o.targetId === npcName);
+          if (neededAlive) this.questSystem.failQuest(quest.id);
+      }
   }
 
   private _applyFrameworkQuestEvent(
@@ -4526,6 +5202,29 @@ export class Game {
           if (update.xpReward > 0) {
               this.player.addExperience(update.xpReward);
               this.ui.showNotification(`+${update.xpReward} XP`, 2000);
+          }
+          // Quest rewards: gold and items declared on the quest definition.
+          const definition = this.frameworkRuntime.questEngine.getQuestDefinition(update.questId);
+          const gold = Math.max(0, Math.floor(definition?.rewardGold ?? 0));
+          if (gold > 0) {
+              this.inventorySystem.addItem({
+                  id: GOLD_ITEM_ID,
+                  name: "Gold Coins",
+                  description: "Currency for trade and fines.",
+                  stackable: true,
+                  quantity: gold,
+                  weight: 0.1,
+                  stats: { value: 1 },
+              });
+              this._syncInventoryGoldToFramework();
+              this.ui.showNotification(`Quest reward: +${gold} gold`, 2400);
+          }
+          for (const reward of definition?.rewardItems ?? []) {
+              const quantity = Math.max(1, Math.floor(reward.quantity ?? 1));
+              this._grantFrameworkItem(reward.itemId, quantity);
+          }
+          if (gold > 0 || (definition?.rewardItems?.length ?? 0) > 0) {
+              this.saveSystem.markDirty();
           }
       }
   }
@@ -4545,6 +5244,16 @@ export class Game {
       for (const npc of this.scheduleSystem.npcs) {
         const hitReact = npc.justTakenDamageVisual;
         if (hitReact) npc.justTakenDamageVisual = false;
+        // Animation LOD: beyond 100u a capsule is a few pixels and its loop
+        // re-syncs from aiState on the next near update — skip the work.
+        // Dead NPCs always route so death animations play.
+        if (
+          !npc.isDead &&
+          !hitReact &&
+          Vector3.DistanceSquared(npc.mesh.position, this.player.camera.position) > NPC_ANIMATION_FAR_DISTANCE_SQ
+        ) {
+          continue;
+        }
         this.animationSystem.updateNPCAnimation(
           npc.mesh, npc.aiState, npc.isAttackTelegraphing,
           npc.isStaggered, npc.isDead, hitReact,
@@ -4557,11 +5266,44 @@ export class Game {
       const weatherScale = this.weatherSystem?.state === "clear" ? 1.0 : (this.weatherSystem?.fogDensity ? 0.7 : 1.0);
       const compositeLight = this.timeSystem.ambientIntensity * weatherScale;
       this.stealthSystem.shadowFactor = compositeLight;
-      this.stealthSystem.update(deltaTime, compositeLight);
-      if (this.stealthSystem.isCrouching) {
-        this.skillProgressionSystem.gainXP(
-          "sneak", deltaTime * SNEAK_XP_PER_SECOND * this.classSystem.xpMultiplierFor("sneak"),
+      // Detection (and its occlusion raycasts) pauses while any modal UI is
+      // open — the player can't act, so detection shouldn't build or expire.
+      if (!this._isCombatInputBlocked()) {
+        this.stealthSystem.update(deltaTime, compositeLight);
+        if (this.stealthSystem.isCrouching) {
+          this.skillProgressionSystem.gainXP(
+            "sneak", deltaTime * SNEAK_XP_PER_SECOND * this.classSystem.xpMultiplierFor("sneak"),
+          );
+        }
+      }
+
+      // ── Survival needs ────────────────────────────────────────────────────
+      // Cold drains in the tundra and in bad weather; elsewhere it recovers.
+      {
+        const p = this.player.camera.position;
+        const biome = this.world.getBiome(
+          Math.floor(p.x / this.world.chunkSize),
+          Math.floor(p.z / this.world.chunkSize),
         );
+        const weather = this.weatherSystem?.state ?? "clear";
+        const isCold = biome === "tundra" || weather === "rain" || weather === "storm";
+        this.survivalSystem.update(deltaTime, isCold);
+        this.skillProgressionSystem.globalXpMultiplier = this.survivalSystem.xpMultiplier;
+
+        // Apply derived penalties to the player.
+        const staminaRegenPenalty = this.survivalSystem.staminaRegenPenalty;
+        if (staminaRegenPenalty < 0) {
+          this.player.stamina = Math.max(0, this.player.stamina + staminaRegenPenalty * deltaTime);
+        }
+        const maxStamina = this.player.maxStamina + this.survivalSystem.maxStaminaPenalty;
+        if (this.player.stamina > maxStamina) this.player.stamina = maxStamina;
+        const maxMagicka = this.player.maxMagicka + this.survivalSystem.maxMagickaPenalty;
+        if (this.player.magicka > maxMagicka) this.player.magicka = maxMagicka;
+        const frost = this.survivalSystem.frostDamagePerSecond;
+        if (frost > 0) {
+          this.player.health = Math.max(0, this.player.health - frost * deltaTime);
+          this.player.notifyDamageTaken();
+        }
       }
 
       this.projectileSystem.update(deltaTime);
@@ -4569,7 +5311,7 @@ export class Game {
 
       this._lastLodCulled = this.lodSystem.update(this.player.camera.position);
       this.navigationSystem.update(deltaTime);
-      this.saveSystem.markDirty();
+      // Autosave only fires when real state changes mark the save dirty — no per-tick markDirty.
       this.saveSystem.tickAutosave(deltaTime);
       const cx = Math.floor(this.player.camera.position.x / this.world.chunkSize);
       const cz = Math.floor(this.player.camera.position.z / this.world.chunkSize);
@@ -4583,7 +5325,10 @@ export class Game {
       this._systemTickCounter++;
       const tick = this._systemTickCounter;
 
-      // weatherSystem: 10 Hz (every 6th frame at 60fps)
+      // weatherSystem: 10 Hz (every 6th frame at 60fps).  The clock is blended
+      // into its light application so day/night darken the scene (sun dies at
+      // night, ambient keeps a readable floor, fog follows).
+      this.weatherSystem.daylightScale = this.timeSystem.ambientIntensity;
       if (tick % 6 === 0) this.weatherSystem.update(deltaTime);
 
       // activeEffectsSystem: 30 Hz (every 2nd frame)
@@ -4624,6 +5369,14 @@ export class Game {
         }
       }
 
+      // Keep the shadow frustum centred on the player — only the light position
+      // moves (uniform update); direction, colour, and intensity are constant.
+      this._sunLight?.position.set(
+          this.player.camera.position.x + 80,
+          this.player.camera.position.y + 120,
+          this.player.camera.position.z + 50,
+      );
+
       this._gameplayLoop.tick(frameDelta, (deltaTime) => {
           this._updateGameplayStep(deltaTime);
       });
@@ -4636,14 +5389,39 @@ export class Game {
            if (this.player.health <= 0 && !this._playerAtZeroHP) {
                this._playerAtZeroHP = true;
                this.ui.showHitFlash("rgba(180, 0, 0, 0.55)");
-               this.ui.showNotification("You have been defeated. You will recover soon.", 4000);
-               // Schedule respawn — restore 50% health after 3 seconds
+               this.ui.showNotification("You have fallen...", 4000);
+               // Death has consequences: after 4 seconds you wake at the
+               // nearest discovered location, lighter by 10% of your gold.
                setTimeout(() => {
-                 if (this.player.health <= 0) {
-                   this.player.health = Math.round(this.player.maxHealth * 0.5);
-                   this._playerAtZeroHP = false;
-                   this.ui.showNotification("You feel the will to continue...", 2500);
+                 if (this.player.health > 0) return;
+                 this.player.health = Math.round(this.player.maxHealth * 0.5);
+                 this._playerAtZeroHP = false;
+
+                 const pos = this.player.camera.position;
+                 let nearest: { name: string; position: { x: number; y: number; z: number } } | null = null;
+                 let nearestDistSq = Number.POSITIVE_INFINITY;
+                 for (const loc of this.fastTravelSystem.discoveredLocations) {
+                   const dx = loc.position.x - pos.x;
+                   const dy = loc.position.y - pos.y;
+                   const dz = loc.position.z - pos.z;
+                   const dSq = dx * dx + dy * dy + dz * dz;
+                   if (dSq < nearestDistSq) {
+                     nearestDistSq = dSq;
+                     nearest = loc;
+                   }
                  }
+                 if (nearest) {
+                   pos.set(nearest.position.x, nearest.position.y, nearest.position.z);
+                 }
+                 const lost = Math.floor(this._getInventoryGold() * 0.1);
+                 if (lost > 0) this._consumeInventoryGold(lost);
+                 this.ui.showNotification(
+                   nearest
+                     ? `You awaken at ${nearest.name}.${lost > 0 ? ` (${lost} gold lost)` : ""}`
+                     : "You feel the will to continue...",
+                   4000,
+                 );
+                 this.saveSystem.markDirty();
                }, 4000);
            } else if (this.player.health > 0 && this._playerAtZeroHP) {
               this._playerAtZeroHP = false;
@@ -4693,8 +5471,13 @@ export class Game {
         }
       }
 
-      // Update clock display every frame (cheap text update)
-      this.ui.updateClock(this.timeSystem.timeString);
+      // Update clock display only when the displayed in-game minute changes —
+      // the timeString getter allocates, so don't build it every frame.
+      const clockMinutes = Math.floor(this.timeSystem.gameTime);
+      if (clockMinutes !== this._lastClockMinutes) {
+          this._lastClockMinutes = clockMinutes;
+          this.ui.updateClock(this.timeSystem.timeString);
+      }
 
       // Update compass heading from camera yaw
       this.ui.updateCompass(this.player.camera.rotation.y);
@@ -4705,6 +5488,34 @@ export class Game {
       } else {
           this.ui.updateStealthHUD(null);
       }
+
+      // Combat-state readout: combo chain, finisher, and riposte window.
+      {
+          const combat = this.combatSystem;
+          let combatLabel: string | null = null;
+          if (combat.isDodging) combatLabel = "Dodging!";
+          else if (combat.finisherReady && combat.activeWeaponArchetype !== "bow") combatLabel = "⚔ FINISHER READY";
+          else if (combat.riposteReady) combatLabel = "Riposte ready!";
+          else if (combat.comboStack > 1) combatLabel = `Combo ×${combat.comboStack}`;
+          this.ui.updateCombatState(combatLabel);
+      }
+
+      // Hide the crosshair while any HTML modal overlay owns the screen
+      // (barter, level-up, guard challenge, travel, stable, settings, …).
+      this.ui.setHtmlOverlayActive(
+          this._barterUI.isVisible ||
+          this._containerUI.isVisible ||
+          this.levelUpUI.isVisible ||
+          this.guardEncounterUI.isVisible ||
+          this.spellMakingUI.isVisible ||
+          this.fastTravelUI.isVisible ||
+          this.stableUI.isVisible ||
+          this.saddlebagUI.isVisible ||
+          this.petUI.isVisible ||
+          this.followerUI.isVisible ||
+          this.pickpocketUI.isVisible ||
+          this.graphicsSettingsUI.isVisible
+      );
 
       // Update active effects HUD (30 Hz, same as activeEffectsSystem)
       if (this._systemTickCounter % 2 === 0) {
@@ -4791,7 +5602,38 @@ export class Game {
       }
   }
 
+  /**
+   * Build the fast-travel option list (with a Recall row when a mark exists)
+   * and open the destination picker.
+   */
+  private _openFastTravelMenu(): void {
+      const locs = this.fastTravelSystem.discoveredLocations;
+      const options: FastTravelOptionView[] = locs.map((loc) => ({
+          id: loc.id,
+          name: loc.name,
+          estimatedHours: this.fastTravelSystem.estimateTravelHours(this.player.camera.position, loc.id) ?? 1,
+      }));
+      if (this.markRecallSystem.hasMarked) {
+          options.push({
+              id: MARK_RECALL_TRAVEL_ID,
+              name: "✦ Recall to Mark",
+              estimatedHours: 0,
+              detail: "instant",
+          });
+      }
+      if (options.length === 0) {
+          this.ui.showNotification("No locations discovered yet.", 2000);
+          return;
+      }
+      this.fastTravelUI.open(options);
+      this._suspendGameplayInput();
+  }
+
   private _attemptFastTravel(locationId: string): void {
+      if (locationId === MARK_RECALL_TRAVEL_ID) {
+          this._attemptRecall();
+          return;
+      }
       const hours = this.fastTravelSystem.estimateTravelHours(this.player.camera.position, locationId);
       if (hours === null) {
           this.ui.showNotification("Unknown destination.", 2000);
@@ -4829,6 +5671,24 @@ export class Game {
               3200,
           );
           this.fastTravelUI.close();
+          // Travel events: a chance of an encounter-flavor moment on arrival.
+          if (Math.random() < 0.35) {
+              const travelContext: TravelContext = {
+                  gameTimeHours: this.timeSystem.elapsedGameHours % 24,
+                  activeBiomeIds: [this.world.getBiome(
+                      Math.floor(dest.x / this.world.chunkSize),
+                      Math.floor(dest.z / this.world.chunkSize),
+                  )],
+                  weatherId: this.weatherSystem.state,
+                  playerLevel: this.playerLevelSystem.characterLevel,
+                  getFlag: (flag) => this.frameworkRuntime.getFlag(flag),
+                  setFlag: (flag, value) => this.frameworkRuntime.setFlag(flag, value),
+              };
+              const outcome = this.travelEventSystem.rollEvent(travelContext);
+              if (outcome?.notification) {
+                  this.ui.showNotification(`🌫 ${outcome.notification}`, 4000);
+              }
+          }
           this.saveSystem.markDirty();
       };
 
@@ -4859,6 +5719,31 @@ export class Game {
       }
   }
 
+  /**
+   * Recall to the marked position (via the travel menu's Recall row).
+   * Teleportation + notification happen in the markRecallSystem.onRecall
+   * callback; this only guards, closes the picker, and flags the autosave.
+   */
+  private _attemptRecall(): void {
+      if (this._isPlayerInCombat()) {
+          this.ui.showNotification("Cannot recall while in combat.", 2200);
+          this.fastTravelUI.close();
+          return;
+      }
+      if (this.stealthSystem.isCrouching) {
+          this.ui.showNotification("Cannot recall while sneaking.", 2200);
+          this.fastTravelUI.close();
+          return;
+      }
+      const result = this.markRecallSystem.recall();
+      this.fastTravelUI.close();
+      if (!result) {
+          this.ui.showNotification("No mark has been placed.", 2000);
+          return;
+      }
+      this.saveSystem.markDirty();
+  }
+
   private _getInventoryGold(): number {
       const goldEntry = this.inventorySystem.items.find((item) => item.id === GOLD_ITEM_ID);
       return goldEntry?.quantity ?? 0;
@@ -4874,6 +5759,18 @@ export class Game {
         playerLevel: this.playerLevelSystem.characterLevel,
         activeFactionIds: this.crimeSystem.getTotalBounty() > 0 ? ["bandits"] : [],
         weatherId: this.weatherSystem.state,
+      });
+
+      // Ambient flavor events share the same hourly tick.
+      const p = this.player.camera.position;
+      this.ambientEventSystem.update({
+        gameTimeHours: this.timeSystem.elapsedGameHours % 24,
+        weatherId: this.weatherSystem.state,
+        activeBiomeIds: [this.world.getBiome(
+          Math.floor(p.x / this.world.chunkSize),
+          Math.floor(p.z / this.world.chunkSize),
+        )],
+        playerLevel: this.playerLevelSystem.characterLevel,
       });
   }
 
@@ -4981,6 +5878,146 @@ export class Game {
       this.inventorySystem.addItem(item);
   }
 
+  /**
+   * Register an NPC's liftable inventory: authored starting equipment plus a
+   * coin purse for non-hostiles (settlers carry coin — without this, nobody
+   * in the demo has anything worth stealing).
+   */
+  private _registerPickpocketInventory(npc: NPC): void {
+      const items: PickpocketableItem[] = [];
+      for (const id of npc.startingEquipmentIds) {
+          const def = this.frameworkRuntime.contentRegistry.getItemDefinition(id);
+          items.push({ id, name: def?.name ?? this._humanizeItemId(id), weight: 0.5, value: 10 });
+      }
+      if (!npc.isAggressive) {
+          items.push({ id: "coin_purse", name: "Coin Purse", weight: 0.1, value: 12 });
+      }
+      this.pickpocketSystem.registerNpcInventory(npc.mesh.name, items);
+  }
+
+  /** Open the pickpocket picker for a mark (called from the E interaction). */
+  private _openPickpocketUI(npc: NPC): void {
+      const npcId = npc.mesh.name;
+      const items = this.pickpocketSystem.getNpcInventory(npcId);
+      if (!items || items.length === 0) {
+          this.ui.showNotification("Nothing worth taking.", 1800);
+          return;
+      }
+      this._pickpocketTargetId = npcId;
+      this.pickpocketUI.show(npcId);
+      this._refreshPickpocketUI(npcId);
+      this._suspendGameplayInput();
+      this._advanceOnboardingStep("sneak");
+  }
+
+  /** Re-render the picker with live chances; auto-close when cleaned out. */
+  private _refreshPickpocketUI(npcId: string): void {
+      if (!this.pickpocketUI.isVisible) return;
+      const items = this.pickpocketSystem.getNpcInventory(npcId) ?? [];
+      const sneak = this.skillProgressionSystem.getSkill("sneak")?.level ?? 0;
+      this.pickpocketUI.update(items.map(i => ({
+          id: i.id,
+          name: i.name,
+          chance: this.pickpocketSystem.getSuccessChance(npcId, i.id, sneak, 30) ?? 0,
+      })));
+      if (items.length === 0) {
+          this._pickpocketTargetId = null;
+          this.pickpocketUI.hide();
+          this._restoreGameplayInput();
+      }
+  }
+
+  /** Resolve one steal click: live eligibility check, then the dice roll. */
+  private _attemptPickpocketSteal(itemId: string): void {
+      const npcId = this._pickpocketTargetId;
+      if (!npcId) return;
+      const npc = this.scheduleSystem.npcs.find(n => n.mesh.name === npcId);
+      const sneak = this.skillProgressionSystem.getSkill("sneak")?.level ?? 0;
+      const detected = npc ? this.stealthSystem.getDetectionLevel(npc) >= 30 : true;
+      const result = this.pickpocketSystem.attempt(
+          npcId, itemId, sneak, 30, this.stealthSystem.isCrouching, detected);
+      if (!result.success && result.reason !== "failed_roll") {
+          // Eligibility lapsed mid-panel (stood up, spotted, emptied).
+          const msg: Record<string, string> = {
+              unknown_npc: "There's nothing to steal there.",
+              not_crouching: "You must stay crouched to pickpocket.",
+              already_detected: "You've been spotted — too late to lift anything.",
+              empty_inventory: "Nothing worth taking.",
+              unknown_item: "That item is already gone.",
+          };
+          this.ui.showNotification(msg[result.reason] ?? "Can't steal that.", 2200);
+          if (result.reason === "empty_inventory" || result.reason === "unknown_npc") {
+              this._pickpocketTargetId = null;
+              this.pickpocketUI.hide();
+              this._restoreGameplayInput();
+          }
+      }
+      // Rolled success/failure feedback + picker refresh arrive via the
+      // onPickpocketSuccess / onPickpocketFailed / onCaught callbacks above.
+  }
+
+  /** Display name for a stolen item (framework def, else humanized id). */
+  private _pickpocketItemLabel(itemId: string): string {
+      if (itemId === "coin_purse") return "Coin Purse";
+      return this.frameworkRuntime.contentRegistry.getItemDefinition(itemId)?.name
+          ?? this._humanizeItemId(itemId);
+  }
+
+  private _humanizeItemId(itemId: string): string {
+      return itemId.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  /** Move a successfully lifted item into the player inventory. */
+  private _grantPickpocketItem(_npcId: string, itemId: string): void {
+      if (itemId === "coin_purse") {
+          this.inventorySystem.addItem({
+              id: GOLD_ITEM_ID,
+              name: "Gold Coins",
+              description: "Currency for trade and fines.",
+              stackable: true,
+              quantity: 8,
+              weight: 0.1,
+              stats: { value: 1 },
+          });
+          this._syncInventoryGoldToFramework();
+          this.ui.showNotification("Coin purse: +8 gold", 2200);
+          return;
+      }
+      const gameId = FRAMEWORK_ITEM_TO_GAME[itemId] ?? itemId;
+      const existing = this.inventorySystem.items.find((i) => i.id === gameId);
+      if (existing) {
+          this.inventorySystem.addItem({ ...existing, quantity: 1 });
+          return;
+      }
+      if (this.frameworkRuntime.contentRegistry.getItemDefinition(itemId)) {
+          this._giveDialogueItemToPlayer(itemId, 1);
+          return;
+      }
+      this.inventorySystem.addItem({
+          id: gameId,
+          name: this._humanizeItemId(itemId),
+          description: "Lifted.",
+          stackable: false,
+          quantity: 1,
+          weight: 0.5,
+          stats: { value: 10 },
+      });
+  }
+
+  /** Hide the container panel, clear the active container, restore input. */
+  private _closeContainerUI(): void {
+      this._containerUI.hide();
+      this.containerSystem.closeContainer();
+      this._restoreGameplayInput();
+  }
+
+  /** Grant quest reward items (same pipeline as dialogue give-item effects). */
+  private _grantFrameworkItem(itemId: string, quantity: number): void {
+      const def = this.frameworkRuntime.contentRegistry.getItemDefinition(itemId);
+      this._giveDialogueItemToPlayer(itemId, quantity);
+      if (def) this.ui.showNotification(`Quest reward: ${def.name} ×${quantity}`, 2400);
+  }
+
   private _handleDialogueHostEvent(eventId: string, payload?: Record<string, unknown>): void {
       if (eventId === "trainer:train") {
         const trainerId = typeof payload?.trainerId === "string" ? payload.trainerId : "";
@@ -5032,6 +6069,7 @@ export class Game {
           : 8;
         const result = this.waitSystem.rest(hours, this.timeSystem, this.player);
         if (result.ok) {
+          this.survivalSystem.rest(hours * 22);
           this.ui.showNotification(`You slept soundly. ${result.message}`, 3200);
           this.skillProgressionSystem.gainXP("speechcraft", 6 * this.classSystem.xpMultiplierFor("speechcraft"));
           this.saveSystem.markDirty();
@@ -5053,6 +6091,16 @@ export class Game {
       if (!this.barterSystem.openBarter(merchantId, hour)) {
         return;
       }
+
+      // Reputation pricing: fame-based disposition shifts the price factor,
+      // and the merchant's persuasion disposition refines it further
+      // (allied/friendly merchants give real discounts; hostile ones gouge).
+      const fameFactor = 1 - (this.fameSystem.dispositionModifier / 20) * 0.15;
+      const persuasionFactor = this._currentDialogueNpcName
+        ? this.persuasionSystem.getMerchantPriceMultiplier(this._currentDialogueNpcName)
+        : 1.0;
+      this.barterSystem.sessionBuyPriceFactor =
+        Math.min(1.5, Math.max(0.7, fameFactor * persuasionFactor));
 
       this.barterSystem.playerGold = this._getInventoryGold();
       this._barterUI.show();
@@ -5252,6 +6300,8 @@ export class Game {
       infamy:          this.fameSystem.infamy,
       fameLabel:       this.fameSystem.fameLabel,
       infamyLabel:     this.fameSystem.infamyLabel,
+      perkPoints:      this.perkSystem.perkPoints,
+      perks:           this.perkSystem.getAllPerks(),
     });
   }
 
@@ -5266,15 +6316,40 @@ export class Game {
           this.guardEncounterUI.isVisible ||
           this.spellMakingUI.isVisible ||
           this._barterUI.isVisible ||
+          this._containerUI.isVisible ||
           this.fastTravelUI.isVisible ||
           this.stableUI.isVisible ||
           this.saddlebagUI.isVisible ||
           this.petUI.isVisible ||
+          this.pickpocketUI.isVisible ||
           this.characterSheetUI.isVisible ||
           this.graphicsSettingsUI.isVisible ||
           this.dialogueSystem.isInDialogue ||
           this.interactionSystem.isBlocked
       );
+  }
+
+  /**
+   * Suspend player input while a modal menu is open: block interaction,
+   * release the pointer, and detach camera control.
+   */
+  private _suspendGameplayInput(): void {
+      this.interactionSystem.isBlocked = true;
+      document.exitPointerLock();
+      this.player.camera.detachControl();
+  }
+
+  /**
+   * Restore player input after a modal menu closes: re-attach camera control
+   * and re-lock the pointer (unless a superseding mode — pause, map editor,
+   * character creation — still owns the screen).
+   */
+  private _restoreGameplayInput(): void {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      if (!this.mapEditorSystem.isEnabled && !this.isPaused && !this._inCharacterCreation) {
+          this.canvas.requestPointerLock();
+          this.player.camera.attachControl(this.canvas, true);
+      }
   }
 
   /** Check if the player is looking at an interactable object or NPC within 3 units. */

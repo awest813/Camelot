@@ -7,6 +7,15 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ Completed
 - 🚧 In Progress
 - 🧭 Planned
+- ⏸️ Deferred — implemented and tested in code, but intentionally not wired into the shipped game for v1
+
+### Deferred for v1 (wired later or on demand)
+
+These systems are complete with full test coverage but are **not reachable in-game**; cutting them from v1 keeps every advertised feature playable. Their `saveSystem.set*` hooks are already in place, so wiring one in later is a game.ts-only change:
+
+- ⏸️ **DragonShoutSystem** (`src/systems/dragon-shout-system.ts`) — no construction in `game.ts`; no key/UI trigger.
+- ⏸️ **CraftingSystem + CraftingUI** (smithing/forging) — never instantiated; alchemy/enchanting cover v1 crafting.
+- ⏸️ **ItemConditionSystem** (weapon/armor degradation + repair) — never instantiated.
 
 ---
 
@@ -17,6 +26,7 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ Babylon.js + TypeScript + Vite architecture.
 - ✅ Havok-powered physics integration.
 - ✅ First-person controller with resource-driven combat.
+- ✅ **Performance & leak pass** — chunk-scoped disposal of CDN props / dragon NPCs / structure lights on chunk unload; silent event-driven autosave (no per-tick dirty flag); shared wildflower materials; per-frame GUI/DOM dirty-checking (clock, compass, stats, FPS, stealth HUD); ChunkManager steady-state gate + budgeted chunk mounts (2/update); staggered stealth occlusion raycasts with a reused `Ray`; shadow map refresh every other frame with a player-centred sun frustum; pooled notifications / damage numbers / hit flashes / sparks; stealth detection pauses while modal UI is open; static chunk vegetation merged per material with frozen world matrices; LodSystem priority-cull repaired and NPC capsules distance-culled; NPC animation LOD (skip >100u); fixed-step substeps capped at 2.
 
 ### Framework Core (New Direction)
 
@@ -28,6 +38,9 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 - ✅ Save-state JSON architecture with schema migration pipeline.
 - ✅ Mod folder infrastructure (`public/mods` manifest + loader + content merge reports).
 - ✅ NpcArchetypeDefinition added to content bundle (guard, bandit, merchant, boss, innkeeper, villager).
+- ✅ **Systems wiring pass (dead content made reachable)** — archetype NPCs spawn at world sites (innkeepers/barkeepers/shopkeepers/merchants at inns, villagers + rotating trainers at cottages, bandits + chiefs at pirate forts) with daily schedules, loot tables, and chunk-scoped cleanup; crime ingestion wired (assault/murder of non-hostiles posts witnessed bounties; `isGuard` archetype guards run the pay/persuade/resist/jail challenge chain); dynamic world events now materialize their loot table as findable ground caches; equipped weapon drives `setWeaponArchetype` (bow/staff/dagger/mace/axe/greatsword profiles live); bandits flee below 25% health; `quest_bandit_bounty` activates on the first bandit kill with a guaranteed `bandit_token` proof drop.
+- ✅ **Combat expression pass** — dodge roll (F: WASD-relative dash with i-frames vs NPC strikes, stamina cost, cooldown); directional power attacks (forward = knockdown, sideways = disarm that weakens the NPC for 8s, backward = quick back-cut with player spacing hop); elite bosses (dragons, bandit chiefs) telegraph occasional unblockable blows that break guard; riposte now requires Block 25, combo finishers Blade 50, executions Blade 75; combat-state HUD line (combo count / finisher / riposte); death revives the player at the nearest discovered location with a 10% gold penalty; difficulty setting (Easy/Normal/Hard) in the graphics settings dialog scales NPC→player damage; same-faction packmates within 25u join an aggro'd ally; partial detection (50+) sends NPCs to investigate the player's last known position.
+- ✅ **World simulation pass** — SurvivalSystem wired (hunger/fatigue/cold drain per tick; cold in tundra and bad weather; stat penalties + freezing damage applied to the player; food with `nutrition` stats is edible via quickslots/inventory; waiting and inn rests restore fatigue; well-fed/rested grants a global skill-XP multiplier via `SkillProgressionSystem.globalXpMultiplier`; persists in saves); quests now declare `rewardGold`/`rewardItems` paid on completion (both shipped quests reward gold + potions); barter buy prices factor fame-based disposition (`fameSystem.dispositionModifier`) and the talking merchant's persuasion disposition band via `BarterSystem.sessionBuyPriceFactor`; TravelEventSystem rolls biome/weather-gated encounter flavor on ~35% of fast travels; AmbientEventSystem fires hourly time/weather/biome-gated flavor lines; LeveledListSystem built-ins registered and used for tiered elite drops (dragons/bandit chiefs drop level-appropriate weapons or heavy armor); general-goods merchant stocks bread/ale/stew.
 
 ### RPG Systems
 
@@ -83,7 +96,7 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 ### UX + Persistence
 
 - ✅ HUD, quest log, inventory, skill tree, pause flow.
-- ✅ Save/load (SAVE_VERSION 22) for all system states.
+- ✅ Save/load (SAVE_VERSION 29, single localStorage slot) for all system states.
 - ✅ Save file export to JSON file download + import from JSON/File (browser-safe).
 - ✅ Notifications, hit feedback, and debug support.
 - ✅ Compass HUD (top-center) showing cardinal direction from camera heading.
@@ -503,7 +516,7 @@ Camelot will evolve toward a creator-friendly worldbuilding pipeline through a d
 - ✅ Placement of editor marker objects with grid-snapping — N key.
 - ✅ Terrain sculpt and paint tools (chunk-level sculpt raise + paint tint pass in editor mode).
 
-#### Phase 2: Content Authoring Workflows 🚧
+#### Phase 2: Content Authoring Workflows ✅
 
 - ✅ Multi-type entity placement: **marker**, **loot**, **NPC spawn**, **quest marker**, **structure** — T key cycles type.
 - ✅ Visual differentiation by type: each placement type has a distinct mesh shape and colour.

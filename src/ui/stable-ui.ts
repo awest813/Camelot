@@ -1,3 +1,5 @@
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
+
 export interface StableHorseView {
   id: string;
   name: string;
@@ -22,6 +24,8 @@ export interface StableHorseView {
  */
 export class StableUI {
   public isVisible: boolean = false;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
   public onPurchase: ((horseId: string) => void) | null = null;
   public onClose: (() => void) | null = null;
 
@@ -56,12 +60,15 @@ export class StableUI {
 
     this._root.style.display = "grid";
     this.isVisible = true;
+    if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
   }
 
   public close(): void {
     if (!this._root) return;
     this._root.style.display = "none";
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
     this.onClose?.();
   }
 

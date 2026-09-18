@@ -4,7 +4,7 @@
  * Layout:
  *   HUD widget    — compact bar showing active follower's name, health, and current command.
  *                   Positioned in the bottom-right, above the pet HUD (if any).
- *   Follower panel — full modal opened with [F].  Lists all registered followers,
+  *   Follower panel — full modal opened with [G].  Lists all registered followers,
  *                    their status (available / recruited / deceased), stats, and
  *                    Recruit / Dismiss buttons.
  *
@@ -19,6 +19,7 @@ import type {
   FollowerCommand,
 } from "../systems/follower-system";
 import { sanitizeHtml } from "./dom-utils";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 
 // ── Design tokens (mirrors UIManager) ─────────────────────────────────────
 const C = {
@@ -64,6 +65,8 @@ function pct(val: number, max: number): string {
 export class FollowerUI {
   /** True while the management panel is open. */
   public isVisible: boolean = false;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
 
   public onRecruit:   ((templateId: string) => void) | null = null;
   public onDismiss:   (() => void) | null = null;
@@ -140,12 +143,15 @@ export class FollowerUI {
     this._panelRoot!.style.display = "flex";
     this._panelRoot!.focus();
     this.isVisible = true;
+    if (!this._focusSession && this._panelRoot) this._focusSession = manageDialogFocus(this._panelRoot);
   }
 
   /** Close the management panel. */
   public close(): void {
     if (this._panelRoot) this._panelRoot.style.display = "none";
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
 
   /** Refresh the panel and HUD with new state without reopening if already closed. */
@@ -288,7 +294,7 @@ export class FollowerUI {
 
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
-    _styleButton(closeBtn, "×", { fontSize: "18px", padding: "0 6px" });
+    _styleButton(closeBtn, "✕", { fontSize: "18px", padding: "0 6px" });
     closeBtn.setAttribute("aria-label", "Close followers panel");
     closeBtn.addEventListener("click", () => {
       this.close();
@@ -300,7 +306,7 @@ export class FollowerUI {
     // ── Hint ─────────────────────────────────────────────────────────────────
     const hint = document.createElement("p");
     Object.assign(hint.style, { margin: "0", fontSize: "10px", color: C.DIM });
-    hint.textContent = "[F] or [Esc] to close  ·  Only one follower may be active at a time";
+    hint.textContent = "[G] or [Esc] to close  ·  Only one follower may be active at a time";
 
     // ── Active follower section ──────────────────────────────────────────────
     const activeBlock = document.createElement("div");

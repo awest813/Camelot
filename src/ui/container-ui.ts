@@ -1,5 +1,7 @@
 import type { Container, ContainerSystem } from "../systems/container-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 import type { Item } from "../systems/inventory-system";
+import { getItemIcon } from "./icon-utils";
 
 // ── ContainerUI ────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,8 @@ import type { Item } from "../systems/inventory-system";
  */
 export class ContainerUI {
   public isVisible: boolean = false;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
 
   /** Called when the player clicks "Take" on an item row.  Argument is item id. */
   public onTakeItem: ((itemId: string) => void) | null = null;
@@ -62,12 +66,15 @@ export class ContainerUI {
     this._ensureDom();
     if (this._root) this._root.style.display = "flex";
     this.isVisible = true;
+    if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
   }
 
   /** Hide the panel without destroying its DOM. */
   public hide(): void {
     if (this._root) this._root.style.display = "none";
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
 
   /**
@@ -97,6 +104,8 @@ export class ContainerUI {
     this._takeAllBtn = null;
     this._lastSystem = null;
     this.isVisible   = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
 
   // ── DOM helpers ─────────────────────────────────────────────────────────────
@@ -202,6 +211,12 @@ export class ContainerUI {
     li.className = "container-ui__item-row";
     li.setAttribute("role", "listitem");
     li.setAttribute("data-item-id", item.id);
+
+    const iconEl = document.createElement("span");
+    iconEl.className = "container-ui__item-icon";
+    iconEl.setAttribute("aria-hidden", "true");
+    iconEl.textContent = getItemIcon(item);
+    li.appendChild(iconEl);
 
     const nameEl = document.createElement("span");
     nameEl.className = "container-ui__item-name";

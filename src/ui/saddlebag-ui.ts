@@ -6,6 +6,7 @@ export interface SaddlebagItemView {
 }
 
 import type { UIAnimator } from "./ui-animator";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 
 /**
  * HTML-driven saddlebag inventory dialog.
@@ -22,6 +23,8 @@ import type { UIAnimator } from "./ui-animator";
  */
 export class SaddlebagUI {
   public isVisible: boolean = false;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
   public onRemoveItem: ((itemId: string) => void) | null = null;
   public onClose: (() => void) | null = null;
 
@@ -58,11 +61,14 @@ export class SaddlebagUI {
     this._root.style.display = "grid";
     this._animator?.panelIn(this._root);
     this.isVisible = true;
+    if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
   }
 
   public close(): void {
     if (!this._root) return;
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
     this.onClose?.();
     if (this._animator) {
       this._animator.panelOut(this._root, () => {

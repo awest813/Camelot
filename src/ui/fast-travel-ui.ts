@@ -1,7 +1,11 @@
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
+
 export interface FastTravelOptionView {
   id: string;
   name: string;
   estimatedHours: number;
+  /** Optional short label shown instead of the "~X.Xh" estimate (e.g. "instant"). */
+  detail?: string;
 }
 
 /**
@@ -13,6 +17,8 @@ export interface FastTravelOptionView {
  */
 export class FastTravelUI {
   public isVisible: boolean = false;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
   public onTravel: ((locationId: string) => void) | null = null;
   public onClose: (() => void) | null = null;
 
@@ -34,12 +40,15 @@ export class FastTravelUI {
 
     this._root.style.display = "grid";
     this.isVisible = true;
+    if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
   }
 
   public close(): void {
     if (!this._root) return;
     this._root.style.display = "none";
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
     this.onClose?.();
   }
 
@@ -74,7 +83,7 @@ export class FastTravelUI {
 
     const subtitle = document.createElement("p");
     subtitle.className = "fast-travel__subtitle";
-    subtitle.textContent = "Select a discovered location. Travel time advances the in-game clock.";
+    subtitle.textContent = "Select a discovered location. Travel time advances the in-game clock. Press Y or Esc to close.";
     titleWrap.appendChild(subtitle);
 
     const closeBtn = document.createElement("button");
@@ -153,7 +162,7 @@ export class FastTravelUI {
 
       const eta = document.createElement("span");
       eta.className = "fast-travel__row-eta";
-      eta.textContent = `~${option.estimatedHours.toFixed(1)}h`;
+      eta.textContent = option.detail ?? `~${option.estimatedHours.toFixed(1)}h`;
       row.appendChild(eta);
 
       row.addEventListener("click", () => {
@@ -165,7 +174,9 @@ export class FastTravelUI {
     }
 
     const selected = this._options.find((o) => o.id === this._selectedId) ?? null;
-    if (selected) {
+    if (selected?.detail) {
+      this._statusEl.textContent = `${selected.name} — ${selected.detail}.`;
+    } else if (selected) {
       this._statusEl.textContent = `Travel to ${selected.name} (estimated ${selected.estimatedHours.toFixed(1)} hours).`;
     } else {
       this._statusEl.textContent = "Choose a destination.";

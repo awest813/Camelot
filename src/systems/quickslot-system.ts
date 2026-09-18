@@ -11,14 +11,19 @@ export const QUICK_SLOT_KEYS: readonly QuickSlotKey[] = ["1", "2", "3", "4", "5"
 /** Where a consumable was triggered from (HUD quick slot vs inventory click). */
 export type ConsumableUseSource = QuickSlotKey | "inventory";
 
-/** True when `item.stats` has a positive heal / magicka / stamina restore (quick slots + inventory use). */
+/**
+ * True when `item.stats` has a positive heal / magicka / stamina restore or a
+ * positive `nutrition` value (food — applied by the game layer's SurvivalSystem)
+ * via quick slots + inventory use.
+ */
 export function isConsumableItem(item: Item): boolean {
   const s = item.stats;
   if (!s) return false;
   return (
     (typeof s.heal === "number" && s.heal > 0) ||
     (typeof s.magicka === "number" && s.magicka > 0) ||
-    (typeof s.stamina === "number" && s.stamina > 0)
+    (typeof s.stamina === "number" && s.stamina > 0) ||
+    (typeof s.nutrition === "number" && s.nutrition > 0)
   );
 }
 

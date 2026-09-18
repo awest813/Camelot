@@ -20,6 +20,13 @@ export class ChunkManager<TData> {
   private readonly loadingKeys = new Set<string>();
   private readonly abortControllers = new Map<string, AbortController>();
 
+  /** Chunks activated + loaded but not yet mounted, drained mountBudgetPerUpdate at a time. */
+  private readonly pendingMounts: Chunk<TData>[] = [];
+
+  /** Center chunk coords of the last full update pass (NaN = never ran). */
+  private lastCenterX: number = Number.NaN;
+  private lastCenterY: number = Number.NaN;
+
   private readonly options: Required<ChunkManagerOptions>;
 
   constructor(
@@ -34,6 +41,7 @@ export class ChunkManager<TData> {
       preloadRadius: options?.preloadRadius ?? options?.activeRadius ?? 1,
       maxCachedChunks: options?.maxCachedChunks ?? 24,
       loadConcurrency: options?.loadConcurrency ?? 4,
+      mountBudgetPerUpdate: options?.mountBudgetPerUpdate ?? 2,
     };
 
     if (this.options.preloadRadius < this.options.activeRadius) {
@@ -66,6 +74,22 @@ export class ChunkManager<TData> {
 
   async update(worldPosition: Vec2Like): Promise<void> {
     const center = worldToChunkCoords(worldPosition, this.options.chunkSize);
+
+    // Budgeted mounts drain on every tick, even when the player is standing
+    // still — this is what spreads a mount burst across multiple frames.
+    if (this.pendingMounts.length > 0) {
+      await this._drainPendingMounts();
+    }
+
+    // Steady state — the player hasn't crossed a chunk boundary and no mounts
+    // are pending: the previous pass is still authoritative (loads complete
+    // within their starting pass), so skip the ring rebuild, sorts, cache
+    // scans, and eviction entirely.
+    if (center.x === this.lastCenterX && center.y === this.lastCenterY) {
+      return;
+    }
+    this.lastCenterX = center.x;
+    this.lastCenterY = center.y;
 
     const activeCoords = sortCoordsByDistance(
       squareCoordsAround(center, this.options.activeRadius),
@@ -101,7 +125,9 @@ export class ChunkManager<TData> {
         this.emit("activated", chunk);
 
         if (chunk.isLoaded && !chunk.isMounted) {
-          await this.mountChunk(chunk);
+          // Activation order is nearest-first, so the pending queue drains
+          // near chunks before far ones across ticks.
+          this.pendingMounts.push(chunk);
         }
       }
     }
@@ -126,7 +152,26 @@ export class ChunkManager<TData> {
       this.preloadKeys.add(key);
     }
 
+    await this._drainPendingMounts();
     await this.evictCache();
+  }
+
+  /**
+   * Mount up to `mountBudgetPerUpdate` pending chunks. Entries that were
+   * deactivated, unloaded, or mounted elsewhere while queued are dropped
+   * without consuming budget.
+   */
+  private async _drainPendingMounts(): Promise<void> {
+    let mounted = 0;
+    while (this.pendingMounts.length > 0 && mounted < this.options.mountBudgetPerUpdate) {
+      const chunk = this.pendingMounts.shift();
+      if (!chunk) break;
+      if (!chunk.isLoaded || chunk.isMounted || !this.activeKeys.has(chunk.key)) {
+        continue;
+      }
+      await this.mountChunk(chunk);
+      mounted++;
+    }
   }
 
   async dispose(): Promise<void> {
@@ -147,6 +192,9 @@ export class ChunkManager<TData> {
     this.loadingKeys.clear();
     this.abortControllers.clear();
     this.chunks.clear();
+    this.pendingMounts.length = 0;
+    this.lastCenterX = Number.NaN;
+    this.lastCenterY = Number.NaN;
   }
 
   private ensureChunk(coords: Vec2Like): Chunk<TData> {
@@ -208,7 +256,9 @@ export class ChunkManager<TData> {
       this.emit("loaded", chunk);
 
       if (this.activeKeys.has(chunk.key) && !chunk.isMounted) {
-        await this.mountChunk(chunk);
+        // Queue rather than mount inline so loads triggered mid-pass respect
+        // the same per-tick mount budget as activations.
+        this.pendingMounts.push(chunk);
       }
     } catch (error) {
       if (!(error instanceof DOMException && error.name === "AbortError")) {

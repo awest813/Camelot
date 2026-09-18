@@ -13,6 +13,7 @@ import { SkillProgressionSystem } from "./skill-progression-system";
 import type { ProgressionSkillId } from "./skill-progression-system";
 import { AttributeSystem } from "./attribute-system";
 import type { ActiveEffectsSystem } from "./active-effects-system";
+import type { ProjectileSystem } from "./projectile-system";
 
 const MELEE_DAMAGE = 10;
 const MAGIC_DAMAGE = 20;
@@ -131,6 +132,29 @@ const FINISHER_IMPULSE = 16;
  * heavy swing earns the execution.
  */
 const EXECUTE_HEALTH_THRESHOLD = 0.15;
+
+// ── Dodge roll ───────────────────────────────────────────────────────────────
+const DODGE_STAMINA_COST = 22;
+/** Seconds of invulnerability to NPC strikes while dodging. */
+const DODGE_IFRAME_DURATION = 0.4;
+/** Seconds the dash displacement lasts (i-frames outlive the slide). */
+const DODGE_SLIDE_DURATION = 0.35;
+const DODGE_TOTAL_DISTANCE = 3.2;
+const DODGE_COOLDOWN = 0.9;
+
+// ── Directional power attacks ───────────────────────────────────────────────
+const DISARM_DURATION = 8;
+const DISARM_DAMAGE_MULTIPLIER = 0.6;
+/** Chance an elite's telegraphed blow is unblockable (announced in the warning). */
+const UNBLOCKABLE_CHANCE = 0.25;
+
+// ── Skill gates for latent mechanics ────────────────────────────────────────
+const RIPOSTE_REQUIRED_BLOCK_RANK = 25;
+const FINISHER_REQUIRED_BLADE_RANK = 50;
+const EXECUTE_REQUIRED_BLADE_RANK = 75;
+
+/** Same-faction NPCs within this radius join an aggro'd ally (pack behavior). */
+const AGGRO_BROADCAST_RADIUS_SQ = 25 * 25;
 
 // ─── Adrenaline surge ─────────────────────────────────────────────────────────
 
@@ -281,6 +305,8 @@ export class CombatSystem {
   private _activeEffectsSystem: ActiveEffectsSystem | null;
   /** Optional sneak-system reference for sneak-attack detection. */
   private _stealthSystem: { canSneakAttack(npc: NPC): boolean } | null = null;
+  /** Optional projectile system — enables NPC arrows / magic bolts. */
+  private _projectileSystem: ProjectileSystem | null = null;
 
   // Scratch vectors — reused every frame to avoid GC pressure
   private _currentVel: Vector3 = new Vector3();
@@ -333,11 +359,24 @@ export class CombatSystem {
   /** Fired with the NPC's mesh name, XP reward, and the NPC reference whenever an NPC dies. */
   public onNPCDeath: ((npcName: string, xpReward: number, npc: NPC) => void) | null = null;
 
+  /** Fired whenever the player's attack damages an NPC (assault/crime ingestion). */
+  public onNpcDamaged: ((npc: NPC, damage: number) => void) | null = null;
+
   /** Fired whenever the player takes damage from an NPC. */
   public onPlayerHit: (() => void) | null = null;
 
   /** Fired whenever the player successfully blocks an NPC attack. */
   public onBlockSuccess: (() => void) | null = null;
+
+  /** Scales damage NPCs deal to the player (easy 0.6 · normal 1.0 · hard 1.5). */
+  public difficultyMultiplier: number = 1.0;
+
+  /** Dodge roll: remaining i-frame time, slide time, cooldown, and dash direction. */
+  private _dodgeIframeTimer: number = 0;
+  private _dodgeSlideTimer: number = 0;
+  private _dodgeCooldownRemaining: number = 0;
+  private readonly _dodgeDirection: Vector3 = new Vector3(0, 0, 1);
+  private readonly _dodgeDisplacement: Vector3 = new Vector3();
 
   constructor(
     scene: Scene,
@@ -374,6 +413,14 @@ export class CombatSystem {
 
   public setStealthSystem(s: { canSneakAttack(npc: NPC): boolean } | null): void {
     this._stealthSystem = s;
+  }
+
+  /**
+   * Attach the projectile system so ranged/magic NPCs can fire arrows and
+   * bolts at the player.  Null (default) keeps NPC attacks melee-only.
+   */
+  public setProjectileSystem(s: ProjectileSystem | null): void {
+    this._projectileSystem = s;
   }
 
   public setScalingSystems(opts: {
@@ -453,6 +500,72 @@ export class CombatSystem {
    */
   public get riposteReady(): boolean {
     return this._riposteReady;
+  }
+
+  /** True while the player is inside the dodge-roll i-frame window. */
+  public get isDodging(): boolean {
+    return this._dodgeIframeTimer > 0;
+  }
+
+  // ─── Dodge roll ─────────────────────────────────────────────────────────────
+
+  /**
+   * Attempt a dodge roll in the current movement direction (WASD relative to
+   * the camera; backward if no movement keys are held).  Costs stamina and
+   * grants a short i-frame window against NPC strikes.
+   */
+  public tryDodgeRoll(): boolean {
+    if (this._dodgeCooldownRemaining > 0) return false;
+    if (this.player.stamina < DODGE_STAMINA_COST) {
+      this._ui.showNotification("Not enough stamina to dodge!");
+      return false;
+    }
+
+    this.player.stamina -= DODGE_STAMINA_COST;
+    (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
+      .notifyResourceSpent?.("stamina");
+
+    this._readMoveIntent(this._dodgeDirection, true);
+    this._dodgeSlideTimer = DODGE_SLIDE_DURATION;
+    this._dodgeIframeTimer = DODGE_IFRAME_DURATION;
+    this._dodgeCooldownRemaining = DODGE_COOLDOWN;
+    this._ui.applyHitStop(30);
+    return true;
+  }
+
+  /**
+   * Fill `outDir` with the player's current movement intent in world space:
+   * WASD relative to the camera, flattened to the ground plane.
+   *
+   * @param outDir           Receives the normalized direction.
+   * @param backwardFallback When no movement keys are held: true → face away
+   *   from the camera (dodge back-step); false → leave outDir at zero (neutral).
+   */
+  private _readMoveIntent(outDir: Vector3, backwardFallback: boolean): void {
+    const kb = (this.player.camera.inputs?.attached as { keyboard?: { keys: number[] } } | undefined)?.keyboard;
+    const keys = kb?.keys ?? [];
+    const forwardInput = keys.includes(87) ? 1 : keys.includes(83) ? -1 : 0; // W / S
+    const strafeInput = keys.includes(68) ? 1 : keys.includes(65) ? -1 : 0;  // D / A
+
+    const forward = this.player.getForwardDirection(1);
+    forward.y = 0;
+    if (forward.lengthSquared() < 1e-6) forward.set(0, 0, 1);
+    forward.normalize();
+    const right = Vector3.Cross(Vector3.Up(), forward);
+
+    outDir.set(0, 0, 0);
+    outDir.addInPlace(forward.scale(forwardInput));
+    outDir.addInPlace(right.scale(strafeInput));
+    if (outDir.lengthSquared() < 1e-6) {
+      if (!backwardFallback) return;
+      outDir.copyFrom(forward).scaleInPlace(-1);
+    }
+    outDir.normalize();
+  }
+
+  /** Skill rank used for gating; 100 when no progression system is attached. */
+  private _skillRank(skillId: "block" | "blade"): number {
+    return this._skillSystem?.getSkill(skillId)?.level ?? 100;
   }
 
   /** Read-only view of active player status effects (burns, freezes, etc.). */
@@ -570,6 +683,7 @@ export class CombatSystem {
         );
         const finalDmg = applyDamageWithResistance(rawDmg, npc, "fire");
         npc.takeDamage(finalDmg);
+        this.onNpcDamaged?.(npc, finalDmg);
         this._ui.applyHitStop(100);
         this._ui.shakeCamera(0.4);
 
@@ -652,7 +766,8 @@ export class CombatSystem {
     const riposteMult = isRiposte ? RIPOSTE_DAMAGE_MULTIPLIER : 1.0;
     // Finisher: when the combo is already saturated, this swing becomes the
     // climax — extra damage and a guaranteed stagger — and then resets the chain.
-    const isFinisher = this._comboStack >= MAX_COMBO_STACK;
+      const isFinisher = this._comboStack >= MAX_COMBO_STACK
+        && this._skillRank("blade") >= FINISHER_REQUIRED_BLADE_RANK;
     const finisherMult = isFinisher ? FINISHER_DAMAGE_MULTIPLIER : 1.0;
 
     // ── Determine which NPCs are hit ───────────────────────────────────────
@@ -726,6 +841,7 @@ export class CombatSystem {
       const meleeDmg = applyDamageWithResistance(rawMeleeDmg, npc, "physical", weaponProfile.armorPenFraction);
 
       npc.takeDamage(meleeDmg);
+      this.onNpcDamaged?.(npc, meleeDmg);
       this._ui.applyHitStop(isFinisher ? 160 : isCrit ? 120 : 60);
       this._ui.shakeCamera(isFinisher ? 0.7 : isCrit ? 0.6 : 0.25);
 
@@ -852,6 +968,11 @@ export class CombatSystem {
     }
 
     const fatigueFactor = this._fatigueFactor();
+    // Directional power attacks (Oblivion-style): movement keys held during the
+    // swing pick the variant — forward = knockdown, sideways = disarm,
+    // backward = quick back-cut. Neutral keeps the classic power strike.
+    const intent = new Vector3();
+    this._readMoveIntent(intent, false);
 
     this.player.stamina -= staminaCost;
     this._meleeCooldownRemaining = this._scaledMeleeCooldown(
@@ -877,21 +998,54 @@ export class CombatSystem {
         );
         // Execution: a power attack on an already-broken foe ends the fight.
         // Bypasses armor/resistance — the heavy swing is committed regardless.
+        // Blade 75 unlocks the execute; below that it's a normal power hit.
         const maxHp = Math.max(1, npc.maxHealth);
-        const isExecute = npc.health > 0 && npc.health / maxHp <= EXECUTE_HEALTH_THRESHOLD;
+        const isExecute = this._skillRank("blade") >= EXECUTE_REQUIRED_BLADE_RANK
+          && npc.health > 0 && npc.health / maxHp <= EXECUTE_HEALTH_THRESHOLD;
         const finalDmg = isExecute
           ? npc.health
           : applyDamageWithResistance(rawDmg, npc, "physical", weaponProfile.armorPenFraction);
         npc.takeDamage(finalDmg);
+        this.onNpcDamaged?.(npc, finalDmg);
 
         this._ui.applyHitStop(isExecute ? 200 : 140);
         this._ui.shakeCamera(isExecute ? 0.85 : 0.65);
 
-        // Stagger: cancel current telegraph and freeze the NPC's AI briefly.
+        // Stagger: cancel current telegraph and freeze the NPC's AI briefly,
+        // with the directional variant deciding the payoff.
         npc.isStaggered = true;
-        npc.staggerTimer = POWER_ATTACK_STAGGER_DURATION;
         npc.isAttackTelegraphing = false;
         npc.attackTelegraphTimer = 0;
+        let knockbackMag = 18;
+        if (isExecute) {
+          npc.staggerTimer = POWER_ATTACK_STAGGER_DURATION * 2;
+        } else if (intent.lengthSquared() < 0.5) {
+          // No movement keys held — classic power strike.
+          npc.staggerTimer = POWER_ATTACK_STAGGER_DURATION;
+        } else {
+          const forward = this.player.getForwardDirection(1);
+          forward.y = 0;
+          forward.normalize();
+          const right = Vector3.Cross(Vector3.Up(), forward);
+          const fwdDot = Vector3.Dot(intent, forward);
+          const strafeDot = Vector3.Dot(intent, right);
+          if (fwdDot > 0.5) {
+            // Forward: knockdown — long stagger plus a heavy shove.
+            npc.staggerTimer = POWER_ATTACK_STAGGER_DURATION * 2;
+            knockbackMag = 24;
+            this._ui.showNotification("Knockdown!", 900);
+          } else if (Math.abs(strafeDot) > 0.5) {
+            // Sideways: disarm — the NPC strikes weakly for a while.
+            npc.staggerTimer = POWER_ATTACK_STAGGER_DURATION * 0.8;
+            npc.disarmTimer = DISARM_DURATION;
+            this._ui.showNotification("Disarmed!", 1100);
+          } else {
+            // Backward: quick back-cut; the player hops away for spacing.
+            npc.staggerTimer = POWER_ATTACK_STAGGER_DURATION * 0.6;
+            this.player.camera.cameraDirection.addInPlace(forward.scale(-2.2));
+            this._ui.showNotification("Back-cut!", 800);
+          }
+        }
 
         // Award bonus skill XP for a power attack hit.
         this._skillSystem?.gainXP(weaponProfile.skillId, SKILL_XP_POWER_HIT);
@@ -916,7 +1070,7 @@ export class CombatSystem {
             ? hit.pickedPoint
             : npc.mesh.position.addToRef(CombatSystem._OFFSET_Y1, this._hitPos);
           npc.physicsAggregate.body.applyImpulse(
-            forward.scale(isExecute ? 26 : 18),
+            forward.scale(knockbackMag),
             impulsePoint,
           );
         }
@@ -1126,6 +1280,19 @@ export class CombatSystem {
     }
     this._staffChargeCooldown = Math.max(0, this._staffChargeCooldown - deltaTime);
 
+    // ── Dodge roll slide + i-frames + cooldown ───────────────────────────────
+    this._dodgeCooldownRemaining = Math.max(0, this._dodgeCooldownRemaining - deltaTime);
+    if (this._dodgeSlideTimer > 0) {
+      this._dodgeSlideTimer = Math.max(0, this._dodgeSlideTimer - deltaTime);
+      // Route through cameraDirection so Babylon's collision-aware camera
+      // movement keeps the roll from clipping through walls.  Reuses a scratch
+      // vector — this runs every fixed tick during the slide.
+      const step = (DODGE_TOTAL_DISTANCE * deltaTime) / DODGE_SLIDE_DURATION;
+      this._dodgeDisplacement.copyFrom(this._dodgeDirection).scaleInPlace(step);
+      this.player.camera.cameraDirection.addInPlace(this._dodgeDisplacement);
+    }
+    this._dodgeIframeTimer = Math.max(0, this._dodgeIframeTimer - deltaTime);
+
     // ── Combo window decay ──────────────────────────────────────────────────
     if (this._comboStack > 0) {
       this._comboTimer = Math.max(0, this._comboTimer - deltaTime);
@@ -1149,6 +1316,11 @@ export class CombatSystem {
   // ─── State machine implementation ──────────────────────────────────────────
 
   private _tickNPC(npc: NPC, playerPos: Vector3, deltaTime: number, distSq: number): void {
+    // Disarm wears off over time (side power-attack effect).
+    if (npc.disarmTimer > 0) {
+      npc.disarmTimer = Math.max(0, npc.disarmTimer - deltaTime);
+    }
+
     // Stagger: briefly freeze the NPC's AI after a player power attack.
     if (npc.isStaggered) {
       npc.staggerTimer -= deltaTime;
@@ -1278,13 +1450,23 @@ export class CombatSystem {
         if (npc.attackTimer > npc.attackWindup) {
           this._updateAttackReposition(npc, playerPos, distSq, deltaTime);
         } else {
-          // Ready to attack or winding up: close the distance aggressively if needed
-          const strikeRange = npc.attackRange * 0.5;
-          if (distSq > strikeRange * strikeRange) {
-             this._moveRelativeToTarget(npc, playerPos, npc.moveSpeed, deltaTime);
-          } else {
-             this._stopMovement(npc);
-          }
+        // Ready to attack or winding up: melee closes aggressively, while
+        // ranged/magic holders keep their standoff distance and shoot.
+        // (Undefined archetype means melee — matches the NPC default.)
+        const isRangedHolder = (npc.npcAttackArchetype ?? "melee") !== "melee";
+        const holdRange = isRangedHolder
+          ? npc.attackRange * 0.82
+          : npc.attackRange * 0.5;
+        const strikeRange = npc.attackRange * npc.dodgeWindowRangeMultiplier;
+        if (distSq > holdRange * holdRange) {
+           this._moveRelativeToTarget(npc, playerPos, npc.moveSpeed, deltaTime);
+        } else if (isRangedHolder && distSq < strikeRange * strikeRange) {
+           // Kiting: a crowded shooter backs off to firing range instead of
+           // standing inside its own melee-strike window.
+           this._retreatFromTarget(npc, playerPos, deltaTime);
+        } else {
+           this._stopMovement(npc);
+        }
         }
 
         if (npc.attackTimer <= 0) {
@@ -1428,6 +1610,34 @@ export class CombatSystem {
         npc.setStateColor(COLOR_IDLE);
         this._stopMovement(npc);
         break;
+    }
+
+    if (newState === AIState.CHASE) {
+      this._broadcastAggro(npc);
+    }
+  }
+
+  /**
+   * Pack coordination: when a hostile commits to a chase, nearby same-faction
+   * allies join in — the player can't pull a camp one at a time.
+   */
+  private _broadcastAggro(source: NPC): void {
+    const faction = source.factionId;
+    if (!faction) return;
+
+    for (const other of this.npcs) {
+      if (other === source || other.isDead) continue;
+      if (other.factionId !== faction) continue;
+      if (other.aiState === AIState.CHASE || other.aiState === AIState.ATTACK) continue;
+      if (Vector3.DistanceSquared(other.mesh.position, source.mesh.position) > AGGRO_BROADCAST_RADIUS_SQ) continue;
+
+      // Share the target's position so packmates converge even out of aggro range.
+      if (!other.lastKnownPlayerPos) {
+        other.lastKnownPlayerPos = this.player.camera.position.clone();
+      } else {
+        other.lastKnownPlayerPos.copyFrom(this.player.camera.position);
+      }
+      this._transitionTo(other, AIState.CHASE);
     }
   }
 
@@ -1577,9 +1787,20 @@ export class CombatSystem {
     npc.attackTelegraphTimer = Math.max(0.12, npc.attackWindup);
     this._stopMovement(npc);
     npc.setStateColor(COLOR_TELEGRAPH);
+    // Elites occasionally commit to an unblockable heavy blow.
+    npc.isAttackUnblockable =
+      /^(DragonBoss|Bandit Chief)/.test(npc.mesh.name) && Math.random() < UNBLOCKABLE_CHANCE;
     // Alert the player with a timed warning matching the windup window.
     const windupMs = Math.round(npc.attackTelegraphTimer * 1000);
-    this._ui.showNotification(`⚠ ${npc.mesh.name} attacks!`, windupMs);
+    const attackVerb = npc.npcAttackArchetype === "ranged"
+      ? "fires an arrow!"
+      : npc.npcAttackArchetype === "magic"
+        ? `casts ${npc.npcMagicDamageType}!`
+        : "attacks!";
+    this._ui.showNotification(
+      npc.isAttackUnblockable ? `⚠ ${npc.mesh.name} — UNBLOCKABLE!` : `⚠ ${npc.mesh.name} ${attackVerb}`,
+      windupMs,
+    );
   }
 
   private _tickAttackTelegraph(npc: NPC, distSq: number, deltaTime: number): void {
@@ -1592,36 +1813,44 @@ export class CombatSystem {
     npc.attackTimer = npc.attackCooldown;
     npc.setStateColor(COLOR_CHASE);
 
-    const strikeRange = npc.attackRange * npc.dodgeWindowRangeMultiplier;
-    if (distSq > strikeRange * strikeRange) {
+    // Dodge-roll i-frames beat everything but cost the swing.
+    if (this._dodgeIframeTimer > 0) {
       this._ui.showNotification(`You dodge ${npc.mesh.name}'s strike!`, 1200);
       return;
     }
 
-    // ── NPC attack archetype — determines how damage is computed ─────────────
-    // "melee"  : physical, respects player armor rating (bonusArmor).
-    // "ranged" : physical, slightly reduced (×0.85), still respects armor.
-    // "magic"  : elemental, bypasses player armor; uses npcMagicDamageType.
-    const npcArchetype = npc.npcAttackArchetype;
-    let dmg: number;
-    if (npcArchetype === "magic") {
-      dmg = Math.max(1, npc.attackDamage);
-    } else {
-      const playerAR = Math.max(0, this.player.bonusArmor);
-      const rawDmg = npcArchetype === "ranged"
-        ? Math.round(npc.attackDamage * 0.85)
-        : npc.attackDamage;
-      dmg = Math.max(1, Math.round(rawDmg * 100 / (100 + playerAR)));
+    const strikeRange = npc.attackRange * npc.dodgeWindowRangeMultiplier;
+    const npcArchetype = npc.npcAttackArchetype ?? "melee";
+    // Ranged/magic attackers fire a projectile past melee reach instead of
+    // whiffing — provided a projectile system is attached.  Without one
+    // (or past their own attack range) they miss exactly like melee.
+    const shootsAtRange =
+      npcArchetype !== "melee" &&
+      distSq > strikeRange * strikeRange &&
+      this._projectileSystem !== null;
+    // Ranged shots travel to the NPC's full attack range; melee still
+    // resolves only inside the close strike window (unchanged behaviour).
+    const outOfReach = shootsAtRange
+      ? distSq > npc.attackRange * npc.attackRange
+      : distSq > strikeRange * strikeRange;
+    if (outOfReach) {
+      this._ui.showNotification(`You dodge ${npc.mesh.name}'s strike!`, 1200);
+      return;
     }
 
-    // Apply resist_damage from active magical effects (potions, spells, enchantments).
-    const resistPct = Math.min(100, Math.max(0,
-      this._activeEffectsSystem?.totalMagnitude("resist_damage") ?? 0));
-    if (resistPct > 0) {
-      dmg = Math.max(1, Math.round(dmg * (1 - resistPct / 100)));
+    let dmg = this._computeNpcStrikeDamage(npc);
+    if (shootsAtRange) {
+      this._fireNpcProjectile(npc, dmg);
+      return;
     }
 
-    if (this._isBlocking) {
+    if (this._isBlocking && npc.isAttackUnblockable) {
+      // Elite heavy blow: shrugs off the guard entirely — full damage.
+      this._ui.showNotification("The blow breaks through your guard!", 1600);
+      this._isBlocking = false;
+      this._resetCombo();
+      this._ui.showHitFlash("rgba(200, 0, 0, 0.4)");
+    } else if (this._isBlocking) {
       // Perfect block window: within first 0.3s of blocking.
       const isPerfect = this._blockActiveTimer < 0.3;
       
@@ -1639,9 +1868,11 @@ export class CombatSystem {
         this._ui.applyHitStop(110);
         this._ui.shakeCamera(0.35);
         this._ui.showSpark(this.player.camera.position.add(this.player.camera.getDirection(Vector3.Forward()).scale(1.2)), "#FFFFFF");
-        // Open riposte window after a perfect block.
-        this._riposteReady = true;
-        this._riposteTimer = RIPOSTE_WINDOW;
+        // Open the riposte window after a perfect block — Block 25 required.
+        if (this._skillRank("block") >= RIPOSTE_REQUIRED_BLOCK_RANK) {
+          this._riposteReady = true;
+          this._riposteTimer = RIPOSTE_WINDOW;
+        }
       } else {
         this._ui.showNotification(`Blocked! ${dmg} damage taken.`, 1500);
         this._ui.showHitFlash("rgba(80, 120, 200, 0.35)");
@@ -1682,6 +1913,70 @@ export class CombatSystem {
     this.player.health = Math.max(0, this.player.health - dmg);
     (this.player as unknown as { notifyDamageTaken?: () => void }).notifyDamageTaken?.();
     if (this.onPlayerHit) this.onPlayerHit();
+  }
+
+  /**
+   * Full NPC→player damage pipeline shared by melee resolution and fired
+   * projectiles: archetype rules, disarm, difficulty, then resist_damage.
+   * (Blocking is melee-only and stays in the resolution path above.)
+   */
+  private _computeNpcStrikeDamage(npc: NPC): number {
+    // ── NPC attack archetype — determines how damage is computed ─────────────
+    // "melee"  : physical, respects player armor rating (bonusArmor).
+    // "ranged" : physical, slightly reduced (×0.85), still respects armor.
+    // "magic"  : elemental, bypasses player armor; uses npcMagicDamageType.
+    const npcArchetype = npc.npcAttackArchetype;
+    let dmg: number;
+    if (npcArchetype === "magic") {
+      dmg = Math.max(1, npc.attackDamage);
+    } else {
+      const playerAR = Math.max(0, this.player.bonusArmor);
+      const rawDmg = npcArchetype === "ranged"
+        ? Math.round(npc.attackDamage * 0.85)
+        : npc.attackDamage;
+      dmg = Math.max(1, Math.round(rawDmg * 100 / (100 + playerAR)));
+    }
+
+    // Disarmed (side power attack): the blow lands with much less force.
+    if (npc.disarmTimer > 0) {
+      dmg = Math.max(1, Math.round(dmg * DISARM_DAMAGE_MULTIPLIER));
+    }
+
+    // Difficulty setting scales everything NPCs deal to the player.
+    dmg = Math.max(1, Math.round(dmg * this.difficultyMultiplier));
+
+    // Apply resist_damage from active magical effects (potions, spells, enchantments).
+    const resistPct = Math.min(100, Math.max(0,
+      this._activeEffectsSystem?.totalMagnitude("resist_damage") ?? 0));
+    if (resistPct > 0) {
+      dmg = Math.max(1, Math.round(dmg * (1 - resistPct / 100)));
+    }
+    return dmg;
+  }
+
+  /**
+   * Fire an NPC arrow / magic bolt at the player.  Damage is pre-mitigated;
+   * the projectile itself is dodgeable by movement (blocking does not apply).
+   */
+  private _fireNpcProjectile(npc: NPC, damage: number): void {
+    if (!this._projectileSystem) return;
+    const origin = npc.mesh.position.clone();
+    origin.y += 1.4;
+    const dir = this.player.camera.position.subtract(origin);
+    if (dir.lengthSquared() <= 0.001) return;
+    dir.normalize();
+    // Ranged shots scatter more than guided magic bolts.
+    const spread = npc.npcAttackArchetype === "magic" ? 0.03 : 0.05;
+    dir.x += (Math.random() - 0.5) * spread;
+    dir.y += (Math.random() - 0.5) * spread;
+    dir.z += (Math.random() - 0.5) * spread;
+    dir.normalize();
+    this._projectileSystem.fireNpcArrow(origin, dir, damage, {
+      sourceName: npc.mesh.name,
+      magicType: npc.npcAttackArchetype === "magic" ? npc.npcMagicDamageType : null,
+      owner: npc,
+      statusEffect: npc.attackStatusEffect,
+    });
   }
 
   private _updateAttackReposition(npc: NPC, playerPos: Vector3, distSq: number, deltaTime: number): void {
@@ -1860,6 +2155,24 @@ export class CombatSystem {
     npc.mesh.lookAt(this._lookAtTarget);
   }
 
+  /**
+   * Kiting step: move directly away from the player at reduced speed while
+   * keeping eyes on them (unlike fleeing, which faces away to run).
+   */
+  private _retreatFromTarget(npc: NPC, targetPos: Vector3, deltaTime: number): void {
+    if (!npc.physicsAggregate?.body) return;
+    npc.mesh.position.subtractToRef(targetPos, this._dir);
+    this._dir.y = 0;
+    if (this._dir.lengthSquared() > 0.001) {
+      this._dir.normalize();
+      this._dir.scaleToRef(npc.moveSpeed * 0.55, this._desiredVel);
+      this._setSmoothedHorizontalVelocity(npc, this._desiredVel, deltaTime);
+    } else {
+      this._stopMovement(npc);
+    }
+    this._faceTarget(npc, targetPos);
+  }
+
   /** Zero the NPC's horizontal velocity while preserving vertical (gravity). */
   private _stopMovement(npc: NPC): void {
     if (!npc.physicsAggregate?.body) return;
@@ -2009,6 +2322,19 @@ export class CombatSystem {
   }
 
   /**
+   * Apply or refresh a status effect on the player from an external source
+   * (e.g. hostile bolt hits via ProjectileSystem.onPlayerDamaged).
+   */
+  public applyPlayerStatusEffect(eff: {
+    type: StatusEffect["type"];
+    damagePerTick: number;
+    tickInterval: number;
+    duration: number;
+  }): void {
+    this._applyPlayerStatusEffect(eff);
+  }
+
+  /**
    * Apply or refresh a status effect on the player.
    * If an effect of the same type is already active its duration and damage are
    * each kept at the higher value (no double-stacking of the same type).
@@ -2039,5 +2365,48 @@ export class CombatSystem {
         remainingDuration: eff.duration,
       });
     }
+  }
+
+  // ─── Persistence ───────────────────────────────────────────────────────────
+
+  /**
+   * Snapshot of the player's active combat status effects (burn / poison /
+   * freeze / shock damage-over-time) for save slots.
+   */
+  public getSaveState(): StatusEffect[] {
+    return this._playerStatusEffects.map((e) => ({ ...e }));
+  }
+
+  /**
+   * Restore player status effects from a save snapshot.
+   * Entries that are malformed or already expired are dropped; no callbacks
+   * or notifications fire so loading is silent.
+   */
+  public restoreFromSave(state: unknown): void {
+    if (!Array.isArray(state)) return;
+    const VALID_TYPES = new Set<StatusEffect["type"]>(["burn", "poison", "freeze", "shock"]);
+    const restored: StatusEffect[] = [];
+    for (const raw of state) {
+      if (!raw || typeof raw !== "object") continue;
+      const e = raw as Partial<StatusEffect>;
+      if (!e.type || !VALID_TYPES.has(e.type)) continue;
+      if (
+        !Number.isFinite(e.damagePerTick) ||
+        !Number.isFinite(e.tickInterval) ||
+        !Number.isFinite(e.tickTimer) ||
+        !Number.isFinite(e.remainingDuration) ||
+        (e.remainingDuration as number) <= 0
+      ) {
+        continue;
+      }
+      restored.push({
+        type: e.type,
+        damagePerTick: e.damagePerTick as number,
+        tickInterval: e.tickInterval as number,
+        tickTimer: e.tickTimer as number,
+        remainingDuration: e.remainingDuration as number,
+      });
+    }
+    this._playerStatusEffects = restored;
   }
 }

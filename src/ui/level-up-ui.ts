@@ -1,6 +1,8 @@
 import type { AttributeName } from "../systems/attribute-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 import type { AttributeBonuses } from "../systems/player-level-system";
 import type { UIAnimator } from "./ui-animator";
+import { getAttributeIcon } from "./icon-utils";
 
 /** Per-attribute display metadata. */
 interface AttributeMeta {
@@ -40,6 +42,8 @@ const ATTRIBUTE_ORDER: AttributeName[] = [
  */
 export class LevelUpUI {
   public isVisible: boolean = false;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
 
   /** Called with the three chosen attributes when the player confirms. */
   public onConfirm: ((primary: AttributeName, sec1: AttributeName, sec2: AttributeName) => void) | null = null;
@@ -81,11 +85,14 @@ export class LevelUpUI {
     // Move keyboard focus to the first attribute button for accessibility.
     const firstAttrBtn = this._rowEls.get("strength");
     firstAttrBtn?.focus();
+    if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
   }
 
   public close(): void {
     if (!this._root) return;
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
     if (this._animator) {
       this._animator.panelOut(this._root, () => {
         if (this._root) this._root.style.display = "none";
@@ -152,7 +159,7 @@ export class LevelUpUI {
 
       const nameEl = document.createElement("span");
       nameEl.className = "level-up__attr-name";
-      nameEl.textContent = meta.label;
+      nameEl.textContent = `${getAttributeIcon(attr)} ${meta.label}`;
 
       const skillEl = document.createElement("span");
       skillEl.className = "level-up__attr-skills";

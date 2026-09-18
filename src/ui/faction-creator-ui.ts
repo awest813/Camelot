@@ -3,6 +3,7 @@ import type {
   FactionCreatorDraft,
   FactionRelationDraft,
 } from "../systems/faction-creator-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 import { FACTION_DISPOSITIONS } from "../systems/faction-creator-system";
 
 /**
@@ -26,6 +27,8 @@ export class FactionCreatorUI {
 
   private readonly _sys: FactionCreatorSystem;
   private _root: HTMLElement | null = null;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
   private _statusEl: HTMLElement | null = null;
   private _relListEl: HTMLElement | null = null;
 
@@ -53,13 +56,18 @@ export class FactionCreatorUI {
     if (this._root) {
       this._root.hidden = false;
       this._syncFromDraft();
+      if (!this._focusSession) this._focusSession = manageDialogFocus(this._root);
       return;
     }
     this._build();
+    const root = this._root;
+    if (!this._focusSession && root) this._focusSession = manageDialogFocus(root);
   }
 
   close(): void {
     if (this._root) this._root.hidden = true;
+    this._focusSession?.release();
+    this._focusSession = null;
     this.onClose?.();
   }
 
@@ -69,6 +77,7 @@ export class FactionCreatorUI {
     const root = document.createElement("div");
     root.className = "faction-creator";
     root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-label", "Faction Creator");
     this._root = root;
 

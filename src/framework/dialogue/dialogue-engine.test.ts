@@ -18,6 +18,7 @@ const makeContext = (overrides?: Partial<{
     invCount: overrides?.invCount ?? 0,
     skillLevel: overrides?.skillLevel ?? 0,
     activatedQuests: overrides?.activatedQuests ?? [],
+    failedQuests: [] as string[],
     consumedItems: overrides?.consumedItems ?? [],
     givenItems: overrides?.givenItems ?? [],
     emitEvent: vi.fn(),
@@ -39,6 +40,7 @@ const makeContext = (overrides?: Partial<{
     emitEvent: state.emitEvent,
     getSkillLevel: () => state.skillLevel,
     activateQuest: (questId) => { state.activatedQuests.push(questId); },
+    failQuest: (questId) => { (state.failedQuests as string[]).push(questId); },
     consumeItem: (itemId, quantity) => {
       state.consumedItems.push({ itemId, quantity });
       return true;
@@ -233,6 +235,37 @@ describe("DialogueEngine", () => {
 
     const state = (ctx as unknown as { _state: { activatedQuests: string[] } })._state;
     expect(state.activatedQuests).toContain("q_elder_task");
+  });
+
+  it("fail_quest effect calls failQuest on context", () => {
+    const engine = new DialogueEngine([
+      {
+        id: "quest_fail",
+        startNodeId: "start",
+        nodes: [
+          {
+            id: "start",
+            speaker: "Elder",
+            text: "You have failed me.",
+            choices: [
+              {
+                id: "accept_fate",
+                text: "I understand.",
+                effects: [{ type: "fail_quest", questId: "q_elder_task" }],
+                endsDialogue: true,
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    const ctx = makeContext();
+    const session = engine.createSession("quest_fail", ctx);
+    session.choose("accept_fate");
+
+    const state = (ctx as unknown as { _state: { failedQuests: string[] } })._state;
+    expect(state.failedQuests).toContain("q_elder_task");
   });
 
   it("consume_item effect calls consumeItem on context", () => {

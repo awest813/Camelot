@@ -1,4 +1,6 @@
 import type { QualityTier } from "../systems/graphics-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
+import { getGraphicsTierIcon, getDifficultyIcon } from "./icon-utils";
 
 // ── Tier metadata ─────────────────────────────────────────────────────────────
 
@@ -18,78 +20,81 @@ const TIER_DESCRIPTIONS: Record<QualityTier, string> = {
 
 const TIERS: QualityTier[] = ["low", "medium", "high", "ultra"];
 
+// ── Difficulty metadata ───────────────────────────────────────────────────────
+
+export type Difficulty = "easy" | "normal" | "hard";
+
+const DIFFICULTY_LABELS: Record<Difficulty, string> = {
+  easy:   "Easy",
+  normal: "Normal",
+  hard:   "Hard",
+};
+
+const DIFFICULTY_DESCRIPTIONS: Record<Difficulty, string> = {
+  easy:   "Foes deal 40% less damage.",
+  normal: "The intended challenge.",
+  hard:   "Foes deal 50% more damage.",
+};
+
+const DIFFICULTIES: Difficulty[] = ["easy", "normal", "hard"];
+
 // ── GraphicsSettingsUI ────────────────────────────────────────────────────────
 
 /**
- * GraphicsSettingsUI — modal overlay for switching graphics quality tiers.
- *
- * Presents four tier buttons (Low / Medium / High / Ultra) with short
- * descriptions.  When the player selects a tier, {@link onTierSelect} is
- * called with the new tier.  The caller is responsible for persisting the
- * choice and reloading the page.
- *
- * Wire-up example:
- * ```ts
- * const settingsUI = new GraphicsSettingsUI();
- *
- * settingsUI.onTierSelect = (tier) => {
- *   persistGraphicsTier(tier);
- *   location.reload();
- * };
- *
- * settingsUI.onClose = () => settingsUI.hide();
- *
- * // Open with Escape or a settings button:
- * settingsUI.show("high");
- * ```
+ * GraphicsSettingsUI — modal overlay for switching graphics quality tiers and difficulty.
  */
 export class GraphicsSettingsUI {
   public isVisible: boolean = false;
+  private _focusSession: DialogFocusSession | null = null;
 
-  /** Called when the player selects a quality tier. */
   public onTierSelect: ((tier: QualityTier) => void) | null = null;
-  /** Called when the dialog is dismissed without selecting a tier. */
+  public onDifficultySelect: ((difficulty: Difficulty) => void) | null = null;
   public onClose: (() => void) | null = null;
 
   private _root: HTMLDivElement | null = null;
   private _tierBtns: Map<QualityTier, HTMLButtonElement> = new Map();
+  private _difficultyBtns: Map<Difficulty, HTMLButtonElement> = new Map();
+  private _currentDifficulty: Difficulty = "normal";
 
-  // ── Public API ─────────────────────────────────────────────────────────────
-
-  /**
-   * Make the dialog visible.  Creates DOM lazily on first call.
-   *
-   * @param currentTier — The active quality tier; its button will be
-   *   highlighted so the player sees their current setting.
-   */
-  public show(currentTier: QualityTier): void {
+  public show(currentTier: QualityTier, currentDifficulty: Difficulty = this._currentDifficulty): void {
     if (typeof document === "undefined") return;
     this._ensureDom();
     this._highlightTier(currentTier);
+    this._highlightDifficulty(currentDifficulty);
     if (this._root) this._root.style.display = "flex";
     this.isVisible = true;
+    if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
   }
 
-  /** Hide the dialog without destroying its DOM. */
   public hide(): void {
     if (this._root) this._root.style.display = "none";
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
 
-  /** Remove the DOM element entirely and reset state. */
   public destroy(): void {
     this._root?.remove();
     this._root = null;
     this._tierBtns.clear();
+    this._difficultyBtns.clear();
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
-
-  // ── DOM helpers ────────────────────────────────────────────────────────────
 
   private _highlightTier(tier: QualityTier): void {
     for (const [t, btn] of this._tierBtns) {
       btn.classList.toggle("is-active", t === tier);
       btn.setAttribute("aria-pressed", String(t === tier));
+    }
+  }
+
+  private _highlightDifficulty(difficulty: Difficulty): void {
+    this._currentDifficulty = difficulty;
+    for (const [d, btn] of this._difficultyBtns) {
+      btn.classList.toggle("is-active", d === difficulty);
+      btn.setAttribute("aria-pressed", String(d === difficulty));
     }
   }
 
@@ -121,7 +126,10 @@ export class GraphicsSettingsUI {
     closeBtn.className = "graphics-settings__close";
     closeBtn.setAttribute("aria-label", "Close graphics settings");
     closeBtn.textContent = "✕";
-    closeBtn.addEventListener("click", () => this.onClose?.());
+    closeBtn.addEventListener("click", () => {
+      this.hide();
+      this.onClose?.();
+    });
     header.appendChild(closeBtn);
 
     panel.appendChild(header);
@@ -141,6 +149,14 @@ export class GraphicsSettingsUI {
       card.className = "graphics-settings__card";
       card.setAttribute("aria-pressed", "false");
 
+      const iconEl = document.createElement("span");
+      iconEl.className = "graphics-settings__card-icon";
+      iconEl.setAttribute("aria-hidden", "true");
+      iconEl.textContent = getGraphicsTierIcon(tier);
+      iconEl.style.fontSize = "18px";
+      iconEl.style.marginBottom = "4px";
+      iconEl.style.display = "block";
+
       const labelEl = document.createElement("span");
       labelEl.className = "graphics-settings__card-label";
       labelEl.textContent = TIER_LABELS[tier];
@@ -149,6 +165,7 @@ export class GraphicsSettingsUI {
       descEl.className = "graphics-settings__card-desc";
       descEl.textContent = TIER_DESCRIPTIONS[tier];
 
+      card.appendChild(iconEl);
       card.appendChild(labelEl);
       card.appendChild(descEl);
       card.addEventListener("click", () => this.onTierSelect?.(tier));
@@ -158,11 +175,58 @@ export class GraphicsSettingsUI {
     }
 
     panel.appendChild(grid);
+
+    // Difficulty row
+    const diffTitle = document.createElement("h3");
+    diffTitle.className = "graphics-settings__title";
+    diffTitle.textContent = "Difficulty";
+    diffTitle.style.marginTop = "18px";
+    panel.appendChild(diffTitle);
+
+    const diffGrid = document.createElement("div");
+    diffGrid.className = "graphics-settings__grid";
+
+    for (const difficulty of DIFFICULTIES) {
+      const card = document.createElement("button");
+      card.className = "graphics-settings__card";
+      card.setAttribute("aria-pressed", "false");
+
+      const iconEl = document.createElement("span");
+      iconEl.className = "graphics-settings__card-icon";
+      iconEl.setAttribute("aria-hidden", "true");
+      iconEl.textContent = getDifficultyIcon(difficulty);
+      iconEl.style.fontSize = "18px";
+      iconEl.style.marginBottom = "4px";
+      iconEl.style.display = "block";
+
+      const labelEl = document.createElement("span");
+      labelEl.className = "graphics-settings__card-label";
+      labelEl.textContent = DIFFICULTY_LABELS[difficulty];
+
+      const descEl = document.createElement("span");
+      descEl.className = "graphics-settings__card-desc";
+      descEl.textContent = DIFFICULTY_DESCRIPTIONS[difficulty];
+
+      card.appendChild(iconEl);
+      card.appendChild(labelEl);
+      card.appendChild(descEl);
+      card.addEventListener("click", () => {
+        this._highlightDifficulty(difficulty);
+        this.onDifficultySelect?.(difficulty);
+      });
+
+      this._difficultyBtns.set(difficulty, card);
+      diffGrid.appendChild(card);
+    }
+
+    panel.appendChild(diffGrid);
     root.appendChild(panel);
 
-    // Close when clicking the backdrop (outside the panel)
     root.addEventListener("click", (e) => {
-      if (e.target === root) this.onClose?.();
+      if (e.target === root) {
+        this.hide();
+        this.onClose?.();
+      }
     });
 
     document.body.appendChild(root);

@@ -1,4 +1,5 @@
 import type { QuestCreatorSystem, QuestCreatorNodeDraft } from "../systems/quest-creator-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 import type { QuestTriggerType } from "../framework/quests/quest-types";
 
 const TRIGGER_TYPES: QuestTriggerType[] = ["kill", "pickup", "talk", "custom"];
@@ -31,6 +32,8 @@ export class QuestCreatorUI {
 
   private readonly _system: QuestCreatorSystem;
   private _root: HTMLElement | null = null;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
   private _statusEl: HTMLElement | null = null;
   private _nodeListEl: HTMLElement | null = null;
   private _graphSvg: SVGSVGElement | null = null;
@@ -54,14 +57,19 @@ export class QuestCreatorUI {
     if (this._root) {
       this._root.hidden = false;
       this._syncFromDraft();
+      if (!this._focusSession) this._focusSession = manageDialogFocus(this._root);
       return;
     }
     this._build();
+    const root = this._root;
+    if (!this._focusSession && root) this._focusSession = manageDialogFocus(root);
   }
 
   /** Hide the panel without destroying it. */
   close(): void {
     if (this._root) this._root.hidden = true;
+    this._focusSession?.release();
+    this._focusSession = null;
     this.onClose?.();
   }
 
@@ -71,6 +79,7 @@ export class QuestCreatorUI {
     const root = document.createElement("div");
     root.className = "quest-creator";
     root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-label", "Quest Creator");
     this._root = root;
 
@@ -542,6 +551,25 @@ export class QuestCreatorUI {
     });
     prereqGroup.appendChild(prereqInput);
     row4.appendChild(prereqGroup);
+
+    // ── Row 5: exclusive group (xor-choice branching) ───────────────────────
+    const row5 = document.createElement("div");
+    row5.className = "quest-creator__node-row";
+    card.appendChild(row5);
+
+    const groupGroup = this._makeLabeledControl("Exclusive group (xor with same-named nodes)", `qcn_grp_${node.id}`);
+    groupGroup.style.flex = "1";
+    const groupInput = document.createElement("input");
+    groupInput.id          = `qcn_grp_${node.id}`;
+    groupInput.type        = "text";
+    groupInput.className   = "quest-creator__input";
+    groupInput.placeholder = "e.g. spare_or_kill — empty for none";
+    groupInput.value       = node.exclusiveGroup ?? "";
+    groupInput.addEventListener("input", () => {
+      this._system.updateNode(node.id, { exclusiveGroup: groupInput.value });
+    });
+    groupGroup.appendChild(groupInput);
+    row5.appendChild(groupGroup);
 
     return card;
   }

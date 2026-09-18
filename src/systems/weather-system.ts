@@ -97,6 +97,8 @@ export class WeatherSystem {
   private _transitionProgress: number = 1;
   private _fromVisuals: WeatherVisuals;
   private _toVisuals: WeatherVisuals;
+  /** Daylight scalar baked into the last _applyVisuals pass (change detector). */
+  private _lastAppliedDaylight: number = -1;
 
   // ── Optional scene references (absent in headless/test mode) ──────────────
   private readonly _scene: Scene | null;
@@ -151,6 +153,14 @@ export class WeatherSystem {
 
   // ── Public API ────────────────────────────────────────────────────────────
 
+  /**
+   * Time-of-day light scalar [0-1], written by the game layer from
+   * `TimeSystem.ambientIntensity` (1 = full daylight, 0.08 = deep night).
+   * Blended into the sun/ambient/fog application so nights actually darken
+   * the scene.  Changes are picked up on the next `update()` tick.
+   */
+  public daylightScale: number = 1;
+
   /** Current weather state label. */
   public get state(): WeatherState {
     return this._state;
@@ -203,6 +213,10 @@ export class WeatherSystem {
         this._transitionProgress + deltaTime / Math.max(0.001, this.transitionDuration),
       );
       this._applyVisuals(this._transitionProgress);
+    } else if (this._lastAppliedDaylight !== this.daylightScale) {
+      // Weather is settled but the clock kept moving — re-blend the lights so
+      // day/night continue to darken/brighten the scene.
+      this._applyVisuals(1);
     }
 
     // Count down to next weather change
@@ -271,22 +285,33 @@ export class WeatherSystem {
   }
 
   private _applyVisuals(t: number): void {
+    // Day/night modulation: the sun dies at night, ambient keeps a readable
+    // floor so the scene is dark but not pitch black, and fog takes on the
+    // darkness so the horizon reads as night.
+    const day = Math.min(1, Math.max(0, this.daylightScale));
+    const ambientDay = 0.35 + 0.65 * day;
+    const fogDarken = 0.30 + 0.70 * day;
+
     if (this._scene) {
       this._scene.fogDensity = lerp(this._fromVisuals.fogDensity, this._toVisuals.fogDensity, t);
       this._scene.fogColor   = new Color3(
-        lerp(this._fromVisuals.fogColor.r, this._toVisuals.fogColor.r, t),
-        lerp(this._fromVisuals.fogColor.g, this._toVisuals.fogColor.g, t),
-        lerp(this._fromVisuals.fogColor.b, this._toVisuals.fogColor.b, t),
+        lerp(this._fromVisuals.fogColor.r, this._toVisuals.fogColor.r, t) * fogDarken,
+        lerp(this._fromVisuals.fogColor.g, this._toVisuals.fogColor.g, t) * fogDarken,
+        lerp(this._fromVisuals.fogColor.b, this._toVisuals.fogColor.b, t) * fogDarken,
       );
     }
 
     if (this._ambient) {
-      this._ambient.intensity = this._ambientBase * lerp(this._fromVisuals.ambientScale, this._toVisuals.ambientScale, t);
+      this._ambient.intensity =
+        this._ambientBase * lerp(this._fromVisuals.ambientScale, this._toVisuals.ambientScale, t) * ambientDay;
     }
 
     if (this._sun) {
-      this._sun.intensity = this._sunBase * lerp(this._fromVisuals.sunScale, this._toVisuals.sunScale, t);
+      this._sun.intensity =
+        this._sunBase * lerp(this._fromVisuals.sunScale, this._toVisuals.sunScale, t) * day;
     }
+
+    this._lastAppliedDaylight = this.daylightScale;
   }
 
   private _pickNextState(): WeatherState {

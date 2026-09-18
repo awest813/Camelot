@@ -266,6 +266,39 @@ describe("NpcArchetypeSystem", () => {
     expect(npc!.fleesBelowHealthPct).toBe(0.2);
   });
 
+  it("aiProfile attack archetype and magic type are applied", () => {
+    const sys = new NpcArchetypeSystem();
+    sys.registerArchetype({
+      id: "archetype_mage",
+      name: "Mage",
+      role: "enemy",
+      isHostile: true,
+      isMerchant: false,
+      baseHealth: 60,
+      level: 3,
+      aiProfile: {
+        attackRange: 14,
+        attackArchetype: "magic",
+        magicDamageType: "frost",
+      },
+    });
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const npc = sys.spawnNpc("archetype_mage", scene, new Vector3(0, 0, 0));
+    expect(npc!.npcAttackArchetype).toBe("magic");
+    expect(npc!.npcMagicDamageType).toBe("frost");
+    expect(npc!.attackRange).toBe(14);
+  });
+
+  it("attack archetype defaults to melee when the profile omits it", () => {
+    const sys = new NpcArchetypeSystem();
+    sys.registerArchetype(OVERRIDDEN_ARCHETYPE);
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const npc = sys.spawnNpc("archetype_overridden", scene, new Vector3(0, 0, 0));
+    expect(npc!.npcAttackArchetype).toBe("melee");
+  });
+
   it("startingEquipment is stored on spawned NPC", () => {
     const sys = new NpcArchetypeSystem();
     sys.registerArchetype(OVERRIDDEN_ARCHETYPE);

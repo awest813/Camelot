@@ -1,4 +1,5 @@
 import type { Skill, SkillTree } from "../systems/skill-tree-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -48,12 +49,16 @@ export function renderRankPips(currentRank: number, maxRank: number): string {
  */
 export class SkillTreeUI {
   public isVisible: boolean = false;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
 
   /**
    * Called when the player clicks "Upgrade" on a skill card.
    * Arguments are the tree index and skill index within that tree.
    */
   public onPurchase: ((treeIndex: number, skillIndex: number) => void) | null = null;
+  /** Fired when the ✕ button closes the panel (Escape is owned by the game cascade). */
+  public onClose: (() => void) | null = null;
 
   private _root:        HTMLDivElement | null = null;
   private _tabBar:      HTMLDivElement | null = null;
@@ -71,12 +76,15 @@ export class SkillTreeUI {
     this._ensureDom();
     if (this._root) this._root.style.display = "flex";
     this.isVisible = true;
+    if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
   }
 
   /** Hide the panel without destroying its DOM. */
   public hide(): void {
     if (this._root) this._root.style.display = "none";
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
 
   /**
@@ -107,6 +115,8 @@ export class SkillTreeUI {
     this._pointsLabel = null;
     this._activeTab   = 0;
     this.isVisible    = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
 
   // ── Private helpers ─────────────────────────────────────────────────────────
@@ -156,7 +166,10 @@ export class SkillTreeUI {
     closeBtn.type = "button";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close skill tree");
-    closeBtn.addEventListener("click", () => this.hide());
+    closeBtn.addEventListener("click", () => {
+      this.hide();
+      this.onClose?.();
+    });
     root.appendChild(closeBtn);
 
     document.body.appendChild(root);

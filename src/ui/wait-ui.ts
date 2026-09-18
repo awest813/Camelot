@@ -1,4 +1,5 @@
 import { WAIT_MIN_HOURS, WAIT_MAX_HOURS } from "../systems/wait-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 
 // ── WaitUI ────────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,8 @@ import { WAIT_MIN_HOURS, WAIT_MAX_HOURS } from "../systems/wait-system";
  */
 export class WaitUI {
   public isVisible: boolean = false;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
 
   /** Called when the player confirms the wait.  Argument is the chosen hour count. */
   public onConfirm: ((hours: number) => void) | null = null;
@@ -56,6 +59,7 @@ export class WaitUI {
       this._root.focus();
     }
     this.isVisible = true;
+    if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
     if (currentTimeString !== undefined && this._timeEl) {
       this._timeEl.textContent = currentTimeString;
     }
@@ -65,6 +69,8 @@ export class WaitUI {
   public hide(): void {
     if (this._root) this._root.style.display = "none";
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
 
   /**
@@ -89,6 +95,8 @@ export class WaitUI {
     this._decBtn     = null;
     this._incBtn     = null;
     this.isVisible   = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
 
   // ── DOM helpers ─────────────────────────────────────────────────────────────
@@ -127,6 +135,12 @@ export class WaitUI {
     });
     header.appendChild(closeBtn);
     root.appendChild(header);
+
+    const hint = document.createElement("p");
+    hint.className = "wait-ui__hint";
+    hint.textContent = "Press T or Esc to close.";
+    hint.style.cssText = "margin:0;font-size:11px;color:#998877;";
+    root.appendChild(hint);
 
     // Body
     const body = document.createElement("div");

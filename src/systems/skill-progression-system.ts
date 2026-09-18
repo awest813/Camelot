@@ -115,6 +115,12 @@ export class SkillProgressionSystem {
   // ── Public API ────────────────────────────────────────────────────────────
 
   /**
+   * Global XP multiplier applied to every gainXP call.  The game layer keeps
+   * this synced from SurvivalSystem's well-fed/rested bonus.  Defaults to 1.
+   */
+  public globalXpMultiplier: number = 1.0;
+
+  /**
    * Award XP to a skill.  If XP reaches the threshold the skill levels up
    * (potentially multiple times if a large amount is granted at once) and
    * `onSkillLevelUp` is fired for each level gained.
@@ -127,7 +133,7 @@ export class SkillProgressionSystem {
     if (!skill) return;
     if (amount <= 0 || skill.level >= SKILL_MAX_LEVEL) return;
 
-    skill.xp += amount;
+    skill.xp += amount * this.globalXpMultiplier;
 
     while (skill.xp >= skill.xpToNext && skill.level < SKILL_MAX_LEVEL) {
       skill.xp      -= skill.xpToNext;

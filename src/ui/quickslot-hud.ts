@@ -1,6 +1,7 @@
 import type { QuickSlotSystem, QuickSlotKey } from "../systems/quickslot-system";
 import { QUICK_SLOT_KEYS } from "../systems/quickslot-system";
 import type { Item } from "../systems/inventory-system";
+import { getItemIcon } from "./icon-utils";
 
 // ── QuickSlotHUD ──────────────────────────────────────────────────────────────
 
@@ -9,6 +10,7 @@ interface SlotSnapshot {
   key: QuickSlotKey;
   itemId: string | null;
   itemName: string;
+  itemIcon: string;
   quantity: number;
   stackable: boolean;
 }
@@ -157,17 +159,26 @@ export class QuickSlotHUD {
     if (!cell) return;
 
     const nameEl = cell.querySelector<HTMLSpanElement>(".quickslot-hud__item-name");
+    let iconEl = cell.querySelector<HTMLSpanElement>(".quickslot-hud__item-icon");
 
     // Remove old quantity badge if present
     const oldQty = cell.querySelector(".quickslot-hud__qty-badge");
     if (oldQty) oldQty.remove();
 
     if (snap.itemId === null) {
+      if (iconEl) iconEl.remove();
       if (nameEl) nameEl.textContent = "—";
       cell.classList.add("is-empty");
       cell.setAttribute("aria-label", `Quick slot ${key}: empty`);
       cell.setAttribute("data-item-id", "");
     } else {
+      if (!iconEl && nameEl) {
+        iconEl = document.createElement("span");
+        iconEl.className = "quickslot-hud__item-icon";
+        iconEl.setAttribute("aria-hidden", "true");
+        cell.insertBefore(iconEl, nameEl);
+      }
+      if (iconEl) iconEl.textContent = snap.itemIcon;
       if (nameEl) nameEl.textContent = snap.itemName;
       cell.classList.remove("is-empty");
       cell.setAttribute("data-item-id", snap.itemId);
@@ -200,6 +211,7 @@ export class QuickSlotHUD {
       key,
       itemId,
       itemName:  item?.name      ?? "",
+      itemIcon:  getItemIcon(item),
       quantity:  item?.quantity  ?? 0,
       stackable: item?.stackable ?? false,
     };
@@ -210,6 +222,7 @@ export class QuickSlotHUD {
     return (
       a.itemId   === b.itemId   &&
       a.itemName === b.itemName &&
+      a.itemIcon === b.itemIcon &&
       a.quantity === b.quantity &&
       a.stackable === b.stackable
     );

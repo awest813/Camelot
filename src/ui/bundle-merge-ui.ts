@@ -1,4 +1,5 @@
 import type { BundleMergeSystem, MergeConflict, ConflictStrategy } from "../systems/bundle-merge-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 import type { ContentBundleExport } from "../systems/content-bundle-system";
 
 /**
@@ -19,6 +20,8 @@ export class BundleMergeUI {
 
   private readonly _sys: BundleMergeSystem;
   private _root: HTMLElement | null = null;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
   private _conflictTableEl: HTMLElement | null = null;
   private _statusEl: HTMLElement | null = null;
   private _baseLabel: HTMLElement | null = null;
@@ -34,12 +37,20 @@ export class BundleMergeUI {
   }
 
   open(): void {
-    if (this._root) { this._root.hidden = false; return; }
+    if (this._root) {
+      this._root.hidden = false;
+      if (!this._focusSession) this._focusSession = manageDialogFocus(this._root);
+      return;
+    }
     this._build();
+    const root = this._root;
+    if (!this._focusSession && root) this._focusSession = manageDialogFocus(root);
   }
 
   close(): void {
     if (this._root) this._root.hidden = true;
+    this._focusSession?.release();
+    this._focusSession = null;
     this.onClose?.();
   }
 
@@ -49,6 +60,7 @@ export class BundleMergeUI {
     const root = document.createElement("div");
     root.className = "bundle-merge";
     root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-label", "Bundle Merge Assistant");
     this._root = root;
 

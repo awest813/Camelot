@@ -14,6 +14,7 @@ class App {
 
   private canvas: HTMLCanvasElement;
   private _fpsElement: HTMLElement | null = null;
+  private _lastFpsWriteMs = Number.NEGATIVE_INFINITY;
   private _boundEvents = false;
 
   constructor() {
@@ -71,7 +72,7 @@ class App {
     const configured = Number(import.meta.env.VITE_RENDER_SCALE);
     const scale = Number.isFinite(configured) && configured >= 1
       ? Math.min(configured, 3)
-      : 3;
+      : 1.0;
     this.engine.setHardwareScalingLevel(scale);
   }
 
@@ -108,7 +109,15 @@ class App {
         this._fpsElement = div;
       }
     }
-    this._fpsElement.textContent = `${this.engine.getFps().toFixed()} fps`;
+    // Throttle DOM writes — a textContent assignment invalidates layout even
+    // when the value is unchanged.
+    const nowMs = performance.now();
+    if (nowMs - this._lastFpsWriteMs < 500) return;
+    this._lastFpsWriteMs = nowMs;
+    const text = `${this.engine.getFps().toFixed()} fps`;
+    if (this._fpsElement.textContent !== text) {
+      this._fpsElement.textContent = text;
+    }
   }
 
   async _bindEvent(): Promise<void> {

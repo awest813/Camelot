@@ -51,6 +51,8 @@ export class AlchemyUI {
   public onCraft: ((ingredientIds: string[]) => void) | null = null;
   /** Fired when the user clicks Drink on a crafted potion — passes potion id. */
   public onDrink: ((potionId: string) => void) | null = null;
+  /** Fired when the ✕ button closes the panel (Escape is owned by the game cascade). */
+  public onClosed: (() => void) | null = null;
 
   private readonly _ui: AdvancedDynamicTexture;
   private readonly _system: AlchemySystem;
@@ -235,7 +237,10 @@ export class AlchemyUI {
     closeBtn.left   = "-14px";
     (closeBtn.textBlock as TextBlock).color = T.DIM;
     closeBtn.accessibilityTag = { description: "Close Alchemy Panel" };
-    closeBtn.onPointerClickObservable.add(() => this.toggle(false));
+    closeBtn.onPointerClickObservable.add(() => {
+      this.toggle(false);
+      this.onClosed?.();
+    });
 
     this._panel.addControl(closeBtn);
   }

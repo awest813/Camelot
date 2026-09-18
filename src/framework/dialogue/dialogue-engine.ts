@@ -249,6 +249,9 @@ export class DialogueSession {
         case "activate_quest":
           this._context.activateQuest?.(effect.questId);
           break;
+        case "fail_quest":
+          this._context.failQuest?.(effect.questId);
+          break;
         case "consume_item":
           this._context.consumeItem?.(effect.itemId, effect.quantity);
           break;

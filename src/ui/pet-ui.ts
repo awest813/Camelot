@@ -12,6 +12,7 @@
  */
 
 import type { Pet, PetTemplate } from "../systems/pet-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 
 // ── Design tokens (mirrors UIManager) ─────────────────────────────────────
 const C = {
@@ -50,6 +51,8 @@ function pct(val: number, max: number): string {
 export class PetUI {
   /** True while the management panel is open. */
   public isVisible: boolean = false;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
 
   public onSummon:  ((petId: string) => void) | null = null;
   public onDismiss: (() => void) | null = null;
@@ -113,12 +116,15 @@ export class PetUI {
     this._panelRoot!.style.display = "flex";
     this._panelRoot!.focus();
     this.isVisible = true;
+    if (!this._focusSession && this._panelRoot) this._focusSession = manageDialogFocus(this._panelRoot);
   }
 
   /** Close the management panel. */
   public close(): void {
     if (this._panelRoot) this._panelRoot.style.display = "none";
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
 
   /** Refresh the panel and HUD with new state without reopening if already closed. */
@@ -254,7 +260,7 @@ export class PetUI {
 
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
-    _styleButton(closeBtn, "×", { fontSize: "18px", padding: "0 6px" });
+    _styleButton(closeBtn, "✕", { fontSize: "18px", padding: "0 6px" });
     closeBtn.setAttribute("aria-label", "Close companions panel");
     closeBtn.addEventListener("click", () => {
       this.close();

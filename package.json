@@ -1,11 +1,11 @@
 {
-  "name": "vite-babylon-800",
+  "name": "camelot",
   "author": "Andrei Stepanov <eldinor@gmail.com> (https://babylonpress.org/)",
   "contributors": [
     "minibao (https://github.com/minibao/babylon-vite)"
   ],
   "private": true,
-  "version": "0.0.1",
+  "version": "1.0.0-rc.1",
   "type": "module",
   "scripts": {
     "dev": "vite",

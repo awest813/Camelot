@@ -20,6 +20,11 @@ export interface Quest {
   objectives: QuestObjective[];
   isCompleted: boolean;
   isActive: boolean;
+  /**
+   * Terminal failure (e.g. a quest target the player needed alive died).
+   * Optional for backward compatibility — absent means not failed.
+   */
+  isFailed?: boolean;
   reward?: string;
   xpReward?: number;
 }
@@ -28,6 +33,8 @@ export interface QuestSaveState {
   id: string;
   isCompleted: boolean;
   isActive: boolean;
+  /** Absent in older saves — restored as not failed. */
+  isFailed?: boolean;
   objectives: { id: string; current: number; completed: boolean }[];
 }
 
@@ -42,11 +49,15 @@ export class QuestSystem {
   /** Fired with the quest's xpReward when a quest is completed. */
   public onQuestComplete: ((xpReward: number) => void) | null = null;
 
+  /** Fired with the quest id when a quest fails. */
+  public onQuestFailed: ((questId: string) => void) | null = null;
+
   constructor(ui: UIManager) {
     this._ui = ui;
   }
 
   public addQuest(quest: Quest, silent = false): void {
+    quest.isFailed ??= false;
     this._quests.push(quest);
     if (!silent) this._ui.showNotification(`New Quest: ${quest.name}`, 3000);
     this._syncUI();
@@ -57,11 +68,32 @@ export class QuestSystem {
   }
 
   public getActiveQuests(): Quest[] {
-    return this._quests.filter(q => q.isActive && !q.isCompleted);
+    return this._quests.filter(q => q.isActive && !q.isCompleted && !q.isFailed);
   }
 
   public getCompletedQuests(): Quest[] {
     return this._quests.filter(q => q.isCompleted);
+  }
+
+  public getFailedQuests(): Quest[] {
+    return this._quests.filter(q => q.isFailed);
+  }
+
+  /**
+   * Fail an active quest. Failure is terminal: the quest leaves the active
+   * list, ignores further objective updates, and appears in the failed
+   * section of the quest log.
+   * @returns true if the quest was active and is now failed.
+   */
+  public failQuest(questId: string): boolean {
+    const quest = this._quests.find(q => q.id === questId);
+    if (!quest || !quest.isActive || quest.isCompleted || quest.isFailed) return false;
+    quest.isFailed = true;
+    quest.isActive = false;
+    this._ui.showNotification(`Quest Failed: ${quest.name}`, 4000);
+    this.onQuestFailed?.(quest.id);
+    this._syncUI();
+    return true;
   }
 
   /** Called by CombatSystem when an NPC is killed. */
@@ -94,7 +126,8 @@ export class QuestSystem {
       const quest = this._quests.find(q => q.id === saved.id);
       if (!quest) continue;
       quest.isCompleted = saved.isCompleted;
-      quest.isActive = saved.isActive;
+      quest.isActive = saved.isActive && !saved.isFailed;
+      quest.isFailed = saved.isFailed ?? false;
       for (const savedObj of saved.objectives) {
         const obj = quest.objectives.find(o => o.id === savedObj.id);
         if (obj) {
@@ -109,7 +142,7 @@ export class QuestSystem {
   private _updateObjective(type: ObjectiveType, targetId: string): void {
     let anyUpdated = false;
     for (const quest of this._quests) {
-      if (!quest.isActive || quest.isCompleted) continue;
+      if (!quest.isActive || quest.isCompleted || quest.isFailed) continue;
       for (const obj of quest.objectives) {
         if (obj.completed || obj.type !== type || obj.targetId !== targetId) continue;
         obj.current = Math.min(obj.required, obj.current + 1);

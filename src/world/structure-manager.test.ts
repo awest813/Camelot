@@ -5,10 +5,11 @@ import { MeshBuilder } from '@babylonjs/core/Meshes/meshBuilder';
 
 // ── Hoisted mocks ─────────────────────────────────────────────────────────────
 
-const { mockMeshDispose, mockBodyDispose, standardMaterialInstances } = vi.hoisted(() => ({
+const { mockMeshDispose, mockBodyDispose, standardMaterialInstances, lightInstances } = vi.hoisted(() => ({
   mockMeshDispose: vi.fn(),
   mockBodyDispose: vi.fn(),
   standardMaterialInstances: [] as Array<{ name: string }>,
+  lightInstances: [] as Array<{ dispose: ReturnType<typeof vi.fn> }>,
 }));
 
 // ── Babylon mocks ─────────────────────────────────────────────────────────────
@@ -22,6 +23,7 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
       receiveShadows: false,
       parent: null,
       dispose: mockMeshDispose,
+      freezeWorldMatrix: vi.fn(),
     })),
     CreateGround: vi.fn(() => ({
       position: { x: 0, z: 0 },
@@ -29,6 +31,7 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
       receiveShadows: false,
       material: null,
       dispose: mockMeshDispose,
+      freezeWorldMatrix: vi.fn(),
     })),
     CreateCylinder: vi.fn(() => ({
       position: { set: vi.fn(), x: 0, y: 0, z: 0 },
@@ -37,6 +40,7 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
       receiveShadows: false,
       parent: null,
       dispose: mockMeshDispose,
+      freezeWorldMatrix: vi.fn(),
     })),
     CreateSphere: vi.fn(() => ({
       position: { set: vi.fn(), x: 0, y: 0, z: 0 },
@@ -45,6 +49,7 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
       receiveShadows: false,
       parent: null,
       dispose: mockMeshDispose,
+      freezeWorldMatrix: vi.fn(),
     })),
     CreateTorus: vi.fn(() => ({
       position: { set: vi.fn(), x: 0, y: 0, z: 0 },
@@ -52,6 +57,7 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
       material: null,
       receiveShadows: false,
       dispose: mockMeshDispose,
+      freezeWorldMatrix: vi.fn(),
     })),
     CreatePlane: vi.fn(() => ({
       position: { set: vi.fn(), x: 0, y: 0, z: 0 },
@@ -59,6 +65,7 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
       material: null,
       receiveShadows: false,
       dispose: mockMeshDispose,
+      freezeWorldMatrix: vi.fn(),
     })),
   },
 }));
@@ -69,7 +76,10 @@ vi.mock('@babylonjs/core/Lights/pointLight', () => ({
     specular: any = null;
     intensity: number = 1;
     range: number = 10;
-    constructor(_name: string, _position: any, _scene: any) {}
+    dispose = vi.fn();
+    constructor(_name: string, _position: any, _scene: any) {
+      lightInstances.push(this as any);
+    }
   },
 }));
 
@@ -220,6 +230,30 @@ describe('StructureManager.trySpawnForChunk — physics disposal', () => {
     sm.disposeChunk(cx, cz);
     // Ruins create 4 wall aggregates + 1 chest aggregate = 5 bodies
     expect(mockBodyDispose).toHaveBeenCalled();
+  });
+
+  it('disposeChunk disposes structure PointLights (torches/campfires)', () => {
+    lightInstances.length = 0;
+    const sm = new StructureManager(mockScene);
+
+    let structureChunk: [number, number] | null = null;
+    for (let x = 0; x < 20 && !structureChunk; x++) {
+      for (let z = 0; z < 20 && !structureChunk; z++) {
+        if (sm.hasStructureAt(x, z)) structureChunk = [x, z];
+      }
+    }
+    expect(structureChunk).not.toBeNull();
+    const [cx, cz] = structureChunk!;
+
+    sm.trySpawnForChunk(cx, cz, 'plains', 50);
+    const spawnedLights = lightInstances.splice(0);
+    // Ruins spawn 2 wall torches + 1 campfire — every one owns a PointLight
+    expect(spawnedLights.length).toBeGreaterThan(0);
+
+    sm.disposeChunk(cx, cz);
+    for (const light of spawnedLights) {
+      expect(light.dispose).toHaveBeenCalled();
+    }
   });
 
   it('disposeChunk disposes physics bodies before meshes', () => {

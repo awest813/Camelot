@@ -64,6 +64,7 @@ export class LodSystem {
   private _config: LODConfig;
   private _camera: Camera | null = null;
   private _frustumPlanes: Plane[] = [];
+  private _lastCulled: number = 0;
 
   constructor(config?: Partial<LODConfig>) {
     this._config = { ...DEFAULT_CONFIG, ...config };
@@ -189,7 +190,7 @@ export class LodSystem {
    */
   public update(playerPosition: Vector3): number {
     if (++this._frameCounter % this._updateInterval !== 0) {
-      return this._countCulled();
+      return this._lastCulled;
     }
 
     this._updateFrustumPlanes();
@@ -262,27 +263,21 @@ export class LodSystem {
     this._levelGroups = aliveLevelGroups;
 
     // ── Priority-based culling ─────────────────────────────────────────────
+    // Culling budget: when more meshes than `maxCulledPerFrame` are candidates,
+    // only the farthest ones stay hidden and the closest are restored.
     if (this._config.priorityCull && candidates.length > this._config.maxCulledPerFrame) {
       candidates.sort((a, b) => b.distanceSq - a.distanceSq);
-      const toRestore = candidates.slice(this._config.maxCulledPerFrame);
-      for (const entry of toRestore) {
-        this._entries.find(e => e.mesh === entry.mesh);
-        entry.mesh.isVisible = false;
+      for (const entry of candidates.slice(this._config.maxCulledPerFrame)) {
+        entry.mesh.isVisible = true;
       }
+      culled = this._config.maxCulledPerFrame;
     }
 
+    this._lastCulled = culled;
     return culled;
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
-
-  private _countCulled(): number {
-    let culled = this._entries.filter(e => !e.mesh.isDisposed() && !e.mesh.isVisible).length;
-    for (const group of this._levelGroups) {
-      culled += group.levels.filter(l => !l.mesh.isDisposed() && !l.mesh.isVisible).length;
-    }
-    return culled;
-  }
 
   // ── Debug accessors ───────────────────────────────────────────────────────────
 

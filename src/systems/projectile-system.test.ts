@@ -10,6 +10,8 @@ vi.mock("@babylonjs/core/Meshes/meshBuilder", () => ({
     CreateCylinder: vi.fn(() => ({
       position: new Vector3(0, 0, 0.8),
       material: null,
+      scaling: { setAll: vi.fn() },
+      isVisible: false,
       isDisposed: vi.fn(() => false),
       dispose: vi.fn(),
       lookAt: vi.fn(),
@@ -27,7 +29,12 @@ vi.mock("@babylonjs/core/Materials/standardMaterial", () => ({
 }));
 
 vi.mock("@babylonjs/core/Maths/math.color", () => ({
-  Color3: class { constructor(public r = 0, public g = 0, public b = 0) {} },
+  Color3: class {
+    public r = 0; public g = 0; public b = 0;
+    constructor(r = 0, g = 0, b = 0) { this.r = r; this.g = g; this.b = b; }
+    copyFromFloats(r: number, g: number, b: number) { this.r = r; this.g = g; this.b = b; }
+    static FromHexString(_hex: string) { return new (this as any)(1, 0.4, 0); }
+  },
 }));
 
 vi.mock("@babylonjs/core/Physics/v2/physicsAggregate", () => ({
@@ -412,5 +419,153 @@ describe("ProjectileSystem", () => {
     const daedricProgress = projectileSystem.drawProgress;
 
     expect(daedricProgress).toBeLessThan(ironProgress);
+  });
+
+  // ─── NPC-fired arrows ─────────────────────────────────────────────────────
+
+  it("fireNpcArrow spawns without consuming player ammo or stamina", () => {
+    const ok = projectileSystem.fireNpcArrow(
+      new Vector3(0, 0, 10), new Vector3(0, 0, -1), 7, { sourceName: "Bandit Archer" });
+    expect(ok).toBe(true);
+    expect(projectileSystem.arrowCount).toBe(10);
+    expect(mockPlayer.stamina).toBe(100);
+  });
+
+  it("hostile arrow damages the player on contact and fires onPlayerDamaged", () => {
+    mockPlayer.health = 100;
+    mockNpc.mesh.position = new Vector3(0, 0, 50); // bystander far away
+    const onDamaged = vi.fn();
+    projectileSystem.onPlayerDamaged = onDamaged;
+    projectileSystem.fireNpcArrow(
+      new Vector3(0, 0, 0.5), new Vector3(0, 0, -1), 7, { sourceName: "Bandit Archer" });
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016); // past skipFrames
+    expect(mockPlayer.health).toBe(93);
+    expect(onDamaged).toHaveBeenCalledWith(7, "Bandit Archer", null);
+    const calls = (mockUI.showNotification as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls.some(([msg]) => String(msg).includes("Bandit Archer"))).toBe(true);
+  });
+
+  it("hostile arrow spares its owner but still hits other NPCs", () => {
+    // Owner at the spawn point — must not take damage from its own shot.
+    mockNpc.mesh.position = new Vector3(0, 0, 10);
+    mockPlayer.camera.position = new Vector3(0, 0, 50); // player far away
+    projectileSystem.fireNpcArrow(
+      new Vector3(0, 0, 10), new Vector3(0, 0, -1), 7,
+      { sourceName: "Bandit Archer", owner: mockNpc });
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    expect(mockNpc.takeDamage).not.toHaveBeenCalled();
+  });
+
+  it("player arrows still hit NPCs (no owner exclusion regression)", () => {
+    mockNpc.mesh.position = new Vector3(0, 0, 0.8);
+    projectileSystem.fireArrow();
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    expect(mockNpc.takeDamage).toHaveBeenCalled();
+  });
+
+  it("alert NPCs may sidestep arrows (evasion)", () => {
+    mockNpc.aiState = AIState.CHASE;
+    mockNpc.mesh.position = new Vector3(0, 0, 0.8);
+    const rand = vi.spyOn(Math, "random").mockReturnValue(0.05); // < 0.12 alert bonus
+    projectileSystem.fireArrow();
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    expect(mockNpc.takeDamage).not.toHaveBeenCalled();
+    const calls = (mockUI.showDamageNumber as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls.some(([, dmg]) => dmg === 0)).toBe(true);
+    rand.mockRestore();
+  });
+
+  it("unaware stationary NPCs never evade", () => {
+    mockNpc.aiState = AIState.IDLE;
+    mockNpc.mesh.position = new Vector3(0, 0, 0.8);
+    const rand = vi.spyOn(Math, "random").mockReturnValue(0.99);
+    projectileSystem.fireArrow();
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    expect(mockNpc.takeDamage).toHaveBeenCalledOnce();
+    rand.mockRestore();
+  });
+
+  it("shield carriers block some arrows for half damage", () => {
+    mockNpc.aiState = AIState.IDLE;
+    mockNpc.mesh.position = new Vector3(0, 0, 0.8);
+    mockNpc.startingEquipmentIds = ["shield_wood"];
+    const rand = vi.spyOn(Math, "random").mockReturnValue(0.5); // no crit, no block
+    projectileSystem.fireArrow();
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    const full = (mockNpc.takeDamage as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    projectileSystem.update(1.0); // clear cooldown
+    rand.mockReturnValue(0.2); // < 0.25 block chance, > 0.15 crit bonus
+    projectileSystem.fireArrow();
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    const blocked = (mockNpc.takeDamage as ReturnType<typeof vi.fn>).mock.calls[1][0];
+    expect(blocked).toBe(Math.max(1, Math.round(full / 2)));
+    rand.mockRestore();
+  });
+
+  it("daedric arrows ignite the victim with burn", () => {
+    mockNpc.applyStatusEffect = vi.fn();
+    projectileSystem.equippedArrowType = "daedric";
+    projectileSystem.fireArrow();
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    expect(mockNpc.applyStatusEffect).toHaveBeenCalledOnce();
+    expect(mockNpc.applyStatusEffect).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "burn", tickInterval: 1, remainingDuration: 4 }),
+    );
+  });
+
+  it("iron arrows apply no status effect", () => {
+    mockNpc.applyStatusEffect = vi.fn();
+    projectileSystem.equippedArrowType = "iron";
+    projectileSystem.fireArrow();
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    expect(mockNpc.takeDamage).toHaveBeenCalled();
+    expect(mockNpc.applyStatusEffect).not.toHaveBeenCalled();
+  });
+
+  it("hostile arrow forwards its status effect via onPlayerDamaged", () => {
+    mockPlayer.health = 100;
+    mockNpc.mesh.position = new Vector3(0, 0, 50); // bystander far away
+    const onDamaged = vi.fn();
+    projectileSystem.onPlayerDamaged = onDamaged;
+    const effect = { type: "burn" as const, damagePerTick: 2, tickInterval: 1, duration: 4 };
+    projectileSystem.fireNpcArrow(
+      new Vector3(0, 0, 0.5), new Vector3(0, 0, -1), 5,
+      { sourceName: "Mage", magicType: "fire", statusEffect: effect });
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    expect(onDamaged).toHaveBeenCalledWith(5, "Mage", effect);
+  });
+
+  it("magic bolt labels the element in the player-hit notification", () => {
+    mockPlayer.health = 100;
+    mockNpc.mesh.position = new Vector3(0, 0, 50); // bystander far away
+    projectileSystem.fireNpcArrow(
+      new Vector3(0, 0, 0.5), new Vector3(0, 0, -1), 9,
+      { sourceName: "Mage Apprentice", magicType: "fire" });
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    expect(mockPlayer.health).toBe(91);
+    const calls = (mockUI.showNotification as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls.some(([msg]) => String(msg).includes("fire bolt"))).toBe(true);
   });
 });

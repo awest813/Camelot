@@ -1,4 +1,5 @@
 import type { ModManifestSystem, ModManifestEntryDraft } from "../systems/mod-manifest-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 
 /**
  * HTML-based Mod Manifest Editor overlay (Content GUI Release I).
@@ -22,6 +23,8 @@ export class ModManifestUI {
 
   private readonly _sys: ModManifestSystem;
   private _root: HTMLElement | null = null;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
   private _statusEl: HTMLElement | null = null;
   private _entryListEl: HTMLElement | null = null;
 
@@ -38,14 +41,19 @@ export class ModManifestUI {
     if (this._root) {
       this._root.hidden = false;
       this._renderEntryList();
+      if (!this._focusSession) this._focusSession = manageDialogFocus(this._root);
       return;
     }
     this._build();
+    const root = this._root;
+    if (!this._focusSession && root) this._focusSession = manageDialogFocus(root);
   }
 
   /** Hide the panel without destroying it. */
   close(): void {
     if (this._root) this._root.hidden = true;
+    this._focusSession?.release();
+    this._focusSession = null;
     this.onClose?.();
   }
 
@@ -55,6 +63,7 @@ export class ModManifestUI {
     const root = document.createElement("div");
     root.className = "mod-manifest";
     root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-label", "Mod Manifest Editor");
     this._root = root;
 

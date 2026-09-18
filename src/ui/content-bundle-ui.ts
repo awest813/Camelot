@@ -4,6 +4,7 @@ import type {
   BundleSystemReport,
   BundleSystemId,
 } from "../systems/content-bundle-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 
 /**
  * HTML-based Content Bundle overlay — Release C pre-publish dashboard.
@@ -38,6 +39,8 @@ export class ContentBundleUI {
 
   private readonly _sys: ContentBundleSystem;
   private _root: HTMLElement | null = null;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
   private _statusEl: HTMLElement | null = null;
   private _dashboardEl: HTMLElement | null = null;
   private _validateBtn: HTMLButtonElement | null = null;
@@ -59,13 +62,18 @@ export class ContentBundleUI {
     if (this._root) {
       this._root.hidden = false;
       this._syncMeta();
+      if (!this._focusSession) this._focusSession = manageDialogFocus(this._root);
       return;
     }
     this._build();
+    const root = this._root;
+    if (!this._focusSession && root) this._focusSession = manageDialogFocus(root);
   }
 
   close(): void {
     if (this._root) this._root.hidden = true;
+    this._focusSession?.release();
+    this._focusSession = null;
     this.onClose?.();
   }
 
@@ -75,6 +83,7 @@ export class ContentBundleUI {
     const root = document.createElement("div");
     root.className = "content-bundle";
     root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-label", "Content Bundle Dashboard");
     this._root = root;
 

@@ -222,4 +222,45 @@ describe('QuestSystem', () => {
         }));
         expect(() => qs.onKill('Guard')).not.toThrow();
     });
+
+    // ── failQuest ──────────────────────────────────────────────────────────────
+
+    it('failQuest marks an active quest failed and notifies', () => {
+        qs.addQuest(makeQuest({ id: 'q1' }));
+        expect(qs.failQuest('q1')).toBe(true);
+        expect(qs.getFailedQuests().map(q => q.id)).toEqual(['q1']);
+        expect(qs.getActiveQuests()).toHaveLength(0);
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Quest Failed: Test Quest', 4000);
+    });
+
+    it('failQuest fires onQuestFailed and returns false when not active', () => {
+        const failedCallback = vi.fn();
+        qs.onQuestFailed = failedCallback;
+        qs.addQuest(makeQuest({ id: 'q1' }));
+        expect(qs.failQuest('q1')).toBe(true);
+        expect(failedCallback).toHaveBeenCalledWith('q1');
+        expect(qs.failQuest('q1')).toBe(false); // already failed
+        expect(qs.failQuest('missing')).toBe(false); // unknown
+    });
+
+    it('failed quests ignore further objective updates', () => {
+        qs.addQuest(makeQuest({
+            objectives: [{ id: 'o1', type: 'kill', description: '', targetId: 'Guard', required: 1, current: 0, completed: false }],
+        }));
+        qs.failQuest('q1');
+        qs.onKill('Guard');
+        expect(qs.getQuests()[0].objectives[0].current).toBe(0);
+        expect(qs.getCompletedQuests()).toHaveLength(0);
+    });
+
+    it('restoreState round-trips isFailed', () => {
+        qs.addQuest(makeQuest({ id: 'q1' }));
+        qs.failQuest('q1');
+        qs.restoreState([{ id: 'q1', isCompleted: false, isActive: false, isFailed: true, objectives: [] }]);
+        expect(qs.getFailedQuests()).toHaveLength(1);
+        // Older saves without isFailed restore as not failed.
+        qs.restoreState([{ id: 'q1', isCompleted: false, isActive: true, objectives: [] }]);
+        expect(qs.getFailedQuests()).toHaveLength(0);
+        expect(qs.getActiveQuests()).toHaveLength(1);
+    });
 });

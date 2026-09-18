@@ -33,7 +33,7 @@ export class QuestGraphEngine {
   public activateQuest(questId: string): boolean {
     const definition = this._definitions.get(questId);
     const state = this._states.get(questId);
-    if (!definition || !state || state.status === "completed") return false;
+    if (!definition || !state || state.status === "completed" || state.status === "failed") return false;
 
     state.status = "active";
     const startNodeIds = this._getStartNodeIds(definition);
@@ -46,6 +46,39 @@ export class QuestGraphEngine {
 
   public getQuestStatus(questId: string): QuestStatus {
     return this._states.get(questId)?.status ?? "inactive";
+  }
+
+  /** Ids of all currently active quests (used for failure checks). */
+  public getActiveQuestIds(): string[] {
+    const ids: string[] = [];
+    for (const [questId, state] of this._states.entries()) {
+      if (state.status === "active") ids.push(questId);
+    }
+    return ids;
+  }
+
+  /**
+   * Fail an active quest (e.g. a quest target the player needed alive died).
+   * Failure is terminal: open nodes are marked failed, further events are
+   * ignored, and the quest cannot be re-activated.
+   * @returns true if the quest was active and is now failed.
+   */
+  public failQuest(questId: string): boolean {
+    const state = this._states.get(questId);
+    if (!state || state.status !== "active") return false;
+    state.status = "failed";
+    for (const nodeState of Object.values(state.nodes)) {
+      if (nodeState.active && !nodeState.completed) {
+        nodeState.active = false;
+        nodeState.failed = true;
+      }
+    }
+    return true;
+  }
+
+  /** Look up a quest's static definition (rewards, nodes), or undefined. */
+  public getQuestDefinition(questId: string): QuestDefinition | undefined {
+    return this._definitions.get(questId);
   }
 
   public getQuestState(questId: string): QuestRuntimeState | null {
@@ -68,6 +101,7 @@ export class QuestGraphEngine {
 
       const activatedNodeIds: string[] = [];
       const completedNodeIds: string[] = [];
+      const skippedNodeIds: string[] = [];
       const delta = Math.max(1, Math.floor(event.amount ?? 1));
 
       for (const node of definition.nodes) {
@@ -81,10 +115,14 @@ export class QuestGraphEngine {
           nodeState.active = false;
           completedNodeIds.push(node.id);
 
+          skippedNodeIds.push(
+            ...this._skipExclusiveSiblings(node, definition, state.nodes),
+          );
+
           const nextNodeIds = this._getImmediateNextNodeIds(node, definition);
           for (const nextNodeId of nextNodeIds) {
             const nextState = state.nodes[nextNodeId];
-            if (!nextState || nextState.completed || nextState.active) continue;
+            if (!nextState || nextState.completed || nextState.active || nextState.skipped) continue;
             if (!this._arePrerequisitesCompleted(nextNodeId, definition, state.nodes)) continue;
             nextState.active = true;
             activatedNodeIds.push(nextNodeId);
@@ -106,6 +144,8 @@ export class QuestGraphEngine {
         completedNodeIds,
         questCompleted,
         xpReward: questCompleted ? definition.xpReward ?? 0 : 0,
+        questFailed: false,
+        skippedNodeIds: Array.from(new Set(skippedNodeIds)),
       });
     }
 
@@ -325,11 +365,36 @@ export class QuestGraphEngine {
   ): void {
     for (const node of definition.nodes) {
       const nodeState = state[node.id];
-      if (!nodeState || nodeState.completed || nodeState.active) continue;
+      if (!nodeState || nodeState.completed || nodeState.active || nodeState.skipped) continue;
       if (!this._arePrerequisitesCompleted(node.id, definition, state)) continue;
       nodeState.active = true;
       activatedNodeIds.push(node.id);
     }
+  }
+
+  /**
+   * Xor-choice resolution: when a node in an exclusive group completes,
+   * deactivate every sibling in the same group as skipped (branch not taken).
+   * @returns ids of newly skipped nodes.
+   */
+  private _skipExclusiveSiblings(
+    completedNode: QuestNodeDefinition,
+    definition: QuestDefinition,
+    state: Record<string, QuestNodeState>
+  ): string[] {
+    const group = completedNode.exclusiveGroup;
+    if (!group) return [];
+    const skipped: string[] = [];
+    for (const candidate of definition.nodes) {
+      if (candidate.id === completedNode.id) continue;
+      if (candidate.exclusiveGroup !== group) continue;
+      const candidateState = state[candidate.id];
+      if (!candidateState || candidateState.completed || candidateState.skipped) continue;
+      candidateState.active = false;
+      candidateState.skipped = true;
+      skipped.push(candidate.id);
+    }
+    return skipped;
   }
 
   private _isQuestCompleted(
@@ -341,6 +406,9 @@ export class QuestGraphEngine {
         ? definition.completionNodeIds
         : definition.nodes.map((node) => node.id);
 
-    return completionNodeIds.every((nodeId) => state[nodeId]?.completed);
+    // Skipped branches count as resolved so xor-joins can complete.
+    return completionNodeIds.every(
+      (nodeId) => state[nodeId]?.completed || state[nodeId]?.skipped,
+    );
   }
 }

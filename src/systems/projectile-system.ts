@@ -5,7 +5,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
-import { AIState, NPC } from "../entities/npc";
+import { AIState, NPC, type DamageType, type StatusEffect } from "../entities/npc";
 import { Player } from "../entities/player";
 import { UIManager } from "../ui/ui-manager";
 import { StealthSystem } from "./stealth-system";
@@ -28,6 +28,35 @@ const ARROW_CRIT_DAMAGE_MULTIPLIER = 2.0;
 /** Physical damage number colour (matches combat-system). */
 const DMG_COLOR_ARROW_PHYSICAL = "#FF6030";
 const DMG_COLOR_ARROW_CRIT = "#FFD700";
+/** Missed-shot number colour (a grey zero — the target sidestepped). */
+const DMG_COLOR_ARROW_MISS = "#A89880";
+/** Shield-blocked shot number colour. */
+const DMG_COLOR_ARROW_BLOCKED = "#9FB7D4";
+/** Evasion caps so arrows stay reliable against unaware targets. */
+const NPC_EVASION_CAP = 0.3;
+/** Awareness bonus: fighting targets are mobile and watching. */
+const NPC_EVASION_ALERT_BONUS = 0.12;
+/** Sprinting targets are hard to lead. */
+const NPC_EVASION_SPRINT_BONUS = 0.1;
+/** Sprint speed above which the bonus applies. */
+const NPC_EVASION_SPRINT_SPEED = 3;
+/** Beyond this range shots are easy to sidestep. */
+const NPC_EVASION_LONG_RANGE = 15;
+const NPC_EVASION_LONG_RANGE_BONUS = 0.08;
+/** Shield carriers turn this fraction of incoming arrows for half damage. */
+const NPC_SHIELD_BLOCK_CHANCE = 0.25;
+/** Daedric arrows ignite victims: burn ticks at this fraction of the hit. */
+const DAEDRIC_BURN_TICK_FRACTION = 0.25;
+/** Daedric burn duration in seconds. */
+const DAEDRIC_BURN_DURATION = 4;
+
+/** Status effect delivered by a hostile bolt (mirrors NPC.attackStatusEffect). */
+export interface NpcBoltStatusEffect {
+  type: StatusEffect["type"];
+  damagePerTick: number;
+  tickInterval: number;
+  duration: number;
+}
 /** How far forward from the camera the arrow spawns to avoid clipping. */
 const ARROW_SPAWN_FORWARD  = 0.8;
 /** Slight downward eye-level offset so arrows don't clip the top of the FOV. */
@@ -84,7 +113,26 @@ interface ActiveArrow {
   baseDamage: number;
   skipFrames: number;
   isSneakShot: boolean;
+  /** True for NPC-fired arrows — they test against the player, not NPCs. */
+  hostileToPlayer: boolean;
+  /** NPC that fired this arrow — excluded from its own hit test. */
+  owner: NPC | null;
+  /** Element type for magic bolts (null = plain arrow). */
+  magicType: DamageType | null;
+  /** Display name of the shooter, used in the player-hit notification. */
+  sourceName: string;
+  /** Status effect applied to the player on hit (null = none). */
+  statusEffect: NpcBoltStatusEffect | null;
 }
+
+/** Player hit radius for hostile arrows (around the camera position). */
+const NPC_ARROW_HIT_RADIUS = 1.1;
+/** Emissive tint per magic bolt type (plain arrows keep the wood look). */
+const MAGIC_BOLT_COLORS: Record<string, string> = {
+  fire: "#FF6A00",
+  frost: "#7FD4FF",
+  shock: "#B47FFF",
+};
 
 /**
  * Manages bow-and-arrow ranged combat.
@@ -119,6 +167,7 @@ export class ProjectileSystem {
   private _skillSystem: SkillProgressionSystem | null = null;
   private _attributeSystem: AttributeSystem | null = null;
   private _hitPos: Vector3 = new Vector3();
+  private _npcVel: Vector3 = new Vector3();
 
   private _activeArrows: ActiveArrow[] = [];
   private _cooldownRemaining: number = 0;
@@ -206,6 +255,11 @@ export class ProjectileSystem {
   private _resetArrowMesh(item: PooledArrow): void {
     item.mesh.setEnabled(false);
     item.mesh.isVisible = false;
+    item.mesh.scaling?.setAll?.(1);
+    const mat = item.mesh.material;
+    if (mat?.emissiveColor && typeof mat.emissiveColor.copyFromFloats === "function") {
+      mat.emissiveColor.copyFromFloats(0, 0, 0);
+    }
     item.aggregate.body.disablePreStep = false;
   }
 
@@ -337,6 +391,80 @@ export class ProjectileSystem {
     return this._spawnArrow(1.0);
   }
 
+  /**
+   * Fire an NPC arrow/bolt at the player (ranged & magic enemy AI).
+   * Unlike player arrows this costs no ammo/stamina and skips sneak/crit —
+   * `damage` must be pre-mitigated by the caller (armor, difficulty,
+   * resistances).  Arrows are dodgeable by movement; blocking does not apply.
+   *
+   * @param origin    World-space launch point (e.g. NPC chest height).
+   * @param direction Normalised flight direction (toward the player).
+   * @param damage    Final damage applied on a player hit (min 1).
+   * @param opts      Shooter identity, elemental bolt type, owner exclusion,
+   *                  and an optional status effect applied on a player hit.
+   * @returns true if the projectile was spawned.
+   */
+  public fireNpcArrow(
+    origin: Vector3,
+    direction: Vector3,
+    damage: number,
+    opts: {
+      sourceName?: string;
+      magicType?: DamageType | null;
+      owner?: NPC | null;
+      statusEffect?: NpcBoltStatusEffect | null;
+    } = {},
+  ): boolean {
+    while (this._activeArrows.length >= MAX_ACTIVE_ARROWS) {
+      this._disposeArrow(this._activeArrows.shift()!);
+    }
+
+    const pooled = this._arrowPool.acquire();
+    const mesh = pooled.mesh;
+    const aggregate = pooled.aggregate;
+
+    mesh.position.copyFrom(origin);
+    mesh.lookAt(mesh.position.add(direction));
+    mesh.setEnabled(true);
+    mesh.isVisible = true;
+
+    const magicType = opts.magicType ?? null;
+    if (magicType && MAGIC_BOLT_COLORS[magicType]) {
+      mesh.scaling.setAll(2.2);
+      mesh.material.emissiveColor = Color3.FromHexString(MAGIC_BOLT_COLORS[magicType]);
+    }
+
+    aggregate.body.applyImpulse(
+      direction.scale(ARROW_SPEED * (magicType ? 0.7 : 1.0) * 0.1),
+      mesh.position,
+    );
+
+    this._activeArrows.push({
+      poolIndex: 0,
+      mesh,
+      aggregate,
+      lifetime:   ARROW_LIFETIME,
+      baseDamage: Math.max(1, Math.round(damage)),
+      skipFrames: 2,
+      isSneakShot: false,
+      hostileToPlayer: true,
+      owner: opts.owner ?? null,
+      magicType,
+      sourceName: opts.sourceName ?? "Enemy",
+      statusEffect: opts.statusEffect ?? null,
+    });
+    return true;
+  }
+
+  /**
+   * Fired when a hostile arrow damages the player (game layer hooks).
+   * `statusEffect`, when present, should be applied to the player via
+   * CombatSystem.applyPlayerStatusEffect.
+   */
+  public onPlayerDamaged:
+    | ((damage: number, sourceName: string, statusEffect: NpcBoltStatusEffect | null) => void)
+    | null = null;
+
   // ── Shared spawn ──────────────────────────────────────────────────────────
 
   /**
@@ -399,6 +527,11 @@ export class ProjectileSystem {
       baseDamage,
       skipFrames: 1,
       isSneakShot,
+      hostileToPlayer: false,
+      owner: null,
+      magicType: null,
+      sourceName: "",
+      statusEffect: null,
     });
 
     const staminaCost = this._arrowStaminaCost();
@@ -440,8 +573,18 @@ export class ProjectileSystem {
       // Distance-based hit detection against NPCs
       let hit = false;
       for (const npc of this._npcs) {
+        if (arrow.owner && npc === arrow.owner) continue; // can't hit yourself
         if (npc.isDead) continue;
         if (Vector3.Distance(arrow.mesh.position, npc.mesh.position) < ARROW_HIT_RADIUS) {
+          // Evasion: aware, sprinting, or distant targets may sidestep the
+          // shot entirely — a clean miss, shown as a grey zero.
+          if (Math.random() < this._npcEvasionChance(npc, arrow.mesh.position)) {
+            const missPos = npc.mesh.position.addToRef(ProjectileSystem._DMG_OFFSET_Y2, this._hitPos);
+            this._ui.showDamageNumber(missPos, 0, this._scene, DMG_COLOR_ARROW_MISS);
+            hit = true;
+            break;
+          }
+
           const bowProf = WEAPON_PROFILES.bow;
 
           let raw = arrow.baseDamage;
@@ -463,22 +606,41 @@ export class ProjectileSystem {
             raw = Math.round(raw * ARROW_CRIT_DAMAGE_MULTIPLIER);
           }
 
-          const finalDamage = applyDamageWithResistance(
+          let finalDamage = applyDamageWithResistance(
             raw,
             npc,
             "physical",
             bowProf.armorPenFraction,
           );
 
+          // Shield block: carriers (starting equipment with a shield) turn
+          // some arrows for half damage.
+          let blocked = false;
+          if (this._npcHasShield(npc) && Math.random() < NPC_SHIELD_BLOCK_CHANCE) {
+            blocked = true;
+            finalDamage = Math.max(1, Math.round(finalDamage / 2));
+          }
+
           npc.takeDamage(finalDamage);
           this._skillSystem?.gainXP("marksman", SKILL_XP_MARKSMAN_HIT);
+
+          // Daedric arrows are wreathed in Oblivion flame — victims burn.
+          if (this.equippedArrowType === "daedric") {
+            npc.applyStatusEffect?.({
+              type: "burn",
+              damagePerTick: Math.max(1, Math.round(finalDamage * DAEDRIC_BURN_TICK_FRACTION)),
+              tickInterval: 1,
+              tickTimer: 1,
+              remainingDuration: DAEDRIC_BURN_DURATION,
+            });
+          }
 
           const numPos = npc.mesh.position.addToRef(ProjectileSystem._DMG_OFFSET_Y2, this._hitPos);
           this._ui.showDamageNumber(
             numPos,
             finalDamage,
             this._scene,
-            isCrit ? DMG_COLOR_ARROW_CRIT : DMG_COLOR_ARROW_PHYSICAL,
+            blocked ? DMG_COLOR_ARROW_BLOCKED : (isCrit ? DMG_COLOR_ARROW_CRIT : DMG_COLOR_ARROW_PHYSICAL),
           );
           this._ui.applyHitStop(isCrit ? 85 : 45);
           this._ui.shakeCamera(isCrit ? 0.38 : 0.2);
@@ -509,6 +671,27 @@ export class ProjectileSystem {
 
           hit = true;
           break;
+        }
+      }
+
+      // Hostile (NPC-fired) arrows test against the player instead.
+      // They are dodgeable by movement — blocking does not apply.
+      if (!hit && arrow.hostileToPlayer) {
+        const playerPos = this._player.camera.position;
+        if (Vector3.Distance(arrow.mesh.position, playerPos) < NPC_ARROW_HIT_RADIUS) {
+          const dmg = Math.max(1, Math.round(arrow.baseDamage));
+          this._player.health = Math.max(0, this._player.health - dmg);
+          (this._player as unknown as { notifyDamageTaken?: () => void }).notifyDamageTaken?.();
+          const label = arrow.magicType
+            ? `${arrow.sourceName}'s ${arrow.magicType} bolt hits you for ${dmg}!`
+            : `${arrow.sourceName}'s arrow hits you for ${dmg}!`;
+          this._ui.showNotification(label, 2000);
+          this._ui.showHitFlash(
+            arrow.magicType ? "rgba(180, 120, 255, 0.35)" : "rgba(200, 0, 0, 0.4)");
+          this._ui.shakeCamera(0.4);
+          this._ui.applyHitStop(60);
+          this.onPlayerDamaged?.(dmg, arrow.sourceName, arrow.statusEffect);
+          hit = true;
         }
       }
 
@@ -555,6 +738,42 @@ export class ProjectileSystem {
 
   private _marksmanLevel(): number {
     return this._skillSystem?.getSkill("marksman")?.level ?? this.archerySkill;
+  }
+
+  /**
+   * Sidestep chance for an NPC about to be hit: aware fighters, sprinters,
+   * and long-range targets are harder to pin down.  Unaware, stationary,
+   * close targets never evade (keeps existing behaviour deterministic).
+   */
+  private _npcEvasionChance(npc: NPC, arrowPos: Vector3): number {
+    let chance = 0;
+    if (npc.aiState === AIState.CHASE || npc.aiState === AIState.ATTACK) {
+      chance += NPC_EVASION_ALERT_BONUS;
+    }
+    if (this._npcHorizontalSpeed(npc) > NPC_EVASION_SPRINT_SPEED) {
+      chance += NPC_EVASION_SPRINT_BONUS;
+    }
+    if (Vector3.Distance(arrowPos, npc.mesh.position) > NPC_EVASION_LONG_RANGE) {
+      chance += NPC_EVASION_LONG_RANGE_BONUS;
+    }
+    return Math.min(NPC_EVASION_CAP, chance);
+  }
+
+  /** Horizontal physics speed of an NPC (0 when no physics body is present). */
+  private _npcHorizontalSpeed(npc: NPC): number {
+    const body = npc.physicsAggregate?.body;
+    if (!body || typeof body.getLinearVelocityToRef !== "function") return 0;
+    body.getLinearVelocityToRef(this._npcVel);
+    return Math.hypot(this._npcVel.x, this._npcVel.z);
+  }
+
+  /**
+   * True when the NPC visibly carries a shield (matched against starting
+   * equipment ids — the only shield data authored on NPCs).
+   */
+  private _npcHasShield(npc: NPC): boolean {
+    const ids = npc.startingEquipmentIds ?? [];
+    return ids.some((id) => id.toLowerCase().includes("shield"));
   }
 
   private _scaledArrowStaminaCost(base: number): number {

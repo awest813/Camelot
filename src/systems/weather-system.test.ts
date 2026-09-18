@@ -251,4 +251,37 @@ describe("WeatherSystem", () => {
       expect(scene.fogColor.r).toBeCloseTo(0.30, 4);
     });
   });
+
+  describe("day/night blending (daylightScale)", () => {
+    it("kills the sun and dims ambient with a readable floor at night", () => {
+      const ambient = makeLightMock();
+      const sun = makeLightMock();
+      const sys = new WeatherSystem("clear", null, ambient, sun, { ambientBase: 1.0, sunBase: 1.0 });
+
+      sys.daylightScale = 0.08; // deep night (TimeSystem.ambientIntensity minimum)
+      sys.update(0.016);
+
+      expect(sun.intensity).toBeCloseTo(0.08, 5);
+      expect(ambient.intensity).toBeCloseTo(0.35 + 0.65 * 0.08, 5);
+    });
+
+    it("darkens fog color at night", () => {
+      const scene = makeSceneMock();
+      const sys = new WeatherSystem("clear", scene, null, null);
+      sys.daylightScale = 0;
+      sys.update(0.016);
+      // clear fog r = 0.50 × fogDarken(0.30)
+      expect(scene.fogColor.r).toBeCloseTo(0.15, 4);
+    });
+
+    it("re-applies lighting when daylight changes while weather is settled", () => {
+      const sun = makeLightMock();
+      const sys = new WeatherSystem("clear", null, null, sun, { ambientBase: 1.0, sunBase: 1.0 });
+      expect(sun.intensity).toBeCloseTo(1.0, 5); // noon default
+
+      sys.daylightScale = 0.5;
+      sys.update(0.016);
+      expect(sun.intensity).toBeCloseTo(0.5, 5);
+    });
+  });
 });

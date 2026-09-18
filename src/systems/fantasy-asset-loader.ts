@@ -172,9 +172,11 @@ const CDN_ELF  = CDN + "Elf/";
 
 /**
  * Base path for self-hosted Quaternius assets.
- * Override via `setQuaterniusBasePath()` for custom CDN hosting.
+ * Root-anchored (plus the Vite deployment base) so model URLs keep working
+ * when the app is served from a sub-path.  Override via
+ * `setQuaterniusBasePath()` for custom CDN hosting.
  */
-let QUATERNIUS_BASE = "model/quaternius/";
+let QUATERNIUS_BASE = `${import.meta.env.BASE_URL ?? "/"}model/quaternius/`;
 
 /** Override the default Quaternius asset base path (e.g. for CDN hosting). */
 export function setQuaterniusBasePath(basePath: string): void {

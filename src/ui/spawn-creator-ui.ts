@@ -1,4 +1,5 @@
 import type { SpawnCreatorSystem, SpawnEntryDraft } from "../systems/spawn-creator-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 import { SPAWN_ARCHETYPE_ROLES } from "../systems/spawn-creator-system";
 import { SchemaFieldBuilder } from "./schema-field-builder";
 
@@ -36,6 +37,8 @@ export class SpawnCreatorUI {
   private readonly _fb = new SchemaFieldBuilder("spawn-creator");
 
   private _root: HTMLElement | null = null;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
   private _statusEl: HTMLElement | null = null;
   private _entryListEl: HTMLElement | null = null;
 
@@ -57,14 +60,19 @@ export class SpawnCreatorUI {
     if (this._root) {
       this._root.hidden = false;
       this._syncFromDraft();
+      if (!this._focusSession) this._focusSession = manageDialogFocus(this._root);
       return;
     }
     this._build();
+    const root = this._root;
+    if (!this._focusSession && root) this._focusSession = manageDialogFocus(root);
   }
 
   /** Hide the panel without destroying it. */
   close(): void {
     if (this._root) this._root.hidden = true;
+    this._focusSession?.release();
+    this._focusSession = null;
     this.onClose?.();
   }
 
@@ -74,6 +82,7 @@ export class SpawnCreatorUI {
     const root = document.createElement("div");
     root.className = "spawn-creator";
     root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-label", "Spawn Creator");
     this._root = root;
 

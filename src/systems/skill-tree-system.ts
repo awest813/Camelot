@@ -163,7 +163,7 @@ export class SkillTreeSystem {
     this._player.skillPoints--;
     skill.effect(this._player, 1);
     this._ui.showNotification(`${skill.name} upgraded to rank ${skill.currentRank}!`, 2500);
-    this._ui.refreshSkillTree(this.trees, this._player.skillPoints);
+    this._ui.refreshSkillTree(this.trees, this._player.skillPoints, (i, j) => this.arePrerequisitesMet(i, j));
     return true;
   }
 
@@ -211,7 +211,7 @@ export class SkillTreeSystem {
     this.isOpen = !this.isOpen;
     this._ui.toggleSkillTree(this.isOpen);
     if (this.isOpen) {
-      this._ui.refreshSkillTree(this.trees, this._player.skillPoints);
+      this._ui.refreshSkillTree(this.trees, this._player.skillPoints, (i, j) => this.arePrerequisitesMet(i, j));
     }
   }
 

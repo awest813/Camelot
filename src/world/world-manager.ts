@@ -170,7 +170,10 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     // Dispose vegetation meshes for this chunk
     const veg = this.chunkVegetation.get(key);
     if (veg) {
-      for (const m of veg) m.dispose(false, false);
+      for (const m of veg) {
+        this._removeShadowCaster(m);
+        m.dispose(false, false);
+      }
       this.chunkVegetation.delete(key);
     }
 
@@ -191,7 +194,10 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
 
       const veg = this.chunkVegetation.get(key);
       if (veg) {
-        for (const m of veg) m.dispose(false, false);
+        for (const m of veg) {
+          this._removeShadowCaster(m);
+          m.dispose(false, false);
+        }
         this.chunkVegetation.delete(key);
       }
 
@@ -242,11 +248,16 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     chunkMesh.material = this._getBiomeMaterial(biome);
     // Ground receives but does not cast shadows
     chunkMesh.receiveShadows = true;
+    // Static terrain — never moves, so skip per-frame world-matrix updates
+    chunkMesh.freezeWorldMatrix();
 
     this.loadedChunks.set(key, { mesh: chunkMesh, body, cx: x, cz: z });
 
-    // Spawn vegetation for this chunk
-    const vegMeshes = this._spawnVegetation(x, z, biome);
+    // Spawn vegetation for this chunk (merged per material to cut draw calls)
+    const vegMeshes = this._mergeVegetationByMaterial(
+      this._spawnVegetation(x, z, biome),
+      key,
+    );
     if (vegMeshes.length > 0) {
       this.chunkVegetation.set(key, vegMeshes);
     }
@@ -310,18 +321,24 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     return this.treeTrunkMaterial;
   }
 
-  private _getTreeCrownMaterial(scale: number): StandardMaterial {
-    // Quantize variation to reduce material count while keeping visual diversity.
-    const bucket = Math.round(scale * 4);
-    let material = this.treeCrownMaterials.get(bucket);
+  private _getTreeCrownMaterial(biomeOrScale: BiomeType | number = "forest"): StandardMaterial {
+    const key = typeof biomeOrScale === "string" ? biomeOrScale : "forest";
+    let material = this.treeCrownMaterials.get(key as any);
     if (!material) {
-      const greenShift = bucket / 4;
-      material = new StandardMaterial(`tree_crown_mat_${bucket}`, this.scene);
-      material.diffuseColor  = new Color3(0.05 + greenShift * 0.06, 0.36 + greenShift * 0.24, 0.04 + greenShift * 0.04);
+      material = new StandardMaterial(`tree_crown_mat_${key}`, this.scene);
+      if (key === "forest") {
+        material.diffuseColor  = new Color3(0.08, 0.38, 0.08);
+      } else if (key === "plains") {
+        material.diffuseColor  = new Color3(0.18, 0.48, 0.12);
+      } else if (key === "tundra") {
+        material.diffuseColor  = new Color3(0.20, 0.32, 0.26);
+      } else {
+        material.diffuseColor  = new Color3(0.18, 0.54, 0.12);
+      }
       material.specularColor = new Color3(0.05, 0.10, 0.04);
       material.specularPower = 18;
       material.freeze();
-      this.treeCrownMaterials.set(bucket, material);
+      this.treeCrownMaterials.set(key as any, material);
     }
 
     return material;
@@ -359,6 +376,71 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     mesh.receiveShadows = true;
   }
 
+  /** Remove a mesh from the shadow map's render list (used before disposing sources). */
+  private _removeShadowCaster(mesh: Mesh): void {
+    this._shadows?.removeShadowCaster(mesh, false);
+  }
+
+  /**
+   * Merge a chunk's vegetation into one mesh per shared material.
+   *
+   * Baking each material group into a single mesh drops a chunk from ~35
+   * draw calls to 3-4 draw calls, and the merged mesh gets a frozen world matrix
+   * and bounding sphere culling strategy.
+   */
+  private _mergeVegetationByMaterial(meshes: Mesh[], chunkKey: string): Mesh[] {
+    if (meshes.length === 0) return meshes;
+
+    const byMaterial = new Map<StandardMaterial, Mesh[]>();
+    for (const mesh of meshes) {
+      const mat = mesh.material instanceof StandardMaterial ? mesh.material : null;
+      if (!mat) continue; // unmaterialized meshes stay individual
+      const group = byMaterial.get(mat);
+      if (group) group.push(mesh);
+      else byMaterial.set(mat, [mesh]);
+    }
+
+    const merged: Mesh[] = [];
+    let index = 0;
+    for (const group of byMaterial.values()) {
+      const shouldCastShadow = group.some((m) => m.metadata?.castsShadow === true);
+
+      if (group.length === 1) {
+        group[0].freezeWorldMatrix();
+        if (shouldCastShadow) {
+          this._addShadowCaster(group[0]);
+        }
+        (group[0] as any).cullingStrategy = 1;
+        merged.push(group[0]);
+        continue;
+      }
+
+      // Bake without disposing sources first — on a failed merge the group
+      // falls back to individual meshes instead of leaking untracked ones.
+      const baked = Mesh.MergeMeshes(group, false, true);
+      if (!baked) {
+        for (const m of group) {
+          m.freezeWorldMatrix();
+          if (m.metadata?.castsShadow) this._addShadowCaster(m);
+          (m as any).cullingStrategy = 1;
+          merged.push(m);
+        }
+        continue;
+      }
+      for (const mesh of group) {
+        mesh.dispose(false, false);
+      }
+      baked.name = `veg_merged_${chunkKey}_${index++}`;
+      if (shouldCastShadow) {
+        this._addShadowCaster(baked);
+      }
+      baked.freezeWorldMatrix();
+      (baked as any).cullingStrategy = 1;
+      merged.push(baked);
+    }
+    return merged;
+  }
+
   public _spawnVegetation(chunkX: number, chunkZ: number, biome: BiomeType): Mesh[] {
     const meshes: Mesh[] = [];
     const centerX = chunkX * this.chunkSize;
@@ -377,7 +459,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
         for (let i = 0; i < 6; i++) {
           const px = centerX + (rand(i * 2) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(i * 2 + 1) * 2 - 1) * halfSize;
-          meshes.push(...this._spawnTree(px, pz, `tree_${chunkX}_${chunkZ}_${i}`, rand(i * 3)));
+          meshes.push(...this._spawnTree(px, pz, `tree_${chunkX}_${chunkZ}_${i}`, rand(i * 3), "forest"));
         }
         // 2 giant mushrooms — Oblivion Blackwood/Morrowind feel
         for (let i = 0; i < 2; i++) {
@@ -399,7 +481,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
         for (let i = 0; i < 2; i++) {
           const px = centerX + (rand(i * 2) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(i * 2 + 1) * 2 - 1) * halfSize;
-          meshes.push(...this._spawnTree(px, pz, `tree_${chunkX}_${chunkZ}_${i}`, rand(i * 3)));
+          meshes.push(...this._spawnTree(px, pz, `tree_${chunkX}_${chunkZ}_${i}`, rand(i * 3), "plains"));
         }
         // 1–2 ancient standing stones — Oblivion Ayleid waymarkers
         const stoneCount = rand(200) < 0.5 ? 1 : 2;
@@ -466,7 +548,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
   }
 
   /** Spawn a tree: cylindrical trunk + conical foliage crown for a stylised pine look. */
-  private _spawnTree(x: number, z: number, name: string, scale: number): Mesh[] {
+  private _spawnTree(x: number, z: number, name: string, scale: number, biome: BiomeType = "forest"): Mesh[] {
     const trunkHeight = 2.5 + scale * 2.5; // 2.5–5 m
 
     const trunk = MeshBuilder.CreateCylinder(
@@ -476,7 +558,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     );
     trunk.position.set(x, trunkHeight / 2, z);
     trunk.material = this._getTreeTrunkMaterial();
-    this._addShadowCaster(trunk);
+    trunk.metadata = { castsShadow: true };
 
     // Two-tier cone foliage for a pine/fir silhouette
     const crownBase = 1.6 + scale * 1.0; // 1.6–2.6 m radius at bottom tier
@@ -486,8 +568,8 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       this.scene
     );
     lowerCrown.position.set(x, trunkHeight + crownBase * 0.5, z);
-    lowerCrown.material = this._getTreeCrownMaterial(scale * 0.5);
-    this._addShadowCaster(lowerCrown);
+    lowerCrown.material = this._getTreeCrownMaterial(biome);
+    lowerCrown.metadata = { castsShadow: true };
 
     const upperCrown = MeshBuilder.CreateCylinder(
       `${name}_upper`,
@@ -495,8 +577,8 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       this.scene
     );
     upperCrown.position.set(x, trunkHeight + crownBase * 1.4, z);
-    upperCrown.material = this._getTreeCrownMaterial(Math.min(1, scale + 0.3));
-    this._addShadowCaster(upperCrown);
+    upperCrown.material = this._getTreeCrownMaterial(biome);
+    upperCrown.metadata = { castsShadow: true };
 
     return [trunk, lowerCrown, upperCrown];
   }
@@ -512,7 +594,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     );
     body.position.set(x, 1.4, z);
     body.material = mat;
-    this._addShadowCaster(body);
+    body.metadata = { castsShadow: true };
 
     const armL = MeshBuilder.CreateCylinder(
       `${name}_armL`,
@@ -522,7 +604,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     armL.rotation.z = Math.PI / 2.3;
     armL.position.set(x - 0.65, 1.9, z);
     armL.material = mat;
-    this._addShadowCaster(armL);
+    armL.metadata = { castsShadow: true };
 
     const armR = MeshBuilder.CreateCylinder(
       `${name}_armR`,
@@ -532,7 +614,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     armR.rotation.z = -Math.PI / 2.3;
     armR.position.set(x + 0.65, 1.9, z);
     armR.material = mat;
-    this._addShadowCaster(armR);
+    armR.metadata = { castsShadow: true };
 
     return [body, armL, armR];
   }
@@ -550,7 +632,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     );
     crystal.position.set(x, height / 2, z);
     crystal.material = this._getIceMaterial();
-    this._addShadowCaster(crystal);
+    crystal.metadata = { castsShadow: true };
     meshes.push(crystal);
 
     // Small satellite shard for visual interest
@@ -563,7 +645,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     shard.rotation.z = 0.35;
     shard.position.set(x + 0.30, shardH / 2 + 0.1, z + 0.15);
     shard.material = this._getIceMaterial();
-    this._addShadowCaster(shard);
+    shard.metadata = { castsShadow: false };
     meshes.push(shard);
 
     return meshes;
@@ -617,7 +699,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     );
     stalk.position.set(x, stalkH / 2, z);
     stalk.material = stalkMat;
-    this._addShadowCaster(stalk);
+    stalk.metadata = { castsShadow: false };
 
     const capR = 0.9 + scale * 0.7; // 0.9–1.6 m radius
     const cap = MeshBuilder.CreateCylinder(
@@ -627,7 +709,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     );
     cap.position.set(x, stalkH + capR * 0.2, z);
     cap.material = capMat;
-    this._addShadowCaster(cap);
+    cap.metadata = { castsShadow: false };
 
     return [stalk, cap];
   }
@@ -637,12 +719,11 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
    * Common in forests; also appears in tundra as a grey variant.
    */
   private _spawnBoulder(x: number, z: number, name: string, scale: number): Mesh[] {
-    const r    = 0.5 + scale * 1.0; // 0.5–1.5 m radius
-    const bucket = Math.round(scale * 3);
-    const mat = this._envMat(`boulder_moss_${bucket}`, () => {
-      const m = new StandardMaterial(`boulder_moss_${bucket}`, this.scene);
-      m.diffuseColor  = new Color3(0.38 - scale * 0.08, 0.36 - scale * 0.05, 0.30);
-      m.specularColor = new Color3(0.10, 0.10, 0.08);
+    const r = 0.5 + scale * 1.0; // 0.5–1.5 m radius
+    const mat = this._envMat("boulder_moss", () => {
+      const m = new StandardMaterial("boulder_moss", this.scene);
+      m.diffuseColor  = new Color3(0.35, 0.34, 0.30);
+      m.specularColor = new Color3(0.08, 0.08, 0.06);
       m.specularPower = 16;
       m.freeze();
       return m;
@@ -657,7 +738,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     boulder.position.set(x, r * 0.6, z);
     boulder.rotation.y = scale * Math.PI;
     boulder.material   = mat;
-    this._addShadowCaster(boulder);
+    boulder.metadata   = { castsShadow: true };
 
     return [boulder];
   }
@@ -686,7 +767,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     stone.position.set(x, h / 2, z);
     stone.rotation.y = scale * 1.8; // slight turn for variety
     stone.material   = mat;
-    this._addShadowCaster(stone);
+    stone.metadata   = { castsShadow: true };
 
     // Cap slab (wider than the stone, slightly angled)
     const cap = MeshBuilder.CreateBox(
@@ -704,7 +785,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.freeze();
       return m;
     });
-    this._addShadowCaster(cap);
+    cap.metadata = { castsShadow: true };
 
     return [stone, cap];
   }
@@ -715,12 +796,20 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
    */
   private _spawnWildflowers(x: number, z: number, name: string, seed: number): Mesh[] {
     const meshes: Mesh[] = [];
-    const colors = [
-      new Color3(0.90, 0.22, 0.30), // red
-      new Color3(0.95, 0.78, 0.10), // yellow
-      new Color3(0.50, 0.25, 0.85), // purple
-      new Color3(0.98, 0.98, 0.98), // white
-    ];
+    const bloomMat = this._envMat("flower_bloom", () => {
+      const m = new StandardMaterial("flower_bloom", this.scene);
+      m.diffuseColor  = new Color3(0.92, 0.35, 0.25);
+      m.emissiveColor = new Color3(0.18, 0.06, 0.04);
+      m.freeze();
+      return m;
+    });
+    const stemMat = this._envMat("flower_stem", () => {
+      const sm = new StandardMaterial("flower_stem", this.scene);
+      sm.diffuseColor = new Color3(0.18, 0.44, 0.12);
+      sm.freeze();
+      return sm;
+    });
+
     const count = 8;
     for (let i = 0; i < count; i++) {
       const a  = (i / count) * Math.PI * 2 + seed;
@@ -733,12 +822,8 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
         this.scene,
       );
       bloom.position.set(fx, 0.10, fz);
-      const col = colors[i % colors.length];
-      const bMat = new StandardMaterial(`${name}_bmat_${i}`, this.scene);
-      bMat.diffuseColor  = col;
-      bMat.emissiveColor = new Color3(col.r * 0.15, col.g * 0.15, col.b * 0.15);
-      bMat.freeze();
-      bloom.material = bMat;
+      bloom.material = bloomMat;
+      bloom.metadata = { castsShadow: false };
       meshes.push(bloom);
 
       // Thin stem
@@ -748,12 +833,8 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
         this.scene,
       );
       stem.position.set(fx, 0.05, fz);
-      stem.material = this._envMat("flower_stem", () => {
-        const sm = new StandardMaterial("flower_stem", this.scene);
-        sm.diffuseColor = new Color3(0.18, 0.44, 0.12);
-        sm.freeze();
-        return sm;
-      });
+      stem.material = stemMat;
+      stem.metadata = { castsShadow: false };
       meshes.push(stem);
     }
     return meshes;
@@ -789,7 +870,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     );
     trunk.position.set(x, trunkH / 2, z);
     trunk.material = trunkMat;
-    this._addShadowCaster(trunk);
+    trunk.metadata = { castsShadow: true };
 
     // Fan of 6 fronds arching outward
     const frondCount = 6;
@@ -809,7 +890,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
         z + Math.sin(angle) * 0.7,
       );
       frond.material = frondMat;
-      this._addShadowCaster(frond);
+      frond.metadata = { castsShadow: true };
       meshes.push(frond);
     }
 
@@ -839,7 +920,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     trunk.rotation.z = (scale - 0.5) * 0.3; // slight lean
     trunk.position.set(x, trunkH / 2, z);
     trunk.material = mat;
-    this._addShadowCaster(trunk);
+    trunk.metadata = { castsShadow: true };
 
     // 3 bare branch segments radiating up from near the top
     const meshes: Mesh[] = [trunk];
@@ -859,6 +940,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
         z + Math.sin(bAngle) * 0.4,
       );
       branch.material = mat;
+      branch.metadata = { castsShadow: true };
       meshes.push(branch);
     }
 
@@ -886,7 +968,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.freeze();
       return m;
     });
-    this._addShadowCaster(boulder);
+    boulder.metadata = { castsShadow: true };
 
     // Snow drift cap (flattened sphere on top)
     const cap = MeshBuilder.CreateSphere(

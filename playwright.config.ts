@@ -20,6 +20,11 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:8099",
     headless: true,
     trace: "retain-on-failure",
+    // Software WebGL for headless Chromium (modern Chrome disables SwiftShader
+    // for page content without this flag, which would kill the engine).
+    launchOptions: {
+      args: ["--enable-unsafe-swiftshader"],
+    },
   },
 
   /*

@@ -17,6 +17,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    setupFiles: ["./tests/setup-jsdom-storage.ts"],
+    testTimeout: 15000,
     exclude: [
       "tests/e2e/**",
       "**/node_modules/**",

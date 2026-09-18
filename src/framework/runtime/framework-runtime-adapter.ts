@@ -85,6 +85,8 @@ export interface NotificationListener {
   onQuestActivated?: (questId: string) => void;
   /** A quest was completed; `xpReward` is the quest's configured reward (may be 0). */
   onQuestCompleted?: (questId: string, xpReward: number) => void;
+  /** A quest transitioned to "failed" (e.g. via a dialogue fail_quest effect). */
+  onQuestFailed?: (questId: string) => void;
   /** Dialogue effect consumed an item from the player's inventory. */
   onItemConsumed?: (itemId: string, quantity: number) => void;
   /** Dialogue effect gave an item to the player. */
@@ -219,6 +221,11 @@ export class FrameworkRuntimeAdapter {
       activateQuest: (questId) => {
         runtime.questEngine.activateQuest(questId);
         for (const l of listeners) l.onQuestActivated?.(questId);
+      },
+      failQuest: (questId) => {
+        if (runtime.questEngine.failQuest(questId)) {
+          for (const l of listeners) l.onQuestFailed?.(questId);
+        }
       },
       consumeItem: (itemId, quantity) => {
         const ok = runtime.inventoryEngine.removeItem(itemId, quantity).success;

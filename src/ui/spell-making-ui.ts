@@ -1,4 +1,5 @@
 import type { DamageType, SpellSchool } from "../systems/spell-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 import type { SpellComponent, SpellComponentEffect } from "../systems/spell-making-system";
 import {
   SPELL_COMPONENT_DAMAGE_TYPES,
@@ -33,6 +34,8 @@ const makeDefaultDraft = (): ComponentDraft => ({
  */
 export class SpellMakingUI {
   public isVisible: boolean = false;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
   public onForge: ((request: SpellMakingForgeRequest) => void) | null = null;
   public onClose: (() => void) | null = null;
 
@@ -70,11 +73,14 @@ export class SpellMakingUI {
     this._root.style.display = "grid";
     this._animator?.panelIn(this._root);
     this.isVisible = true;
+    if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
   }
 
   public close(): void {
     if (!this._root) return;
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
     this.onClose?.();
     if (this._animator) {
       this._animator.panelOut(this._root, () => {
@@ -122,7 +128,7 @@ export class SpellMakingUI {
 
     const subtitle = document.createElement("p");
     subtitle.className = "spell-making__subtitle";
-    subtitle.textContent = "Combine up to two effects and forge a custom spell.";
+    subtitle.textContent = "Combine up to two effects and forge a custom spell. Press X or Esc to close.";
     titleWrap.appendChild(subtitle);
 
     const closeBtn = document.createElement("button");

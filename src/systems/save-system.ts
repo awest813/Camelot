@@ -47,9 +47,14 @@ import type { FollowerSystem } from "./follower-system";
 import type { PerkSystem } from "./perk-system";
 import type { SurvivalSystem } from "./survival-system";
 import type { DynamicWorldEventSystem } from "./dynamic-world-event-system";
+import type { TravelEventSystem } from "./travel-event-system";
+import type { AmbientEventSystem } from "./ambient-event-system";
+import type { StealthSystem } from "./stealth-system";
+import type { CombatSystem } from "./combat-system";
 
 const SAVE_KEY = "camelot_save";
-const SAVE_VERSION = 28;
+// v29: stealth crouch state + player combat status effects.
+const SAVE_VERSION = 29;
 /** Oldest save version that can still be loaded (forward-compat window). */
 const SAVE_VERSION_MIN = 5;
 
@@ -135,6 +140,12 @@ interface ParsedSaveData {
   // v28 additions
   survival?: unknown;
   dynamicWorldEvents?: unknown;
+  // Flavor event cooldown state (post-v28 wiring)
+  travelEvents?: unknown;
+  ambientEvents?: unknown;
+  // v29 additions
+  stealth?: unknown;
+  combatEffects?: unknown;
 }
 
 interface EquipmentEntry {
@@ -216,6 +227,11 @@ export interface SaveData {
   // v28 additions
   survival?: any;
   dynamicWorldEvents?: any;
+  travelEvents?: any;
+  ambientEvents?: any;
+  // v29 additions
+  stealth?: any;
+  combatEffects?: any;
 }
 
 export class SaveSystem {
@@ -306,6 +322,11 @@ export class SaveSystem {
   // ── v28 optional systems ──────────────────────────────────────────────────
   private _survivalSystem: SurvivalSystem | null = null;
   private _dynamicWorldEventSystem: DynamicWorldEventSystem | null = null;
+  private _travelEventSystem: TravelEventSystem | null = null;
+  private _ambientEventSystem: AmbientEventSystem | null = null;
+  // ── v29 optional systems ──────────────────────────────────────────────────
+  private _stealthSystem: StealthSystem | null = null;
+  private _combatSystem: CombatSystem | null = null;
 
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
@@ -444,8 +465,19 @@ export class SaveSystem {
 
   public setSurvivalSystem(s: SurvivalSystem): void           { this._survivalSystem = s; }
   public setDynamicWorldEventSystem(s: DynamicWorldEventSystem): void { this._dynamicWorldEventSystem = s; }
+  public setTravelEventSystem(s: TravelEventSystem): void { this._travelEventSystem = s; }
+  public setAmbientEventSystem(s: AmbientEventSystem): void { this._ambientEventSystem = s; }
 
-  public save(): void {
+  // ── v29 system injection ──────────────────────────────────────────────────
+
+  public setStealthSystem(s: StealthSystem): void           { this._stealthSystem = s; }
+  public setCombatSystem(s: CombatSystem): void             { this._combatSystem = s; }
+
+  /**
+   * Serialize the full game state to localStorage.
+   * @param silent suppress the "Game Saved!" notification (used by autosave)
+   */
+  public save(silent = false): void {
     const equipmentEntries: EquipmentEntry[] = [];
     for (const [slot, item] of this._equipment.getEquipped()) {
       equipmentEntries.push({ slot, item });
@@ -456,6 +488,7 @@ export class SaveSystem {
           id: q.id,
           isCompleted: q.isCompleted,
           isActive: q.isActive,
+          isFailed: q.isFailed ?? false,
           objectives: q.objectives.map(o => ({
             id: o.id,
             current: o.current,
@@ -533,9 +566,13 @@ export class SaveSystem {
     if (this._perkSystem)             data.perks            = this._perkSystem.getSaveState();
     if (this._survivalSystem)         data.survival         = this._survivalSystem.getSaveState();
     if (this._dynamicWorldEventSystem) data.dynamicWorldEvents = this._dynamicWorldEventSystem.getSnapshot();
+    if (this._travelEventSystem) data.travelEvents = this._travelEventSystem.getSnapshot();
+    if (this._ambientEventSystem) data.ambientEvents = this._ambientEventSystem.getSnapshot();
+    if (this._stealthSystem) data.stealth = this._stealthSystem.getSaveState();
+    if (this._combatSystem) data.combatEffects = this._combatSystem.getSaveState();
 
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-    this._ui.showNotification("Game Saved!", 2500);
+    if (!silent) this._ui.showNotification("Game Saved!", 2500);
     this._autosaveDirty = false;
     this._autosaveAccumulator = 0;
   }
@@ -562,7 +599,7 @@ export class SaveSystem {
     this._autosaveAccumulator += deltaSeconds;
     if (this._autosaveAccumulator < this._autosaveIntervalSeconds) return;
 
-    this.save();
+    this.save(true);
   }
 
   /**
@@ -583,7 +620,8 @@ export class SaveSystem {
     let parsed: unknown;
     try {
       parsed = JSON.parse(raw);
-    } catch {
+    } catch (error) {
+      console.error("[SaveSystem] Save file is corrupt (invalid JSON):", error);
       this._ui.showNotification("Save file is corrupt.", 2500);
       return false;
     }
@@ -658,7 +696,8 @@ export class SaveSystem {
       try {
         const frameworkSave = this._frameworkSaveEngine.deserialize(data.framework);
         this._frameworkRuntime.restoreFromSave(frameworkSave);
-      } catch {
+      } catch (error) {
+        console.error("[SaveSystem] Framework save data was invalid:", error);
         this._ui.showNotification("Framework save data was invalid; loaded legacy state only.", 2500);
       }
     }
@@ -769,6 +808,15 @@ export class SaveSystem {
       this._survivalSystem.restoreFromSave(data.survival as any);
     if (this._dynamicWorldEventSystem && data.dynamicWorldEvents)
       this._dynamicWorldEventSystem.restoreSnapshot(data.dynamicWorldEvents as any);
+    if (this._travelEventSystem && data.travelEvents)
+      this._travelEventSystem.restoreSnapshot(data.travelEvents as any);
+    if (this._ambientEventSystem && data.ambientEvents)
+      this._ambientEventSystem.restoreSnapshot(data.ambientEvents as any);
+    // v29 systems
+    if (this._stealthSystem && data.stealth)
+      this._stealthSystem.restoreFromSave(data.stealth as any);
+    if (this._combatSystem && data.combatEffects)
+      this._combatSystem.restoreFromSave(data.combatEffects as any);
 
     // Restore player name (v15+; keep default "Hero" for older saves)
     if (typeof data.player.name === "string" && data.player.name.trim()) {
@@ -865,7 +913,8 @@ export class SaveSystem {
     let parsed: unknown;
     try {
       parsed = JSON.parse(json);
-    } catch {
+    } catch (error) {
+      console.error("[SaveSystem] Import failed (invalid JSON):", error);
       this._ui.showNotification("Import failed: invalid JSON.", 2500);
       return false;
     }
@@ -949,6 +998,23 @@ export class SaveSystem {
       swimming: data.swimming,
       disease: data.disease,
       eventManager: data.eventManager,
+      // v23+ fields — previously dropped here, which silently discarded
+      // pets, pickpocket stats, follower state, etc. on every load.
+      pets: data.pets,
+      markRecall: data.markRecall,
+      trainer: data.trainer,
+      pickpocket: data.pickpocket,
+      itemCondition: data.itemCondition,
+      dragonShouts: data.dragonShouts,
+      follower: data.follower,
+      perks: data.perks,
+      survival: data.survival,
+      dynamicWorldEvents: data.dynamicWorldEvents,
+      travelEvents: data.travelEvents,
+      ambientEvents: data.ambientEvents,
+      // v29 fields
+      stealth: data.stealth,
+      combatEffects: data.combatEffects,
     };
   }
 
@@ -984,6 +1050,9 @@ export class SaveSystem {
       experienceToNextLevel: player.experienceToNextLevel,
       carryWeight: player.carryWeight,
       maxCarryWeight: player.maxCarryWeight,
+      // Pass through only non-blank names; older saves (and blank ones)
+      // restore as undefined so load() keeps the default.
+      name: typeof player.name === "string" && player.name.trim() ? player.name : undefined,
     };
   }
 

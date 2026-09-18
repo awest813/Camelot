@@ -127,6 +127,8 @@ export class NpcArchetypeSystem {
       if (def.aiProfile.attackCooldown  !== undefined) npc.attackCooldown  = def.aiProfile.attackCooldown;
       if (def.aiProfile.moveSpeed       !== undefined) npc.moveSpeed       = def.aiProfile.moveSpeed;
       if (def.aiProfile.fleesBelowHealthPct !== undefined) npc.fleesBelowHealthPct = def.aiProfile.fleesBelowHealthPct;
+      if (def.aiProfile.attackArchetype !== undefined) npc.npcAttackArchetype = def.aiProfile.attackArchetype;
+      if (def.aiProfile.magicDamageType !== undefined) npc.npcMagicDamageType = def.aiProfile.magicDamageType;
     }
 
     // Store starting equipment IDs for inventory integration

@@ -18,6 +18,7 @@ interface StructureSpawn {
   loot: Loot[];
   bodies: PhysicsAggregate[];
   npcs: NPC[];
+  lights: PointLight[];
 }
 
 /**
@@ -94,7 +95,7 @@ export class StructureManager {
     if (this._chunkStructures.has(key)) return;
 
     if (!this.hasStructureAt(chunkX, chunkZ)) {
-      this._chunkStructures.set(key, { meshes: [], loot: [], bodies: [], npcs: [] });
+      this._chunkStructures.set(key, { meshes: [], loot: [], bodies: [], npcs: [], lights: [] });
       return;
     }
 
@@ -121,6 +122,9 @@ export class StructureManager {
     }
 
     this._chunkStructures.set(key, spawn);
+
+    // Static masonry — freeze world matrices so Babylon skips per-frame updates
+    for (const m of spawn.meshes) m.freezeWorldMatrix();
   }
 
   /**
@@ -130,8 +134,12 @@ export class StructureManager {
   public dispose(): void {
     for (const [, spawn] of this._chunkStructures) {
       for (const body of spawn.bodies) body.dispose();
-      for (const m of spawn.meshes) m.dispose(false, false);
+      for (const m of spawn.meshes) {
+        this._shadows?.removeShadowCaster(m, false);
+        m.dispose(false, false);
+      }
       for (const l of spawn.loot) l.dispose();
+      for (const l of spawn.lights) l.dispose();
       for (const npc of spawn.npcs) {
         this.onNPCRemove?.(npc);
         npc.mesh.dispose();
@@ -164,8 +172,14 @@ export class StructureManager {
     // Dispose physics bodies BEFORE their meshes to avoid dangling references
     for (const body of spawn.bodies) body.dispose();
     // Materials are shared across all structure instances — preserve them
-    for (const m of spawn.meshes) m.dispose(false, false);
+    for (const m of spawn.meshes) {
+      this._shadows?.removeShadowCaster(m, false);
+      m.dispose(false, false);
+    }
     for (const l of spawn.loot) l.dispose();
+    // Torches/campfires own a PointLight each — dispose or scene.lights grows forever
+    for (const l of spawn.lights) l.dispose();
+    spawn.lights.length = 0;
 
     // Clean up NPCs that aren't "busy" tracking the player or in dialogue.
     // If they ARE busy, we let them persist (they'll likely never be unloaded
@@ -211,6 +225,7 @@ export class StructureManager {
     const meshes: Mesh[] = [];
     const loot: Loot[] = [];
     const bodies: PhysicsAggregate[] = [];
+    const lights: PointLight[] = [];
     // Aged limestone — warm earthy grey with subtle specular for weathered stone
     const mat = this._mat(
       "ruins_stone",
@@ -248,7 +263,7 @@ export class StructureManager {
       );
       rubble.rotation.y = this._rand(cx, cz, i + 22) * Math.PI;
       rubble.material = mat;
-      meshes.push(this._shadow(rubble));
+      meshes.push(rubble);
     }
 
     // Loot chest at the center
@@ -259,11 +274,11 @@ export class StructureManager {
     // ── Fantasy props ──────────────────────────────────────────────────────
 
     // Two wall torches on the north wall flanking the entrance
-    this._addTorch(`ruins_torch_L_${cx}_${cz}`, new Vector3(origin.x - 2.5, 2.4, origin.z + 3.5), meshes);
-    this._addTorch(`ruins_torch_R_${cx}_${cz}`, new Vector3(origin.x + 2.5, 2.4, origin.z + 3.5), meshes);
+    this._addTorch(`ruins_torch_L_${cx}_${cz}`, new Vector3(origin.x - 2.5, 2.4, origin.z + 3.5), meshes, lights);
+    this._addTorch(`ruins_torch_R_${cx}_${cz}`, new Vector3(origin.x + 2.5, 2.4, origin.z + 3.5), meshes, lights);
 
     // Guard campfire in the center courtyard
-    this._addCampfire(`ruins_campfire_${cx}_${cz}`, new Vector3(origin.x, 0, origin.z - 1), meshes);
+    this._addCampfire(`ruins_campfire_${cx}_${cz}`, new Vector3(origin.x, 0, origin.z - 1), meshes, lights);
 
     // Scattered barrels (guard supplies)
     this._addBarrel(`ruins_barrel_A_${cx}_${cz}`, new Vector3(origin.x - 3.0, 0, origin.z + 1.5), meshes, bodies);
@@ -287,7 +302,7 @@ export class StructureManager {
     ];
     if (this.onNPCSpawn) this.onNPCSpawn(guard);
 
-    return { meshes, loot, bodies, npcs: [guard] };
+    return { meshes, loot, bodies, npcs: [guard], lights };
   }
 
   /**
@@ -298,6 +313,7 @@ export class StructureManager {
     const meshes: Mesh[] = [];
     const loot: Loot[] = [];
     const bodies: PhysicsAggregate[] = [];
+    const lights: PointLight[] = [];
     // Sun-bleached sandstone platform
     const stoneMat = this._mat(
       "shrine_stone",
@@ -356,8 +372,8 @@ export class StructureManager {
     // ── Fantasy props ──────────────────────────────────────────────────────
 
     // Altar torch — sacred shrine flame
-    this._addTorch(`shrine_torch_A_${cx}_${cz}`, new Vector3(origin.x - 1.0, 0.4, origin.z - 1.2), meshes);
-    this._addTorch(`shrine_torch_B_${cx}_${cz}`, new Vector3(origin.x + 1.0, 0.4, origin.z - 1.2), meshes);
+    this._addTorch(`shrine_torch_A_${cx}_${cz}`, new Vector3(origin.x - 1.0, 0.4, origin.z - 1.2), meshes, lights);
+    this._addTorch(`shrine_torch_B_${cx}_${cz}`, new Vector3(origin.x + 1.0, 0.4, origin.z - 1.2), meshes, lights);
 
     // Four outer standing stones in a ritual ring — Oblivion-style Ayleid ruin
     const ringR = 5.5;
@@ -381,7 +397,7 @@ export class StructureManager {
     );
     meshes.push(runeSlab);
 
-    return { meshes, loot, bodies, npcs: [] };
+    return { meshes, loot, bodies, npcs: [], lights };
   }
 
   /**
@@ -392,6 +408,7 @@ export class StructureManager {
     const meshes: Mesh[] = [];
     const loot: Loot[] = [];
     const bodies: PhysicsAggregate[] = [];
+    const lights: PointLight[] = [];
     // Cold granite stone — blue-grey tint with reflective highlights
     const stoneMat = this._mat(
       "tower_stone",
@@ -464,8 +481,8 @@ export class StructureManager {
     // ── Fantasy props ──────────────────────────────────────────────────────
 
     // Torches flanking the doorway — guard post lighting
-    this._addTorch(`tower_torch_L_${cx}_${cz}`, new Vector3(origin.x - 1.2, 2.8, origin.z - tW / 2 - 0.1), meshes);
-    this._addTorch(`tower_torch_R_${cx}_${cz}`, new Vector3(origin.x + 1.2, 2.8, origin.z - tW / 2 - 0.1), meshes);
+    this._addTorch(`tower_torch_L_${cx}_${cz}`, new Vector3(origin.x - 1.2, 2.8, origin.z - tW / 2 - 0.1), meshes, lights);
+    this._addTorch(`tower_torch_R_${cx}_${cz}`, new Vector3(origin.x + 1.2, 2.8, origin.z - tW / 2 - 0.1), meshes, lights);
 
     // Supply barrels stacked by the east wall
     this._addBarrel(`tower_barrel_A_${cx}_${cz}`, new Vector3(origin.x + tW / 2 - 0.5, 0, origin.z - 0.5), meshes, bodies);
@@ -475,7 +492,7 @@ export class StructureManager {
     this._addBanner(`tower_banner_${cx}_${cz}`, new Vector3(origin.x - tW / 2 - 0.2, 0, origin.z), new Color3(0.10, 0.20, 0.65), "imperial", meshes);
 
     // Campfire outside (guard warming spot)
-    this._addCampfire(`tower_campfire_${cx}_${cz}`, new Vector3(origin.x + 3.5, 0, origin.z - tW / 2 - 3), meshes);
+    this._addCampfire(`tower_campfire_${cx}_${cz}`, new Vector3(origin.x + 3.5, 0, origin.z - tW / 2 - 3), meshes, lights);
 
     // Guard NPC positioned in front of the doorway
     const guard = new NPC(this._scene, new Vector3(origin.x, 2, origin.z - tW / 2 - 2), `TowerGuard_${cx}_${cz}`);
@@ -488,7 +505,7 @@ export class StructureManager {
     ];
     if (this.onNPCSpawn) this.onNPCSpawn(guard);
 
-    return { meshes, loot, bodies, npcs: [guard] };
+    return { meshes, loot, bodies, npcs: [guard], lights };
   }
 
   // ─── Fantasy props ─────────────────────────────────────────────────────────
@@ -497,7 +514,7 @@ export class StructureManager {
    * Place a wall-mounted torch sconce: iron bracket cylinder + flame cone with
    * emissive warm-orange glow and a dynamic PointLight. Oblivion-style ambient.
    */
-  private _addTorch(name: string, position: Vector3, meshes: Mesh[]): void {
+  private _addTorch(name: string, position: Vector3, meshes: Mesh[], lights: PointLight[]): void {
     // Iron sconce bracket
     const bracket = MeshBuilder.CreateCylinder(
       `${name}_bracket`,
@@ -506,7 +523,7 @@ export class StructureManager {
     );
     bracket.position.set(position.x, position.y, position.z);
     bracket.material = this._mat("torch_iron", new Color3(0.18, 0.14, 0.09), new Color3(0.28, 0.22, 0.10), 64);
-    meshes.push(this._shadow(bracket));
+    meshes.push(bracket);
 
     // Torch handle
     const handle = MeshBuilder.CreateCylinder(
@@ -538,15 +555,16 @@ export class StructureManager {
     const light = new PointLight(`${name}_light`, new Vector3(position.x, position.y + 0.7, position.z), this._scene);
     light.diffuse   = new Color3(1.0, 0.58, 0.15);
     light.specular  = new Color3(0.9, 0.45, 0.05);
-    light.intensity = 0.9;
-    light.range     = 7.0;
+    light.intensity = 0.85;
+    light.range     = 6.0;
+    lights.push(light);
   }
 
   /**
    * Place a campfire: ring of log stumps + flame cone with PointLight.
    * Guards' resting spot — warm Oblivion/Skyrim dungeon atmosphere.
    */
-  private _addCampfire(name: string, position: Vector3, meshes: Mesh[]): void {
+  private _addCampfire(name: string, position: Vector3, meshes: Mesh[], lights: PointLight[]): void {
     const logMat = this._mat("campfire_log", new Color3(0.28, 0.14, 0.05), new Color3(0.05, 0.03, 0.01), 10);
     const stoneMat = this._mat("campfire_stone", new Color3(0.40, 0.36, 0.30), new Color3(0.08, 0.07, 0.06), 18);
 
@@ -604,8 +622,9 @@ export class StructureManager {
     const light = new PointLight(`${name}_light`, new Vector3(position.x, position.y + 0.6, position.z), this._scene);
     light.diffuse   = new Color3(1.0, 0.55, 0.12);
     light.specular  = new Color3(0.9, 0.42, 0.04);
-    light.intensity = 1.4;
-    light.range     = 10.0;
+    light.intensity = 1.2;
+    light.range     = 8.0;
+    lights.push(light);
   }
 
   /**

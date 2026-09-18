@@ -144,6 +144,9 @@ export class FrameworkRuntime {
       activateQuest: (questId) => {
         this._questEngine.activateQuest(questId);
       },
+      failQuest: (questId) => {
+        this._questEngine.failQuest(questId);
+      },
       consumeItem: (itemId, quantity) => {
         if (this._onDialogueConsumeItem) {
           return this._onDialogueConsumeItem(itemId, quantity);

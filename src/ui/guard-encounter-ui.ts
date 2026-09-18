@@ -1,4 +1,5 @@
 import type { UIAnimator } from "./ui-animator";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 import { makeEl } from "./dom-utils";
 
 export type GuardEncounterAction = "pay_fine" | "go_to_jail" | "resist_arrest" | "persuade";
@@ -16,6 +17,8 @@ export interface GuardEncounterView {
  */
 export class GuardEncounterUI {
   public isVisible: boolean = false;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
   public onResolve: ((action: GuardEncounterAction) => void) | null = null;
 
   private _root: HTMLDivElement | null = null;
@@ -61,11 +64,14 @@ export class GuardEncounterUI {
       const firstBtn = this._root.querySelector("button");
       if (firstBtn) firstBtn.focus();
     }
+    if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
   }
 
   public close(): void {
     if (!this._root) return;
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
     if (this._animator) {
       this._animator.panelOut(this._root, () => {
         if (this._root) this._root.style.display = "none";

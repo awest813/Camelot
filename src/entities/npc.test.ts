@@ -5,18 +5,34 @@ import { Color3 } from '@babylonjs/core/Maths/math.color';
 import { PhysicsMotionType } from '@babylonjs/core/Physics';
 
 // Mock BabylonJS core features to avoid complex initialization
-vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
-    MeshBuilder: {
-        CreateCapsule: vi.fn((name, _options, _scene) => ({
-            name,
-            position: new Vector3(),
-            material: null,
-            metadata: null,
-            dispose: vi.fn(),
-            isDisposed: vi.fn().mockReturnValue(false)
-        }))
-    }
-}));
+vi.mock('@babylonjs/core/Meshes/meshBuilder', () => {
+    const mockPrimitive = (name: string) => ({
+        name,
+        position: new Vector3(),
+        rotation: new Vector3(),
+        parent: null,
+        material: null,
+        receiveShadows: false,
+        dispose: vi.fn(),
+        isDisposed: vi.fn().mockReturnValue(false)
+    });
+    return {
+        MeshBuilder: {
+            CreateCapsule: vi.fn((name, _options, _scene) => ({
+                name,
+                position: new Vector3(),
+                material: null,
+                metadata: null,
+                dispose: vi.fn(),
+                isDisposed: vi.fn().mockReturnValue(false)
+            })),
+            CreateBox: vi.fn((name) => mockPrimitive(name)),
+            CreateCylinder: vi.fn((name) => mockPrimitive(name)),
+            CreateSphere: vi.fn((name) => mockPrimitive(name)),
+            CreateTorus: vi.fn((name) => mockPrimitive(name)),
+        }
+    };
+});
 
 vi.mock('@babylonjs/core/Materials/standardMaterial', () => {
     class MockStandardMaterial {
@@ -201,6 +217,36 @@ describe('NPC', () => {
         it('health should not go below zero', () => {
             npc.takeDamage(150);
             expect(npc.health).toBe(0);
+        });
+    });
+
+    describe('Role visuals', () => {
+        const colorOf = (name: string) => {
+            const n = new NPC(mockScene, new Vector3(0, 0, 0), name);
+            return (n.mesh.material as any).diffuseColor;
+        };
+
+        it('bandits render crimson, distinct from villagers', () => {
+            const bandit = colorOf('Bandit_12');
+            expect(bandit.r).toBeCloseTo(0.45);
+            expect(bandit.g).toBeCloseTo(0.10);
+            expect(bandit.b).toBeCloseTo(0.10);
+            const villager = colorOf('Villager_3');
+            expect(villager.r).toBeCloseTo(0.82);
+        });
+
+        it('archers render forest green (ranged role reads first)', () => {
+            const archer = colorOf('Bandit Archer_7');
+            expect(archer.r).toBeCloseTo(0.16);
+            expect(archer.g).toBeCloseTo(0.35);
+            expect(archer.b).toBeCloseTo(0.16);
+        });
+
+        it('bandit chiefs still render as bosses', () => {
+            const chief = colorOf('Bandit Chief_9');
+            expect(chief.r).toBeCloseTo(0.10);
+            expect(chief.g).toBeCloseTo(0.08);
+            expect(chief.b).toBeCloseTo(0.06);
         });
     });
 });

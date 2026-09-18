@@ -2,8 +2,8 @@
 /* Polish styles for Camelot */
 
 .onboarding-tip {
-  backdrop-filter: blur(12px) !important;
-  background: rgba(8, 6, 4, 0.88) !important;
+  backdrop-filter: blur(4px) !important;
+  background: rgba(8, 6, 4, 0.92) !important;
   border: 1px solid rgba(212, 160, 23, 0.6) !important;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
@@ -74,8 +74,8 @@
 
 .active-effect-hud__pill {
   position: relative;
-  backdrop-filter: blur(8px) !important;
-  background: rgba(12, 10, 8, 0.85) !important;
+  backdrop-filter: blur(4px) !important;
+  background: rgba(12, 10, 8, 0.9) !important;
   border: 1px solid rgba(212, 160, 23, 0.25) !important;
 }
 
@@ -108,10 +108,7 @@
   line-height: 1.45;
   color: #e8eef8;
   border: 1px solid rgba(212, 175, 88, 0.35);
-  background:
-    linear-gradient(145deg, rgba(18, 14, 10, 0.94) 0%, rgba(8, 6, 4, 0.92) 100%),
-    url("https://assets.babylonjs.com/textures/leather.jpg") center / cover;
-  background-blend-mode: normal, luminosity;
+  background: radial-gradient(circle at 10% 10%, rgba(36, 26, 16, 0.96) 0%, rgba(12, 9, 6, 0.98) 100%);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
@@ -125,11 +122,9 @@
 
 .character-create {
   background:
-    radial-gradient(ellipse 120% 80% at 50% -10%, rgba(212, 160, 23, 0.12), transparent 55%),
-    radial-gradient(circle at 20% 80%, rgba(40, 72, 110, 0.12), transparent 45%),
-    url("https://assets.babylonjs.com/textures/floor.png") center / 420px repeat,
-    radial-gradient(circle at top, rgba(32, 22, 8, 0.94), rgba(4, 3, 2, 0.97)) !important;
-  background-blend-mode: screen, multiply, soft-light, normal;
+    radial-gradient(ellipse 120% 80% at 50% -10%, rgba(212, 160, 23, 0.16), transparent 55%),
+    radial-gradient(circle at 20% 80%, rgba(40, 72, 110, 0.14), transparent 45%),
+    radial-gradient(circle at top, rgba(32, 22, 8, 0.96), rgba(4, 3, 2, 0.98)) !important;
 }
 
 .character-create__panel {
@@ -141,9 +136,7 @@
 
 .fast-travel {
   background:
-    radial-gradient(circle at top, rgba(8, 10, 18, 0.92), rgba(3, 4, 8, 0.96)),
-    url("https://assets.babylonjs.com/textures/wood.jpg") center / 480px repeat !important;
-  background-blend-mode: multiply, soft-light;
+    radial-gradient(ellipse at 50% 10%, rgba(24, 20, 32, 0.96), rgba(6, 6, 12, 0.98)) !important;
 }
 
 /* ── Quick Slot HUD: hotbar strip ──────────────────────────────────────────── */
@@ -322,3 +315,30 @@
 .active-effect-hud__pill--harm    { background: rgba(130, 30, 20, 0.85); border: 1px solid rgba(220, 60, 40, 0.4); }
 
 .active-effect-hud__bar { background: rgba(255, 255, 255, 0.35); }
+
+/* ── Menu & HUD icon polish ──────────────────────────────────────────────── */
+
+.quickslot-hud__item-icon {
+  font-size: 14px;
+  line-height: 1;
+  margin-bottom: 2px;
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+
+.container-ui__item-icon,
+.barter-ui__item-icon {
+  font-size: 15px;
+  margin-right: 8px;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.character-sheet-ui__row-icon {
+  margin-right: 7px;
+  font-size: 13px;
+  opacity: 0.9;
+  display: inline-block;
+  vertical-align: middle;
+}

@@ -3,6 +3,7 @@ import type {
   DialogueNodeDraft,
   DialogueChoiceDraft,
 } from "../systems/dialogue-creator-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 import type {
   DialogueChoiceCondition,
   DialogueChoiceEffect,
@@ -11,7 +12,7 @@ import type {
 // ── Condition / Effect type lists ─────────────────────────────────────────────
 
 const CONDITION_TYPES = ["flag", "faction_min", "quest_status", "has_item", "skill_min"] as const;
-const EFFECT_TYPES    = ["set_flag", "faction_delta", "emit_event", "activate_quest", "consume_item", "give_item"] as const;
+const EFFECT_TYPES    = ["set_flag", "faction_delta", "emit_event", "activate_quest", "fail_quest", "consume_item", "give_item"] as const;
 
 /**
  * Visual Dialogue Creator UI.
@@ -32,6 +33,8 @@ export class DialogueCreatorUI {
 
   private readonly _sys: DialogueCreatorSystem;
   private _root: HTMLElement | null = null;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
   private _nodeListEl: HTMLElement | null = null;
   private _detailEl: HTMLElement | null = null;
   private _statusEl: HTMLElement | null = null;
@@ -54,13 +57,18 @@ export class DialogueCreatorUI {
     if (this._root) {
       this._root.hidden = false;
       this._sync();
+      if (!this._focusSession) this._focusSession = manageDialogFocus(this._root);
       return;
     }
     this._build();
+    const root = this._root;
+    if (!this._focusSession && root) this._focusSession = manageDialogFocus(root);
   }
 
   close(): void {
     if (this._root) this._root.hidden = true;
+    this._focusSession?.release();
+    this._focusSession = null;
     this.onClose?.();
   }
 
@@ -70,6 +78,7 @@ export class DialogueCreatorUI {
     const root = document.createElement("div");
     root.className = "dlg-creator";
     root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-label", "Dialogue Creator");
     this._root = root;
 
@@ -569,7 +578,7 @@ export class DialogueCreatorUI {
     switch (type) {
       case "flag":         return { type, flag: a, equals: b !== "false" };
       case "faction_min":  return { type, factionId: a, min: parseFloat(b) || 0 };
-      case "quest_status": return { type, questId: a, status: (b as "inactive" | "active" | "completed") || "active" };
+      case "quest_status": return { type, questId: a, status: (b as "inactive" | "active" | "completed" | "failed") || "active" };
       case "has_item":     return { type, itemId: a, minQuantity: parseInt(b, 10) || 1 };
       case "skill_min":    return { type, skillId: a, min: parseFloat(b) || 0 };
     }
@@ -621,6 +630,7 @@ export class DialogueCreatorUI {
       case "faction_delta": return `faction "${e.factionId}" += ${e.amount}`;
       case "emit_event":    return `emit event "${e.eventId}"`;
       case "activate_quest": return `activate quest "${e.questId}"`;
+      case "fail_quest": return `fail quest "${e.questId}"`;
       case "consume_item":  return `consume "${e.itemId}" × ${e.quantity}`;
       case "give_item":     return `give "${e.itemId}" × ${e.quantity}`;
     }
@@ -678,6 +688,7 @@ export class DialogueCreatorUI {
       case "faction_delta": return { type, factionId: a, amount: parseFloat(b) || 0 };
       case "emit_event":    return { type, eventId: a };
       case "activate_quest": return { type, questId: a };
+      case "fail_quest": return { type, questId: a };
       case "consume_item":  return { type, itemId: a, quantity: parseInt(b, 10) || 1 };
       case "give_item":     return { type, itemId: a, quantity: parseInt(b, 10) || 1 };
     }

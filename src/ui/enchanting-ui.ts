@@ -49,6 +49,8 @@ const T = {
 export class EnchantingUI {
   /** Fired when the player clicks Enchant.  Passes itemId, effectId, gemType. */
   public onEnchant: ((itemId: string, effectId: string, gemType: SoulGemType) => void) | null = null;
+  /** Fired when the ✕ button closes the panel (Escape is owned by the game cascade). */
+  public onClosed: (() => void) | null = null;
 
   private readonly _ui: AdvancedDynamicTexture;
   private readonly _system: EnchantingSystem;
@@ -163,7 +165,10 @@ export class EnchantingUI {
     closeBtn.top    = "-4px";
     (closeBtn.textBlock as TextBlock).color = T.DIM;
     closeBtn.accessibilityTag = { description: "Close Enchanting Panel" };
-    closeBtn.onPointerClickObservable.add(() => this.toggle(false));
+    closeBtn.onPointerClickObservable.add(() => {
+      this.toggle(false);
+      this.onClosed?.();
+    });
 
     actionRow.addControl(closeBtn);
   }

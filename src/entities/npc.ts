@@ -284,6 +284,12 @@ export class NPC {
    */
   public fleesBelowHealthPct: number = 0;
 
+  /** While > 0, this NPC's strikes are weakened (side power-attack disarm). */
+  public disarmTimer: number = 0;
+
+  /** True while the NPC's current telegraphed blow is unblockable (elites). */
+  public isAttackUnblockable: boolean = false;
+
   /** Probability [0, 1] that the NPC dodges a player's melee attack. */
   public dodgeChance: number = 0.05;
 
@@ -443,13 +449,16 @@ export class NPC {
    * Guards → steel armour colours; merchants → warm leather; undead → ashen pale;
    * mages → deep purple; bosses → black/gold.  Falls back to the default tan skin.
    */
-  private _archetypeFromName(name: string): "guard" | "merchant" | "mage" | "boss" | "undead" | "default" {
+  private _archetypeFromName(name: string): "guard" | "merchant" | "mage" | "boss" | "undead" | "bandit" | "archer" | "default" {
     const lower = name.toLowerCase();
     if (lower.includes("guard") || lower.includes("knight") || lower.includes("soldier")) return "guard";
     if (lower.includes("merchant") || lower.includes("innkeeper") || lower.includes("vendor")) return "merchant";
     if (lower.includes("mage") || lower.includes("wizard") || lower.includes("sorcerer")) return "mage";
     if (lower.includes("boss") || lower.includes("chief") || lower.includes("lord")) return "boss";
     if (lower.includes("undead") || lower.includes("skeleton") || lower.includes("draugr") || lower.includes("zombie")) return "undead";
+    // Ranged role reads first so "Bandit Archer" renders as an archer, not a bandit.
+    if (lower.includes("archer") || lower.includes("ranger") || lower.includes("hunter")) return "archer";
+    if (lower.includes("bandit") || lower.includes("outlaw") || lower.includes("robber")) return "bandit";
     return "default";
   }
 
@@ -497,6 +506,20 @@ export class NPC {
         material.specularPower = 12;
         this._baseColor = new Color3(0.62, 0.58, 0.52);
         break;
+      case "bandit":
+        // Bandit — dark crimson leathers, matte (hostiles read at a glance)
+        material.diffuseColor  = new Color3(0.45, 0.10, 0.10);
+        material.specularColor = new Color3(0.10, 0.04, 0.04);
+        material.specularPower = 14;
+        this._baseColor = new Color3(0.45, 0.10, 0.10);
+        break;
+      case "archer":
+        // Archer — forest green garb with a dull finish
+        material.diffuseColor  = new Color3(0.16, 0.35, 0.16);
+        material.specularColor = new Color3(0.06, 0.12, 0.06);
+        material.specularPower = 14;
+        this._baseColor = new Color3(0.16, 0.35, 0.16);
+        break;
       default:
         // Villager — warm tan skin
         material.diffuseColor  = new Color3(0.82, 0.64, 0.38);
@@ -517,6 +540,10 @@ export class NPC {
       this._addStaff(name);
     } else if (archetype === "boss") {
       this._addCrown(name);
+    } else if (archetype === "bandit") {
+      this._addMask(name);
+    } else if (archetype === "archer") {
+      this._addBow(name);
     }
 
     this.physicsAggregate = new PhysicsAggregate(
@@ -571,6 +598,38 @@ export class NPC {
     orbMat.specularColor = new Color3(0.60, 0.30, 1.00);
     orbMat.specularPower = 128;
     orb.material = orbMat;
+  }
+
+  /** Add a dark wrap band across the face for bandits. */
+  private _addMask(name: string): void {
+    const mask = MeshBuilder.CreateBox(`${name}_mask`, { width: 0.55, height: 0.18, depth: 0.55 }, this.scene);
+    mask.position = new Vector3(0, 0.55, 0); // relative to capsule centre
+    mask.parent   = this.mesh;
+
+    const mat = new StandardMaterial(`${name}_maskMat`, this.scene);
+    mat.diffuseColor  = new Color3(0.12, 0.05, 0.05);
+    mat.specularColor = new Color3(0.05, 0.02, 0.02);
+    mat.specularPower = 10;
+    mask.material   = mat;
+    mask.receiveShadows = true;
+  }
+
+  /** Add a simple bow stave at the side for archers. */
+  private _addBow(name: string): void {
+    const bow = MeshBuilder.CreateTorus(
+      `${name}_bow`,
+      { diameter: 0.9, thickness: 0.05, tessellation: 12 },
+      this.scene,
+    );
+    bow.position = new Vector3(0.55, -0.1, 0);
+    bow.rotation.z = Math.PI / 2;
+    bow.parent   = this.mesh;
+
+    const mat = new StandardMaterial(`${name}_bowMat`, this.scene);
+    mat.diffuseColor  = new Color3(0.30, 0.18, 0.08);
+    mat.specularColor = new Color3(0.12, 0.08, 0.03);
+    mat.specularPower = 18;
+    bow.material   = mat;
   }
 
   /** Add a small gold crown above boss NPCs. */

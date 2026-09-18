@@ -1,4 +1,5 @@
 import type { JournalCategory, JournalEntry, JournalSystem } from "../systems/journal-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -53,9 +54,13 @@ export function formatEntryDate(ms: number): string {
  */
 export class JournalUI {
   public isVisible: boolean = false;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
 
   /** Called when the player clicks the ⭐ toggle on an entry row. */
   public onFavoriteToggle: ((id: string) => void) | null = null;
+  /** Fired when the ✕ button closes the panel (Escape is owned by the game cascade). */
+  public onClose: (() => void) | null = null;
 
   private _root:       HTMLDivElement | null = null;
   private _tabBar:     HTMLDivElement | null = null;
@@ -80,12 +85,15 @@ export class JournalUI {
     this._ensureDom();
     if (this._root) this._root.style.display = "flex";
     this.isVisible = true;
+    if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
   }
 
   /** Hide the panel without destroying its DOM. */
   public hide(): void {
     if (this._root) this._root.style.display = "none";
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
 
   /**
@@ -142,6 +150,8 @@ export class JournalUI {
     this._lastEntries = [];
     this._activeFilter = "all";
     this.isVisible    = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
 
   // ── DOM accessors (for testing) ─────────────────────────────────────────────
@@ -183,7 +193,10 @@ export class JournalUI {
     closeBtn.type = "button";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close journal");
-    closeBtn.addEventListener("click", () => this.hide());
+    closeBtn.addEventListener("click", () => {
+      this.hide();
+      this.onClose?.();
+    });
     header.appendChild(closeBtn);
 
     // ── Category tab bar ──────────────────────────────────────────────────────

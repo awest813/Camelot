@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { QuestCreatorSystem } from "./quest-creator-system";
+import { QuestGraphEngine } from "../framework/quests/quest-graph-engine";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -269,5 +270,42 @@ describe("QuestCreatorSystem — reset", () => {
     sys.reset();
     const id = sys.addNode();
     expect(id).toBe("node_1"); // counter restarted
+  });
+});
+
+// ── exclusiveGroup (xor-choice branching) ──────────────────────────────────
+
+describe("QuestCreatorSystem — exclusiveGroup", () => {
+  it("passes the group through addNode and toQuestDefinition", () => {
+    const sys = makeSystem();
+    sys.setMeta("q1", "Q", "", 10);
+    sys.addNode({ id: "a", triggerType: "kill", targetId: "x", requiredCount: 1, exclusiveGroup: "fate" });
+    sys.addNode({ id: "b", triggerType: "talk", targetId: "y", requiredCount: 1, exclusiveGroup: "fate" });
+    const def = sys.toQuestDefinition();
+    expect(def.nodes[0].exclusiveGroup).toBe("fate");
+    expect(def.nodes[1].exclusiveGroup).toBe("fate");
+
+    // The exported quest actually branches in the engine.
+    const engine = new QuestGraphEngine([def]);
+    engine.activateQuest("q1");
+    const [result] = engine.applyEvent({ type: "kill", targetId: "x" });
+    expect(result.completedNodeIds).toContain("a");
+    expect(result.skippedNodeIds).toContain("b");
+  });
+
+  it("omits exclusiveGroup when blank", () => {
+    const sys = makeSystem();
+    sys.setMeta("q1", "Q", "", 10);
+    sys.addNode({ id: "n1", triggerType: "kill", targetId: "x", requiredCount: 1 });
+    const def = sys.toQuestDefinition();
+    expect(def.nodes[0].exclusiveGroup).toBeUndefined();
+  });
+
+  it("updateNode trims the group and clears it when blank", () => {
+    const sys = makeSystem();
+    sys.addNode({ id: "n1", exclusiveGroup: "  fate  " });
+    expect(sys.nodes[0].exclusiveGroup).toBe("fate");
+    sys.updateNode("n1", { exclusiveGroup: "   " });
+    expect(sys.nodes[0].exclusiveGroup).toBeUndefined();
   });
 });

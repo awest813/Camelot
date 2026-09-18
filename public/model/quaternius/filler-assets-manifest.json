@@ -1,6 +1,6 @@
 {
   "generator": "tools/generate-filler-assets.mjs",
-  "note": "Temporary static placeholder GLBs for Quaternius CC0 catalogue slots. Replace with real pack assets when available.",
+  "note": "Polished low-poly stylized placeholder GLBs for Quaternius CC0 catalogue slots.",
   "files": [
     "public/model/quaternius/props/Barrel.glb",
     "public/model/quaternius/props/Crate.glb",

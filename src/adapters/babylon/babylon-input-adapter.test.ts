@@ -157,6 +157,69 @@ describe("BabylonInputAdapter", () => {
     expect(fired).toBe(1);
   });
 
+  it("modifier guards: shift:false rejects the shifted chord", () => {
+    const adapter = new BabylonInputAdapter();
+    let loaded = 0;
+    adapter.onAction("load", () => { loaded++; });
+
+    // Shift+F9 must fall through (null) so the legacy Faction Creator branch
+    // runs — loading a save on a creator hotkey destroys player progress.
+    expect(adapter.handleKeyEvent("F9", "down", { shift: true })).toBeNull();
+    expect(loaded).toBe(0);
+
+    expect(adapter.handleKeyEvent("F9", "down")).toBe("load");
+    expect(loaded).toBe(1);
+  });
+
+  it("default bindings route Shift+E to powerAttack and E to interact", () => {
+    const adapter = new BabylonInputAdapter();
+    const fired: string[] = [];
+    adapter.onAction("interact", () => { fired.push("interact"); });
+    adapter.onAction("powerAttack", () => { fired.push("powerAttack"); });
+
+    adapter.handleKeyEvent("e", "down", {});
+    adapter.handleKeyEvent("e", "down", { shift: true });
+    expect(fired).toEqual(["interact", "powerAttack"]);
+  });
+
+  it("default bindings fall through shifted/ctrl creator chords to legacy", () => {
+    const adapter = new BabylonInputAdapter();
+    // Shift+F5 / Shift+F8 belong to the legacy Bundle Merge / Loot Table creators
+    expect(adapter.handleKeyEvent("F5", "down", { shift: true })).toBeNull();
+    expect(adapter.handleKeyEvent("F8", "down", { shift: true })).toBeNull();
+    // Ctrl+M / Ctrl+Shift+M belong to Scene Notes / Mod Manifest (legacy)
+    expect(adapter.handleKeyEvent("m", "down", { ctrlOrMeta: true })).toBeNull();
+    // Ctrl+Z / Ctrl+Y belong to editor undo/redo (legacy)
+    expect(adapter.handleKeyEvent("z", "down", { ctrlOrMeta: true })).toBeNull();
+    expect(adapter.handleKeyEvent("y", "down", { ctrlOrMeta: true })).toBeNull();
+    // Unmodified chords still fire
+    expect(adapter.handleKeyEvent("F5", "down")).toBe("save");
+    expect(adapter.handleKeyEvent("F8", "down")).toBe("favoritesMenu");
+    expect(adapter.handleKeyEvent("m", "down")).toBe("toggleMute");
+    expect(adapter.handleKeyEvent("z", "down")).toBe("cycleSpell");
+    expect(adapter.handleKeyEvent("y", "down")).toBe("toggleFastTravel");
+  });
+
+  it("permissive bindings still match while Shift is held (sprint-jump)", () => {
+    const adapter = new BabylonInputAdapter();
+    // Space/jump and the shifted-character archetype keys must keep working
+    // while Shift is held — only bindings with an explicit modifier flag are strict.
+    expect(adapter.handleKeyEvent(" ", "down", { shift: true })).toBe("jump");
+    expect(adapter.handleKeyEvent("!", "down", { shift: true })).toBe("archetype1");
+  });
+
+  it("default bindings keep Shift+O / O disambiguation", () => {
+    const adapter = new BabylonInputAdapter();
+    expect(adapter.handleKeyEvent("O", "down", { shift: true })).toBe("stableOrSaddlebag");
+    expect(adapter.handleKeyEvent("O", "down")).toBe("mountDismount");
+  });
+
+  it("default bindings route Shift+M to markPosition, M to mute", () => {
+    const adapter = new BabylonInputAdapter();
+    expect(adapter.handleKeyEvent("M", "down", { shift: true })).toBe("markPosition");
+    expect(adapter.handleKeyEvent("m", "down")).toBe("toggleMute");
+  });
+
   it("returns null when no binding matches", () => {
     const adapter = new BabylonInputAdapter([]);
     const result = adapter.handleKeyEvent("z", "down");

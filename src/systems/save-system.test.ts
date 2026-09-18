@@ -79,7 +79,7 @@ describe('SaveSystem', () => {
         expect(localStorage.setItem).toHaveBeenCalledOnce();
         const raw = localStorageMock['camelot_save'];
         const data: SaveData = JSON.parse(raw);
-        expect(data.version).toBe(28);
+        expect(data.version).toBe(29);
         expect(data.player.health).toBe(80);
         expect(data.player.magicka).toBe(60);
         expect(data.player.stamina).toBe(90);
@@ -207,6 +207,83 @@ describe('SaveSystem', () => {
         saveSystem.save();
         saveSystem.load();
         expect(mockUI.showNotification).toHaveBeenCalledWith('Game Loaded!', 2500);
+    });
+
+    it('should round-trip the player name', () => {
+        mockPlayer.name = 'Aldric';
+        saveSystem.save();
+        mockPlayer.name = 'Someone Else';
+        saveSystem.load();
+        expect(mockPlayer.name).toBe('Aldric');
+    });
+
+    it('should keep the default name when the save has none', () => {
+        saveSystem.save();
+        mockPlayer.name = 'Someone Else';
+        saveSystem.load();
+        expect(mockPlayer.name).toBe('Someone Else');
+    });
+
+    it('should restore v23+ systems (e.g. pickpocket stats) instead of dropping them', () => {
+        const mockPickpocket = {
+            getSaveState: vi.fn(() => ({ totalAttempts: 3, totalSuccesses: 2, totalCaught: 1 })),
+            restoreFromSave: vi.fn(),
+        };
+        saveSystem.setPickpocketSystem(mockPickpocket as any);
+        saveSystem.save();
+
+        mockPickpocket.restoreFromSave.mockClear();
+        const result = saveSystem.load();
+        expect(result).toBe(true);
+        expect(mockPickpocket.restoreFromSave).toHaveBeenCalledWith(
+            expect.objectContaining({ totalAttempts: 3, totalSuccesses: 2, totalCaught: 1 }),
+        );
+    });
+
+    it('should round-trip the stealth crouch state into save slots', () => {
+        const mockStealth = {
+            getSaveState: vi.fn(() => ({ isCrouching: true })),
+            restoreFromSave: vi.fn(),
+        };
+        saveSystem.setStealthSystem(mockStealth as any);
+        saveSystem.save();
+
+        mockStealth.restoreFromSave.mockClear();
+        const result = saveSystem.load();
+        expect(result).toBe(true);
+        expect(mockStealth.restoreFromSave).toHaveBeenCalledWith({ isCrouching: true });
+    });
+
+    it('should round-trip player combat status effects into save slots', () => {
+        const effect = {
+            type: 'poison',
+            damagePerTick: 2,
+            tickInterval: 1.5,
+            tickTimer: 0.4,
+            remainingDuration: 7,
+        };
+        const mockCombat = {
+            getSaveState: vi.fn(() => [effect]),
+            restoreFromSave: vi.fn(),
+        };
+        saveSystem.setCombatSystem(mockCombat as any);
+        saveSystem.save();
+
+        const raw = localStorageMock['camelot_save'];
+        const data: SaveData = JSON.parse(raw);
+        expect(data.combatEffects).toEqual([effect]);
+
+        mockCombat.restoreFromSave.mockClear();
+        const result = saveSystem.load();
+        expect(result).toBe(true);
+        expect(mockCombat.restoreFromSave).toHaveBeenCalledWith([effect]);
+    });
+
+    it('should omit stealth/combatEffects fields when those systems are not wired', () => {
+        saveSystem.save();
+        const data: SaveData = JSON.parse(localStorageMock['camelot_save']);
+        expect(data.stealth).toBeUndefined();
+        expect(data.combatEffects).toBeUndefined();
     });
 
     it('restores framework runtime state when framework data exists', () => {

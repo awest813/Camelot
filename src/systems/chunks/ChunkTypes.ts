@@ -40,6 +40,12 @@ export interface ChunkManagerOptions {
   maxCachedChunks?: number;
   preloadRadius?: number;
   loadConcurrency?: number;
+  /**
+   * Maximum chunk mounts (mesh/physics/scene work) performed per update() call.
+   * Spreads border-crossing and fast-travel mount bursts across ticks.
+   * Defaults to 2.
+   */
+  mountBudgetPerUpdate?: number;
 }
 
 export interface ChunkSource<TData> {

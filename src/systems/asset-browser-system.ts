@@ -97,6 +97,31 @@ export class AssetBrowserSystem {
       }
     };
 
+    // Asset-list exports (written by the Asset Browser's "Export Selected"):
+    // register each entry directly so exports round-trip.
+    const listed = (bundle as unknown as { assets?: unknown }).assets;
+    if (Array.isArray(listed)) {
+      const knownTypes: ReadonlySet<string> = new Set([
+        "item", "npc", "quest", "dialogue", "faction", "lootTable", "spawn", "map",
+      ]);
+      for (const a of listed) {
+        const entry = a as Partial<AssetEntry>;
+        if (!entry || typeof entry.id !== "string" || !knownTypes.has(entry.type as string)) {
+          continue;
+        }
+        const strings = (v: unknown): string[] =>
+          Array.isArray(v) ? v.filter((t): t is string => typeof t === "string") : [];
+        tryRegister({
+          id: entry.id,
+          name: typeof entry.name === "string" ? entry.name : entry.id,
+          type: entry.type as AssetEntry["type"],
+          tags: strings(entry.tags),
+          description: typeof entry.description === "string" ? entry.description : "",
+          dependencies: strings(entry.dependencies),
+        });
+      }
+    }
+
     // quest
     if (bundle.quest) {
       const q = bundle.quest as Record<string, unknown>;

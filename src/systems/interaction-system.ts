@@ -1,8 +1,12 @@
 import { Scene } from "@babylonjs/core/scene";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { Player } from "../entities/player";
+import type { NPC } from "../entities/npc";
 import { InventorySystem } from "./inventory-system";
 import { DialogueSystem } from "./dialogue-system";
+import type { StealthSystem } from "./stealth-system";
+import type { PickpocketSystem } from "./pickpocket-system";
+import type { ContainerSystem } from "./container-system";
 import { UIManager } from "../ui/ui-manager";
 import type { CellManager } from "../world/cell-manager";
 
@@ -21,6 +25,22 @@ export class InteractionSystem {
 
   /** When set, portal meshes can trigger cell transitions (E key). */
   public cellManager: CellManager | null = null;
+
+  /** When set, chest meshes can be opened into the container UI (E key). */
+  public containerSystem: ContainerSystem | null = null;
+
+  /**
+   * Optional pickpocket integration (set by the game layer).
+   * When `pickpocketSystem` is present and the player is crouching undetected
+   * behind a living, non-hostile NPC, the prompt offers pickpocketing and E
+   * fires `onPickpocketNpc` instead of opening dialogue.
+   */
+  public stealthSystem: StealthSystem | null = null;
+  public pickpocketSystem: PickpocketSystem | null = null;
+  /** Player's current Sneak level, used for the displayed success chance. */
+  public sneakLevelProvider: (() => number) | null = null;
+  /** Fired with the targeted NPC when the player presses E on a pickpocket prompt. */
+  public onPickpocketNpc: ((npc: NPC) => void) | null = null;
 
   /**
    * Runs a map/interior transition with optional screen fade. When null,
@@ -71,11 +91,16 @@ export class InteractionSystem {
               if (metadata.npc.isAggressive) {
                   this.ui.setInteractionText(`${metadata.npc.mesh.name} is hostile`);
               } else {
-                  this.ui.setInteractionText(`[E] Talk to ${metadata.npc.mesh.name}`);
+                  const sneakPrompt = this._pickpocketPromptFor(metadata.npc);
+                  this.ui.setInteractionText(
+                      sneakPrompt ?? `[E] Talk to ${metadata.npc.mesh.name}`);
               }
               this.ui.setCrosshairActive(true);
           } else if (metadata.type === 'loot') {
               this.ui.setInteractionText(`[E] Take ${metadata.loot.item.name}`);
+              this.ui.setCrosshairActive(true);
+          } else if (metadata.type === 'container' && metadata.container) {
+              this.ui.setInteractionText(`[E] Open ${metadata.container.name}`);
               this.ui.setCrosshairActive(true);
           } else if (metadata.type === 'portal' && metadata.portal && this.cellManager) {
               if (this.cellManager.isTransitioning || this.ui.isScreenFadeActive) {
@@ -109,6 +134,10 @@ export class InteractionSystem {
               this.ui.showNotification(`${metadata.npc.mesh.name} is hostile!`, 1500);
               return;
           }
+          if (this._pickpocketPromptFor(metadata.npc) && this.onPickpocketNpc) {
+              this.onPickpocketNpc(metadata.npc);
+              return;
+          }
           this.dialogueSystem.startDialogue(metadata.npc);
       } else if (metadata.type === 'loot') {
           const loot = metadata.loot;
@@ -116,6 +145,9 @@ export class InteractionSystem {
               loot.dispose();
               if (this.onLootPickup) this.onLootPickup(loot.item.id);
           }
+      } else if (metadata.type === 'container' && metadata.container && this.containerSystem) {
+          // No lockpick skill exists yet — locked chests report their difficulty.
+          this.containerSystem.tryOpen(metadata.container, 0);
       } else if (metadata.type === 'portal' && metadata.portal && this.cellManager) {
           if (this.cellManager.isTransitioning || this.ui.isScreenFadeActive) return;
           const portalId = metadata.portal.id as string;
@@ -126,6 +158,22 @@ export class InteractionSystem {
           }
       }
     }
+  }
+
+  /**
+   * Returns the pickpocket prompt text when sneaking undetected behind a
+   * living, non-hostile NPC with something to steal — otherwise null.
+   * Mirrors the Oblivion rule: crouch + undetected + a registered inventory.
+   */
+  private _pickpocketPromptFor(npc: NPC): string | null {
+    if (!this.stealthSystem || !this.pickpocketSystem) return null;
+    if (npc.isDead) return null;
+    if (!this.stealthSystem.canSneakAttack(npc)) return null;
+    const npcId = npc.mesh.name;
+    const sneakLevel = this.sneakLevelProvider?.() ?? 0;
+    const check = this.pickpocketSystem.canAttempt(npcId, true, false, "", sneakLevel);
+    if (!check.canAttempt || check.successChance == null) return null;
+    return `[E] Pickpocket ${npcId} (${Math.round(check.successChance)}%)`;
   }
 
   private _raycast() {

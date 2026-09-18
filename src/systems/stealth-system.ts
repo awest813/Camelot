@@ -35,6 +35,8 @@ const NOISE_DECAY_RATE = 1.5;
 const NOISE_HEAR_RANGE_BONUS = 8;
 /** Detection level below which a sneak attack against an NPC is valid. */
 const SNEAK_ATTACK_MAX_DETECTION = 30;
+/** Detection level at which an NPC starts investigating a suspicious position. */
+const PARTIAL_DETECTION_THRESHOLD = 50;
 
 /**
  * Manages player stealth, NPC detection cones/hearing, and sneaking feedback.
@@ -74,6 +76,7 @@ export class StealthSystem {
   private _scratchVec = new Vector3();
   private _scratchDir = new Vector3();
   private _scratchRayOrigin = new Vector3();
+  private _scratchRay = new Ray(new Vector3(), new Vector3(), 0);
   private _raycastFrameCounter: number = 0;
 
   /**
@@ -88,6 +91,13 @@ export class StealthSystem {
 
   /** Fired once when an NPC's detection level first reaches 100. */
   public onDetected: ((npc: NPC) => void) | null = null;
+
+  /**
+   * Fired when an NPC's detection crosses 50 upward — suspicion without full
+   * detection.  The game layer typically routes the NPC into INVESTIGATE with
+   * the player's position as the search target.
+   */
+  public onPartialDetection: ((npc: NPC, playerPos: Vector3) => void) | null = null;
 
   /**
    * Scene is optional for headless tests; without one, sight checks skip raycast
@@ -191,16 +201,20 @@ export class StealthSystem {
     // Decay transient noise level
     this._noiseLevel = Math.max(0, this._noiseLevel - NOISE_DECAY_RATE * deltaTime);
 
-    // Throttle raycast-heavy sight checks to every 3 frames
+    // Throttle raycast-heavy sight checks: each NPC raycasts every 3rd update,
+    // phase-staggered by its list index so occlusion rays spread evenly across
+    // frames instead of bursting on a single tick.
     this._raycastFrameCounter++;
 
-    for (const npc of this._npcs) {
+    for (let i = 0; i < this._npcs.length; i++) {
+      const npc = this._npcs[i];
       if (npc.isDead || npc.aiState === AIState.ATTACK || npc.aiState === AIState.CHASE) {
         this._detectionLevels.delete(npc);
         continue;
       }
 
-      const canSee  = this._canNPCSee(npc, ambientIntensity);
+      const shouldRaycast = (this._raycastFrameCounter + i) % 3 === 0;
+      const canSee  = this._canNPCSee(npc, ambientIntensity, shouldRaycast);
       const canHear = this._canNPCHear(npc);
       const wasFullyDetected = (this._detectionLevels.get(npc) ?? 0) >= 100;
 
@@ -209,6 +223,10 @@ export class StealthSystem {
         const prev = this._detectionLevels.get(npc) ?? 0;
         const next = Math.min(100, prev + rate * deltaTime);
         this._detectionLevels.set(npc, next);
+
+        if (prev < PARTIAL_DETECTION_THRESHOLD && next >= PARTIAL_DETECTION_THRESHOLD && next < 100) {
+          this.onPartialDetection?.(npc, this._player.camera.position.clone());
+        }
 
         if (!wasFullyDetected && next >= 100) {
           npc.aiState = AIState.ALERT;
@@ -223,7 +241,7 @@ export class StealthSystem {
     }
   }
 
-  private _canNPCSee(npc: NPC, ambientIntensity: number): boolean {
+  private _canNPCSee(npc: NPC, ambientIntensity: number, shouldRaycast: boolean): boolean {
     if (npc.isDead) return false;
 
     const playerPos = this._player.camera.position;
@@ -251,12 +269,14 @@ export class StealthSystem {
 
     if (!this._scene) return true;
 
-    if (this._raycastFrameCounter % 3 !== 0) return true;
+    if (!shouldRaycast) return true;
 
     this._scratchRayOrigin.set(npcPos.x, npcPos.y + 1.3, npcPos.z);
-    const ray = new Ray(this._scratchRayOrigin, toPlayerNorm, dist);
+    this._scratchRay.origin.copyFrom(this._scratchRayOrigin);
+    this._scratchRay.direction.copyFrom(toPlayerNorm);
+    this._scratchRay.length = dist;
 
-    const hit = this._scene.pickWithRay(ray, (mesh: AbstractMesh) => {
+    const hit = this._scene.pickWithRay(this._scratchRay, (mesh: AbstractMesh) => {
         return mesh !== npc.mesh && mesh.name !== "player_camera_helper" && mesh.checkCollisions;
     });
 

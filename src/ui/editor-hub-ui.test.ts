@@ -69,61 +69,31 @@ describe("EditorHubUI", () => {
     });
   });
 
-  describe("Escape key handler", () => {
-    it("closes the hub when Escape is pressed while open", () => {
+  describe("Escape handling", () => {
+    // Escape is owned by the game's pause cascade — the hub deliberately has
+    // no self-Escape listener (a self-close there double-fired: the cascade
+    // saw the hub already closed and paused on top of it).
+    it("does not close itself on Escape", () => {
       ui.open();
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       expect(ui.isVisible).toBe(true);
-
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-
-      expect(ui.isVisible).toBe(false);
     });
 
-    it("fires onClose callback when Escape closes the hub", () => {
+    it("fires onClose when close() is called (by the game cascade)", () => {
       const onClose = vi.fn();
       ui.onClose = onClose;
-      ui.open();
-
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-
-      expect(onClose).toHaveBeenCalledOnce();
-    });
-
-    it("does not respond to Escape after the hub is closed", () => {
-      const onClose = vi.fn();
-      ui.onClose = onClose;
-      ui.open();
-      ui.close(); // removes the listener
-
-      onClose.mockClear();
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-
-      expect(onClose).not.toHaveBeenCalled();
-    });
-
-    it("re-attaches the Escape listener when opened again after being closed", () => {
       ui.open();
       ui.close();
-      ui.open(); // re-open
-
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-
-      expect(ui.isVisible).toBe(false);
-    });
-
-    it("does not add a duplicate Escape listener on repeated open() calls", () => {
-      const onClose = vi.fn();
-      ui.onClose = onClose;
-      ui.open();
-      ui.open(); // second call while already open
-
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-
-      // onClose should fire exactly once
       expect(onClose).toHaveBeenCalledOnce();
     });
 
-    it("ignores non-Escape key presses while open", () => {
+    it("repeated open() calls stay open", () => {
+      ui.open();
+      ui.open(); // second call while already open
+      expect(ui.isVisible).toBe(true);
+    });
+
+    it("stays open on non-Escape key presses", () => {
       ui.open();
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
       expect(ui.isVisible).toBe(true);

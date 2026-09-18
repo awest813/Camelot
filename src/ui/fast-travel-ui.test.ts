@@ -388,5 +388,13 @@ describe("FastTravelUI", () => {
       const eta = document.querySelector(".fast-travel__row-eta") as HTMLElement;
       expect(eta.textContent).toBe("~6.0h");
     });
+
+    it("renders the detail label instead of the estimate when provided", () => {
+      ui.open([{ id: "__recall", name: "✦ Recall to Mark", estimatedHours: 0, detail: "instant" }]);
+      const eta = document.querySelector(".fast-travel__row-eta") as HTMLElement;
+      expect(eta.textContent).toBe("instant");
+      const status = document.querySelector(".fast-travel__status") as HTMLElement;
+      expect(status.textContent).toBe("✦ Recall to Mark — instant.");
+    });
   });
 });

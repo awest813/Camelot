@@ -40,7 +40,8 @@ assetLoader.preloadAll();
 ### Quaternius Base Path
 
 Quaternius assets are self-hosted (not available from a public CDN).
-By default they are loaded from `model/quaternius/` relative to the app root.
+By default they are loaded from `model/quaternius/` under the app root
+(root-anchored with the Vite deployment base, so sub-path hosting works).
 Override this for custom CDN hosting:
 
 ```ts
@@ -51,7 +52,7 @@ setQuaterniusBasePath("https://cdn.example.com/models/quaternius/");
 ### Quaternius Asset Manifest
 
 Metadata about all Quaternius assets (pack, category, tags, animation groups)
-is available via `QuaterniusAssetManifest` (`src/systems/quaternius-asset-manifest.ts`):
+is available via the `quaternius-asset-manifest` module (`src/systems/quaternius-asset-manifest.ts`):
 
 ```ts
 import { getKeysByPack, getQuaterniusEntry } from "./systems/quaternius-asset-manifest";

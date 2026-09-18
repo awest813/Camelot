@@ -32,6 +32,9 @@ export type NpcPersonalityTrait =
  * Per-archetype combat AI tuning overrides.
  * Fields left undefined fall back to role-based or entity defaults.
  */
+/** How an NPC delivers its telegraphed attack (mirrors NPC.npcAttackArchetype). */
+export type NpcAttackArchetype = "melee" | "ranged" | "magic";
+
 export interface NpcAIProfile {
   /** Detection radius in world units. */
   aggroRange: number;
@@ -48,6 +51,13 @@ export interface NpcAIProfile {
    * 0 means the NPC never flees.
    */
   fleesBelowHealthPct: number;
+  /**
+   * Attack delivery: "ranged" fires arrows, "magic" fires elemental bolts
+   * (see npcMagicDamageType). Defaults to "melee" when undefined.
+   */
+  attackArchetype?: NpcAttackArchetype;
+  /** Elemental type for "magic" attacks. Defaults to "fire". */
+  magicDamageType?: DamageType;
 }
 
 /** Damage categories matched by the combat system's resistance calculations. */

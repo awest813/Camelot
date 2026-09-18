@@ -38,9 +38,11 @@ describe("LootTableSystem", () => {
     expect(result.items).toHaveLength(0);
   });
 
-  it("rollTable produces exactly `rolls` items (non-unique table, no noneWeight)", () => {
+  it("rollTable produces exactly `rolls` items plus guaranteed entries (non-unique table, no noneWeight)", () => {
     const result = lts.rollTable("bandit_loot", 42);
-    expect(result.items).toHaveLength(3);
+    // 3 weighted rolls + the guaranteed bandit_token quest proof
+    expect(result.items).toHaveLength(4);
+    expect(result.items.some(i => i.id === "bandit_token")).toBe(true);
   });
 
   it("rollTable returns items with valid ids from the table entries", () => {
@@ -117,10 +119,10 @@ describe("LootTableSystem", () => {
   // ── rollTables (multi-table) ───────────────────────────────────────────────
 
   it("rollTables merges results from multiple tables", () => {
-    // bandit_loot: 3 rolls (no noneWeight) = always 3 items
+    // bandit_loot: 3 rolls + 1 guaranteed = 4 items
     // dungeon_loot: 4 rolls (no noneWeight) = always 4 items
     const items = lts.rollTables(["bandit_loot", "dungeon_loot"], 42);
-    expect(items).toHaveLength(7);
+    expect(items).toHaveLength(8);
   });
 
   it("rollTables with empty array returns empty list", () => {

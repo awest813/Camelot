@@ -48,6 +48,13 @@ export class BarterSystem {
   /** Player's barter skill (1-100).  Higher = better buy/sell ratios. */
   public barterSkill: number = 20;
 
+  /**
+   * Session buy-price multiplier for reputation/persuasion — the game layer
+   * sets it from fame disposition and the merchant's disposition band when a
+   * barter session opens (e.g. allied: 0.8, hostile: 1.4).  Reset per session.
+   */
+  public sessionBuyPriceFactor: number = 1.0;
+
   /** Player's current gold. */
   public playerGold: number = 100;
 
@@ -82,7 +89,9 @@ export class BarterSystem {
     const barterFactor = 1.4 - this.barterSkill / 250;
     const rapportFactor = 1 - this._getRapport(merchantId) * 0.003;
     const baseValue = item.stats?.value ?? 10;
-    return Math.max(1, Math.round(baseValue * priceMultiplier * barterFactor * rapportFactor));
+    return Math.max(1, Math.round(
+      baseValue * priceMultiplier * barterFactor * rapportFactor * this.sessionBuyPriceFactor
+    ));
   }
 
   /**

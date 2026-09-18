@@ -2,6 +2,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { Observer } from "@babylonjs/core/Misc/observable";
 import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Grid, Button } from "@babylonjs/gui/2D";
@@ -9,6 +10,7 @@ import { LinearGradient } from "@babylonjs/gui/2D/controls/gradient/LinearGradie
 import { Item } from "../systems/inventory-system";
 import { Quest } from "../systems/quest-system";
 import { EquipSlot } from "../systems/equipment-system";
+import { getItemIcon } from "./icon-utils";
 import { Player } from "../entities/player";
 import type { SkillTree } from "../systems/skill-tree-system";
 import { AttributeSystem, ATTRIBUTE_NAMES, type AttributeName } from "../systems/attribute-system";
@@ -48,6 +50,9 @@ export const SHARED_UI_PANEL = {
   BTN_HOVER:    T.BTN_HOVER,
 } as const;
 
+/** Cardinal labels for the compass strip, clockwise from north. */
+const COMPASS_DIRECTIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
+
 const clampPercentage = (current: number, max: number): string => {
   if (max <= 0) return "0%";
   const percent = (current / max) * 100;
@@ -82,7 +87,9 @@ export class UIManager {
   public inventoryGrid: Grid;
   public inventoryDescription: TextBlock;
   public statsText: TextBlock;
+  private _lastStatsText: string | null = null;
   public equipmentText: TextBlock;
+  private _inventoryMainGrid: Grid | null = null;
 
   private _equippedIds: Set<string> = new Set();
 
@@ -97,12 +104,33 @@ export class UIManager {
 
   // Pause Menu
   public pausePanel: Rectangle;
+  private _pauseCard: Rectangle | null = null;
   public resumeButton: Button;
   public saveButton: Button;
   public loadButton: Button;
+  public exportButton: Button;
+  public importButton: Button;
   public quitButton: Button;
 
   private _hpPulseObs: any = null;
+
+  // ── Pooled transient feedback ─────────────────────────────────────────────
+  // Notifications, damage numbers, hit flashes, and impact sparks reuse
+  // pre-allocated controls/meshes driven by one shared observer each, so
+  // combat bursts don't allocate controls and observers per event.
+  private _notifyRows: Array<{ rect: Rectangle; label: TextBlock; remainingMs: number }> = [];
+  private _notifyObs: Observer<Scene> | null = null;
+
+  private _damageRows: Array<{ label: TextBlock; topPx: number; elapsedMs: number; active: boolean }> = [];
+  private _damageObs: Observer<Scene> | null = null;
+  private readonly _damageLifetimeMs = 1000;
+
+  private _flashRows: Array<{ rect: Rectangle; t: number; active: boolean }> = [];
+  private _flashObs: Observer<Scene> | null = null;
+  private readonly _flashDurationMs = 420;
+
+  private _sparkRows: Array<{ mesh: Mesh; mat: StandardMaterial; scale: number; active: boolean }> = [];
+  private _sparkObs: Observer<Scene> | null = null;
 
   // Interaction
   public interactionLabel: TextBlock;
@@ -119,6 +147,8 @@ export class UIManager {
   /** True while the HTML Character Sheet overlay is open (hides crosshair with other blocking panels). */
   private _characterSheetOpen: boolean = false;
   private _htmlOverlayCount: number = 0;
+  /** Set by the game layer each frame: true while any HTML modal overlay owns the screen. */
+  private _htmlModalActive: boolean = false;
   public get htmlOverlayCount(): number { return this._htmlOverlayCount; }
   public registerHtmlOverlay(): () => void {
     this._htmlOverlayCount++;
@@ -127,6 +157,17 @@ export class UIManager {
       this._htmlOverlayCount--;
       this._syncCrosshairVisibility();
     };
+  }
+
+  /**
+   * Report whether any HTML modal overlay (barter, level-up, guard challenge,
+   * travel, stable, settings, …) is currently open so the crosshair hides
+   * alongside the Babylon-GUI blocking panels.  Cheap to call every frame.
+   */
+  public setHtmlOverlayActive(active: boolean): void {
+    if (active === this._htmlModalActive) return;
+    this._htmlModalActive = active;
+    this._syncCrosshairVisibility();
   }
 
   // Camera Shake & Hit-stop
@@ -158,9 +199,15 @@ export class UIManager {
   // ── Stealth HUD ────────────────────────────────────────────────────────
   private _stealthPanel: Rectangle | null = null;
   private _stealthLabel: TextBlock | null = null;
+  private _lastStealthHudLabel: "Hidden" | "Caution" | "Detected" | null | undefined = undefined;
 
   // ── Clock HUD ─────────────────────────────────────────────────────────
   private _clockLabel: TextBlock | null = null;
+
+  // ── Combat state readout (combo / finisher / riposte) ────────────────────
+  private _combatStateLabel: TextBlock | null = null;
+  private _lastCombatStateText: string | null = null;
+  private _lastCombatStateVisible: boolean | null = null;
 
   // ── Attribute Panel ───────────────────────────────────────────────────────
   public attributePanel: Rectangle | null = null;
@@ -176,12 +223,17 @@ export class UIManager {
   private _waitHoursLabel: TextBlock | null = null;
   private _waitHoursValue: number = 8;
   public isWaitDialogOpen: boolean = false;
+  /** Fired when the wait dialog closes via its own buttons (Wait/Cancel) so the game layer can restore input. */
+  public onWaitDialogClosed: (() => void) | null = null;
+  /** Fired when the attribute panel closes via its own ✕ button so the game layer can restore input. */
+  public onAttributePanelClosed: (() => void) | null = null;
   /** Called with the chosen hour count when the player confirms the wait. */
   public onWaitConfirm: ((hours: number) => void) | null = null;
 
   // ── Compass HUD ────────────────────────────────────────────────────────────
   private _compassPanel: Rectangle | null = null;
   private _compassLabel: TextBlock | null = null;
+  private _lastCompassIndex: number = -1;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -202,6 +254,15 @@ export class UIManager {
 
   private _initUI(): void {
     this._ui = AdvancedDynamicTexture.CreateFullscreenUI("UI");
+
+    if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+      window.addEventListener("resize", () => {
+        if (this.inventoryPanel?.isVisible) this._adaptInventoryLayout();
+        if (this.pausePanel?.isVisible) this._adaptPauseLayout();
+        if (this.questLogPanel?.isVisible) this._adaptQuestLogLayout();
+        if (this.skillTreePanel?.isVisible) this._adaptSkillTreeLayout();
+      });
+    }
 
     // ── Cross-shaped Crosshair ────────────────────────────────────────────────
     this.crosshair = new Rectangle("crosshairContainer");
@@ -454,6 +515,7 @@ export class UIManager {
     mainGrid.addColumnDefinition(0.6);
     mainGrid.addColumnDefinition(0.4);
     this.inventoryPanel.addControl(mainGrid);
+    this._inventoryMainGrid = mainGrid;
 
     // Inventory Grid (Left)
     this.inventoryGrid = new Grid();
@@ -545,13 +607,14 @@ export class UIManager {
     // Central card
     const card = new Rectangle();
     card.width = "340px";
-    card.height = "440px";
+    card.height = "560px";
     card.cornerRadius = 10;
     card.color = T.PANEL_BORDER;
     card.thickness = 2;
     card.background = T.PANEL_BG;
     card.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
     this.pausePanel.addControl(card);
+    this._pauseCard = card;
 
     const panel = new StackPanel();
     panel.width = "290px";
@@ -586,6 +649,8 @@ export class UIManager {
     this.resumeButton = this._createButton("Resume",        panel);
     this.saveButton   = this._createButton("Save Game",     panel);
     this.loadButton   = this._createButton("Load Game",     panel);
+    this.exportButton = this._createButton("Export Save",   panel);
+    this.importButton = this._createButton("Import Save…",  panel);
     this.quitButton   = this._createButton("Quit to Menu",  panel);
   }
 
@@ -699,11 +764,25 @@ export class UIManager {
   // ── Public methods ────────────────────────────────────────────────────────────
 
   public toggleSkillTree(visible: boolean): void {
+    if (visible) this._adaptSkillTreeLayout();
     this.skillTreePanel.isVisible = visible;
     this._syncCrosshairVisibility();
   }
 
-  public refreshSkillTree(trees: SkillTree[], skillPoints: number): void {
+  /**
+   * Re-render the skill tree panel.
+   * @param trees            Skill tree data (ranks, names, prerequisites).
+   * @param skillPoints      Unspent skill points.
+   * @param prereqMet        Optional predicate consulted per skill — return
+   *   false to render the skill as locked ("🔒 Locked" instead of a clickable
+   *   upgrade button).  The game passes
+   *   `SkillTreeSystem.arePrerequisitesMet` here.
+   */
+  public refreshSkillTree(
+    trees: SkillTree[],
+    skillPoints: number,
+    prereqMet?: (treeIndex: number, skillIndex: number) => boolean,
+  ): void {
     this._skillPointsLabel.text = `Skill Points: ${skillPoints}`;
 
     while (this._skillTreeContent.children.length > 0) {
@@ -737,13 +816,8 @@ export class UIManager {
 
       tree.skills.forEach((skill, skillIdx) => {
         const isMax  = skill.currentRank >= skill.maxRank;
-        // NOTE (audit finding): prerequisites are not checked here — canBuy only
-        // guards against no skill points and max rank.  Skills with unmet
-        // prerequisites appear as "[+] Upgrade" in this BabylonJS panel even
-        // though SkillTreeSystem.purchaseSkill() will still reject the purchase
-        // and emit a "Requires: …" notification.  The HTML SkillTreeUI in
-        // src/ui/skill-tree-ui.ts handles prerequisites correctly.
-        const canBuy = !isMax && skillPoints > 0;
+        const isLocked = !isMax && prereqMet ? !prereqMet(treeIdx, skillIdx) : false;
+        const canBuy = !isMax && !isLocked && skillPoints > 0;
 
         const card = new Rectangle();
         card.width = "236px";
@@ -784,7 +858,7 @@ export class UIManager {
         descText.textWrapping = true;
         inner.addControl(descText);
 
-        const buyLabel = isMax ? "✦ MASTERED" : (canBuy ? "[+] Upgrade" : "Need Points");
+        const buyLabel = isMax ? "✦ MASTERED" : (isLocked ? "🔒 Locked" : (canBuy ? "[+] Upgrade" : "Need Points"));
         const buyBtn = Button.CreateSimpleButton(`skill_${treeIdx}_${skillIdx}`, buyLabel);
         buyBtn.width = "90%";
         buyBtn.height = "30px";
@@ -798,7 +872,9 @@ export class UIManager {
         buyBtn.isFocusInvisible = false;
         buyBtn.tabIndex = 0;
         buyBtn.accessibilityTag = {
-          description: isMax ? `${skill.name} Mastered` : (canBuy ? `Upgrade ${skill.name}` : `Need Points for ${skill.name}`)
+          description: isMax
+            ? `${skill.name} Mastered`
+            : (isLocked ? `${skill.name} Locked — prerequisites not met` : (canBuy ? `Upgrade ${skill.name}` : `Need Points for ${skill.name}`))
         };
 
         const defaultBg = isMax ? "rgba(10,40,10,0.65)" : (canBuy ? "rgba(60,40,0,0.85)" : "rgba(18,12,2,0.55)");
@@ -908,20 +984,109 @@ export class UIManager {
     return button;
   }
 
+  /** Fired once when the inventory panel transitions from open to closed. */
+  public onInventoryClosed: (() => void) | null = null;
+
+  private _getViewportSize(): { width: number; height: number } {
+    let width = 1280;
+    let height = 720;
+    if (typeof window !== "undefined" && typeof window.innerWidth === "number" && window.innerWidth > 0) {
+      width = window.innerWidth;
+      height = window.innerHeight > 0 ? window.innerHeight : 720;
+    } else {
+      const engine = (this.scene as any)?.getEngine?.();
+      if (engine && typeof engine.getRenderWidth === "function") {
+        const ew = engine.getRenderWidth();
+        const eh = engine.getRenderHeight();
+        if (ew > 0) width = ew;
+        if (eh > 0) height = eh;
+      } else {
+        const size = (this._ui as any)?.getSize?.();
+        if (size?.width && size.width > 0) width = size.width;
+        if (size?.height && size.height > 0) height = size.height;
+      }
+    }
+    return { width, height };
+  }
+
+  private _adaptInventoryLayout(): void {
+    if (!this.inventoryPanel) return;
+    const vp = this._getViewportSize();
+    const invW = Math.min(620, Math.max(320, vp.width - 24));
+    const invH = Math.min(620, Math.max(380, vp.height - 24));
+    this.inventoryPanel.width = `${invW}px`;
+    this.inventoryPanel.height = `${invH}px`;
+    if (this._inventoryMainGrid) {
+      this._inventoryMainGrid.width = `${Math.max(280, invW - 40)}px`;
+      this._inventoryMainGrid.height = `${Math.max(300, invH - 70)}px`;
+    }
+    if (vp.width < 720) {
+      this.inventoryPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+      this.inventoryPanel.left = "0px";
+    } else {
+      this.inventoryPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+      this.inventoryPanel.left = "-20px";
+    }
+  }
+
+  private _adaptPauseLayout(): void {
+    if (!this._pauseCard) return;
+    const vp = this._getViewportSize();
+    this._pauseCard.width = `${Math.min(340, Math.max(260, vp.width - 24))}px`;
+    this._pauseCard.height = `${Math.min(560, Math.max(360, vp.height - 24))}px`;
+  }
+
+  private _adaptQuestLogLayout(): void {
+    if (!this.questLogPanel) return;
+    const vp = this._getViewportSize();
+    const qW = Math.min(380, Math.max(280, vp.width - 24));
+    const qH = Math.min(500, Math.max(320, vp.height - 24));
+    this.questLogPanel.width = `${qW}px`;
+    this.questLogPanel.height = `${qH}px`;
+    if (this.questLogContent) {
+      this.questLogContent.width = `${Math.max(260, qW - 20)}px`;
+    }
+    if (vp.width < 640) {
+      this.questLogPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+      this.questLogPanel.left = "0px";
+    } else {
+      this.questLogPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+      this.questLogPanel.left = "20px";
+    }
+  }
+
+  private _adaptSkillTreeLayout(): void {
+    if (!this.skillTreePanel) return;
+    const vp = this._getViewportSize();
+    const sW = Math.min(780, Math.max(320, vp.width - 24));
+    const sH = Math.min(560, Math.max(360, vp.height - 24));
+    this.skillTreePanel.width = `${sW}px`;
+    this.skillTreePanel.height = `${sH}px`;
+    if (this._skillTreeContent) {
+      this._skillTreeContent.width = `${Math.max(280, sW - 24)}px`;
+      this._skillTreeContent.height = `${Math.max(260, sH - 98)}px`;
+    }
+  }
+
   public toggleInventory(visible: boolean): void {
+    const wasOpen = this.inventoryPanel.isVisible;
+    if (visible) this._adaptInventoryLayout();
     this.inventoryPanel.isVisible = visible;
     this._syncCrosshairVisibility();
     if (!visible) {
       this.inventoryDescription.text = "";
+      if (wasOpen) this.onInventoryClosed?.();
     }
   }
 
   public togglePauseMenu(visible: boolean): void {
+    if (visible) this._adaptPauseLayout();
     this.pausePanel.isVisible = visible;
     this._syncCrosshairVisibility();
   }
 
   public toggleQuestLog(visible: boolean): void {
+    if (visible) this._adaptQuestLogLayout();
     this.questLogPanel.isVisible = visible;
     this._syncCrosshairVisibility();
   }
@@ -935,7 +1100,8 @@ export class UIManager {
       !!this.attributePanel?.isVisible ||
       this.isWaitDialogOpen ||
       this._characterSheetOpen ||
-      this._htmlOverlayCount > 0;
+      this._htmlOverlayCount > 0 ||
+      this._htmlModalActive;
 
     this.toggleCrosshair(!hasBlockingPanelOpen);
   }
@@ -951,13 +1117,14 @@ export class UIManager {
       this.questLogContent.children[0].dispose();
     }
 
-    const active = quests.filter(q => q.isActive && !q.isCompleted);
-    const done   = quests.filter(q => q.isCompleted);
+    const active = quests.filter(q => q.isActive && !q.isCompleted && !q.isFailed);
+    const failed = quests.filter(q => q.isFailed);
+    const done   = quests.filter(q => q.isCompleted && !q.isFailed);
 
     const addEntry = (quest: Quest): void => {
       const header = new TextBlock();
-      header.text = (quest.isCompleted ? "✓ " : "◆ ") + quest.name;
-      header.color = quest.isCompleted ? T.DIM : T.TITLE;
+      header.text = (quest.isCompleted ? "✓ " : quest.isFailed ? "✕ " : "◆ ") + quest.name;
+      header.color = quest.isCompleted ? T.DIM : quest.isFailed ? T.HP_FILL : T.TITLE;
       header.fontSize = 14;
       header.fontWeight = "bold";
       header.height = "26px";
@@ -1000,9 +1167,10 @@ export class UIManager {
     };
 
     for (const q of active) addEntry(q);
+    for (const q of failed) addEntry(q);
     for (const q of done)   addEntry(q);
 
-    if (active.length === 0 && done.length === 0) {
+    if (active.length === 0 && failed.length === 0 && done.length === 0) {
       const empty = new TextBlock();
       empty.text = "No quests yet.";
       empty.color = T.DIM;
@@ -1029,9 +1197,12 @@ export class UIManager {
   }
 
   public updateStats(player: Player, characterLevel: number): void {
-    this.statsText.text =
+    const text =
       `Stats:\nCharacter Lv: ${characterLevel}  Combat Lv: ${player.level}  XP: ${Math.floor(player.experience)}/${player.experienceToNextLevel}\n` +
       `HP: ${Math.floor(player.health)} / ${player.maxHealth}\nMP: ${Math.floor(player.magicka)} / ${player.maxMagicka}\nSP: ${Math.floor(player.stamina)} / ${player.maxStamina}\nDMG Bonus: +${player.bonusDamage}\nArmor: ${player.bonusArmor}`;
+    if (this._lastStatsText === text) return;
+    this._lastStatsText = text;
+    this.statsText.text = text;
   }
 
   public setEquippedIds(ids: Set<string>): void {
@@ -1128,8 +1299,9 @@ export class UIManager {
         });
       }
 
+      const icon = getItemIcon(item);
       const text = new TextBlock();
-      text.text = item.name + (item.quantity > 1 ? ` (${item.quantity})` : "");
+      text.text = `${icon} ${item.name}` + (item.quantity > 1 ? ` (${item.quantity})` : "");
       text.color = isEquipped ? T.TITLE : T.TEXT;
       text.fontSize = 11;
       text.textWrapping = true;
@@ -1137,6 +1309,20 @@ export class UIManager {
 
       this.inventoryGrid.addControl(slot, row, col);
     });
+
+    for (let index = Math.min(items.length, 20); index < 20; index++) {
+      const row = Math.floor(index / 4);
+      const col = index % 4;
+
+      const emptySlot = new Rectangle();
+      emptySlot.width = "82px";
+      emptySlot.height = "82px";
+      emptySlot.cornerRadius = 5;
+      emptySlot.color = "rgba(107, 79, 18, 0.25)";
+      emptySlot.thickness = 1;
+      emptySlot.background = "rgba(16, 12, 4, 0.35)";
+      this.inventoryGrid.addControl(emptySlot, row, col);
+    }
   }
 
   public updateEquipment(slots: Map<EquipSlot, import("../systems/inventory-system").Item>): void {
@@ -1160,43 +1346,80 @@ export class UIManager {
     this.interactionLabel.text = text;
   }
 
+  /** Pre-allocate the fixed notification rows (once). */
+  private _ensureNotifyRows(): void {
+    if (this._notifyRows.length > 0) return;
+    for (let i = 0; i < 6; i++) {
+      const rect = new Rectangle();
+      rect.width = "100%";
+      rect.height = "40px";
+      rect.cornerRadius = 8;
+      rect.color = "rgba(232, 198, 86, 0.55)";
+      rect.thickness = 2;
+      rect.background = "rgba(14, 10, 4, 0.96)";
+      rect.paddingBottom = "5px";
+      rect.shadowOffsetX = 0;
+      rect.shadowOffsetY = 2;
+      rect.shadowBlur = 10;
+      rect.shadowColor = "rgba(0,0,0,0.55)";
+      rect.isVisible = false;
+
+      const label = new TextBlock();
+      label.text = "";
+      label.color = T.TITLE;
+      label.fontSize = 14;
+      label.fontWeight = "bold";
+      label.shadowColor = "rgba(0,0,0,0.75)";
+      label.shadowBlur = 4;
+      label.shadowOffsetY = 1;
+      rect.addControl(label);
+
+      this.notificationPanel.addControl(rect);
+      this._notifyRows.push({ rect, label, remainingMs: 0 });
+    }
+  }
+
   public showNotification(text: string, duration: number = 3000): void {
-    const rect = new Rectangle();
-    rect.width = "100%";
-    rect.height = "40px";
-    rect.cornerRadius = 8;
-    rect.color = "rgba(232, 198, 86, 0.55)";
-    rect.thickness = 2;
-    rect.background = "rgba(14, 10, 4, 0.96)";
-    rect.paddingBottom = "5px";
-    rect.shadowOffsetX = 0;
-    rect.shadowOffsetY = 2;
-    rect.shadowBlur = 10;
-    rect.shadowColor = "rgba(0,0,0,0.55)";
+    this._ensureNotifyRows();
 
-    const label = new TextBlock();
-    label.text = text;
-    label.color = T.TITLE;
-    label.fontSize = 14;
-    label.fontWeight = "bold";
-    label.shadowColor = "rgba(0,0,0,0.75)";
-    label.shadowBlur = 4;
-    label.shadowOffsetY = 1;
-    rect.addControl(label);
-
-    this.notificationPanel.addControl(rect);
-
-    let elapsedMs = 0;
-    const obs = this.scene.onBeforeRenderObservable.add(() => {
-      elapsedMs += this.scene.getEngine().getDeltaTime();
-      if (elapsedMs >= duration) {
-        this.scene.onBeforeRenderObservable.remove(obs);
-        if (this.notificationPanel.children.includes(rect)) {
-          this.notificationPanel.removeControl(rect);
-        }
-        rect.dispose();
+    // Prefer the bottom-most free row so new messages appear where the old
+    // implementation stacked them; when all rows are busy, overwrite the one
+    // closest to expiring.
+    let row = this._notifyRows[this._notifyRows.length - 1];
+    for (let i = this._notifyRows.length - 1; i >= 0; i--) {
+      if (this._notifyRows[i].remainingMs <= 0) {
+        row = this._notifyRows[i];
+        break;
       }
-    });
+      if (this._notifyRows[i].remainingMs < row.remainingMs) {
+        row = this._notifyRows[i];
+      }
+    }
+
+    row.label.text = text;
+    row.rect.isVisible = true;
+    row.remainingMs = duration;
+
+    if (!this._notifyObs) {
+      this._notifyObs = this.scene.onBeforeRenderObservable.add(() => {
+        const dt = this.scene.getEngine().getDeltaTime();
+        let anyActive = false;
+        for (const r of this._notifyRows) {
+          if (r.remainingMs <= 0) continue;
+          r.remainingMs -= dt;
+          if (r.remainingMs <= 0) {
+            r.remainingMs = 0;
+            r.rect.isVisible = false;
+          } else {
+            anyActive = true;
+          }
+        }
+        if (!anyActive && this._notifyObs) {
+          this.scene.onBeforeRenderObservable.remove(this._notifyObs);
+          this._notifyObs = null;
+        }
+      });
+    }
   }
 
   private _createBar(label: string, fillColor: string, trackColor: string, parent: StackPanel): { container: Rectangle, bar: Rectangle } {
@@ -1338,30 +1561,61 @@ export class UIManager {
     }
   }
 
+  /** Pre-allocate the impact spark pool (once): one sphere + own material each. */
+  private _ensureSparkRows(): void {
+    if (this._sparkRows.length > 0) return;
+    for (let i = 0; i < 8; i++) {
+      const spark = MeshBuilder.CreateSphere("impact_spark", { diameter: 0.15 }, this.scene);
+      spark.isVisible = false;
+      const mat = new StandardMaterial("spark_mat", this.scene);
+      mat.disableLighting = true;
+      mat.alpha = 1;
+      spark.material = mat;
+      this._sparkRows.push({ mesh: spark, mat, scale: 1, active: false });
+    }
+  }
+
   /**
    * Spawns a brief "spark" or impact flare at a world position.
    * Used for perfect blocks and critical hits.
    */
   public showSpark(position: Vector3, color: string = "#FFD700"): void {
-    const spark = MeshBuilder.CreateSphere("impact_spark", { diameter: 0.15 }, this.scene);
-    spark.position = position.clone();
-    
-    const mat = new StandardMaterial("spark_mat", this.scene);
-    mat.emissiveColor = Color3.FromHexString(color);
-    mat.disableLighting = true;
-    spark.material = mat;
+    this._ensureSparkRows();
 
-    let scale = 1.0;
-    const obs = this.scene.onBeforeRenderObservable.add(() => {
-      scale += 0.4;
-      mat.alpha -= 0.15;
-      spark.scaling.setAll(scale);
-      
-      if (mat.alpha <= 0) {
-        this.scene.onBeforeRenderObservable.remove(obs);
-        spark.dispose();
-      }
-    });
+    let row = this._sparkRows.find((r) => !r.active)
+      ?? this._sparkRows[0]; // all busy — reuse the oldest slot
+    row.active = true;
+    row.scale = 1;
+    row.mesh.position.copyFrom(position);
+    row.mesh.scaling.setAll(1);
+    row.mat.emissiveColor = Color3.FromHexString(color);
+    row.mat.alpha = 1;
+    row.mesh.isVisible = true;
+
+    if (!this._sparkObs) {
+      this._sparkObs = this.scene.onBeforeRenderObservable.add(() => {
+        const dt = this.scene.getEngine().getDeltaTime();
+        const step = dt / (1000 / 60); // preserve the original per-frame rate at 60 fps
+        let anyActive = false;
+        for (const r of this._sparkRows) {
+          if (!r.active) continue;
+          r.scale += 0.4 * step;
+          r.mat.alpha -= 0.15 * step;
+          r.mesh.scaling.setAll(r.scale);
+          if (r.mat.alpha <= 0) {
+            r.mat.alpha = 1; // reset for the next reuse
+            r.mesh.isVisible = false;
+            r.active = false;
+          } else {
+            anyActive = true;
+          }
+        }
+        if (!anyActive && this._sparkObs) {
+          this.scene.onBeforeRenderObservable.remove(this._sparkObs);
+          this._sparkObs = null;
+        }
+      });
+    }
   }
 
   /**
@@ -1374,26 +1628,52 @@ export class UIManager {
 
   /** Flash a translucent color overlay to signal being hit or dealing damage. */
   public showHitFlash(color: string = "red"): void {
-    const flash = new Rectangle();
-    flash.width = "100%";
-    flash.height = "100%";
-    flash.background = color;
-    flash.thickness = 0;
-    flash.alpha = 0.45;
-    flash.isPointerBlocker = false;
-    flash.zIndex = 1;
-    this._ui.addControl(flash);
-
-    let t = 0;
-    const obs = this.scene.onBeforeRenderObservable.add(() => {
-      t += this.scene.getEngine().getDeltaTime() / 420;
-      flash.alpha = Math.max(0, 0.45 * (1 - t));
-      if (t >= 1) {
-        this.scene.onBeforeRenderObservable.remove(obs);
-        this._ui.removeControl(flash);
-        flash.dispose();
+    if (this._flashRows.length === 0) {
+      for (let i = 0; i < 3; i++) {
+        const flash = new Rectangle();
+        flash.width = "100%";
+        flash.height = "100%";
+        flash.background = color;
+        flash.thickness = 0;
+        flash.alpha = 0;
+        flash.isPointerBlocker = false;
+        flash.zIndex = 1;
+        flash.isVisible = false;
+        this._ui.addControl(flash);
+        this._flashRows.push({ rect: flash, t: 0, active: false });
       }
-    });
+    }
+
+    // All busy — restart the one closest to finished.
+    let row = this._flashRows.find((r) => !r.active)
+      ?? this._flashRows.reduce((a, b) => (a.t > b.t ? a : b));
+    row.active = true;
+    row.t = 0;
+    row.rect.background = color;
+    row.rect.alpha = 0.45;
+    row.rect.isVisible = true;
+
+    if (!this._flashObs) {
+      this._flashObs = this.scene.onBeforeRenderObservable.add(() => {
+        const dt = this.scene.getEngine().getDeltaTime();
+        let anyActive = false;
+        for (const r of this._flashRows) {
+          if (!r.active) continue;
+          r.t += dt / this._flashDurationMs;
+          r.rect.alpha = Math.max(0, 0.45 * (1 - r.t));
+          if (r.t >= 1) {
+            r.rect.isVisible = false;
+            r.active = false;
+          } else {
+            anyActive = true;
+          }
+        }
+        if (!anyActive && this._flashObs) {
+          this.scene.onBeforeRenderObservable.remove(this._flashObs);
+          this._flashObs = null;
+        }
+      });
+    }
   }
 
   /** Special curative flash (green/white) for healing events. */
@@ -1416,32 +1696,59 @@ export class UIManager {
     const hw = engine.getRenderWidth() / 2;
     const hh = engine.getRenderHeight() / 2;
 
-    const text = new TextBlock();
-    text.text = `-${damage}`;
-    text.color = color ?? "#FF6030";
-    text.fontSize = 24;
-    text.fontWeight = "bold";
-    text.shadowColor = "black";
-    text.shadowBlur = 4;
-    text.left = `${screenPos.x - hw}px`;
-    text.top = `${screenPos.y - hh}px`;
-    text.zIndex = 60;
-    this._ui.addControl(text);
-
-    let elapsed = 0;
-    const obs = this.scene.onBeforeRenderObservable.add(() => {
-      const dt = this.scene.getEngine().getDeltaTime();
-      elapsed += dt;
-      const moveRate = 30 * (dt / 1000);
-      const topPx = parseFloat(text.top as string) - moveRate;
-      text.top = `${topPx}px`;
-      text.alpha = Math.max(0, 1 - elapsed / 1000);
-      if (elapsed >= 1000) {
-        this.scene.onBeforeRenderObservable.remove(obs);
-        this._ui.removeControl(text);
-        text.dispose();
+    if (this._damageRows.length === 0) {
+      for (let i = 0; i < 12; i++) {
+        const label = new TextBlock();
+        label.text = "";
+        label.color = "#FF6030";
+        label.fontSize = 24;
+        label.fontWeight = "bold";
+        label.shadowColor = "black";
+        label.shadowBlur = 4;
+        label.zIndex = 60;
+        label.isVisible = false;
+        this._ui.addControl(label);
+        this._damageRows.push({ label, topPx: 0, elapsedMs: 0, active: false });
       }
-    });
+    }
+
+    // All busy — overwrite the number closest to expiring.
+    let row = this._damageRows.find((r) => !r.active)
+      ?? this._damageRows.reduce((a, b) => (a.elapsedMs > b.elapsedMs ? a : b));
+    row.active = true;
+    row.elapsedMs = 0;
+    row.topPx = screenPos.y - hh;
+    row.label.text = `-${damage}`;
+    row.label.color = color ?? "#FF6030";
+    row.label.left = `${screenPos.x - hw}px`;
+    row.label.top = `${row.topPx}px`;
+    row.label.alpha = 1;
+    row.label.isVisible = true;
+
+    if (!this._damageObs) {
+      this._damageObs = this.scene.onBeforeRenderObservable.add(() => {
+        const dt = this.scene.getEngine().getDeltaTime();
+        const moveRate = 30 * (dt / 1000);
+        let anyActive = false;
+        for (const r of this._damageRows) {
+          if (!r.active) continue;
+          r.elapsedMs += dt;
+          r.topPx -= moveRate;
+          r.label.top = `${r.topPx}px`;
+          r.label.alpha = Math.max(0, 1 - r.elapsedMs / this._damageLifetimeMs);
+          if (r.elapsedMs >= this._damageLifetimeMs) {
+            r.label.isVisible = false;
+            r.active = false;
+          } else {
+            anyActive = true;
+          }
+        }
+        if (!anyActive && this._damageObs) {
+          this.scene.onBeforeRenderObservable.remove(this._damageObs);
+          this._damageObs = null;
+        }
+      });
+    }
   }
 
   // ── Debug / Performance Overlay ───────────────────────────────────────────
@@ -1549,6 +1856,8 @@ export class UIManager {
   /** Update the stealth eye indicator. Pass null to hide it. */
   public updateStealthHUD(label: "Hidden" | "Caution" | "Detected" | null): void {
     if (!this._stealthPanel || !this._stealthLabel) return;
+    if (label === this._lastStealthHudLabel) return;
+    this._lastStealthHudLabel = label;
     if (!label) {
       this._stealthPanel.isVisible = false;
       return;
@@ -1579,6 +1888,36 @@ export class UIManager {
   /** Update the in-game clock display (top-right corner). */
   public updateClock(timeString: string): void {
     if (this._clockLabel) this._clockLabel.text = timeString;
+  }
+
+  // ── Combat state readout ──────────────────────────────────────────────────
+
+  /**
+   * Show a short transient combat-state line above the quick-slots
+   * ("Combo ×2", "FINISHER READY", "Riposte ready!").  Pass null to hide.
+   */
+  public updateCombatState(text: string | null): void {
+    if (!this._combatStateLabel) {
+      const label = new TextBlock("combatStateLabel");
+      label.text = "";
+      label.color = T.TITLE;
+      label.fontSize = 15;
+      label.fontWeight = "bold";
+      label.shadowColor = "rgba(0,0,0,0.8)";
+      label.shadowBlur = 4;
+      label.height = "24px";
+      label.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+      label.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+      label.top = "-96px";
+      label.isVisible = false;
+      this._ui.addControl(label);
+      this._combatStateLabel = label;
+    }
+    if (text === this._lastCombatStateText && (text !== null) === this._lastCombatStateVisible) return;
+    this._lastCombatStateText = text;
+    this._lastCombatStateVisible = text !== null;
+    this._combatStateLabel.text = text ?? "";
+    this._combatStateLabel.isVisible = text !== null;
   }
 
   // ── Attribute Panel ───────────────────────────────────────────────────────
@@ -1649,7 +1988,10 @@ export class UIManager {
     closeBtn.fontSize = 13;
     closeBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
     closeBtn.top = "-14px";
-    closeBtn.onPointerUpObservable.add(() => this.toggleAttributePanel(false));
+    closeBtn.onPointerUpObservable.add(() => {
+      this.toggleAttributePanel(false);
+      this.onAttributePanelClosed?.();
+    });
     this._applyA11y(closeBtn, "Close Attribute Panel");
     panel.addControl(closeBtn);
   }
@@ -1922,6 +2264,7 @@ export class UIManager {
     waitBtn.onPointerUpObservable.add(() => {
       this.onWaitConfirm?.(this._waitHoursValue);
       this.toggleWaitDialog(false);
+      this.onWaitDialogClosed?.();
     });
 
     this._applyA11y(waitBtn, "Confirm wait");
@@ -1935,7 +2278,10 @@ export class UIManager {
     cancelBtn.cornerRadius = 4;
     cancelBtn.fontSize = 14;
     cancelBtn.paddingLeft = "8px";
-    cancelBtn.onPointerUpObservable.add(() => this.toggleWaitDialog(false));
+    cancelBtn.onPointerUpObservable.add(() => {
+      this.toggleWaitDialog(false);
+      this.onWaitDialogClosed?.();
+    });
 
     this._applyA11y(cancelBtn, "Cancel wait");
     btnRow.addControl(cancelBtn);
@@ -1990,14 +2336,15 @@ export class UIManager {
     const deg = ((yawRadians * (180 / Math.PI)) % 360 + 360) % 360;
 
     // Map degrees to compass segments (each segment = 45°, centred on its direction)
-    const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
     const idx = Math.round(deg / 45) % 8;
+    if (idx === this._lastCompassIndex) return;
+    this._lastCompassIndex = idx;
 
     // Show three visible directions; the current facing direction is wrapped in
     // angle brackets to visually distinguish it from its neighbours.
-    const prev = directions[(idx + 7) % 8];
-    const curr = directions[idx];
-    const next = directions[(idx + 1) % 8];
+    const prev = COMPASS_DIRECTIONS[(idx + 7) % 8];
+    const curr = COMPASS_DIRECTIONS[idx];
+    const next = COMPASS_DIRECTIONS[(idx + 1) % 8];
 
     this._compassLabel.text = `${prev}  ‹ ${curr} ›  ${next}`;
   }

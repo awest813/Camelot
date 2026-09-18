@@ -1,5 +1,7 @@
 import type { BarterSystem, MerchantDef } from "../systems/barter-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 import type { Item } from "../systems/inventory-system";
+import { getItemIcon } from "./icon-utils";
 
 // ── BarterUI ───────────────────────────────────────────────────────────────────
 
@@ -36,6 +38,8 @@ import type { Item } from "../systems/inventory-system";
  */
 export class BarterUI {
   public isVisible: boolean = false;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
 
   /** Called when the player clicks "Buy" on a merchant item row. */
   public onBuy: ((itemId: string) => void) | null = null;
@@ -64,12 +68,15 @@ export class BarterUI {
     this._ensureDom();
     if (this._root) this._root.style.display = "flex";
     this.isVisible = true;
+    if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
   }
 
   /** Hide the panel without destroying its DOM. */
   public hide(): void {
     if (this._root) this._root.style.display = "none";
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
 
   /**
@@ -107,6 +114,8 @@ export class BarterUI {
     this._lastSystem      = null;
     this._lastPlayerItems = [];
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
 
   // ── DOM helpers ─────────────────────────────────────────────────────────────
@@ -293,6 +302,12 @@ export class BarterUI {
     li.className = "barter-ui__item-row";
     li.setAttribute("role", "listitem");
     li.setAttribute("data-item-id", item.id);
+
+    const iconEl = document.createElement("span");
+    iconEl.className = "barter-ui__item-icon";
+    iconEl.setAttribute("aria-hidden", "true");
+    iconEl.textContent = getItemIcon(item);
+    li.appendChild(iconEl);
 
     const nameEl = document.createElement("span");
     nameEl.className = "barter-ui__item-name";

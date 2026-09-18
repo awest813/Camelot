@@ -1,4 +1,5 @@
 import { BIRTHSIGNS, type BirthsignDefinition } from "../systems/birthsign-system";
+import { manageDialogFocus } from "./dialog-focus";
 import { CHARACTER_CLASSES, type CharacterClass } from "../systems/class-system";
 import { RACES, type RaceDefinition } from "../systems/race-system";
 import { shouldSkipOnboardingTips } from "../onboarding-preferences";
@@ -200,6 +201,7 @@ export class CharacterCreationUI {
       actions.appendChild(continueButton);
 
       document.body.appendChild(root);
+      const focusSession = manageDialogFocus(root);
       if (this._animator) {
         this._animator.panelIn(panel);
       }
@@ -952,10 +954,12 @@ export class CharacterCreationUI {
 
         if (this._animator) {
           this._animator.panelOut(panel, () => {
+            focusSession.release();
             root.remove();
             resolve(result);
           });
         } else {
+          focusSession.release();
           root.remove();
           resolve(result);
         }

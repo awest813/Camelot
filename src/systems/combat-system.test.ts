@@ -1686,6 +1686,115 @@ describe('CombatSystem', () => {
         expect(mockPlayer.health).toBe(83);
     });
 
+    it('ranged NPC beyond melee reach fires an arrow instead of hitting directly', () => {
+        const fireNpcArrow = vi.fn(() => true);
+        combatSystem.setProjectileSystem({ fireNpcArrow } as any);
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 14;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 20;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 11);
+        mockNpcs[0].npcAttackArchetype = 'ranged';
+
+        mockPlayer.bonusArmor = 0;
+        mockPlayer.health = 100;
+
+        combatSystem.updateNPCAI(0.016);
+        combatSystem.updateNPCAI(0.25);
+
+        // No instant hit — the damage travels as a projectile.
+        expect(mockPlayer.health).toBe(100);
+        expect(fireNpcArrow).toHaveBeenCalledOnce();
+        const calls = fireNpcArrow.mock.calls as unknown as
+          Array<[Vector3, Vector3, number, { magicType: string | null; owner: unknown }]>;
+        // round(20 * 0.85) = 17, no armor, difficulty 1
+        expect(calls[0][2]).toBe(17);
+        expect(calls[0][3].magicType).toBeNull();
+        expect(calls[0][3].owner).toBe(mockNpcs[0]);
+    });
+
+    it('magic NPC beyond melee reach fires a bolt that bypasses armor', () => {
+        const fireNpcArrow = vi.fn(() => true);
+        combatSystem.setProjectileSystem({ fireNpcArrow } as any);
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 14;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 10;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 11);
+        mockNpcs[0].npcAttackArchetype = 'magic';
+        mockNpcs[0].npcMagicDamageType = 'frost';
+
+        mockPlayer.bonusArmor = 100; // would halve physical — magic ignores it
+        mockPlayer.health = 100;
+
+        combatSystem.updateNPCAI(0.016);
+        combatSystem.updateNPCAI(0.25);
+
+        expect(mockPlayer.health).toBe(100);
+        expect(fireNpcArrow).toHaveBeenCalledOnce();
+        const calls = fireNpcArrow.mock.calls as unknown as
+          Array<[Vector3, Vector3, number, { magicType: string | null; owner: unknown }]>;
+        expect(calls[0][2]).toBe(10);
+        expect(calls[0][3].magicType).toBe('frost');
+    });
+
+    it('crowded ranged NPC backs away to firing range instead of standing still', () => {
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 14;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0.1; // winding up: ready-branch movement
+        mockNpcs[0].moveSpeed = 2;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 5); // inside strike window (9.8)
+        mockNpcs[0].npcAttackArchetype = 'ranged';
+
+        combatSystem.updateNPCAI(0.016);
+
+        const setVel = mockNpcs[0].physicsAggregate.body.setLinearVelocity;
+        expect(setVel).toHaveBeenCalled();
+        // Fleeing +z: away from the player at the origin.
+        const vel = setVel.mock.calls[setVel.mock.calls.length - 1][0];
+        expect(vel.z).toBeGreaterThan(0);
+        expect(mockNpcs[0].mesh.lookAt).toHaveBeenCalled();
+    });
+
+    it('crowded melee NPC plants its feet instead of retreating', () => {
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0.1;
+        mockNpcs[0].moveSpeed = 2;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 0.8);
+        mockNpcs[0].npcAttackArchetype = 'melee';
+
+        combatSystem.updateNPCAI(0.016);
+
+        const setVel = mockNpcs[0].physicsAggregate.body.setLinearVelocity;
+        expect(setVel).toHaveBeenCalled();
+        const vel = setVel.mock.calls[setVel.mock.calls.length - 1][0];
+        expect(vel.x).toBe(0);
+        expect(vel.z).toBe(0);
+    });
+
+    it('ranged NPC without a projectile system whiffs past melee reach (legacy)', () => {
+        combatSystem.setProjectileSystem(null);
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 14;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 20;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 11);
+        mockNpcs[0].npcAttackArchetype = 'ranged';
+
+        mockPlayer.health = 100;
+
+        combatSystem.updateNPCAI(0.016);
+        combatSystem.updateNPCAI(0.25);
+
+        expect(mockPlayer.health).toBe(100);
+    });
+
     it('NPC with attackStatusEffect applies a player DoT on unblocked hit', () => {
         mockNpcs[0].aiState = 'ATTACK';
         mockNpcs[0].attackRange = 2;
@@ -1920,6 +2029,46 @@ describe('CombatSystem', () => {
         expect(effects).toHaveLength(1); // still one entry
         expect(effects[0].damagePerTick).toBe(5);    // upgraded
         expect(effects[0].remainingDuration).toBe(6.0); // refreshed
+    });
+
+    it('getSaveState snapshots active player status effects', () => {
+        combatSystem.applyPlayerStatusEffect({
+            type: 'poison', damagePerTick: 2, tickInterval: 1.5, duration: 7,
+        });
+
+        const saved = combatSystem.getSaveState();
+        expect(saved).toEqual([
+            { type: 'poison', damagePerTick: 2, tickInterval: 1.5, tickTimer: 1.5, remainingDuration: 7 },
+        ]);
+        // Snapshot must be a copy — mutating it must not touch live state.
+        saved[0].remainingDuration = 99;
+        expect(combatSystem.playerStatusEffects[0].remainingDuration).toBe(7);
+    });
+
+    it('restoreFromSave reloads valid effects and drops malformed/expired ones', () => {
+        combatSystem.restoreFromSave([
+            { type: 'burn', damagePerTick: 3, tickInterval: 1, tickTimer: 0.5, remainingDuration: 4 },
+            { type: 'cursed', damagePerTick: 1, tickInterval: 1, tickTimer: 1, remainingDuration: 5 }, // invalid type
+            { type: 'shock', damagePerTick: NaN, tickInterval: 1, tickTimer: 1, remainingDuration: 5 }, // invalid numbers
+            { type: 'freeze', damagePerTick: 0, tickInterval: 1, tickTimer: 1, remainingDuration: 0 },  // expired
+            null,
+        ]);
+
+        expect(combatSystem.playerStatusEffects).toEqual([
+            { type: 'burn', damagePerTick: 3, tickInterval: 1, tickTimer: 0.5, remainingDuration: 4 },
+        ]);
+    });
+
+    it('restoreFromSave ignores non-array payloads and clears stale effects', () => {
+        combatSystem.applyPlayerStatusEffect({
+            type: 'poison', damagePerTick: 2, tickInterval: 1, duration: 5,
+        });
+
+        combatSystem.restoreFromSave(undefined);
+        expect(combatSystem.playerStatusEffects).toHaveLength(1); // untouched
+
+        combatSystem.restoreFromSave([]);
+        expect(combatSystem.playerStatusEffects).toHaveLength(0); // cleared by empty snapshot
     });
 
 });

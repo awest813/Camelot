@@ -20,6 +20,7 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
         receiveShadows: false,
         material: null,
         dispose: mockMeshDispose,
+        freezeWorldMatrix: vi.fn(),
       };
     }),
     CreateCylinder: vi.fn(function() {
@@ -30,6 +31,7 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
         material: null,
         receiveShadows: false,
         dispose: mockMeshDispose,
+        freezeWorldMatrix: vi.fn(),
       };
     }),
     CreateBox: vi.fn(function() {
@@ -40,6 +42,7 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
         material: null,
         receiveShadows: false,
         dispose: mockMeshDispose,
+        freezeWorldMatrix: vi.fn(),
       };
     }),
     CreateSphere: vi.fn(function() {
@@ -50,6 +53,7 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
         material: null,
         receiveShadows: false,
         dispose: mockMeshDispose,
+        freezeWorldMatrix: vi.fn(),
       };
     }),
     CreateTorus: vi.fn(function() {
@@ -59,6 +63,7 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
         material: null,
         receiveShadows: false,
         dispose: mockMeshDispose,
+        freezeWorldMatrix: vi.fn(),
       };
     }),
     CreatePlane: vi.fn(function() {
@@ -68,6 +73,7 @@ vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
         material: null,
         receiveShadows: false,
         dispose: mockMeshDispose,
+        freezeWorldMatrix: vi.fn(),
       };
     }),
   },
@@ -77,6 +83,14 @@ vi.mock('@babylonjs/core/Physics/v2/physicsAggregate', () => ({
   // Use a regular function (not arrow function) so it can be called with `new`
   PhysicsAggregate: function PhysicsAggregate() {
     return { dispose: mockBodyDispose };
+  },
+}));
+
+vi.mock('@babylonjs/core/Meshes/mesh', () => ({
+  // MergeMeshes is stubbed to stand in for a real baked mesh; the merge
+  // helper only renames/freezes/re-registers the result.
+  Mesh: class Mesh {
+    static MergeMeshes = vi.fn((meshes: unknown[]) => meshes[0]);
   },
 }));
 
@@ -202,7 +216,9 @@ describe('WorldManager chunk load queue', () => {
 
   it('player chunk (0,0) is the first chunk loaded after the sweep', async () => {
     const wm = new WorldManager(mockScene);
-    await advanceFrames(wm, 11);
+    // Mounts are budgeted (~2/update), so pump enough frames to drain the
+    // 25-chunk active area before asserting totals.
+    await advanceFrames(wm, 10 + 25);
     expect(wm.loadedChunkCount).toBeGreaterThanOrEqual(1);
     // And the total chunks queued + loaded = 25
     expect(wm.loadQueueLength + wm.loadedChunkCount).toBe(25);
@@ -453,9 +469,10 @@ describe('WorldManager chunk callbacks', () => {
     let callCount = 0;
     wm.onChunkLoaded = () => { callCount++; };
 
-    // Update directly at far position — origin chunks are never in the active set
+    // Update only at far position — origin chunks are never in the active set.
+    // Mounts are budgeted, so pump frames until the 5×5 active area drains.
     const farPos = new Vector3(100 * 50, 0, 100 * 50);
-    await wm.update(farPos);
+    await advanceFrames(wm, 10 + 25, farPos);
 
     // Only far-position chunks should have loaded (5×5 = 25); origin area is skipped
     expect(callCount).toBe(25);

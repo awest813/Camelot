@@ -38,7 +38,8 @@ describe("GraphicsSettingsUI", () => {
 
   it("show() highlights the active tier button", () => {
     ui.show("medium");
-    const cards = document.querySelectorAll(".graphics-settings__card");
+    const tierGrid = document.querySelector(".graphics-settings__grid")!;
+    const cards = tierGrid.querySelectorAll(".graphics-settings__card");
     const labels = Array.from(cards).map((c) => c.querySelector(".graphics-settings__card-label")!.textContent);
     const activeCards = Array.from(cards).filter((c) => c.classList.contains("is-active"));
     expect(activeCards).toHaveLength(1);
@@ -49,15 +50,16 @@ describe("GraphicsSettingsUI", () => {
 
   it("renders four tier cards", () => {
     ui.show("high");
-    const cards = document.querySelectorAll(".graphics-settings__card");
-    expect(cards).toHaveLength(4);
+    const tierGrid = document.querySelector(".graphics-settings__grid")!;
+    expect(tierGrid.querySelectorAll(".graphics-settings__card")).toHaveLength(4);
   });
 
   it("calls onTierSelect when a tier card is clicked", () => {
     const spy = vi.fn();
     ui.onTierSelect = spy;
     ui.show("high");
-    const cards = document.querySelectorAll<HTMLButtonElement>(".graphics-settings__card");
+    const tierGrid = document.querySelector(".graphics-settings__grid")!;
+    const cards = tierGrid.querySelectorAll<HTMLButtonElement>(".graphics-settings__card");
     // Click the first card (Low)
     cards[0].click();
     expect(spy).toHaveBeenCalledOnce();
@@ -110,10 +112,37 @@ describe("GraphicsSettingsUI", () => {
     "show('%s') marks only that card as active",
     (tier) => {
       ui.show(tier);
-      const activeCards = document.querySelectorAll(".graphics-settings__card.is-active");
+      const tierGrid = document.querySelector(".graphics-settings__grid")!;
+      const activeCards = tierGrid.querySelectorAll(".graphics-settings__card.is-active");
       expect(activeCards).toHaveLength(1);
       const active = activeCards[0] as HTMLElement;
       expect(active.querySelector(".graphics-settings__card-label")!.textContent!.toLowerCase()).toBe(tier);
     },
   );
+
+  // ── Difficulty row ──────────────────────────────────────────────────────────
+
+  it("renders three difficulty cards", () => {
+    ui.show("high");
+    const grids = document.querySelectorAll(".graphics-settings__grid");
+    expect(grids.length).toBeGreaterThanOrEqual(2);
+    const diffGrid = grids[grids.length - 1]!;
+    expect(diffGrid.querySelectorAll(".graphics-settings__card")).toHaveLength(3);
+  });
+
+  it("marks the current difficulty active and fires onDifficultySelect on click", () => {
+    const spy = vi.fn();
+    ui.onDifficultySelect = spy;
+    ui.show("high", "hard");
+    const grids = document.querySelectorAll(".graphics-settings__grid");
+    const diffGrid = grids[grids.length - 1]!;
+    const active = diffGrid.querySelectorAll(".graphics-settings__card.is-active");
+    expect(active).toHaveLength(1);
+    expect(active[0].querySelector(".graphics-settings__card-label")!.textContent).toBe("Hard");
+
+    const cards = diffGrid.querySelectorAll<HTMLButtonElement>(".graphics-settings__card");
+    cards[0].click(); // Easy
+    expect(spy).toHaveBeenCalledOnce();
+    expect(spy).toHaveBeenCalledWith("easy");
+  });
 });

@@ -13,6 +13,11 @@ export interface QuestCreatorNodeDraft {
   targetId: string;
   requiredCount: number;
   prerequisites: string[];
+  /**
+   * Xor-choice group: completing one node skips the others in the group.
+   * Empty/undefined means no exclusivity.
+   */
+  exclusiveGroup?: string;
   /** Canvas X position for the graph view (auto-assigned on add). */
   x: number;
   /** Canvas Y position for the graph view (auto-assigned on add). */
@@ -83,6 +88,7 @@ export class QuestCreatorSystem {
       targetId:      partial.targetId      ?? "",
       requiredCount: Math.max(1, partial.requiredCount ?? 1),
       prerequisites: [...(partial.prerequisites ?? [])],
+      exclusiveGroup: partial.exclusiveGroup?.trim() || undefined,
       x:             partial.x             ?? pos.x,
       y:             partial.y             ?? pos.y,
     };
@@ -113,6 +119,9 @@ export class QuestCreatorSystem {
     if (updates.targetId      !== undefined) node.targetId      = updates.targetId.trim();
     if (updates.requiredCount !== undefined) node.requiredCount = Math.max(1, updates.requiredCount);
     if (updates.prerequisites !== undefined) node.prerequisites = [...updates.prerequisites];
+    if (updates.exclusiveGroup !== undefined) {
+      node.exclusiveGroup = updates.exclusiveGroup.trim() || undefined;
+    }
     if (updates.x             !== undefined) node.x             = updates.x;
     if (updates.y             !== undefined) node.y             = updates.y;
 
@@ -180,6 +189,7 @@ export class QuestCreatorSystem {
         targetId:      n.targetId,
         requiredCount: n.requiredCount,
         prerequisites: n.prerequisites.length > 0 ? [...n.prerequisites] : undefined,
+        exclusiveGroup: n.exclusiveGroup || undefined,
       })),
     };
   }

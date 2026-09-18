@@ -45,6 +45,8 @@ export type InputAction =
   | "drawBow"
   | "releaseBow"
   | "racialPower"
+  | "dodgeRoll"
+  | "toggleFollowerPanel"
   // Movement / stance
   | "toggleCrouch"
   | "jump"
@@ -66,9 +68,11 @@ export type InputAction =
   | "toggleSpellMaking"
   | "toggleFastTravel"
   | "togglePetPanel"
+  | "toggleFollowerPanel"
   | "toggleWaitDialog"
   | "mountDismount"
   | "stableOrSaddlebag"
+  | "markPosition"
   | "showFameStatus"
   | "favoritesMenu"
   // Quick-slots
@@ -116,9 +120,11 @@ export interface InputBinding {
   phase?: "down" | "up";
   /** When true, the key match is case-insensitive (e.g. `"i"` matches `"I"`). */
   caseInsensitive?: boolean;
-  /** When true, Shift must be held. */
+  /** When true, Shift must be held.  When false, Shift must NOT be held.
+   *  When undefined, the Shift state is ignored. */
   shift?: boolean;
-  /** When true, Ctrl/Cmd must be held. */
+  /** When true, Ctrl/Cmd must be held.  When false, Ctrl/Cmd must NOT be held.
+   *  When undefined, the Ctrl/Cmd state is ignored. */
   ctrlOrMeta?: boolean;
 }
 
@@ -136,8 +142,9 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   { key: "CapsLock", action: "autoRun" },
 
   // ── Combat ──────────────────────────────────────────────────────────────────
-  // E = Interact/Use; Shift+E = power attack
-  { key: "e", action: "interact", caseInsensitive: true },
+  // E = Interact/Use; Shift+E = power attack (shift:false routes Shift+E here
+  // to the powerAttack binding instead of consuming it as interact)
+  { key: "e", action: "interact", caseInsensitive: true, shift: false },
   { key: "e", action: "powerAttack", shift: true, caseInsensitive: true },
   // Q = Cast spell (KEYUP releases staff charge)
   { key: "q", action: "castSpell", caseInsensitive: true },
@@ -145,12 +152,16 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   // R = Draw/release bow
   { key: "r", action: "drawBow", caseInsensitive: true },
   { key: "r", action: "releaseBow", phase: "up", caseInsensitive: true },
-  // Z = Cycle equipped spell
-  { key: "z", action: "cycleSpell", caseInsensitive: true },
+  // Z = Cycle equipped spell (shift:false so Ctrl+Z falls through to editor undo)
+  { key: "z", action: "cycleSpell", caseInsensitive: true, ctrlOrMeta: false },
+  // F = Dodge roll (i-frame dash; shift:false so editor Shift+F = Frame All)
+  { key: "f", action: "dodgeRoll", caseInsensitive: true, shift: false },
   // V = Racial power
   { key: "v", action: "racialPower", caseInsensitive: true },
-  // F8 = Favorites menu
-  { key: "F8", action: "favoritesMenu" },
+  // F8 = Favorites menu (shift:false so editor Shift+F8 = Loot Table Creator)
+  { key: "F8", action: "favoritesMenu", shift: false },
+  // G = Follower panel (F is taken by the dodge roll)
+  { key: "g", action: "toggleFollowerPanel", caseInsensitive: true },
 
   // ── UI panels ───────────────────────────────────────────────────────────────
   // Tab = Character sheet (stays in legacy handler)
@@ -158,16 +169,21 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   { key: "j", action: "toggleQuestLog", caseInsensitive: true },
   { key: "k", action: "toggleSkillTree", caseInsensitive: true },
   { key: "u", action: "toggleAttributePanel", caseInsensitive: true },
-  { key: "l", action: "toggleAlchemy", caseInsensitive: true },
+  { key: "l", action: "toggleAlchemy", caseInsensitive: true, shift: false },
   { key: "b", action: "toggleEnchanting", caseInsensitive: true },
   { key: "x", action: "toggleSpellMaking", caseInsensitive: true },
-  { key: "y", action: "toggleFastTravel", caseInsensitive: true },
+  // Y = Fast travel (ctrlOrMeta:false so Ctrl+Y falls through to editor redo)
+  { key: "y", action: "toggleFastTravel", caseInsensitive: true, ctrlOrMeta: false },
   { key: "t", action: "toggleWaitDialog", caseInsensitive: true },
   { key: "p", action: "togglePetPanel", caseInsensitive: true },
+  { key: "g", action: "toggleFollowerPanel", caseInsensitive: true },
   { key: "h", action: "showFameStatus", caseInsensitive: true },
   // O = Mount/dismount; Shift+O = Stable/Saddlebag (shift binding must come first)
   { key: "o", action: "stableOrSaddlebag", shift: true, caseInsensitive: true },
   { key: "o", action: "mountDismount", caseInsensitive: true },
+  // Shift+M = Mark position for Recall (recall itself lives in the Y travel menu;
+  // binding must precede mute, which rejects Shift)
+  { key: "m", action: "markPosition", shift: true, caseInsensitive: true },
 
   // ── Quick-slots (1-0) ───────────────────────────────────────────────────────
   { key: "1", action: "quickSlot1" },
@@ -194,10 +210,14 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   { key: "F1", action: "helpOverlay" },
   { key: "F2", action: "toggleMapEditor" },
   { key: "F3", action: "toggleDebugOverlay" },
-  { key: "F4", action: "togglePOV" },
-  { key: "F5", action: "save" },
-  { key: "F9", action: "load" },
-  { key: "m", action: "toggleMute", caseInsensitive: true },
+  // F4 = POV toggle (shift:false so editor Shift+F4 stays free; plain F4 in the
+  // editor is handled by the editor's own F4-export branch via game.ts)
+  { key: "F4", action: "togglePOV", shift: false },
+  { key: "F5", action: "save", shift: false },   // shift:false → Shift+F5 = Bundle Merge Assistant
+  { key: "F9", action: "load", shift: false },   // shift:false → Shift+F9 = Faction Creator (never load a save!)
+  // M = Mute (shift:false so Shift+M = Mark; ctrlOrMeta:false so Ctrl+M = Scene
+  // Notes, Ctrl+Shift+M = Mod Manifest)
+  { key: "m", action: "toggleMute", caseInsensitive: true, ctrlOrMeta: false, shift: false },
   { key: "PrintScreen", action: "screenshot", caseInsensitive: true },
 ];
 
@@ -304,9 +324,13 @@ export class BabylonInputAdapter {
         : bindingKey === eventKey;
       if (!match) continue;
 
-      // Modifier guards
-      if (binding.shift && !modifiers.shift) continue;
-      if (binding.ctrlOrMeta && !modifiers.ctrlOrMeta) continue;
+      // Modifier guards.  `false` explicitly REJECTS the modifier so the chord
+      // falls through to legacy handling — e.g. Shift+F9 must reach the Faction
+      // Creator, not fire `load`; Ctrl+M must reach Scene Notes, not mute.
+      if (binding.shift === true && !modifiers.shift) continue;
+      if (binding.shift === false && modifiers.shift) continue;
+      if (binding.ctrlOrMeta === true && !modifiers.ctrlOrMeta) continue;
+      if (binding.ctrlOrMeta === false && modifiers.ctrlOrMeta) continue;
 
       // Track active state
       if (phase === "down") {

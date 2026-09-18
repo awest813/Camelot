@@ -10,6 +10,9 @@ export class EquipmentSystem {
   private _inventory: InventorySystem;
   private _ui: UIManager;
 
+  /** Fired after any equip/unequip so the game layer can sync derived state (e.g. weapon archetype). */
+  public onEquipmentChanged: (() => void) | null = null;
+
   constructor(player: Player, inventory: InventorySystem, ui: UIManager) {
     this._player = player;
     this._inventory = inventory;
@@ -47,6 +50,7 @@ export class EquipmentSystem {
 
     this._refreshUI();
     this._ui.showNotification(`Equipped ${item.name}`);
+    this.onEquipmentChanged?.();
   }
 
   public unequip(slot: EquipSlot): void {
@@ -59,6 +63,7 @@ export class EquipmentSystem {
 
     this._refreshUI();
     this._ui.showNotification(`Unequipped ${item.name}`);
+    this.onEquipmentChanged?.();
   }
 
   public getEquipped(): Map<EquipSlot, Item> {

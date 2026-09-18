@@ -6,6 +6,7 @@ import type {
   CraftingSystem,
   MaterialInventory,
 } from "../systems/crafting-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 import {
   CRAFTING_STATION_LABELS,
   CRAFTING_TIER_LABELS,
@@ -18,11 +19,11 @@ import {
 
 /** Ordered category tabs shown above the recipe list. */
 const CATEGORY_TABS: Array<{ key: CraftingCategory | "all"; label: string }> = [
-  { key: "all",     label: "All"     },
-  { key: "weapon",  label: "Weapon"  },
-  { key: "armor",   label: "Armor"   },
-  { key: "jewelry", label: "Jewelry" },
-  { key: "misc",    label: "Misc"    },
+  { key: "all",     label: "✦ All"     },
+  { key: "weapon",  label: "⚔ Weapon"  },
+  { key: "armor",   label: "🛡 Armor"   },
+  { key: "jewelry", label: "💍 Jewelry" },
+  { key: "misc",    label: "📦 Misc"    },
 ];
 
 // ── CraftingUI ─────────────────────────────────────────────────────────────────
@@ -70,12 +71,16 @@ const CATEGORY_TABS: Array<{ key: CraftingCategory | "all"; label: string }> = [
  */
 export class CraftingUI {
   public isVisible: boolean = false;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
 
   /**
    * Called when the player clicks "Craft" on the detail pane.
    * Argument is the recipe id being crafted.
    */
   public onCraft: ((recipeId: string) => void) | null = null;
+  /** Fired when the ✕ button closes the panel (Escape is owned by the game cascade). */
+  public onClose: (() => void) | null = null;
 
   private _root:        HTMLDivElement   | null = null;
   private _tabBar:      HTMLDivElement   | null = null;
@@ -106,12 +111,15 @@ export class CraftingUI {
     this._ensureDom();
     if (this._root) this._root.style.display = "flex";
     this.isVisible = true;
+    if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
   }
 
   /** Hide the panel without destroying its DOM. */
   public hide(): void {
     if (this._root) this._root.style.display = "none";
     this.isVisible = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
 
   /**
@@ -196,6 +204,8 @@ export class CraftingUI {
     this._lastStationId = undefined;
     this._lastSystem   = null;
     this.isVisible     = false;
+    this._focusSession?.release();
+    this._focusSession = null;
   }
 
   // ── Private helpers ─────────────────────────────────────────────────────────
@@ -251,7 +261,10 @@ export class CraftingUI {
     closeBtn.type = "button";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close crafting workbench");
-    closeBtn.addEventListener("click", () => this.hide());
+    closeBtn.addEventListener("click", () => {
+      this.hide();
+      this.onClose?.();
+    });
     root.appendChild(closeBtn);
 
     document.body.appendChild(root);

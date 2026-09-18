@@ -1,3 +1,5 @@
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
+
 /**
  * Editor Hub — central launcher for all Camelot creator tools.
  *
@@ -149,7 +151,8 @@ export class EditorHubUI {
 
   private readonly _callbacks: EditorHubCallbacks;
   private _root: HTMLElement | null = null;
-  private _keyHandler: ((e: KeyboardEvent) => void) | null = null;
+  /** Active focus trap/restore session while the hub is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
   /** Maps toolId → badge <span> element for live count updates. */
   private readonly _badges = new Map<EditorToolId, HTMLElement>();
 
@@ -183,20 +186,15 @@ export class EditorHubUI {
     } else {
       this._build();
     }
-    if (!this._keyHandler) {
-      this._keyHandler = (e: KeyboardEvent) => {
-        if (e.key === "Escape") this.close();
-      };
-      document.addEventListener("keydown", this._keyHandler);
-    }
+    // NOTE: Escape is owned by the game's pause cascade (it closes the hub AND
+    // restores gameplay input) — this class deliberately has no key listener.
+    if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
   }
 
   close(): void {
     if (this._root) this._root.hidden = true;
-    if (this._keyHandler) {
-      document.removeEventListener("keydown", this._keyHandler);
-      this._keyHandler = null;
-    }
+    this._focusSession?.release();
+    this._focusSession = null;
     this.onClose?.();
   }
 
@@ -211,6 +209,7 @@ export class EditorHubUI {
     const root = document.createElement("div");
     root.className = "editor-hub";
     root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-label", "Editor Hub");
     this._root = root;
 

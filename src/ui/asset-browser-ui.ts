@@ -1,4 +1,5 @@
 import type { AssetBrowserSystem, AssetEntry, AssetType } from "../systems/asset-browser-system";
+import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 
 // ── Icon map ───────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,8 @@ export class AssetBrowserUI {
 
   private readonly _sys: AssetBrowserSystem;
   private _root: HTMLElement | null = null;
+  /** Active focus trap/restore session while the panel is open (null when closed). */
+  private _focusSession: DialogFocusSession | null = null;
   private _listEl: HTMLElement | null = null;
   private _detailEl: HTMLElement | null = null;
   private _countEl: HTMLElement | null = null;
@@ -73,6 +76,7 @@ export class AssetBrowserUI {
   private _activeTypes: Set<AssetType> = new Set(ALL_TYPES);
   private _favOnly = false;
   private _activeTags: Set<string> = new Set();
+  private _tagRow: HTMLDivElement | null = null;
 
   constructor(system: AssetBrowserSystem) {
     this._sys = system;
@@ -86,13 +90,18 @@ export class AssetBrowserUI {
     if (this._root) {
       this._root.hidden = false;
       this._refresh();
+      if (!this._focusSession) this._focusSession = manageDialogFocus(this._root);
       return;
     }
     this._build();
+    const root = this._root;
+    if (!this._focusSession && root) this._focusSession = manageDialogFocus(root);
   }
 
   close(): void {
     if (this._root) this._root.hidden = true;
+    this._focusSession?.release();
+    this._focusSession = null;
     this.onClose?.();
   }
 
@@ -107,6 +116,7 @@ export class AssetBrowserUI {
     const root = document.createElement("div");
     root.className = "asset-browser";
     root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-label", "Asset Browser");
     this._root = root;
 
@@ -177,6 +187,13 @@ export class AssetBrowserUI {
       typeRow.appendChild(chip);
     }
     filterBar.appendChild(typeRow);
+
+    // Tag filter chips (rebuilt on every refresh — selections persist)
+    const tagRow = document.createElement("div");
+    tagRow.className = "asset-browser__type-row";
+    tagRow.setAttribute("aria-label", "Filter by tag");
+    this._tagRow = tagRow;
+    filterBar.appendChild(tagRow);
 
     // Favorites toggle
     const favBtn = document.createElement("button");
@@ -270,8 +287,10 @@ export class AssetBrowserUI {
     const results = this._sys.search({
       query: query || undefined,
       types: Array.from(this._activeTypes),
+      tags: Array.from(this._activeTags),
       favoritesOnly: this._favOnly || undefined,
     });
+    this._renderTagRow();
 
     this._countEl.textContent = `${results.length} asset${results.length !== 1 ? "s" : ""}`;
     this._listEl.innerHTML = "";
@@ -289,6 +308,40 @@ export class AssetBrowserUI {
 
     for (const asset of results) {
       this._listEl.appendChild(this._buildCard(asset));
+    }
+  }
+
+  /** Rebuild the tag filter chips, preserving selections that still exist. */
+  private _renderTagRow(): void {
+    if (!this._tagRow) return;
+    const tags = this._sys.getAllTags();
+    for (const selected of Array.from(this._activeTags)) {
+      if (!tags.includes(selected)) this._activeTags.delete(selected);
+    }
+    this._tagRow.innerHTML = "";
+    if (tags.length === 0) {
+      this._tagRow.style.display = "none";
+      return;
+    }
+    this._tagRow.style.display = "";
+    for (const tag of tags) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "asset-browser__type-chip";
+      chip.textContent = `#${tag}`;
+      const active = this._activeTags.has(tag);
+      if (active) chip.classList.add("asset-browser__type-chip--active");
+      chip.setAttribute("aria-pressed", String(active));
+      chip.setAttribute("data-tag", tag);
+      chip.addEventListener("click", () => {
+        if (this._activeTags.has(tag)) {
+          this._activeTags.delete(tag);
+        } else {
+          this._activeTags.add(tag);
+        }
+        this._refresh();
+      });
+      this._tagRow.appendChild(chip);
     }
   }
 

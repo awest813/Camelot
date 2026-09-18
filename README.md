@@ -65,9 +65,9 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 - **Horse / Stable System**: purchase and ride horses from stable NPCs; each horse has its own speed multiplier and saddlebag inventory; O to mount/dismount, Shift+O to browse stable or open saddlebag.
 - **Disease System**: contract one of seven Oblivion-style diseases (Rust Chancre, Swamp Rot, Witbane, Collywobbles, Brain Rot, Yellow Tick, Porphyric Hemophilia) through combat hits; each disease weakens one or more attributes until cured by a Cure Disease potion or shrine; Argonians are immune.
 - **Standing Stones**: Skyrim-style Guardian Stones scattered across the wilderness. Touching a stone swaps your current blessing at any time (one active stone at a time, stackable with your birthsign). The three Guardian Stones (Warrior / Mage / Thief) grant +20% XP to their skill family; other stones provide passive bonuses (Atronach's 50% spell absorption with stunted magicka, Steed's carry weight, Lady's regen, Apprentice's doubled magicka regen, Lord's armor + magic resist, Lover's 15% XP to all skills) or once-per-day powers (Ritual reanimation, Shadow invisibility, Tower lock opening, Serpent paralysis).
-- **Survival System** *(Skyrim AE-inspired)*: three survival needs — Hunger, Fatigue, and Cold — each tracked on a [0, 100] scale. Hunger drains over two in-game days; Fatigue over one day; Cold drains in freezing environments and recovers near fires or indoors. Threshold levels (satiated / normal / hungry / starving, etc.) apply stat penalties (stamina regen, max stamina, max magicka, frost damage) and XP bonuses when the player is well-fed and rested. Restored via eating food, resting, or warming up. Fully serialized (SAVE_VERSION 28).
+- **Survival System** *(Skyrim AE-inspired)*: three survival needs — Hunger, Fatigue, and Cold — each tracked on a [0, 100] scale. Hunger drains over two in-game days; Fatigue over one day; Cold drains in freezing environments and recovers near fires or indoors. Threshold levels (satiated / normal / hungry / starving, etc.) apply stat penalties (stamina regen, max stamina, max magicka, frost damage) and XP bonuses when the player is well-fed and rested. Restored via eating food, resting, or warming up. Fully serialized (SAVE_VERSION 29).
 - **Companion Stance & Synergy** *(Avowed-inspired)*: the active follower now has a tactical **stance** (aggressive / defensive / stealth) toggled via the follower panel. Each combat role has a signature **ability** (warrior → Shield Bash, archer → Arrow Volley, mage → Arcane Surge, rogue → Smoke Bomb) triggered on cooldown. **Synergy combos** fire automatically when the player's combat action matches the follower's role (e.g. player power-attack + warrior follower → Momentum Surge; mage + cast-spell → Arcane Resonance). All cooldowns persist across saves.
-- **Dynamic World Events** *(Crimson Desert-inspired)*: `DynamicWorldEventSystem` schedules reactive roadside encounters via biome, faction-threat, weather, and time-of-day weighting. Faction hostility multiplies spawn chance; storm weather and night-time windows boost dangerous events. Each template declares XP/gold rewards and can chain a follow-on event (e.g. bandit ambush → hidden cache becomes discoverable). Save-persistent trigger history (SAVE_VERSION 28).
+- **Dynamic World Events** *(Crimson Desert-inspired)*: `DynamicWorldEventSystem` schedules reactive roadside encounters via biome, faction-threat, weather, and time-of-day weighting. Faction hostility multiplies spawn chance; storm weather and night-time windows boost dangerous events. Each template declares XP/gold rewards and can chain a follow-on event (e.g. bandit ambush → hidden cache becomes discoverable). Save-persistent trigger history (SAVE_VERSION 29).
 
 ### UI + Quality of Life
 
@@ -182,7 +182,7 @@ The in-engine **Map Editor** (activated with F2) lets you author world content w
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+ (22 or 24 recommended)
 - npm
 
 ### Install
@@ -212,11 +212,33 @@ npm run build
 npm run preview
 ```
 
-### Run tests
+The production build uses relative asset paths (`./`), so `dist/` can be served
+from any static host or subpath (e.g. GitHub Pages, itch.io).
+
+### Run unit tests
 
 ```bash
 npm test
 ```
+
+### Run E2E tests (Playwright)
+
+The E2E suite boots the real game in headless Chromium (software WebGL) and
+drives character creation, saving, and loading end to end.
+
+```bash
+# one-time: install the Chromium browser binary
+npx playwright install --with-deps chromium
+
+npm run test:e2e
+```
+
+The Playwright config starts its own Vite dev server on `http://127.0.0.1:8099`
+(see `playwright.config.ts` / `vite.e2e.config.ts`); no separate dev server is
+needed. Reports are written to `playwright-report/`.
+
+CI (`.github/workflows/ci.yml`) runs unit tests, typecheck + build, and the
+E2E suite on every push to `main` and every pull request.
 
 ### Debugging + targeted test workflow
 

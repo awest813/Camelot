@@ -333,6 +333,8 @@ export const STARTER_LOOT_TABLES: LootTable[] = [
     id: "bandit_loot",
     rolls: 3,
     entries: [
+      // Always drops — the Bandit Bounty quest requires one as proof.
+      { itemId: "bandit_token",  itemName: "Bandit Token",  weight: 0, guarantee: true, itemTemplate: { stackable: true, weight: 0.1, stats: { value: 5 } } },
       { itemId: "gold_coins",    itemName: "Gold Coins",    weight: 35, minQuantity: 10, maxQuantity: 50, itemTemplate: { stackable: true, weight: 0.1, stats: { value: 1 } } },
       { itemId: "iron_sword",    itemName: "Iron Sword",    weight: 20,                  itemTemplate: { stackable: false, weight: 3.5, slot: "mainHand", stats: { damage: 10, value: 80 } } },
       { itemId: "iron_shield",   itemName: "Iron Shield",   weight: 15,                  itemTemplate: { stackable: false, weight: 5.0, slot: "offHand",  stats: { armor: 6,  value: 60 } } },
