@@ -20,9 +20,7 @@ const MAGIC_DAMAGE = 20;
 
 // ─── Oblivion-style combat constants ──────────────────────────────────────────
 
-/** Fraction of incoming NPC damage absorbed when the player is blocking (no block skill). */
-const BLOCK_DAMAGE_REDUCTION = 0.5;
-/** Block damage reduction fraction at block skill 0 (matches BLOCK_DAMAGE_REDUCTION for backward compat). */
+/** Block damage reduction fraction at block skill 0. */
 const BLOCK_SKILL_REDUCTION_BASE = 0.5;
 /** Maximum block damage reduction fraction (at block skill 100). */
 const BLOCK_SKILL_REDUCTION_MAX = 0.8;
@@ -50,8 +48,8 @@ const FATIGUE_DAMAGE_MIN_FACTOR = 0.5;
  */
 const BOW_MELEE_BASH_RANGE = 2.5;
 /**
- * Base hit-chance at blade skill 0 (55 %).  Linearly increases to 100 % at skill 50,
- * capped at HIT_CHANCE_MAX above that.  Only applied when both skill and attribute
+ * Base hit-chance at weapon skill 0 (55 %).  Linearly increases to 100 % at skill 50,
+ * and stays at 100 % above that.  Only applied when both skill and attribute
  * systems are attached (preserves backward-compatible behaviour in tests / bare combats).
  */
 const HIT_CHANCE_BASE = 0.55;
@@ -84,20 +82,21 @@ const FLEE_SAFE_DISTANCE_SQ = 400; // 20 units
 const SKILL_XP_MELEE_HIT = 6;
 /** XP granted to the weapon skill on a power-attack hit. */
 const SKILL_XP_POWER_HIT = 10;
-/** XP granted to the block skill on each successfully blocked hit. */
-const SKILL_XP_BLOCK_HIT = 4;
 /** XP granted to the destruction skill on a magic projectile hit. */
 const SKILL_XP_MAGIC_HIT = 8;
 
 // ─── Combo system ──────────────────────────────────────────────────────────────
 
-/** Maximum combo stack depth. At stack 3 every additional hit still applies the ×3 bonus. */
+/**
+ * Maximum combo stack depth. Damage uses the stack *before* the current hit
+ * builds it, so a saturated stack of 3 means the swing multiplies by 1.45.
+ * Further hits stay capped at that same stack-3 bonus until a finisher resets.
+ */
 const MAX_COMBO_STACK = 3;
 /**
- * Bonus damage fraction added per combo stack level.
- * Stack 1 = +0 % (first hit builds the chain but earns no bonus).
- * Stack 2 = +15 % (multiplier 1.15), Stack 3 = +30 % (1.30),
- * capped: 4th+ hit still uses the stack 3 bonus of +45 % (multiplier 1.45).
+ * Bonus damage fraction added per combo stack level (applied from the
+ * pre-hit stack). Stack 0 → ×1.00, stack 1 → ×1.15, stack 2 → ×1.30,
+ * stack 3 → ×1.45 (cap).
  */
 const COMBO_DAMAGE_BONUS_PER_STACK = 0.15;
 /** Seconds between hits before the combo streak resets automatically. */
@@ -150,8 +149,10 @@ const UNBLOCKABLE_CHANCE = 0.25;
 
 // ── Skill gates for latent mechanics ────────────────────────────────────────
 const RIPOSTE_REQUIRED_BLOCK_RANK = 25;
-const FINISHER_REQUIRED_BLADE_RANK = 50;
-const EXECUTE_REQUIRED_BLADE_RANK = 75;
+/** Finisher unlocks at this rank in the equipped weapon's governing skill. */
+const FINISHER_REQUIRED_WEAPON_RANK = 50;
+/** Execute unlocks at this rank in the equipped weapon's governing skill. */
+const EXECUTE_REQUIRED_WEAPON_RANK = 75;
 
 /** Same-faction NPCs within this radius join an aggro'd ally (pack behavior). */
 const AGGRO_BROADCAST_RADIUS_SQ = 25 * 25;
@@ -182,6 +183,7 @@ const DMG_COLOR_EXECUTE = "#FF2030";
 
 import {
   applyDamageWithResistance,
+  resolveSneakAttackMultiplier,
   WEAPON_PROFILES,
   type WeaponArchetype,
   type WeaponProfile,
@@ -189,6 +191,7 @@ import {
 
 export {
   applyDamageWithResistance,
+  resolveSneakAttackMultiplier,
   WEAPON_PROFILES,
   type WeaponArchetype,
   type WeaponProfile,
@@ -487,11 +490,14 @@ export class CombatSystem {
 
   /**
    * True when the next melee strike will land as a finisher: combo is already
-   * saturated, so the swing deals bonus damage, guarantees a stagger, and
-   * then resets the chain. Surface this in the HUD to telegraph the payoff.
+   * saturated *and* the equipped weapon skill meets the unlock rank, so the
+   * swing deals bonus damage, guarantees a stagger, and then resets the chain.
+   * Surface this in the HUD to telegraph the payoff.
    */
   public get finisherReady(): boolean {
-    return this._comboStack >= MAX_COMBO_STACK;
+    if (this._comboStack < MAX_COMBO_STACK) return false;
+    const skillId = WEAPON_PROFILES[this._weaponArchetype].skillId;
+    return this._skillRank(skillId) >= FINISHER_REQUIRED_WEAPON_RANK;
   }
 
   /**
@@ -564,8 +570,19 @@ export class CombatSystem {
   }
 
   /** Skill rank used for gating; 100 when no progression system is attached. */
-  private _skillRank(skillId: "block" | "blade"): number {
+  private _skillRank(skillId: ProgressionSkillId): number {
     return this._skillSystem?.getSkill(skillId)?.level ?? 100;
+  }
+
+  /**
+   * Shared entry point when the player damages an NPC from any combat path
+   * (melee, arrow, spell). Fires assault/crime hooks and forces chase + pack aggro.
+   */
+  public notifyHostileHit(npc: NPC, damage: number): void {
+    this.onNpcDamaged?.(npc, damage);
+    if (!npc.isDead && npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
+      this._transitionTo(npc, AIState.CHASE);
+    }
   }
 
   /** Read-only view of active player status effects (burns, freezes, etc.). */
@@ -764,10 +781,12 @@ export class CombatSystem {
     // Capture combo multiplier from the PREVIOUS stack (before this hit builds it).
     const comboMult = this._comboMultiplier();
     const riposteMult = isRiposte ? RIPOSTE_DAMAGE_MULTIPLIER : 1.0;
-    // Finisher: when the combo is already saturated, this swing becomes the
-    // climax — extra damage and a guaranteed stagger — and then resets the chain.
+    // Finisher: when the combo is already saturated and the weapon skill
+    // unlock is met, this swing becomes the climax — extra damage and a
+    // guaranteed stagger — and then resets the chain.
+      const weaponSkillId = weaponProfile.skillId;
       const isFinisher = this._comboStack >= MAX_COMBO_STACK
-        && this._skillRank("blade") >= FINISHER_REQUIRED_BLADE_RANK;
+        && this._skillRank(weaponSkillId) >= FINISHER_REQUIRED_WEAPON_RANK;
     const finisherMult = isFinisher ? FINISHER_DAMAGE_MULTIPLIER : 1.0;
 
     // ── Determine which NPCs are hit ───────────────────────────────────────
@@ -812,12 +831,12 @@ export class CombatSystem {
       const isCrit = effectiveCritChance > 0 && Math.random() < effectiveCritChance;
       const critMultiplier = isCrit ? CRIT_DAMAGE_MULTIPLIER : 1.0;
 
-      // Sneak-attack multiplier: applied when the perk is unlocked and the
-      // player is undetected (canSneakAttack returns true).
-      const sneakMult = (
-        (this.player.perkSneakAttackMultiplier ?? 1.0) > 1.0 &&
-        this._stealthSystem?.canSneakAttack(npc)
-      ) ? this.player.perkSneakAttackMultiplier : 1.0;
+      // Sneak-attack multiplier: shared base with bows; perks can raise it further.
+      // Eligibility uses StealthSystem.canSneakAttack (crouch + low detection + not already fighting).
+      const sneakMult = resolveSneakAttackMultiplier(
+        this._stealthSystem?.canSneakAttack(npc) === true,
+        this.player.perkSneakAttackMultiplier ?? 1.0,
+      );
 
       // Backstab: bonus when striking the NPC from behind (dagger excels here).
       const backstabMult = this._isBackstabAngle(npc) ? weaponProfile.backstabMultiplier : 1.0;
@@ -886,6 +905,9 @@ export class CombatSystem {
       if (isCrit) {
         this._ui.showNotification("Critical Hit!", 1000);
       }
+      if (sneakMult > 1.0) {
+        this._ui.showNotification("Sneak Attack!", 900);
+      }
       if (backstabMult > 1.0) {
         this._ui.showNotification("Backstab!", 900);
       }
@@ -938,7 +960,9 @@ export class CombatSystem {
    * Oblivion-style power attack.
    *
    * Costs POWER_ATTACK_STAMINA_MULTIPLIER × the current archetype's stamina cost.
-   * Deals POWER_ATTACK_DAMAGE_MULTIPLIER × normal melee damage (before fatigue/crits).
+   * Deals POWER_ATTACK_DAMAGE_MULTIPLIER × normal melee damage (fatigue, crits,
+   * and sneak still apply — the commitment is the stamina + recovery, not a
+   * bypass of stealth/crit rules).
    * On hit, staggers the target NPC for POWER_ATTACK_STAGGER_DURATION seconds,
    * interrupting its AI and any ongoing telegraph animation.
    */
@@ -985,6 +1009,16 @@ export class CombatSystem {
     if (hit && hit.pickedMesh) {
       const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
       if (npc && !npc.isDead) {
+        const baseCritChance = (this.player as unknown as { critChance?: number }).critChance ?? 0;
+        const effectiveCritChance = baseCritChance + weaponProfile.critChanceBonus;
+        const isCrit = effectiveCritChance > 0 && Math.random() < effectiveCritChance;
+        const critMultiplier = isCrit ? CRIT_DAMAGE_MULTIPLIER : 1.0;
+        const sneakMult = resolveSneakAttackMultiplier(
+          this._stealthSystem?.canSneakAttack(npc) === true,
+          this.player.perkSneakAttackMultiplier ?? 1.0,
+        );
+        const backstabMult = this._isBackstabAngle(npc) ? weaponProfile.backstabMultiplier : 1.0;
+
         const rawDmg = Math.max(
           1,
           Math.round(
@@ -993,14 +1027,17 @@ export class CombatSystem {
             * weaponProfile.damageMultiplier
             * POWER_ATTACK_DAMAGE_MULTIPLIER
             * fatigueFactor
+            * critMultiplier
+            * sneakMult
+            * backstabMult
             * this._weaponSkillMultiplier()
           )
         );
         // Execution: a power attack on an already-broken foe ends the fight.
         // Bypasses armor/resistance — the heavy swing is committed regardless.
-        // Blade 75 unlocks the execute; below that it's a normal power hit.
+        // Weapon skill 75 unlocks the execute; below that it's a normal power hit.
         const maxHp = Math.max(1, npc.maxHealth);
-        const isExecute = this._skillRank("blade") >= EXECUTE_REQUIRED_BLADE_RANK
+        const isExecute = this._skillRank(weaponProfile.skillId) >= EXECUTE_REQUIRED_WEAPON_RANK
           && npc.health > 0 && npc.health / maxHp <= EXECUTE_HEALTH_THRESHOLD;
         const finalDmg = isExecute
           ? npc.health
@@ -1057,12 +1094,21 @@ export class CombatSystem {
           numberPos,
           finalDmg,
           this.scene,
-          isExecute ? DMG_COLOR_EXECUTE : DMG_COLOR_POWER,
+          isExecute ? DMG_COLOR_EXECUTE : (isCrit ? DMG_COLOR_CRIT : DMG_COLOR_POWER),
         );
         this._ui.showHitFlash(
           isExecute ? "rgba(255, 32, 48, 0.55)" : "rgba(255, 100, 0, 0.45)",
         );
-        this._ui.showNotification(isExecute ? "Execution!" : "Power Strike!", 1000);
+        if (isExecute) {
+          this._ui.showNotification("Execution!", 1000);
+        } else if (isCrit) {
+          this._ui.showNotification("Critical Hit!", 900);
+        } else {
+          this._ui.showNotification("Power Strike!", 1000);
+        }
+        if (sneakMult > 1.0) {
+          this._ui.showNotification("Sneak Attack!", 900);
+        }
 
         if (npc.physicsAggregate?.body) {
           const forward = this.player.getForwardDirection(1);
@@ -1668,10 +1714,6 @@ export class CombatSystem {
     return Math.max(FATIGUE_DAMAGE_MIN_FACTOR, this.player.stamina / maxStamina);
   }
 
-  private _bladeMultiplier(): number {
-    return this._skillSystem?.multiplier("blade") ?? 1;
-  }
-
   /**
    * Returns the skill multiplier for the currently equipped weapon archetype.
    * Routes to the appropriate skill (blade, blunt, marksman, or destruction)
@@ -1701,7 +1743,7 @@ export class CombatSystem {
 
   /**
    * Block damage reduction fraction scaled by the player's block skill.
-   * When no skill system is attached the base value equals BLOCK_DAMAGE_REDUCTION (0.5),
+   * When no skill system is attached the base value equals BLOCK_SKILL_REDUCTION_BASE (0.5),
    * preserving backward-compatible behaviour.
    *
    * At block skill 0   → BLOCK_SKILL_REDUCTION_BASE (0.5)
@@ -1879,9 +1921,6 @@ export class CombatSystem {
       }
       if (this.onBlockSuccess) this.onBlockSuccess();
 
-      // Award block skill XP for each hit successfully blocked.
-      this._skillSystem?.gainXP("block", SKILL_XP_BLOCK_HIT);
-
       // Block counter: chance to stagger the attacker (Oblivion-style shield bash feel).
       // Perfect block ALWAYS staggers.
       if (isPerfect || Math.random() < BLOCK_COUNTER_STAGGER_CHANCE) {
@@ -1911,8 +1950,12 @@ export class CombatSystem {
     }
 
     this.player.health = Math.max(0, this.player.health - dmg);
-    (this.player as unknown as { notifyDamageTaken?: () => void }).notifyDamageTaken?.();
-    if (this.onPlayerHit) this.onPlayerHit();
+    if (dmg > 0) {
+      (this.player as unknown as { notifyDamageTaken?: () => void }).notifyDamageTaken?.();
+      // Disease / hit SFX only on real damage — perfect blocks and zero-damage
+      // outcomes must not roll disease or play the hurt cue.
+      if (this.onPlayerHit) this.onPlayerHit();
+    }
   }
 
   /**
@@ -2306,7 +2349,8 @@ export class CombatSystem {
         if (effect.damagePerTick > 0) {
           this.player.health = Math.max(0, this.player.health - effect.damagePerTick);
           (this.player as unknown as { notifyDamageTaken?: () => void }).notifyDamageTaken?.();
-          if (this.onPlayerHit) this.onPlayerHit();
+          // Do not call onPlayerHit here — that hook rolls disease / hit SFX for
+          // weapon strikes. Status ticks already show their own notification.
           this._ui.showNotification(
             `${effect.type} deals ${effect.damagePerTick} damage!`, 800
           );

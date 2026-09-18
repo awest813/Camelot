@@ -326,6 +326,7 @@ describe("ProjectileSystem", () => {
     const mockStealth = {
       isCrouching: true,
       getDetectionLevel: vi.fn(() => 0), // NPC is fully undetected
+      canSneakAttack: vi.fn(() => true),
     };
     projectileSystem.stealthSystem = mockStealth as any;
     mockNpc.isDead = false;
@@ -347,6 +348,7 @@ describe("ProjectileSystem", () => {
     const mockStealth = {
       isCrouching: false,
       getDetectionLevel: vi.fn(() => 0),
+      canSneakAttack: vi.fn(() => false),
     };
     projectileSystem.stealthSystem = mockStealth as any;
     mockNpc.mesh.position = new Vector3(0, 0, 0.8);
@@ -356,7 +358,7 @@ describe("ProjectileSystem", () => {
     projectileSystem.update(0.1);
 
     const calls = (mockUI.showNotification as ReturnType<typeof vi.fn>).mock.calls;
-    const sneakCall = calls.find(([msg]) => String(msg).includes("Sneak Attack"));
+    const sneakCall = calls.find(([msg]) => String(msg).includes("Sneak"));
     expect(sneakCall).toBeUndefined();
   });
 
@@ -364,6 +366,7 @@ describe("ProjectileSystem", () => {
     const mockStealth = {
       isCrouching: true,
       getDetectionLevel: vi.fn(() => 80), // NPC is suspicious
+      canSneakAttack: vi.fn(() => false),
     };
     projectileSystem.stealthSystem = mockStealth as any;
     mockNpc.mesh.position = new Vector3(0, 0, 0.8);
@@ -373,7 +376,7 @@ describe("ProjectileSystem", () => {
     projectileSystem.update(0.1);
 
     const calls = (mockUI.showNotification as ReturnType<typeof vi.fn>).mock.calls;
-    const sneakCall = calls.find(([msg]) => String(msg).includes("Sneak Attack"));
+    const sneakCall = calls.find(([msg]) => String(msg).includes("Sneak"));
     expect(sneakCall).toBeUndefined();
   });
 
@@ -445,6 +448,37 @@ describe("ProjectileSystem", () => {
     expect(onDamaged).toHaveBeenCalledWith(7, "Bandit Archer", null);
     const calls = (mockUI.showNotification as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls.some(([msg]) => String(msg).includes("Bandit Archer"))).toBe(true);
+  });
+
+  it("hostile arrow is ignored while the player is dodging", () => {
+    mockPlayer.health = 100;
+    mockNpc.mesh.position = new Vector3(0, 0, 50);
+    const onDamaged = vi.fn();
+    projectileSystem.onPlayerDamaged = onDamaged;
+    projectileSystem.isPlayerDodging = () => true;
+    projectileSystem.fireNpcArrow(
+      new Vector3(0, 0, 0.5), new Vector3(0, 0, -1), 7, { sourceName: "Bandit Archer" });
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    expect(mockPlayer.health).toBe(100);
+    expect(onDamaged).not.toHaveBeenCalled();
+    expect(mockUI.showNotification).toHaveBeenCalledWith(
+      expect.stringContaining("dodge"),
+      expect.any(Number),
+    );
+  });
+
+  it("onHostileHit fires when a player arrow damages an NPC", () => {
+    mockNpc.mesh.position = new Vector3(0, 0, 0.8);
+    const onHostile = vi.fn();
+    projectileSystem.onHostileHit = onHostile;
+    projectileSystem.fireArrow();
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    projectileSystem.update(0.016);
+    expect(mockNpc.takeDamage).toHaveBeenCalled();
+    expect(onHostile).toHaveBeenCalled();
   });
 
   it("hostile arrow spares its owner but still hits other NPCs", () => {

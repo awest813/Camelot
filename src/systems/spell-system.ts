@@ -208,6 +208,12 @@ export class SpellSystem {
    */
   public onSpellCast: ((spell: SpellDefinition, result: SpellCastResult) => void) | null = null;
 
+  /**
+   * Fired when a damaging spell hits an NPC (game wires this to
+   * CombatSystem.notifyHostileHit for assault crime + pack aggro).
+   */
+  public onHostileHit: ((npc: NPC, damage: number) => void) | null = null;
+
   constructor(player: Player, npcs: NPC[], ui: UIManager, scene: Scene | null = null) {
     this._player = player;
     this._npcs   = npcs;
@@ -404,6 +410,7 @@ export class SpellSystem {
           if (dist <= spell.aoeRadius) {
             const finalDmg = applyDamageWithResistance(rawHit, npc, damageType);
             npc.takeDamage(finalDmg);
+            this.onHostileHit?.(npc, finalDmg);
             this._applySpellDoT(spell, npc);
             if (hitNpcName === undefined) {
               hitNpcName = npc.mesh.name;
@@ -416,6 +423,7 @@ export class SpellSystem {
         if (target) {
           const finalDmg = applyDamageWithResistance(rawHit, target, damageType);
           target.takeDamage(finalDmg);
+          this.onHostileHit?.(target, finalDmg);
           this._applySpellDoT(spell, target);
           hitNpcName = target.mesh.name;
           reportedDamage = finalDmg;

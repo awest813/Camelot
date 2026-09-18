@@ -1342,18 +1342,6 @@ export class Game {
     // Alchemy/enchanting ✕ buttons likewise.
     this.alchemyUI.onClosed = () => this._restoreGameplayInput();
     this.enchantingUI.onClosed = () => this._restoreGameplayInput();
-    // Character sheet ✕ button (its Escape path is owned by the game cascade).
-    this.characterSheetUI.onClose = () => {
-      this.ui.setCharacterSheetOpen(false);
-      this._restoreGameplayInput();
-    };
-    // Perk spending from the character sheet (points come from level-ups).
-    this.characterSheetUI.onPerkUnlock = (perkId) => {
-      if (this.perkSystem.unlock(perkId)) {
-        this.saveSystem.markDirty();
-        this._refreshCharacterSheet();
-      }
-    };
 
     // ── v8 system wiring (Oblivion depth: skill progression, fast travel, level scaling) ──
     this.skillProgressionSystem = new SkillProgressionSystem();
@@ -1376,6 +1364,13 @@ export class Game {
     // Bolt-riding status effects (burn, freeze, …) land on the player.
     this.projectileSystem.onPlayerDamaged = (_dmg, _sourceName, effect) => {
       if (effect) this.combatSystem.applyPlayerStatusEffect(effect);
+    };
+    this.projectileSystem.isPlayerDodging = () => this.combatSystem.isDodging;
+    this.projectileSystem.onHostileHit = (npc, damage) => {
+      this.combatSystem.notifyHostileHit(npc, damage);
+    };
+    this.spellSystem.onHostileHit = (npc, damage) => {
+      this.combatSystem.notifyHostileHit(npc, damage);
     };
     this.projectileSystem.setScalingSystems({
       skillSystem: this.skillProgressionSystem,
@@ -1674,6 +1669,20 @@ export class Game {
     this.saveSystem.setPlayerLevelSystem(this.playerLevelSystem);
 
     this.characterSheetUI = new CharacterSheetUI();
+    // Character sheet ✕ button (its Escape path is owned by the game cascade).
+    // Must wire after construction — assigning earlier throws and aborts Game.init
+    // (boot-smoke / character-create never appear).
+    this.characterSheetUI.onClose = () => {
+      this.ui.setCharacterSheetOpen(false);
+      this._restoreGameplayInput();
+    };
+    // Perk spending from the character sheet (points come from level-ups).
+    this.characterSheetUI.onPerkUnlock = (perkId) => {
+      if (this.perkSystem.unlock(perkId)) {
+        this.saveSystem.markDirty();
+        this._refreshCharacterSheet();
+      }
+    };
 
     // ── Graphics Settings UI ──────────────────────────────────────────────────
     this.graphicsSettingsUI = new GraphicsSettingsUI();
@@ -3363,7 +3372,7 @@ export class Game {
                     const powered = this.combatSystem.powerAttack();
                     if (powered) {
                         this.audioSystem.playMeleeAttack();
-                        this.skillProgressionSystem.gainXP("blade", 6 * this.classSystem.xpMultiplierFor("blade"));
+                        // Weapon-skill XP is awarded inside CombatSystem on hit.
                     }
                 }
             } else if (kbInfo.event.key === "r" || kbInfo.event.key === "R") {
@@ -4011,9 +4020,9 @@ export class Game {
           if (drawing) this.stealthSystem.pushNoise(0.4);
         } else {
           const attacked = this.combatSystem.meleeAttack();
+          // Weapon-skill XP is awarded inside CombatSystem on hit (correct skill for blade/blunt).
           if (attacked) {
             this.audioSystem.playMeleeAttack();
-            this.skillProgressionSystem.gainXP("blade", 4 * this.classSystem.xpMultiplierFor("blade"));
           }
         }
       }
@@ -4023,7 +4032,6 @@ export class Game {
         const powered = this.combatSystem.powerAttack();
         if (powered) {
           this.audioSystem.playMeleeAttack();
-          this.skillProgressionSystem.gainXP("blade", 6 * this.classSystem.xpMultiplierFor("blade"));
         }
       }
     });
@@ -4045,9 +4053,8 @@ export class Game {
       if (!this._inputAdapter.isActive("castSpell")) {
         if (this.combatSystem.isChargingStaff) {
           const fired = this.combatSystem.releaseStaffCharge();
-          if (fired) {
-            this.skillProgressionSystem.gainXP("destruction", 8 * this.classSystem.xpMultiplierFor("destruction"));
-          }
+          // Destruction XP is awarded inside CombatSystem on a successful hit.
+          void fired;
         }
         return;
       }

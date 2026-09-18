@@ -2071,4 +2071,153 @@ describe('CombatSystem', () => {
         expect(combatSystem.playerStatusEffects).toHaveLength(0); // cleared by empty snapshot
     });
 
+    // ─── Combat polish audit ─────────────────────────────────────────────────
+
+    it('player DoT ticks do not fire onPlayerHit (disease / hit-SFX hook)', () => {
+        const onPlayerHit = vi.fn();
+        combatSystem.onPlayerHit = onPlayerHit;
+        (combatSystem as any)._playerStatusEffects = [{
+            type: 'burn',
+            damagePerTick: 4,
+            tickInterval: 1.0,
+            tickTimer: 0.5,
+            remainingDuration: 5.0,
+        }];
+        mockPlayer.health = 100;
+
+        combatSystem.updateNPCAI(0.6);
+        expect(mockPlayer.health).toBe(96);
+        expect(onPlayerHit).not.toHaveBeenCalled();
+    });
+
+    it('perfect block with zero damage does not fire onPlayerHit', () => {
+        const onPlayerHit = vi.fn();
+        combatSystem.onPlayerHit = onPlayerHit;
+        mockNpcs[0].aiState = 'ATTACK';
+        mockNpcs[0].attackRange = 2;
+        mockNpcs[0].attackWindup = 0.2;
+        mockNpcs[0].attackTimer = 0;
+        mockNpcs[0].attackDamage = 10;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 1.1);
+
+        combatSystem.beginBlock();
+        combatSystem.updateNPCAI(0.016);
+        combatSystem.updateNPCAI(0.25);
+
+        expect(mockPlayer.health).toBe(100);
+        expect(onPlayerHit).not.toHaveBeenCalled();
+    });
+
+    it('finisherReady stays false when weapon skill is below the unlock rank', () => {
+        const skills = new SkillProgressionSystem();
+        skills.setSkillLevel('blade', 40);
+        combatSystem.setScalingSystems({ skillSystem: skills });
+        (combatSystem as any)._comboStack = 3;
+        (combatSystem as any)._comboTimer = 2.0;
+
+        expect(combatSystem.finisherReady).toBe(false);
+    });
+
+    it('mace finishers and executes gate on blunt skill, not blade', () => {
+        const skills = new SkillProgressionSystem();
+        skills.setSkillLevel('blade', 0);
+        skills.setSkillLevel('blunt', 80);
+        combatSystem.setScalingSystems({ skillSystem: skills });
+        combatSystem.setWeaponArchetype('mace');
+        (combatSystem as any)._comboStack = 3;
+        (combatSystem as any)._comboTimer = 2.0;
+
+        expect(combatSystem.finisherReady).toBe(true);
+
+        mockNpcs[0].health = 10;
+        mockNpcs[0].maxHealth = 100;
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1),
+        });
+        mockPlayer.stamina = 200;
+
+        combatSystem.powerAttack();
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Execution!', 1000);
+    });
+
+    it('notifyHostileHit fires onNpcDamaged and transitions to CHASE with pack aggro', () => {
+        const onNpcDamaged = vi.fn();
+        combatSystem.onNpcDamaged = onNpcDamaged;
+        mockNpcs[0].aiState = 'IDLE';
+        mockNpcs[0].factionId = 'bandits';
+        mockNpcs[0].isDead = false;
+        mockNpcs[0].mesh.position = new Vector3(0, 0, 2);
+
+        const ally: any = {
+            mesh: {
+                name: 'Ally',
+                position: new Vector3(1, 0, 2),
+                lookAt: vi.fn(),
+            },
+            isDead: false,
+            health: 50,
+            takeDamage: vi.fn(),
+            physicsAggregate: {
+                body: { applyImpulse: vi.fn(), getLinearVelocityToRef: vi.fn(), setLinearVelocity: vi.fn() },
+            },
+            aiState: 'IDLE',
+            isAggressive: false,
+            factionId: 'bandits',
+            spawnPosition: new Vector3(1, 0, 2),
+            alertTimer: 0,
+            currentPath: [],
+            pathIndex: 0,
+            pathRefreshTimer: 0,
+            setStateColor: vi.fn(),
+            aggroRange: 10,
+            attackRange: 2,
+            attackEngageRangeMultiplier: 0.9,
+            attackDisengageRangeMultiplier: 1.15,
+            attackWindup: 0.35,
+            attackDamage: 5,
+            attackTimer: 0,
+            attackCooldown: 2,
+            isAttackTelegraphing: false,
+            attackTelegraphTimer: 0,
+            dodgeWindowRangeMultiplier: 0.7,
+            strafeDirection: 0,
+            strafeTimer: 0,
+            strafeSpeedMultiplier: 0.65,
+            movementResponsiveness: 8,
+            moveSpeed: 2,
+            statusEffects: [],
+            tickStatusEffects: vi.fn(() => 0),
+            xpReward: 25,
+            lastKnownPlayerPos: null,
+        };
+        (combatSystem as any).npcs = [mockNpcs[0], ally];
+
+        combatSystem.notifyHostileHit(mockNpcs[0], 12);
+
+        expect(onNpcDamaged).toHaveBeenCalledWith(mockNpcs[0], 12);
+        expect(mockNpcs[0].aiState).toBe('CHASE');
+        expect(ally.aiState).toBe('CHASE');
+    });
+
+    it('melee sneak attacks apply the shared base multiplier without a perk', () => {
+        combatSystem.setStealthSystem({ canSneakAttack: () => true });
+        mockPlayer.perkSneakAttackMultiplier = 1.0;
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1),
+        });
+        mockNpcs[0].takeDamage.mockClear();
+
+        combatSystem.meleeAttack();
+
+        const dmg = mockNpcs[0].takeDamage.mock.calls[0][0];
+        // Base melee 10 × sneak 3.0 = 30 (no armor on the mock).
+        expect(dmg).toBeGreaterThanOrEqual(30);
+        expect(mockUI.showNotification).toHaveBeenCalledWith(
+            expect.stringMatching(/Sneak/i),
+            expect.any(Number),
+        );
+    });
+
 });

@@ -294,4 +294,14 @@ describe("SpellSystem", () => {
     expect(spell.id).toBe("flames");
     expect(result.success).toBe(true);
   });
+
+  it("fires onHostileHit when a damaging spell lands", () => {
+    const onHostile = vi.fn();
+    sys.onHostileHit = onHostile;
+    sys.learnSpell("flames");
+    sys.equipSpell("flames");
+    sys.castSpell();
+    expect(npc.takeDamage).toHaveBeenCalled();
+    expect(onHostile).toHaveBeenCalledWith(npc, expect.any(Number));
+  });
 });
