@@ -37,8 +37,13 @@ function isBenignPageError(err: Error): boolean {
 
 /** Drive the character-creation wizard: Welcome → World → Name → Race → Birthsign → Class. */
 async function completeCharacterCreation(page: Page) {
+  // Fail fast if engine init aborts before the wizard mounts (e.g. Game.init throw).
   const root = page.locator(".character-create");
-  await expect(root).toBeVisible({ timeout: 90_000 });
+  const fatal = page.locator(".app-fatal-error");
+  await expect(root.or(fatal)).toBeVisible({ timeout: 90_000 });
+  if (await fatal.count()) {
+    throw new Error(`Game failed to boot: ${await fatal.textContent()}`);
+  }
 
   const continueBtn = root.locator(".character-create__actions button", { hasText: /Continue|Begin/i });
 
@@ -103,6 +108,9 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
 
   // Let the world simulate for a few seconds (chunks stream, systems tick).
   await page.waitForTimeout(4_000);
+
+  // Babylon keyboard input requires canvas focus — click it so F5/F9 reach the game.
+  await page.locator("#renderCanvas").click({ force: true });
 
   // F5 — manual save.  Assert the full game-state graph serialised.
   await page.keyboard.press("F5");

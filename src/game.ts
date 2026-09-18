@@ -1342,18 +1342,6 @@ export class Game {
     // Alchemy/enchanting ✕ buttons likewise.
     this.alchemyUI.onClosed = () => this._restoreGameplayInput();
     this.enchantingUI.onClosed = () => this._restoreGameplayInput();
-    // Character sheet ✕ button (its Escape path is owned by the game cascade).
-    this.characterSheetUI.onClose = () => {
-      this.ui.setCharacterSheetOpen(false);
-      this._restoreGameplayInput();
-    };
-    // Perk spending from the character sheet (points come from level-ups).
-    this.characterSheetUI.onPerkUnlock = (perkId) => {
-      if (this.perkSystem.unlock(perkId)) {
-        this.saveSystem.markDirty();
-        this._refreshCharacterSheet();
-      }
-    };
 
     // ── v8 system wiring (Oblivion depth: skill progression, fast travel, level scaling) ──
     this.skillProgressionSystem = new SkillProgressionSystem();
@@ -1681,6 +1669,20 @@ export class Game {
     this.saveSystem.setPlayerLevelSystem(this.playerLevelSystem);
 
     this.characterSheetUI = new CharacterSheetUI();
+    // Character sheet ✕ button (its Escape path is owned by the game cascade).
+    // Must wire after construction — assigning earlier throws and aborts Game.init
+    // (boot-smoke / character-create never appear).
+    this.characterSheetUI.onClose = () => {
+      this.ui.setCharacterSheetOpen(false);
+      this._restoreGameplayInput();
+    };
+    // Perk spending from the character sheet (points come from level-ups).
+    this.characterSheetUI.onPerkUnlock = (perkId) => {
+      if (this.perkSystem.unlock(perkId)) {
+        this.saveSystem.markDirty();
+        this._refreshCharacterSheet();
+      }
+    };
 
     // ── Graphics Settings UI ──────────────────────────────────────────────────
     this.graphicsSettingsUI = new GraphicsSettingsUI();
