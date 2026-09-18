@@ -1377,6 +1377,13 @@ export class Game {
     this.projectileSystem.onPlayerDamaged = (_dmg, _sourceName, effect) => {
       if (effect) this.combatSystem.applyPlayerStatusEffect(effect);
     };
+    this.projectileSystem.isPlayerDodging = () => this.combatSystem.isDodging;
+    this.projectileSystem.onHostileHit = (npc, damage) => {
+      this.combatSystem.notifyHostileHit(npc, damage);
+    };
+    this.spellSystem.onHostileHit = (npc, damage) => {
+      this.combatSystem.notifyHostileHit(npc, damage);
+    };
     this.projectileSystem.setScalingSystems({
       skillSystem: this.skillProgressionSystem,
       attributeSystem: this.attributeSystem,
@@ -3363,7 +3370,7 @@ export class Game {
                     const powered = this.combatSystem.powerAttack();
                     if (powered) {
                         this.audioSystem.playMeleeAttack();
-                        this.skillProgressionSystem.gainXP("blade", 6 * this.classSystem.xpMultiplierFor("blade"));
+                        // Weapon-skill XP is awarded inside CombatSystem on hit.
                     }
                 }
             } else if (kbInfo.event.key === "r" || kbInfo.event.key === "R") {
@@ -4011,9 +4018,9 @@ export class Game {
           if (drawing) this.stealthSystem.pushNoise(0.4);
         } else {
           const attacked = this.combatSystem.meleeAttack();
+          // Weapon-skill XP is awarded inside CombatSystem on hit (correct skill for blade/blunt).
           if (attacked) {
             this.audioSystem.playMeleeAttack();
-            this.skillProgressionSystem.gainXP("blade", 4 * this.classSystem.xpMultiplierFor("blade"));
           }
         }
       }
@@ -4023,7 +4030,6 @@ export class Game {
         const powered = this.combatSystem.powerAttack();
         if (powered) {
           this.audioSystem.playMeleeAttack();
-          this.skillProgressionSystem.gainXP("blade", 6 * this.classSystem.xpMultiplierFor("blade"));
         }
       }
     });
@@ -4045,9 +4051,8 @@ export class Game {
       if (!this._inputAdapter.isActive("castSpell")) {
         if (this.combatSystem.isChargingStaff) {
           const fired = this.combatSystem.releaseStaffCharge();
-          if (fired) {
-            this.skillProgressionSystem.gainXP("destruction", 8 * this.classSystem.xpMultiplierFor("destruction"));
-          }
+          // Destruction XP is awarded inside CombatSystem on a successful hit.
+          void fired;
         }
         return;
       }

@@ -9,7 +9,7 @@ import { AIState, NPC, type DamageType, type StatusEffect } from "../entities/np
 import { Player } from "../entities/player";
 import { UIManager } from "../ui/ui-manager";
 import { StealthSystem } from "./stealth-system";
-import { applyDamageWithResistance, WEAPON_PROFILES } from "./combat-shared";
+import { applyDamageWithResistance, resolveSneakAttackMultiplier, WEAPON_PROFILES } from "./combat-shared";
 import type { SkillProgressionSystem } from "./skill-progression-system";
 import type { AttributeSystem } from "./attribute-system";
 import { ObjectPool } from "./object-pool";
@@ -65,13 +65,6 @@ const ARROW_SPAWN_Y_OFFSET = -0.1;
 const BOW_DRAW_TIME        = 0.8;
 /** Minimum draw fraction before the arrow can be fired (prevents zero-power releases). */
 const BOW_MIN_DRAW         = 0.1;
-/**
- * Sneak-attack damage multiplier for bow shots.
- * Applied when the player is crouching and the target NPC's detection level < 30.
- */
-const BOW_SNEAK_ATTACK_MULTIPLIER = 3.0;
-/** Detection threshold below which a bow sneak attack is valid. */
-const SNEAK_ATTACK_DETECTION_THRESHOLD = 30;
 
 // ─── Arrow type profiles ──────────────────────────────────────────────────────
 
@@ -195,13 +188,25 @@ export class ProjectileSystem {
 
   /**
    * Optional reference to the StealthSystem.
-   * When set, arrows fired while the player is crouching and undetected deal
-   * a sneak-attack bonus (BOW_SNEAK_ATTACK_MULTIPLIER).
+   * When set, arrows that pass {@link StealthSystem.canSneakAttack} deal the
+   * shared sneak-attack multiplier (same base as melee).
    */
   public stealthSystem: StealthSystem | null = null;
 
   /** Same contract as {@link CombatSystem.onNPCDeath} — fired when an arrow kill lands. */
   public onNPCDeath: ((npcName: string, xpReward: number, npc: NPC) => void) | null = null;
+
+  /**
+   * Fired when a player arrow damages an NPC (game wires this to
+   * CombatSystem.notifyHostileHit for assault crime + pack aggro).
+   */
+  public onHostileHit: ((npc: NPC, damage: number) => void) | null = null;
+
+  /**
+   * When true, hostile arrows/bolts are consumed without damaging the player
+   * (dodge-roll i-frames). Wired from CombatSystem.isDodging in game.ts.
+   */
+  public isPlayerDodging: (() => boolean) | null = null;
 
   private static readonly _DMG_OFFSET_Y2 = new Vector3(0, 2, 0);
 
@@ -589,12 +594,14 @@ export class ProjectileSystem {
 
           let raw = arrow.baseDamage;
           let isSneakAttack = false;
-          if (
-            arrow.isSneakShot &&
-            this.stealthSystem &&
-            this.stealthSystem.getDetectionLevel(npc) < SNEAK_ATTACK_DETECTION_THRESHOLD
-          ) {
-            raw = Math.round(raw * BOW_SNEAK_ATTACK_MULTIPLIER);
+          const canSneak = this.stealthSystem?.canSneakAttack(npc) === true;
+          if (canSneak) {
+            const sneakMult = resolveSneakAttackMultiplier(
+              true,
+              (this._player as unknown as { perkSneakAttackMultiplier?: number })
+                .perkSneakAttackMultiplier ?? 1.0,
+            );
+            raw = Math.round(raw * sneakMult);
             isSneakAttack = true;
           }
 
@@ -623,6 +630,7 @@ export class ProjectileSystem {
 
           npc.takeDamage(finalDamage);
           this._skillSystem?.gainXP("marksman", SKILL_XP_MARKSMAN_HIT);
+          this.onHostileHit?.(npc, finalDamage);
 
           // Daedric arrows are wreathed in Oblivion flame — victims burn.
           if (this.equippedArrowType === "daedric") {
@@ -658,9 +666,6 @@ export class ProjectileSystem {
           }
 
           npc.isAggressive = true;
-          if (!npc.isDead && npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
-            npc.aiState = AIState.CHASE;
-          }
 
           if (npc.isDead) {
             this._ui.showNotification(`${npc.mesh.name} defeated!`);
@@ -679,6 +684,10 @@ export class ProjectileSystem {
       if (!hit && arrow.hostileToPlayer) {
         const playerPos = this._player.camera.position;
         if (Vector3.Distance(arrow.mesh.position, playerPos) < NPC_ARROW_HIT_RADIUS) {
+          if (this.isPlayerDodging?.()) {
+            this._ui.showNotification(`You dodge ${arrow.sourceName}'s shot!`, 1200);
+            hit = true;
+          } else {
           const dmg = Math.max(1, Math.round(arrow.baseDamage));
           this._player.health = Math.max(0, this._player.health - dmg);
           (this._player as unknown as { notifyDamageTaken?: () => void }).notifyDamageTaken?.();
@@ -692,6 +701,7 @@ export class ProjectileSystem {
           this._ui.applyHitStop(60);
           this.onPlayerDamaged?.(dmg, arrow.sourceName, arrow.statusEffect);
           hit = true;
+          }
         }
       }
 

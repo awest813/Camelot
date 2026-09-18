@@ -7,6 +7,26 @@ import type { NPC, DamageType } from "../entities/npc";
 import type { ProgressionSkillId } from "./skill-progression-system";
 
 /**
+ * Base sneak-attack damage multiplier shared by melee and bows.
+ * Player `perkSneakAttackMultiplier` can raise this further when unlocked.
+ */
+export const BASE_SNEAK_ATTACK_MULTIPLIER = 3.0;
+
+/**
+ * Resolve the sneak-attack damage multiplier for a hit that already passed
+ * stealth eligibility (`canSneakAttack` / crouch + low detection).
+ * Perks can only raise the bonus above the shared base — never suppress it.
+ */
+export function resolveSneakAttackMultiplier(
+  canSneak: boolean,
+  perkMultiplier: number = 1.0,
+): number {
+  if (!canSneak) return 1.0;
+  const perk = Number.isFinite(perkMultiplier) ? perkMultiplier : 1.0;
+  return Math.max(BASE_SNEAK_ATTACK_MULTIPLIER, perk);
+}
+
+/**
  * Applies NPC-specific resistance, weakness, and armor rating to a raw damage amount.
  *
  * Resistance/weakness pass:
