@@ -224,6 +224,7 @@ export class PetUI {
     root.setAttribute("aria-modal", "true");
     root.setAttribute("aria-labelledby", "pet-panel-title");
     root.tabIndex = -1;
+    root.className = "pet-ui";
     Object.assign(root.style, {
       position:       "fixed",
       top:            "50%",
@@ -234,8 +235,10 @@ export class PetUI {
       gap:            "10px",
       background:     C.BG,
       border:         `1px solid ${C.BORDER}`,
-      borderRadius:   "8px",
-      padding:        "16px",
+      borderRadius:   "10px",
+      boxShadow:      "0 20px 60px rgba(0, 0, 0, 0.85), 0 0 0 100vmax rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 230, 180, 0.1)",
+      backdropFilter: "blur(4px)",
+      padding:        "18px",
       zIndex:         "1600",
       minWidth:       "340px",
       maxWidth:       "420px",
@@ -279,6 +282,15 @@ export class PetUI {
     Object.assign(listEl.style, { display: "flex", flexDirection: "column", gap: "8px" });
 
     root.append(header, hint, listEl);
+
+    root.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        this.close();
+        this.onClose?.();
+      }
+    });
+
     document.body.appendChild(root);
 
     this._panelRoot = root;

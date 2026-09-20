@@ -465,4 +465,23 @@ describe('StructureManager with WorldSeed', () => {
       }
     }
   });
+
+  it('registers and unregisters structure meshes with LodSystem', () => {
+    const sm = new StructureManager(mockScene);
+    const mockLod = {
+      getConfig: () => ({ distanceThresholds: { ultraFar: 250, near: 30, medium: 80 } }),
+      register: vi.fn(),
+      unregister: vi.fn(),
+    } as any;
+    sm.lodSystem = mockLod;
+
+    let cx = 0, cz = 0;
+    while (!sm.hasStructureAt(cx, cz)) { cx++; }
+
+    sm.trySpawnForChunk(cx, cz, "plains", 50);
+    expect(mockLod.register).toHaveBeenCalled();
+
+    sm.disposeChunk(cx, cz);
+    expect(mockLod.unregister).toHaveBeenCalled();
+  });
 });

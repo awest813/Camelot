@@ -42,7 +42,18 @@ describe("resolveDialogueIdForNpcMeshName", () => {
     expect(resolveDialogueIdForNpcMeshName("Guard", [])).toBe("guard_intro");
   });
 
-  it("returns null when no binding and not a guard", () => {
+  it("falls back to appropriate dialogue for common NPC professions", () => {
+    expect(resolveDialogueIdForNpcMeshName("Trader Elan", [])).toBe("merchant_intro");
+    expect(resolveDialogueIdForNpcMeshName("Village Merchant_01", [])).toBe("merchant_intro");
+    expect(resolveDialogueIdForNpcMeshName("Innkeeper Martha", [])).toBe("innkeeper_intro");
+    expect(resolveDialogueIdForNpcMeshName("Tavern Barkeeper", [])).toBe("barkeeper_intro");
+    expect(resolveDialogueIdForNpcMeshName("Alchemist Corvus", [])).toBe("shopkeeper_alchemist_intro");
+    expect(resolveDialogueIdForNpcMeshName("Town Blacksmith", [])).toBe("shopkeeper_armor_intro");
+    expect(resolveDialogueIdForNpcMeshName("Village Armorer", [])).toBe("shopkeeper_armor_intro");
+    expect(resolveDialogueIdForNpcMeshName("Roadside Weapons Dealer", [])).toBe("shopkeeper_weapons_intro");
+  });
+
+  it("returns null when no binding and not a known role", () => {
     expect(resolveDialogueIdForNpcMeshName("RandomNPC_9", [])).toBeNull();
   });
 

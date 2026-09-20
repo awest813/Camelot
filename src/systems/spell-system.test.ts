@@ -303,5 +303,32 @@ describe("SpellSystem", () => {
     sys.castSpell();
     expect(npc.takeDamage).toHaveBeenCalled();
     expect(onHostile).toHaveBeenCalledWith(npc, expect.any(Number));
+  // ── Expanded school & spell casting coverage ───────────────────────────────
+
+  it("default spells include definitions across all five magical schools", () => {
+    const schools = new Set(DEFAULT_SPELLS.map((s) => s.school));
+    expect(schools.has("destruction")).toBe(true);
+    expect(schools.has("restoration")).toBe(true);
+    expect(schools.has("alteration")).toBe(true);
+    expect(schools.has("illusion")).toBe(true);
+    expect(schools.has("conjuration")).toBe(true);
+  });
+
+  it("can cast Alteration self-buff spell (Oakflesh)", () => {
+    sys.learnSpell("oakflesh");
+    sys.equipSpell("oakflesh");
+    const initialMagicka = player.magicka;
+    const result = sys.castSpell();
+    expect(result.success).toBe(true);
+    expect(player.magicka).toBe(initialMagicka - 28);
+  });
+
+  it("can cast holy Restoration offensive spell (Turn Undead) and hit NPC", () => {
+    sys.learnSpell("turn_undead");
+    sys.equipSpell("turn_undead");
+    const result = sys.castSpell();
+    expect(result.success).toBe(true);
+    expect(result.hitNpc).toBe(npc.mesh.name);
+    expect(npc.takeDamage).toHaveBeenCalled();
   });
 });

@@ -141,6 +141,26 @@ export const CHARACTER_CLASSES: ReadonlyArray<CharacterClass> = [
     favoredAttributes: ["strength", "agility"],
     majorSkills: ["blade", "marksman", "alchemy"],
   },
+  {
+    id: "crusader",
+    name: "Crusader",
+    specialization: "combat",
+    description:
+      "Holy warriors clad in heavy armor, smiting evil with blade and blunt " +
+      "while sustaining themselves with restorative miracles.",
+    favoredAttributes: ["strength", "willpower"],
+    majorSkills: ["blade", "blunt", "restoration", "block"],
+  },
+  {
+    id: "archer",
+    name: "Archer",
+    specialization: "combat",
+    description:
+      "Deadly marksmen capable of striking targets from immense distances " +
+      "before finishing off surviving foes with nimble blades.",
+    favoredAttributes: ["agility", "strength"],
+    majorSkills: ["marksman", "blade", "sneak", "block"],
+  },
   // ── Magic specialization ──────────────────────────────────────────────────
   {
     id: "mage",
@@ -172,6 +192,26 @@ export const CHARACTER_CLASSES: ReadonlyArray<CharacterClass> = [
     favoredAttributes: ["willpower", "intelligence"],
     majorSkills: ["restoration", "alchemy", "speechcraft"],
   },
+  {
+    id: "spellsword",
+    name: "Spellsword",
+    specialization: "magic",
+    description:
+      "Versatile battle casters who weave offensive destruction and protective " +
+      "restoration spells seamlessly with martial blade combat.",
+    favoredAttributes: ["willpower", "endurance"],
+    majorSkills: ["blade", "destruction", "restoration", "block"],
+  },
+  {
+    id: "battlemage",
+    name: "Battlemage",
+    specialization: "magic",
+    description:
+      "Battlemages combine swordsmanship with destructive sorcery, making them " +
+      "dangerous at any range and in any situation.",
+    favoredAttributes: ["intelligence", "strength"],
+    majorSkills: ["blade", "destruction", "alchemy"],
+  },
   // ── Stealth specialization ────────────────────────────────────────────────
   {
     id: "thief",
@@ -182,6 +222,16 @@ export const CHARACTER_CLASSES: ReadonlyArray<CharacterClass> = [
       "rather than brute force.",
     favoredAttributes: ["agility", "speed"],
     majorSkills: ["sneak", "speechcraft", "marksman"],
+  },
+  {
+    id: "assassin",
+    name: "Assassin",
+    specialization: "stealth",
+    description:
+      "Nimble killers who strike without warning. Masters of stealth, " +
+      "deadly marksmanship, precision blades, and lethal alchemy.",
+    favoredAttributes: ["agility", "speed"],
+    majorSkills: ["blade", "marksman", "sneak", "alchemy"],
   },
   {
     id: "scout",
@@ -203,16 +253,35 @@ export const CHARACTER_CLASSES: ReadonlyArray<CharacterClass> = [
     favoredAttributes: ["agility", "speed"],
     majorSkills: ["blade", "sneak", "speechcraft"],
   },
-  // ── Mixed specialization ──────────────────────────────────────────────────
   {
-    id: "battlemage",
-    name: "Battlemage",
-    specialization: "magic",
+    id: "nightblade",
+    name: "Nightblade",
+    specialization: "stealth",
     description:
-      "Battlemages combine swordsmanship with destructive sorcery, making them " +
-      "dangerous at any range and in any situation.",
-    favoredAttributes: ["intelligence", "strength"],
-    majorSkills: ["blade", "destruction", "alchemy"],
+      "Cunning infiltrators who cloak their movements with magic, striking from " +
+      "the shadows with enchanted blades and destructive spells.",
+    favoredAttributes: ["willpower", "speed"],
+    majorSkills: ["blade", "destruction", "restoration", "sneak"],
+  },
+  {
+    id: "bard",
+    name: "Bard",
+    specialization: "stealth",
+    description:
+      "Charming wanderers and silver-tongued raconteurs. Skilled in speechcraft, " +
+      "street blades, and alchemical brews.",
+    favoredAttributes: ["speed", "luck"],
+    majorSkills: ["speechcraft", "blade", "alchemy", "sneak"],
+  },
+  {
+    id: "monk",
+    name: "Monk",
+    specialization: "stealth",
+    description:
+      "Disciplined ascetics who move with preternatural quiet and grace, " +
+      "channeling inner focus into restoration and precision defense.",
+    favoredAttributes: ["agility", "willpower"],
+    majorSkills: ["block", "sneak", "marksman", "restoration"],
   },
 ];
 

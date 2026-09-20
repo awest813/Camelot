@@ -13,6 +13,37 @@ export class Loot {
   public item: Item;
   public physicsAggregate: PhysicsAggregate;
 
+  private static _equipMatCache = new WeakMap<Scene, StandardMaterial>();
+  private static _consumableMatCache = new WeakMap<Scene, StandardMaterial>();
+
+  private static _getMaterial(scene: Scene, isEquipment: boolean): StandardMaterial {
+    const cache = isEquipment ? Loot._equipMatCache : Loot._consumableMatCache;
+    let mat = cache.get(scene);
+    const isDisposed = typeof (mat as any)?.isDisposed === "function" ? (mat as any).isDisposed() : false;
+    if (!mat || isDisposed) {
+      mat = new StandardMaterial(
+        isEquipment ? "lootMat_equipment_shared" : "lootMat_consumable_shared",
+        scene,
+      );
+      if (isEquipment) {
+        mat.diffuseColor  = new Color3(0.55, 0.72, 1.00);
+        mat.emissiveColor = new Color3(0.10, 0.16, 0.40);
+        mat.specularColor = new Color3(1.00, 1.00, 1.00);
+        mat.specularPower = 64;
+      } else {
+        mat.diffuseColor  = new Color3(1.00, 0.82, 0.18);
+        mat.emissiveColor = new Color3(0.30, 0.18, 0.00);
+        mat.specularColor = new Color3(1.00, 0.92, 0.50);
+        mat.specularPower = 32;
+      }
+      if (typeof (mat as any).freeze === "function") {
+        mat.freeze();
+      }
+      cache.set(scene, mat);
+    }
+    return mat;
+  }
+
   constructor(scene: Scene, position: Vector3, item: Item) {
     this.item = item;
 
@@ -20,20 +51,8 @@ export class Loot {
     this.mesh = MeshBuilder.CreateSphere("loot_" + item.id, { diameter: 0.45, segments: 6 }, scene);
     this.mesh.position = position;
 
-    // Color by category: equipment = silvery-blue, consumable/misc = golden
-    const material = new StandardMaterial("lootMat_" + item.id, scene);
-    if (item.slot) {
-      material.diffuseColor  = new Color3(0.55, 0.72, 1.00);
-      material.emissiveColor = new Color3(0.10, 0.16, 0.40);
-      material.specularColor = new Color3(1.00, 1.00, 1.00);
-      material.specularPower = 64;
-    } else {
-      material.diffuseColor  = new Color3(1.00, 0.82, 0.18);
-      material.emissiveColor = new Color3(0.30, 0.18, 0.00);
-      material.specularColor = new Color3(1.00, 0.92, 0.50);
-      material.specularPower = 32;
-    }
-    this.mesh.material = material;
+    // Color by category: equipment = silvery-blue, consumable/misc = golden (shared material)
+    this.mesh.material = Loot._getMaterial(scene, Boolean(item.slot));
 
     // Physics (sphere shape)
     this.physicsAggregate = new PhysicsAggregate(this.mesh, PhysicsShapeType.SPHERE, { mass: 1, restitution: 0.5 }, scene);

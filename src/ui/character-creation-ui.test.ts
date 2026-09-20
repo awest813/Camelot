@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { CharacterCreationUI, type CharacterCreationResult } from "./character-creation-ui";
+import {
+  CharacterCreationUI,
+  type CharacterCreationResult,
+  RACIAL_NAME_SUGGESTIONS,
+  ALL_NAME_SUGGESTIONS,
+  ZODIAC_NAME_SUGGESTIONS,
+} from "./character-creation-ui";
 import { WorldSeed } from "../world/world-seed";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -428,6 +434,96 @@ describe("CharacterCreationUI", () => {
           expect(sm.hasStructureAt(cx, cz)).toBe(false);
         }
       }
+    });
+  });
+
+  // ── Name step & suggestions enhancements ───────────────────────────────────
+
+  describe("Name step suggestions & randomize", () => {
+    it("exposes RACIAL_NAME_SUGGESTIONS with all 10 playable races", () => {
+      const expectedRaces = [
+        "nord",
+        "imperial",
+        "breton",
+        "redguard",
+        "altmer",
+        "dunmer",
+        "bosmer",
+        "orsimer",
+        "khajiit",
+        "argonian",
+      ];
+      for (const r of expectedRaces) {
+        expect(RACIAL_NAME_SUGGESTIONS[r]).toBeDefined();
+        expect(RACIAL_NAME_SUGGESTIONS[r].length).toBeGreaterThanOrEqual(8);
+      }
+    });
+
+    it("ALL_NAME_SUGGESTIONS includes both Zodiac and racial names", () => {
+      expect(ALL_NAME_SUGGESTIONS.length).toBeGreaterThan(ZODIAC_NAME_SUGGESTIONS.length);
+      const hasZodiac = ALL_NAME_SUGGESTIONS.some((s) => s.name === "Arion");
+      const hasNord = ALL_NAME_SUGGESTIONS.some((s) => s.name === "Ragnar");
+      expect(hasZodiac).toBe(true);
+      expect(hasNord).toBe(true);
+    });
+
+    it("Randomize button on Name step generates a name and enables Continue", async () => {
+      const ui = new CharacterCreationUI();
+      ui.open();
+      const continueBtn = () =>
+        document.querySelector<HTMLButtonElement>(
+          ".character-create__button:not(.character-create__button--secondary)",
+        )!;
+
+      continueBtn().click(); // Welcome -> World
+      await Promise.resolve();
+      continueBtn().click(); // World -> Name
+      await Promise.resolve();
+
+      const nameInput = document.querySelector<HTMLInputElement>(".character-create__name-input")!;
+      expect(nameInput.value).toBe("");
+
+      const randomBtn = document.querySelector<HTMLButtonElement>(".character-create__name-random-btn")!;
+      expect(randomBtn).not.toBeNull();
+      randomBtn.click();
+
+      expect(nameInput.value.trim().length).toBeGreaterThan(0);
+      expect(continueBtn().getAttribute("aria-disabled")).toBe("false");
+    });
+
+    it("clicking a culture category filters suggestion buttons", async () => {
+      const ui = new CharacterCreationUI();
+      ui.open();
+      const continueBtn = () =>
+        document.querySelector<HTMLButtonElement>(
+          ".character-create__button:not(.character-create__button--secondary)",
+        )!;
+
+      continueBtn().click(); // Welcome -> World
+      await Promise.resolve();
+      continueBtn().click(); // World -> Name
+      await Promise.resolve();
+
+      const catBtns = Array.from(
+        document.querySelectorAll<HTMLButtonElement>(".character-create__name-cat-btn"),
+      );
+      const nordBtn = catBtns.find((b) => b.textContent === "Nord");
+      expect(nordBtn).toBeDefined();
+
+      nordBtn!.click();
+      const suggestBtns = Array.from(
+        document.querySelectorAll<HTMLButtonElement>(".character-create__suggest-btn"),
+      );
+      const names = suggestBtns.map((b) => b.textContent);
+      expect(names).toContain("Ragnar");
+      expect(names).toContain("Astrid");
+
+      // Clicking Ragnar sets the name
+      const ragnarBtn = suggestBtns.find((b) => b.textContent === "Ragnar")!;
+      ragnarBtn.click();
+      const nameInput = document.querySelector<HTMLInputElement>(".character-create__name-input")!;
+      expect(nameInput.value).toBe("Ragnar");
+      expect(continueBtn().getAttribute("aria-disabled")).toBe("false");
     });
   });
 });

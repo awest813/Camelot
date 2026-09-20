@@ -39,8 +39,8 @@ describe("ClassSystem", () => {
 
   // ── Catalogue ──────────────────────────────────────────────────────────────
 
-  it("exposes 10 character class definitions", () => {
-    expect(system.all.length).toBe(10);
+  it("exposes 17 character class definitions", () => {
+    expect(system.all.length).toBe(17);
   });
 
   it("all class ids match the CHARACTER_CLASSES export", () => {
@@ -54,6 +54,16 @@ describe("ClassSystem", () => {
     expect(warrior).toBeDefined();
     expect(warrior!.name).toBe("Warrior");
     expect(warrior!.specialization).toBe("combat");
+
+    const assassin = system.getDefinition("assassin");
+    expect(assassin).toBeDefined();
+    expect(assassin!.name).toBe("Assassin");
+    expect(assassin!.specialization).toBe("stealth");
+
+    const crusader = system.getDefinition("crusader");
+    expect(crusader).toBeDefined();
+    expect(crusader!.name).toBe("Crusader");
+    expect(crusader!.favoredAttributes).toEqual(["strength", "willpower"]);
   });
 
   it("getDefinition returns undefined for unknown id", () => {

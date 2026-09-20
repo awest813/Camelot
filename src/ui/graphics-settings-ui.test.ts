@@ -84,6 +84,16 @@ describe("GraphicsSettingsUI", () => {
     expect(spy).toHaveBeenCalledOnce();
   });
 
+  it("calls onClose and hides dialog when Escape key is pressed", () => {
+    const spy = vi.fn();
+    ui.onClose = spy;
+    ui.show("high");
+    const root = document.querySelector<HTMLElement>(".graphics-settings")!;
+    root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(spy).toHaveBeenCalledOnce();
+    expect(ui.isVisible).toBe(false);
+  });
+
   it("does not call onTierSelect when clicking backdrop", () => {
     const tierSpy = vi.fn();
     ui.onTierSelect = tierSpy;
@@ -145,4 +155,84 @@ describe("GraphicsSettingsUI", () => {
     expect(spy).toHaveBeenCalledOnce();
     expect(spy).toHaveBeenCalledWith("easy");
   });
+
+  // ── Audio controls ─────────────────────────────────────────────────────────
+
+  it("renders audio mute toggle and volume preset buttons", () => {
+    ui.show("high", "normal", false, 0.5);
+    const audioRow = document.querySelector(".graphics-settings__audio-row")!;
+    expect(audioRow).not.toBeNull();
+    const chips = audioRow.querySelectorAll<HTMLButtonElement>(".graphics-settings__chip-btn");
+    expect(chips).toHaveLength(5); // 1 mute button + 4 volume presets
+    expect(chips[0].textContent).toContain("Mute Audio");
+    const activeVol = audioRow.querySelector(".graphics-settings__chip-btn.is-active");
+    expect(activeVol?.textContent).toContain("50%");
+  });
+
+  it("toggles mute state and calls onAudioMuteToggle callback", () => {
+    const spy = vi.fn();
+    ui.onAudioMuteToggle = spy;
+    ui.show("high", "normal", false, 0.75);
+
+    const audioRow = document.querySelector(".graphics-settings__audio-row")!;
+    const muteBtn = audioRow.querySelectorAll<HTMLButtonElement>(".graphics-settings__chip-btn")[0]!;
+    muteBtn.click();
+    expect(spy).toHaveBeenCalledWith(true);
+    expect(muteBtn.textContent).toContain("Unmute Audio");
+    expect(muteBtn.classList.contains("is-active")).toBe(true);
+
+    muteBtn.click();
+    expect(spy).toHaveBeenCalledWith(false);
+    expect(muteBtn.textContent).toContain("Mute Audio");
+  });
+
+  it("changes volume and calls onVolumeChange callback", () => {
+    const spy = vi.fn();
+    ui.onVolumeChange = spy;
+    ui.show("high", "normal", false, 0.5);
+
+    const audioRow = document.querySelector(".graphics-settings__audio-row")!;
+    const volChips = audioRow.querySelectorAll<HTMLButtonElement>(".graphics-settings__chip-btn");
+    // volChips[3] is 75%
+    volChips[3].click();
+    expect(spy).toHaveBeenCalledWith(0.75);
+    expect(volChips[3].classList.contains("is-active")).toBe(true);
+  });
+
+  // ── Camera Sensitivity ─────────────────────────────────────────────────────
+
+  it("renders camera sensitivity buttons and highlights active sensitivity", () => {
+    ui.show("high", "normal", false, 0.5, "high");
+    const sensRow = document.querySelector(".graphics-settings__sens-row")!;
+    expect(sensRow).not.toBeNull();
+    const sensChips = sensRow.querySelectorAll<HTMLButtonElement>(".graphics-settings__chip-btn");
+    expect(sensChips).toHaveLength(3);
+    const active = sensRow.querySelector(".graphics-settings__chip-btn.is-active");
+    expect(active?.textContent).toContain("High");
+  });
+
+  it("calls onCameraSensitivityChange when sensitivity preset is clicked", () => {
+    const spy = vi.fn();
+    ui.onCameraSensitivityChange = spy;
+    ui.show("high", "normal", false, 0.5, "standard");
+
+    const sensRow = document.querySelector(".graphics-settings__sens-row")!;
+    const sensChips = sensRow.querySelectorAll<HTMLButtonElement>(".graphics-settings__chip-btn");
+    sensChips[0].click(); // low
+    expect(spy).toHaveBeenCalledWith("low");
+    expect(sensChips[0].classList.contains("is-active")).toBe(true);
+  });
+
+  // ── Status Bar ─────────────────────────────────────────────────────────────
+
+  it("displays live status feedback updates", () => {
+    ui.show("high");
+    const statusEl = document.querySelector(".graphics-settings__status-bar span")!;
+    expect(statusEl).not.toBeNull();
+    expect(statusEl.textContent).toBe("Ready");
+
+    ui.showStatus("Settings updated successfully");
+    expect(statusEl.textContent).toBe("Settings updated successfully");
+  });
 });
+

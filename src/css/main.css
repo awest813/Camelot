@@ -269,6 +269,9 @@ body::before {
 
 .character-create__name-wrap {
   grid-column: 1 / -1;
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 /* ── World Step ──────────────────────────────────────────────────────────── */
@@ -373,6 +376,58 @@ body::before {
   outline: 2px solid rgba(212, 160, 23, 0.85);
   outline-offset: 2px;
   border-color: rgba(212, 160, 23, 0.9);
+}
+
+.character-create__name-random-btn {
+  flex-shrink: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 160, 23, 0.7);
+  background: rgba(36, 26, 12, 0.9);
+  color: #f5dfa8;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.character-create__name-random-btn:hover,
+.character-create__name-random-btn:focus-visible {
+  border-color: rgba(240, 185, 45, 0.95);
+  background: rgba(60, 42, 18, 0.95);
+  color: #fff0c8;
+}
+
+.character-create__name-categories {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 2px;
+}
+
+.character-create__name-cat-btn {
+  border: 1px solid rgba(132, 108, 65, 0.45);
+  border-radius: 14px;
+  background: rgba(18, 13, 7, 0.75);
+  color: #c9b892;
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.character-create__name-cat-btn:hover {
+  border-color: rgba(212, 160, 23, 0.75);
+  color: #f3e5c3;
+}
+
+.character-create__name-cat-btn.is-active {
+  border-color: rgba(212, 160, 23, 0.95);
+  background: rgba(48, 34, 12, 0.95);
+  color: #fce8b2;
+  font-weight: 600;
 }
 
 .character-create__suggest-label {

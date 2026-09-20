@@ -60,12 +60,22 @@ describe("PickpocketUI", () => {
     expect(document.body.textContent).toContain("Nothing worth taking.");
   });
 
-  it("✕ hides and fires onClose (Escape stays in the game cascade)", () => {
+  it("✕ hides and fires onClose", () => {
     const onClose = vi.fn();
     ui.onClose = onClose;
     ui.show("Guard");
     const closeBtn = document.querySelector('[aria-label="Close pickpocket panel"]') as HTMLButtonElement;
     closeBtn.click();
+    expect(ui.isVisible).toBe(false);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("pressing Escape hides the dialog and calls onClose", () => {
+    const onClose = vi.fn();
+    ui.onClose = onClose;
+    ui.show("Guard");
+    const root = document.querySelector('[role="dialog"]')!;
+    root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     expect(ui.isVisible).toBe(false);
     expect(onClose).toHaveBeenCalledOnce();
   });

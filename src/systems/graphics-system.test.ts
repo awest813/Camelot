@@ -751,3 +751,57 @@ describe("GraphicsSystem.fromSavedOrAutoDetect with saved tier", () => {
     expect(gfx.tier).toBe("high");
   });
 });
+
+describe("TextureConfig across quality tiers", () => {
+  it("provides appropriate texture resolution and filtering for low tier", () => {
+    const gfx = new GraphicsSystem({ tier: "low" });
+    expect(gfx.texture.resolution).toBe(128);
+    expect(gfx.texture.anisotropicFiltering).toBe(1);
+    expect(gfx.texture.mipmaps).toBe(true);
+    expect(gfx.isValid).toBe(true);
+  });
+
+  it("provides appropriate texture resolution and filtering for medium tier", () => {
+    const gfx = new GraphicsSystem({ tier: "medium" });
+    expect(gfx.texture.resolution).toBe(128);
+    expect(gfx.texture.anisotropicFiltering).toBe(2);
+    expect(gfx.texture.mipmaps).toBe(true);
+  });
+
+  it("provides appropriate texture resolution and filtering for high tier", () => {
+    const gfx = new GraphicsSystem({ tier: "high" });
+    expect(gfx.texture.resolution).toBe(256);
+    expect(gfx.texture.anisotropicFiltering).toBe(4);
+    expect(gfx.texture.mipmaps).toBe(true);
+  });
+
+  it("provides appropriate texture resolution and filtering for ultra tier", () => {
+    const gfx = new GraphicsSystem({ tier: "ultra" });
+    expect(gfx.texture.resolution).toBe(256);
+    expect(gfx.texture.anisotropicFiltering).toBe(8);
+    expect(gfx.texture.mipmaps).toBe(true);
+  });
+
+  it("allows custom overrides of texture config", () => {
+    const gfx = new GraphicsSystem({
+      tier: "high",
+      texture: { resolution: 64, anisotropicFiltering: 2 },
+    });
+    expect(gfx.texture.resolution).toBe(64);
+    expect(gfx.texture.anisotropicFiltering).toBe(2);
+    expect(gfx.isValid).toBe(true);
+  });
+
+  it("detects invalid texture resolution in validation", () => {
+    const errors = validateGraphicsConfig({
+      shadow:      DEFAULT_SHADOW,
+      postProcess: DEFAULT_POST_PROCESS,
+      sky:         DEFAULT_SKY,
+      fog:         DEFAULT_FOG,
+      lighting:    DEFAULT_LIGHTING,
+      texture:     { resolution: 512 as any, anisotropicFiltering: 2, mipmaps: true },
+    });
+    expect(errors.some(e => e.includes("texture.resolution"))).toBe(true);
+  });
+});
+

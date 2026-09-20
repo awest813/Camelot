@@ -239,5 +239,15 @@ describe("StableUI", () => {
       const status = document.querySelector(".stable__status");
       expect(status?.classList.contains("stable__status--ok")).toBe(true);
     });
+
+    it("closes and calls onClose when Escape is pressed", () => {
+      const onClose = vi.fn();
+      ui.onClose = onClose;
+      ui.open("Stable Master", [makeHorse()], 500);
+      const root = document.querySelector(".stable") as HTMLElement;
+      root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(ui.isVisible).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 });

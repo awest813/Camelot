@@ -152,6 +152,15 @@ export class BarterUI {
     header.appendChild(closeBtn);
     root.appendChild(header);
 
+    root.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.hide();
+        this.onClose?.();
+      }
+    });
+
     // Two-column body
     const body = document.createElement("div");
     body.className = "barter-ui__body";

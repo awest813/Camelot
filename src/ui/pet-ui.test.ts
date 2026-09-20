@@ -325,5 +325,18 @@ describe("PetUI", () => {
       ui.open([makePet({ name: "Beta" })], null);
       expect(document.body.textContent).toContain("Beta");
     });
+
+    it("pressing Escape closes the panel and fires onClose", () => {
+      const onClose = vi.fn();
+      ui.onClose = onClose;
+      ui.open([makePet()], null);
+      expect(ui.isVisible).toBe(true);
+
+      const root = document.querySelector('[role="dialog"]')!;
+      root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+      expect(ui.isVisible).toBe(false);
+      expect(onClose).toHaveBeenCalledOnce();
+    });
   });
 });

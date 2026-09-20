@@ -137,6 +137,14 @@ export class StableUI {
     closeBtn.addEventListener("click", () => this.close());
     header.appendChild(closeBtn);
 
+    root.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.close();
+      }
+    });
+
     const gold = document.createElement("p");
     gold.className = "stable__gold";
     panel.appendChild(gold);

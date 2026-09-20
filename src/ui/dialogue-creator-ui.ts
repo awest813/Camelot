@@ -102,6 +102,15 @@ export class DialogueCreatorUI {
     // Footer
     root.appendChild(this._buildFooter());
 
+    // Escape closes the creator
+    root.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.close();
+      }
+    });
+
     document.body.appendChild(root);
     this._sync();
   }

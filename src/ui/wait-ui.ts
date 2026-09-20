@@ -244,6 +244,16 @@ export class WaitUI {
     footer.appendChild(cancelBtn);
 
     root.appendChild(footer);
+
+    root.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Escape" || e.key === "t" || e.key === "T") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.hide();
+        this.onClose?.();
+      }
+    });
+
     document.body.appendChild(root);
 
     this._root       = root;

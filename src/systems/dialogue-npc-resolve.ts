@@ -26,6 +26,12 @@ export function resolveDialogueIdForNpcMeshName(
   }
 
   if (/guard/i.test(meshName)) return "guard_intro";
+  if (/merchant|trader/i.test(meshName)) return "merchant_intro";
+  if (/innkeeper/i.test(meshName)) return "innkeeper_intro";
+  if (/barkeeper|bartender|tavern/i.test(meshName)) return "barkeeper_intro";
+  if (/alchemist|apothecary/i.test(meshName)) return "shopkeeper_alchemist_intro";
+  if (/armorer|blacksmith|smith/i.test(meshName)) return "shopkeeper_armor_intro";
+  if (/weapons|arms/i.test(meshName)) return "shopkeeper_weapons_intro";
 
   return null;
 }

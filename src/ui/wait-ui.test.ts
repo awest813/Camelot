@@ -450,5 +450,25 @@ describe("WaitUI", () => {
       const timeEl = document.querySelector(".wait-ui__time-value");
       expect(timeEl?.textContent).toBe("Day 2, 12:00");
     });
+
+    it("closes and calls onClose when Escape is pressed", () => {
+      const onClose = vi.fn();
+      ui.onClose = onClose;
+      ui.show();
+      const root = document.querySelector(".wait-ui") as HTMLElement;
+      root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(ui.isVisible).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("closes and calls onClose when T is pressed", () => {
+      const onClose = vi.fn();
+      ui.onClose = onClose;
+      ui.show();
+      const root = document.querySelector(".wait-ui") as HTMLElement;
+      root.dispatchEvent(new KeyboardEvent("keydown", { key: "t", bubbles: true }));
+      expect(ui.isVisible).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 });

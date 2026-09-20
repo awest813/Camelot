@@ -41,9 +41,20 @@ function styleButton(btn: HTMLButtonElement, label: string): void {
   btn.type = "button";
   Object.assign(btn.style, {
     background: C.BTN_BG, color: C.TEXT, border: `1px solid ${C.BORDER}`,
-    borderRadius: "4px", fontSize: "12px", padding: "4px 10px", cursor: "pointer",
+    borderRadius: "6px", fontSize: "12px", fontWeight: "600", padding: "5px 12px", cursor: "pointer",
+    transition: "background 0.15s, border-color 0.15s, color 0.15s",
   });
   btn.textContent = label;
+  btn.onmouseenter = () => {
+    btn.style.background = "rgba(60, 42, 14, 0.95)";
+    btn.style.borderColor = "#D4A017";
+    btn.style.color = "#fff4d6";
+  };
+  btn.onmouseleave = () => {
+    btn.style.background = C.BTN_BG;
+    btn.style.borderColor = C.BORDER;
+    btn.style.color = C.TEXT;
+  };
 }
 
 export class PickpocketUI {
@@ -91,12 +102,22 @@ export class PickpocketUI {
       const li = document.createElement("li");
       Object.assign(li.style, {
         display: "flex", justifyContent: "space-between", alignItems: "center",
-        gap: "8px", padding: "4px 0", listStyle: "none",
+        gap: "8px", padding: "6px 10px", listStyle: "none",
+        borderRadius: "6px", background: "rgba(18, 13, 6, 0.7)", border: "1px solid rgba(212, 160, 23, 0.15)",
+        marginBottom: "4px", transition: "background 0.15s, border-color 0.15s",
       });
+      li.onmouseenter = () => {
+        li.style.background = "rgba(212, 160, 23, 0.14)";
+        li.style.borderColor = "rgba(212, 160, 23, 0.4)";
+      };
+      li.onmouseleave = () => {
+        li.style.background = "rgba(18, 13, 6, 0.7)";
+        li.style.borderColor = "rgba(212, 160, 23, 0.15)";
+      };
       li.setAttribute("data-item-id", item.id);
 
       const nameEl = document.createElement("span");
-      Object.assign(nameEl.style, { color: C.TEXT, fontSize: "13px" });
+      Object.assign(nameEl.style, { color: C.TEXT, fontSize: "13px", fontWeight: "500" });
       const icon = getItemIcon({ id: item.id, name: item.name });
       nameEl.textContent = `${icon} ${item.name}`;
       li.appendChild(nameEl);
@@ -135,11 +156,15 @@ export class PickpocketUI {
     if (this._root || typeof document === "undefined") return;
 
     const root = document.createElement("div");
+    root.className = "pickpocket-ui";
     Object.assign(root.style, {
-      position: "fixed", zIndex: "60", left: "50%", top: "50%",
-      transform: "translate(-50%, -50%)", minWidth: "320px", maxWidth: "420px",
-      background: C.BG, border: `2px solid ${C.BORDER}`, borderRadius: "8px",
-      padding: "14px 16px", display: "none", flexDirection: "column", gap: "8px",
+      position: "fixed", zIndex: "1200", left: "50%", top: "50%",
+      transform: "translate(-50%, -50%)", minWidth: "340px", maxWidth: "440px",
+      background: C.BG, border: `1px solid ${C.BORDER}`, borderRadius: "10px",
+      boxShadow: "0 20px 60px rgba(0, 0, 0, 0.85), 0 0 0 100vmax rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 230, 180, 0.1)",
+      backdropFilter: "blur(4px)",
+      padding: "16px 18px", display: "none", flexDirection: "column", gap: "10px",
+      fontFamily: "Inter, 'Segoe UI', Roboto, sans-serif",
     });
     root.setAttribute("role", "dialog");
     root.setAttribute("aria-modal", "true");
@@ -149,10 +174,11 @@ export class PickpocketUI {
     const header = document.createElement("div");
     Object.assign(header.style, {
       display: "flex", justifyContent: "space-between", alignItems: "center",
+      borderBottom: "1px solid rgba(212, 160, 23, 0.25)", paddingBottom: "8px",
     });
 
     const title = document.createElement("h2");
-    Object.assign(title.style, { margin: "0", color: C.TITLE, fontSize: "15px" });
+    Object.assign(title.style, { margin: "0", color: C.TITLE, fontSize: "16px", fontFamily: "'Cinzel', serif", letterSpacing: "0.5px" });
     header.appendChild(title);
 
     const closeBtn = document.createElement("button");
@@ -174,6 +200,14 @@ export class PickpocketUI {
     Object.assign(hint.style, { margin: "0", fontSize: "10px", color: C.DIM });
     hint.textContent = "[Esc] to close  ·  Getting caught is a crime";
     root.appendChild(hint);
+
+    root.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        this.hide();
+        this.onClose?.();
+      }
+    });
 
     document.body.appendChild(root);
     this._root    = root;

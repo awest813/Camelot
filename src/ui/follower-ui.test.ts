@@ -100,4 +100,19 @@ describe("FollowerUI", () => {
       expect(fn).not.toHaveBeenCalled();
     });
   });
+
+  describe("keyboard dismissal", () => {
+    it("pressing Escape closes the panel and fires onClose", () => {
+      const onClose = vi.fn();
+      ui.onClose = onClose;
+      ui.open(mockTemplates, null, [], 1000);
+      expect(ui.isVisible).toBe(true);
+
+      const root = document.querySelector('[role="dialog"]')!;
+      root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+      expect(ui.isVisible).toBe(false);
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+  });
 });

@@ -258,6 +258,26 @@ describe("FastTravelUI", () => {
       closeBtn?.click();
       expect(onClose).toHaveBeenCalledOnce();
     });
+
+    it("closes and calls onClose when Escape is pressed", () => {
+      const onClose = vi.fn();
+      ui.onClose = onClose;
+      ui.open(SAMPLE_OPTIONS);
+      const root = document.querySelector(".fast-travel") as HTMLElement;
+      root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(ui.isVisible).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("closes and calls onClose when Y is pressed", () => {
+      const onClose = vi.fn();
+      ui.onClose = onClose;
+      ui.open(SAMPLE_OPTIONS);
+      const root = document.querySelector(".fast-travel") as HTMLElement;
+      root.dispatchEvent(new KeyboardEvent("keydown", { key: "y", bubbles: true }));
+      expect(ui.isVisible).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ── Destination selection ─────────────────────────────────────────────────────

@@ -12,6 +12,9 @@ import { ObjectPool } from "../systems/object-pool";
 import type { WorldSeed } from "./world-seed";
 import { ChunkManager } from "../systems/chunks/ChunkManager";
 import type { Chunk, ChunkAdapter, ChunkSource, Vec2Like } from "../systems/chunks/ChunkTypes";
+import { ProceduralTextureManager } from "../systems/procedural-texture-manager";
+import type { TextureConfig } from "../systems/graphics-system";
+import type { LodSystem } from "../systems/lod-system";
 
 export type WorldChunkData = {
   biome: BiomeType;
@@ -38,8 +41,30 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
   /** Manages procedural structures (ruins, shrines, towers) per chunk. */
   public structures: StructureManager;
 
+  /** Procedural texture generator and cache for biomes and structures. */
+  public readonly textureManager: ProceduralTextureManager;
+
   /** Decoupled chunk lifecycle manager. */
   private _chunkManager: ChunkManager<WorldChunkData>;
+
+  /** Optional LOD system for distance culling vegetation and structures. */
+  public lodSystem: LodSystem | null = null;
+
+  /**
+   * Attach or detach a LodSystem.  Configures structure culling and
+   * retroactively registers any already-loaded chunk vegetation.
+   */
+  public setLodSystem(lod: LodSystem | null): void {
+    this.lodSystem = lod;
+    this.structures.lodSystem = lod;
+    if (lod) {
+      for (const veg of this.chunkVegetation.values()) {
+        for (const m of veg) {
+          lod.register(m, lod.getConfig().distanceThresholds.far);
+        }
+      }
+    }
+  }
 
   /**
    * Fires immediately after a chunk finishes being built and registered.
@@ -74,11 +99,17 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
    */
   private _seed: WorldSeed | null;
 
-  constructor(scene: Scene, shadowGenerator: ShadowGenerator | null = null, seed: WorldSeed | null = null) {
+  constructor(
+    scene: Scene,
+    shadowGenerator: ShadowGenerator | null = null,
+    seed: WorldSeed | null = null,
+    textureConfig?: TextureConfig,
+  ) {
     this.scene = scene;
     this._shadows = shadowGenerator;
     this._seed = seed;
-    this.structures = new StructureManager(scene, shadowGenerator, seed);
+    this.textureManager = new ProceduralTextureManager(scene, textureConfig);
+    this.structures = new StructureManager(scene, shadowGenerator, seed, this.textureManager);
 
     this._chunkManager = new ChunkManager<WorldChunkData>(this, this, {
       chunkSize: this.chunkSize,
@@ -171,6 +202,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     const veg = this.chunkVegetation.get(key);
     if (veg) {
       for (const m of veg) {
+        this.lodSystem?.unregister(m);
         this._removeShadowCaster(m);
         m.dispose(false, false);
       }
@@ -195,6 +227,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       const veg = this.chunkVegetation.get(key);
       if (veg) {
         for (const m of veg) {
+          this.lodSystem?.unregister(m);
           this._removeShadowCaster(m);
           m.dispose(false, false);
         }
@@ -205,6 +238,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     }
     this.loadedChunks.clear();
     this.chunkVegetation.clear();
+    this.textureManager.dispose();
   }
 
   /**
@@ -260,6 +294,11 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     );
     if (vegMeshes.length > 0) {
       this.chunkVegetation.set(key, vegMeshes);
+      if (this.lodSystem) {
+        for (const m of vegMeshes) {
+          this.lodSystem.register(m, this.lodSystem.getConfig().distanceThresholds.far);
+        }
+      }
     }
 
     // Spawn a structure for this chunk (ruins, shrine, or tower based on biome)
@@ -302,7 +341,18 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       material.diffuseColor  = cols.diffuse;
       material.specularColor = cols.specular;
       material.specularPower = cols.specularPower;
-      material.freeze();
+
+      // Attach tileable procedural ground texture
+      const tex = this.textureManager.getBiomeTexture(biome, 128);
+      if (tex) {
+        tex.uScale = 8;
+        tex.vScale = 8;
+        material.diffuseTexture = tex;
+      }
+
+      if (typeof (material as any).freeze === "function") {
+        material.freeze();
+      }
       this.biomeMaterials.set(biome, material);
     }
 
@@ -315,7 +365,17 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       this.treeTrunkMaterial.diffuseColor  = new Color3(0.34, 0.19, 0.06);
       this.treeTrunkMaterial.specularColor = new Color3(0.06, 0.04, 0.01);
       this.treeTrunkMaterial.specularPower = 12;
-      this.treeTrunkMaterial.freeze();
+
+      const tex = this.textureManager.getStructureTexture("bark_timber", 128);
+      if (tex) {
+        tex.uScale = 1;
+        tex.vScale = 3;
+        this.treeTrunkMaterial.diffuseTexture = tex;
+      }
+
+      if (typeof (this.treeTrunkMaterial as any).freeze === "function") {
+        this.treeTrunkMaterial.freeze();
+      }
     }
 
     return this.treeTrunkMaterial;
@@ -337,7 +397,17 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       }
       material.specularColor = new Color3(0.05, 0.10, 0.04);
       material.specularPower = 18;
-      material.freeze();
+
+      const tex = this.textureManager.getStructureTexture("foliage_canopy", 128);
+      if (tex) {
+        tex.uScale = 2;
+        tex.vScale = 2;
+        material.diffuseTexture = tex;
+      }
+
+      if (typeof (material as any).freeze === "function") {
+        material.freeze();
+      }
       this.treeCrownMaterials.set(key as any, material);
     }
 
@@ -725,7 +795,15 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.diffuseColor  = new Color3(0.35, 0.34, 0.30);
       m.specularColor = new Color3(0.08, 0.08, 0.06);
       m.specularPower = 16;
-      m.freeze();
+      const tex = this.textureManager.getStructureTexture("mossy_stone", 128);
+      if (tex) {
+        tex.uScale = 2;
+        tex.vScale = 2;
+        m.diffuseTexture = tex;
+      }
+      if (typeof (m as any).freeze === "function") {
+        m.freeze();
+      }
       return m;
     });
 
@@ -755,7 +833,15 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.diffuseColor  = new Color3(0.48, 0.43, 0.36);
       m.specularColor = new Color3(0.14, 0.13, 0.10);
       m.specularPower = 28;
-      m.freeze();
+      const tex = this.textureManager.getStructureTexture("stone_ruins", 128);
+      if (tex) {
+        tex.uScale = 1;
+        tex.vScale = 3;
+        m.diffuseTexture = tex;
+      }
+      if (typeof (m as any).freeze === "function") {
+        m.freeze();
+      }
       return m;
     });
 
@@ -782,7 +868,15 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.diffuseColor  = new Color3(0.36, 0.42, 0.28);
       m.specularColor = new Color3(0.06, 0.08, 0.04);
       m.specularPower = 16;
-      m.freeze();
+      const tex = this.textureManager.getStructureTexture("mossy_stone", 128);
+      if (tex) {
+        tex.uScale = 1;
+        tex.vScale = 1;
+        m.diffuseTexture = tex;
+      }
+      if (typeof (m as any).freeze === "function") {
+        m.freeze();
+      }
       return m;
     });
     cap.metadata = { castsShadow: true };
@@ -850,7 +944,15 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.diffuseColor  = new Color3(0.52, 0.38, 0.18);
       m.specularColor = new Color3(0.10, 0.07, 0.03);
       m.specularPower = 14;
-      m.freeze();
+      const tex = this.textureManager.getStructureTexture("bark_timber", 128);
+      if (tex) {
+        tex.uScale = 1;
+        tex.vScale = 4;
+        m.diffuseTexture = tex;
+      }
+      if (typeof (m as any).freeze === "function") {
+        m.freeze();
+      }
       return m;
     });
     const frondMat = this._envMat("palm_frond", () => {
@@ -858,7 +960,15 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.diffuseColor  = new Color3(0.18, 0.54, 0.12);
       m.specularColor = new Color3(0.06, 0.14, 0.04);
       m.specularPower = 20;
-      m.freeze();
+      const tex = this.textureManager.getStructureTexture("foliage_canopy", 128);
+      if (tex) {
+        tex.uScale = 2;
+        tex.vScale = 2;
+        m.diffuseTexture = tex;
+      }
+      if (typeof (m as any).freeze === "function") {
+        m.freeze();
+      }
       return m;
     });
     const trunkH   = 5.5;
@@ -908,7 +1018,15 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.diffuseColor  = new Color3(0.14, 0.11, 0.10);
       m.specularColor = new Color3(0.06, 0.05, 0.04);
       m.specularPower = 10;
-      m.freeze();
+      const tex = this.textureManager.getStructureTexture("bark_timber", 128);
+      if (tex) {
+        tex.uScale = 1;
+        tex.vScale = 2;
+        m.diffuseTexture = tex;
+      }
+      if (typeof (m as any).freeze === "function") {
+        m.freeze();
+      }
       return m;
     });
 
@@ -965,7 +1083,15 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.diffuseColor  = new Color3(0.56, 0.54, 0.58);
       m.specularColor = new Color3(0.16, 0.16, 0.20);
       m.specularPower = 24;
-      m.freeze();
+      const tex = this.textureManager.getStructureTexture("stone_ruins", 128);
+      if (tex) {
+        tex.uScale = 2;
+        tex.vScale = 2;
+        m.diffuseTexture = tex;
+      }
+      if (typeof (m as any).freeze === "function") {
+        m.freeze();
+      }
       return m;
     });
     boulder.metadata = { castsShadow: true };
@@ -983,7 +1109,15 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.diffuseColor  = new Color3(0.90, 0.92, 0.96);
       m.specularColor = new Color3(0.50, 0.52, 0.58);
       m.specularPower = 64;
-      m.freeze();
+      const tex = this.textureManager.getBiomeTexture("tundra", 128);
+      if (tex) {
+        tex.uScale = 2;
+        tex.vScale = 2;
+        m.diffuseTexture = tex;
+      }
+      if (typeof (m as any).freeze === "function") {
+        m.freeze();
+      }
       return m;
     });
     cap.receiveShadows = true;

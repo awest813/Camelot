@@ -114,7 +114,28 @@ export interface LightingConfig {
   sunBase: number;
 }
 
+// ── Texture configuration ───────────────────────────────────────────────────
+
+/**
+ * Texture quality and filtering configuration.
+ */
+export interface TextureConfig {
+  /** Resolution for procedural world and material textures. */
+  resolution: 64 | 128 | 256;
+  /** Anisotropic filtering level (1 = off, 2-8 = anisotropic filtering). */
+  anisotropicFiltering: number;
+  /** Whether to generate mipmaps for textures. */
+  mipmaps: boolean;
+}
+
 // ── Default presets ───────────────────────────────────────────────────────────
+
+/** Default texture configuration used by the game. */
+export const DEFAULT_TEXTURE: TextureConfig = {
+  resolution: 256,
+  anisotropicFiltering: 4,
+  mipmaps: true,
+};
 
 /** Default shadow map configuration used by the game. */
 export const DEFAULT_SHADOW: ShadowConfig = {
@@ -193,6 +214,7 @@ export function validateGraphicsConfig(config: {
   sky:         SkyConfig;
   fog:         FogConfig;
   lighting:    LightingConfig;
+  texture?:    TextureConfig;
 }): string[] {
   const errors: string[] = [];
 
@@ -281,6 +303,16 @@ export function validateGraphicsConfig(config: {
     errors.push(`lighting.sunBase must be > 0, got ${config.lighting.sunBase}`);
   }
 
+  // ── Texture ───────────────────────────────────────────────────────────────
+  if (config.texture) {
+    if (![64, 128, 256].includes(config.texture.resolution)) {
+      errors.push(`texture.resolution must be 64, 128, or 256, got ${config.texture.resolution}`);
+    }
+    if (!Number.isFinite(config.texture.anisotropicFiltering) || config.texture.anisotropicFiltering < 1) {
+      errors.push(`texture.anisotropicFiltering must be >= 1, got ${config.texture.anisotropicFiltering}`);
+    }
+  }
+
   return errors;
 }
 
@@ -334,6 +366,7 @@ export interface TierPreset {
   fog:         FogConfig;
   lighting:    LightingConfig;
   performance: PerformanceConfig;
+  texture:     TextureConfig;
 }
 
 /**
@@ -383,6 +416,11 @@ export const LOW_TIER_PRESET: TierPreset = {
     maxParticles:         64,
     targetFps:            30,
   },
+  texture: {
+    resolution:           128,
+    anisotropicFiltering: 1,
+    mipmaps:              true,
+  },
 };
 
 /** Medium preset — 4-8 GB RAM, mid-range iGPU/entry dGPU. */
@@ -410,6 +448,11 @@ export const MEDIUM_TIER_PRESET: TierPreset = {
     maxParticles:         256,
     targetFps:            60,
   },
+  texture: {
+    resolution:           128,
+    anisotropicFiltering: 2,
+    mipmaps:              true,
+  },
 };
 
 /** High preset — matches the existing DEFAULT_* values. */
@@ -428,6 +471,11 @@ export const HIGH_TIER_PRESET: TierPreset = {
     postProcessEnabled:   true,
     maxParticles:         512,
     targetFps:            60,
+  },
+  texture: {
+    resolution:           256,
+    anisotropicFiltering: 4,
+    mipmaps:              true,
   },
 };
 
@@ -461,6 +509,11 @@ export const ULTRA_TIER_PRESET: TierPreset = {
     postProcessEnabled:   true,
     maxParticles:         1024,
     targetFps:            60,
+  },
+  texture: {
+    resolution:           256,
+    anisotropicFiltering: 8,
+    mipmaps:              true,
   },
 };
 
@@ -572,6 +625,7 @@ export class GraphicsSystem {
   public readonly fog:         FogConfig;
   public readonly lighting:    LightingConfig;
   public readonly performance: PerformanceConfig;
+  public readonly texture:     TextureConfig;
   public readonly tier:        QualityTier;
 
   constructor(overrides: {
@@ -590,6 +644,7 @@ export class GraphicsSystem {
     fog?:         Partial<FogConfig>;
     lighting?:    Partial<LightingConfig>;
     performance?: Partial<PerformanceConfig>;
+    texture?:     Partial<TextureConfig>;
   } = {}) {
     this.tier = overrides.tier ?? "high";
     const base = overrides.tier ? presetForTier(overrides.tier) : {
@@ -598,6 +653,7 @@ export class GraphicsSystem {
       fog:         DEFAULT_FOG,
       lighting:    DEFAULT_LIGHTING,
       performance: HIGH_TIER_PRESET.performance,
+      texture:     DEFAULT_TEXTURE,
     };
 
     this.shadow = { ...base.shadow, ...overrides.shadow };
@@ -619,6 +675,7 @@ export class GraphicsSystem {
     };
     this.lighting    = { ...base.lighting,    ...overrides.lighting };
     this.performance = { ...base.performance, ...overrides.performance };
+    this.texture     = { ...base.texture,     ...overrides.texture };
   }
 
   /**
@@ -660,6 +717,7 @@ export class GraphicsSystem {
       sky:         this.sky,
       fog:         this.fog,
       lighting:    this.lighting,
+      texture:     this.texture,
     });
   }
 

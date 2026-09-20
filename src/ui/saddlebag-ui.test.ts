@@ -143,5 +143,15 @@ describe("SaddlebagUI", () => {
       const status = document.querySelector(".saddlebag__status");
       expect(status?.textContent).toBe("Item taken.");
     });
+
+    it("closes and calls onClose when Escape is pressed", () => {
+      const onClose = vi.fn();
+      ui.onClose = onClose;
+      ui.open("Shadowmere", [], 0, 10);
+      const root = document.querySelector(".saddlebag") as HTMLElement;
+      root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(ui.isVisible).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 });

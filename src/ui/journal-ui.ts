@@ -199,6 +199,15 @@ export class JournalUI {
     });
     header.appendChild(closeBtn);
 
+    root.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.hide();
+        this.onClose?.();
+      }
+    });
+
     // ── Category tab bar ──────────────────────────────────────────────────────
     const tabBar = document.createElement("div");
     tabBar.className = "journal-ui__tabs";

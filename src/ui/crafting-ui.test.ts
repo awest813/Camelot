@@ -698,4 +698,14 @@ describe("CraftingUI — detail pane: quality, station, tier", () => {
     const tierEl = document.querySelector(".crafting-ui__detail-tier");
     expect(tierEl).toBeNull();
   });
+
+  it("closes and calls onClose when Escape is pressed", () => {
+    const onClose = vi.fn();
+    ui.onClose = onClose;
+    ui.show();
+    const root = document.querySelector(".crafting-ui") as HTMLElement;
+    root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(ui.isVisible).toBe(false);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

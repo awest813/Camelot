@@ -445,5 +445,25 @@ describe("SpellMakingUI", () => {
       ui.open();
       expect(ui.isVisible).toBe(true);
     });
+
+    it("closes and calls onClose when Escape is pressed", () => {
+      const onClose = vi.fn();
+      ui.onClose = onClose;
+      ui.open();
+      const root = document.querySelector(".spell-making") as HTMLElement;
+      root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(ui.isVisible).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("closes and calls onClose when X is pressed outside input", () => {
+      const onClose = vi.fn();
+      ui.onClose = onClose;
+      ui.open();
+      const root = document.querySelector(".spell-making") as HTMLElement;
+      root.dispatchEvent(new KeyboardEvent("keydown", { key: "x", bubbles: true }));
+      expect(ui.isVisible).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 });

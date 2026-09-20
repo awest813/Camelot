@@ -10,6 +10,8 @@ export class AudioSystem {
   private _masterGain: GainNode;
   private _noiseBuffer: AudioBuffer;
 
+  private _masterVolume: number = 0.4;
+
   public isMuted: boolean = false;
 
   // Footstep state
@@ -25,7 +27,7 @@ export class AudioSystem {
         .webkitAudioContext ?? AudioContext;
     this._ctx = new Ctx();
     this._masterGain = this._ctx.createGain();
-    this._masterGain.gain.value = 0.4;
+    this._masterGain.gain.value = this._masterVolume;
     this._masterGain.connect(this._ctx.destination);
 
     // Pre-bake a 2-second white-noise buffer reused by all noise sounds
@@ -36,10 +38,25 @@ export class AudioSystem {
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
+  public get masterVolume(): number {
+    return this._masterVolume;
+  }
+
+  public setMasterVolume(volume: number): void {
+    const clamped = Math.max(0, Math.min(1, volume));
+    this._masterVolume = clamped;
+    if (!this.isMuted) {
+      this._masterGain.gain.linearRampToValueAtTime(
+        clamped,
+        this._ctx.currentTime + 0.05
+      );
+    }
+  }
+
   public toggleMute(): void {
     this.isMuted = !this.isMuted;
     this._masterGain.gain.linearRampToValueAtTime(
-      this.isMuted ? 0 : 0.4,
+      this.isMuted ? 0 : this._masterVolume,
       this._ctx.currentTime + 0.05
     );
   }

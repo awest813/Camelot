@@ -139,6 +139,14 @@ export class SpellMakingUI {
     closeBtn.addEventListener("click", () => this.close());
     header.appendChild(closeBtn);
 
+    root.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Escape" || ((e.key === "x" || e.key === "X") && document.activeElement !== this._nameInput)) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.close();
+      }
+    });
+
     const nameField = document.createElement("label");
     nameField.className = "spell-making__field";
     const nameLabel = document.createElement("span");

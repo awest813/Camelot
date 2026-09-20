@@ -236,15 +236,29 @@ export class ProjectileSystem {
     );
   }
 
+  private _sharedArrowMaterial?: StandardMaterial;
+
+  private _getArrowMaterial(): StandardMaterial {
+    const isDisposed = typeof (this._sharedArrowMaterial as any)?.isDisposed === "function"
+      ? (this._sharedArrowMaterial as any).isDisposed()
+      : false;
+    if (!this._sharedArrowMaterial || isDisposed) {
+      this._sharedArrowMaterial = new StandardMaterial("arrowMat_pooled_shared", this._scene);
+      this._sharedArrowMaterial.diffuseColor = new Color3(0.6, 0.45, 0.2);
+      if (typeof (this._sharedArrowMaterial as any).freeze === "function") {
+        this._sharedArrowMaterial.freeze();
+      }
+    }
+    return this._sharedArrowMaterial;
+  }
+
   private _createArrowMesh(): PooledArrow {
     const mesh = MeshBuilder.CreateCylinder(
       `arrow_pooled_${Date.now()}_${Math.random()}`,
       { diameter: 0.05, height: 0.6, tessellation: 4 },
       this._scene,
     );
-    const mat = new StandardMaterial(`arrowMat_pooled_${Date.now()}`, this._scene);
-    mat.diffuseColor = new Color3(0.6, 0.45, 0.2);
-    mesh.material = mat;
+    mesh.material = this._getArrowMaterial();
     const aggregate = new PhysicsAggregate(
       mesh,
       PhysicsShapeType.CYLINDER,

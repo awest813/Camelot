@@ -375,4 +375,58 @@ describe("LodSystem", () => {
     // All 3 level meshes are beyond their maxDistance → all hidden
     expect(culled).toBe(3);
   });
+
+  describe("setQuality()", () => {
+    it("configures aggressive culling for low tier", () => {
+      lod.setQuality("low");
+      const config = lod.getConfig();
+      expect(config.updateEveryNFrames).toBe(3);
+      expect(config.maxCulledPerFrame).toBe(150);
+      expect(config.distanceThresholds.ultraFar).toBe(140);
+      expect(config.distanceThresholds.far).toBe(90);
+    });
+
+    it("configures balanced culling for medium tier", () => {
+      lod.setQuality("medium");
+      const config = lod.getConfig();
+      expect(config.updateEveryNFrames).toBe(4);
+      expect(config.distanceThresholds.ultraFar).toBe(200);
+    });
+
+    it("configures standard culling for high tier", () => {
+      lod.setQuality("high");
+      const config = lod.getConfig();
+      expect(config.updateEveryNFrames).toBe(5);
+      expect(config.distanceThresholds.ultraFar).toBe(250);
+    });
+
+    it("configures long distance culling for ultra tier", () => {
+      lod.setQuality("ultra");
+      const config = lod.getConfig();
+      expect(config.updateEveryNFrames).toBe(6);
+      expect(config.maxCulledPerFrame).toBe(80);
+      expect(config.distanceThresholds.ultraFar).toBe(350);
+    });
+  });
+
+  it("uses boundingSphere.centerWorld when present on mesh", () => {
+    const mesh = makeMesh(0, 0, 0) as any;
+    // Local mesh.position is (0,0,0) like a merged mesh, but centerWorld is at (200, 0, 0)
+    mesh.getBoundingInfo = () => ({
+      boundingSphere: {
+        centerWorld: new Vector3(200, 0, 0),
+        radiusWorld: 5,
+        radius: 5,
+      },
+    });
+    lod.register(mesh, 100);
+    // Player at origin: distance to centerWorld (200) > cullDistance (100) -> should be culled
+    lod.update(PLAYER_ORIGIN);
+    expect(mesh.isVisible).toBe(false);
+
+    // If player moves to (190, 0, 0): distance to centerWorld (10) < cullDistance (100) -> visible
+    lod.update(new Vector3(190, 0, 0));
+    expect(mesh.isVisible).toBe(true);
+  });
 });
+

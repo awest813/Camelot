@@ -12,6 +12,9 @@ import { NPC } from "../entities/npc";
 import { Loot } from "../entities/loot";
 import { BiomeType } from "./world-manager";
 import type { WorldSeed } from "./world-seed";
+import type { ProceduralTextureManager } from "../systems/procedural-texture-manager";
+import type { RawTexture } from "@babylonjs/core/Materials/Textures/rawTexture";
+import type { LodSystem } from "../systems/lod-system";
 
 interface StructureSpawn {
   meshes: Mesh[];
@@ -30,6 +33,9 @@ export class StructureManager {
   private _scene: Scene;
   /** Maps chunk key ("cx,cz") to the structure spawned there. */
   private _chunkStructures: Map<string, StructureSpawn> = new Map();
+
+  /** Optional LOD system for distance culling structure meshes. */
+  public lodSystem: LodSystem | null = null;
 
   /**
    * Shared material pool — one material per structural type rather than one
@@ -58,11 +64,19 @@ export class StructureManager {
 
   /** Optional shadow generator — structure meshes are registered as casters. */
   private readonly _shadows: ShadowGenerator | null;
+  /** Optional procedural texture manager for structural surface textures. */
+  private readonly _textureManager?: ProceduralTextureManager;
 
-  constructor(scene: Scene, shadowGenerator: ShadowGenerator | null = null, seed: WorldSeed | null = null) {
+  constructor(
+    scene: Scene,
+    shadowGenerator: ShadowGenerator | null = null,
+    seed: WorldSeed | null = null,
+    textureManager?: ProceduralTextureManager,
+  ) {
     this._scene = scene;
     this._shadows = shadowGenerator;
     this._seed = seed;
+    this._textureManager = textureManager;
   }
 
   /**
@@ -124,7 +138,24 @@ export class StructureManager {
     this._chunkStructures.set(key, spawn);
 
     // Static masonry — freeze world matrices so Babylon skips per-frame updates
-    for (const m of spawn.meshes) m.freezeWorldMatrix();
+    for (const m of spawn.meshes) {
+      m.freezeWorldMatrix();
+      if (this.lodSystem) {
+        this.lodSystem.register(m, this.lodSystem.getConfig().distanceThresholds.ultraFar);
+      }
+    }
+    if (this.lodSystem) {
+      for (const l of spawn.loot) {
+        if (l.mesh) {
+          this.lodSystem.register(l.mesh, this.lodSystem.getConfig().distanceThresholds.near);
+        }
+      }
+      for (const npc of spawn.npcs) {
+        if (npc.mesh) {
+          this.lodSystem.register(npc.mesh, this.lodSystem.getConfig().distanceThresholds.medium);
+        }
+      }
+    }
   }
 
   /**
@@ -135,12 +166,17 @@ export class StructureManager {
     for (const [, spawn] of this._chunkStructures) {
       for (const body of spawn.bodies) body.dispose();
       for (const m of spawn.meshes) {
+        this.lodSystem?.unregister(m);
         this._shadows?.removeShadowCaster(m, false);
         m.dispose(false, false);
       }
-      for (const l of spawn.loot) l.dispose();
+      for (const l of spawn.loot) {
+        if (l.mesh) this.lodSystem?.unregister(l.mesh);
+        l.dispose();
+      }
       for (const l of spawn.lights) l.dispose();
       for (const npc of spawn.npcs) {
+        if (npc.mesh) this.lodSystem?.unregister(npc.mesh);
         this.onNPCRemove?.(npc);
         npc.mesh.dispose();
       }
@@ -173,10 +209,14 @@ export class StructureManager {
     for (const body of spawn.bodies) body.dispose();
     // Materials are shared across all structure instances — preserve them
     for (const m of spawn.meshes) {
+      this.lodSystem?.unregister(m);
       this._shadows?.removeShadowCaster(m, false);
       m.dispose(false, false);
     }
-    for (const l of spawn.loot) l.dispose();
+    for (const l of spawn.loot) {
+      if (l.mesh) this.lodSystem?.unregister(l.mesh);
+      l.dispose();
+    }
     // Torches/campfires own a PointLight each — dispose or scene.lights grows forever
     for (const l of spawn.lights) l.dispose();
     spawn.lights.length = 0;
@@ -793,7 +833,27 @@ export class StructureManager {
       if (opts?.emissive)        mat.emissiveColor    = opts.emissive;
       if (opts?.disableLighting) mat.disableLighting  = true;
       if (opts?.backFaceCulling === false) mat.backFaceCulling = false;
-      mat.freeze();
+
+      // Attach procedural masonry or timber textures when texture manager is active
+      if (this._textureManager) {
+        let tex: RawTexture | null = null;
+        if (name.includes("ruins")) {
+          tex = this._textureManager.getStructureTexture("stone_ruins", 128);
+        } else if (name.includes("shrine") || name.includes("sandstone")) {
+          tex = this._textureManager.getStructureTexture("desert_sandstone", 128);
+        } else if (name.includes("tower") || name.includes("wood") || name.includes("timber")) {
+          tex = this._textureManager.getStructureTexture("watchtower_timber", 128);
+        }
+        if (tex) {
+          tex.uScale = 2;
+          tex.vScale = 2;
+          mat.diffuseTexture = tex;
+        }
+      }
+
+      if (typeof (mat as any).freeze === "function") {
+        mat.freeze();
+      }
       this._sharedMaterials.set(name, mat);
     }
     return mat;

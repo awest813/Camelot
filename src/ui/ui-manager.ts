@@ -110,6 +110,7 @@ export class UIManager {
   public loadButton: Button;
   public exportButton: Button;
   public importButton: Button;
+  public settingsButton: Button;
   public quitButton: Button;
 
   private _hpPulseObs: any = null;
@@ -607,7 +608,7 @@ export class UIManager {
     // Central card
     const card = new Rectangle();
     card.width = "340px";
-    card.height = "560px";
+    card.height = "620px";
     card.cornerRadius = 10;
     card.color = T.PANEL_BORDER;
     card.thickness = 2;
@@ -646,12 +647,13 @@ export class UIManager {
     divider.paddingBottom = "14px";
     panel.addControl(divider);
 
-    this.resumeButton = this._createButton("Resume",        panel);
-    this.saveButton   = this._createButton("Save Game",     panel);
-    this.loadButton   = this._createButton("Load Game",     panel);
-    this.exportButton = this._createButton("Export Save",   panel);
-    this.importButton = this._createButton("Import Save…",  panel);
-    this.quitButton   = this._createButton("Quit to Menu",  panel);
+    this.resumeButton   = this._createButton("Resume",        panel);
+    this.saveButton     = this._createButton("Save Game",     panel);
+    this.loadButton     = this._createButton("Load Game",     panel);
+    this.exportButton   = this._createButton("Export Save",   panel);
+    this.importButton   = this._createButton("Import Save…",  panel);
+    this.settingsButton = this._createButton("Settings",      panel);
+    this.quitButton     = this._createButton("Quit to Menu",  panel);
   }
 
   private _initQuestLogUI(): void {

@@ -159,4 +159,16 @@ describe('UIManager', () => {
             expect(uiManager.crosshair.isVisible).toBe(true);
         });
     });
+
+    describe('pause menu', () => {
+        it('initializes all pause menu buttons including settingsButton', () => {
+            expect(uiManager.resumeButton).toBeDefined();
+            expect(uiManager.saveButton).toBeDefined();
+            expect(uiManager.loadButton).toBeDefined();
+            expect(uiManager.exportButton).toBeDefined();
+            expect(uiManager.importButton).toBeDefined();
+            expect(uiManager.settingsButton).toBeDefined();
+            expect(uiManager.quitButton).toBeDefined();
+        });
+    });
 });

@@ -340,5 +340,15 @@ describe("JournalUI", () => {
       closeBtn?.click();
       expect(ui.isVisible).toBe(false);
     });
+
+    it("closes and calls onClose when Escape is pressed", () => {
+      const onClose = vi.fn();
+      ui.onClose = onClose;
+      ui.show();
+      const root = document.querySelector(".journal-ui") as HTMLElement;
+      root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(ui.isVisible).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 });

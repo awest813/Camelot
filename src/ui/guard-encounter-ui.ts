@@ -135,6 +135,14 @@ export class GuardEncounterUI {
     this._persuadeBtn = makeBtn("Persuade", "persuade");
     makeBtn("Resist Arrest", "resist_arrest", "guard-encounter__btn guard-encounter__btn--danger");
 
+    root.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.onResolve?.("resist_arrest");
+      }
+    });
+
     document.body.appendChild(root);
     this._root = root;
   }

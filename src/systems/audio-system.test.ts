@@ -185,4 +185,15 @@ describe('AudioSystem', () => {
         audio.playMeleeAttack();
         expect(mockCtx.resume).toHaveBeenCalled();
     });
+
+    it('setMasterVolume updates volume and clamps values within [0, 1]', () => {
+        audio.setMasterVolume(0.8);
+        expect(audio.masterVolume).toBe(0.8);
+
+        audio.setMasterVolume(1.5);
+        expect(audio.masterVolume).toBe(1.0);
+
+        audio.setMasterVolume(-0.2);
+        expect(audio.masterVolume).toBe(0.0);
+    });
 });

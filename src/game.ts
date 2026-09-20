@@ -159,7 +159,7 @@ import { QuickSlotHUD } from "./ui/quickslot-hud";
 import { PerkSystem } from "./systems/perk-system";
 import { DynamicWorldEventSystem } from "./systems/dynamic-world-event-system";
 import type { DynamicEventReward } from "./systems/dynamic-world-event-system";
-import { GraphicsSettingsUI } from "./ui/graphics-settings-ui";
+import { GraphicsSettingsUI, type CameraSensitivity } from "./ui/graphics-settings-ui";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -431,6 +431,8 @@ export class Game {
   private _banditQuestStarted: boolean = false;
   /** Active difficulty setting (scales NPC→player damage). */
   private _difficulty: "easy" | "normal" | "hard" = "normal";
+  /** Active camera look sensitivity setting. */
+  private _cameraSensitivity: CameraSensitivity = "standard";
   /** Mesh name of the NPC the player is currently talking to (persuasion pricing). */
   private _currentDialogueNpcName: string | null = null;
   /** Mesh name of the NPC currently shown in the pickpocket picker (null when closed). */
@@ -611,7 +613,7 @@ export class Game {
     // Post-processing and skybox require the camera, so initialise after Player.
     this._initPostProcessing();
     this.ui = new UIManager(this.scene);
-    this.world = new WorldManager(this.scene, this.shadowGenerator);
+    this.world = new WorldManager(this.scene, this.shadowGenerator, null, this.graphics.texture);
     this.navigationSystem = new NavigationSystem(this.scene);
     this.scheduleSystem = new ScheduleSystem();
 
@@ -1224,7 +1226,9 @@ export class Game {
     // LOD system: run the visibility pass every 5 frames for performance.
     // Registered meshes are pruned when disposed; no global clear on cell travel.
     this.lodSystem = new LodSystem({ updateEveryNFrames: 5 });
+    this.lodSystem.setQuality(this.graphics.tier);
     this.lodSystem.setCamera(this.player.camera);
+    this.world.setLodSystem(this.lodSystem);
     this._gamepadInput.setCamera(this.player.camera);
     // Distance-cull the demo guard's capsule alongside the world props.
     if (this.scheduleSystem.npcs[0]) {
@@ -1688,6 +1692,7 @@ export class Game {
     this.graphicsSettingsUI = new GraphicsSettingsUI();
     this.graphicsSettingsUI.onTierSelect = (tier) => {
       persistGraphicsTier(tier);
+      this.lodSystem?.setQuality(tier);
       location.reload();
     };
     // Difficulty applies immediately — it only scales NPC→player damage.
@@ -1697,10 +1702,34 @@ export class Game {
         difficulty === "easy" ? 0.6 : difficulty === "hard" ? 1.5 : 1.0;
       this.ui.showNotification(`Difficulty: ${difficulty[0].toUpperCase()}${difficulty.slice(1)}`, 2400);
     };
+    this.graphicsSettingsUI.onAudioMuteToggle = (isMuted) => {
+      if (this.audioSystem.isMuted !== isMuted) {
+        this.audioSystem.toggleMute();
+      }
+      this.ui.showNotification(isMuted ? "Audio muted" : "Audio unmuted", 1500);
+    };
+    this.graphicsSettingsUI.onVolumeChange = (volume) => {
+      this.audioSystem.setMasterVolume(volume);
+      this.ui.showNotification(`Master volume: ${Math.round(volume * 100)}%`, 1500);
+    };
+    this.graphicsSettingsUI.onCameraSensitivityChange = (sens) => {
+      this._cameraSensitivity = sens;
+      const sensMap: Record<CameraSensitivity, number> = {
+        low: 1200,
+        standard: 800,
+        high: 500,
+      };
+      if (this.player?.camera) {
+        this.player.camera.angularSensibility = sensMap[sens];
+      }
+      this.ui.showNotification(`Look Sensitivity: ${sens[0].toUpperCase()}${sens.slice(1)}`, 1500);
+    };
     this.graphicsSettingsUI.onClose = () => {
       this.interactionSystem.isBlocked = false;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
+      if (!this.isPaused) {
+        this.canvas.requestPointerLock();
+        this.player.camera.attachControl(this.canvas, true);
+      }
     };
     this._wireGraphicsSettingsButton();
 
@@ -3124,7 +3153,7 @@ export class Game {
                 }
             } else if (kbInfo.event.key === "Escape") {
                 if (this._inCharacterCreation) return;
-                if (this.dialogueSystem.isInDialogue) return;
+                if (this.dialogueSystem.isInDialogue) { this.dialogueSystem.endDialogue(); return; }
 
                 if (this.levelUpUI.isVisible) {
                     // Level-up is a mandatory choice — Escape is intentionally blocked.
@@ -3954,6 +3983,15 @@ export class Game {
       this.saveSystem.exportToFile();
     });
     this.ui.importButton.onPointerUpObservable.add(() => this._openSaveImportPicker());
+    this.ui.settingsButton?.onPointerUpObservable.add(() => {
+      this.graphicsSettingsUI.show(
+        this.graphics.tier,
+        this._difficulty,
+        this.audioSystem.isMuted,
+        this.audioSystem.masterVolume,
+        this._cameraSensitivity,
+      );
+    });
     this.ui.quitButton.onPointerUpObservable.add(() => window.location.reload());
 
     // Wire decoupled input adapter after all systems are initialized
@@ -4803,7 +4841,13 @@ export class Game {
     btn.textContent = "⚙";
     btn.addEventListener("click", () => {
       if (this._inCharacterCreation || this.graphicsSettingsUI.isVisible || this._isCombatInputBlocked()) return;
-      this.graphicsSettingsUI.show(this.graphics.tier, this._difficulty);
+      this.graphicsSettingsUI.show(
+        this.graphics.tier,
+        this._difficulty,
+        this.audioSystem.isMuted,
+        this.audioSystem.masterVolume,
+        this._cameraSensitivity,
+      );
       this._suspendGameplayInput();
     });
     document.body.appendChild(btn);

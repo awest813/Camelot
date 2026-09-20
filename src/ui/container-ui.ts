@@ -142,6 +142,15 @@ export class ContainerUI {
     header.appendChild(closeBtn);
     root.appendChild(header);
 
+    root.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.hide();
+        this.onClose?.();
+      }
+    });
+
     // Item list
     const itemList = document.createElement("ul");
     itemList.className = "container-ui__item-list";

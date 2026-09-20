@@ -9,6 +9,12 @@ import { DialogueSession } from "../framework/dialogue/dialogue-engine";
 import { DialogueNodeView } from "../framework/dialogue/dialogue-types";
 import { SHARED_UI_PANEL as D } from "../ui/ui-manager";
 
+export interface DialogueChoiceOption {
+  text: string;
+  callback: () => void;
+  enabled: boolean;
+}
+
 export class DialogueSystem {
   public scene: Scene;
   public player: Player;
@@ -26,6 +32,8 @@ export class DialogueSystem {
   private _choiceCount: number = 0;
   private _activeSession: DialogueSession | null = null;
   private _activeNpc: NPC | null = null;
+  private _choices: DialogueChoiceOption[] = [];
+  private _keyHandler: ((e: KeyboardEvent) => void) | null = null;
 
   // Scratch vectors for performance optimization
   private _direction: Vector3 = new Vector3();
@@ -40,6 +48,10 @@ export class DialogueSystem {
 
   public get isInDialogue(): boolean {
     return this._isInDialogue;
+  }
+
+  public get choices(): ReadonlyArray<DialogueChoiceOption> {
+    return this._choices;
   }
 
   constructor(scene: Scene, player: Player, npcs: NPC[], canvas: HTMLCanvasElement) {
@@ -134,20 +146,13 @@ export class DialogueSystem {
     // Switch Camera
     this._originalCamera = this.scene.activeCamera;
 
-    // Position cinematic camera
-    // Look at NPC face
-    // Position slightly offset from player view? Or fixed "talking head" view?
-    // Fallout 3 style: Zoom in on face.
-
     const npcHeadPos = npc.mesh.position.clone().add(new Vector3(0, 0.5, 0)); // Approx head height
     this._cinematicCamera.setTarget(npcHeadPos);
 
-    // Position camera in front of NPC
-    // Calculate direction from NPC to Player
+    // Position camera between player and NPC
     this.player.camera.position.subtractToRef(npc.mesh.position, this._direction);
     this._direction.normalize();
 
-    // Scale direction and add to npc position
     this._direction.scaleToRef(1.5, this._camPos);
     this._camPos.addInPlace(npc.mesh.position);
     this._camPos.addInPlaceFromFloats(0, 0.5, 0);
@@ -162,6 +167,7 @@ export class DialogueSystem {
 
     // Show UI
     this._choiceCount = 0;
+    this._choices = [];
     this._dialoguePanel.isVisible = true;
 
     const session = this.dialogueSessionProvider ? this.dialogueSessionProvider(npc) : null;
@@ -169,6 +175,7 @@ export class DialogueSystem {
     if (session && node) {
       this._activeSession = session;
       this._renderNode(node);
+      this._installKeyHandler();
       return;
     }
 
@@ -179,15 +186,32 @@ export class DialogueSystem {
           { npc: npc.mesh.name },
         );
       }
-      this._endDialogue();
+      this.endDialogue();
       return;
     }
 
-    // Fallback legacy dialogue when no framework session is available.
+    // Fallback dialogue with generic rumors when no framework session exists.
     this._nameLabel.text = `✦  ${npc.mesh.name}`;
-    this._textBlock.text = `"Hello, traveler. What brings you here?"`;
-    this._addChoice("Hello.", () => this._endDialogue());
-    this._addChoice("Goodbye.", () => this._endDialogue());
+    this._textBlock.text = `"Greetings, traveler. What can I do for you?"`;
+    this._addChoice("Just passing through.", () => this.endDialogue());
+    this._addChoice("Any rumors worth hearing?", () => {
+      this._textBlock.text = `"Aye, there's talk of strange lights near the old ruins to the north. Folk say it's best not to linger after dark."`;
+      this._choicesPanel.clearControls();
+      this._choiceCount = 0;
+      this._choices = [];
+      this._addChoice("Sounds dangerous.", () => {
+        this._textBlock.text = `"That it is. But fortune favors the bold, they say. Safe travels."`;
+        this._choicesPanel.clearControls();
+        this._choiceCount = 0;
+        this._choices = [];
+        this._addChoice("Farewell.", () => this.endDialogue());
+        this._installKeyHandler();
+      });
+      this._addChoice("I'll keep that in mind. Goodbye.", () => this.endDialogue());
+      this._installKeyHandler();
+    });
+    this._addChoice("Goodbye.", () => this.endDialogue());
+    this._installKeyHandler();
   }
 
   private _renderNode(node: DialogueNodeView): void {
@@ -195,9 +219,11 @@ export class DialogueSystem {
     this._textBlock.text = `"${node.text}"`;
     this._choicesPanel.clearControls();
     this._choiceCount = 0;
+    this._choices = [];
 
     if (node.choices.length === 0) {
-      this._addChoice("Goodbye.", () => this._endDialogue());
+      this._addChoice("Goodbye.", () => this.endDialogue());
+      this._installKeyHandler();
       return;
     }
 
@@ -209,24 +235,34 @@ export class DialogueSystem {
 
   private _handleFrameworkChoice(choiceId: string): void {
     if (!this._activeSession) {
-      this._endDialogue();
+      this.endDialogue();
       return;
     }
 
     const result = this._activeSession.choose(choiceId);
     if (!result.success && result.currentNode) {
       this._renderNode(result.currentNode);
+      this._installKeyHandler();
       return;
     }
     if (result.isComplete || !result.currentNode) {
-      this._endDialogue();
+      this.endDialogue();
       return;
     }
     this._renderNode(result.currentNode);
+    this._installKeyHandler();
   }
 
   private _addChoice(text: string, callback: () => void, enabled: boolean = true): void {
-    const button = Button.CreateSimpleButton(`btn_choice_${this._choiceCount++}`, text);
+    const idx = this._choices.length + 1;
+    const label = idx <= 9 ? `[${idx}]  ${text}` : text;
+
+    // Track choice for keyboard shortcuts
+    if (enabled) {
+      this._choices.push({ text, callback, enabled });
+    }
+
+    const button = Button.CreateSimpleButton(`btn_choice_${this._choiceCount++}`, label);
     button.width = "100%";
     button.height = "44px";
     button.color = enabled ? D.TEXT : D.DIM;
@@ -238,9 +274,15 @@ export class DialogueSystem {
     button.hoverCursor = enabled ? "pointer" : "default";
     button.isEnabled = enabled;
 
+    // Left-align text like a standard RPG choice list
+    if (button.textBlock) {
+      button.textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+      button.textBlock.paddingLeft = "16px";
+    }
+
     button.isFocusInvisible = false;
     button.tabIndex = 0;
-    button.accessibilityTag = { description: text };
+    button.accessibilityTag = { description: label };
 
     const setHover = () => {
       button.background = D.BTN_HOVER;
@@ -276,13 +318,46 @@ export class DialogueSystem {
     this._choicesPanel.addControl(button);
   }
 
-  private _endDialogue(): void {
+  private _installKeyHandler(): void {
+    this._removeKeyHandler();
+    this._keyHandler = (e: KeyboardEvent) => {
+      if (!this._isInDialogue) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.endDialogue();
+        return;
+      }
+      const n = parseInt(e.key, 10);
+      if (n >= 1 && n <= 9) {
+        const choice = this._choices[n - 1];
+        if (choice && choice.enabled) {
+          e.preventDefault();
+          e.stopPropagation();
+          choice.callback();
+        }
+      }
+    };
+    window.addEventListener("keydown", this._keyHandler, true);
+  }
+
+  private _removeKeyHandler(): void {
+    if (this._keyHandler) {
+      window.removeEventListener("keydown", this._keyHandler, true);
+      this._keyHandler = null;
+    }
+  }
+
+  public endDialogue(): void {
+    if (!this._isInDialogue) return;
     this._isInDialogue = false;
+    this._removeKeyHandler();
     if (this._activeNpc) {
-        this._activeNpc.isInDialogue = false;
-        this._activeNpc = null;
+      this._activeNpc.isInDialogue = false;
+      this._activeNpc = null;
     }
     this._activeSession = null;
+    this._choices = [];
 
     // Hide UI
     this._dialoguePanel.isVisible = false;
@@ -291,9 +366,15 @@ export class DialogueSystem {
     // Restore Camera
     this.scene.activeCamera = this._originalCamera;
 
-    // Restore controls and pointer lock so mouse-look works immediately
-    this.canvas.requestPointerLock();
-    this.player.camera.attachControl(this.canvas, true);
+    // Restore controls and pointer lock so mouse-look works immediately.
+    // Wrapped in try/catch so tests running in a headless Node environment
+    // don't fail when canvas.requestPointerLock() is not available.
+    try {
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    } catch (_) {
+      // headless / test environment — ignore
+    }
 
     if (this.onDialogueClosed) this.onDialogueClosed();
   }

@@ -577,4 +577,22 @@ describe('WorldManager with WorldSeed', () => {
     }
     expect(differ).toBe(true);
   });
+
+  it('registers and unregisters vegetation with LodSystem', async () => {
+    const wm = new WorldManager(mockScene);
+    const mockLod = {
+      getConfig: () => ({ distanceThresholds: { far: 150 } }),
+      register: vi.fn(),
+      unregister: vi.fn(),
+    } as any;
+    wm.setLodSystem(mockLod);
+    expect(wm.lodSystem).toBe(mockLod);
+    expect(wm.structures.lodSystem).toBe(mockLod);
+
+    await advanceFrames(wm, 15);
+    expect(mockLod.register).toHaveBeenCalled();
+
+    wm.dispose();
+    expect(mockLod.unregister).toHaveBeenCalled();
+  });
 });

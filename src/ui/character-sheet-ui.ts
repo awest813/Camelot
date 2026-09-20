@@ -275,6 +275,15 @@ export class CharacterSheetUI {
     });
     root.appendChild(closeBtn);
 
+    root.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.hide();
+        this.onClose?.();
+      }
+    });
+
     document.body.appendChild(root);
     this._root = root;
   }

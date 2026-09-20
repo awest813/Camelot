@@ -3,6 +3,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Matrix } from "@babylonjs/core/Maths/math.vector";
 import type { Camera } from "@babylonjs/core/Cameras/camera";
 import { Plane } from "@babylonjs/core/Maths/math.plane";
+import type { QualityTier } from "./graphics-system";
 
 export interface LodEntry {
   mesh: AbstractMesh;
@@ -60,7 +61,7 @@ export class LodSystem {
   private _entries: LodEntry[] = [];
   private _levelGroups: LodLevelEntry[] = [];
   private _frameCounter: number = 0;
-  private readonly _updateInterval: number;
+  private _updateInterval: number;
   private _config: LODConfig;
   private _camera: Camera | null = null;
   private _frustumPlanes: Plane[] = [];
@@ -77,10 +78,70 @@ export class LodSystem {
 
   public setConfig(config: Partial<LODConfig>): void {
     this._config = { ...this._config, ...config };
+    if (config.updateEveryNFrames !== undefined) {
+      this._updateInterval = Math.max(1, this._config.updateEveryNFrames);
+    }
   }
 
   public getConfig(): Readonly<LODConfig> {
     return this._config;
+  }
+
+  /**
+   * Configure distance culling thresholds and update frequency based on a
+   * graphics quality tier or LODQuality enum value.
+   */
+  public setQuality(quality: QualityTier | LODQuality): void {
+    const isLow = quality === "low" || quality === LODQuality.LOW;
+    const isMed = quality === "medium" || quality === LODQuality.MEDIUM;
+    const isUltra = quality === "ultra" || quality === LODQuality.ULTRA;
+
+    if (isLow) {
+      this.setConfig({
+        updateEveryNFrames: 3,
+        maxCulledPerFrame: 150,
+        distanceThresholds: {
+          near: 20,
+          medium: 50,
+          far: 90,
+          ultraFar: 140,
+        },
+      });
+    } else if (isMed) {
+      this.setConfig({
+        updateEveryNFrames: 4,
+        maxCulledPerFrame: 120,
+        distanceThresholds: {
+          near: 25,
+          medium: 70,
+          far: 120,
+          ultraFar: 200,
+        },
+      });
+    } else if (isUltra) {
+      this.setConfig({
+        updateEveryNFrames: 6,
+        maxCulledPerFrame: 80,
+        distanceThresholds: {
+          near: 40,
+          medium: 100,
+          far: 200,
+          ultraFar: 350,
+        },
+      });
+    } else {
+      // High tier (default)
+      this.setConfig({
+        updateEveryNFrames: 5,
+        maxCulledPerFrame: 100,
+        distanceThresholds: {
+          near: 30,
+          medium: 80,
+          far: 150,
+          ultraFar: 250,
+        },
+      });
+    }
   }
 
   /**
@@ -170,8 +231,9 @@ export class LodSystem {
 
   private _isInFrustum(mesh: AbstractMesh): boolean {
     if (!this._config.frustumCull || this._frustumPlanes.length === 0) return true;
-    const pos = mesh.position;
-    const radius = mesh.getBoundingInfo?.()?.boundingSphere?.radius ?? 1;
+    const boundingInfo = (mesh as any).getBoundingInfo?.();
+    const pos = boundingInfo?.boundingSphere?.centerWorld ?? mesh.position;
+    const radius = boundingInfo?.boundingSphere?.radiusWorld ?? boundingInfo?.boundingSphere?.radius ?? 1;
     for (const plane of this._frustumPlanes) {
       const d = plane.normal.x * pos.x + plane.normal.y * pos.y + plane.normal.z * pos.z + plane.d;
       if (d < -radius) return false;
@@ -206,7 +268,9 @@ export class LodSystem {
       if (entry.mesh.isDisposed()) continue;
       aliveEntries.push(entry);
 
-      const distSq = Vector3.DistanceSquared(entry.mesh.position, playerPosition);
+      const boundingInfo = (entry.mesh as any).getBoundingInfo?.();
+      const pos = boundingInfo?.boundingSphere?.centerWorld ?? entry.mesh.position;
+      const distSq = Vector3.DistanceSquared(pos, playerPosition);
       const cullSq = entry.cullDistance * entry.cullDistance;
       const distCulled = distSq > cullSq;
 
@@ -240,7 +304,9 @@ export class LodSystem {
       const originMesh = group.levels.find(l => !l.mesh.isDisposed());
       if (!originMesh) continue;
 
-      const distSq = Vector3.DistanceSquared(originMesh.mesh.position, playerPosition);
+      const originInfo = (originMesh.mesh as any).getBoundingInfo?.();
+      const originPos = originInfo?.boundingSphere?.centerWorld ?? originMesh.mesh.position;
+      const distSq = Vector3.DistanceSquared(originPos, playerPosition);
 
       let chosen = false;
       for (const level of group.levels) {

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { CharacterSheetUI } from "./character-sheet-ui";
 import type { CharacterSheetData } from "./character-sheet-ui";
 import type { ProgressionSkill } from "../systems/skill-progression-system";
@@ -486,6 +486,16 @@ describe("CharacterSheetUI", () => {
 
     it("does not throw when called before show()", () => {
       expect(() => ui.destroy()).not.toThrow();
+    });
+
+    it("closes and calls onClose when Escape is pressed", () => {
+      const onClose = vi.fn();
+      ui.onClose = onClose;
+      ui.show();
+      const root = document.querySelector(".character-sheet-ui") as HTMLElement;
+      root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      expect(ui.isVisible).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -23,7 +23,7 @@ export interface CharacterCreationResult {
  * Each entry pairs a zodiac sign with a medieval-sounding given name and a
  * gender-neutral descriptor drawn from medieval heraldic tradition.
  */
-const ZODIAC_NAME_SUGGESTIONS: ReadonlyArray<{ sign: string; name: string }> = [
+export const ZODIAC_NAME_SUGGESTIONS: ReadonlyArray<{ sign: string; name: string }> = [
   { sign: "Aries",       name: "Arion"    },
   { sign: "Taurus",      name: "Toberon"  },
   { sign: "Gemini",      name: "Geminus"  },
@@ -36,6 +36,120 @@ const ZODIAC_NAME_SUGGESTIONS: ReadonlyArray<{ sign: string; name: string }> = [
   { sign: "Capricorn",   name: "Caprian"  },
   { sign: "Aquarius",    name: "Aquilan"  },
   { sign: "Pisces",      name: "Pisceon"  },
+];
+
+/**
+ * Culturally authentic, lore-friendly name suggestions for all 10 playable races.
+ */
+export const RACIAL_NAME_SUGGESTIONS: Readonly<Record<string, ReadonlyArray<{ race: string; name: string }>>> = {
+  nord: [
+    { race: "Nord", name: "Ragnar" },
+    { race: "Nord", name: "Bjorn" },
+    { race: "Nord", name: "Torvald" },
+    { race: "Nord", name: "Astrid" },
+    { race: "Nord", name: "Freya" },
+    { race: "Nord", name: "Sigrid" },
+    { race: "Nord", name: "Ulfgar" },
+    { race: "Nord", name: "Brynja" },
+  ],
+  imperial: [
+    { race: "Imperial", name: "Marcus" },
+    { race: "Imperial", name: "Valeria" },
+    { race: "Imperial", name: "Lucian" },
+    { race: "Imperial", name: "Camilla" },
+    { race: "Imperial", name: "Titus" },
+    { race: "Imperial", name: "Octavia" },
+    { race: "Imperial", name: "Aurelius" },
+    { race: "Imperial", name: "Julia" },
+  ],
+  breton: [
+    { race: "Breton", name: "Alain" },
+    { race: "Breton", name: "Antoinette" },
+    { race: "Breton", name: "Etienne" },
+    { race: "Breton", name: "Delphine" },
+    { race: "Breton", name: "Tristan" },
+    { race: "Breton", name: "Genevieve" },
+    { race: "Breton", name: "Giraud" },
+    { race: "Breton", name: "Vivienne" },
+  ],
+  redguard: [
+    { race: "Redguard", name: "Cyrus" },
+    { race: "Redguard", name: "Sadiya" },
+    { race: "Redguard", name: "Isran" },
+    { race: "Redguard", name: "Raya" },
+    { race: "Redguard", name: "Tariq" },
+    { race: "Redguard", name: "Yasmin" },
+    { race: "Redguard", name: "Nazir" },
+    { race: "Redguard", name: "Safiya" },
+  ],
+  altmer: [
+    { race: "Altmer", name: "Ayrenn" },
+    { race: "Altmer", name: "Calcelmo" },
+    { race: "Altmer", name: "Faralda" },
+    { race: "Altmer", name: "Ancano" },
+    { race: "Altmer", name: "Taarie" },
+    { race: "Altmer", name: "Ondolemar" },
+    { race: "Altmer", name: "Elenwen" },
+    { race: "Altmer", name: "Valmir" },
+  ],
+  dunmer: [
+    { race: "Dunmer", name: "Velyn" },
+    { race: "Dunmer", name: "Brelas" },
+    { race: "Dunmer", name: "Jiub" },
+    { race: "Dunmer", name: "Jenassa" },
+    { race: "Dunmer", name: "Neloth" },
+    { race: "Dunmer", name: "Karliah" },
+    { race: "Dunmer", name: "Divayth" },
+    { race: "Dunmer", name: "Brelyna" },
+  ],
+  bosmer: [
+    { race: "Bosmer", name: "Faendal" },
+    { race: "Bosmer", name: "Nimriel" },
+    { race: "Bosmer", name: "Gwilym" },
+    { race: "Bosmer", name: "Aralor" },
+    { race: "Bosmer", name: "Findal" },
+    { race: "Bosmer", name: "Silana" },
+    { race: "Bosmer", name: "Thoronir" },
+    { race: "Bosmer", name: "Lothiel" },
+  ],
+  orsimer: [
+    { race: "Orsimer", name: "Gro-Khash" },
+    { race: "Orsimer", name: "Mazoga" },
+    { race: "Orsimer", name: "Ghorbash" },
+    { race: "Orsimer", name: "Shelur" },
+    { race: "Orsimer", name: "Yashnag" },
+    { race: "Orsimer", name: "Bolar" },
+    { race: "Orsimer", name: "Mauhulakh" },
+    { race: "Orsimer", name: "Urzoga" },
+  ],
+  khajiit: [
+    { race: "Khajiit", name: "J'zargo" },
+    { race: "Khajiit", name: "Ahkari" },
+    { race: "Khajiit", name: "M'aiq" },
+    { race: "Khajiit", name: "Shavari" },
+    { race: "Khajiit", name: "Kharjo" },
+    { race: "Khajiit", name: "Tsavani" },
+    { race: "Khajiit", name: "Ri'saad" },
+    { race: "Khajiit", name: "Zaynabi" },
+  ],
+  argonian: [
+    { race: "Argonian", name: "Teeba-Khat" },
+    { race: "Argonian", name: "Shahvee" },
+    { race: "Argonian", name: "Derkeethus" },
+    { race: "Argonian", name: "Keerava" },
+    { race: "Argonian", name: "Deetsan" },
+    { race: "Argonian", name: "Wujeeta" },
+    { race: "Argonian", name: "Scouts-Many-Marshes" },
+    { race: "Argonian", name: "Stands-In-Shallows" },
+  ],
+};
+
+/** All name suggestions combined for fast lookup and random selection. */
+export const ALL_NAME_SUGGESTIONS: ReadonlyArray<{ tag: string; name: string }> = [
+  ...ZODIAC_NAME_SUGGESTIONS.map((z) => ({ tag: `Zodiac (${z.sign})`, name: z.name })),
+  ...Object.values(RACIAL_NAME_SUGGESTIONS).flatMap((list) =>
+    list.map((item) => ({ tag: item.race, name: item.name })),
+  ),
 ];
 
 /** Per-race decorative icons shown on race cards. */
@@ -275,7 +389,7 @@ export class CharacterCreationUI {
 
           if (entry.power) {
             const power = document.createElement("li");
-            power.textContent = `Power: ${entry.power.name}`;
+            power.textContent = `Power: ${entry.power.name} — ${entry.power.description}`;
             detailsMeta.appendChild(power);
           }
 
@@ -289,6 +403,40 @@ export class CharacterCreationUI {
               detailsMeta.appendChild(attrLi);
             }
           }
+
+          if (entry.skillBonus) {
+            const skillParts = Object.entries(entry.skillBonus)
+              .filter(([, v]) => v !== 0)
+              .map(([k, v]) => `${k} +${v}`);
+            if (skillParts.length) {
+              const skillLi = document.createElement("li");
+              skillLi.textContent = `Skill bonuses: ${skillParts.join(", ")}`;
+              detailsMeta.appendChild(skillLi);
+            }
+          }
+
+          if (entry.resistance) {
+            const resParts = Object.entries(entry.resistance)
+              .filter(([, v]) => v !== 0)
+              .map(([k, v]) => `${k} ${v! > 0 ? "+" : ""}${Math.round(v! * 100)}%`);
+            if (resParts.length) {
+              const resLi = document.createElement("li");
+              resLi.textContent = `Resistances: ${resParts.join(", ")}`;
+              detailsMeta.appendChild(resLi);
+            }
+          }
+
+          if (entry.waterBreathing) {
+            const wbLi = document.createElement("li");
+            wbLi.textContent = "Trait: Water Breathing (unlimited underwater breath)";
+            detailsMeta.appendChild(wbLi);
+          }
+
+          if (entry.maxMagickaBonus) {
+            const magLi = document.createElement("li");
+            magLi.textContent = `Magicka bonus: +${entry.maxMagickaBonus}`;
+            detailsMeta.appendChild(magLi);
+          }
         } else if ("guardian" in entry) {
           const guardian = document.createElement("li");
           guardian.textContent = `Guardian: ${guardianLabel(entry.guardian)}`;
@@ -296,20 +444,72 @@ export class CharacterCreationUI {
 
           if (entry.power) {
             const power = document.createElement("li");
-            power.textContent = `Power: ${entry.power.name}`;
+            power.textContent = `Power: ${entry.power.name} — ${entry.power.description}`;
             detailsMeta.appendChild(power);
+          }
+
+          if (entry.attributeBonus) {
+            const bonusParts = Object.entries(entry.attributeBonus)
+              .filter(([, v]) => v !== 0)
+              .map(([k, v]) => `${k} ${v! > 0 ? "+" : ""}${v}`);
+            if (bonusParts.length) {
+              const attrLi = document.createElement("li");
+              attrLi.textContent = `Attributes: ${bonusParts.join(", ")}`;
+              detailsMeta.appendChild(attrLi);
+            }
+          }
+
+          if (entry.skillBonus) {
+            const skillParts = Object.entries(entry.skillBonus)
+              .filter(([, v]) => v !== 0)
+              .map(([k, v]) => `${k} +${v}`);
+            if (skillParts.length) {
+              const skillLi = document.createElement("li");
+              skillLi.textContent = `Skill bonuses: ${skillParts.join(", ")}`;
+              detailsMeta.appendChild(skillLi);
+            }
+          }
+
+          if (entry.maxMagickaBonus) {
+            const magLi = document.createElement("li");
+            magLi.textContent = `Magicka bonus: +${entry.maxMagickaBonus}`;
+            detailsMeta.appendChild(magLi);
+          }
+
+          if (entry.maxHealthBonus) {
+            const hpLi = document.createElement("li");
+            hpLi.textContent = `Health bonus: +${entry.maxHealthBonus}`;
+            detailsMeta.appendChild(hpLi);
+          }
+
+          if (entry.maxStaminaBonus) {
+            const stamLi = document.createElement("li");
+            stamLi.textContent = `Stamina bonus: +${entry.maxStaminaBonus}`;
+            detailsMeta.appendChild(stamLi);
+          }
+
+          if (entry.carryWeightBonus) {
+            const cwLi = document.createElement("li");
+            cwLi.textContent = `Carry weight: +${entry.carryWeightBonus}`;
+            detailsMeta.appendChild(cwLi);
+          }
+
+          if (entry.stunted) {
+            const stuntedLi = document.createElement("li");
+            stuntedLi.textContent = "Trait: Stunted Magicka (no natural regeneration)";
+            detailsMeta.appendChild(stuntedLi);
           }
         } else {
           const spec = document.createElement("li");
-          spec.textContent = `Specialization: ${entry.specialization}`;
+          spec.textContent = `Specialization: ${entry.specialization.toUpperCase()} (+5 group skills)`;
           detailsMeta.appendChild(spec);
 
           const attrs = document.createElement("li");
-          attrs.textContent = `Favored attributes: ${entry.favoredAttributes.join(", ")}`;
+          attrs.textContent = `Favored attributes (+10 base): ${entry.favoredAttributes.join(", ")}`;
           detailsMeta.appendChild(attrs);
 
           const majors = document.createElement("li");
-          majors.textContent = `Major skills: ${entry.majorSkills.join(", ")}`;
+          majors.textContent = `Major skills (+25 starting, 1.5× XP): ${entry.majorSkills.join(", ")}`;
           detailsMeta.appendChild(majors);
         }
       };
@@ -711,10 +911,12 @@ export class CharacterCreationUI {
       };
 
 
+      let selectedNameCategory = "All";
+
       const renderName = () => {
         clearCards();
         subtitle.textContent =
-          "Name your hero. Choose a suggestion below or type your own — each name is inspired by a sign of the medieval zodiac.";
+          "Name your hero. Choose a lore suggestion below, click Randomize, or type your own.";
         continueButton.textContent = "Continue";
         setBtnDisabled(continueButton, enteredName.trim().length === 0, "Please enter a name to continue.");
         setBtnDisabled(backButton, false);
@@ -732,6 +934,13 @@ export class CharacterCreationUI {
         nameInput.value = enteredName;
         inputWrap.appendChild(nameInput);
 
+        const randomNameBtn = document.createElement("button");
+        randomNameBtn.type = "button";
+        randomNameBtn.className = "character-create__name-random-btn";
+        randomNameBtn.textContent = "🎲 Randomize";
+        randomNameBtn.title = "Generate a random lore-friendly name";
+        inputWrap.appendChild(randomNameBtn);
+
         setTimeout(() => nameInput.focus(), 10);
 
         nameInput.addEventListener("input", () => {
@@ -739,36 +948,101 @@ export class CharacterCreationUI {
           setBtnDisabled(continueButton, enteredName.trim().length === 0, "Please enter a name to continue.");
         });
 
+        const categoriesWrap = document.createElement("div");
+        categoriesWrap.className = "character-create__name-categories";
+        cards.appendChild(categoriesWrap);
+
         const suggestLabel = document.createElement("p");
         suggestLabel.className = "character-create__suggest-label";
-        suggestLabel.textContent = "Zodiac-inspired suggestions:";
+        suggestLabel.textContent = "Lore suggestions by culture:";
         cards.appendChild(suggestLabel);
 
         const suggestGrid = document.createElement("div");
         suggestGrid.className = "character-create__suggest-grid";
         cards.appendChild(suggestGrid);
 
-        for (const { sign, name } of ZODIAC_NAME_SUGGESTIONS) {
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "character-create__suggest-btn";
-          btn.title = sign;
-          btn.textContent = name;
-          btn.addEventListener("click", () => {
-            enteredName = name;
-            nameInput.value = name;
-            setBtnDisabled(continueButton, false);
+        const getSuggestionsForCategory = (cat: string): ReadonlyArray<{ tag: string; name: string }> => {
+          if (cat === "Zodiac") {
+            return ZODIAC_NAME_SUGGESTIONS.map((z) => ({ tag: z.sign, name: z.name }));
+          }
+          if (cat === "All") {
+            return ALL_NAME_SUGGESTIONS;
+          }
+          const raceKey = cat.toLowerCase();
+          const list = RACIAL_NAME_SUGGESTIONS[raceKey];
+          if (list) {
+            return list.map((item) => ({ tag: item.race, name: item.name }));
+          }
+          return ALL_NAME_SUGGESTIONS;
+        };
+
+        const updateSuggestions = () => {
+          suggestGrid.innerHTML = "";
+          const suggestions = getSuggestionsForCategory(selectedNameCategory);
+          for (const { tag, name } of suggestions) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "character-create__suggest-btn";
+            btn.title = tag;
+            btn.textContent = name;
+            btn.addEventListener("click", () => {
+              enteredName = name;
+              nameInput.value = name;
+              setBtnDisabled(continueButton, false);
+            });
+            suggestGrid.appendChild(btn);
+          }
+        };
+
+        const categories = [
+          "All",
+          "Zodiac",
+          "Nord",
+          "Imperial",
+          "Breton",
+          "Redguard",
+          "Altmer",
+          "Dunmer",
+          "Bosmer",
+          "Orsimer",
+          "Khajiit",
+          "Argonian",
+        ];
+
+        for (const cat of categories) {
+          const catBtn = document.createElement("button");
+          catBtn.type = "button";
+          catBtn.className = "character-create__name-cat-btn" + (cat === selectedNameCategory ? " is-active" : "");
+          catBtn.textContent = cat;
+          catBtn.addEventListener("click", () => {
+            selectedNameCategory = cat;
+            Array.from(categoriesWrap.children).forEach((el) => {
+              el.classList.toggle("is-active", el.textContent === cat);
+            });
+            updateSuggestions();
           });
-          suggestGrid.appendChild(btn);
+          categoriesWrap.appendChild(catBtn);
         }
 
+        randomNameBtn.addEventListener("click", () => {
+          const pool = getSuggestionsForCategory(selectedNameCategory);
+          if (pool.length > 0) {
+            const pick = pool[Math.floor(Math.random() * pool.length)];
+            enteredName = pick.name;
+            nameInput.value = pick.name;
+            setBtnDisabled(continueButton, false);
+          }
+        });
+
+        updateSuggestions();
+
         if (this._animator) {
-          this._animator.staggerIn(Array.from(suggestGrid.children), 0.02);
+          this._animator.staggerIn(Array.from(suggestGrid.children).slice(0, 16), 0.02);
         }
 
         detailsTitle.textContent = "Your name";
         detailsBody.textContent =
-          "Your name will be known across the realm. Pick a zodiac-inspired name for a touch of destiny, or forge your own legend.";
+          "Your name will be known across the realm. Pick a culturally authentic lore name, choose a celestial zodiac moniker, or forge your own legend.";
         detailsMeta.innerHTML = "";
       };
 

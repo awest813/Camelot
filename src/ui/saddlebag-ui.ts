@@ -134,6 +134,14 @@ export class SaddlebagUI {
     closeBtn.addEventListener("click", () => this.close());
     header.appendChild(closeBtn);
 
+    root.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.close();
+      }
+    });
+
     const list = document.createElement("div");
     list.className = "saddlebag__list";
     panel.appendChild(list);

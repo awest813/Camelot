@@ -94,6 +94,14 @@ export class FastTravelUI {
     closeBtn.addEventListener("click", () => this.close());
     header.appendChild(closeBtn);
 
+    root.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key === "Escape" || e.key === "y" || e.key === "Y") {
+        e.preventDefault();
+        e.stopPropagation();
+        this.close();
+      }
+    });
+
     const list = document.createElement("div");
     list.className = "fast-travel__list";
     panel.appendChild(list);
