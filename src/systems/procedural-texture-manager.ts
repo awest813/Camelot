@@ -132,7 +132,7 @@ export class ProceduralTextureManager {
         const sinU2 = Math.sin(u * twoPi * 3);
         const sinU4 = Math.sin(u * twoPi * 7);
 
-        // Toroidal multi-octave harmonic noise in [0, 1]
+        // Multi-octave toroidal harmonic noise in [0, 1]
         const n1 = (sinU1 * cosV1 + cosU1 * sinV1) * 0.25 + 0.5;
         const n2 = (sinU2 * sinV2) * 0.15 + 0.15;
         const n3 = (sinU4 * sinV4) * 0.10 + 0.10;
@@ -140,7 +140,7 @@ export class ProceduralTextureManager {
 
         // High frequency pseudo-random grain (seamless hash)
         const h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-        const grain = (h - Math.floor(h)) * 0.12;
+        const grain = (h - Math.floor(h)) * 0.14;
 
         let r = 0;
         let g = 0;
@@ -148,37 +148,37 @@ export class ProceduralTextureManager {
 
         switch (biome) {
           case "plains": {
-            // Vibrant grassy meadow with earth and clover accents
-            const factor = Math.min(1, Math.max(0, noise + grain));
-            r = Math.round(55  + factor * 35);
-            g = Math.round(135 + factor * 50);
-            b = Math.round(40  + factor * 30);
+            // Vibrant grassy meadow with warm earth undertones and lush clover accents
+            const factor = Math.min(1, Math.max(0, noise * 0.88 + grain * 0.9));
+            r = Math.round(52  + factor * 38);
+            g = Math.round(140 + factor * 55);
+            b = Math.round(38  + factor * 28);
             break;
           }
           case "forest": {
-            // Deep woodland moss, loam undertones, and dark foliage speckles
-            const factor = Math.min(1, Math.max(0, noise * 0.85 + grain * 1.2));
-            r = Math.round(25 + factor * 25);
-            g = Math.round(75 + factor * 35);
-            b = Math.round(22 + factor * 22);
+            // Deep woodland moss, rich humus undertones, and dark leafy canopy speckles
+            const factor = Math.min(1, Math.max(0, noise * 0.85 + grain * 1.15));
+            r = Math.round(22 + factor * 28);
+            g = Math.round(78 + factor * 40);
+            b = Math.round(20 + factor * 24);
             break;
           }
           case "desert": {
-            // Dune ripples with granular sand sparkle
-            const ripple = Math.sin((u * 4 + v * 8) * twoPi) * 0.10;
-            const factor = Math.min(1, Math.max(0, noise * 0.7 + ripple + grain * 0.8));
-            r = Math.round(210 + factor * 35);
-            g = Math.round(175 + factor * 30);
-            b = Math.round(105 + factor * 25);
+            // Dune ripples with warm sunlit amber crests and granular quartz sparkle
+            const ripple = Math.sin((u * 4 + v * 8) * twoPi) * 0.12;
+            const factor = Math.min(1, Math.max(0, noise * 0.68 + ripple + grain * 0.85));
+            r = Math.round(214 + factor * 36);
+            g = Math.round(178 + factor * 32);
+            b = Math.round(102 + factor * 26);
             break;
           }
           case "tundra": {
-            // Frosted snow crust with subtle sub-surface ice veining
-            const vein = Math.abs(Math.sin((u * 3 - v * 3) * twoPi)) * 0.15;
-            const factor = Math.min(1, Math.max(0, noise * 0.6 + vein + grain * 0.5));
-            r = Math.round(215 + factor * 35);
-            g = Math.round(228 + factor * 25);
-            b = Math.round(240 + factor * 15);
+            // Frosted snow crust with subtle sub-surface glacial ice veining
+            const vein = Math.abs(Math.sin((u * 3 - v * 3) * twoPi)) * 0.14;
+            const factor = Math.min(1, Math.max(0, noise * 0.62 + vein + grain * 0.55));
+            r = Math.round(218 + factor * 32);
+            g = Math.round(230 + factor * 24);
+            b = Math.round(244 + factor * 11);
             break;
           }
         }
@@ -212,76 +212,76 @@ export class ProceduralTextureManager {
         let b = 0;
 
         if (type === "stone_ruins") {
-          // Weathered stone blocks with mortar lines
+          // Weathered stone blocks with defined mortar lines
           const brickY = Math.floor(v * 8);
           const brickX = Math.floor(u * 8 + (brickY % 2 === 0 ? 0 : 0.5));
           const fracX = (u * 8 + (brickY % 2 === 0 ? 0 : 0.5)) - brickX;
           const fracY = v * 8 - brickY;
-          const isMortar = fracX < 0.08 || fracY < 0.08;
+          const isMortar = fracX < 0.075 || fracY < 0.075;
 
           if (isMortar) {
-            r = Math.round(70 + grain * 30);
-            g = Math.round(65 + grain * 25);
-            b = Math.round(55 + grain * 20);
+            r = Math.round(66 + grain * 28);
+            g = Math.round(62 + grain * 24);
+            b = Math.round(54 + grain * 20);
           } else {
-            const stoneNoise = Math.sin(u * twoPi * 4) * Math.cos(v * twoPi * 4) * 0.15;
+            const stoneNoise = Math.sin(u * twoPi * 4) * Math.cos(v * twoPi * 4) * 0.16;
             const factor = Math.min(1, Math.max(0, 0.5 + stoneNoise + grain));
-            r = Math.round(115 + factor * 35);
-            g = Math.round(108 + factor * 30);
-            b = Math.round(92  + factor * 25);
+            r = Math.round(118 + factor * 38);
+            g = Math.round(112 + factor * 34);
+            b = Math.round(96  + factor * 28);
           }
         } else if (type === "desert_sandstone") {
-          // Layered sedimentary sandstone
-          const layer = Math.sin(v * twoPi * 6 + Math.sin(u * twoPi * 2) * 0.5) * 0.15;
+          // Layered sedimentary sandstone with geological strata
+          const layer = Math.sin(v * twoPi * 6 + Math.sin(u * twoPi * 2) * 0.5) * 0.16;
           const factor = Math.min(1, Math.max(0, 0.5 + layer + grain * 0.8));
-          r = Math.round(195 + factor * 35);
-          g = Math.round(150 + factor * 25);
-          b = Math.round(95  + factor * 20);
+          r = Math.round(198 + factor * 36);
+          g = Math.round(154 + factor * 26);
+          b = Math.round(98  + factor * 22);
         } else if (type === "watchtower_timber") {
-          // Watchtower timber: directional wood grain along V axis
-          const grainLine = Math.sin(u * twoPi * 12) * 0.20;
+          // Watchtower timber: warm directional wood grain along V axis
+          const grainLine = Math.sin(u * twoPi * 12) * 0.22;
           const factor = Math.min(1, Math.max(0, 0.5 + grainLine + grain));
-          r = Math.round(95  + factor * 30);
-          g = Math.round(60  + factor * 25);
-          b = Math.round(35  + factor * 15);
+          r = Math.round(98  + factor * 32);
+          g = Math.round(64  + factor * 26);
+          b = Math.round(38  + factor * 16);
         } else if (type === "bark_timber") {
           // Organic tree bark: furrowed vertical grain
-          const furrow = Math.sin(u * twoPi * 16 + Math.sin(v * twoPi * 4) * 0.75) * 0.30;
+          const furrow = Math.sin(u * twoPi * 16 + Math.sin(v * twoPi * 4) * 0.75) * 0.32;
           const factor = Math.min(1, Math.max(0, 0.45 + furrow + grain));
-          r = Math.round(75 + factor * 40);
-          g = Math.round(45 + factor * 30);
-          b = Math.round(25 + factor * 20);
+          r = Math.round(76 + factor * 42);
+          g = Math.round(46 + factor * 32);
+          b = Math.round(26 + factor * 22);
         } else if (type === "mossy_stone") {
-          // Weathered stone with organic moss patches
+          // Weathered stone with organic creeping moss patches
           const stoneNoise = Math.sin(u * twoPi * 3) * Math.cos(v * twoPi * 3) * 0.20;
           const mossThreshold = Math.sin(u * twoPi * 2 + v * twoPi * 2) * 0.5 + 0.5;
-          if (mossThreshold > 0.55) {
+          if (mossThreshold > 0.52) {
             const factor = Math.min(1, Math.max(0, 0.5 + stoneNoise + grain));
-            r = Math.round(45 + factor * 35);
-            g = Math.round(85 + factor * 45);
-            b = Math.round(30 + factor * 25);
+            r = Math.round(44 + factor * 36);
+            g = Math.round(88 + factor * 48);
+            b = Math.round(30 + factor * 26);
           } else {
             const factor = Math.min(1, Math.max(0, 0.5 + stoneNoise + grain));
-            r = Math.round(85 + factor * 35);
-            g = Math.round(85 + factor * 35);
-            b = Math.round(80 + factor * 30);
+            r = Math.round(88 + factor * 36);
+            g = Math.round(88 + factor * 36);
+            b = Math.round(82 + factor * 32);
           }
         } else if (type === "foliage_canopy") {
           // Stippled needle and leaf clusters
-          const cluster1 = Math.sin(u * twoPi * 8) * Math.cos(v * twoPi * 8) * 0.20;
-          const cluster2 = Math.sin((u + v) * twoPi * 14) * 0.15;
+          const cluster1 = Math.sin(u * twoPi * 8) * Math.cos(v * twoPi * 8) * 0.22;
+          const cluster2 = Math.sin((u + v) * twoPi * 14) * 0.16;
           const factor = Math.min(1, Math.max(0, 0.45 + cluster1 + cluster2 + grain * 1.2));
-          r = Math.round(28 + factor * 35);
-          g = Math.round(85 + factor * 55);
-          b = Math.round(24 + factor * 28);
+          r = Math.round(26 + factor * 36);
+          g = Math.round(88 + factor * 58);
+          b = Math.round(22 + factor * 28);
         } else {
-          // Iron metal: brushed metal with subtle patina
-          const brush = Math.sin(v * twoPi * 32) * 0.08;
+          // Iron metal: brushed cold metal with subtle highlight sheen
+          const brush = Math.sin(v * twoPi * 32) * 0.09;
           const mottle = (Math.sin(u * twoPi * 4) + Math.cos(v * twoPi * 4)) * 0.10;
           const factor = Math.min(1, Math.max(0, 0.5 + brush + mottle + grain * 0.6));
-          r = Math.round(75 + factor * 35);
-          g = Math.round(78 + factor * 35);
-          b = Math.round(85 + factor * 40);
+          r = Math.round(78 + factor * 36);
+          g = Math.round(82 + factor * 36);
+          b = Math.round(90 + factor * 42);
         }
 
         const idx = (y * size + x) * 4;
