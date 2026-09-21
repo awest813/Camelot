@@ -1,6 +1,33 @@
 # Camelot — Handoff
 
-Date: 2026-09-16 · Branch: `main` · Working tree: **uncommitted changes** (phases 0–5 + menu polish, all verified)
+Date: 2026-09-20 (evening) · Branch: `main` · Prior HEAD `4a42028` committed 18:22
+(Sep-16 handoff's phases 0–5 + menu polish are now committed; what follows is new.)
+
+## Verification status (all green as of this handoff)
+
+| Check | Command | Result |
+|---|---|---|
+| Typecheck | `npx tsc --noEmit` | clean (fixed 3 errors in new world-gen tests) |
+| Unit suite | `npm test` | **171 files / 5,644 tests, all passing** |
+| Production build | `npx.cmd vite build` | ✓ (18.5 s) |
+| E2E boot smoke | `playwright test boot-smoke` | **PASSING — first green run 2026-09-20** (via system Chrome, see note) |
+| E2E skill-tree | `playwright test skill-tree` | **53/53 passing** (spec's audit note updated: UIManager lock gap is fixed) |
+
+Note: `recent-projects-system.test.ts` used to fail 34 tests on earlier runs (suspected environment/timing); it passes in the latest full run. If it recurs, it is pre-existing on `main`, not from this work.
+
+## Playwright / Chromium environment note (important)
+
+- The Sep-16 session's `playwright install chromium-headless-shell` **never completed** — three
+  installer processes (PIDs 7588/24040/32544, started Sep-16) were found hung holding
+  `ms-playwright/__dirlock` with only 303 bytes downloaded. They were killed and the stale
+  lock removed on Sep-20. `ms-playwright/chromium_headless_shell-1217/` remains partial.
+- E2E runs here used the **system Google Chrome** via a temporary `channel: "chrome"` config
+  (created, used, then deleted — not committed). Before `npx playwright install` works again,
+  re-run it to finish the headless-shell download (network to the Playwright CDN stalled it
+  for 4 days; verify before relying on the stock `playwright.config.ts` in CI-fresh environments).
+- The stock `webServer` spawn (`npx vite --config vite.e2e.config.ts`) works; one run flaked
+  because a manually started server on :8099 was mid-dependency-reoptimization. Prefer letting
+  Playwright manage the server, or start it manually and wait for "ready".
 
 ## What this project is
 
@@ -21,7 +48,23 @@ DOM overlays in `src/ui/`, chunk world in `src/world/`.
 
 Note: `recent-projects-system.test.ts` used to fail 34 tests on earlier runs (suspected environment/timing); it passes in the latest full run. If it recurs, it is pre-existing on `main`, not from this work.
 
-## Work delivered (uncommitted)
+## Work delivered (committed as 4a42028 on 2026-09-20 + 3 new commits this session — tree clean)
+
+### Post-4a42028 work committed this session (2026-09-20 evening)
+
+- **World-builder feature** — procedural generation stack: `VoronoiWorldGraph` (provinces,
+  settlements, roads), `SimplexTerrainGenerator`, `RiverNetworkGenerator` (D8 flow + lakes),
+  `DungeonGenerator` (seeded Arthurian barrow → `CellDefinition`), `ArthurianNameGenerator`;
+  `WorldBuilderSystem` + `WorldBuilderUI` (Shift+F4 / Ctrl+Shift+W, Escape handling, seed apply →
+  fast-travel landmarks + dungeon cell registration); editor-hub 13th tool card; new deps
+  (`delaunator`, `simplex-noise`, `@types/delaunator`); 80 new unit tests.
+- **Asset/brand pass** — regenerated all 82 Quaternius filler GLBs (stylized meshes + PBR),
+  overhauled `tools/generate-filler-assets.mjs` (`npm run assets:filler`), brand identity
+  (`camelot-icon.png`, `camelot-logo.png`, `favicon.svg`, crest logo), favicon links in
+  `index.html`, provenance docs, `procedural-texture-manager` rework.
+- **Smoke-test bugfix** — animation extension import (see session fix log) + e2e spec note.
+
+### Prior work (phases 0–5 + menu polish, committed)
 
 ### Phases 0–2 — performance
 - **Leak fixes**: chunk-scoped disposal of CDN props / dragon NPCs / structure PointLights / wildflower materials on chunk unload (`world.onChunkUnloaded` wired in game.ts; `_trackChunkProp` guards late-arriving GLTF clones).
@@ -46,14 +89,29 @@ Note: `recent-projects-system.test.ts` used to fail 34 tests on earlier runs (su
 
 ## Next actions (in order)
 
-1. **Run the smoke test** (chromium is now installed):
-   ```
-   npx playwright test boot-smoke
-   ```
-   It boots the real game, completes character creation, saves (F5) — asserting `survival`/`travelEvents`/`ambientEvents` persist — and loads (F9), failing on any page/console error. `--enable-unsafe-swiftshader` is set in playwright.config.ts for headless WebGL. First run may surface minor selector/timing issues in `completeCharacterCreation` (steps: Welcome → World → Name → Race → Birthsign → Class; cards have no defaults, click first card per step).
-2. **Re-run the skill-tree e2e** (`npm run test:e2e`) — the spec documents the old locked-skill gap as an "audit finding"; that gap is now fixed, so update the spec's finding note.
-3. **Manual play-through** (only step I can't do headlessly): movement, open/close every menu, Escape from each, barter with an innkeeper shopkeeper, wait at an inn, dodge roll (F), save/load.
-4. **Commit** the working tree (consider splitting: perf phases / depth phases / menu polish).
+1. ~~**Run the smoke test**~~ — DONE 2026-09-20, passing. It caught one real bug (below); keep
+   the suite in CI and investigate any future page-error failure the same way.
+2. ~~**Re-run the skill-tree e2e**~~ — DONE 2026-09-20, 53/53 passing with the finding note
+   updated to "fixed" status.
+3. **Manual play-through** (only step I can't do headlessly): movement, open/close every menu, Escape from each, barter with an innkeeper shopkeeper, wait at an inn, dodge roll (F), save/load. **Plus**: watch an NPC idle/walk loop up close to confirm the animation fix visually (capsule breathing/bob).
+4. ~~**Commit** the working tree~~ — DONE 2026-09-20, split into 3 commits (world-builder feature /
+   asset-brand pass / smoke-test bugfix + e2e note). See `git log --oneline -5`.
+
+## Session fix log (2026-09-20 evening — the smoke test earned its keep)
+
+- **Real bug found by first-ever boot-smoke run**: `TypeError: this._scene.beginAnimation is not
+  a function`. Root cause: Babylon.js v8 moved `Scene.beginAnimation`/`beginDirectAnimation` into
+  the optional side-effect module `@babylonjs/core/Animations/animatable`
+  (`AddAnimationExtensions(Scene, Bone)` patches the prototype; the `declare module` block keeps
+  tsc silent, so typecheck passed while the live game crashed on the first NPC animation).
+  Fix: side-effect `import "@babylonjs/core/Animations/animatable"` in
+  `src/systems/animation-system.ts`. One-line change, full suite + smoke green after.
+- **Type fixes in new world-gen tests** (were failing `tsc`): unused `options` params in
+  `dungeon-generator.test.ts` mocks → `_options`; `SimplexTerrainGenerator({seed})` → `(seed)` in
+  `river-network.test.ts` (constructor takes `string | number`, not an options object).
+- **Spec update**: `tests/e2e/skill-tree.spec.ts` header + "UIManager gap" describe rewritten to
+  "fixed" status (verified `refreshSkillTree(..., prereqMet?)` renders "🔒 Locked" and
+  `SkillTreeSystem` passes `arePrerequisitesMet`).
 
 ## Known deferred work (from the audits)
 

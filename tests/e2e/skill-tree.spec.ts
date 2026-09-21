@@ -4,19 +4,21 @@
  * This suite drives the HTML-based SkillTreeUI (src/ui/skill-tree-ui.ts) wired
  * to SkillTreeSystem (src/systems/skill-tree-system.ts) through a headless
  * browser, without loading the full BabylonJS game.  It exercises every
- * observable behaviour and documents one known gap found during the audit:
+ * observable behaviour, including the regression coverage for a gap found
+ * during the audit and since fixed:
  *
- *   ⚠  AUDIT FINDING — prerequisites not enforced in the BabylonJS UIManager
+ *   ✅ FIXED (was: AUDIT FINDING) — prerequisites are now enforced visually
  *   ──────────────────────────────────────────────────────────────────────────
- *   UIManager.refreshSkillTree() (src/ui/ui-manager.ts:728-837) renders skill
- *   buttons with `canBuy = !isMax && skillPoints > 0` — it NEVER consults
- *   arePrerequisitesMet().  That means locked skills (e.g. Warrior's Edge
- *   before Iron Skin rank 1, Mana Flow before Arcane Power rank 1) appear
- *   as clickable "[+] Upgrade" buttons in the in-game BabylonJS panel.
- *   The system does enforce the prerequisite on purchase and shows a
- *   "Requires: …" notification, but the user gets no visual indication that
- *   the skill is locked.  The HTML SkillTreeUI exercised in these tests
- *   handles this correctly — the discrepancy is in UIManager.
+ *   UIManager.refreshSkillTree() (src/ui/ui-manager.ts) accepts an optional
+ *   `prereqMet` predicate and renders unmet-prerequisite skills as a
+ *   non-clickable "🔒 Locked" label (with an accessibility tag) instead of a
+ *   "[+] Upgrade" button.  SkillTreeSystem passes
+ *   `(i, j) => this.arePrerequisitesMet(i, j)`, so locked skills (e.g.
+ *   Warrior's Edge before Iron Skin rank 1, Mana Flow before Arcane Power
+ *   rank 1) are visibly locked in the in-game BabylonJS panel.
+ *   The system also enforces the prerequisite on purchase and shows a
+ *   "Requires: …" notification as a second layer of defence.  The HTML
+ *   SkillTreeUI exercised in these tests handles this correctly too.
  *
  * Run: npm run test:e2e
  */
@@ -603,15 +605,16 @@ test.describe("Skill Tree Audit — save/restore state", () => {
   });
 });
 
-// ── Audit finding: BabylonJS UIManager prerequisite gap ──────────────────────
+// ── Audit regression: BabylonJS UIManager prerequisite locking (fixed) ───────
 
-test.describe("Skill Tree Audit — prerequisite enforcement (UIManager gap)", () => {
+test.describe("Skill Tree Audit — prerequisite enforcement (UIManager, fixed)", () => {
   /**
-   * This group documents the known gap: UIManager.refreshSkillTree() does
-   * not visually lock skills whose prerequisites are unmet.  The system
+   * Regression coverage for the former gap where UIManager.refreshSkillTree()
+   * did not visually lock skills whose prerequisites were unmet.  The UI now
+   * renders those skills as "🔒 Locked" (see header note); the system
    * (SkillTreeSystem.purchaseSkill) still rejects such purchases and fires
-   * a "Requires: …" notification.  The HTML SkillTreeUI exercised in all
-   * other tests handles this correctly.
+   * a "Requires: …" notification as defence in depth.  The HTML SkillTreeUI
+   * exercised in all other tests handles this correctly.
    */
   test.beforeEach(async ({ page }) => {
     await openHarness(page);
@@ -644,7 +647,7 @@ test.describe("Skill Tree Audit — prerequisite enforcement (UIManager gap)", (
 
   test("system rejects Warrior's Edge purchase and fires Requires notification (even if called directly)", async ({ page }) => {
     await grantPoints(page, 3);
-    // Directly invoke purchaseSkill to simulate the UIManager gap (bypasses button disable)
+    // Directly invoke purchaseSkill to verify defence in depth (bypasses button disable)
     const result = await page.evaluate(() => {
       return (window as HarnessWindow).__harness.system.purchaseSkill(0, 1);
     });

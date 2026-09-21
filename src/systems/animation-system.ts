@@ -35,6 +35,13 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Animation } from "@babylonjs/core/Animations/animation";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+// Side-effect import: registers Scene.prototype.beginAnimation /
+// beginDirectAnimation / stopAllAnimations via AddAnimationExtensions.
+// Babylon.js v8 ships these as an optional extension — without this import
+// the methods are absent at runtime (the types still resolve through the
+// `declare module "../scene.js"` augmentation, so tsc stays silent while
+// the live game crashes with "beginAnimation is not a function").
+import "@babylonjs/core/Animations/animatable";
 
 /** The set of named animation clips the system can play. */
 export type AnimationClip =
