@@ -109,6 +109,9 @@ import { LootTableCreatorSystem } from "./systems/loot-table-creator-system";
 import { LootTableCreatorUI } from "./ui/loot-table-creator-ui";
 import { SpawnCreatorSystem } from "./systems/spawn-creator-system";
 import { SpawnCreatorUI } from "./ui/spawn-creator-ui";
+import { WorldBuilderSystem } from "./systems/world-builder-system";
+import { WorldBuilderUI } from "./ui/world-builder-ui";
+import { DungeonGenerator } from "./world/dungeon-generator";
 import { ContentBundleSystem } from "./systems/content-bundle-system";
 import { ContentBundleUI } from "./ui/content-bundle-ui";
 import { EditorHubUI, type EditorToolId } from "./ui/editor-hub-ui";
@@ -267,6 +270,8 @@ export class Game {
   public lootTableCreatorUI: LootTableCreatorUI;
   public spawnCreatorSystem: SpawnCreatorSystem;
   public spawnCreatorUI: SpawnCreatorUI;
+  public worldBuilderSystem: WorldBuilderSystem;
+  public worldBuilderUI: WorldBuilderUI;
   public contentBundleSystem: ContentBundleSystem;
   public contentBundleUI: ContentBundleUI;
   public assetBrowserSystem: AssetBrowserSystem;
@@ -986,6 +991,38 @@ export class Game {
       this.workspaceDraftSystem.markDirty();
     };
 
+    // ── World Builder ───────────────────────────────────────────────────────────
+    this.worldBuilderSystem = new WorldBuilderSystem();
+    this.worldBuilderUI = new WorldBuilderUI(this.worldBuilderSystem);
+    this.worldBuilderUI.onClose = () => {
+      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
+    this.worldBuilderUI.onApplyToWorld = (worldSeed) => {
+      this.world.setSeed(worldSeed);
+
+      // Register procedural settlements as discoverable fast-travel landmarks
+      if (this.fastTravelSystem && this.worldBuilderSystem.settlements.length > 0) {
+        for (const s of this.worldBuilderSystem.settlements) {
+          const wp = new Vector3(s.cx * this.world.chunkSize, 2, s.cz * this.world.chunkSize);
+          this.fastTravelSystem.discoverLocation(`settlement_${s.id}`, s.name, wp);
+        }
+      }
+
+      // Generate seeded Arthurian barrow interior cell and register with CellManager
+      if (this.cellManager) {
+        const dungeonGen = new DungeonGenerator({ seed: worldSeed.seedString, dangerLevel: 3 });
+        this.cellManager.registerCell(dungeonGen.toCellDefinition());
+      }
+
+      this.ui.showNotification(
+        `Applied world seed: ${worldSeed.seedString} (${worldSeed.options.worldType} / ${worldSeed.options.biomeScale})`,
+        3000,
+      );
+    };
+
     // ── Content Bundle ─────────────────────────────────────────────────────────
     this.contentBundleSystem = new ContentBundleSystem();
     this.contentBundleSystem
@@ -1019,13 +1056,13 @@ export class Game {
             this._refreshEditorToolbar();
           }
           break;
-        case "quest":     this.questCreatorUI.open();     break;
-        case "dialogue":  this.dialogueCreatorUI.open();  break;
-        case "faction":   this.factionCreatorUI.open();   break;
-        case "lootTable": this.lootTableCreatorUI.open(); break;
-        case "npc":       this.npcCreatorUI.open();       break;
-        case "item":      this.itemCreatorUI.open();      break;
-        case "spawn":     this.spawnCreatorUI.open();     break;
+        case "quest":        this.questCreatorUI.open();        break;
+        case "dialogue":     this.dialogueCreatorUI.open();     break;
+        case "faction":      this.factionCreatorUI.open();      break;
+        case "lootTable":    this.lootTableCreatorUI.open();    break;
+        case "npc":          this.npcCreatorUI.open();          break;
+        case "item":         this.itemCreatorUI.open();         break;
+        case "spawn":        this.spawnCreatorUI.open();        break;
         default: break;
       }
     };
@@ -3264,6 +3301,10 @@ export class Game {
                     this.spawnCreatorUI.close();
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.worldBuilderUI.isVisible) {
+                    this.worldBuilderUI.close();
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
                 } else if (this.contentBundleUI.isVisible) {
                     this.contentBundleUI.close();
                     this.canvas.requestPointerLock();
@@ -3547,9 +3588,35 @@ export class Game {
                 const step = this.mapEditorSystem.adjustTerrainSculptStep(0.1);
                 this.ui.showNotification(`Terrain sculpt step: ${step.toFixed(1)}`, 1200);
             } else if (kbInfo.event.key === "F4") {
-                if (!this.mapEditorSystem.isEnabled) return;
-                this.mapEditorSystem.exportToFile();
-                this.ui.showNotification("Map exported to file", 2000);
+                if (kbInfo.event.shiftKey) {
+                    // Shift+F4 → World Builder
+                    if (this.worldBuilderUI.isVisible) {
+                        this.worldBuilderUI.close();
+                    } else {
+                        this.worldBuilderUI.open();
+                        this.interactionSystem.isBlocked = true;
+                        document.exitPointerLock();
+                        this.player.camera.detachControl();
+                    }
+                } else {
+                    if (!this.mapEditorSystem.isEnabled) return;
+                    this.mapEditorSystem.exportToFile();
+                    this.ui.showNotification("Map exported to file", 2000);
+                }
+            } else if (
+                (kbInfo.event.key === "w" || kbInfo.event.key === "W") &&
+                (kbInfo.event.ctrlKey || kbInfo.event.metaKey) &&
+                kbInfo.event.shiftKey
+            ) {
+                // Ctrl+Shift+W → World Builder
+                if (this.worldBuilderUI.isVisible) {
+                    this.worldBuilderUI.close();
+                } else {
+                    this.worldBuilderUI.open();
+                    this.interactionSystem.isBlocked = true;
+                    document.exitPointerLock();
+                    this.player.camera.detachControl();
+                }
             } else if (kbInfo.event.key === "z" && (kbInfo.event.ctrlKey || kbInfo.event.metaKey) && !kbInfo.event.shiftKey) {
                 if (!this.mapEditorSystem.isEnabled) return;
                 const undone = this.mapEditorSystem.undo();
@@ -5141,6 +5208,9 @@ export class Game {
           break;
         case "spawn":
           this.spawnCreatorUI.open();
+          break;
+        case "worldBuilder":
+          this.worldBuilderUI.open();
           break;
         case "bundle":
           this.contentBundleUI.open();

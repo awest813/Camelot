@@ -88,6 +88,15 @@ const SHELL_TOOLS: ShellToolEntry[] = [
     section: "world",
     accent: "#6ee7b7",
   },
+  {
+    id: "worldBuilder",
+    label: "World Builder",
+    icon: "🌍",
+    description: "Macro world generator: tune seeds, biome distribution, terrain scale, and regions.",
+    shortcut: "Shift+F4",
+    section: "world",
+    accent: "#48bb78",
+  },
   // Tools section
   {
     id: "bundle",

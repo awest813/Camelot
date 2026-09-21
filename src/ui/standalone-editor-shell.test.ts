@@ -249,11 +249,11 @@ describe("StandaloneEditorShell", () => {
       expect(headers.length).toBe(3);
     });
 
-    it("renders 12 tool navigation items total", () => {
+    it("renders 13 tool navigation items total", () => {
       const shell = makeShell();
       shell.open();
       const items = document.querySelectorAll(".standalone-editor__nav-item");
-      expect(items.length).toBe(12);
+      expect(items.length).toBe(13);
     });
 
     it("each nav item carries a data-tool-id attribute", () => {

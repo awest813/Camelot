@@ -303,6 +303,8 @@ describe("SpellSystem", () => {
     sys.castSpell();
     expect(npc.takeDamage).toHaveBeenCalled();
     expect(onHostile).toHaveBeenCalledWith(npc, expect.any(Number));
+  });
+
   // ── Expanded school & spell casting coverage ───────────────────────────────
 
   it("default spells include definitions across all five magical schools", () => {

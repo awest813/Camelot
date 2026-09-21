@@ -28,6 +28,7 @@ export type EditorToolId =
   | "faction"
   | "lootTable"
   | "spawn"
+  | "worldBuilder"
   | "bundle"
   | "assets"
   | "merge"
@@ -111,6 +112,14 @@ const TOOLS: ToolEntry[] = [
     description: "Author NPC spawn groups with archetype picker, loot table linking, count, level range, and respawn interval; inline validation hints flag issues before export.",
     shortcut:    "Shift+F11",
     accentVar:   "#6ee7b7",
+  },
+  {
+    id:          "worldBuilder",
+    label:       "World Builder",
+    icon:        "🌍",
+    description: "Macro world generator: tune procedural seeds, biome distribution, terrain elevation scale, and environmental temperature with a 2D chunk minimap preview.",
+    shortcut:    "Shift+F4",
+    accentVar:   "#48bb78",
   },
   {
     id:          "bundle",
