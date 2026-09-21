@@ -29,6 +29,8 @@ import { BabylonInputAdapter } from "./adapters/babylon/babylon-input-adapter";
 import { GamepadInputSystem } from "./systems/gamepad-input-system";
 import { InventorySystem } from "./systems/inventory-system";
 import type { WeaponArchetype } from "./systems/combat-shared";
+import { applyDamageWithResistance } from "./systems/combat-shared";
+import type { DamageType } from "./entities/npc";
 import { EquipmentSystem } from "./systems/equipment-system";
 import { SaveSystem } from "./systems/save-system";
 import { QuestSystem } from "./systems/quest-system";
@@ -162,6 +164,8 @@ import { QuickSlotHUD } from "./ui/quickslot-hud";
 import { PerkSystem } from "./systems/perk-system";
 import { DynamicWorldEventSystem } from "./systems/dynamic-world-event-system";
 import type { DynamicEventReward } from "./systems/dynamic-world-event-system";
+import { DragonShoutSystem, type ShoutTierEffect } from "./systems/dragon-shout-system";
+import { ShoutUI, type ShoutView } from "./ui/shout-ui";
 import { GraphicsSettingsUI, type CameraSensitivity } from "./ui/graphics-settings-ui";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
@@ -397,6 +401,16 @@ export class Game {
 
   // v28 systems
   public dynamicWorldEventSystem!: DynamicWorldEventSystem;
+
+  // Thu'um — dragon shouts (wired post-alpha; state persists via saveSystem)
+  public dragonShoutSystem: DragonShoutSystem;
+  public shoutUI: ShoutUI;
+  /** Multiplier applied to NPC AI updates while Slow Time is active (1 = normal). */
+  private _hostileTimeScale: number = 1;
+  /** Real seconds remaining on the Slow Time shout effect. */
+  private _slowTimeRemaining: number = 0;
+  /** Real seconds remaining on the Elemental Fury shout effect. */
+  private _attackSpeedBuffRemaining: number = 0;
 
   /** Fantasy asset loader — streams BabylonJS CDN models (weapons, structures, creatures). */
   public fantasyAssets: FantasyAssetLoader;
@@ -2294,6 +2308,52 @@ export class Game {
     };
     this.saveSystem.setTrainerSystem(this.trainerSystem);
 
+    // ── Thu'um: Dragon Shouts ─────────────────────────────────────────────
+    // Souls + word discovery come from slaying dragons (see the elite drop
+    // branch in onNPCDeath); souls are spent in the shouts panel [N].
+    this.dragonShoutSystem = new DragonShoutSystem();
+    this.dragonShoutSystem.onShoutUsed = (shoutId, _wordCount, tier) => {
+      this._applyShoutEffects(shoutId, tier);
+    };
+    this.dragonShoutSystem.onWordLearned = (_shoutId, _wordIndex, word) => {
+      this.ui.showNotification(`Word of Power learned: ${word.dragonWord} — "${word.translation}"`, 3600);
+    };
+    this.dragonShoutSystem.onWordUnlocked = (shoutId, wordIndex, word) => {
+      const def = this.dragonShoutSystem.getShout(shoutId);
+      this.ui.showNotification(
+        `${def?.name ?? shoutId}: "${word.dragonWord}" unlocked (${wordIndex + 1}/3 words).`,
+        3000,
+      );
+      if (this.shoutUI.isVisible) {
+        this.shoutUI.refresh(this._buildShoutViews(), this.dragonShoutSystem.dragonSouls, this.dragonShoutSystem.equippedShoutId);
+      }
+      this.saveSystem.markDirty();
+    };
+    this.dragonShoutSystem.onDragonSoulGained = (total) => {
+      this.ui.showNotification(`Dragon soul absorbed (${total} held).`, 3000);
+    };
+    this.saveSystem.setDragonShoutSystem(this.dragonShoutSystem);
+
+    this.shoutUI = new ShoutUI();
+    this.shoutUI.onEquip = (shoutId) => {
+      if (this.dragonShoutSystem.equipShout(shoutId)) {
+        this.shoutUI.refresh(this._buildShoutViews(), this.dragonShoutSystem.dragonSouls, shoutId);
+        const def = this.dragonShoutSystem.getShout(shoutId);
+        this.ui.showNotification(`${def?.name ?? shoutId} equipped — Shift+N to shout.`, 2400);
+        this.saveSystem.markDirty();
+      }
+    };
+    this.shoutUI.onUnlockWord = (shoutId, wordIndex) => {
+      if (!this.dragonShoutSystem.unlockWord(shoutId, wordIndex)) {
+        this.ui.showNotification("Cannot unlock that word — a dragon soul is required.", 2400);
+      }
+    };
+    this.shoutUI.onClose = () => {
+      this.interactionSystem.isBlocked = false;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
+
     // ── v26: Follower System ──────────────────────────────────────────────
     this.followerSystem = new FollowerSystem();
     this.followerSystem.onFollowerRecruited = (_templateId, name) => {
@@ -2942,6 +3002,14 @@ export class Game {
                 this.ui.showNotification(`The elite drops ${template.name}!`, 2600);
             }
         }
+
+        // Slaying a dragon absorbs its soul and echoes a new Word of Power
+        // into the player's mind (unlock it in the shouts panel [N]).
+        if (/^DragonBoss/.test(npc.mesh.name)) {
+            this.dragonShoutSystem.gainDragonSoul();
+            this._learnNextWordOfTheVoice();
+            this.saveSystem.markDirty();
+        }
     };
     this.projectileSystem.onNPCDeath = this.combatSystem.onNPCDeath;
     this.combatSystem.onNpcDamaged = (npc) => {
@@ -3263,6 +3331,11 @@ export class Game {
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this.shoutUI.isVisible) {
+                    this.shoutUI.close();
+                    this.interactionSystem.isBlocked = false;
+                    this.canvas.requestPointerLock();
+                    this.player.camera.attachControl(this.canvas, true);
                 } else if (this.pickpocketUI.isVisible) {
                     this._pickpocketTargetId = null;
                     this.pickpocketUI.hide();
@@ -3413,6 +3486,7 @@ export class Game {
                     this.saddlebagUI.isVisible ||
                     this.petUI.isVisible ||
                     this.followerUI.isVisible ||
+                    this.shoutUI.isVisible ||
                     this.pickpocketUI.isVisible ||
                     this.interactionSystem.isBlocked
                 ) {
@@ -4345,6 +4419,38 @@ export class Game {
       this.followerUI.open(templates, activeFollower, deceasedIds, this._getInventoryGold());
       this._suspendGameplayInput();
     });
+    adapter.onAction("toggleShoutMenu", () => {
+      if (this.shoutUI.isVisible) {
+        this.shoutUI.close();
+        this._restoreGameplayInput();
+        return;
+      }
+      if (this._isCombatInputBlocked()) return;
+      this.shoutUI.open(
+        this._buildShoutViews(),
+        this.dragonShoutSystem.dragonSouls,
+        this.dragonShoutSystem.equippedShoutId,
+      );
+      this._suspendGameplayInput();
+    });
+    adapter.onAction("useShout", () => {
+      if (this._isCombatInputBlocked()) return;
+      const result = this.dragonShoutSystem.useShout(this.timeSystem.gameTime);
+      if (result.success) return; // effects applied via onShoutUsed
+      switch (result.reason) {
+        case "no_shout_equipped":
+          this.ui.showNotification("No shout equipped — open the shouts panel (N).", 2200);
+          break;
+        case "no_words_unlocked":
+          this.ui.showNotification("That shout has no unlocked words — spend a dragon soul (N).", 2600);
+          break;
+        case "on_cooldown":
+          this.ui.showNotification(`The Thu'um needs ${Math.ceil(result.cooldownRemainingSeconds ?? 0)}s to recover.`, 1800);
+          break;
+        default:
+          break;
+      }
+    });
     adapter.onAction("toggleWaitDialog", () => {
       if (this.ui.isWaitDialogOpen) {
         this.ui.toggleWaitDialog(false);
@@ -4668,6 +4774,7 @@ export class Game {
           if (this.fastTravelUI.isVisible) { this.fastTravelUI.close(); }
           if (this.petUI.isVisible) { this.petUI.close(); }
           if (this.followerUI.isVisible) { this.followerUI.close(); }
+          if (this.shoutUI.isVisible) { this.shoutUI.close(); }
           if (this.pickpocketUI.isVisible) { this._pickpocketTargetId = null; this.pickpocketUI.hide(); }
           if (this.stableUI.isVisible) { this.stableUI.close(); }
           if (this.saddlebagUI.isVisible) { this.saddlebagUI.close(); }
@@ -5350,6 +5457,196 @@ export class Game {
       }
   }
 
+  // ── Thu'um: dragon shout helpers ──────────────────────────────────────────
+
+  /**
+   * Learn the next undiscovered Word of Power, walking the shout catalogue in
+   * registration order.  Silent when every word is already known.
+   */
+  private _learnNextWordOfTheVoice(): void {
+    for (const def of this.dragonShoutSystem.getAllShouts()) {
+      for (let i = 0 as 0 | 1 | 2; i < def.words.length; i = (i + 1) as 0 | 1 | 2) {
+        if (!this.dragonShoutSystem.isWordLearned(def.id, i)) {
+          this.dragonShoutSystem.learnWord(def.id, i);
+          return;
+        }
+      }
+    }
+  }
+
+  /** Snapshot all registered shouts for the shouts panel. */
+  private _buildShoutViews(): ShoutView[] {
+    return this.dragonShoutSystem.getAllShouts().map((def) => {
+      const learned: boolean[] = [];
+      const unlocked: boolean[] = [];
+      for (let i = 0 as 0 | 1 | 2; i < def.words.length; i = (i + 1) as 0 | 1 | 2) {
+        learned.push(this.dragonShoutSystem.isWordLearned(def.id, i));
+        unlocked.push(this.dragonShoutSystem.isWordUnlocked(def.id, i));
+      }
+      return { def, learned, unlocked };
+    });
+  }
+
+  /**
+   * Deliver a shout's tier effects to the world.  Called from
+   * `dragonShoutSystem.onShoutUsed` after the headless system validated
+   * cooldown and unlocked words.
+   */
+  private _applyShoutEffects(shoutId: string, tier: ShoutTierEffect): void {
+    const def = this.dragonShoutSystem.getShout(shoutId);
+    if (!def) return;
+    const fx = tier.effects;
+    const words = def.words.slice(0, this.dragonShoutSystem.getUnlockedTier(shoutId))
+      .map(w => w!.dragonWord)
+      .join(" ");
+    this.ui.showNotification(`"${words}!" — ${tier.description}`, 2400);
+
+    // Cone in front of the player: shouts are voice-borne, so they only reach
+    // what the player is facing (generous 16u reach, ~75° half-angle).
+    const forward = this.player.getForwardDirection(1);
+    forward.y = 0;
+    forward.normalize();
+    const origin = this.player.camera.position;
+    const inCone = (npc: NPC): boolean => {
+      if (npc.isDead) return false;
+      const toNpc = npc.mesh.position.subtract(origin);
+      toNpc.y = 0;
+      const dist = toNpc.length();
+      if (dist > 16) return false;
+      if (dist < 0.001) return true;
+      return Vector3.Dot(forward, toNpc.scale(1 / dist)) > 0.25;
+    };
+
+    if (fx.knockback_force) {
+      const staggerSeconds = fx.stagger_duration ?? 1.0;
+      const impulseMag = fx.knockback_force / 10;
+      for (const npc of this.combatSystem.npcs) {
+        if (!inCone(npc)) continue;
+        if (npc.physicsAggregate?.body) {
+          npc.physicsAggregate.body.applyImpulse(
+            forward.scale(impulseMag),
+            npc.mesh.position,
+          );
+        }
+        npc.isStaggered = true;
+        npc.isAttackTelegraphing = false;
+        npc.attackTelegraphTimer = 0;
+        npc.staggerTimer = staggerSeconds;
+        if (fx.knockback_damage) this._dealShoutDamage(npc, fx.knockback_damage, "physical");
+      }
+    }
+
+    if (fx.dash_distance) {
+      const wanted = Math.min(fx.dash_distance, 30);
+      const flat = new Vector3(forward.x, 0, forward.z);
+      if (flat.lengthSquared() > 0.001) {
+        flat.normalize();
+        // Stop short of any wall between the player and the dash target.
+        const pick = this.player.raycastForward(wanted);
+        const reach = pick?.hit ? Math.max(1, pick.distance - 0.8) : wanted;
+        this.player.camera.position.addInPlace(flat.scale(reach));
+      }
+    }
+
+    if (fx.ethereal_duration) {
+      this.activeEffectsSystem.addEffect({
+        id: `shout_ethereal_${Date.now()}`,
+        name: "Become Ethereal",
+        effectType: "resist_damage",
+        magnitude: 100,
+        duration: fx.ethereal_duration,
+      });
+    }
+
+    if (fx.fire_damage) {
+      for (const npc of this.combatSystem.npcs) {
+        if (!inCone(npc)) continue;
+        this._dealShoutDamage(npc, fx.fire_damage, "fire");
+        if (fx.fire_dot_damage && fx.fire_dot_duration && !npc.isDead) {
+          npc.applyStatusEffect({
+            type: "burn",
+            damagePerTick: fx.fire_dot_damage,
+            tickInterval: 1,
+            tickTimer: 1,
+            remainingDuration: fx.fire_dot_duration,
+          });
+        }
+      }
+    }
+
+    if (fx.freeze_duration) {
+      // Ice Form freezes a single opponent — the closest one in the cone.
+      let target: NPC | null = null;
+      let bestDist = Infinity;
+      for (const npc of this.combatSystem.npcs) {
+        if (!inCone(npc)) continue;
+        const d = Vector3.DistanceSquared(npc.mesh.position, origin);
+        if (d < bestDist) { bestDist = d; target = npc; }
+      }
+      if (target) {
+        target.applyStatusEffect({
+          type: "freeze",
+          damagePerTick: 0,
+          tickInterval: 1,
+          tickTimer: 1,
+          remainingDuration: fx.freeze_duration,
+        });
+        target.isStaggered = true;
+        target.isAttackTelegraphing = false;
+        target.attackTelegraphTimer = 0;
+        target.staggerTimer = fx.freeze_duration;
+        if (fx.frost_damage) this._dealShoutDamage(target, fx.frost_damage, "frost");
+      }
+    }
+
+    if (fx.time_scale && fx.slow_duration) {
+      this._hostileTimeScale = fx.time_scale;
+      this._slowTimeRemaining = fx.slow_duration;
+    }
+
+    if (fx.attack_speed_mult && fx.attack_speed_duration) {
+      this.combatSystem.externalAttackSpeedMultiplier = fx.attack_speed_mult;
+      this._attackSpeedBuffRemaining = fx.attack_speed_duration;
+    }
+
+    if (fx.clear_fog) {
+      this.weatherSystem.forceWeather("clear");
+    }
+  }
+
+  /**
+   * Apply shout-originated damage through the shared resistance formula and
+   * route kills exactly like arrows do (hostile-hit aggro + onNPCDeath).
+   */
+  private _dealShoutDamage(npc: NPC, rawDamage: number, damageType: DamageType): void {
+    if (npc.isDead) return;
+    const damage = applyDamageWithResistance(rawDamage, npc, damageType);
+    npc.takeDamage(damage);
+    this.combatSystem.notifyHostileHit(npc, damage);
+    if (npc.isDead) {
+      this.ui.showNotification(`${npc.mesh.name} defeated!`);
+      this.combatSystem.onNPCDeath?.(npc.mesh.name, npc.xpReward, npc);
+    }
+  }
+
+  /** Tick shout buff timers; expires Slow Time and Elemental Fury. */
+  private _updateShoutBuffs(deltaTime: number): void {
+    if (this._slowTimeRemaining > 0) {
+      this._slowTimeRemaining = Math.max(0, this._slowTimeRemaining - deltaTime);
+      if (this._slowTimeRemaining === 0) {
+        this._hostileTimeScale = 1;
+        this.ui.showNotification("Time resumes its flow.", 1600);
+      }
+    }
+    if (this._attackSpeedBuffRemaining > 0) {
+      this._attackSpeedBuffRemaining = Math.max(0, this._attackSpeedBuffRemaining - deltaTime);
+      if (this._attackSpeedBuffRemaining === 0) {
+        this.combatSystem.externalAttackSpeedMultiplier = 1;
+        this.ui.showNotification("The fury of the wind fades.", 1600);
+      }
+    }
+  }
+
   private _updateGameplayStep(deltaTime: number): void {
       this.player.update(deltaTime);
       this.audioSystem.updateFootsteps(deltaTime, this.player.camera.position);
@@ -5360,7 +5657,9 @@ export class Game {
 
       this.scheduleSystem.update(deltaTime);
       this.combatSystem.update(deltaTime);
-      this.combatSystem.updateNPCAI(deltaTime);
+      this._updateShoutBuffs(deltaTime);
+      // Slow Time squeezes the NPC AI clock (movement, telegraphs, strikes).
+      this.combatSystem.updateNPCAI(deltaTime * this._hostileTimeScale);
 
       for (const npc of this.scheduleSystem.npcs) {
         const hitReact = npc.justTakenDamageVisual;
@@ -5589,6 +5888,24 @@ export class Game {
           this._lastFollowerId     = afId;
           this._lastFollowerHealth = af?.health ?? -1;
           this.followerUI?.updateHUD(af);
+        }
+      }
+
+      // Shout HUD chip — equipped shout name, word pips, cooldown countdown.
+      // updateHUD() skips DOM writes when nothing changed, so per-frame calls
+      // are cheap.
+      {
+        const equippedId = this.dragonShoutSystem?.equippedShoutId ?? null;
+        if (equippedId) {
+          const def = this.dragonShoutSystem.getShout(equippedId);
+          const tier = this.dragonShoutSystem.getUnlockedTier(equippedId);
+          this.shoutUI?.updateHUD({
+            name: def?.name ?? equippedId,
+            tier,
+            cooldownSeconds: this.dragonShoutSystem.cooldownRemaining(equippedId, this.timeSystem.gameTime),
+          });
+        } else {
+          this.shoutUI?.updateHUD(null);
         }
       }
 

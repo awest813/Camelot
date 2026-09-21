@@ -350,5 +350,37 @@ describe("BabylonInputAdapter", () => {
     expect(actions.has("pause")).toBe(true);
     expect(actions.has("save")).toBe(true);
     expect(actions.has("toggleMapEditor")).toBe(true);
+    expect(actions.has("toggleShoutMenu")).toBe(true);
+    expect(actions.has("useShout")).toBe(true);
+  });
+
+  // ── Shout keys (N / Shift+N) ────────────────────────────────────────────────
+
+  it("plain N fires toggleShoutMenu", () => {
+    const adapter = new BabylonInputAdapter();
+    const fired: InputAction[] = [];
+    adapter.onAction("toggleShoutMenu", () => fired.push("toggleShoutMenu"));
+    adapter.onAction("useShout", () => fired.push("useShout"));
+    expect(adapter.handleKeyEvent("n", "down")).toBe("toggleShoutMenu");
+    expect(adapter.handleKeyEvent("N", "down")).toBe("toggleShoutMenu");
+    expect(fired).toEqual(["toggleShoutMenu", "toggleShoutMenu"]);
+  });
+
+  it("Shift+N fires useShout and not toggleShoutMenu", () => {
+    const adapter = new BabylonInputAdapter();
+    const fired: InputAction[] = [];
+    adapter.onAction("toggleShoutMenu", () => fired.push("toggleShoutMenu"));
+    adapter.onAction("useShout", () => fired.push("useShout"));
+    expect(adapter.handleKeyEvent("n", "down", { shift: true })).toBe("useShout");
+    expect(adapter.handleKeyEvent("N", "down", { shift: true })).toBe("useShout");
+    expect(fired).toEqual(["useShout", "useShout"]);
+  });
+
+  it("useShout is not fired without Shift", () => {
+    const adapter = new BabylonInputAdapter();
+    const fired: InputAction[] = [];
+    adapter.onAction("useShout", () => fired.push("useShout"));
+    expect(adapter.handleKeyEvent("n", "down")).toBe("toggleShoutMenu");
+    expect(fired).toEqual([]);
   });
 });

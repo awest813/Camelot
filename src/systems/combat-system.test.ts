@@ -245,6 +245,25 @@ describe('CombatSystem', () => {
         expect(mockPlayer.stamina).toBe(76);  // 88 − 12 = 76
     });
 
+    it('externalAttackSpeedMultiplier shortens melee cooldown (Elemental Fury)', () => {
+        mockScene.pickWithRay.mockReturnValue(null);
+
+        // Baseline cadence: a 0.2s tick does NOT free the sword's ~0.29s swing.
+        expect(combatSystem.meleeAttack()).toBe(true);
+        combatSystem.updateNPCAI(0.2);
+        expect(combatSystem.meleeAttack()).toBe(false);
+        combatSystem.updateNPCAI(0.2); // clears the rest of the baseline swing
+
+        // With the Elemental Fury buff (2× attack speed) the swing cooldown
+        // drops to ~0.17s (floor-limited), so a 0.2s tick frees every swing.
+        combatSystem.externalAttackSpeedMultiplier = 2.0;
+        expect(combatSystem.meleeAttack()).toBe(true);
+        combatSystem.updateNPCAI(0.2);
+        expect(combatSystem.meleeAttack()).toBe(true);
+        combatSystem.updateNPCAI(0.2);
+        expect(combatSystem.meleeAttack()).toBe(true);
+    });
+
     it('magicAttack enforces cooldown cadence between casts', () => {
         expect(combatSystem.magicAttack()).toBe(true);
         expect(mockPlayer.magicka).toBe(80);

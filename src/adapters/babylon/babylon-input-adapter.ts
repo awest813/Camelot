@@ -47,6 +47,8 @@ export type InputAction =
   | "racialPower"
   | "dodgeRoll"
   | "toggleFollowerPanel"
+  | "toggleShoutMenu"
+  | "useShout"
   // Movement / stance
   | "toggleCrouch"
   | "jump"
@@ -162,6 +164,12 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   { key: "F8", action: "favoritesMenu", shift: false },
   // G = Follower panel (F is taken by the dodge roll)
   { key: "g", action: "toggleFollowerPanel", caseInsensitive: true },
+  // N = Shouts menu; Shift+N = activate the equipped shout.  The shift binding
+  // must precede the plain binding (same pattern as the O mount/stable pair).
+  // In map-editor mode the adapter is bypassed for "n" (not in
+  // _EDITOR_ADAPTER_KEYS), so the editor's place-entity N keeps working.
+  { key: "n", action: "useShout", shift: true, caseInsensitive: true },
+  { key: "n", action: "toggleShoutMenu", shift: false, caseInsensitive: true },
 
   // ── UI panels ───────────────────────────────────────────────────────────────
   // Tab = Character sheet (stays in legacy handler)

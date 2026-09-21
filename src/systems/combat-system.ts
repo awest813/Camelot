@@ -374,6 +374,13 @@ export class CombatSystem {
   /** Scales damage NPCs deal to the player (easy 0.6 · normal 1.0 · hard 1.5). */
   public difficultyMultiplier: number = 1.0;
 
+  /**
+   * External attack-speed multiplier for the player's melee/power-attack
+   * cooldowns (e.g. the Elemental Fury shout).  Stacks multiplicatively with
+   * the internal cadence multiplier; 1 = normal speed.
+   */
+  public externalAttackSpeedMultiplier: number = 1.0;
+
   /** Dodge roll: remaining i-frame time, slide time, cooldown, and dash direction. */
   private _dodgeIframeTimer: number = 0;
   private _dodgeSlideTimer: number = 0;
@@ -1810,7 +1817,8 @@ export class CombatSystem {
   }
 
   private _scaledMeleeCooldown(baseCooldown: number): number {
-    const scaled = baseCooldown / this._meleeCadenceMultiplier();
+    const scaled =
+      baseCooldown / (this._meleeCadenceMultiplier() * Math.max(0.1, this.externalAttackSpeedMultiplier));
     return Math.max(baseCooldown * 0.45, scaled);
   }
 
