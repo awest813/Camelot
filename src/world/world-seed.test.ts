@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { WorldSeed, WorldType, BiomeScale, StructureDensity } from './world-seed';
+import { WorldSeed, applyTemperatureBias, WorldType, BiomeScale, StructureDensity } from './world-seed';
 import type { BiomeType } from './world-manager';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -345,5 +345,101 @@ describe('WorldSeed.hasStructure', () => {
       }
     }
     expect(differ).toBe(true);
+  });
+});
+
+// ── WorldSeed.getBiome — temperatureShift ─────────────────────────────────────
+
+describe('applyTemperatureBias', () => {
+  it('leaves biomes unchanged for |shift| <= 0.3', () => {
+    for (const biome of ['tundra', 'plains', 'forest', 'desert'] as BiomeType[]) {
+      expect(applyTemperatureBias(biome, 0)).toBe(biome);
+      expect(applyTemperatureBias(biome, 0.3)).toBe(biome);
+      expect(applyTemperatureBias(biome, -0.3)).toBe(biome);
+    }
+  });
+
+  it('shifts one warm step: tundra → plains (shift > 0.3), plains → desert (shift > 0.6)', () => {
+    expect(applyTemperatureBias('tundra', 0.5)).toBe('plains');
+    expect(applyTemperatureBias('tundra', 0.9)).toBe('plains');
+    expect(applyTemperatureBias('plains', 0.9)).toBe('desert');
+    // A single step is never skipped past plains (tundra does not jump to desert)
+    expect(applyTemperatureBias('tundra', 0.9)).not.toBe('desert');
+    // Forest / desert are unaffected by warming
+    expect(applyTemperatureBias('forest', 0.9)).toBe('forest');
+    expect(applyTemperatureBias('desert', 0.9)).toBe('desert');
+  });
+
+  it('shifts one cold step: desert → plains (shift < -0.3), plains → tundra (shift < -0.6)', () => {
+    expect(applyTemperatureBias('desert', -0.5)).toBe('plains');
+    expect(applyTemperatureBias('desert', -0.9)).toBe('plains');
+    expect(applyTemperatureBias('plains', -0.9)).toBe('tundra');
+    expect(applyTemperatureBias('desert', -0.9)).not.toBe('tundra');
+    // Forest / tundra are unaffected by cooling
+    expect(applyTemperatureBias('forest', -0.9)).toBe('forest');
+    expect(applyTemperatureBias('tundra', -0.9)).toBe('tundra');
+  });
+});
+
+describe('WorldSeed.getBiome — temperatureShift', () => {
+  it('defaults temperatureShift to 0 and produces the unbiased world', () => {
+    const base = new WorldSeed(77);
+    expect(base.options.temperatureShift).toBe(0);
+    const warm = new WorldSeed(77, { temperatureShift: 0 });
+    for (let x = -8; x <= 8; x++) {
+      expect(warm.getBiome(x, 3)).toBe(base.getBiome(x, 3));
+    }
+  });
+
+  it('applies the bias to "normal" worlds so getBiome matches the bias remap', () => {
+    const base = new WorldSeed(77);
+    const warm = new WorldSeed(77, { temperatureShift: 0.9 });
+    const cold = new WorldSeed(77, { temperatureShift: -0.9 });
+    for (let x = -8; x <= 8; x++) {
+      for (let z = -8; z <= 8; z++) {
+        expect(warm.getBiome(x, z)).toBe(applyTemperatureBias(base.getBiome(x, z), 0.9));
+        expect(cold.getBiome(x, z)).toBe(applyTemperatureBias(base.getBiome(x, z), -0.9));
+      }
+    }
+  });
+
+  it('warms a cold world into measurably fewer tundra chunks', () => {
+    const base = new WorldSeed(5);
+    const warm = new WorldSeed(5, { temperatureShift: 0.9 });
+    const coldCounts = biomeCounts(base, 12);
+    const warmCounts = biomeCounts(warm, 12);
+    expect(warmCounts.tundra).toBeLessThan(coldCounts.tundra);
+  });
+
+  it('also biases "island" outer rings and "amplified" extremes', () => {
+    const island = new WorldSeed(9, { worldType: 'island', temperatureShift: 0.9 });
+    const islandBase = new WorldSeed(9, { worldType: 'island' });
+    // Outer island ring is tundra/desert; warming must convert the tundra half
+    let sawRemap = false;
+    for (let x = -20; x <= 20 && !sawRemap; x++) {
+      const base = islandBase.getBiome(x, 11);
+      if (base === 'tundra' && island.getBiome(x, 11) === 'plains') sawRemap = true;
+    }
+    expect(sawRemap).toBe(true);
+
+    const amp = new WorldSeed(11, { worldType: 'amplified', temperatureShift: -0.9 });
+    const ampBase = new WorldSeed(11, { worldType: 'amplified' });
+    let sawColdRemap = false;
+    for (let x = -20; x <= 20 && !sawColdRemap; x++) {
+      const base = ampBase.getBiome(x, 5);
+      if (base === 'desert' && amp.getBiome(x, 5) === 'plains') sawColdRemap = true;
+    }
+    expect(sawColdRemap).toBe(true);
+  });
+
+  it('flat worlds stay all-plains regardless of the bias', () => {
+    const flat = new WorldSeed(3, { worldType: 'flat', temperatureShift: 0.9 });
+    expect(biomeCounts(flat, 6).plains).toBe(13 * 13);
+  });
+
+  it('startingBiome pins win over the bias near the origin', () => {
+    const pinned = new WorldSeed(21, { startingBiome: 'tundra', temperatureShift: 0.9 });
+    expect(pinned.getBiome(0, 0)).toBe('tundra');
+    expect(pinned.getBiome(2, -1)).toBe('tundra');
   });
 });

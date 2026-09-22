@@ -32,6 +32,11 @@ export interface WorldGenOptions {
    * starting area. `null` means no override.  Default: `null`.
    */
   startingBiome: BiomeType | null;
+  /**
+   * Global climate bias shifting biome distribution. `-1` = colder (tundra
+   * bias), `+1` = warmer (desert bias).  Default: `0`.
+   */
+  temperatureShift: number;
 }
 
 const DEFAULT_OPTIONS: WorldGenOptions = {
@@ -39,7 +44,22 @@ const DEFAULT_OPTIONS: WorldGenOptions = {
   biomeScale: "medium",
   structureDensity: "normal",
   startingBiome: null,
+  temperatureShift: 0,
 };
+
+/**
+ * Remap a base biome according to a climate bias, moving boundaries one step
+ * along the tundra → plains → desert gradient. Used identically by
+ * `WorldSeed.getBiome` and the World Builder preview so the 2D map always
+ * matches the applied game world.
+ */
+export function applyTemperatureBias(biome: BiomeType, shift: number): BiomeType {
+  if (shift > 0.3 && biome === "tundra") return "plains";
+  if (shift > 0.6 && biome === "plains") return "desert";
+  if (shift < -0.3 && biome === "desert") return "plains";
+  if (shift < -0.6 && biome === "plains") return "tundra";
+  return biome;
+}
 
 // ─── Biome-scale frequency tables ─────────────────────────────────────────────
 
@@ -153,7 +173,7 @@ export class WorldSeed {
       // Island worlds: a lush central core surrounded by harsher terrain
       const dist = Math.sqrt(chunkX * chunkX + chunkZ * chunkZ);
       if (dist < 6) return n < 0.5 ? "plains" : "forest";
-      return n < 0.5 ? "tundra" : "desert";
+      return applyTemperatureBias(n < 0.5 ? "tundra" : "desert", this.options.temperatureShift);
     }
 
     if (this.options.worldType === "amplified") {
@@ -166,17 +186,17 @@ export class WorldSeed {
         ? n * n * AMPLIFIED_COMPRESSION
         : 1 - (1 - n) * (1 - n) * AMPLIFIED_COMPRESSION;
       const a = Math.max(0, Math.min(1, amp));
-      if (a < 0.25) return "tundra";
-      if (a < 0.5)  return "plains";
-      if (a < 0.75) return "forest";
-      return "desert";
+      return applyTemperatureBias(
+        a < 0.25 ? "tundra" : a < 0.5 ? "plains" : a < 0.75 ? "forest" : "desert",
+        this.options.temperatureShift,
+      );
     }
 
     // "normal" (and fallthrough)
-    if (n < 0.25) return "tundra";
-    if (n < 0.5)  return "plains";
-    if (n < 0.75) return "forest";
-    return "desert";
+    return applyTemperatureBias(
+      n < 0.25 ? "tundra" : n < 0.5 ? "plains" : n < 0.75 ? "forest" : "desert",
+      this.options.temperatureShift,
+    );
   }
 
   // ─── Structure placement ────────────────────────────────────────────────────

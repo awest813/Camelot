@@ -629,3 +629,73 @@ describe("WorldBuilderUI", () => {
   });
 });
 
+
+describe("WorldBuilderUI — analytics modal lifecycle", () => {
+  let sys: WorldBuilderSystem;
+  let ui: WorldBuilderUI;
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    sys = new WorldBuilderSystem();
+    ui = new WorldBuilderUI(sys);
+    ui.open();
+  });
+
+  function openAnalytics(): HTMLElement {
+    const btn = Array.from(document.querySelectorAll<HTMLButtonElement>("button")).find(
+      (b) => b.textContent?.includes("Analytics"),
+    );
+    btn!.click();
+    return document.querySelector<HTMLElement>(".world-builder__analytics-modal")!;
+  }
+
+  it("removes the analytics modal when clicking Done, the ✕ button, or the backdrop", () => {
+    const modal = openAnalytics();
+    expect(modal).not.toBeNull();
+
+    // Backdrop click dismisses
+    modal.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(document.querySelector(".world-builder__analytics-modal")).toBeNull();
+
+    const modal2 = openAnalytics();
+    const closeX = Array.from(modal2.querySelectorAll<HTMLButtonElement>("button")).find(
+      (b) => b.getAttribute("aria-label") === "Close analytics",
+    );
+    closeX!.click();
+    expect(document.querySelector(".world-builder__analytics-modal")).toBeNull();
+
+    const modal3 = openAnalytics();
+    const done = Array.from(modal3.querySelectorAll<HTMLButtonElement>("button")).find(
+      (b) => b.textContent === "Done",
+    );
+    done!.click();
+    expect(document.querySelector(".world-builder__analytics-modal")).toBeNull();
+  });
+
+  it("does not stack a second modal when Analytics is clicked twice", () => {
+    openAnalytics();
+    openAnalytics();
+    const modals = document.querySelectorAll(".world-builder__analytics-modal");
+    expect(modals.length).toBe(1);
+  });
+
+  it("Escape closes the analytics modal first and keeps the builder open", () => {
+    openAnalytics();
+    expect(document.querySelector(".world-builder__analytics-modal")).not.toBeNull();
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(document.querySelector(".world-builder__analytics-modal")).toBeNull();
+    expect(ui.isVisible).toBe(true);
+
+    // Second Escape closes the builder itself
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(ui.isVisible).toBe(false);
+  });
+
+  it("leaves no stale modal behind after close() and reopen", () => {
+    openAnalytics();
+    ui.close();
+    ui.open();
+    expect(document.querySelector(".world-builder__analytics-modal")).toBeNull();
+  });
+});

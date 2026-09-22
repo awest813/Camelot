@@ -645,3 +645,56 @@ describe("WorldBuilderSystem — Simplex, Voronoi & Arthurian Procedural Extensi
   });
 });
 
+
+describe("WorldBuilderSystem — preview/apply parity & validation", () => {
+  it("passes temperatureShift through toWorldSeed()", () => {
+    const sys = new WorldBuilderSystem({ seed: "Merlin" });
+    sys.setTemperatureShift(0.7);
+    const ws = sys.toWorldSeed();
+    expect(ws.options.temperatureShift).toBe(0.7);
+    expect(ws.seedString).toBe("Merlin");
+  });
+
+  it("preview biomes exactly match the applied WorldSeed biomes (no region overrides)", () => {
+    const sys = new WorldBuilderSystem({ seed: "ParityCheck", temperatureShift: -0.8 });
+    const ws = sys.toWorldSeed();
+    const grid = sys.sampleGrid(6, 0, 0);
+    for (const row of grid) {
+      for (const cell of row) {
+        expect(cell.biome).toBe(ws.getBiome(cell.cx, cell.cz));
+      }
+    }
+  });
+
+  it("warns when two custom regions overlap and stays silent when they do not", () => {
+    const sys = new WorldBuilderSystem();
+    sys.addRegion({
+      id: "reg_alpha",
+      name: "Alpha Vale",
+      bounds: { minCX: -2, minCZ: -2, maxCX: 2, maxCZ: 2 },
+      biome: "plains",
+      dangerLevel: 2,
+      encounterRate: 1.0,
+    });
+    sys.addRegion({
+      id: "reg_beta",
+      name: "Beta Wood",
+      bounds: { minCX: 1, minCZ: 1, maxCX: 4, maxCZ: 4 },
+      biome: "forest",
+      dangerLevel: 4,
+      encounterRate: 1.0,
+    });
+
+    let report = sys.validate();
+    expect(report.isValid).toBe(true); // overlap is a warning, not an error
+    const overlap = report.issues.find((i) => i.message.includes("overlaps region"));
+    expect(overlap).toBeDefined();
+    expect(overlap?.severity).toBe("warning");
+    expect(overlap?.message).toContain("Alpha Vale");
+    expect(overlap?.message).toContain("Beta Wood");
+
+    sys.updateRegion("reg_beta", { bounds: { minCX: 5, minCZ: 5, maxCX: 8, maxCZ: 8 } });
+    report = sys.validate();
+    expect(report.issues.find((i) => i.message.includes("overlaps region"))).toBeUndefined();
+  });
+});

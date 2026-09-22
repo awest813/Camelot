@@ -608,6 +608,7 @@ export class WorldBuilderSystem {
       biomeScale: this._config.biomeScale,
       structureDensity: this._config.structureDensity,
       startingBiome: this._config.startingBiome,
+      temperatureShift: this._config.temperatureShift,
     };
     return new WorldSeed(this._config.seed, opts);
   }
@@ -641,16 +642,9 @@ export class WorldBuilderSystem {
       const cz = centerCZ + z;
       for (let x = -r; x <= r; x++) {
         const cx = centerCX + x;
+        // WorldSeed.getBiome applies the configured climate bias and the
+        // starting-biome pin; custom region overrides take precedence below.
         let biome = worldSeed.getBiome(cx, cz);
-
-        // Apply temperature shift bias if not overridden by flat or startingBiome
-        if (this._config.worldType !== "flat" && Math.abs(this._config.temperatureShift) > 0.05) {
-          const shift = this._config.temperatureShift;
-          if (shift > 0.3 && biome === "tundra") biome = "plains";
-          else if (shift > 0.6 && biome === "plains") biome = "desert";
-          else if (shift < -0.3 && biome === "desert") biome = "plains";
-          else if (shift < -0.6 && biome === "plains") biome = "tundra";
-        }
 
         // Apply custom region biome override if chunk is within a defined region
         const region = this.getRegionAt(cx, cz);
@@ -1074,6 +1068,28 @@ export class WorldBuilderSystem {
           message: `Region '${reg.name || reg.id}' bounds must span at least 1x1 chunks.`,
           severity: "error",
         });
+      }
+    }
+
+    // Overlapping regions: allowed, but only the earliest-defined region
+    // applies in shared chunks — surface it so authors aren't surprised.
+    const regionList = Array.from(this._regions.values());
+    for (let i = 0; i < regionList.length; i++) {
+      for (let j = i + 1; j < regionList.length; j++) {
+        const a = regionList[i];
+        const b = regionList[j];
+        const overlaps =
+          a.bounds.minCX <= b.bounds.maxCX &&
+          b.bounds.minCX <= a.bounds.maxCX &&
+          a.bounds.minCZ <= b.bounds.maxCZ &&
+          b.bounds.minCZ <= a.bounds.maxCZ;
+        if (overlaps) {
+          issues.push({
+            field: `region_${a.id}`,
+            message: `Region '${a.name || a.id}' overlaps region '${b.name || b.id}'; '${a.name || a.id}' wins in shared chunks.`,
+            severity: "warning",
+          });
+        }
       }
     }
 

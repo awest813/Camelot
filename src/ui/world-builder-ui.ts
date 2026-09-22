@@ -80,6 +80,7 @@ export class WorldBuilderUI {
   // Status elements & timers
   private _statusEl: HTMLElement | null = null;
   private _statusTimer: ReturnType<typeof setTimeout> | null = null;
+  private _analyticsModal: HTMLElement | null = null;
   private _onKeyDownBound: ((e: KeyboardEvent) => void) | null = null;
 
   constructor(system: WorldBuilderSystem) {
@@ -117,6 +118,7 @@ export class WorldBuilderUI {
     if (this._root) {
       this._root.hidden = true;
     }
+    this._dismissAnalyticsModal();
     if (this._onKeyDownBound) {
       window.removeEventListener("keydown", this._onKeyDownBound);
       this._onKeyDownBound = null;
@@ -146,8 +148,18 @@ export class WorldBuilderUI {
     if (e.key === "Escape") {
       e.preventDefault();
       e.stopPropagation();
+      // Nested analytics modal absorbs Escape before the builder itself.
+      if (this._analyticsModal) {
+        this._dismissAnalyticsModal();
+        return;
+      }
       this.close();
     }
+  }
+
+  private _dismissAnalyticsModal(): void {
+    this._analyticsModal?.remove();
+    this._analyticsModal = null;
   }
 
   // ── Build DOM ──────────────────────────────────────────────────────────────
@@ -699,6 +711,8 @@ export class WorldBuilderUI {
 
     const statusEl = document.createElement("div");
     statusEl.className = "world-builder__status";
+    statusEl.setAttribute("role", "status");
+    statusEl.setAttribute("aria-live", "polite");
     statusEl.textContent = "Ready.";
     this._statusEl = statusEl;
     footer.appendChild(statusEl);
@@ -1209,8 +1223,14 @@ export class WorldBuilderUI {
         }
       }
 
+      const dungeonInfo = cell.dungeon ? ` | ${cell.dungeon.name} (${cell.dungeon.theme}, Danger ${cell.dungeon.dangerLevel}/10)` : "";
+      const resInfo =
+        cell.resourceNodes && cell.resourceNodes.length > 0
+          ? ` | 💎 ${cell.resourceNodes.map((r) => r.name).join(", ")}`
+          : "";
+
       const climInfo = ` | Temp: ${(cell.temperature * 50).toFixed(0)}°C, Moist: ${(cell.moisture * 100).toFixed(0)}%`;
-      this._tooltipEl.textContent = `Chunk (${cell.cx}, ${cell.cz}) | Biome: ${cell.biome.toUpperCase()} | Elevation: ${(cell.elevation * 100).toFixed(0)}%${structInfo}${regInfo}${settlInfo}${waterInfo}${climInfo}`;
+      this._tooltipEl.textContent = `Chunk (${cell.cx}, ${cell.cz}) | Biome: ${cell.biome.toUpperCase()} | Elevation: ${(cell.elevation * 100).toFixed(0)}%${structInfo}${regInfo}${settlInfo}${waterInfo}${dungeonInfo}${resInfo}${climInfo}`;
     }
   }
 
@@ -1974,6 +1994,9 @@ export class WorldBuilderUI {
   }
 
   private _showAnalyticsModal(): void {
+    // Never stack a second modal; refresh in place instead.
+    this._dismissAnalyticsModal();
+
     const stats = this._sys.computeWorldAnalytics(this._radius);
 
     const modal = document.createElement("div");
@@ -1981,6 +2004,9 @@ export class WorldBuilderUI {
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
     modal.setAttribute("aria-label", "World Analytics");
+    this._analyticsModal = modal;
+
+    const dismiss = () => this._dismissAnalyticsModal();
 
     const content = document.createElement("div");
     content.className = "world-builder__analytics-content";
@@ -2003,7 +2029,7 @@ export class WorldBuilderUI {
     closeBtn.className = "world-builder__btn world-builder__btn--sm";
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close analytics");
-    closeBtn.addEventListener("click", () => modal.remove());
+    closeBtn.addEventListener("click", dismiss);
     header.appendChild(closeBtn);
     content.appendChild(header);
 
@@ -2128,13 +2154,13 @@ export class WorldBuilderUI {
     doneBtn.type = "button";
     doneBtn.className = "world-builder__btn world-builder__btn--primary";
     doneBtn.textContent = "Done";
-    doneBtn.addEventListener("click", () => modal.remove());
+    doneBtn.addEventListener("click", dismiss);
     modalFooter.appendChild(doneBtn);
     content.appendChild(modalFooter);
 
     modal.appendChild(content);
     modal.addEventListener("click", (e) => {
-      if (e.target === modal) modal.remove();
+      if (e.target === modal) dismiss();
     });
 
     const parent = this._root ?? document.body;
