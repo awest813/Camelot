@@ -2239,4 +2239,78 @@ describe('CombatSystem', () => {
         );
     });
 
+    // ─── Block-attack guard ───────────────────────────────────────────────────
+
+    it('melee attack is rejected while the guard is raised', () => {
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: mockNpcs[0].mesh,
+            pickedPoint: new Vector3(0, 0, 1),
+        });
+        mockNpcs[0].takeDamage.mockClear();
+
+        combatSystem.beginBlock();
+        mockPlayer.stamina = 200;
+        const ok = combatSystem.meleeAttack();
+
+        expect(ok).toBe(false);
+        expect(mockNpcs[0].takeDamage).not.toHaveBeenCalled();
+        expect(mockPlayer.stamina).toBe(200); // no stamina spent
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Lower your guard to attack!');
+    });
+
+    it('power attack is rejected while the guard is raised', () => {
+        mockNpcs[0].takeDamage.mockClear();
+
+        combatSystem.beginBlock();
+        mockPlayer.stamina = 200;
+        const ok = combatSystem.powerAttack();
+
+        expect(ok).toBe(false);
+        expect(mockNpcs[0].takeDamage).not.toHaveBeenCalled();
+        expect(mockPlayer.stamina).toBe(200);
+        expect(mockUI.showNotification).toHaveBeenCalledWith('Lower your guard to attack!');
+    });
+
+    it('attacks work again after lowering the guard', () => {
+        combatSystem.beginBlock();
+        combatSystem.endBlock();
+        mockPlayer.stamina = 200;
+        expect(combatSystem.meleeAttack()).toBe(true);
+    });
+
+    it('riposte swings never miss, even at guaranteed-miss chance', () => {
+        const attrs = new AttributeSystem({ agility: 40 });
+        const skills = new SkillProgressionSystem();
+        skills.setSkillLevel("blade", 0); // low skill → misses normally possible
+
+        const riposteNpc = {
+            ...mockNpcs[0],
+            mesh: { ...mockNpcs[0].mesh, position: new Vector3(0, 0, 2) },
+            takeDamage: vi.fn(),
+        };
+
+        const riposteCombat = new CombatSystem(
+            mockScene, mockPlayer, [riposteNpc as any], mockUI,
+            undefined, { skillSystem: skills, attributeSystem: attrs }
+        );
+
+        mockScene.pickWithRay.mockReturnValue({
+            pickedMesh: riposteNpc.mesh,
+            pickedPoint: new Vector3(0, 0, 1)
+        });
+
+        (riposteCombat as any)._riposteReady = true;
+        (riposteCombat as any)._riposteTimer = 1.5;
+        mockPlayer.stamina = 50; // low stamina → hitChance < 1.0
+
+        vi.spyOn(Math, 'random').mockReturnValue(0.99); // would miss a normal swing
+        const ok = riposteCombat.meleeAttack();
+
+        expect(ok).toBe(true);
+        expect(riposteNpc.takeDamage).toHaveBeenCalled(); // riposte landed anyway
+        expect(mockUI.showNotification).not.toHaveBeenCalledWith('Miss!', 600);
+
+        vi.restoreAllMocks();
+    });
+
 });

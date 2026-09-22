@@ -134,6 +134,19 @@ describe("InteractionSystem", () => {
     expect(onPortalTransition).not.toHaveBeenCalled();
   });
 
+  it("ignores interact entirely while isBlocked (modal owns the screen)", () => {
+    const npc = { isAggressive: false, mesh: { name: "Guard" } };
+    player.raycastForward.mockReturnValue({
+      pickedMesh: { metadata: { type: "npc", npc } },
+    });
+
+    system.isBlocked = true;
+    system.interact();
+
+    expect(dialogue.startDialogue).not.toHaveBeenCalled();
+    expect(player.raycastForward).not.toHaveBeenCalled();
+  });
+
   it("hides portal prompt while a screen fade is active", () => {
     system.cellManager = {
       isTransitioning: false,

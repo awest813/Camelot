@@ -745,6 +745,12 @@ export class CombatSystem {
     const meleeProfile = MELEE_PROFILES[this._meleeArchetype];
     const weaponProfile = WEAPON_PROFILES[this._weaponArchetype];
 
+    // A raised guard must be lowered before swinging (no block-attack turtle).
+    if (this._isBlocking) {
+      this._ui.showNotification("Lower your guard to attack!");
+      return false;
+    }
+
     // Riposte bypasses the normal cooldown gate.
     const isRiposte = this._riposteReady;
     if (!isRiposte && this._meleeCooldownRemaining > 0) {
@@ -778,8 +784,9 @@ export class CombatSystem {
 
     // Oblivion-style hit chance: low weapon skill / agility / fatigue can cause a miss.
     // Only active when skill and attribute systems are wired up (backward-compatible).
+    // Riposte swings never miss — the perfect-block reward must not be lost to RNG.
     const hitChance = this._hitChance();
-    if (hitChance < 1.0 && Math.random() >= hitChance) {
+    if (!isRiposte && hitChance < 1.0 && Math.random() >= hitChance) {
       this._ui.showNotification("Miss!", 600);
       this._resetCombo();
       return true;
@@ -981,6 +988,11 @@ export class CombatSystem {
         "Power attacks require a melee weapon. Hold R or click to charge a shot.",
         2400,
       );
+      return false;
+    }
+    // A raised guard must be lowered before swinging (no block-attack turtle).
+    if (this._isBlocking) {
+      this._ui.showNotification("Lower your guard to attack!");
       return false;
     }
     if (this._meleeCooldownRemaining > 0) {
@@ -1574,6 +1586,16 @@ export class CombatSystem {
    * Apply a state transition: update aiState, sync the legacy isAggressive flag,
    * reset per-state timers, update NPC colour, and clear path state as needed.
    */
+  /**
+   * Tint an NPC with the INVESTIGATE state color without running the full
+   * combat transition. The stealth partial-detection hook assigns INVESTIGATE
+   * directly so the NPC stays non-hostile (talkable) while suspicious — this
+   * keeps its visual channel in sync without flipping `isAggressive`.
+   */
+  public paintNpcInvestigating(npc: NPC): void {
+    npc.setStateColor(COLOR_INVESTIGATE);
+  }
+
   private _transitionTo(npc: NPC, newState: AIState): void {
     npc.aiState = newState;
 

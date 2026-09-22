@@ -240,6 +240,58 @@ describe('SaveSystem', () => {
         );
     });
 
+    it('load restores attribute-derived maxima and clamps resources to them', () => {
+        const mockAttributes = {
+            getSaveState: vi.fn(() => ({ attributes: { endurance: 70 } })),
+            restoreFromSave: vi.fn(),
+            maxHealth: 180,
+            maxMagicka: 140,
+            maxStamina: 140,
+            carryWeight: 300,
+        };
+        saveSystem.setAttributeSystem(mockAttributes as any);
+
+        // Saved while attribute-boosted: resource values above the collapsed maxima
+        mockPlayer.health = 170;
+        mockPlayer.magicka = 130;
+        mockPlayer.stamina = 135;
+        saveSystem.save();
+
+        // Simulate the level-only maxima estimate that load applies mid-restore
+        mockPlayer.maxHealth = 100;
+        mockPlayer.maxMagicka = 100;
+        mockPlayer.maxStamina = 100;
+
+        const result = saveSystem.load();
+        expect(result).toBe(true);
+        expect(mockAttributes.restoreFromSave).toHaveBeenCalled();
+        expect(mockPlayer.maxHealth).toBe(180);
+        expect(mockPlayer.maxMagicka).toBe(140);
+        expect(mockPlayer.maxStamina).toBe(140);
+        expect(mockPlayer.maxCarryWeight).toBe(300);
+        expect(mockPlayer.health).toBe(170);
+        expect(mockPlayer.magicka).toBe(130);
+        expect(mockPlayer.stamina).toBe(135);
+    });
+
+    it('load clamps saved resources that exceed the restored maxima', () => {
+        const mockAttributes = {
+            getSaveState: vi.fn(() => ({ attributes: { endurance: 70 } })),
+            restoreFromSave: vi.fn(),
+            maxHealth: 180,
+            maxMagicka: 140,
+            maxStamina: 140,
+            carryWeight: 300,
+        };
+        saveSystem.setAttributeSystem(mockAttributes as any);
+        mockPlayer.health = 500; // saved while some temporary boost was active
+        saveSystem.save();
+
+        const result = saveSystem.load();
+        expect(result).toBe(true);
+        expect(mockPlayer.health).toBeLessThanOrEqual(mockPlayer.maxHealth);
+    });
+
     it('should round-trip the stealth crouch state into save slots', () => {
         const mockStealth = {
             getSaveState: vi.fn(() => ({ isCrouching: true })),

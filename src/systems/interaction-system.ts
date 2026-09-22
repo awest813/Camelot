@@ -118,6 +118,7 @@ export class InteractionSystem {
   }
 
   public interact(): void {
+    if (this.isBlocked) return;
     if (this.dialogueSystem.isInDialogue) return;
     if (this.inventorySystem.isOpen) {
         this.inventorySystem.toggleInventory();

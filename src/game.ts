@@ -668,7 +668,11 @@ export class Game {
     this.inventorySystem    = new InventorySystem(this.player, this.ui, this.canvas);
     this.equipmentSystem    = new EquipmentSystem(this.player, this.inventorySystem, this.ui);
     // Equipped weapon drives the combat weapon archetype (sword/bow/staff/...).
-    this.equipmentSystem.onEquipmentChanged = () => this._syncWeaponArchetype();
+    this.equipmentSystem.onEquipmentChanged = () => {
+      this._syncWeaponArchetype();
+      // Equipped gear is persistent state — keep the dirty-gated autosave aware.
+      this.saveSystem.markDirty();
+    };
     this._syncWeaponArchetype();
     this.saveSystem         = new SaveSystem(this.player, this.inventorySystem, this.equipmentSystem, this.ui);
     this.saveSystem.setCombatSystem(this.combatSystem);
@@ -2575,6 +2579,9 @@ export class Game {
       if (npc.aiState === AIState.IDLE || npc.aiState === AIState.PATROL) {
         npc.aiState = AIState.INVESTIGATE;
         npc.investigateTimer = 0;
+        // Sync the visual channel (amber tint) without the combat transition,
+        // which would flag the suspicious NPC as hostile.
+        this.combatSystem.paintNpcInvestigating(npc);
       }
     };
 
@@ -2698,6 +2705,7 @@ export class Game {
     this.questSystem.onQuestComplete = (xp) => {
       this.player.addExperience(xp);
       this.fameSystem.addFame(10);
+      this.saveSystem.markDirty();
       this.ui.showNotification(
         `+${xp} XP  |  Fame: ${this.fameSystem.fame} (${this.fameSystem.fameLabel})`, 3000
       );
@@ -2726,6 +2734,7 @@ export class Game {
     this.ui.onAttributeSpend = (name) => {
       const spent = this.attributeSystem.spendPoint(name);
       if (spent) {
+        this.saveSystem.markDirty();
         // Sync derived stats back to player after spending
         this.player.maxHealth      = this.attributeSystem.maxHealth;
         this.player.maxMagicka     = this.attributeSystem.maxMagicka;
@@ -2750,6 +2759,7 @@ export class Game {
       // Combat XP level-up — no notification (spam). Character level-up
       // fires via onLevelUpComplete and shows the meaningful notification.
       this.attributeSystem.awardLevelUpPoints(1);
+      this.saveSystem.markDirty();
       // Sync magic damage bonus after level-up attribute award
       this.spellSystem.magicDamageBonus = this.attributeSystem.magicDamageBonus;
     };
@@ -3066,6 +3076,7 @@ export class Game {
     this.interactionSystem.onLootPickup = (id) => {
         this.questSystem.onPickup(id);
         this._applyFrameworkQuestEvent("pickup", id);
+        this.saveSystem.markDirty();
         const frameworkItemId = this._toFrameworkInventoryItemId(id);
         if (frameworkItemId) this.frameworkRuntime.inventoryEngine.addItem(frameworkItemId, 1);
         if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === "interact") {
@@ -4717,8 +4728,14 @@ export class Game {
       if (this.dialogueSystem.isInDialogue) return;
       if (this.inventorySystem.isOpen) {
         this.inventorySystem.toggleInventory();
+        // Closing with E must clear isBlocked exactly like the Escape path.
+        this._restoreGameplayInput();
         return;
       }
+
+      // A paused game or an open modal owns the screen: no world interaction
+      // (and no E-jump fallback) may bleed through.
+      if (this._isCombatInputBlocked()) return;
 
       // Skyrim-style: if nothing is within interact range, jump instead
       const interactHit = this._raycastInteract();
@@ -5799,9 +5816,13 @@ export class Game {
       // swimSystem: 20 Hz (every 3rd frame)
       if (tick % 3 === 0) this.swimSystem.update(deltaTime, this.player);
 
-      // crimeSystem, merchantRestockSystem: ~1 Hz (every 60 frames)
+      // crimeSystem: every step — its guard-challenge cooldown decays by the
+      // passed delta, so starving it to a 1 Hz call made the 15 s cooldown
+      // take ~15 real minutes. It early-returns while no bounty is active.
+      this.crimeSystem.update(deltaTime);
+
+      // merchantRestockSystem: ~1 Hz (every 60 frames)
       if (tick % 60 === 0) {
-        this.crimeSystem.update(deltaTime);
         const gameTime = this.timeSystem.elapsedGameTime;
         this.respawnSystem.update(gameTime);
         this.merchantRestockSystem.update(gameTime, this.barterSystem);
@@ -5854,10 +5875,40 @@ export class Game {
                this.ui.showNotification("You have fallen...", 4000);
                // Death has consequences: after 4 seconds you wake at the
                // nearest discovered location, lighter by 10% of your gold.
+               // (Health regen is suppressed at 0 HP, so this timer is the
+               // only path back above zero.)
                setTimeout(() => {
                  if (this.player.health > 0) return;
                  this.player.health = Math.round(this.player.maxHealth * 0.5);
                  this._playerAtZeroHP = false;
+
+                 // Tear down any screen state owned at the moment of death so
+                 // the player does not wake up inside a stale modal/conversation.
+                 if (this.dialogueSystem.isInDialogue) this.dialogueSystem.endDialogue();
+                 if (this.inventorySystem.isOpen) this.inventorySystem.toggleInventory();
+                 if (this._containerUI.isVisible) this._containerUI.onClose?.();
+                 if (this._barterUI.isVisible) this._barterUI.onClose?.();
+
+                 // Death purges active status effects (burn/freeze DoTs etc.).
+                 for (const effect of this.activeEffectsSystem.activeEffects) {
+                   this.activeEffectsSystem.removeEffect(effect.id);
+                 }
+
+                 // Disengage every living attacker so the revive point is not
+                 // a combat zone (and fast travel is not immediately blocked).
+                 for (const npc of this.scheduleSystem.npcs) {
+                   if (npc.isDead) continue;
+                   if (
+                     npc.aiState === AIState.ALERT ||
+                     npc.aiState === AIState.INVESTIGATE ||
+                     npc.aiState === AIState.CHASE ||
+                     npc.aiState === AIState.ATTACK
+                   ) {
+                     npc.aiState = npc.patrolPoints.length > 0 ? AIState.RETURN : AIState.IDLE;
+                     npc.isAggressive = false;
+                   }
+                 }
+                 this._restoreGameplayInput();
 
                  const pos = this.player.camera.position;
                  let nearest: { name: string; position: { x: number; y: number; z: number } } | null = null;
@@ -6126,6 +6177,10 @@ export class Game {
       }
       if (this.stealthSystem.isCrouching) {
           this.ui.showNotification("Cannot fast travel while sneaking.", 2200);
+          return;
+      }
+      if (this.player.isEncumbered) {
+          this.ui.showNotification("Cannot fast travel while overencumbered.", 2200);
           return;
       }
 
@@ -6837,7 +6892,7 @@ export class Game {
     const hit = this.player.raycastForward(3, true);
     if (hit?.pickedMesh?.metadata) {
       const m = hit.pickedMesh.metadata;
-      return m.type === "npc" || m.type === "loot" || m.type === "portal";
+      return m.type === "npc" || m.type === "loot" || m.type === "portal" || m.type === "container";
     }
     return false;
   }

@@ -103,7 +103,9 @@ export class Player {
       this._magickaRegenDelayRemaining = Math.max(0, this._magickaRegenDelayRemaining - deltaTime);
       this._staminaRegenDelayRemaining = Math.max(0, this._staminaRegenDelayRemaining - deltaTime);
 
-      if (this._healthRegenDelayRemaining <= 0) {
+      // A downed (0 HP) player must not regenerate out of death — the
+      // revive flow in game.ts owns recovery after the death timer.
+      if (this.health > 0 && this._healthRegenDelayRemaining <= 0) {
         this.health = Math.min(this.maxHealth, this.health + this.healthRegen * deltaTime);
       }
       if (this._magickaRegenDelayRemaining <= 0) {

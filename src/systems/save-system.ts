@@ -703,7 +703,20 @@ export class SaveSystem {
     }
 
     // v5 systems
-    if (this._attributes && data.attributes)   this._attributes.restoreFromSave(data.attributes as any);
+    if (this._attributes && data.attributes) {
+      this._attributes.restoreFromSave(data.attributes as any);
+      // Attribute-derived maxima supersede the XP-level estimate above — same
+      // sync the game layer applies after every attribute spend. Without this,
+      // every load silently collapsed the maxima to the level-based values.
+      this._player.maxHealth      = this._attributes.maxHealth;
+      this._player.maxMagicka     = this._attributes.maxMagicka;
+      this._player.maxStamina     = this._attributes.maxStamina;
+      this._player.maxCarryWeight = this._attributes.carryWeight;
+      // Clamp restored resources to the restored maxima.
+      this._player.health  = Math.min(this._player.health, this._player.maxHealth);
+      this._player.magicka = Math.min(this._player.magicka, this._player.maxMagicka);
+      this._player.stamina = Math.min(this._player.stamina, this._player.maxStamina);
+    }
     if (this._timeSystem && data.time)         this._timeSystem.restoreFromSave(data.time as any);
     if (this._crimeSystem && data.crime)       this._crimeSystem.restoreFromSave(data.crime as any);
     if (this._containerSystem && data.containers) this._containerSystem.restoreFromSave(data.containers as any);
