@@ -1,6 +1,6 @@
 import { WorldSeed, type WorldType, type BiomeScale, type StructureDensity, type WorldGenOptions } from "../world/world-seed";
 import type { BiomeType } from "../world/world-manager";
-import { SimplexTerrainGenerator } from "../world/simplex-terrain";
+import { createMulberry32, SimplexTerrainGenerator } from "../world/simplex-terrain";
 import {
   VoronoiWorldGraph,
   type WorldSettlement,
@@ -13,6 +13,7 @@ import {
   type LakeBasin,
 } from "../world/river-network";
 import { ArthurianNameGenerator } from "../world/arthurian-names";
+import { generatePoissonPoints } from "../world/poisson-disk";
 
 // ─── Interfaces & Types ───────────────────────────────────────────────────────
 
@@ -78,6 +79,54 @@ export interface ChunkCellSample {
   isStartingChunk: boolean;
   riverFlow?: number;
   isWaterBody?: boolean;
+  dungeon?: WorldDungeonPOI;
+  settlement?: WorldSettlement;
+  resourceNodes?: WorldResourceNode[];
+}
+
+/** Procedural dungeon or ancient barrow POI located in the world. */
+export interface WorldDungeonPOI {
+  id: string;
+  name: string;
+  cx: number;
+  cz: number;
+  dangerLevel: number;
+  roomCount: number;
+  theme: "barrow" | "crypt" | "catacomb" | "cavern";
+  bossType: string;
+}
+
+/** Types of mineral veins, harvesting herbs, and magical resource caches. */
+export type ResourceType =
+  | "iron_ore"
+  | "silver_ore"
+  | "mithril_ore"
+  | "gold_deposit"
+  | "kingsbloom"
+  | "mana_crystal";
+
+/** Procedural mineral vein or harvestable node located on the chunk grid. */
+export interface WorldResourceNode {
+  id: string;
+  type: ResourceType;
+  name: string;
+  cx: number;
+  cz: number;
+  richness: number; // 1 to 5
+  rarity: "common" | "uncommon" | "rare" | "legendary";
+}
+
+/** High-level statistical breakdown of world territory, hydrology, and danger. */
+export interface WorldAnalytics {
+  totalChunks: number;
+  biomeCoverage: Record<BiomeType, { count: number; percentage: number }>;
+  averageElevation: number;
+  averageTemperature: number;
+  averageDangerLevel: number;
+  totalSettlements: number;
+  totalDungeons: number;
+  totalResourceNodes: number;
+  totalWaterways: number;
 }
 
 export interface WorldBuilderValidationIssue {
@@ -100,6 +149,8 @@ export interface WorldBuilderExportData {
   settlements?: WorldSettlement[];
   rivers?: River[];
   lakes?: LakeBasin[];
+  dungeons?: WorldDungeonPOI[];
+  resourceNodes?: WorldResourceNode[];
 }
 
 // ─── Default Constants ────────────────────────────────────────────────────────
@@ -252,6 +303,8 @@ export class WorldBuilderSystem {
   private _terrainGen!: SimplexTerrainGenerator;
   private _voronoiGraph!: VoronoiWorldGraph;
   private _riverGen!: RiverNetworkGenerator;
+  private _dungeons: WorldDungeonPOI[] = [];
+  private _resourceNodes: WorldResourceNode[] = [];
 
   /** Callback fired whenever the world configuration changes. */
   public onConfigChanged: ((config: Readonly<WorldGenConfig>) => void) | null = null;
@@ -273,6 +326,160 @@ export class WorldBuilderSystem {
       minFlowThreshold: 3,
       sourceElevationMin: 0.15,
     });
+    this._generateDungeons();
+    this._generateResourceNodes();
+  }
+
+  private _generateDungeons(): void {
+    const rng = createMulberry32((this._terrainGen.seedNumber ^ 0xa5a5a5a5) >>> 0);
+    const count = 7;
+    this._dungeons = [];
+    const themes: Array<"barrow" | "crypt" | "catacomb" | "cavern"> = ["barrow", "crypt", "catacomb", "cavern"];
+    const bossTypes = ["Skeleton", "Ghost", "Troll", "Spider", "Dragon"];
+
+    for (let i = 0; i < count; i++) {
+      let cx = 0;
+      let cz = 0;
+      let attempts = 0;
+      while (attempts < 20) {
+        cx = Math.floor(rng() * 15) - 7;
+        cz = Math.floor(rng() * 15) - 7;
+        if (Math.abs(cx) <= 1 && Math.abs(cz) <= 1) {
+          attempts++;
+          continue;
+        }
+        const nearSettlement = this.settlements.some(
+          (s) => Math.abs(s.cx - cx) <= 1 && Math.abs(s.cz - cz) <= 1,
+        );
+        if (nearSettlement) {
+          attempts++;
+          continue;
+        }
+        const nearDungeon = this._dungeons.some(
+          (d) => d.cx === cx && d.cz === cz,
+        );
+        if (nearDungeon) {
+          attempts++;
+          continue;
+        }
+        break;
+      }
+
+      const dist = Math.sqrt(cx * cx + cz * cz);
+      const dangerLevel = Math.min(10, Math.max(2, Math.floor(2 + dist * 0.8 + rng() * 2)));
+      const theme = themes[Math.floor(rng() * themes.length)];
+      const roomCount = Math.floor(4 + rng() * 4);
+      const bossType = dangerLevel >= 8 ? "Dragon" : bossTypes[Math.floor(rng() * (bossTypes.length - 1))];
+      const dungeonSeed = (this._terrainGen.seedNumber + i * 7919) >>> 0;
+      const name = ArthurianNameGenerator.generateDungeonName(dungeonSeed);
+      const id = `dungeon_${dungeonSeed.toString(36)}`;
+
+      this._dungeons.push({
+        id,
+        name,
+        cx,
+        cz,
+        dangerLevel,
+        roomCount,
+        theme,
+        bossType,
+      });
+    }
+  }
+
+  private _generateResourceNodes(): void {
+    const rng = createMulberry32((this._terrainGen.seedNumber ^ 0x5a5a5a5a) >>> 0);
+    this._resourceNodes = [];
+    const worldSeed = this.toWorldSeed();
+
+    // Use Bridson Poisson-disk sampling for organic blue-noise distribution across chunks
+    const points = generatePoissonPoints(
+      { minX: -7, minY: -7, maxX: 7, maxY: 7 },
+      1.75,
+      { prng: rng, k: 30 },
+    );
+
+    const occupied = new Set<string>();
+    const maxNodes = 24;
+    let i = 0;
+    for (const pt of points) {
+      if (this._resourceNodes.length >= maxNodes) break;
+      const cx = Math.round(pt.x);
+      const cz = Math.round(pt.y);
+      const key = `${cx},${cz}`;
+      if (occupied.has(key)) continue;
+      occupied.add(key);
+      i++;
+
+      let biome = worldSeed.getBiome(cx, cz);
+      const reg = this.getRegionAt(cx, cz);
+      if (reg) {
+        biome = reg.biome;
+      }
+      const dist = Math.sqrt(cx * cx + cz * cz);
+      const danger = reg ? reg.dangerLevel : Math.min(10, Math.max(1, Math.round(1 + dist * 0.8)));
+
+      let type: ResourceType = "iron_ore";
+      let name = "Iron Ore Deposit";
+      let richness = Math.min(5, Math.max(1, Math.floor(1 + rng() * 3)));
+      let rarity: "common" | "uncommon" | "rare" | "legendary" = "common";
+
+      if (danger >= 7 && rng() > 0.4) {
+        if (rng() > 0.5) {
+          type = "mithril_ore";
+          name = "Starmetal Mithril Lode";
+          richness = Math.min(5, 3 + Math.floor(rng() * 3));
+          rarity = "rare";
+        } else {
+          type = "mana_crystal";
+          name = "Crystalline Mana Geode";
+          richness = 5;
+          rarity = "legendary";
+        }
+      } else if (biome === "desert") {
+        if (rng() > 0.5) {
+          type = "gold_deposit";
+          name = "Alluvial Gold Seam";
+          richness = Math.min(5, 2 + Math.floor(rng() * 3));
+          rarity = "uncommon";
+        } else {
+          type = "silver_ore";
+          name = "Silver Vein";
+          richness = Math.min(5, 2 + Math.floor(rng() * 3));
+          rarity = "uncommon";
+        }
+      } else if (biome === "forest") {
+        if (rng() > 0.4) {
+          type = "kingsbloom";
+          name = "Kingsbloom Herb Cluster";
+          richness = Math.min(5, 2 + Math.floor(rng() * 4));
+          rarity = "uncommon";
+        } else {
+          type = "iron_ore";
+          name = "Iron Ore Deposit";
+          richness = Math.min(5, 1 + Math.floor(rng() * 4));
+          rarity = "common";
+        }
+      } else if (biome === "tundra") {
+        type = rng() > 0.4 ? "silver_ore" : "iron_ore";
+        name = type === "silver_ore" ? "Silver Vein" : "Iron Ore Deposit";
+        rarity = type === "silver_ore" ? "uncommon" : "common";
+      } else {
+        type = rng() > 0.5 ? "kingsbloom" : "iron_ore";
+        name = type === "kingsbloom" ? "Kingsbloom Herb Cluster" : "Iron Ore Deposit";
+        rarity = "common";
+      }
+
+      this._resourceNodes.push({
+        id: `res_${(this._terrainGen.seedNumber + i * 3571).toString(36)}`,
+        type,
+        name,
+        cx,
+        cz,
+        richness,
+        rarity,
+      });
+    }
   }
 
   // ── Configuration Accessors ───────────────────────────────────────────────
@@ -297,8 +504,36 @@ export class WorldBuilderSystem {
     return this._voronoiGraph.settlements;
   }
 
+  public get dungeons(): WorldDungeonPOI[] {
+    return this._dungeons;
+  }
+
+  public get resourceNodes(): WorldResourceNode[] {
+    return this._resourceNodes;
+  }
+
+  public getResourceNodesAt(cx: number, cz: number): WorldResourceNode[] {
+    return this._resourceNodes.filter((n) => n.cx === cx && n.cz === cz);
+  }
+
   public get provinces(): WorldProvince[] {
     return this._voronoiGraph.provinces;
+  }
+
+  /** Returns the Voronoi territory province containing or closest to chunk (cx, cz). */
+  public getProvinceAt(cx: number, cz: number): WorldProvince | undefined {
+    let closest: WorldProvince | undefined;
+    let minDistSq = Infinity;
+    for (const p of this._voronoiGraph.provinces) {
+      const dx = p.center[0] - cx;
+      const dz = p.center[1] - cz;
+      const dSq = dx * dx + dz * dz;
+      if (dSq < minDistSq) {
+        minDistSq = dSq;
+        closest = p;
+      }
+    }
+    return closest;
   }
 
   public get roads(): WorldRoadEdge[] {
@@ -443,6 +678,11 @@ export class WorldBuilderSystem {
         const elevation = Math.min(1.0, (baseElev * 0.35 + normSimplex * 0.65) * this._config.elevationScale);
 
         const waterInfo = this._riverGen.getWaterInfoAt(cx, cz);
+        const dungeon = this._dungeons.find((d) => d.cx === cx && d.cz === cz);
+        const settlement = this.settlements.find(
+          (s) => Math.abs(s.cx - cx) <= 0.6 && Math.abs(s.cz - cz) <= 0.6,
+        );
+        const chunkResources = this.getResourceNodesAt(cx, cz);
 
         row.push({
           cx,
@@ -455,6 +695,9 @@ export class WorldBuilderSystem {
           isStartingChunk,
           riverFlow: waterInfo.flow,
           isWaterBody: waterInfo.isWater,
+          dungeon,
+          settlement,
+          resourceNodes: chunkResources,
         });
       }
       rows.push(row);
@@ -484,6 +727,138 @@ export class WorldBuilderSystem {
       dangerLevel: Math.floor(1 + Math.random() * 8),
       encounterRate: Math.round((0.6 + Math.random() * 1.2) * 10) / 10,
       description: `Historical Arthurian territory of ${name}.`,
+    };
+  }
+
+  /**
+   * Generates a complete, authentic 5-region Arthurian Kingdom layout
+   * with custom bounds, biomes, danger ratings, and historical lore.
+   */
+  public generateArthurianKingdom(): WorldRegion[] {
+    const kingdomRegions: WorldRegion[] = [
+      {
+        id: "reg_camelot_heartland",
+        name: "Camelot Crownlands",
+        bounds: { minCX: -2, minCZ: -2, maxCX: 2, maxCZ: 2 },
+        biome: "plains",
+        dangerLevel: 2,
+        encounterRate: 0.8,
+        description: "The fertile royal valley surrounding King Arthur's fortress at Camelot.",
+      },
+      {
+        id: "reg_broceliande",
+        name: "Brocéliande Enchanted Forest",
+        bounds: { minCX: -6, minCZ: -2, maxCX: -3, maxCZ: 3 },
+        biome: "forest",
+        dangerLevel: 5,
+        encounterRate: 1.5,
+        description: "An ancient, mist-shrouded woodland steeped in Druidic enchantment and fairy rings.",
+      },
+      {
+        id: "reg_avalon_isles",
+        name: "Misty Isle of Avalon",
+        bounds: { minCX: -2, minCZ: 3, maxCX: 2, maxCZ: 6 },
+        biome: "plains",
+        dangerLevel: 3,
+        encounterRate: 0.9,
+        description: "The sacred, otherworldly lake isle where Excalibur was forged.",
+      },
+      {
+        id: "reg_gorre_crags",
+        name: "Gorre Wastes & Crags",
+        bounds: { minCX: 3, minCZ: -6, maxCX: 7, maxCZ: -1 },
+        biome: "tundra",
+        dangerLevel: 8,
+        encounterRate: 2.0,
+        description: "Treacherous jagged mountains ruled by King Uriens and hostile warbands.",
+      },
+      {
+        id: "reg_lyonesse",
+        name: "Lyonesse Sunken Coast",
+        bounds: { minCX: 3, minCZ: 2, maxCX: 7, maxCZ: 7 },
+        biome: "desert",
+        dangerLevel: 6,
+        encounterRate: 1.3,
+        description: "A windswept peninsula of sea-cliffs and ruins whispering of sunken ancestral towns.",
+      },
+    ];
+
+    this._regions.clear();
+    for (const r of kingdomRegions) {
+      this._regions.set(r.id, r);
+    }
+    this._generateResourceNodes();
+    return kingdomRegions;
+  }
+
+  /**
+   * Computes a comprehensive statistical breakdown of world territory,
+   * biome distribution, average danger, and resource abundance.
+   */
+  public computeWorldAnalytics(radius: number = 7): WorldAnalytics {
+    const samples = this.sampleGrid(radius, 0, 0);
+    let totalChunks = 0;
+    const biomeCounts: Record<BiomeType, number> = {
+      plains: 0,
+      forest: 0,
+      desert: 0,
+      tundra: 0,
+    };
+    let sumElev = 0;
+    let sumTemp = 0;
+    let sumDanger = 0;
+    let totalWaterways = 0;
+    let totalResourceNodes = 0;
+
+    for (const row of samples) {
+      for (const cell of row) {
+        totalChunks++;
+        biomeCounts[cell.biome] = (biomeCounts[cell.biome] || 0) + 1;
+        sumElev += cell.elevation;
+        sumTemp += cell.temperature;
+        const reg = this.getRegionAt(cell.cx, cell.cz);
+        const danger = reg
+          ? reg.dangerLevel
+          : Math.min(10, Math.max(1, Math.round(Math.sqrt(cell.cx * cell.cx + cell.cz * cell.cz))));
+        sumDanger += danger;
+        if (cell.isWaterBody || (cell.riverFlow ?? 0) > 0) {
+          totalWaterways++;
+        }
+        if (cell.resourceNodes && cell.resourceNodes.length > 0) {
+          totalResourceNodes += cell.resourceNodes.length;
+        }
+      }
+    }
+
+    const coverage: Record<BiomeType, { count: number; percentage: number }> = {
+      plains: {
+        count: biomeCounts.plains,
+        percentage: totalChunks > 0 ? (biomeCounts.plains / totalChunks) * 100 : 0,
+      },
+      forest: {
+        count: biomeCounts.forest,
+        percentage: totalChunks > 0 ? (biomeCounts.forest / totalChunks) * 100 : 0,
+      },
+      desert: {
+        count: biomeCounts.desert,
+        percentage: totalChunks > 0 ? (biomeCounts.desert / totalChunks) * 100 : 0,
+      },
+      tundra: {
+        count: biomeCounts.tundra,
+        percentage: totalChunks > 0 ? (biomeCounts.tundra / totalChunks) * 100 : 0,
+      },
+    };
+
+    return {
+      totalChunks,
+      biomeCoverage: coverage,
+      averageElevation: totalChunks > 0 ? sumElev / totalChunks : 0,
+      averageTemperature: totalChunks > 0 ? sumTemp / totalChunks : 0,
+      averageDangerLevel: totalChunks > 0 ? sumDanger / totalChunks : 0,
+      totalSettlements: this.settlements.length,
+      totalDungeons: this.dungeons.length,
+      totalResourceNodes,
+      totalWaterways,
     };
   }
 
@@ -551,6 +926,53 @@ export class WorldBuilderSystem {
     return true;
   }
 
+  public expandRegionBounds(id: string, delta: number = 1): boolean {
+    const reg = this._regions.get(id);
+    if (!reg) return false;
+    return this.updateRegion(id, {
+      bounds: {
+        minCX: reg.bounds.minCX - delta,
+        minCZ: reg.bounds.minCZ - delta,
+        maxCX: reg.bounds.maxCX + delta,
+        maxCZ: reg.bounds.maxCZ + delta,
+      },
+    });
+  }
+
+  public contractRegionBounds(id: string, delta: number = 1): boolean {
+    const reg = this._regions.get(id);
+    if (!reg) return false;
+    if (reg.bounds.maxCX - reg.bounds.minCX <= delta * 2 || reg.bounds.maxCZ - reg.bounds.minCZ <= delta * 2) {
+      return false;
+    }
+    return this.updateRegion(id, {
+      bounds: {
+        minCX: reg.bounds.minCX + delta,
+        minCZ: reg.bounds.minCZ + delta,
+        maxCX: reg.bounds.maxCX - delta,
+        maxCZ: reg.bounds.maxCZ - delta,
+      },
+    });
+  }
+
+  public setRegionBounds(id: string, bounds: { minCX: number; minCZ: number; maxCX: number; maxCZ: number }): boolean {
+    return this.updateRegion(id, { bounds });
+  }
+
+  public duplicateRegion(id: string): WorldRegion | null {
+    const existing = this._regions.get(id);
+    if (!existing) return null;
+    const newId = `reg_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`;
+    const copy: WorldRegion = {
+      ...existing,
+      id: newId,
+      name: `${existing.name} (Copy)`,
+      bounds: { ...existing.bounds },
+    };
+    this.addRegion(copy);
+    return this.getRegion(newId) ?? null;
+  }
+
   public removeRegion(id: string): boolean {
     return this._regions.delete(id);
   }
@@ -595,7 +1017,7 @@ export class WorldBuilderSystem {
     return this._customPresets.delete(id);
   }
 
-  // ── Validation ────────────────────────────────────────────────────────────
+  // ── Validation ────────────────────────────────────────────────────
 
   public validate(): WorldBuilderValidationReport {
     const issues: WorldBuilderValidationIssue[] = [];
@@ -625,18 +1047,32 @@ export class WorldBuilderSystem {
     }
 
     for (const reg of this._regions.values()) {
+      if (!reg.name || reg.name.trim().length === 0) {
+        issues.push({
+          field: `region_${reg.id}`,
+          message: `Region '${reg.id}' must have a non-empty name.`,
+          severity: "error",
+        });
+      }
       if (reg.dangerLevel < 1 || reg.dangerLevel > 10) {
         issues.push({
           field: `region_${reg.id}`,
-          message: `Region '${reg.name}' danger level must be between 1 and 10.`,
+          message: `Region '${reg.name || reg.id}' danger level must be between 1 and 10.`,
           severity: "error",
         });
       }
       if (reg.encounterRate < 0.0 || reg.encounterRate > 3.0) {
         issues.push({
           field: `region_${reg.id}`,
-          message: `Region '${reg.name}' encounter rate must be between 0.0 and 3.0.`,
+          message: `Region '${reg.name || reg.id}' encounter rate must be between 0.0 and 3.0.`,
           severity: "warning",
+        });
+      }
+      if (reg.bounds.maxCX - reg.bounds.minCX < 1 || reg.bounds.maxCZ - reg.bounds.minCZ < 1) {
+        issues.push({
+          field: `region_${reg.id}`,
+          message: `Region '${reg.name || reg.id}' bounds must span at least 1x1 chunks.`,
+          severity: "error",
         });
       }
     }
@@ -659,6 +1095,8 @@ export class WorldBuilderSystem {
       settlements: this.settlements,
       rivers: this.rivers,
       lakes: this.lakes,
+      dungeons: this.dungeons,
+      resourceNodes: this.resourceNodes,
     };
     return JSON.stringify(payload, null, 2);
   }
@@ -688,6 +1126,12 @@ export class WorldBuilderSystem {
         for (const reg of data.regions) {
           this.addRegion(reg);
         }
+      }
+      if (Array.isArray(data.dungeons) && data.dungeons.length > 0) {
+        this._dungeons = data.dungeons;
+      }
+      if (Array.isArray(data.resourceNodes) && data.resourceNodes.length > 0) {
+        this._resourceNodes = data.resourceNodes;
       }
       return true;
     } catch {

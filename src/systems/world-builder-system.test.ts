@@ -407,4 +407,241 @@ describe("WorldBuilderSystem — Simplex, Voronoi & Arthurian Procedural Extensi
     expect(parsed.lakes).toBeDefined();
     expect(Array.isArray(parsed.lakes)).toBe(true);
   });
+
+  it("generates deterministic seeded Arthurian dungeon POIs", () => {
+    const sys1 = new WorldBuilderSystem({ seed: "CamelotDungeons" });
+    const sys2 = new WorldBuilderSystem({ seed: "CamelotDungeons" });
+
+    expect(sys1.dungeons.length).toBe(7);
+    expect(sys2.dungeons.length).toBe(7);
+    expect(sys1.dungeons[0].id).toBe(sys2.dungeons[0].id);
+    expect(sys1.dungeons[0].name).toBe(sys2.dungeons[0].name);
+    expect(sys1.dungeons[0].theme).toBe(sys2.dungeons[0].theme);
+    expect(sys1.dungeons[0].dangerLevel).toBe(sys2.dungeons[0].dangerLevel);
+
+    for (const d of sys1.dungeons) {
+      expect(d.name.length).toBeGreaterThan(0);
+      expect(d.dangerLevel).toBeGreaterThanOrEqual(2);
+      expect(d.dangerLevel).toBeLessThanOrEqual(10);
+      expect(d.roomCount).toBeGreaterThanOrEqual(4);
+      expect(["barrow", "crypt", "catacomb", "cavern"]).toContain(d.theme);
+      expect(["Skeleton", "Ghost", "Troll", "Spider", "Dragon"]).toContain(d.bossType);
+      // Not on world origin
+      expect(Math.abs(d.cx) + Math.abs(d.cz)).toBeGreaterThan(1);
+    }
+  });
+
+  it("annotates dungeons and settlements on sampled grid cells", () => {
+    const sys = new WorldBuilderSystem({ seed: "SamplePOI" });
+    const grid = sys.sampleGrid(7, 0, 0);
+
+    let foundDungeon = false;
+    let foundSettlement = false;
+
+    for (const row of grid) {
+      for (const cell of row) {
+        if (cell.dungeon) {
+          foundDungeon = true;
+          expect(cell.dungeon.cx).toBe(cell.cx);
+          expect(cell.dungeon.cz).toBe(cell.cz);
+        }
+        if (cell.settlement) {
+          foundSettlement = true;
+          expect(Math.abs(cell.settlement.cx - cell.cx)).toBeLessThanOrEqual(0.6);
+        }
+      }
+    }
+
+    expect(foundDungeon).toBe(true);
+    expect(foundSettlement).toBe(true);
+  });
+
+  it("expands and contracts region bounds correctly", () => {
+    const sys = new WorldBuilderSystem();
+    sys.addRegion({
+      id: "test_reg",
+      name: "Test Bounds",
+      bounds: { minCX: -2, minCZ: -2, maxCX: 2, maxCZ: 2 },
+      biome: "plains",
+      dangerLevel: 3,
+      encounterRate: 1.0,
+    });
+
+    // Expand by 1
+    expect(sys.expandRegionBounds("test_reg", 1)).toBe(true);
+    const expanded = sys.getRegion("test_reg");
+    expect(expanded?.bounds).toEqual({ minCX: -3, minCZ: -3, maxCX: 3, maxCZ: 3 });
+
+    // Contract by 1
+    expect(sys.contractRegionBounds("test_reg", 1)).toBe(true);
+    const contracted = sys.getRegion("test_reg");
+    expect(contracted?.bounds).toEqual({ minCX: -2, minCZ: -2, maxCX: 2, maxCZ: 2 });
+
+    // Set bounds directly
+    expect(sys.setRegionBounds("test_reg", { minCX: -5, minCZ: -5, maxCX: 5, maxCZ: 5 })).toBe(true);
+    expect(sys.getRegion("test_reg")?.bounds).toEqual({ minCX: -5, minCZ: -5, maxCX: 5, maxCZ: 5 });
+
+    // Unknown region fails
+    expect(sys.expandRegionBounds("unknown", 1)).toBe(false);
+    expect(sys.contractRegionBounds("unknown", 1)).toBe(false);
+    expect(sys.setRegionBounds("unknown", { minCX: 0, minCZ: 0, maxCX: 1, maxCZ: 1 })).toBe(false);
+  });
+
+  it("validates empty region name and degenerate bounds", () => {
+    const sys = new WorldBuilderSystem();
+    sys.addRegion({
+      id: "bad_reg",
+      name: "   ",
+      bounds: { minCX: 2, minCZ: 2, maxCX: 2, maxCZ: 2 },
+      biome: "plains",
+      dangerLevel: 3,
+      encounterRate: 1.0,
+    });
+
+    const report = sys.validate();
+    expect(report.isValid).toBe(false);
+    const nameIssue = report.issues.find((i) => i.message.includes("non-empty name"));
+    expect(nameIssue).toBeDefined();
+    const boundsIssue = report.issues.find((i) => i.message.includes("bounds must span at least 1x1 chunks"));
+    expect(boundsIssue).toBeDefined();
+  });
+
+  it("includes dungeons in export and restores them on import", () => {
+    const sys = new WorldBuilderSystem({ seed: "DungeonRoundtrip" });
+    const json = sys.exportToJson();
+    const parsed = JSON.parse(json);
+    expect(parsed.dungeons).toBeDefined();
+    expect(parsed.dungeons.length).toBe(sys.dungeons.length);
+
+    const restoredSys = new WorldBuilderSystem();
+    const ok = restoredSys.importFromJson(json);
+    expect(ok).toBe(true);
+    expect(restoredSys.dungeons.length).toBe(sys.dungeons.length);
+    expect(restoredSys.dungeons[0].name).toBe(sys.dungeons[0].name);
+  });
+
+  it("duplicates a region with a new ID and copy suffix", () => {
+    const sys = new WorldBuilderSystem();
+    sys.addRegion({
+      id: "reg_orig",
+      name: "Gawain's Crossing",
+      bounds: { minCX: -2, minCZ: -2, maxCX: 2, maxCZ: 2 },
+      biome: "forest",
+      dangerLevel: 5,
+      encounterRate: 1.2,
+      description: "Original Gawain domain.",
+    });
+
+    const dup = sys.duplicateRegion("reg_orig");
+    expect(dup).not.toBeNull();
+    expect(dup?.id).not.toBe("reg_orig");
+    expect(dup?.name).toBe("Gawain's Crossing (Copy)");
+    expect(dup?.biome).toBe("forest");
+    expect(dup?.dangerLevel).toBe(5);
+    expect(dup?.encounterRate).toBe(1.2);
+    expect(dup?.bounds).toEqual({ minCX: -2, minCZ: -2, maxCX: 2, maxCZ: 2 });
+    expect(sys.regions.length).toBe(2);
+
+    expect(sys.duplicateRegion("nonexistent")).toBeNull();
+  });
+
+  it("finds the closest Voronoi province at given chunk coordinates", () => {
+    const sys = new WorldBuilderSystem({ seed: "ProvinceTest" });
+    expect(sys.provinces.length).toBeGreaterThan(0);
+
+    const firstProv = sys.provinces[0];
+    const found = sys.getProvinceAt(firstProv.center[0], firstProv.center[1]);
+    expect(found).toBeDefined();
+    expect(found?.name).toBe(firstProv.name);
+  });
+
+  it("generates deterministic seeded resource nodes and mining veins", () => {
+    const sys1 = new WorldBuilderSystem({ seed: "OreMountains" });
+    const sys2 = new WorldBuilderSystem({ seed: "OreMountains" });
+
+    expect(sys1.resourceNodes.length).toBe(24);
+    expect(sys2.resourceNodes.length).toBe(24);
+    expect(sys1.resourceNodes[0].id).toBe(sys2.resourceNodes[0].id);
+    expect(sys1.resourceNodes[0].type).toBe(sys2.resourceNodes[0].type);
+    expect(sys1.resourceNodes[0].richness).toBe(sys2.resourceNodes[0].richness);
+
+    for (const node of sys1.resourceNodes) {
+      expect(node.name.length).toBeGreaterThan(0);
+      expect(node.richness).toBeGreaterThanOrEqual(1);
+      expect(node.richness).toBeLessThanOrEqual(5);
+      expect(["common", "uncommon", "rare", "legendary"]).toContain(node.rarity);
+      expect([
+        "iron_ore",
+        "silver_ore",
+        "mithril_ore",
+        "gold_deposit",
+        "kingsbloom",
+        "mana_crystal",
+      ]).toContain(node.type);
+    }
+
+    const firstNode = sys1.resourceNodes[0];
+    const foundNodes = sys1.getResourceNodesAt(firstNode.cx, firstNode.cz);
+    expect(foundNodes.some((n) => n.id === firstNode.id)).toBe(true);
+  });
+
+  it("generates a complete 5-region Arthurian Kingdom layout", () => {
+    const sys = new WorldBuilderSystem();
+    const kingdom = sys.generateArthurianKingdom();
+
+    expect(kingdom.length).toBe(5);
+    expect(sys.regions.length).toBe(5);
+
+    const names = kingdom.map((r) => r.name);
+    expect(names).toContain("Camelot Crownlands");
+    expect(names).toContain("Brocéliande Enchanted Forest");
+    expect(names).toContain("Misty Isle of Avalon");
+    expect(names).toContain("Gorre Wastes & Crags");
+    expect(names).toContain("Lyonesse Sunken Coast");
+
+    for (const reg of kingdom) {
+      expect(reg.bounds.maxCX).toBeGreaterThan(reg.bounds.minCX);
+      expect(reg.bounds.maxCZ).toBeGreaterThan(reg.bounds.minCZ);
+      expect(reg.dangerLevel).toBeGreaterThanOrEqual(1);
+      expect(reg.dangerLevel).toBeLessThanOrEqual(10);
+      expect(reg.description).toBeDefined();
+    }
+  });
+
+  it("computes comprehensive world analytics across the sampled territory", () => {
+    const sys = new WorldBuilderSystem({ seed: "AnalyticsRealm" });
+    sys.generateArthurianKingdom();
+
+    const analytics = sys.computeWorldAnalytics(5); // 11x11 grid = 121 chunks
+    expect(analytics.totalChunks).toBe(121);
+
+    const totalPct =
+      analytics.biomeCoverage.plains.percentage +
+      analytics.biomeCoverage.forest.percentage +
+      analytics.biomeCoverage.desert.percentage +
+      analytics.biomeCoverage.tundra.percentage;
+    expect(totalPct).toBeCloseTo(100, 1);
+
+    expect(analytics.averageElevation).toBeGreaterThan(0);
+    expect(analytics.averageDangerLevel).toBeGreaterThanOrEqual(1);
+    expect(analytics.totalSettlements).toBe(sys.settlements.length);
+    expect(analytics.totalDungeons).toBe(sys.dungeons.length);
+    expect(analytics.totalResourceNodes).toBeGreaterThan(0);
+  });
+
+  it("includes resource nodes in export and restores them on import", () => {
+    const sys = new WorldBuilderSystem({ seed: "ResourceExportTest" });
+    const json = sys.exportToJson();
+    const parsed = JSON.parse(json);
+
+    expect(parsed.resourceNodes).toBeDefined();
+    expect(parsed.resourceNodes.length).toBe(sys.resourceNodes.length);
+
+    const restoredSys = new WorldBuilderSystem();
+    const ok = restoredSys.importFromJson(json);
+    expect(ok).toBe(true);
+    expect(restoredSys.resourceNodes.length).toBe(sys.resourceNodes.length);
+    expect(restoredSys.resourceNodes[0].id).toBe(sys.resourceNodes[0].id);
+  });
 });
+

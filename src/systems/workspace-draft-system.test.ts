@@ -212,4 +212,20 @@ describe("WorkspaceDraftSystem", () => {
     expect(snap.quest).toBeDefined();
     expect(snap.faction).toBeDefined();
   });
+
+  it("saves and restores worldBuilder draft state", () => {
+    const payload = JSON.stringify({ version: 1, config: { seed: "DraftWorld" } });
+    const wb = makeStub(payload);
+    sys.attachWorldBuilder(wb as any);
+    const snap = sys.save();
+    expect(snap.worldBuilder).toBeDefined();
+
+    const restoredSys = new WorkspaceDraftSystem();
+    const wbTarget = makeStub("");
+    restoredSys.attachWorldBuilder(wbTarget as any);
+    const res = restoredSys.restore();
+    expect(res.restoredCount).toBe(1);
+    expect(res.restoredSystems).toContain("World Builder");
+    expect(wbTarget.importFromJson).toHaveBeenCalledWith(payload);
+  });
 });

@@ -6,6 +6,7 @@ import type { LootTableCreatorSystem } from "./loot-table-creator-system";
 import type { NpcCreatorSystem } from "./npc-creator-system";
 import type { ItemCreatorSystem } from "./item-creator-system";
 import type { SpawnCreatorSystem } from "./spawn-creator-system";
+import type { WorldBuilderSystem } from "./world-builder-system";
 
 // ── Validation report types ───────────────────────────────────────────────────
 
@@ -47,7 +48,8 @@ export type BundleSystemId =
   | "lootTable"
   | "npc"
   | "item"
-  | "spawn";
+  | "spawn"
+  | "worldBuilder";
 
 /** Manifest embedded at the top of every exported bundle. */
 export interface ContentBundleManifest {
@@ -83,6 +85,8 @@ export interface ContentBundleExport {
   item?: unknown;
   /** Serialised spawn group definition JSON (parsed object). */
   spawn?: unknown;
+  /** Serialised world builder configuration and regions JSON (parsed object). */
+  worldBuilder?: unknown;
 }
 
 // ── Play-from-here harness ────────────────────────────────────────────────────
@@ -108,6 +112,7 @@ export interface ContentBundleSystems {
   npc?: NpcCreatorSystem;
   item?: ItemCreatorSystem;
   spawn?: SpawnCreatorSystem;
+  worldBuilder?: WorldBuilderSystem;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -173,6 +178,7 @@ export class ContentBundleSystem {
   attachNpc(sys: NpcCreatorSystem):            this { this._systems.npc          = sys; return this; }
   attachItem(sys: ItemCreatorSystem):          this { this._systems.item         = sys; return this; }
   attachSpawn(sys: SpawnCreatorSystem):        this { this._systems.spawn        = sys; return this; }
+  attachWorldBuilder(sys: WorldBuilderSystem): this { this._systems.worldBuilder = sys; return this; }
 
   // ── Meta ──────────────────────────────────────────────────────────────────
 
@@ -194,7 +200,7 @@ export class ContentBundleSystem {
    */
   validate(): ContentBundleReport {
     const reports: BundleSystemReport[] = [];
-    const { map, quest, dialogue, faction, lootTable, npc, item, spawn } = this._systems;
+    const { map, quest, dialogue, faction, lootTable, npc, item, spawn, worldBuilder } = this._systems;
 
     if (map) {
       const r = map.validateMap(0.5);
@@ -276,6 +282,16 @@ export class ContentBundleSystem {
       });
     }
 
+    if (worldBuilder) {
+      const r = worldBuilder.validate();
+      reports.push({
+        systemId: "worldBuilder",
+        label: "World Builder",
+        valid: r.isValid,
+        issues: r.issues.map((i) => ({ message: i.message })),
+      });
+    }
+
     return {
       allValid: reports.every((r) => r.valid),
       systems: reports,
@@ -290,7 +306,7 @@ export class ContentBundleSystem {
    * All nested keys are sorted for deterministic output.
    */
   buildBundle(): ContentBundleExport {
-    const { map, quest, dialogue, faction, lootTable, npc, item, spawn } = this._systems;
+    const { map, quest, dialogue, faction, lootTable, npc, item, spawn, worldBuilder } = this._systems;
     const included: BundleSystemId[] = [];
 
     const bundle: ContentBundleExport = {
@@ -336,6 +352,10 @@ export class ContentBundleSystem {
       try { bundle.spawn = JSON.parse(spawn.exportToJson()); } catch { /* skip */ }
       included.push("spawn");
     }
+    if (worldBuilder) {
+      try { bundle.worldBuilder = JSON.parse(worldBuilder.exportToJson()); } catch { /* skip */ }
+      included.push("worldBuilder");
+    }
 
     // Update manifest systems list (populated above)
     bundle.manifest.systems = [...included];
@@ -377,14 +397,15 @@ export class ContentBundleSystem {
    */
   getPlayFromHereConfig(systemId: BundleSystemId): PlayFromHereConfig | null {
     const labels: Record<BundleSystemId, string> = {
-      map:       "Map Editor",
-      quest:     "Quest Creator",
-      dialogue:  "Dialogue Creator",
-      faction:   "Faction Creator",
-      lootTable: "Loot Table Creator",
-      npc:       "NPC Creator",
-      item:      "Item Creator",
-      spawn:     "Loot + Spawn Creator",
+      map:          "Map Editor",
+      quest:        "Quest Creator",
+      dialogue:     "Dialogue Creator",
+      faction:      "Faction Creator",
+      lootTable:    "Loot Table Creator",
+      npc:          "NPC Creator",
+      item:         "Item Creator",
+      spawn:        "Loot + Spawn Creator",
+      worldBuilder: "World Builder",
     };
     if (!this._systems[systemId]) return null;
     return { systemId, label: labels[systemId] };

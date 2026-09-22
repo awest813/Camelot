@@ -11,6 +11,7 @@ import { ItemCreatorSystem } from "./item-creator-system";
 import { NpcCreatorSystem } from "./npc-creator-system";
 import { SpawnCreatorSystem } from "./spawn-creator-system";
 import { DialogueCreatorSystem } from "./dialogue-creator-system";
+import { WorldBuilderSystem } from "./world-builder-system";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,19 @@ function makePopulatedDialogue() {
   const s = new DialogueCreatorSystem();
   s.setMeta("d1", "greeting");
   s.addNode({ id: "greeting", speaker: "Guard", text: "Halt!" });
+  return s;
+}
+
+function makePopulatedWorldBuilder() {
+  const s = new WorldBuilderSystem({ seed: "BundleWorld" });
+  s.addRegion({
+    id: "reg_valley",
+    name: "Valley of the Sun",
+    bounds: { minCX: -3, minCZ: -3, maxCX: 3, maxCZ: 3 },
+    biome: "plains",
+    dangerLevel: 2,
+    encounterRate: 0.9,
+  });
   return s;
 }
 
@@ -426,5 +440,29 @@ describe("ContentBundleSystem — getPlayFromHereConfig", () => {
     expect(b.getPlayFromHereConfig("npc")!.label).toBe("NPC Creator");
     expect(b.getPlayFromHereConfig("spawn")!.label).toBe("Loot + Spawn Creator");
     expect(b.getPlayFromHereConfig("dialogue")!.label).toBe("Dialogue Creator");
+
+    b.attachWorldBuilder(makePopulatedWorldBuilder());
+    expect(b.getPlayFromHereConfig("worldBuilder")!.label).toBe("World Builder");
+  });
+
+  it("validates and includes worldBuilder in bundle output", () => {
+    const b = makeBundle();
+    const wb = makePopulatedWorldBuilder();
+    b.attachWorldBuilder(wb);
+
+    expect(b.attachedSystems).toContain("worldBuilder");
+
+    const report = b.validate();
+    expect(report.allValid).toBe(true);
+    const wbReport = report.systems.find((s) => s.systemId === "worldBuilder");
+    expect(wbReport).toBeDefined();
+    expect(wbReport!.valid).toBe(true);
+
+    const bundle = b.buildBundle();
+    expect(bundle.manifest.systems).toContain("worldBuilder");
+    expect(bundle.worldBuilder).toBeDefined();
+    const wbData = bundle.worldBuilder as { config: { seed: string }; regions: unknown[] };
+    expect(wbData.config.seed).toBe("BundleWorld");
+    expect(wbData.regions.length).toBe(1);
   });
 });

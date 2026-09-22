@@ -6,6 +6,7 @@ import type { LootTableCreatorSystem } from "./loot-table-creator-system";
 import type { NpcCreatorSystem } from "./npc-creator-system";
 import type { ItemCreatorSystem } from "./item-creator-system";
 import type { SpawnCreatorSystem } from "./spawn-creator-system";
+import type { WorldBuilderSystem } from "./world-builder-system";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -14,14 +15,15 @@ export interface WorkspaceDraftSnapshot {
   /** ISO-8601 timestamp of the last save. */
   savedAt: string;
   /** Serialised creator-system payloads (optional — only present when non-empty). */
-  quest?:     string;
-  dialogue?:  string;
-  faction?:   string;
-  lootTable?: string;
-  npc?:       string;
-  item?:      string;
-  spawn?:     string;
-  map?:       string;
+  quest?:        string;
+  dialogue?:     string;
+  faction?:      string;
+  lootTable?:    string;
+  npc?:          string;
+  item?:         string;
+  spawn?:        string;
+  map?:          string;
+  worldBuilder?: string;
 }
 
 /** Summary of what was restored from a draft. */
@@ -37,14 +39,15 @@ export interface WorkspaceDraftRestoreResult {
 // ── Attached systems registry ─────────────────────────────────────────────────
 
 export interface WorkspaceDraftSystems {
-  quest?:     QuestCreatorSystem;
-  dialogue?:  DialogueCreatorSystem;
-  faction?:   FactionCreatorSystem;
-  lootTable?: LootTableCreatorSystem;
-  npc?:       NpcCreatorSystem;
-  item?:      ItemCreatorSystem;
-  spawn?:     SpawnCreatorSystem;
-  map?:       MapEditorSystem;
+  quest?:        QuestCreatorSystem;
+  dialogue?:     DialogueCreatorSystem;
+  faction?:      FactionCreatorSystem;
+  lootTable?:    LootTableCreatorSystem;
+  npc?:          NpcCreatorSystem;
+  item?:         ItemCreatorSystem;
+  spawn?:        SpawnCreatorSystem;
+  map?:          MapEditorSystem;
+  worldBuilder?: WorldBuilderSystem;
 }
 
 // ── System ─────────────────────────────────────────────────────────────────────
@@ -95,8 +98,9 @@ export class WorkspaceDraftSystem {
   attachLootTable(sys: LootTableCreatorSystem):   this { this._systems.lootTable = sys; return this; }
   attachNpc(sys: NpcCreatorSystem):               this { this._systems.npc       = sys; return this; }
   attachItem(sys: ItemCreatorSystem):             this { this._systems.item      = sys; return this; }
-  attachSpawn(sys: SpawnCreatorSystem):           this { this._systems.spawn     = sys; return this; }
-  attachMap(sys: MapEditorSystem):                this { this._systems.map       = sys; return this; }
+  attachSpawn(sys: SpawnCreatorSystem):           this { this._systems.spawn        = sys; return this; }
+  attachMap(sys: MapEditorSystem):                this { this._systems.map          = sys; return this; }
+  attachWorldBuilder(sys: WorldBuilderSystem):    this { this._systems.worldBuilder = sys; return this; }
 
   // ── Dirty / auto-save ─────────────────────────────────────────────────────
 
@@ -165,6 +169,10 @@ export class WorkspaceDraftSystem {
       if (mapData.entries.length > 0 || (mapData.patrolRoutes?.length ?? 0) > 0) {
         snap.map = JSON.stringify(mapData);
       }
+    }
+    if (this._systems.worldBuilder) {
+      const json = this._systems.worldBuilder.exportToJson();
+      snap.worldBuilder = json;
     }
 
     if (typeof localStorage !== "undefined") {
@@ -242,6 +250,9 @@ export class WorkspaceDraftSystem {
         this._systems.map!.importFromJson(j);
         return true;
       });
+    }
+    if (this._systems.worldBuilder && snap.worldBuilder) {
+      tryRestore("World Builder", snap.worldBuilder, (j) => this._systems.worldBuilder!.importFromJson(j));
     }
 
     return result;

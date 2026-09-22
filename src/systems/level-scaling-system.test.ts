@@ -96,4 +96,22 @@ describe("LevelScalingSystem", () => {
     expect(npc1.maxHealth).toBe(npc2.maxHealth);
     expect(npc1.xpReward).toBe(npc2.xpReward);
   });
+
+  it("scales higher in dangerous zones with zoneDangerLevel", () => {
+    const sBase = LevelScalingSystem.computeScale(5);
+    const sDanger10 = LevelScalingSystem.computeScale(5, 10);
+    const sSafe1 = LevelScalingSystem.computeScale(5, 1);
+
+    expect(sDanger10).toBeGreaterThan(sBase);
+    expect(sBase).toBeGreaterThan(sSafe1);
+
+    const npcHigh = makeNPC(100, 50);
+    const npcLow = makeNPC(100, 50);
+    lss.scaleNPC(npcHigh, 5, 10);
+    lss.scaleNPC(npcLow, 5, 1);
+
+    expect(npcHigh.maxHealth).toBeGreaterThan(npcLow.maxHealth);
+    expect(npcHigh.xpReward).toBeGreaterThan(npcLow.xpReward);
+  });
 });
+

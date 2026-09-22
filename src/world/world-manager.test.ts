@@ -595,4 +595,37 @@ describe('WorldManager with WorldSeed', () => {
     wm.dispose();
     expect(mockLod.unregister).toHaveBeenCalled();
   });
+
+  it('respects custom region overrides for chunk biomes', () => {
+    const wm = new WorldManager(mockScene);
+    wm.setRegions([
+      {
+        id: 'reg_desert_oasis',
+        name: 'The Great Waste',
+        bounds: { minCX: 0, minCZ: 0, maxCX: 2, maxCZ: 2 },
+        biome: 'desert',
+        dangerLevel: 8,
+        encounterRate: 1.5,
+      },
+    ]);
+
+    expect(wm.regions.length).toBe(1);
+    expect(wm.getRegionAt(1, 1)?.name).toBe('The Great Waste');
+    expect(wm.getRegionAt(10, 10)).toBeUndefined();
+
+    // Chunk (1, 1) inside bounds must return custom region biome 'desert'
+    expect(wm.getBiome(1, 1)).toBe('desert');
+  });
+
+  it('scales vegetation prop spawning by vegetationDensity', () => {
+    const wm = new WorldManager(mockScene);
+    wm.vegetationDensity = 0.0;
+    const zeroProps = wm._spawnVegetation(0, 0, 'forest');
+    expect(zeroProps.length).toBe(0);
+
+    wm.vegetationDensity = 2.0;
+    const heavyProps = wm._spawnVegetation(0, 0, 'forest');
+    expect(heavyProps.length).toBeGreaterThan(0);
+  });
 });
+

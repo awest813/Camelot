@@ -39,17 +39,24 @@ const BASE_OFFSET = 0.8;
 
 export class LevelScalingSystem {
   /**
-   * Compute the scale factor for a given player level.
+   * Compute the scale factor for a given player level and optional zone danger level (1–10).
    * Exposed as a static helper so callers can preview the factor without
    * creating an instance.
+   *
+   * When zoneDangerLevel is provided:
+   * Each danger level above 5 adds +5% threat; below 5 subtracts 5%.
    */
-  public static computeScale(playerLevel: number): number {
-    const raw = BASE_OFFSET + playerLevel * SCALE_PER_LEVEL;
+  public static computeScale(playerLevel: number, zoneDangerLevel?: number): number {
+    let raw = BASE_OFFSET + playerLevel * SCALE_PER_LEVEL;
+    if (typeof zoneDangerLevel === "number") {
+      const dangerOffset = (zoneDangerLevel - 5) * 0.05;
+      raw += dangerOffset;
+    }
     return Math.max(MIN_SCALE, Math.min(MAX_SCALE, raw));
   }
 
   /**
-   * Apply player-level-based scaling to an NPC's stats in-place.
+   * Apply player-level and regional danger scaling to an NPC's stats in-place.
    *
    * Affected stats:
    *   - `health` and `maxHealth` – scaled by `factor`
@@ -58,11 +65,12 @@ export class LevelScalingSystem {
    * The NPC's current health is set to the new maxHealth so freshly-spawned
    * enemies start at full HP.
    *
-   * @param npc         The NPC to scale (modified in-place).
-   * @param playerLevel The player's current level.
+   * @param npc             The NPC to scale (modified in-place).
+   * @param playerLevel     The player's current level.
+   * @param zoneDangerLevel Optional regional danger rating (1–10).
    */
-  public scaleNPC(npc: NPC, playerLevel: number): void {
-    const factor = LevelScalingSystem.computeScale(playerLevel);
+  public scaleNPC(npc: NPC, playerLevel: number, zoneDangerLevel?: number): void {
+    const factor = LevelScalingSystem.computeScale(playerLevel, zoneDangerLevel);
 
     const newMaxHealth = Math.max(1, Math.round(npc.maxHealth * factor));
     npc.maxHealth = newMaxHealth;

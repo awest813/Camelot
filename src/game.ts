@@ -437,6 +437,7 @@ export class Game {
   // Chunk tracking for navmesh rebuild triggers
   private _lastNavChunkX: number = NaN;
   private _lastNavChunkZ: number = NaN;
+  private _lastRegionId: string | null = null;
 
   /** CDN props and chunk-scoped NPCs spawned per chunk key ("cx,cz") — disposed on chunk unload. */
   private readonly _chunkFantasyContent = new Map<string, { roots: AbstractMesh[]; npcs: NPC[] }>();
@@ -1010,12 +1011,18 @@ export class Game {
     this.worldBuilderUI = new WorldBuilderUI(this.worldBuilderSystem);
     this.worldBuilderUI.onClose = () => {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.workspaceDraftSystem.markDirty();
       if (this.mapEditorSystem.isEnabled || this.isPaused) return;
       this.canvas.requestPointerLock();
       this.player.camera.attachControl(this.canvas, true);
     };
-    this.worldBuilderUI.onApplyToWorld = (worldSeed) => {
+    this.worldBuilderUI.onApplyToWorld = (worldSeed, config) => {
       this.world.setSeed(worldSeed);
+      if (config) {
+        this.world.vegetationDensity = config.vegetationDensity;
+        this.world.elevationScale = config.elevationScale;
+      }
+      this.world.setRegions(this.worldBuilderSystem.regions);
 
       // Register procedural settlements as discoverable fast-travel landmarks
       if (this.fastTravelSystem && this.worldBuilderSystem.settlements.length > 0) {
@@ -1025,10 +1032,25 @@ export class Game {
         }
       }
 
-      // Generate seeded Arthurian barrow interior cell and register with CellManager
+      // Generate seeded Arthurian barrows & crypts and register with CellManager and fast travel
       if (this.cellManager) {
-        const dungeonGen = new DungeonGenerator({ seed: worldSeed.seedString, dangerLevel: 3 });
-        this.cellManager.registerCell(dungeonGen.toCellDefinition());
+        for (const d of this.worldBuilderSystem.dungeons) {
+          const dungeonGen = new DungeonGenerator({
+            seed: `${worldSeed.seedString}_${d.id}`,
+            dangerLevel: d.dangerLevel,
+            maxRooms: d.roomCount,
+            theme: d.theme,
+          });
+          const cellDef = dungeonGen.toCellDefinition();
+          cellDef.id = d.id;
+          cellDef.name = d.name;
+          this.cellManager.registerCell(cellDef);
+
+          if (this.fastTravelSystem) {
+            const dwp = new Vector3(d.cx * this.world.chunkSize, 2, d.cz * this.world.chunkSize);
+            this.fastTravelSystem.discoverLocation(`dungeon_${d.id}`, d.name, dwp);
+          }
+        }
       }
 
       this.ui.showNotification(
@@ -1046,7 +1068,8 @@ export class Game {
       .attachLootTable(this.lootTableCreatorSystem)
       .attachNpc(this.npcCreatorSystem)
       .attachItem(this.itemCreatorSystem)
-      .attachSpawn(this.spawnCreatorSystem);
+      .attachSpawn(this.spawnCreatorSystem)
+      .attachWorldBuilder(this.worldBuilderSystem);
     this.contentBundleUI = new ContentBundleUI(this.contentBundleSystem);
     this.contentBundleUI.onClose = () => {
       this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
@@ -1077,6 +1100,7 @@ export class Game {
         case "npc":          this.npcCreatorUI.open();          break;
         case "item":         this.itemCreatorUI.open();         break;
         case "spawn":        this.spawnCreatorUI.open();        break;
+        case "worldBuilder": this.worldBuilderUI.open();        break;
         default: break;
       }
     };
@@ -1149,7 +1173,8 @@ export class Game {
       .attachNpc(this.npcCreatorSystem)
       .attachItem(this.itemCreatorSystem)
       .attachSpawn(this.spawnCreatorSystem)
-      .attachMap(this.mapEditorSystem);
+      .attachMap(this.mapEditorSystem)
+      .attachWorldBuilder(this.worldBuilderSystem);
     this.workspaceDraftSystem.onSaved = () => {
       this.ui.showNotification("Workspace draft auto-saved.", 1500);
     };
@@ -1971,7 +1996,8 @@ export class Game {
         // Hide the default capsule — the CDN model provides the visual
         dragonNpc.mesh.isVisible = false;
         this.scheduleSystem.addNPC(dragonNpc);
-        this.levelScalingSystem?.scaleNPC(dragonNpc, this.player.level);
+        const reg = this.world.getRegionAt(cx, cz);
+        this.levelScalingSystem?.scaleNPC(dragonNpc, this.player.level, reg?.dangerLevel);
         chunkRecord.npcs.push(dragonNpc);
         // NOTE: the capsule stays unregistered in LodSystem — visibility toggling
         // would reveal it; the CDN model root is LOD-tracked via _trackChunkProp.
@@ -5242,7 +5268,10 @@ export class Game {
       const npc = this.npcArchetypeSystem.spawnNpc(archetypeId, this.scene, new Vector3(x, 2, z));
       if (!npc) return false;
       this.scheduleSystem.addNPC(npc);
-      this.levelScalingSystem?.scaleNPC(npc, this.player.level);
+      const cx = Math.floor(x / this.world.chunkSize);
+      const cz = Math.floor(z / this.world.chunkSize);
+      const reg = this.world.getRegionAt(cx, cz);
+      this.levelScalingSystem?.scaleNPC(npc, this.player.level, reg?.dangerLevel);
       this._registerPickpocketInventory(npc);
       this.lodSystem.register(npc.mesh, 120);
       chunkRecord.npcs.push(npc);
@@ -5739,6 +5768,19 @@ export class Game {
         this._lastNavChunkX = cx;
         this._lastNavChunkZ = cz;
         this.navigationSystem.requestRebuild();
+
+        // Dynamic region transition check
+        const currentRegion = this.world.getRegionAt(cx, cz);
+        const regId = currentRegion ? currentRegion.id : null;
+        if (regId !== this._lastRegionId) {
+          this._lastRegionId = regId;
+          if (currentRegion) {
+            this.ui.showNotification(
+              `📍 Entered ${currentRegion.name} (Danger ${currentRegion.dangerLevel}/10)`,
+              3500,
+            );
+          }
+        }
       }
 
       // ── Throttled systems (don't run every frame) ──────────────────────────

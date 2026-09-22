@@ -5777,6 +5777,13 @@ body::before {
   border: 1px solid rgba(212, 160, 23, 0.4);
   image-rendering: pixelated;
   cursor: crosshair;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.world-builder__canvas:focus-visible {
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.5);
 }
 
 .world-builder__tooltip {
@@ -5837,28 +5844,171 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 130px;
+  max-height: 220px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(212, 160, 23, 0.3) rgba(10, 8, 4, 0.4);
 }
 
 .world-builder__region-item {
-  padding: 6px 10px;
+  padding: 8px 12px;
   border-radius: 6px;
   background: rgba(18, 13, 6, 0.8);
   border: 1px solid rgba(212, 160, 23, 0.18);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.world-builder__region-item--expanded {
+  background: rgba(26, 18, 8, 0.95);
+  border-color: rgba(212, 160, 23, 0.5);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.world-builder__region-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.world-builder__chevron {
+  font-size: 0.72rem;
+  color: #d4a017;
+  user-select: none;
 }
 
 .world-builder__region-name {
   color: #f8f0dc;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 }
 
 .world-builder__region-meta {
   font-size: 0.74rem;
   color: #a89880;
-  margin-top: 2px;
+  margin-top: 4px;
+}
+
+.world-builder__region-edit-form {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(212, 160, 23, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.world-builder__bounds-card {
+  background: rgba(14, 10, 5, 0.6);
+  border: 1px solid rgba(212, 160, 23, 0.2);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.world-builder__bound-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.75rem;
+  color: #a89880;
+}
+
+.world-builder__chunk-inspector {
+  display: none;
+  background: rgba(22, 16, 8, 0.92);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 10px;
+}
+
+.world-builder__grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  font-size: 0.8rem;
+  color: #e5d5b5;
+  margin: 6px 0;
+}
+
+.world-builder__grid-4col {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.world-builder__inspector-features {
+  font-size: 0.78rem;
+  color: #fde68a;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0;
+  padding-top: 6px;
+  border-top: 1px solid rgba(212, 160, 23, 0.15);
+}
+
+.world-builder__pill {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  vertical-align: middle;
+}
+
+.world-builder__pill--danger {
+  background: rgba(220, 38, 38, 0.8);
+}
+
+.world-builder__badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(212, 160, 23, 0.2);
+  color: #fde68a;
+  border: 1px solid rgba(212, 160, 23, 0.35);
+  vertical-align: middle;
+}
+
+.world-builder__search-wrap {
+  margin-bottom: 8px;
+}
+
+.world-builder__search-input {
+  width: 100%;
+  padding: 6px 10px;
+  background: rgba(14, 10, 5, 0.7);
+  border: 1px solid rgba(212, 160, 23, 0.25);
+  border-radius: 6px;
+  color: #f8f0dc;
+  font-size: 0.8rem;
+  box-sizing: border-box;
+  transition: border-color var(--transition-fast);
+}
+
+.world-builder__search-input:focus {
+  border-color: #d4a017;
+  outline: none;
+}
+
+.world-builder__region-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+}
+
+.world-builder__btn--delete-confirm {
+  background: rgba(239, 68, 68, 0.35) !important;
+  border-color: #ef4444 !important;
+  color: #fee2e2 !important;
+  font-weight: 700 !important;
 }
 
 .world-builder__empty {
@@ -5906,6 +6056,28 @@ body::before {
   flex: 0 0 auto;
 }
 
+.world-builder__analytics-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10050;
+  backdrop-filter: blur(4px);
+}
+
+.world-builder__analytics-content {
+  background: rgba(22, 16, 8, 0.98);
+  border: 1px solid rgba(212, 160, 23, 0.45);
+  border-radius: 10px;
+  padding: 18px 22px;
+  max-width: 520px;
+  width: 90%;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
+  box-sizing: border-box;
+}
+
 /* ── Responsive Breakpoints for Overlays ─────────────────────────────────────── */
 
 @media (max-width: 760px) {
@@ -5930,6 +6102,7 @@ body::before {
   .barter-ui,
   .journal-ui,
   .skill-tree-ui,
+  .world-builder,
   .spell-making__panel {
     padding: 12px;
     max-height: 96vh;
@@ -5938,7 +6111,8 @@ body::before {
   .character-sheet-ui__header,
   .barter-ui__header,
   .journal-ui__header,
-  .skill-tree-ui__header {
+  .skill-tree-ui__header,
+  .world-builder__header {
     margin-bottom: 8px;
     padding-bottom: 6px;
   }

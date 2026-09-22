@@ -131,6 +131,76 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     this.structures.setSeed(seed);
   }
 
+  /** Multiplier for vegetation prop density (default: 1.0, range: [0.0, 2.5]). */
+  public vegetationDensity: number = 1.0;
+
+  /** Multiplier for terrain elevation (default: 1.0, range: [0.5, 3.0]). */
+  public elevationScale: number = 1.0;
+
+  /** Active custom regions authored via WorldBuilder. */
+  private _regions: Array<{
+    id: string;
+    name: string;
+    bounds: { minCX: number; minCZ: number; maxCX: number; maxCZ: number };
+    biome: BiomeType;
+    dangerLevel: number;
+    encounterRate: number;
+    description?: string;
+  }> = [];
+
+  public get regions(): ReadonlyArray<{
+    id: string;
+    name: string;
+    bounds: { minCX: number; minCZ: number; maxCX: number; maxCZ: number };
+    biome: BiomeType;
+    dangerLevel: number;
+    encounterRate: number;
+    description?: string;
+  }> {
+    return this._regions;
+  }
+
+  public setRegions(
+    regions: ReadonlyArray<{
+      id: string;
+      name: string;
+      bounds: { minCX: number; minCZ: number; maxCX: number; maxCZ: number };
+      biome: BiomeType;
+      dangerLevel: number;
+      encounterRate: number;
+      description?: string;
+    }>,
+  ): void {
+    this._regions = [...regions];
+  }
+
+  public getRegionAt(
+    chunkX: number,
+    chunkZ: number,
+  ):
+    | {
+        id: string;
+        name: string;
+        bounds: { minCX: number; minCZ: number; maxCX: number; maxCZ: number };
+        biome: BiomeType;
+        dangerLevel: number;
+        encounterRate: number;
+        description?: string;
+      }
+    | undefined {
+    for (const r of this._regions) {
+      if (
+        chunkX >= r.bounds.minCX &&
+        chunkX <= r.bounds.maxCX &&
+        chunkZ >= r.bounds.minCZ &&
+        chunkZ <= r.bounds.maxCZ
+      ) {
+        return r;
+      }
+    }
+    return undefined;
+  }
+
   // ── Debug / test accessors ─────────────────────────────────────────────────
 
   /** Number of chunks currently loaded and visible. */
@@ -155,10 +225,16 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
 
   /**
    * Determine the biome for a given chunk coordinate.
-   * Uses the active `WorldSeed` when one is set; otherwise falls back to the
-   * default deterministic trig hash so existing behaviour is preserved.
+   * Priority:
+   * 1. Active authored WorldRegion containing (chunkX, chunkZ).
+   * 2. Active `WorldSeed` when set.
+   * 3. Deterministic fallback trig hash.
    */
   public getBiome(chunkX: number, chunkZ: number): BiomeType {
+    const customRegion = this.getRegionAt(chunkX, chunkZ);
+    if (customRegion) {
+      return customRegion.biome;
+    }
     if (this._seed) return this._seed.getBiome(chunkX, chunkZ);
     const v = Math.sin(chunkX * 0.5 + chunkZ * 0.3) * Math.cos(chunkX * 0.2 - chunkZ * 0.7);
     const n = (v + 1) / 2; // normalise to [0, 1]
@@ -513,9 +589,14 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
 
   public _spawnVegetation(chunkX: number, chunkZ: number, biome: BiomeType): Mesh[] {
     const meshes: Mesh[] = [];
+    if (this.vegetationDensity <= 0.05) {
+      return meshes;
+    }
+
     const centerX = chunkX * this.chunkSize;
     const centerZ = chunkZ * this.chunkSize;
     const halfSize = this.chunkSize / 2 - 4; // keep 4 m margin from chunk edges
+    const density = this.vegetationDensity;
 
     // Deterministic pseudo-random seeded by chunk coords
     const rand = (i: number) =>
@@ -525,20 +606,22 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
 
     switch (biome) {
       case "forest": {
-        // 6 pine trees
-        for (let i = 0; i < 6; i++) {
+        // Pine trees scaled by density
+        const treeCount = Math.round(6 * density);
+        for (let i = 0; i < treeCount; i++) {
           const px = centerX + (rand(i * 2) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(i * 2 + 1) * 2 - 1) * halfSize;
           meshes.push(...this._spawnTree(px, pz, `tree_${chunkX}_${chunkZ}_${i}`, rand(i * 3), "forest"));
         }
-        // 2 giant mushrooms — Oblivion Blackwood/Morrowind feel
-        for (let i = 0; i < 2; i++) {
+        // Giant mushrooms
+        const shroomCount = Math.round(2 * density);
+        for (let i = 0; i < shroomCount; i++) {
           const px = centerX + (rand(100 + i * 2) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(100 + i * 2 + 1) * 2 - 1) * halfSize;
           meshes.push(...this._spawnMushroom(px, pz, `mushroom_${chunkX}_${chunkZ}_${i}`, rand(100 + i * 3)));
         }
-        // 1 mossy boulder
-        {
+        // Mossy boulder
+        if (rand(120) < 0.8 * density) {
           const px = centerX + (rand(120) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(121) * 2 - 1) * halfSize;
           meshes.push(...this._spawnBoulder(px, pz, `boulder_${chunkX}_${chunkZ}`, rand(122)));
@@ -547,21 +630,23 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       }
 
       case "plains": {
-        // 2 trees
-        for (let i = 0; i < 2; i++) {
+        // Trees scaled by density
+        const treeCount = Math.round(2 * density);
+        for (let i = 0; i < treeCount; i++) {
           const px = centerX + (rand(i * 2) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(i * 2 + 1) * 2 - 1) * halfSize;
           meshes.push(...this._spawnTree(px, pz, `tree_${chunkX}_${chunkZ}_${i}`, rand(i * 3), "plains"));
         }
-        // 1–2 ancient standing stones — Oblivion Ayleid waymarkers
-        const stoneCount = rand(200) < 0.5 ? 1 : 2;
+        // Standing stones
+        const baseStone = rand(200) < 0.5 ? 1 : 2;
+        const stoneCount = Math.round(baseStone * density);
         for (let i = 0; i < stoneCount; i++) {
           const px = centerX + (rand(200 + i * 2) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(200 + i * 2 + 1) * 2 - 1) * halfSize;
           meshes.push(...this._spawnMonolith(px, pz, `monolith_${chunkX}_${chunkZ}_${i}`, rand(200 + i * 3)));
         }
-        // Wildflower cluster — small coloured dots scattered in grass
-        if (rand(210) < 0.6) {
+        // Wildflower cluster
+        if (rand(210) < 0.6 * density) {
           const px = centerX + (rand(211) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(212) * 2 - 1) * halfSize;
           meshes.push(...this._spawnWildflowers(px, pz, `flowers_${chunkX}_${chunkZ}`, rand(213)));
@@ -570,20 +655,21 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       }
 
       case "desert": {
-        // 2 cacti
-        for (let i = 0; i < 2; i++) {
+        // Cacti scaled by density
+        const cactusCount = Math.round(2 * density);
+        for (let i = 0; i < cactusCount; i++) {
           const px = centerX + (rand(i * 2) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(i * 2 + 1) * 2 - 1) * halfSize;
           meshes.push(...this._spawnCactus(px, pz, `cactus_${chunkX}_${chunkZ}_${i}`));
         }
-        // 1 desert palm (oasis feel)
-        {
+        // Desert palm
+        if (rand(300) < 0.7 * density) {
           const px = centerX + (rand(300) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(301) * 2 - 1) * halfSize;
           meshes.push(...this._spawnDesertPalm(px, pz, `palm_${chunkX}_${chunkZ}`));
         }
         // Scattered sandstone boulders
-        if (rand(310) < 0.7) {
+        if (rand(310) < 0.7 * density) {
           const px = centerX + (rand(311) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(312) * 2 - 1) * halfSize;
           meshes.push(...this._spawnBoulder(px, pz, `sboulder_${chunkX}_${chunkZ}`, rand(313)));
@@ -592,20 +678,21 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       }
 
       case "tundra": {
-        // 1–2 ice crystal clusters
-        for (let i = 0; i < 2; i++) {
+        // Ice crystal clusters scaled by density
+        const iceCount = Math.round(2 * density);
+        for (let i = 0; i < iceCount; i++) {
           const px = centerX + (rand(i * 2) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(i * 2 + 1) * 2 - 1) * halfSize;
           meshes.push(...this._spawnIceCrystal(px, pz, `ice_${chunkX}_${chunkZ}_${i}`, rand(i * 3)));
         }
-        // Dead twisted trees — Skyrim Winterhold atmosphere
-        if (rand(400) < 0.65) {
+        // Dead twisted trees
+        if (rand(400) < 0.65 * density) {
           const px = centerX + (rand(401) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(402) * 2 - 1) * halfSize;
           meshes.push(...this._spawnDeadTree(px, pz, `deadtree_${chunkX}_${chunkZ}`, rand(403)));
         }
         // Snow boulders
-        if (rand(410) < 0.55) {
+        if (rand(410) < 0.55 * density) {
           const px = centerX + (rand(411) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(412) * 2 - 1) * halfSize;
           meshes.push(...this._spawnSnowBoulder(px, pz, `snowboulder_${chunkX}_${chunkZ}`, rand(413)));
