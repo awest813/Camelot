@@ -143,7 +143,8 @@
 
 .quickslot-hud {
   position: fixed;
-  bottom: 56px;
+  /* Clears the Babylon GUI XP row (bottom 50–78px) — at 56px the XP bar ran through the slots. */
+  bottom: 86px;
   left: 50%;
   transform: translateX(-50%);
   display: none;
@@ -212,7 +213,7 @@
 
 @media (max-width: 760px) {
   .quickslot-hud {
-    bottom: 48px;
+    bottom: 84px;
     gap: 4px;
   }
 
@@ -903,4 +904,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+/* Dialog containers receive programmatic focus (dialog-focus.ts) so the Tab
+   trap starts inside them; the container itself is not an interactive target,
+   so don't paint the browser focus ring around the whole panel. */
+[role="dialog"][tabindex="-1"]:focus {
+  outline: none;
 }

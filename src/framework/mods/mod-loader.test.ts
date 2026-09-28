@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ModLoader } from "./mod-loader";
+import { ModLoader, resolveUrl } from "./mod-loader";
 import { RpgContentBundle } from "../content/content-types";
 
 const baseContent: RpgContentBundle = {
@@ -83,5 +83,12 @@ describe("ModLoader", () => {
     expect(report.loadedModIds).toEqual([]);
     expect(report.failures).toHaveLength(1);
     expect(report.failures[0].modId).toBe("missing_mod");
+  });
+
+  it("resolves entries beside a relative manifest, not at the site root", () => {
+    // jsdom page: resolved against location, keeping the manifest's directory.
+    expect(resolveUrl("./mod.json", "./mods/mods-manifest.json")).toBe(new URL("./mods/mod.json", location.href).toString());
+    expect(resolveUrl("./mod.json", "/mods/mods-manifest.json")).toBe(new URL("/mods/mod.json", location.href).toString());
+    expect(resolveUrl("./mod.json", "https://mods.test/a/mods-manifest.json")).toBe("https://mods.test/a/mod.json");
   });
 });

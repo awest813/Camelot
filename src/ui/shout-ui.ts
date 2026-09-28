@@ -29,6 +29,8 @@ const C = {
   BTN_BG:   "rgba(28, 20, 6, 0.95)",
   BTN_HVR:  "rgba(80, 56, 10, 0.98)",
   FONT:     "'Cinzel', 'Times New Roman', Georgia, serif",
+  /** Body/button face — Cinzel is all-caps display type, unreadable for prose. */
+  BODY:     "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
   MONO:     "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
 };
 
@@ -233,7 +235,7 @@ export class ShoutUI {
       maxWidth:       "460px",
       maxHeight:      "80vh",
       overflowY:      "auto",
-      fontFamily:     C.FONT,
+      fontFamily:     C.BODY,
       color:          C.TEXT,
     });
 
@@ -246,7 +248,7 @@ export class ShoutUI {
     const title = document.createElement("h3");
     title.id = "shout-panel-title";
     Object.assign(title.style, {
-      margin: "0", color: C.TITLE, fontSize: "15px", letterSpacing: "1px",
+      margin: "0", fontFamily: C.FONT, color: C.TITLE, fontSize: "15px", letterSpacing: "1px",
     });
     title.textContent = "SHOUTS";
 
@@ -410,7 +412,7 @@ export class ShoutUI {
       const nextWord = def.words[nextIndex];
       if (!nextLearned) {
         const learnHint = document.createElement("span");
-        Object.assign(learnHint.style, { color: C.LOCKED, fontSize: "9px", fontStyle: "italic" });
+        Object.assign(learnHint.style, { color: C.LOCKED, fontSize: "11px", fontStyle: "italic" });
         learnHint.textContent = "Next word awaits at a Word Wall…";
         actionRow.appendChild(learnHint);
       } else if (!nextUnlocked) {
@@ -477,7 +479,7 @@ function _styleButton(
     padding:       "4px 10px",
     cursor:        "pointer",
     fontSize:      "11px",
-    fontFamily:    C.FONT,
+    fontFamily:    C.BODY,
     ...overrides,
   });
   btn.addEventListener("mouseenter", () => { btn.style.background = C.BTN_HVR; });

@@ -446,8 +446,11 @@ export class EnchantingUI {
     col.addControl(header);
 
     const scroll = new ScrollViewer(scrollName);
-    scroll.width   = "calc(100% - 8px)";
-    scroll.height  = "calc(100% - 26px)";
+    // Babylon GUI has no CSS calc(): "calc(…)" parses to NaN, and NaN-sized
+    // ScrollViewers wiped the whole panel (it never appeared on B). Pixel sizes
+    // from the fixed 252px column and 420px body row.
+    scroll.width   = "244px";
+    scroll.height  = "394px";
     scroll.top     = "24px";
     scroll.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
     scroll.thickness = 1;

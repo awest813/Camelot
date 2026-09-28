@@ -134,8 +134,11 @@ export class AlchemyUI {
     leftCol.addControl(leftTitle);
 
     const ingScroll = new ScrollViewer("alchIngScroll");
-    ingScroll.width   = "calc(100% - 10px)";
-    ingScroll.height  = "calc(100% - 26px)";
+    // Babylon GUI has no CSS calc(): "calc(…)" parses to NaN, and NaN-sized
+    // ScrollViewers wiped the whole panel (it never appeared on L). Pixel sizes
+    // from the fixed 340px column and 390px body.
+    ingScroll.width   = "330px";
+    ingScroll.height  = "364px";
     ingScroll.top     = "24px";
     ingScroll.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
     ingScroll.thickness = 1;
@@ -167,8 +170,8 @@ export class AlchemyUI {
     rightCol.addControl(rightTitle);
 
     const potScroll = new ScrollViewer("alchPotScroll");
-    potScroll.width   = "calc(100% - 10px)";
-    potScroll.height  = "calc(100% - 26px)";
+    potScroll.width   = "330px";
+    potScroll.height  = "364px";
     potScroll.top     = "24px";
     potScroll.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
     potScroll.thickness = 1;
@@ -455,6 +458,9 @@ export class AlchemyUI {
     // Update craft button state
     const canCraft = count >= 2;
     this._craftBtn.isEnabled = canCraft;
+    // Disabled GUI buttons paint disabledColor (#9a9a9a) instead of background.
+    this._craftBtn.disabledColor = T.BTN_BG;
+    this._craftBtn.disabledColorItem = T.DIM;
     this._craftBtn.background = canCraft ? T.CRAFT_BG : T.BTN_BG;
     if (this._craftBtn.textBlock) {
       this._craftBtn.textBlock.color = canCraft ? T.TEXT : T.DIM;

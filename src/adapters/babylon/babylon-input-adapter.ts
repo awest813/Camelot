@@ -184,7 +184,6 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   { key: "y", action: "toggleFastTravel", caseInsensitive: true, ctrlOrMeta: false },
   { key: "t", action: "toggleWaitDialog", caseInsensitive: true },
   { key: "p", action: "togglePetPanel", caseInsensitive: true },
-  { key: "g", action: "toggleFollowerPanel", caseInsensitive: true },
   { key: "h", action: "showFameStatus", caseInsensitive: true },
   // O = Mount/dismount; Shift+O = Stable/Saddlebag (shift binding must come first)
   { key: "o", action: "stableOrSaddlebag", shift: true, caseInsensitive: true },
@@ -320,6 +319,37 @@ export class BabylonInputAdapter {
     phase: "down" | "up",
     modifiers: { shift?: boolean; ctrlOrMeta?: boolean } = {},
   ): InputAction | null {
+    const binding = this._matchBinding(key, phase, modifiers);
+    if (!binding) return null;
+
+    // Track active state
+    if (phase === "down") {
+      this._activeActions.add(binding.action);
+    } else {
+      this._activeActions.delete(binding.action);
+    }
+
+    this._dispatch(binding.action);
+    return binding.action;
+  }
+
+  /**
+   * Resolve which action a key event would trigger, without dispatching it or
+   * touching held-action state.
+   */
+  matchAction(
+    key: string,
+    phase: "down" | "up",
+    modifiers: { shift?: boolean; ctrlOrMeta?: boolean } = {},
+  ): InputAction | null {
+    return this._matchBinding(key, phase, modifiers)?.action ?? null;
+  }
+
+  private _matchBinding(
+    key: string,
+    phase: "down" | "up",
+    modifiers: { shift?: boolean; ctrlOrMeta?: boolean },
+  ): InputBinding | null {
     for (const binding of this._bindings) {
       const bindingPhase = binding.phase ?? "down";
       if (bindingPhase !== phase) continue;
@@ -340,15 +370,7 @@ export class BabylonInputAdapter {
       if (binding.ctrlOrMeta === true && !modifiers.ctrlOrMeta) continue;
       if (binding.ctrlOrMeta === false && modifiers.ctrlOrMeta) continue;
 
-      // Track active state
-      if (phase === "down") {
-        this._activeActions.add(binding.action);
-      } else {
-        this._activeActions.delete(binding.action);
-      }
-
-      this._dispatch(binding.action);
-      return binding.action;
+      return binding;
     }
     return null;
   }

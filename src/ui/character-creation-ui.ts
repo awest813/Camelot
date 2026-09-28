@@ -344,9 +344,19 @@ export class CharacterCreationUI {
        * Helper to transition between steps with a smooth animation.
        * Invokes the render callback after the container fades out.
        */
+      // While the outgoing step fades out, its cards are still in the DOM. Without
+      // this guard a click in that window re-selects on the *previous* step (e.g.
+      // silently changes the race after Continue), and Back/Continue act on the
+      // stale step. `inert` blocks pointer + keyboard on the fading cards.
+      let transitioning = false;
       const transitionTo = (nextStep: CreationStep, renderFn: () => void) => {
+        if (transitioning) return;
         if (this._animator && step !== nextStep) {
+          transitioning = true;
+          cards.inert = true;
           this._animator.panelOut(cards, () => {
+            transitioning = false;
+            cards.inert = false;
             step = nextStep;
             renderFn();
             this._animator?.panelIn(cards);
@@ -369,6 +379,20 @@ export class CharacterCreationUI {
             pills[i].removeAttribute("aria-current");
           }
         });
+      };
+
+      /**
+       * Mark one card selected in place. Rebuilding the grid on every pick
+       * replayed the entrance stagger (the whole grid blinked) and destroyed the
+       * focused button, dropping keyboard focus to <body>.
+       */
+      const markSelectedCard = (selected: HTMLElement) => {
+        for (const el of Array.from(cards.children)) {
+          const on = el === selected;
+          el.classList.toggle("is-selected", on);
+          el.setAttribute("aria-pressed", String(on));
+        }
+        setBtnDisabled(continueButton, false);
       };
 
       const setDetails = (entry: RaceDefinition | BirthsignDefinition | CharacterClass | null) => {
@@ -1080,7 +1104,7 @@ export class CharacterCreationUI {
           card.addEventListener("click", () => {
             selectedRace = race;
             setDetails(race);
-            renderRaces();
+            markSelectedCard(card);
           });
           cards.appendChild(card);
         }
@@ -1126,7 +1150,7 @@ export class CharacterCreationUI {
           card.addEventListener("click", () => {
             selectedBirthsign = sign;
             setDetails(sign);
-            renderBirthsigns();
+            markSelectedCard(card);
           });
           cards.appendChild(card);
         }
@@ -1172,7 +1196,7 @@ export class CharacterCreationUI {
           card.addEventListener("click", () => {
             selectedClass = cls;
             setDetails(cls);
-            renderClasses();
+            markSelectedCard(card);
           });
           cards.appendChild(card);
         }

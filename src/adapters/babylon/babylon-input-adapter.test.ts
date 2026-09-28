@@ -383,4 +383,26 @@ describe("BabylonInputAdapter", () => {
     expect(adapter.handleKeyEvent("n", "down")).toBe("toggleShoutMenu");
     expect(fired).toEqual([]);
   });
+
+  // ── matchAction (non-dispatching lookup) ────────────────────────────────────
+
+  it("matchAction resolves the same action as handleKeyEvent without dispatching", () => {
+    const adapter = new BabylonInputAdapter();
+    const fired: InputAction[] = [];
+    adapter.onAction("togglePetPanel", () => fired.push("togglePetPanel"));
+    expect(adapter.matchAction("P", "down")).toBe("togglePetPanel");
+    expect(fired).toEqual([]);
+    expect(adapter.isActive("togglePetPanel")).toBe(false);
+    expect(adapter.matchAction("n", "down", { shift: true })).toBe("useShout");
+    expect(adapter.matchAction("F9", "down", { shift: true })).toBeNull();
+  });
+
+  it("binds each key/action pair once (G was listed twice)", () => {
+    const seen = new Set<string>();
+    for (const b of DEFAULT_BINDINGS) {
+      const sig = JSON.stringify([b.key, b.action, b.phase ?? "down", b.shift, b.ctrlOrMeta]);
+      expect(seen.has(sig), `duplicate binding ${sig}`).toBe(false);
+      seen.add(sig);
+    }
+  });
 });

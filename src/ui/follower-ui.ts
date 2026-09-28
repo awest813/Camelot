@@ -37,6 +37,8 @@ const C = {
   BTN_HVR:  "rgba(80, 56, 10, 0.98)",
   BTN_DIS:  "rgba(18, 12, 4, 0.6)",
   FONT:     "'Cinzel', 'Times New Roman', Georgia, serif",
+  /** Body/button face — Cinzel is all-caps display type, unreadable for prose. */
+  BODY:     "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
   MONO:     "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
 };
 
@@ -61,6 +63,11 @@ function pct(val: number, max: number): string {
 }
 
 // ── FollowerUI ─────────────────────────────────────────────────────────────
+
+/** "whiterun_dragonsreach" → "Whiterun Dragonsreach" for display. */
+function humanizeId(id: string): string {
+  return id.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
+}
 
 export class FollowerUI {
   /** True while the management panel is open. */
@@ -278,7 +285,7 @@ export class FollowerUI {
       maxWidth:       "520px",
       maxHeight:      "85vh",
       overflowY:      "auto",
-      fontFamily:     C.FONT,
+      fontFamily:     C.BODY,
       color:          C.TEXT,
     });
 
@@ -291,7 +298,7 @@ export class FollowerUI {
     const title = document.createElement("h3");
     title.id = "follower-panel-title";
     Object.assign(title.style, {
-      margin: "0", color: C.TITLE, fontSize: "16px", letterSpacing: "1px",
+      margin: "0", fontFamily: C.FONT, color: C.TITLE, fontSize: "16px", letterSpacing: "1px",
     });
     title.textContent = "FOLLOWERS";
 
@@ -534,12 +541,12 @@ export class FollowerUI {
     nameEl.textContent = tmpl.name + (isDeceased ? " (deceased)" : "");
 
     const subEl = document.createElement("div");
-    Object.assign(subEl.style, { color: C.DIM, fontSize: "9px" });
+    Object.assign(subEl.style, { color: C.DIM, fontSize: "11px" });
     subEl.textContent = `${_capitalise(tmpl.combatRole)}  ·  Level ${tmpl.level}`;
 
     const descEl = document.createElement("div");
     Object.assign(descEl.style, {
-      color: C.DIM, fontSize: "9px", marginTop: "2px", fontStyle: "italic",
+      color: C.DIM, fontSize: "11px", marginTop: "2px", fontStyle: "italic",
     });
     descEl.textContent = tmpl.description;
 
@@ -550,7 +557,7 @@ export class FollowerUI {
 
     if (tmpl.hireCost > 0) {
       const costLabel = document.createElement("div");
-      Object.assign(costLabel.style, { color: C.DIM, fontSize: "8px" });
+      Object.assign(costLabel.style, { color: C.DIM, fontSize: "10px" });
       costLabel.textContent = "Hire Cost";
 
       const costValue = document.createElement("div");
@@ -563,7 +570,7 @@ export class FollowerUI {
     } else {
       const freeLabel = document.createElement("div");
       Object.assign(freeLabel.style, {
-        color: C.STATUS_OK, fontSize: "9px", fontWeight: "bold",
+        color: C.STATUS_OK, fontSize: "11px", fontWeight: "bold",
       });
       freeLabel.textContent = "Free";
       costBlock.appendChild(freeLabel);
@@ -575,11 +582,11 @@ export class FollowerUI {
     const stats = document.createElement("div");
     Object.assign(stats.style, {
       display: "grid", gridTemplateColumns: "1fr 1fr",
-      gap: "2px 10px", fontSize: "9px", color: C.DIM,
+      gap: "2px 10px", fontSize: "11px", color: C.DIM,
     });
     stats.innerHTML = sanitizeHtml(`
       <span>Carry Weight</span><span style="color:${C.TEXT}">+${tmpl.carryWeightBonus}</span>
-      <span>Home</span><span style="color:${C.TEXT};font-size:8px">${tmpl.homeLocationId}</span>
+      <span>Home</span><span style="color:${C.TEXT};font-size:11px">${humanizeId(tmpl.homeLocationId)}</span>
     `);
 
     // ── Action button ─────────────────────────────────────────────────────────
@@ -635,7 +642,7 @@ function _buildBar(
 
   if (label) {
     const lbl = document.createElement("span");
-    Object.assign(lbl.style, { color: C.DIM, fontSize: "9px", minWidth: "14px" });
+    Object.assign(lbl.style, { color: C.DIM, fontSize: "11px", minWidth: "14px" });
     lbl.textContent = label;
     wrapper.appendChild(lbl);
   }
@@ -671,7 +678,7 @@ function _styleButton(
     padding:       "4px 10px",
     cursor:        "pointer",
     fontSize:      "11px",
-    fontFamily:    C.FONT,
+    fontFamily:    C.BODY,
     ...overrides,
   });
   btn.addEventListener("mouseenter", () => {

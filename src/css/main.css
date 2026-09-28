@@ -462,7 +462,7 @@ body::before {
 }
 
 .character-create__card {
-  text-align: left;
+  text-align: center;
   background: rgba(26, 19, 9, 0.96);
   border: 1px solid rgba(107, 79, 18, 0.7);
   border-radius: 10px;
@@ -478,6 +478,11 @@ body::before {
   background: rgba(46, 34, 14, 0.98);
   transform: translateY(-1px);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.26);
+}
+
+.character-create__card strong {
+  /* Name and heritage/guardian tag stack — inline they ran together ("NordHUMAN"). */
+  display: block;
 }
 
 .character-create__card.is-selected {
@@ -4291,8 +4296,34 @@ body::before {
 
 .character-sheet-ui__identity {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 8px;
+  /* 130px columns forced "Birthsign" + "The Warrior" to wrap into each other. */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 4px 12px;
+}
+
+.character-sheet-ui__row {
+  gap: 12px;
+}
+
+.character-sheet-ui__identity-row .character-sheet-ui__row-value {
+  text-align: right;
+  text-transform: capitalize;
+}
+
+/* Skill rows have three cells (name, level, xp%): let the name take the slack so
+   levels line up in one column instead of floating with the name's width. */
+.character-sheet-ui__skill-row .character-sheet-ui__row-label {
+  flex: 1;
+}
+
+.character-sheet-ui__row-value,
+.character-sheet-ui__skill-xp {
+  font-variant-numeric: tabular-nums;
+}
+
+.character-sheet-ui__skill-row .character-sheet-ui__skill-xp {
+  min-width: 3.5em;
+  text-align: right;
 }
 
 .character-sheet-ui__cols {
