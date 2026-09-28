@@ -4,7 +4,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
-import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
+import type { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
@@ -25,7 +25,7 @@ import { CombatSystem } from "./systems/combat-system";
 import { DialogueSystem } from "./systems/dialogue-system";
 import { PointerEventTypes } from "@babylonjs/core/Events/pointerEvents";
 import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
-import { BabylonInputAdapter } from "./adapters/babylon/babylon-input-adapter";
+import { BabylonInputAdapter, type InputAction } from "./adapters/babylon/babylon-input-adapter";
 import { GamepadInputSystem } from "./systems/gamepad-input-system";
 import { InventorySystem } from "./systems/inventory-system";
 import type { WeaponArchetype } from "./systems/combat-shared";
@@ -3262,6 +3262,13 @@ export class Game {
         }
     });
 
+    // DOM dialogs take keyboard focus from the canvas, and the observable below
+    // only hears the canvas — so a panel opened with P/G/N/K/… could not be
+    // closed with the same key. Forward panel-toggle keys from inside dialogs.
+    if (typeof window !== "undefined") {
+      window.addEventListener("keydown", (ev) => this._forwardDialogToggleKey(ev));
+    }
+
     // Input handling for pause
     this.scene.onKeyboardObservable.add((kbInfo) => {
         this._keyConsumedByAdapter = false;
@@ -4223,6 +4230,33 @@ export class Game {
       input.addEventListener("cancel", cleanup);
       document.body.appendChild(input);
       input.click();
+  }
+
+  /** Panel toggles that may be pressed again from inside their open DOM dialog. */
+  private static readonly _DIALOG_TOGGLE_ACTIONS: ReadonlySet<InputAction> = new Set<InputAction>([
+    "toggleInventory", "toggleQuestLog", "toggleSkillTree", "toggleAttributePanel",
+    "toggleAlchemy", "toggleEnchanting", "toggleSpellMaking", "toggleFastTravel",
+    "toggleWaitDialog", "togglePetPanel", "toggleFollowerPanel", "toggleShoutMenu",
+    "stableOrSaddlebag", "favoritesMenu",
+  ]);
+
+  /**
+   * Route a panel-toggle key pressed while focus is inside an open dialog to the
+   * input adapter (the canvas observable never sees it). Keys typed into text
+   * fields, Escape/Tab (dialogs own those), and canvas-origin events — already
+   * handled by the observable — are left alone.
+   */
+  private _forwardDialogToggleKey(ev: KeyboardEvent): void {
+    if (ev.repeat || ev.defaultPrevented || this._inCharacterCreation) return;
+    const target = ev.target;
+    if (!(target instanceof HTMLElement) || target === this.canvas) return;
+    if (!target.closest('[role="dialog"], [aria-modal="true"]')) return;
+    if (target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return;
+    const modifiers = { shift: ev.shiftKey, ctrlOrMeta: ev.ctrlKey || ev.metaKey };
+    const action = this._inputAdapter.matchAction(ev.key, "down", modifiers);
+    if (!action || !Game._DIALOG_TOGGLE_ACTIONS.has(action)) return;
+    ev.preventDefault();
+    this._inputAdapter.handleKeyEvent(ev.key, "down", modifiers);
   }
 
   private _wireInputAdapter(): void {
@@ -5212,7 +5246,7 @@ export class Game {
 
   private _loadFrameworkMods(): void {
       this.frameworkRuntime
-          .loadModsFromManifest("/mods/mods-manifest.json")
+          .loadModsFromManifest(`${import.meta.env.BASE_URL ?? "/"}mods/mods-manifest.json`)
           .then((report) => {
               if (report.loadedModIds.length > 0) {
                   this.ui.showNotification(`Framework mods loaded: ${report.loadedModIds.length}`, 2200);
@@ -6055,7 +6089,9 @@ export class Game {
       }
 
       if (!this.ui.isDebugVisible) {
-          this._debugOverlayFrameSkip = 0;
+          // Primed so the first visible frame fills the overlay (otherwise it
+          // sat empty for 12 frames — seconds at low frame rates).
+          this._debugOverlayFrameSkip = 11;
       } else if (++this._debugOverlayFrameSkip >= 12) {
           this._debugOverlayFrameSkip = 0;
           const eng = this.engine;

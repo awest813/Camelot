@@ -31,6 +31,8 @@ const C = {
   BTN_BG:   "rgba(28, 20, 6, 0.95)",
   BTN_HVR:  "rgba(80, 56, 10, 0.98)",
   FONT:     "'Cinzel', 'Times New Roman', Georgia, serif",
+  /** Body/button face — Cinzel is all-caps display type, unreadable for prose. */
+  BODY:     "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
   MONO:     "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
 };
 
@@ -244,7 +246,7 @@ export class PetUI {
       maxWidth:       "420px",
       maxHeight:      "80vh",
       overflowY:      "auto",
-      fontFamily:     C.FONT,
+      fontFamily:     C.BODY,
       color:          C.TEXT,
     });
 
@@ -257,7 +259,7 @@ export class PetUI {
     const title = document.createElement("h3");
     title.id = "pet-panel-title";
     Object.assign(title.style, {
-      margin: "0", color: C.TITLE, fontSize: "15px", letterSpacing: "1px",
+      margin: "0", fontFamily: C.FONT, color: C.TITLE, fontSize: "15px", letterSpacing: "1px",
     });
     title.textContent = "COMPANIONS";
 
@@ -447,7 +449,7 @@ function _buildBar(
 
   if (label) {
     const lbl = document.createElement("span");
-    Object.assign(lbl.style, { color: C.DIM, fontSize: "9px", minWidth: "14px" });
+    Object.assign(lbl.style, { color: C.DIM, fontSize: "11px", minWidth: "14px" });
     lbl.textContent = label;
     wrapper.appendChild(lbl);
   }
@@ -483,7 +485,7 @@ function _styleButton(
     padding:       "4px 10px",
     cursor:        "pointer",
     fontSize:      "11px",
-    fontFamily:    C.FONT,
+    fontFamily:    C.BODY,
     ...overrides,
   });
   btn.addEventListener("mouseenter", () => { btn.style.background = C.BTN_HVR; });

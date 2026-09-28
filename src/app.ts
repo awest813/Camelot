@@ -2,7 +2,7 @@ import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
 import { AxesViewer } from "@babylonjs/core/Debug/axesViewer";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
+import type { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 import HavokPhysics from "@babylonjs/havok";
 
@@ -59,6 +59,9 @@ class App {
   }
 
   private async _initWebGPUEngine(): Promise<void> {
+    // Loaded on demand: the WebGPU engine (and the WGSL shaders it pulls in)
+    // stays out of the default WebGL bundle.
+    const { WebGPUEngine } = await import("@babylonjs/core/Engines/webgpuEngine");
     const webgpu = new WebGPUEngine(this.canvas, {
       adaptToDeviceRatio: true,
       antialias: false,

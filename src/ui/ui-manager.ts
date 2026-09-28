@@ -14,6 +14,7 @@ import { getItemIcon } from "./icon-utils";
 import { Player } from "../entities/player";
 import type { SkillTree } from "../systems/skill-tree-system";
 import { AttributeSystem, ATTRIBUTE_NAMES, type AttributeName } from "../systems/attribute-system";
+import { keepGuiAtCssResolution } from "./gui-resolution";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -255,6 +256,7 @@ export class UIManager {
 
   private _initUI(): void {
     this._ui = AdvancedDynamicTexture.CreateFullscreenUI("UI");
+    keepGuiAtCssResolution(this._ui, this.scene?.getEngine?.());
 
     if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
       window.addEventListener("resize", () => {
@@ -387,6 +389,10 @@ export class UIManager {
     this.notificationPanel.top = "70px";
     this.notificationPanel.left = "-16px";
     this.notificationPanel.isVertical = true;
+    // Rows change height/visibility between layouts; don't clip a toast to the
+    // previous frame's stack height.
+    this.notificationPanel.clipChildren = false;
+    this.notificationPanel.clipContent = false;
     this._ui.addControl(this.notificationPanel);
 
     this._transitionOverlay = new Rectangle("screenTransition");
@@ -641,7 +647,9 @@ export class UIManager {
 
     const divider = new Rectangle();
     divider.width = "75%";
-    divider.height = "1px";
+    // Babylon padding lives inside the height: 1px + 14px padding left a
+    // negative content box that painted a bar over the subtitle.
+    divider.height = "15px";
     divider.background = T.PANEL_BORDER;
     divider.thickness = 0;
     divider.paddingBottom = "14px";
@@ -1200,7 +1208,7 @@ export class UIManager {
 
   public updateStats(player: Player, characterLevel: number): void {
     const text =
-      `Stats:\nCharacter Lv: ${characterLevel}  Combat Lv: ${player.level}  XP: ${Math.floor(player.experience)}/${player.experienceToNextLevel}\n` +
+      `Stats:\nCharacter Lv: ${characterLevel}  Combat Lv: ${player.level}\nXP: ${Math.floor(player.experience)} / ${player.experienceToNextLevel}\n` +
       `HP: ${Math.floor(player.health)} / ${player.maxHealth}\nMP: ${Math.floor(player.magicka)} / ${player.maxMagicka}\nSP: ${Math.floor(player.stamina)} / ${player.maxStamina}\nDMG Bonus: +${player.bonusDamage}\nArmor: ${player.bonusArmor}`;
     if (this._lastStatsText === text) return;
     this._lastStatsText = text;
@@ -1354,7 +1362,9 @@ export class UIManager {
     for (let i = 0; i < 6; i++) {
       const rect = new Rectangle();
       rect.width = "100%";
-      rect.height = "40px";
+      // Grow with the wrapped label: a fixed 40px single line clipped long
+      // messages at both edges ("r travelers gossiping about … on th").
+      rect.adaptHeightToChildren = true;
       rect.cornerRadius = 8;
       rect.color = "rgba(232, 198, 86, 0.55)";
       rect.thickness = 2;
@@ -1374,6 +1384,13 @@ export class UIManager {
       label.shadowColor = "rgba(0,0,0,0.75)";
       label.shadowBlur = 4;
       label.shadowOffsetY = 1;
+      label.textWrapping = true;
+      label.resizeToFit = true;
+      label.width = "100%";
+      label.paddingTop = "9px";
+      label.paddingBottom = "9px";
+      label.paddingLeft = "14px";
+      label.paddingRight = "14px";
       rect.addControl(label);
 
       this.notificationPanel.addControl(rect);
@@ -1401,6 +1418,12 @@ export class UIManager {
     row.label.text = text;
     row.rect.isVisible = true;
     row.remainingMs = duration;
+    // Newest toast at the bottom of the stack, whichever pooled row it reused.
+    const panelChildren = this.notificationPanel.children;
+    if (panelChildren[panelChildren.length - 1] !== row.rect) {
+      this.notificationPanel.removeControl(row.rect);
+      this.notificationPanel.addControl(row.rect);
+    }
 
     if (!this._notifyObs) {
       this._notifyObs = this.scene.onBeforeRenderObservable.add(() => {
@@ -1877,17 +1900,25 @@ export class UIManager {
   private _initClockHUD(): void {
     this._clockLabel = new TextBlock("clockLabel");
     this._clockLabel.text = "08:00";
-    this._clockLabel.color = T.DIM;
+    this._clockLabel.color = T.TEXT;
     this._clockLabel.fontSize = 13;
+    this._clockLabel.alpha = 0.85;
     this._clockLabel.fontFamily = "monospace";
-    this._clockLabel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
+    // A TextBlock defaults to a full-screen box with centred text, so without an
+    // explicit size the alignment below moved nothing and the clock sat on the
+    // crosshair. Sized box, docked under the compass (top-right holds the FPS chip).
+    this._clockLabel.width = "80px";
+    this._clockLabel.height = "18px";
+    this._clockLabel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
     this._clockLabel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this._clockLabel.left = "-12px";
-    this._clockLabel.top = "12px";
+    this._clockLabel.top = "54px";
+    this._clockLabel.shadowColor = "rgba(0,0,0,0.9)";
+    this._clockLabel.shadowBlur = 2;
+    this._clockLabel.shadowOffsetY = 1;
     this._ui.addControl(this._clockLabel);
   }
 
-  /** Update the in-game clock display (top-right corner). */
+  /** Update the in-game clock display (under the compass). */
   public updateClock(timeString: string): void {
     if (this._clockLabel) this._clockLabel.text = timeString;
   }
@@ -2078,6 +2109,9 @@ export class UIManager {
       spendBtn.cornerRadius = 4;
       spendBtn.fontSize = 13;
       spendBtn.isEnabled = canSpend;
+      // Disabled GUI buttons paint disabledColor (#9a9a9a) instead of background.
+      spendBtn.disabledColor = T.BTN_BG;
+      spendBtn.disabledColorItem = T.DIM;
       spendBtn.isFocusInvisible = false;
       spendBtn.tabIndex = 0;
       spendBtn.accessibilityTag = {

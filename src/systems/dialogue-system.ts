@@ -8,6 +8,7 @@ import { Player } from "../entities/player";
 import { DialogueSession } from "../framework/dialogue/dialogue-engine";
 import { DialogueNodeView } from "../framework/dialogue/dialogue-types";
 import { SHARED_UI_PANEL as D } from "../ui/ui-manager";
+import { keepGuiAtCssResolution } from "../ui/gui-resolution";
 
 export interface DialogueChoiceOption {
   text: string;
@@ -65,6 +66,7 @@ export class DialogueSystem {
 
   private _initUI(): void {
     this._ui = AdvancedDynamicTexture.CreateFullscreenUI("DialogueUI");
+    keepGuiAtCssResolution(this._ui, this.scene?.getEngine?.());
 
     // Main Panel (Bottom)
     this._dialoguePanel = new Rectangle();
@@ -273,6 +275,9 @@ export class DialogueSystem {
     button.paddingBottom = "8px";
     button.hoverCursor = enabled ? "pointer" : "default";
     button.isEnabled = enabled;
+    // Disabled GUI buttons paint disabledColor (#9a9a9a) instead of background.
+    button.disabledColor = "rgba(20, 16, 10, 0.9)";
+    button.disabledColorItem = D.DIM;
 
     // Left-align text like a standard RPG choice list
     if (button.textBlock) {

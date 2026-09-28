@@ -112,6 +112,15 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
   // Babylon keyboard input requires canvas focus — click it so F5/F9 reach the game.
   await page.locator("#renderCanvas").click({ force: true });
 
+  // Walk forward. The camera's first collision query needs Babylon's collision
+  // coordinator side-effect import; without it the query throws inside the
+  // render loop and Babylon never queues another frame (the game froze on the
+  // first step while idle boot looked fine).
+  await page.keyboard.down("w");
+  await page.waitForTimeout(1_500);
+  await page.keyboard.up("w");
+  expect(pageErrors, `walking threw inside the render loop:\n${pageErrors.join("\n")}`).toEqual([]);
+
   // F5 — manual save.  Assert the full game-state graph serialised.
   await page.keyboard.press("F5");
   const saveRaw = await page.evaluate(() => localStorage.getItem("camelot_save"));

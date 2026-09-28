@@ -97,9 +97,23 @@ const validateMod = (raw: unknown, fallbackId: string): RpgMod => {
   };
 };
 
-const resolveUrl = (candidate: string, manifestUrl: string): string => {
+/** Placeholder origin used to resolve relative URLs outside a browser page. */
+const RELATIVE_BASE = "http://mod-loader.invalid";
+
+/**
+ * Resolve a mod entry URL against its manifest URL. A relative manifest URL
+ * (e.g. "./mods/mods-manifest.json") is not a valid `new URL` base on its own,
+ * so it is first resolved against the page location — otherwise "./mod.json"
+ * would be fetched from the site root instead of beside the manifest.
+ */
+export const resolveUrl = (candidate: string, manifestUrl: string): string => {
+  const pageBase = typeof location !== "undefined" && location.href ? location.href : RELATIVE_BASE + "/";
   try {
-    return new URL(candidate, manifestUrl).toString();
+    const resolved = new URL(candidate, new URL(manifestUrl, pageBase));
+    // No page to resolve against: hand back a path, not the placeholder origin.
+    return resolved.origin === RELATIVE_BASE
+      ? resolved.pathname + resolved.search + resolved.hash
+      : resolved.toString();
   } catch {
     return candidate;
   }

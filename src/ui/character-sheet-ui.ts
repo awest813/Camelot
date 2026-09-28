@@ -276,13 +276,18 @@ export class CharacterSheetUI {
     root.appendChild(closeBtn);
 
     root.addEventListener("keydown", (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      // Plain Tab closes too ("Press Tab or Esc to close"). The game's Tab toggle
+      // listens on the canvas, which loses focus to this dialog on open, so the
+      // sheet must own its close key. Shift+Tab still cycles focus (perk buttons).
+      const isCloseTab =
+        e.key === "Tab" && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && !e.repeat;
+      if (e.key === "Escape" || isCloseTab) {
         e.preventDefault();
         e.stopPropagation();
         this.hide();
         this.onClose?.();
       }
-    });
+    }, true);
 
     document.body.appendChild(root);
     this._root = root;

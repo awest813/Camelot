@@ -497,5 +497,22 @@ describe("CharacterSheetUI", () => {
       expect(ui.isVisible).toBe(false);
       expect(onClose).toHaveBeenCalledTimes(1);
     });
+
+    it("closes on plain Tab (the canvas toggle can't hear it once focus is in the sheet)", () => {
+      const onClose = vi.fn();
+      ui.onClose = onClose;
+      ui.show();
+      const root = document.querySelector(".character-sheet-ui") as HTMLElement;
+      root.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+      expect(ui.isVisible).toBe(false);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps Shift+Tab for focus navigation", () => {
+      ui.show();
+      const root = document.querySelector(".character-sheet-ui") as HTMLElement;
+      root.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }));
+      expect(ui.isVisible).toBe(true);
+    });
   });
 });

@@ -5,6 +5,10 @@ import { Ray } from "@babylonjs/core/Culling/ray";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+// Side-effect import: registers Scene.CollisionCoordinatorFactory. Without it the
+// camera's first collision query (checkCollisions below) throws inside the render
+// loop and Babylon never queues another frame — the game freezes on first step.
+import "@babylonjs/core/Collisions/collisionCoordinator";
 
 export class Player {
   public camera: UniversalCamera;
