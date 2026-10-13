@@ -8,6 +8,10 @@ import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType } from "@babylonjs/core/Physics";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { StructureManager } from "./structure-manager";
+import type { Material } from "@babylonjs/core/Materials/material";
+import { applyTerrainWeights } from "../rendering/terrain-material";
+import { carvePond, insidePond, type Pond, type WaterRenderer } from "../rendering/water";
+import { buildBroadleafTree, buildPalmTree, buildPineTree, FoliageBatch, type FoliageMaterials } from "../rendering/foliage";
 import { ObjectPool } from "../systems/object-pool";
 import type { WorldSeed } from "./world-seed";
 import { ChunkManager } from "../systems/chunks/ChunkManager";
@@ -84,6 +88,67 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
   private cactusMaterial?: StandardMaterial;
   private iceMaterial?: StandardMaterial;
 
+  /**
+   * Shared blended terrain material (see rendering/terrain-material.ts).
+   * Installed by the game after construction; null in headless tests.
+   */
+  public terrainMaterial: Material | null = null;
+
+  /**
+   * Procedural tree materials (see rendering/foliage.ts).  When installed,
+   * trees are built from bark trunks + alpha leaf-card canopies; otherwise
+   * the legacy primitive cones are used (headless tests).
+   */
+  public foliage: FoliageMaterials | null = null;
+  private _foliageBatch: FoliageBatch | null = null;
+  private _activePond: Pond | null = null;
+
+  /** Pond water renderer (see rendering/water.ts); null disables ponds. */
+  public water: WaterRenderer | null = null;
+  private readonly _ponds: Map<string, Pond | null> = new Map();
+
+  /**
+   * Deterministic pond for a chunk, or null.  Ponds sit in plains / forest
+   * chunks that have no structure, away from the spawn area.
+   */
+  public pondAt(cx: number, cz: number): Pond | null {
+    const key = `${cx},${cz}`;
+    const cached = this._ponds.get(key);
+    if (cached !== undefined) return cached;
+    let pond: Pond | null = null;
+    const biome = this.getBiome(cx, cz);
+    const r = (slot: number) => Math.abs(Math.sin(cx * 91.7 + cz * 47.3 + slot * 13.9) * 43758.5453) % 1;
+    if (
+      (biome === "plains" || biome === "forest") &&
+      Math.max(Math.abs(cx), Math.abs(cz)) > 1 &&
+      !this.structures.hasStructureAt(cx, cz) &&
+      r(1) < 0.2
+    ) {
+      const radius = 6 + r(2) * 5;
+      const span = this.chunkSize / 2 - radius - 3;
+      pond = {
+        x: cx * this.chunkSize + (r(3) * 2 - 1) * span,
+        z: cz * this.chunkSize + (r(4) * 2 - 1) * span,
+        radius,
+        depth: 0.75 + r(5) * 0.4,
+      };
+    }
+    this._ponds.set(key, pond);
+    return pond;
+  }
+
+  /** True when (x, z) is in a pond (grass, props and NPC placement avoid it). */
+  public isInPond(x: number, z: number, margin = 0): boolean {
+    const cx = Math.round(x / this.chunkSize);
+    const cz = Math.round(z / this.chunkSize);
+    return insidePond(this.water ? this.pondAt(cx, cz) : null, x, z, margin);
+  }
+
+  /** Exterior world visibility (false while inside an interior cell). */
+  public visible = true;
+  /** Notified from {@link setVisible} (grass field, ambient particles…). */
+  public onVisibilityChanged: ((visible: boolean) => void) | null = null;
+
   /** Shared material cache for fantasy environment props — avoids getMaterialByName calls. */
   private readonly _envMaterials: Map<string, StandardMaterial> = new Map();
 
@@ -129,6 +194,8 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
   public setSeed(seed: WorldSeed | null): void {
     this._seed = seed;
     this.structures.setSeed(seed);
+    this._biomeCache.clear();
+    this._ponds.clear();
   }
 
   /** Multiplier for vegetation prop density (default: 1.0, range: [0.0, 2.5]). */
@@ -172,6 +239,8 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     }>,
   ): void {
     this._regions = [...regions];
+    this._biomeCache.clear();
+    this._ponds.clear();
   }
 
   public getRegionAt(
@@ -230,7 +299,25 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
    * 2. Active `WorldSeed` when set.
    * 3. Deterministic fallback trig hash.
    */
+  /**
+   * Biome per chunk.  Memoized: it's queried per terrain vertex and per grass
+   * instance (thousands of times per chunk/patch).  Cleared on seed/region
+   * changes.
+   */
   public getBiome(chunkX: number, chunkZ: number): BiomeType {
+    const key = (chunkX + 32768) * 65536 + (chunkZ + 32768);
+    let biome = this._biomeCache.get(key);
+    if (biome === undefined) {
+      biome = this._computeBiome(chunkX, chunkZ);
+      if (this._biomeCache.size > 65536) this._biomeCache.clear();
+      this._biomeCache.set(key, biome);
+    }
+    return biome;
+  }
+
+  private readonly _biomeCache: Map<number, BiomeType> = new Map();
+
+  private _computeBiome(chunkX: number, chunkZ: number): BiomeType {
     const customRegion = this.getRegionAt(chunkX, chunkZ);
     if (customRegion) {
       return customRegion.biome;
@@ -323,6 +410,8 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
    * world geometry from bleeding through or wasting draw calls.
    */
   public setVisible(visible: boolean): void {
+    this.visible = visible;
+    this.onVisibilityChanged?.(visible);
     for (const entry of this.loadedChunks.values()) {
       entry.mesh.isVisible = visible;
     }
@@ -343,7 +432,12 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     const biome = this.getBiome(x, z);
 
     // Create ground for this chunk
-    const chunkMesh = MeshBuilder.CreateGround(`chunk_${key}`, { width: this.chunkSize, height: this.chunkSize, subdivisions: 4 }, this.scene);
+    const chunkMesh = MeshBuilder.CreateGround(`chunk_${key}`, {
+      width: this.chunkSize,
+      height: this.chunkSize,
+      // Dense enough for smooth biome cross-fades (weights are per vertex).
+      subdivisions: this.terrainMaterial ? 14 : 4,
+    }, this.scene);
     // Position is center of mesh, so offset by half size
     chunkMesh.position.x = x * this.chunkSize;
     chunkMesh.position.z = z * this.chunkSize;
@@ -354,8 +448,14 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     // Store the aggregate so it can be explicitly disposed when the chunk unloads
     const body = new PhysicsAggregate(chunkMesh, PhysicsShapeType.BOX, { mass: 0 }, this.scene);
 
-    // Biome-specific terrain material with specular
-    chunkMesh.material = this._getBiomeMaterial(biome);
+    // Shared blended terrain material when installed (biomes cross-fade via a
+    // per-vertex weight attribute); otherwise a flat per-biome material.
+    if (this.terrainMaterial) {
+      applyTerrainWeights(chunkMesh, this.chunkSize, (cx, cz) => this.getBiome(cx, cz));
+      chunkMesh.material = this.terrainMaterial;
+    } else {
+      chunkMesh.material = this._getBiomeMaterial(biome);
+    }
     // Ground receives but does not cast shadows
     chunkMesh.receiveShadows = true;
     // Static terrain — never moves, so skip per-frame world-matrix updates
@@ -363,11 +463,35 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
 
     this.loadedChunks.set(key, { mesh: chunkMesh, body, cx: x, cz: z });
 
-    // Spawn vegetation for this chunk (merged per material to cut draw calls)
-    const vegMeshes = this._mergeVegetationByMaterial(
-      this._spawnVegetation(x, z, biome),
-      key,
-    );
+    // Ponds: carve the basin before anything else uses the ground.
+    const pond = this.water ? this.pondAt(x, z) : null;
+    if (pond) carvePond(chunkMesh, pond);
+
+    // Spawn vegetation for this chunk (merged per material to cut draw calls).
+    // Procedural trees append into one geometry batch per material.
+    this._foliageBatch = this.foliage ? new FoliageBatch() : null;
+    let spawned = this._spawnVegetation(x, z, biome, pond);
+    if (this._foliageBatch && this.foliage) {
+      for (const m of this._foliageBatch.build(`trees_${key}`, this.scene, this.foliage)) {
+        m.metadata = { castsShadow: true };
+        m.isPickable = false;
+        spawned.push(m);
+      }
+    }
+    this._foliageBatch = null;
+    if (pond) {
+      spawned = spawned.filter((m) => {
+        m.computeWorldMatrix(true);
+        const c = m.getBoundingInfo().boundingBox.centerWorld;
+        if (insidePond(pond, c.x, c.z, 2)) {
+          m.dispose();
+          return false;
+        }
+        return true;
+      });
+    }
+    const vegMeshes = this._mergeVegetationByMaterial(spawned, key);
+    if (pond && this.water) vegMeshes.push(this.water.createPond(`pond_${key}`, pond));
     if (vegMeshes.length > 0) {
       this.chunkVegetation.set(key, vegMeshes);
       if (this.lodSystem) {
@@ -442,12 +566,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       this.treeTrunkMaterial.specularColor = new Color3(0.06, 0.04, 0.01);
       this.treeTrunkMaterial.specularPower = 12;
 
-      const tex = this.textureManager.getStructureTexture("bark_timber", 128);
-      if (tex) {
-        tex.uScale = 1;
-        tex.vScale = 3;
-        this.treeTrunkMaterial.diffuseTexture = tex;
-      }
+      this.textureManager.applySurface(this.treeTrunkMaterial, "bark_timber", 1, 3);
 
       if (typeof (this.treeTrunkMaterial as any).freeze === "function") {
         this.treeTrunkMaterial.freeze();
@@ -474,12 +593,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       material.specularColor = new Color3(0.05, 0.10, 0.04);
       material.specularPower = 18;
 
-      const tex = this.textureManager.getStructureTexture("foliage_canopy", 128);
-      if (tex) {
-        tex.uScale = 2;
-        tex.vScale = 2;
-        material.diffuseTexture = tex;
-      }
+      this.textureManager.applySurface(material, "foliage_canopy", 2, 2);
 
       if (typeof (material as any).freeze === "function") {
         material.freeze();
@@ -577,6 +691,8 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
         mesh.dispose(false, false);
       }
       baked.name = `veg_merged_${chunkKey}_${index++}`;
+      // Decorative — keep it out of gameplay raycasts.
+      baked.isPickable = false;
       if (shouldCastShadow) {
         this._addShadowCaster(baked);
       }
@@ -587,7 +703,8 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     return merged;
   }
 
-  public _spawnVegetation(chunkX: number, chunkZ: number, biome: BiomeType): Mesh[] {
+  public _spawnVegetation(chunkX: number, chunkZ: number, biome: BiomeType, pond: Pond | null = null): Mesh[] {
+    this._activePond = pond;
     const meshes: Mesh[] = [];
     if (this.vegetationDensity <= 0.05) {
       return meshes;
@@ -607,7 +724,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     switch (biome) {
       case "forest": {
         // Pine trees scaled by density
-        const treeCount = Math.round(6 * density);
+        const treeCount = Math.round((this.foliage ? 12 : 6) * density);
         for (let i = 0; i < treeCount; i++) {
           const px = centerX + (rand(i * 2) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(i * 2 + 1) * 2 - 1) * halfSize;
@@ -631,7 +748,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
 
       case "plains": {
         // Trees scaled by density
-        const treeCount = Math.round(2 * density);
+        const treeCount = Math.round((this.foliage ? 3 : 2) * density);
         for (let i = 0; i < treeCount; i++) {
           const px = centerX + (rand(i * 2) * 2 - 1) * halfSize;
           const pz = centerZ + (rand(i * 2 + 1) * 2 - 1) * halfSize;
@@ -706,6 +823,19 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
 
   /** Spawn a tree: cylindrical trunk + conical foliage crown for a stylised pine look. */
   private _spawnTree(x: number, z: number, name: string, scale: number, biome: BiomeType = "forest"): Mesh[] {
+    if (insidePond(this._activePond, x, z, 2.5)) return [];
+    if (this.foliage) {
+      // Plains mix in broadleaf trees; forests and tundra are coniferous.
+      const seed = Math.floor(Math.abs(x * 73.13 + z * 19.71)) + 1;
+      const broad = biome === "plains" && (seed % 10) < 7;
+      const tree = broad
+        ? buildBroadleafTree(this.scene, name, x, z, scale, seed, this.foliage, this._foliageBatch ?? undefined)
+        : buildPineTree(this.scene, name, x, z, scale, seed, this.foliage, this._foliageBatch ?? undefined);
+      if (!tree) return [];
+      tree.trunk.metadata = { castsShadow: true };
+      tree.crown.metadata = { castsShadow: true };
+      return [tree.trunk, tree.crown];
+    }
     const trunkHeight = 2.5 + scale * 2.5; // 2.5–5 m
 
     const trunk = MeshBuilder.CreateCylinder(
@@ -882,12 +1012,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.diffuseColor  = new Color3(0.35, 0.34, 0.30);
       m.specularColor = new Color3(0.08, 0.08, 0.06);
       m.specularPower = 16;
-      const tex = this.textureManager.getStructureTexture("mossy_stone", 128);
-      if (tex) {
-        tex.uScale = 2;
-        tex.vScale = 2;
-        m.diffuseTexture = tex;
-      }
+      this.textureManager.applySurface(m, "mossy_stone", 2, 2);
       if (typeof (m as any).freeze === "function") {
         m.freeze();
       }
@@ -920,12 +1045,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.diffuseColor  = new Color3(0.48, 0.43, 0.36);
       m.specularColor = new Color3(0.14, 0.13, 0.10);
       m.specularPower = 28;
-      const tex = this.textureManager.getStructureTexture("stone_ruins", 128);
-      if (tex) {
-        tex.uScale = 1;
-        tex.vScale = 3;
-        m.diffuseTexture = tex;
-      }
+      this.textureManager.applySurface(m, "stone_ruins", 1, 3);
       if (typeof (m as any).freeze === "function") {
         m.freeze();
       }
@@ -955,12 +1075,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.diffuseColor  = new Color3(0.36, 0.42, 0.28);
       m.specularColor = new Color3(0.06, 0.08, 0.04);
       m.specularPower = 16;
-      const tex = this.textureManager.getStructureTexture("mossy_stone", 128);
-      if (tex) {
-        tex.uScale = 1;
-        tex.vScale = 1;
-        m.diffuseTexture = tex;
-      }
+      this.textureManager.applySurface(m, "mossy_stone", 1, 1);
       if (typeof (m as any).freeze === "function") {
         m.freeze();
       }
@@ -1026,17 +1141,19 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
    * Gives the desert biome an oasis / Hammerfell silhouette.
    */
   private _spawnDesertPalm(x: number, z: number, name: string): Mesh[] {
+    if (this.foliage) {
+      const tree = buildPalmTree(this.scene, name, x, z, Math.floor(Math.abs(x * 31.7 + z * 57.3)) + 3, this.foliage, this._foliageBatch ?? undefined);
+      if (!tree) return [];
+      tree.trunk.metadata = { castsShadow: true };
+      tree.crown.metadata = { castsShadow: true };
+      return [tree.trunk, tree.crown];
+    }
     const trunkMat = this._envMat("palm_trunk", () => {
       const m = new StandardMaterial("palm_trunk", this.scene);
       m.diffuseColor  = new Color3(0.52, 0.38, 0.18);
       m.specularColor = new Color3(0.10, 0.07, 0.03);
       m.specularPower = 14;
-      const tex = this.textureManager.getStructureTexture("bark_timber", 128);
-      if (tex) {
-        tex.uScale = 1;
-        tex.vScale = 4;
-        m.diffuseTexture = tex;
-      }
+      this.textureManager.applySurface(m, "bark_timber", 1, 4);
       if (typeof (m as any).freeze === "function") {
         m.freeze();
       }
@@ -1047,12 +1164,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.diffuseColor  = new Color3(0.18, 0.54, 0.12);
       m.specularColor = new Color3(0.06, 0.14, 0.04);
       m.specularPower = 20;
-      const tex = this.textureManager.getStructureTexture("foliage_canopy", 128);
-      if (tex) {
-        tex.uScale = 2;
-        tex.vScale = 2;
-        m.diffuseTexture = tex;
-      }
+      this.textureManager.applySurface(m, "foliage_canopy", 2, 2);
       if (typeof (m as any).freeze === "function") {
         m.freeze();
       }
@@ -1105,12 +1217,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.diffuseColor  = new Color3(0.14, 0.11, 0.10);
       m.specularColor = new Color3(0.06, 0.05, 0.04);
       m.specularPower = 10;
-      const tex = this.textureManager.getStructureTexture("bark_timber", 128);
-      if (tex) {
-        tex.uScale = 1;
-        tex.vScale = 2;
-        m.diffuseTexture = tex;
-      }
+      this.textureManager.applySurface(m, "bark_timber", 1, 2);
       if (typeof (m as any).freeze === "function") {
         m.freeze();
       }
@@ -1170,12 +1277,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.diffuseColor  = new Color3(0.56, 0.54, 0.58);
       m.specularColor = new Color3(0.16, 0.16, 0.20);
       m.specularPower = 24;
-      const tex = this.textureManager.getStructureTexture("stone_ruins", 128);
-      if (tex) {
-        tex.uScale = 2;
-        tex.vScale = 2;
-        m.diffuseTexture = tex;
-      }
+      this.textureManager.applySurface(m, "stone_ruins", 2, 2);
       if (typeof (m as any).freeze === "function") {
         m.freeze();
       }
@@ -1196,12 +1298,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       m.diffuseColor  = new Color3(0.90, 0.92, 0.96);
       m.specularColor = new Color3(0.50, 0.52, 0.58);
       m.specularPower = 64;
-      const tex = this.textureManager.getBiomeTexture("tundra", 128);
-      if (tex) {
-        tex.uScale = 2;
-        tex.vScale = 2;
-        m.diffuseTexture = tex;
-      }
+      this.textureManager.applySurface(m, "tundra", 2, 2);
       if (typeof (m as any).freeze === "function") {
         m.freeze();
       }

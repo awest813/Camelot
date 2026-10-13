@@ -179,7 +179,9 @@ export class Player {
     const ray = new Ray(origin, forward, distance);
 
     return this.scene.pickWithRay(ray, (mesh) => {
-       const baseCondition = mesh.name !== "playerBody" && !mesh.name.startsWith("chunk_");
+       // Respect isPickable: decorative meshes (sky, horizon, grass, tree
+       // batches) opt out, and testing their triangles is expensive.
+       const baseCondition = mesh.isPickable && mesh.name !== "playerBody" && !mesh.name.startsWith("chunk_");
        if (requireVisible) {
            return mesh.isVisible && baseCondition;
        }

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
+  classifyGpu,
   GraphicsSystem,
   DEFAULT_SHADOW,
   DEFAULT_POST_PROCESS,
@@ -484,8 +485,8 @@ describe("GraphicsSystem", () => {
     expect(gfx.isValid).toBe(false);
   });
 
-  it("default toneMappingType is 'aces'", () => {
-    expect(new GraphicsSystem().postProcess.toneMappingType).toBe("aces");
+  it("default toneMappingType is 'neutral'", () => {
+    expect(new GraphicsSystem().postProcess.toneMappingType).toBe("neutral");
   });
 
   it("toneMappingType can be overridden to 'none'", () => {
@@ -493,8 +494,10 @@ describe("GraphicsSystem", () => {
     expect(gfx.postProcess.toneMappingType).toBe("none");
   });
 
-  it("default fxaa is disabled for the performance-first preset", () => {
-    expect(new GraphicsSystem().postProcess.fxaa).toBe(false);
+  it("default preset enables FXAA and bloom (HDR sun/emissives feed it)", () => {
+    const gfx = new GraphicsSystem();
+    expect(gfx.postProcess.fxaa).toBe(true);
+    expect(gfx.postProcess.bloom.enabled).toBe(true);
   });
 
   it("fxaa can be disabled via override", () => {
@@ -526,9 +529,10 @@ describe("quality tier presets", () => {
     expect(LOW_TIER_PRESET.performance.targetFps).toBe(30);
   });
 
-  it("MEDIUM tier keeps shadows + FXAA but disables bloom", () => {
+  it("MEDIUM tier keeps shadows + FXAA with a cheaper bloom kernel", () => {
     expect(MEDIUM_TIER_PRESET.postProcess.fxaa).toBe(true);
-    expect(MEDIUM_TIER_PRESET.postProcess.bloom.enabled).toBe(false);
+    expect(MEDIUM_TIER_PRESET.postProcess.bloom.enabled).toBe(true);
+    expect(MEDIUM_TIER_PRESET.postProcess.bloom.kernel).toBeLessThan(ULTRA_TIER_PRESET.postProcess.bloom.kernel);
     expect(MEDIUM_TIER_PRESET.performance.softShadows).toBe(true);
   });
 
@@ -777,7 +781,7 @@ describe("TextureConfig across quality tiers", () => {
 
   it("provides appropriate texture resolution and filtering for ultra tier", () => {
     const gfx = new GraphicsSystem({ tier: "ultra" });
-    expect(gfx.texture.resolution).toBe(256);
+    expect(gfx.texture.resolution).toBe(512);
     expect(gfx.texture.anisotropicFiltering).toBe(8);
     expect(gfx.texture.mipmaps).toBe(true);
   });
@@ -799,9 +803,58 @@ describe("TextureConfig across quality tiers", () => {
       sky:         DEFAULT_SKY,
       fog:         DEFAULT_FOG,
       lighting:    DEFAULT_LIGHTING,
-      texture:     { resolution: 512 as any, anisotropicFiltering: 2, mipmaps: true },
+      texture:     { resolution: 1024 as any, anisotropicFiltering: 2, mipmaps: true },
     });
     expect(errors.some(e => e.includes("texture.resolution"))).toBe(true);
   });
 });
 
+describe("EffectsConfig across quality tiers", () => {
+  it("scales modern effects up with the tier", () => {
+    const low = new GraphicsSystem({ tier: "low" }).effects;
+    const high = new GraphicsSystem({ tier: "high" }).effects;
+    const ultra = new GraphicsSystem({ tier: "ultra" }).effects;
+    expect(low.ssao).toBe(false);
+    expect(low.grassDensity).toBe(0);
+    expect(low.shadowCascades).toBe(0);
+    expect(high.ssao).toBe(true);
+    expect(high.shadowCascades).toBeGreaterThan(0);
+    expect(ultra.godRays).toBe(true);
+    expect(ultra.grassDensity).toBeGreaterThan(high.grassDensity);
+  });
+
+  it("accepts per-effect overrides", () => {
+    const gfx = new GraphicsSystem({ tier: "ultra", effects: { godRays: false } });
+    expect(gfx.effects.godRays).toBe(false);
+    expect(gfx.effects.ssao).toBe(true);
+  });
+
+  it("low tier turns normal maps off", () => {
+    expect(new GraphicsSystem({ tier: "low" }).texture.normalMaps).toBe(false);
+  });
+});
+
+describe("GPU-aware tier detection", () => {
+  it("classifies common renderer strings", () => {
+    expect(classifyGpu("ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)")).toBe("software");
+    expect(classifyGpu("llvmpipe (LLVM 15.0.7, 256 bits)")).toBe("software");
+    expect(classifyGpu("ANGLE (Intel, Intel(R) UHD Graphics 620 Direct3D11 vs_5_0 ps_5_0)")).toBe("integrated");
+    expect(classifyGpu("ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Direct3D11 vs_5_0 ps_5_0)")).toBe("discrete");
+    expect(classifyGpu("Mali-G78")).toBe("mobile");
+    expect(classifyGpu("Apple M2")).toBe("discrete");
+    expect(classifyGpu(undefined)).toBe("unknown");
+  });
+
+  it("caps integrated GPUs at medium and software/mobile at low", () => {
+    const strong = { deviceMemoryGB: 16, hardwareConcurrency: 16 };
+    expect(detectQualityTier(strong)).toBe("high");
+    expect(detectQualityTier({ ...strong, gpuRenderer: "Intel(R) Iris(R) Xe Graphics" })).toBe("medium");
+    expect(detectQualityTier({ ...strong, gpuRenderer: "SwiftShader" })).toBe("low");
+    expect(detectQualityTier({ ...strong, gpuRenderer: "Adreno (TM) 740" })).toBe("low");
+    expect(detectQualityTier({ ...strong, gpuRenderer: "NVIDIA GeForce GTX 1060" })).toBe("high");
+  });
+
+  it("never raises a tier because of the GPU", () => {
+    expect(detectQualityTier({ deviceMemoryGB: 2, gpuRenderer: "NVIDIA GeForce RTX 4090" })).toBe("low");
+  });
+});

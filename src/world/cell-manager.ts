@@ -139,11 +139,47 @@ export class CellManager {
     );
     mesh.position = position.clone();
 
+    // Glowing veil: HDR emissive (>1) so the bloom pass haloes it.
     const mat = new StandardMaterial(`portalMat_${id}`, this._scene);
-    mat.diffuseColor  = new Color3(0.30, 0.50, 0.80);
-    mat.emissiveColor = new Color3(0.05, 0.10, 0.25);
-    mat.alpha = 0.75;
+    mat.diffuseColor  = new Color3(0, 0, 0);
+    mat.specularColor = new Color3(0, 0, 0);
+    mat.emissiveColor = new Color3(0.30, 0.65, 1.5);
+    mat.disableLighting = true;
+    mat.alpha = 0.62;
     mesh.material = mat;
+
+    // Stone archway framing the veil (decorative; the veil stays pickable).
+    const stone = new StandardMaterial(`portalStone_${id}`, this._scene);
+    stone.diffuseColor = new Color3(0.42, 0.40, 0.37);
+    stone.specularColor = new Color3(0.05, 0.05, 0.05);
+    const parts: Array<[number, number, number, number, number, number]> = [
+      // w, h, d, x, y, z (relative to the veil centre)
+      [0.38, 2.7, 0.5, -0.8, 0.1, 0],
+      [0.38, 2.7, 0.5, 0.8, 0.1, 0],
+      [2.1, 0.4, 0.6, 0, 1.45, 0],
+      [0.6, 0.18, 0.7, -0.8, -1.2, 0],
+      [0.6, 0.18, 0.7, 0.8, -1.2, 0],
+    ];
+    parts.forEach(([w, h, d, x, y, z], i) => {
+      const part = MeshBuilder.CreateBox(`portal_${id}_arch${i}`, { width: w, height: h, depth: d }, this._scene);
+      part.parent = mesh;
+      part.position = new Vector3(x, y, z);
+      part.material = stone;
+      part.isPickable = false;
+      part.receiveShadows = true;
+    });
+
+    // Slow shimmer.
+    let t = Math.random() * 10;
+    const pulse = this._scene.onBeforeRenderObservable?.add(() => {
+      t += this._scene.getEngine().getDeltaTime() / 1000;
+      const k = 0.85 + 0.15 * Math.sin(t * 2.1) + 0.05 * Math.sin(t * 5.3);
+      mat.emissiveColor.set(0.30 * k, 0.65 * k, 1.5 * k);
+    });
+    mesh.onDisposeObservable?.addOnce(() => {
+      if (pulse) this._scene.onBeforeRenderObservable.remove(pulse);
+      stone.dispose();
+    });
 
     const portal: Portal = {
       id,

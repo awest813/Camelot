@@ -43,6 +43,11 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 // the live game crashes with "beginAnimation is not a function").
 import "@babylonjs/core/Animations/animatable";
 
+/** Minimal interface a rigged model exposes to the AnimationSystem. */
+export interface SkeletalAnimator {
+  play(clip: AnimationClip, onDone?: () => void): void;
+}
+
 /** The set of named animation clips the system can play. */
 export type AnimationClip =
   | "idle"
@@ -71,8 +76,46 @@ export class AnimationSystem {
   /** Tracks the currently playing clip name per mesh (keyed by mesh.name). */
   private readonly _active: Map<string, AnimationClip> = new Map();
 
+  /**
+   * Rigged models (keyed by capsule mesh name).  When a mesh has one, clips
+   * play as skeletal animation groups instead of the capsule scale tweens —
+   * which would otherwise squash the parented model.
+   */
+  private readonly _skeletal: Map<string, SkeletalAnimator> = new Map();
+
   constructor(scene: Scene) {
     this._scene = scene;
+  }
+
+  /** Route this mesh's clips to a skeletal animator (see character-models.ts). */
+  public registerSkeletal(meshName: string, animator: SkeletalAnimator): void {
+    this._skeletal.set(meshName, animator);
+    const current = this._active.get(meshName);
+    if (current) animator.play(current);
+  }
+
+  public unregisterSkeletal(meshName: string): void {
+    this._skeletal.delete(meshName);
+  }
+
+  public hasSkeletal(meshName: string): boolean {
+    return this._skeletal.has(meshName);
+  }
+
+  /**
+   * Play `clip` on the mesh's skeletal animator if it has one.  One-shot
+   * clips clear their tracking entry on completion, mirroring the tween path.
+   */
+  private _playSkeletal(mesh: Mesh, clip: AnimationClip, onComplete?: () => void): boolean {
+    const animator = this._skeletal.get(mesh.name);
+    if (!animator) return false;
+    const looping = clip === "idle" || clip === "walk" || clip === "run" || clip === "alert"
+      || clip === "investigate" || clip === "return" || clip === "victory";
+    animator.play(clip, looping || clip === "death" ? undefined : () => {
+      if (this._active.get(mesh.name) === clip) this._active.delete(mesh.name);
+      onComplete?.();
+    });
+    return true;
   }
 
   // ── Looping clips ──────────────────────────────────────────────────────────
@@ -86,6 +129,7 @@ export class AnimationSystem {
     if (current === "idle" || current === "death") return;
     this._stopAll(mesh);
     this._active.set(mesh.name, "idle");
+    if (this._playSkeletal(mesh, "idle")) return;
 
     // Gentle Y-scale swell: 1.0 → 1.015 → 1.0 → 0.985 → 1.0  (3-second cycle)
     const anim = new Animation(
@@ -115,6 +159,7 @@ export class AnimationSystem {
     if (current === "walk" || current === "death") return;
     this._stopAll(mesh);
     this._active.set(mesh.name, "walk");
+    if (this._playSkeletal(mesh, "walk")) return;
 
     const anim = new Animation(
       `${mesh.name}_walk`,
@@ -143,6 +188,7 @@ export class AnimationSystem {
     if (current === "run" || current === "death") return;
     this._stopAll(mesh);
     this._active.set(mesh.name, "run");
+    if (this._playSkeletal(mesh, "run")) return;
 
     const anim = new Animation(
       `${mesh.name}_run`,
@@ -170,6 +216,7 @@ export class AnimationSystem {
     if (current === "alert" || current === "death") return;
     this._stopAll(mesh);
     this._active.set(mesh.name, "alert");
+    if (this._playSkeletal(mesh, "alert")) return;
 
     const anim = new Animation(
       `${mesh.name}_alert`,
@@ -197,6 +244,7 @@ export class AnimationSystem {
     if (current === "investigate" || current === "death") return;
     this._stopAll(mesh);
     this._active.set(mesh.name, "investigate");
+    if (this._playSkeletal(mesh, "investigate")) return;
 
     const anim = new Animation(
       `${mesh.name}_investigate`,
@@ -224,6 +272,7 @@ export class AnimationSystem {
     if (current === "return" || current === "death") return;
     this._stopAll(mesh);
     this._active.set(mesh.name, "return");
+    if (this._playSkeletal(mesh, "return")) return;
 
     const anim = new Animation(
       `${mesh.name}_return`,
@@ -252,6 +301,7 @@ export class AnimationSystem {
     if (current === "victory" || current === "death") return;
     this._stopAll(mesh);
     this._active.set(mesh.name, "victory");
+    if (this._playSkeletal(mesh, "victory")) return;
 
     const anim = new Animation(
       `${mesh.name}_victory`,
@@ -282,6 +332,7 @@ export class AnimationSystem {
     if (this._active.get(mesh.name) === "death") return;
     this._stopAll(mesh);
     this._active.set(mesh.name, "spawn");
+    if (this._playSkeletal(mesh, "spawn", onComplete)) return;
 
     const scaleY = _makeAnimation(`${mesh.name}_spawn_sy`, "scaling.y", FPS, [
       { frame: 0,  value: 0.0  },
@@ -320,6 +371,7 @@ export class AnimationSystem {
     if (this._active.get(mesh.name) === "death") return;
     this._stopAll(mesh);
     this._active.set(mesh.name, "telegraph");
+    if (this._playSkeletal(mesh, "telegraph", onComplete)) return;
 
     const scaleX = _makeAnimation(`${mesh.name}_tele_sx`, "scaling.x", FPS, [
       { frame: 0,  value: 1.0  },
@@ -358,6 +410,7 @@ export class AnimationSystem {
     if (this._active.get(mesh.name) === "death") return;
     this._stopAll(mesh);
     this._active.set(mesh.name, "stagger");
+    if (this._playSkeletal(mesh, "stagger")) return;
 
     const scaleX = _makeAnimation(`${mesh.name}_stag_sx`, "scaling.x", FPS, [
       { frame: 0,  value: 1.0  },
@@ -392,6 +445,7 @@ export class AnimationSystem {
     if (this._active.get(mesh.name) === "death") return;
     this._stopAll(mesh);
     this._active.set(mesh.name, "hit");
+    if (this._playSkeletal(mesh, "hit")) return;
 
     const scaleX = _makeAnimation(`${mesh.name}_hit_sx`, "scaling.x", FPS, [
       { frame: 0,  value: 1.0  },
@@ -431,6 +485,7 @@ export class AnimationSystem {
     if (this._active.get(mesh.name) === "death") return;
     this._stopAll(mesh);
     this._active.set(mesh.name, "death");
+    if (this._playSkeletal(mesh, "death")) return;
 
     const rotZ = _makeAnimation(`${mesh.name}_death_rz`, "rotation.z", FPS, [
       { frame: 0,  value: 0             },

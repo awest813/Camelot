@@ -1,8 +1,11 @@
 import { Scene } from "@babylonjs/core/scene";
 import { RawTexture } from "@babylonjs/core/Materials/Textures/rawTexture";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
+import type { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { BiomeType } from "../world/world-manager";
 import type { TextureConfig } from "./graphics-system";
+import { synthesizeSurface, heightToNormalMap, type SurfaceKind, type SynthSurface } from "../rendering/texture-synth";
 
 export type StructureTextureType =
   | "stone_ruins"
@@ -12,7 +15,7 @@ export type StructureTextureType =
   | "mossy_stone"
   | "foliage_canopy"
   | "iron_metal";
-export type TextureResolution = 64 | 128 | 256;
+export type TextureResolution = 64 | 128 | 256 | 512;
 
 /**
  * ProceduralTextureManager — generates and caches headless-safe, tileable
@@ -29,6 +32,12 @@ export type TextureResolution = 64 | 128 | 256;
 export class ProceduralTextureManager {
   private readonly _scene: Scene;
   private readonly _textures: Map<string, RawTexture> = new Map();
+  private readonly _surfaces: Map<string, SynthSurface> = new Map();
+  private readonly _views: Map<string, Texture> = new Map();
+  /** Synthesize in a Web Worker when available (browser). */
+  public useWorker = true;
+  /** Attach normal maps in {@link applySurface}.  Off on the low tier. */
+  public normalMaps: boolean;
   public defaultResolution: TextureResolution;
   public anisotropicFiltering: number;
   public generateMipMaps: boolean;
@@ -38,68 +47,92 @@ export class ProceduralTextureManager {
     this.defaultResolution = config?.resolution ?? 128;
     this.anisotropicFiltering = config?.anisotropicFiltering ?? 4;
     this.generateMipMaps = config?.mipmaps ?? true;
+    this.normalMaps = config?.normalMaps ?? true;
   }
 
   /**
    * Get or create a tileable procedural ground texture for a given biome.
    */
   public getBiomeTexture(biome: BiomeType, resolution: TextureResolution = this.defaultResolution): RawTexture | null {
-    if (!this._scene || typeof (this._scene as any).getEngine !== "function") return null;
-
-    const key = `biome_${biome}_${resolution}`;
-    let tex = this._textures.get(key);
-    if (tex) return tex;
-
-    const data = this._generateBiomeBuffer(biome, resolution);
-    tex = RawTexture.CreateRGBATexture(
-      data,
-      resolution,
-      resolution,
-      this._scene,
-      this.generateMipMaps,
-      false, // invertY
-      Texture.TRILINEAR_SAMPLINGMODE,
-    );
-    tex.wrapU = Texture.WRAP_ADDRESSMODE;
-    tex.wrapV = Texture.WRAP_ADDRESSMODE;
-    if (this.anisotropicFiltering > 1) {
-      tex.anisotropicFilteringLevel = this.anisotropicFiltering;
-    }
-    tex.name = `tex_${key}`;
-
-    this._textures.set(key, tex);
-    return tex;
+    return this._get(`biome_${biome}`, BIOME_SURFACE[biome], resolution, false);
   }
 
   /**
    * Get or create a tileable procedural material texture for structures.
    */
   public getStructureTexture(type: StructureTextureType, resolution: TextureResolution = this.defaultResolution): RawTexture | null {
-    if (!this._scene || typeof (this._scene as any).getEngine !== "function") return null;
+    return this._get(`struct_${type}`, type, resolution, false);
+  }
 
-    const key = `struct_${type}_${resolution}`;
-    let tex = this._textures.get(key);
-    if (tex) return tex;
+  /**
+   * Get or create any synthesized surface (albedo).  Cut-out surfaces
+   * (`leaf_card`, `grass_blades`) carry their mask in the alpha channel.
+   */
+  public getSurfaceTexture(kind: SurfaceKind, resolution: TextureResolution = this.defaultResolution): RawTexture | null {
+    return this._get(`surf_${kind}`, kind, resolution, false);
+  }
 
-    const data = this._generateStructureBuffer(type, resolution);
-    tex = RawTexture.CreateRGBATexture(
-      data,
-      resolution,
-      resolution,
-      this._scene,
-      this.generateMipMaps,
-      false,
-      Texture.TRILINEAR_SAMPLINGMODE,
-    );
-    tex.wrapU = Texture.WRAP_ADDRESSMODE;
-    tex.wrapV = Texture.WRAP_ADDRESSMODE;
-    if (this.anisotropicFiltering > 1) {
-      tex.anisotropicFilteringLevel = this.anisotropicFiltering;
+  /**
+   * Tangent-space normal map matching {@link getSurfaceTexture} /
+   * {@link getBiomeTexture} / {@link getStructureTexture} for the same surface.
+   * Alpha holds height (usable for parallax).
+   */
+  public getNormalTexture(kind: SurfaceKind | BiomeType, resolution: TextureResolution = this.defaultResolution): RawTexture | null {
+    const surface = (BIOME_SURFACE as Record<string, SurfaceKind>)[kind] ?? (kind as SurfaceKind);
+    return this._get(`normal_${surface}`, surface, resolution, true);
+  }
+
+  /**
+   * A texture sharing `base`'s GPU storage with its own UV tiling.  Cached
+   * textures are shared between materials, so callers must never mutate
+   * `uScale`/`vScale` on them directly — that silently retiles every other
+   * user of the surface.
+   */
+  public getView(base: RawTexture, uScale: number, vScale: number = uScale): Texture {
+    if (uScale === 1 && vScale === 1) return base;
+    const key = `${base.name}@${uScale}x${vScale}`;
+    let view = this._views.get(key);
+    if (view) return view;
+    view = new Texture(null, this._scene, !this.generateMipMaps, false, Texture.TRILINEAR_SAMPLINGMODE);
+    const internal = base.getInternalTexture();
+    if (internal) {
+      internal.incrementReferences();
+      view._texture = internal;
     }
-    tex.name = `tex_${key}`;
+    view.name = key;
+    view.wrapU = Texture.WRAP_ADDRESSMODE;
+    view.wrapV = Texture.WRAP_ADDRESSMODE;
+    view.uScale = uScale;
+    view.vScale = vScale;
+    view.hasAlpha = base.hasAlpha;
+    view.anisotropicFilteringLevel = base.anisotropicFilteringLevel;
+    this._views.set(key, view);
+    return view;
+  }
 
-    this._textures.set(key, tex);
-    return tex;
+  /**
+   * Dress a StandardMaterial with a synthesized surface: albedo, matching
+   * normal map (when {@link normalMaps} is on) and a near-white tint derived
+   * from the material's current diffuse colour so the texture — not a dark
+   * multiplier — carries the albedo.
+   */
+  public applySurface(
+    mat: StandardMaterial,
+    kind: SurfaceKind | BiomeType,
+    uScale = 1,
+    vScale: number = uScale,
+    opts: { tintStrength?: number; normals?: boolean } = {},
+  ): boolean {
+    const surface = (BIOME_SURFACE as Record<string, SurfaceKind>)[kind] ?? (kind as SurfaceKind);
+    const albedo = this.getSurfaceTexture(surface);
+    if (!albedo) return false;
+    mat.diffuseTexture = this.getView(albedo, uScale, vScale);
+    mat.diffuseColor = textureTint(mat.diffuseColor, opts.tintStrength ?? 0.3);
+    if (opts.normals ?? this.normalMaps) {
+      const nrm = this.getNormalTexture(surface);
+      if (nrm) mat.bumpTexture = this.getView(nrm, uScale, vScale);
+    }
+    return true;
   }
 
   /**
@@ -110,188 +143,162 @@ export class ProceduralTextureManager {
       tex.dispose();
     }
     this._textures.clear();
+    this._surfaces.clear();
+    for (const view of this._views.values()) view.dispose();
+    this._views.clear();
   }
 
-  // ── Procedural Buffer Generators ───────────────────────────────────────────
+  private _surface(kind: SurfaceKind, resolution: number): SynthSurface {
+    const key = `${kind}_${resolution}`;
+    let surf = this._surfaces.get(key);
+    if (!surf) {
+      surf = synthesizeSurface(kind, resolution);
+      this._surfaces.set(key, surf);
+    }
+    return surf;
+  }
 
-  private _generateBiomeBuffer(biome: BiomeType, size: number): Uint8Array {
-    const buffer = new Uint8Array(size * size * 4);
-    const twoPi = Math.PI * 2;
+  private _get(keyBase: string, kind: SurfaceKind, resolution: TextureResolution, normal: boolean): RawTexture | null {
+    if (!this._scene || typeof (this._scene as any).getEngine !== "function") return null;
 
-    for (let y = 0; y < size; y++) {
-      const v = y / size;
-      const sinV1 = Math.sin(v * twoPi);
-      const cosV1 = Math.cos(v * twoPi);
-      const sinV2 = Math.sin(v * twoPi * 3);
-      const sinV4 = Math.sin(v * twoPi * 7);
+    const key = `${keyBase}_${resolution}`;
+    let tex = this._textures.get(key);
+    if (tex) return tex;
 
-      for (let x = 0; x < size; x++) {
-        const u = x / size;
-        const sinU1 = Math.sin(u * twoPi);
-        const cosU1 = Math.cos(u * twoPi);
-        const sinU2 = Math.sin(u * twoPi * 3);
-        const sinU4 = Math.sin(u * twoPi * 7);
+    // Off-thread when a worker is available: the texture is created now from a
+    // cheap low-res preview and filled in when the full synthesis arrives.
+    const async = this.useWorker && SynthWorkerPool.available();
+    const hasAlpha = CUTOUT_KINDS.has(kind);
+    let data: Uint8Array;
+    if (async) {
+      data = previewData(kind, resolution, normal);
+    } else {
+      const surf = this._surface(kind, resolution);
+      data = normal ? heightToNormalMap(surf.height, resolution, surf.bumpStrength) : surf.albedo;
+    }
+    tex = RawTexture.CreateRGBATexture(
+      data,
+      resolution,
+      resolution,
+      this._scene,
+      this.generateMipMaps,
+      false, // invertY
+      Texture.TRILINEAR_SAMPLINGMODE,
+    );
+    if (async) {
+      const target = tex;
+      void SynthWorkerPool.request(kind, resolution).then((res) => {
+        if (!target.getInternalTexture()) return;
+        target.update(normal ? res.normal : res.albedo);
+      });
+    }
+    tex.wrapU = Texture.WRAP_ADDRESSMODE;
+    tex.wrapV = Texture.WRAP_ADDRESSMODE;
+    if (this.anisotropicFiltering > 1) {
+      tex.anisotropicFilteringLevel = this.anisotropicFiltering;
+    }
+    if (!normal && hasAlpha) tex.hasAlpha = true;
+    tex.name = `tex_${key}`;
 
-        // Multi-octave toroidal harmonic noise in [0, 1]
-        const n1 = (sinU1 * cosV1 + cosU1 * sinV1) * 0.25 + 0.5;
-        const n2 = (sinU2 * sinV2) * 0.15 + 0.15;
-        const n3 = (sinU4 * sinV4) * 0.10 + 0.10;
-        const noise = Math.min(1, Math.max(0, n1 + n2 + n3));
+    this._textures.set(key, tex);
+    return tex;
+  }
+}
 
-        // High frequency pseudo-random grain (seamless hash)
-        const h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-        const grain = (h - Math.floor(h)) * 0.14;
+const CUTOUT_KINDS = new Set<SurfaceKind>(["leaf_card", "grass_blades", "palm_frond"]);
 
-        let r = 0;
-        let g = 0;
-        let b = 0;
+/** 16² synthesis upscaled (nearest) — a stand-in until the worker finishes. */
+function previewData(kind: SurfaceKind, size: number, normal: boolean): Uint8Array {
+  const out = new Uint8Array(size * size * 4);
+  if (normal) {
+    for (let i = 0; i < out.length; i += 4) { out[i] = 128; out[i + 1] = 128; out[i + 2] = 255; out[i + 3] = 128; }
+    return out;
+  }
+  const p = 16;
+  const small = synthesizeSurface(kind, p).albedo;
+  const step = size / p;
+  for (let y = 0; y < size; y++) {
+    const sy = Math.floor(y / step);
+    for (let x = 0; x < size; x++) {
+      const si = (sy * p + Math.floor(x / step)) * 4;
+      const di = (y * size + x) * 4;
+      out[di] = small[si]; out[di + 1] = small[si + 1]; out[di + 2] = small[si + 2]; out[di + 3] = small[si + 3];
+    }
+  }
+  return out;
+}
 
-        switch (biome) {
-          case "plains": {
-            // Vibrant grassy meadow with warm earth undertones and lush clover accents
-            const factor = Math.min(1, Math.max(0, noise * 0.88 + grain * 0.9));
-            r = Math.round(52  + factor * 38);
-            g = Math.round(140 + factor * 55);
-            b = Math.round(38  + factor * 28);
-            break;
+interface SynthResult { albedo: Uint8Array; normal: Uint8Array }
+
+/** One shared synthesis worker; requests for the same surface are shared. */
+const SynthWorkerPool = {
+  _worker: null as Worker | null,
+  _failed: false,
+  _nextId: 1,
+  _pending: new Map<number, { resolve: (r: SynthResult) => void; kind: SurfaceKind; size: number }>(),
+  _byKey: new Map<string, Promise<SynthResult>>(),
+
+  available(): boolean {
+    if (this._failed || typeof Worker === "undefined") return false;
+    if (!this._worker) {
+      try {
+        this._worker = new Worker(new URL("../rendering/texture-synth.worker.ts", import.meta.url), { type: "module" });
+        this._worker.onmessage = (ev: MessageEvent<{ id: number } & SynthResult>) => {
+          const job = this._pending.get(ev.data.id);
+          this._pending.delete(ev.data.id);
+          job?.resolve(ev.data);
+        };
+        // If the worker dies, finish outstanding jobs on the main thread.
+        this._worker.onerror = () => {
+          this._failed = true;
+          for (const [id, job] of this._pending) {
+            this._pending.delete(id);
+            const surf = synthesizeSurface(job.kind, job.size);
+            job.resolve({ albedo: surf.albedo, normal: heightToNormalMap(surf.height, job.size, surf.bumpStrength) });
           }
-          case "forest": {
-            // Deep woodland moss, rich humus undertones, and dark leafy canopy speckles
-            const factor = Math.min(1, Math.max(0, noise * 0.85 + grain * 1.15));
-            r = Math.round(22 + factor * 28);
-            g = Math.round(78 + factor * 40);
-            b = Math.round(20 + factor * 24);
-            break;
-          }
-          case "desert": {
-            // Dune ripples with warm sunlit amber crests and granular quartz sparkle
-            const ripple = Math.sin((u * 4 + v * 8) * twoPi) * 0.12;
-            const factor = Math.min(1, Math.max(0, noise * 0.68 + ripple + grain * 0.85));
-            r = Math.round(214 + factor * 36);
-            g = Math.round(178 + factor * 32);
-            b = Math.round(102 + factor * 26);
-            break;
-          }
-          case "tundra": {
-            // Frosted snow crust with subtle sub-surface glacial ice veining
-            const vein = Math.abs(Math.sin((u * 3 - v * 3) * twoPi)) * 0.14;
-            const factor = Math.min(1, Math.max(0, noise * 0.62 + vein + grain * 0.55));
-            r = Math.round(218 + factor * 32);
-            g = Math.round(230 + factor * 24);
-            b = Math.round(244 + factor * 11);
-            break;
-          }
-        }
-
-        const idx = (y * size + x) * 4;
-        buffer[idx]     = Math.min(255, Math.max(0, r));
-        buffer[idx + 1] = Math.min(255, Math.max(0, g));
-        buffer[idx + 2] = Math.min(255, Math.max(0, b));
-        buffer[idx + 3] = 255;
+        };
+      } catch {
+        this._failed = true;
+        return false;
       }
     }
+    return true;
+  },
 
-    return buffer;
-  }
-
-  private _generateStructureBuffer(type: StructureTextureType, size: number): Uint8Array {
-    const buffer = new Uint8Array(size * size * 4);
-    const twoPi = Math.PI * 2;
-
-    for (let y = 0; y < size; y++) {
-      const v = y / size;
-      for (let x = 0; x < size; x++) {
-        const u = x / size;
-
-        // Periodic seamless grain
-        const h = Math.sin(x * 9.123 + y * 41.567) * 28734.123;
-        const grain = (h - Math.floor(h)) * 0.15;
-
-        let r = 0;
-        let g = 0;
-        let b = 0;
-
-        if (type === "stone_ruins") {
-          // Weathered stone blocks with defined mortar lines
-          const brickY = Math.floor(v * 8);
-          const brickX = Math.floor(u * 8 + (brickY % 2 === 0 ? 0 : 0.5));
-          const fracX = (u * 8 + (brickY % 2 === 0 ? 0 : 0.5)) - brickX;
-          const fracY = v * 8 - brickY;
-          const isMortar = fracX < 0.075 || fracY < 0.075;
-
-          if (isMortar) {
-            r = Math.round(66 + grain * 28);
-            g = Math.round(62 + grain * 24);
-            b = Math.round(54 + grain * 20);
-          } else {
-            const stoneNoise = Math.sin(u * twoPi * 4) * Math.cos(v * twoPi * 4) * 0.16;
-            const factor = Math.min(1, Math.max(0, 0.5 + stoneNoise + grain));
-            r = Math.round(118 + factor * 38);
-            g = Math.round(112 + factor * 34);
-            b = Math.round(96  + factor * 28);
-          }
-        } else if (type === "desert_sandstone") {
-          // Layered sedimentary sandstone with geological strata
-          const layer = Math.sin(v * twoPi * 6 + Math.sin(u * twoPi * 2) * 0.5) * 0.16;
-          const factor = Math.min(1, Math.max(0, 0.5 + layer + grain * 0.8));
-          r = Math.round(198 + factor * 36);
-          g = Math.round(154 + factor * 26);
-          b = Math.round(98  + factor * 22);
-        } else if (type === "watchtower_timber") {
-          // Watchtower timber: warm directional wood grain along V axis
-          const grainLine = Math.sin(u * twoPi * 12) * 0.22;
-          const factor = Math.min(1, Math.max(0, 0.5 + grainLine + grain));
-          r = Math.round(98  + factor * 32);
-          g = Math.round(64  + factor * 26);
-          b = Math.round(38  + factor * 16);
-        } else if (type === "bark_timber") {
-          // Organic tree bark: furrowed vertical grain
-          const furrow = Math.sin(u * twoPi * 16 + Math.sin(v * twoPi * 4) * 0.75) * 0.32;
-          const factor = Math.min(1, Math.max(0, 0.45 + furrow + grain));
-          r = Math.round(76 + factor * 42);
-          g = Math.round(46 + factor * 32);
-          b = Math.round(26 + factor * 22);
-        } else if (type === "mossy_stone") {
-          // Weathered stone with organic creeping moss patches
-          const stoneNoise = Math.sin(u * twoPi * 3) * Math.cos(v * twoPi * 3) * 0.20;
-          const mossThreshold = Math.sin(u * twoPi * 2 + v * twoPi * 2) * 0.5 + 0.5;
-          if (mossThreshold > 0.52) {
-            const factor = Math.min(1, Math.max(0, 0.5 + stoneNoise + grain));
-            r = Math.round(44 + factor * 36);
-            g = Math.round(88 + factor * 48);
-            b = Math.round(30 + factor * 26);
-          } else {
-            const factor = Math.min(1, Math.max(0, 0.5 + stoneNoise + grain));
-            r = Math.round(88 + factor * 36);
-            g = Math.round(88 + factor * 36);
-            b = Math.round(82 + factor * 32);
-          }
-        } else if (type === "foliage_canopy") {
-          // Stippled needle and leaf clusters
-          const cluster1 = Math.sin(u * twoPi * 8) * Math.cos(v * twoPi * 8) * 0.22;
-          const cluster2 = Math.sin((u + v) * twoPi * 14) * 0.16;
-          const factor = Math.min(1, Math.max(0, 0.45 + cluster1 + cluster2 + grain * 1.2));
-          r = Math.round(26 + factor * 36);
-          g = Math.round(88 + factor * 58);
-          b = Math.round(22 + factor * 28);
-        } else {
-          // Iron metal: brushed cold metal with subtle highlight sheen
-          const brush = Math.sin(v * twoPi * 32) * 0.09;
-          const mottle = (Math.sin(u * twoPi * 4) + Math.cos(v * twoPi * 4)) * 0.10;
-          const factor = Math.min(1, Math.max(0, 0.5 + brush + mottle + grain * 0.6));
-          r = Math.round(78 + factor * 36);
-          g = Math.round(82 + factor * 36);
-          b = Math.round(90 + factor * 42);
-        }
-
-        const idx = (y * size + x) * 4;
-        buffer[idx]     = Math.min(255, Math.max(0, r));
-        buffer[idx + 1] = Math.min(255, Math.max(0, g));
-        buffer[idx + 2] = Math.min(255, Math.max(0, b));
-        buffer[idx + 3] = 255;
-      }
+  request(kind: SurfaceKind, size: number): Promise<SynthResult> {
+    const key = `${kind}_${size}`;
+    let p = this._byKey.get(key);
+    if (!p) {
+      p = new Promise<SynthResult>((resolve) => {
+        const id = this._nextId++;
+        this._pending.set(id, { resolve, kind, size });
+        this._worker!.postMessage({ id, kind, size, seed: 7 });
+      });
+      this._byKey.set(key, p);
     }
+    return p;
+  },
+};
 
-    return buffer;
-  }
+/** Ground surface synthesized for each biome. */
+const BIOME_SURFACE: Record<BiomeType, SurfaceKind> = {
+  plains: "grass",
+  forest: "forest_floor",
+  desert: "sand",
+  tundra: "snow",
+};
+
+/**
+ * Near-white tint that keeps `color`'s hue.  Legacy materials stored their
+ * final albedo in `diffuseColor`; multiplying that by a full-colour texture
+ * double-darkens it (dark bark × dark texture ≈ black).
+ */
+export function textureTint(color: Color3, strength = 0.3): Color3 {
+  const m = Math.max(color.r, color.g, color.b, 1e-3);
+  const t = Math.min(1, Math.max(0, strength));
+  return new Color3(
+    1 + (color.r / m - 1) * t,
+    1 + (color.g / m - 1) * t,
+    1 + (color.b / m - 1) * t,
+  );
 }

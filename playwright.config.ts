@@ -24,6 +24,9 @@ export default defineConfig({
     // for page content without this flag, which would kill the engine).
     launchOptions: {
       args: ["--enable-unsafe-swiftshader"],
+      // Pre-provisioned browser (e.g. cloud containers) when the pinned
+      // Playwright build isn't downloaded.
+      ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}),
     },
   },
 

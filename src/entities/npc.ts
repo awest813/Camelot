@@ -332,10 +332,18 @@ export class NPC {
 
   // ───────────────────────────────────────────────────────────────────────────
 
+  /**
+   * Called after every NPC is constructed.  The game installs a hook here to
+   * attach a rigged visual model to the capsule (see character-models.ts);
+   * tests and headless tools leave it null.
+   */
+  public static onCreated: ((npc: NPC) => void) | null = null;
+
   constructor(scene: Scene, position: Vector3, name: string) {
     this.scene = scene;
     this.spawnPosition = position.clone();
     this._createMesh(position, name);
+    NPC.onCreated?.(this);
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────

@@ -24,6 +24,21 @@ Camelot uses three asset lanes:
 
 These assets require attribution in shipped builds.
 
+### KayKit Adventurers (rigged NPC characters)
+
+- Source: https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0 (Kay Lousberg, www.kaylousberg.com)
+- License: CC0 1.0 Universal (`public/model/kaykit/LICENSE.txt`). Credit appreciated, not required.
+- Integration: `public/model/kaykit/{Knight,Barbarian,Mage,Rogue,Rogue_Hooded}.glb`, loaded by
+  `src/rendering/character-models.ts`.
+- The GLBs are compacted to the 19 animation clips the game plays (idle, walk, run, combat
+  stance, attacks, block, hit, death, cheer, spellcast, ranged shoot, interact, sit) with
+  `tools/compact-glb.py`. Re-run it against the upstream files to add clips.
+
+### Procedural surfaces
+
+- Every terrain/structure/foliage texture and normal map is synthesized at load time by
+  `src/rendering/texture-synth.ts` (no image assets).
+
 ### Quaternius
 
 - Source: https://quaternius.com

@@ -17,7 +17,7 @@ export const WEATHER_STATES: WeatherState[] = [
 
 // ── Per-state visual configuration ───────────────────────────────────────────
 
-interface WeatherVisuals {
+export interface WeatherVisuals {
   fogDensity: number;
   fogColor: { r: number; g: number; b: number };
   /** Multiplier applied to the base ambient-light intensity (0–1). */
@@ -176,6 +176,15 @@ export class WeatherSystem {
       storm:    "Storm",
     };
     return map[this._state];
+  }
+
+  /**
+   * Current blended weather visuals (fog density/colour before day/night
+   * darkening, plus light scales).  Read by the atmosphere renderer, which
+   * composes them with the time-of-day sky every frame.
+   */
+  public get visuals(): Readonly<WeatherVisuals> {
+    return this._currentBlendedVisuals();
   }
 
   /** Current blended fog density (useful for UI display / debug). */

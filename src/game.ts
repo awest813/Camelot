@@ -3,6 +3,7 @@ import { Engine } from "@babylonjs/core/Engines/engine";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import type { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
@@ -15,7 +16,16 @@ import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
-import { SkyMaterial } from "@babylonjs/materials/sky/skyMaterial";
+import { AtmosphereController } from "./rendering/sky-dome";
+import { createTerrainMaterial } from "./rendering/terrain-material";
+import { HorizonMountains } from "./rendering/horizon";
+import { WeaponViewModel } from "./rendering/viewmodel";
+import { FireFx, WeatherFx } from "./rendering/particles-fx";
+import { WaterRenderer } from "./rendering/water";
+import { AdaptiveResolution } from "./rendering/adaptive-resolution";
+import { createFoliageMaterials, GrassField, WindState } from "./rendering/foliage";
+import { CharacterModelLibrary, modelForNpcName, type CharacterRig } from "./rendering/character-models";
+import { createPostFx, createSunShadows, type PostFxHandle } from "./rendering/render-pipeline";
 import { Player } from "./entities/player";
 import { UIManager } from "./ui/ui-manager";
 import { WorldManager } from "./world/world-manager";
@@ -174,6 +184,8 @@ const SNEAK_XP_PER_SECOND = 2;
 const MARK_RECALL_TRAVEL_ID = "__recall";
 /** Squared distance beyond which NPC procedural animation updates are skipped. */
 const NPC_ANIMATION_FAR_DISTANCE_SQ = 100 * 100;
+/** NPCs below this height fell through the world (e.g. spawned before their chunk). */
+const NPC_FALL_RECOVERY_Y = -30;
 /** Inventory item ID used for player gold (bounty payment check). */
 const GOLD_ITEM_ID = "gold_coins";
 /** Map framework bundle item ids to Babylon inventory ids when they differ. */
@@ -236,8 +248,28 @@ export class Game {
   public readonly graphics: GraphicsSystem = GraphicsSystem.fromSavedOrAutoDetect();
   /** Procedural sky-dome mesh (skybox).  Null before _initPostProcessing() runs. */
   public skyDome: Mesh | null = null;
-  /** Procedural sky-dome material.  Null before _initPostProcessing() runs. */
-  public skyMaterial: SkyMaterial | null = null;
+  /** Time-of-day sky, sun/moon light and fog driver.  Null before _initPostProcessing() runs. */
+  public atmosphere: AtmosphereController | null = null;
+  /** Dynamic render scale defending the tier's target FPS. */
+  private _adaptiveRes: AdaptiveResolution | null = null;
+  /** Pond water surfaces. */
+  private _water: WaterRenderer | null = null;
+  /** Torch / campfire particles + flicker + nearest-light management. */
+  private _fireFx: FireFx | null = null;
+  /** Rain, snow, lightning, dust motes, fireflies. */
+  private _weatherFx: WeatherFx | null = null;
+  private _precipitation = 0;
+  /** First-person weapon (CC0 KayKit weapons). */
+  private _viewModel: WeaponViewModel | null = null;
+  /** Distant mountain rings on the horizon. */
+  private _horizon: HorizonMountains | null = null;
+  /** Instanced, wind-blown grass around the player (null when the tier disables it). */
+  private _grass: GrassField | null = null;
+  /** Rigged NPC models (CC0 KayKit characters). */
+  private _characterModels: CharacterModelLibrary | null = null;
+  private readonly _npcRigs: Map<NPC, CharacterRig> = new Map();
+  /** SSAO / god rays / lens flare / HDR pipeline handle. */
+  private _postFx: PostFxHandle | null = null;
   /** DefaultRenderingPipeline (bloom, FXAA, sharpen, tone-mapping, vignette). */
   public renderingPipeline: DefaultRenderingPipeline | null = null;
   public scheduleSystem: ScheduleSystem;
@@ -628,12 +660,31 @@ export class Game {
   init(): void {
     // Apply the tier's hardware scaling level before the first render.
     this.engine.setHardwareScalingLevel(this.graphics.performance.hardwareScalingLevel);
+    this._adaptiveRes = new AdaptiveResolution({
+      baseLevel: this.graphics.performance.hardwareScalingLevel,
+      targetFps: this.graphics.performance.targetFps,
+    });
+    // `camelot_adaptive_res=0` pins the resolution (benchmarks, screenshot tests).
+    try {
+      if (typeof localStorage !== "undefined" && localStorage.getItem("camelot_adaptive_res") === "0") {
+        this._adaptiveRes.enabled = false;
+      }
+    } catch { /* storage unavailable */ }
+    // All picking is explicit (raycasts, editor clicks); skip Babylon's
+    // automatic pick on every pointer move.
+    this.scene.skipPointerMovePicking = true;
     this._setLight();
     this.player = new Player(this.scene, this.canvas);
     // Post-processing and skybox require the camera, so initialise after Player.
     this._initPostProcessing();
+    this._initCharacterModels();
+    this._viewModel = new WeaponViewModel(
+      this.scene, this.player.camera, `${import.meta.env.BASE_URL ?? "/"}model/kaykit/weapons/`,
+    );
     this.ui = new UIManager(this.scene);
     this.world = new WorldManager(this.scene, this.shadowGenerator, null, this.graphics.texture);
+    this.world.terrainMaterial = createTerrainMaterial(this.scene, this.world.textureManager);
+    this._initFoliage();
     this.navigationSystem = new NavigationSystem(this.scene);
     this.scheduleSystem = new ScheduleSystem();
 
@@ -1945,6 +1996,8 @@ export class Game {
         const chunkKey = `${cx},${cz}`;
         const chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] } = { roots: [], npcs: [] };
         this._chunkFantasyContent.set(chunkKey, chunkRecord);
+        // Pond chunks are quiet clearings — no props dropped into the water.
+        if (this.world.pondAt(cx, cz)) return;
 
       // ── Obelisks in desert / plains (1-in-8 chance per chunk) ────────────
       if ((biome === "desert" || biome === "plains") && _chunkRand(cx, cz, 0) < 0.125) {
@@ -3559,6 +3612,7 @@ export class Game {
                 if (!this._isCombatInputBlocked()) {
                     const powered = this.combatSystem.powerAttack();
                     if (powered) {
+            this._viewModel?.swing(true);
                         this.audioSystem.playMeleeAttack();
                         // Weapon-skill XP is awarded inside CombatSystem on hit.
                     }
@@ -4272,6 +4326,7 @@ export class Game {
           const attacked = this.combatSystem.meleeAttack();
           // Weapon-skill XP is awarded inside CombatSystem on hit (correct skill for blade/blunt).
           if (attacked) {
+            this._viewModel?.swing(false);
             this.audioSystem.playMeleeAttack();
           }
         }
@@ -4281,6 +4336,7 @@ export class Game {
       if (!this._isCombatInputBlocked()) {
         const powered = this.combatSystem.powerAttack();
         if (powered) {
+            this._viewModel?.swing(true);
           this.audioSystem.playMeleeAttack();
         }
       }
@@ -5127,21 +5183,9 @@ export class Game {
     sun.position  = new Vector3(80, 120, 50);
     this._sunLight = sun;
 
-    // Shadows are driven by the active graphics quality tier.
-    if (this.graphics.performance.shadowsEnabled) {
-      const shadows = new ShadowGenerator(this.graphics.shadow.mapSize, sun);
-      shadows.useBlurExponentialShadowMap = this.graphics.performance.softShadows;
-      shadows.blurKernel = this.graphics.shadow.blurKernel;
-      shadows.bias = 0.0005;
-      // Halve the shadow-map render rate — a one-frame-old shadow is
-      // imperceptible and the caster pass is a large share of frame time.
-      if (shadows.getShadowMap()) {
-        shadows.getShadowMap()!.refreshRate = 2;
-      }
-      this.shadowGenerator = shadows;
-    } else {
-      this.shadowGenerator = null;
-    }
+    // Shadows are driven by the active graphics quality tier: cascaded PCF
+    // shadows on medium+, a single soft map on low.
+    this.shadowGenerator = createSunShadows(this.scene, sun, this.graphics);
 
     // Atmospheric distance fog — initial values match WeatherSystem's "clear"
     // state so the first frame is consistent before WeatherSystem takes over.
@@ -5154,74 +5198,194 @@ export class Game {
     );
   }
 
+  /** Leaf-card trees, wind sway and the grass field. */
+  private _initFoliage(): void {
+    this._water = new WaterRenderer(this.scene);
+    this.world.water = this._water;
+    const foliage = createFoliageMaterials(this.scene, this.world.textureManager, this.graphics.effects.wind);
+    this.world.foliage = foliage;
+    const density = this.graphics.effects.grassDensity;
+    if (density > 0) {
+      this._grass = new GrassField(
+        this.scene, foliage.grass, density, this.world.chunkSize,
+        (cx, cz) => this.world.getBiome(cx, cz),
+        (x, z) => this.world.isInPond(x, z, 0.5),
+      );
+    }
+    const particleScale = Math.min(1.5, this.graphics.performance.maxParticles / 512);
+    this._fireFx = new FireFx(this.scene, particleScale);
+    this.world.structures.onFire = (info) => this._fireFx?.attach(info);
+    this.world.structures.mergeStatic = true;
+    this._weatherFx = new WeatherFx(this.scene, this.graphics.effects.ambientParticles ? particleScale : particleScale * 0.5);
+
+    this.world.onVisibilityChanged = (visible) => {
+      this._grass?.setVisible(visible);
+      this._horizon?.setVisible(visible);
+      this.atmosphere?.mesh.setEnabled(visible);
+      if (this._postFx) this._postFx.outdoors = visible;
+    };
+  }
+
+  /**
+   * Give every NPC a rigged, animated body.  The physics capsule keeps doing
+   * collision and picking; the model follows it, faces its travel direction
+   * (or the player in combat) and plays skeletal clips routed through
+   * AnimationSystem.
+   */
+  private _initCharacterModels(): void {
+    const base = `${import.meta.env.BASE_URL ?? "/"}model/kaykit/`;
+    const library = new CharacterModelLibrary(this.scene, base, this.shadowGenerator);
+    this._characterModels = library;
+    library.preload();
+    NPC.onCreated = (npc) => {
+      const id = modelForNpcName(npc.mesh.name);
+      if (!id) return;
+      void library.attach(npc.mesh, id).then((rig) => {
+        if (!rig) return;
+        this._npcRigs.set(npc, rig);
+        npc.mesh.onDisposeObservable.addOnce(() => {
+          this._npcRigs.delete(npc);
+          this.animationSystem?.unregisterSkeletal(npc.mesh.name);
+        });
+        this.animationSystem?.registerSkeletal(npc.mesh.name, rig);
+      });
+    };
+  }
+
+  /**
+   * Put an NPC that fell through the world back at its spawn point.  Bodies
+   * spawned before their ground chunk existed (e.g. the boot-time test guard)
+   * otherwise fall forever.
+   */
+  private _recoverFallenNpc(npc: NPC): void {
+    const body = npc.physicsAggregate?.body;
+    npc.mesh.position.set(npc.spawnPosition.x, Math.max(npc.spawnPosition.y, 2), npc.spawnPosition.z);
+    if (!body) return;
+    body.setLinearVelocity(Vector3.Zero());
+    // Let the physics step read the teleported transform once.
+    body.disablePreStep = false;
+    this.scene.onAfterPhysicsObservable.addOnce(() => { body.disablePreStep = true; });
+  }
+
+  /** Per-frame rig facing, gait speed, hit flash and distance LOD. */
+  private _updateNpcRigs(dt: number): void {
+    if (this._npcRigs.size === 0) return;
+    const playerPos = this.player.camera.position;
+    for (const [npc, rig] of this._npcRigs) {
+      // Follow the LodSystem's capsule cull so culled NPCs stop drawing too.
+      const shown = npc.mesh.isVisible;
+      if (rig.pivot.isEnabled(false) !== shown) rig.pivot.setEnabled(shown);
+      const far = Vector3.DistanceSquared(npc.mesh.position, playerPos) > NPC_ANIMATION_FAR_DISTANCE_SQ;
+      rig.setPaused(far && !npc.isDead);
+      if (far) continue;
+      const engaged = !npc.isDead && (npc.isAggressive || npc.aiState === AIState.ALERT || npc.isAttackTelegraphing);
+      rig.update(dt, npc.mesh.position, engaged ? playerPos : null);
+    }
+  }
+
+  /**
+   * Drive sun/moon direction, light colours, sky and fog from the clock and
+   * weather, and keep the shadow frustum centred on the player.
+   */
+  private _updateAtmosphere(dt: number): void {
+    const atmo = this.atmosphere;
+    if (!atmo) return;
+    const weather = this.weatherSystem?.visuals;
+    if (weather) {
+      // Light loss from the weather doubles as a smooth cloudiness signal.
+      atmo.cloudiness = 0.15 + 0.85 * Math.min(1, Math.max(0, (1 - weather.sunScale) / 0.8));
+      atmo.weatherFog = atmo.weatherFog ?? new Color3();
+      atmo.weatherFog.set(weather.fogColor.r, weather.fogColor.g, weather.fogColor.b);
+      atmo.weatherFogWeight = Math.min(0.85, Math.max(0, (weather.fogDensity - 0.006) / 0.02));
+    }
+    const hour = (this.timeSystem?.normalizedTime ?? 8 / 24) * 24;
+    const state = atmo.update(hour, dt, {
+      sun: this._sunLight,
+      ambient: this.scene.getLightByName("hLight") as HemisphericLight | null,
+      sunBase: this.graphics.lighting.sunBase,
+      ambientBase: this.graphics.lighting.ambientBase,
+      sunWeatherScale: weather?.sunScale,
+      ambientWeatherScale: weather?.ambientScale,
+    });
+    // Weather particles + lightning.
+    let flash = 0;
+    if (this._weatherFx && this.player) {
+      const ws = this.weatherSystem?.state ?? "clear";
+      const target = ws === "storm" ? 1 : ws === "rain" ? 0.55 : 0;
+      this._precipitation += (target - this._precipitation) * Math.min(1, dt * 0.25);
+      const p = this.player.camera.position;
+      const biome = this.world?.getBiome(Math.floor(p.x / this.world.chunkSize), Math.floor(p.z / this.world.chunkSize));
+      this._weatherFx.update(dt, p, {
+        precipitation: this._precipitation,
+        snow: biome === "tundra",
+        storm: ws === "storm",
+        daylight: Math.max(0, Math.min(1, (state.ambientIntensity - 0.42) / 0.58)),
+        outdoors: this.world?.visible ?? true,
+        windX: WindState.dirX * WindState.strength * 3,
+        windZ: WindState.dirZ * WindState.strength * 3,
+      });
+      flash = this._weatherFx.flashLight;
+      if (flash > 0) {
+        const amb = this.scene.getLightByName("hLight") as HemisphericLight | null;
+        if (amb) {
+          amb.intensity += flash * 1.4;
+          amb.diffuse.set(0.75, 0.82, 1.0);
+        }
+      }
+    }
+    if (this._fireFx && this.player) this._fireFx.update(dt, this.player.camera.position);
+    this._water?.update(dt, state, { x: WindState.dirX * WindState.strength, z: WindState.dirZ * WindState.strength });
+
+    if (this.renderingPipeline) {
+      this.renderingPipeline.imageProcessing.exposure = this.graphics.postProcess.exposure * state.exposure * (1 + flash * 0.8);
+    }
+
+    // Interiors: no daylight pouring in, and fog is dark rather than sky-blue.
+    if (this.world && !this.world.visible) {
+      if (this._sunLight) this._sunLight.intensity *= 0.12;
+      const amb = this.scene.getLightByName("hLight") as HemisphericLight | null;
+      if (amb) amb.intensity *= 0.7;
+      this.scene.fogColor.set(0.02, 0.02, 0.025);
+    }
+    this._postFx?.update(state, atmo.cloudiness);
+    if (this._horizon && this.player) this._horizon.update(this.player.camera.position, state, this.scene.fogColor, atmo.cloudiness);
+    // Wind picks up with the weather.
+    WindState.time += dt;
+    WindState.strength += ((0.22 + atmo.cloudiness * 0.75) - WindState.strength) * Math.min(1, dt * 0.5);
+    if (this._grass && this.world?.visible && this.player) {
+      this._grass.update(this.player.camera.position.x, this.player.camera.position.z);
+      this._grass.pump(2);
+    }
+    // Keep the shadow frustum centred on the player, placed up-light.
+    const sun = this._sunLight;
+    if (sun && this.player) {
+      const p = this.player.camera.position;
+      sun.position.set(
+        p.x - state.lightDir[0] * 150,
+        p.y - state.lightDir[1] * 150,
+        p.z - state.lightDir[2] * 150,
+      );
+    }
+  }
+
   /**
    * Initialise post-processing effects and the procedural sky dome.
    * Must be called after `Player` is created so its camera is available.
    */
   private _initPostProcessing(): void {
-    // ── Procedural sky dome ──────────────────────────────────────────────────
-    const skybox = MeshBuilder.CreateBox("skyBox", { size: 2000 }, this.scene);
-    skybox.infiniteDistance = true;
-    // Disable picking so raycasts pass through the sky dome and hit world geometry.
-    skybox.isPickable = false;
-    this.skyDome = skybox;
+    // ── Procedural sky dome + time-of-day atmosphere ─────────────────────────
+    // A custom sky shader (gradient, sun/moon, clouds, stars) whose horizon
+    // colour is also the scene fog colour, so distant terrain melts into it.
+    this.atmosphere = new AtmosphereController(this.scene);
+    this.skyDome = this.atmosphere.mesh;
+    this._horizon = new HorizonMountains(this.scene);
+    this._updateAtmosphere(0);
 
-    const skyMat = new SkyMaterial("skyMat", this.scene);
-    skyMat.backFaceCulling = false;
-    // Atmospheric parameters — vivid clear-day atmosphere
-    const sky = this.graphics.sky;
-    skyMat.turbidity       = sky.turbidity;
-    skyMat.luminance       = sky.luminance;
-    skyMat.rayleigh        = sky.rayleigh;
-    skyMat.mieCoefficient  = sky.mieCoefficient;
-    skyMat.mieDirectionalG = sky.mieDirectionalG;
-    skyMat.inclination     = sky.inclination;
-    skyMat.azimuth         = sky.azimuth;
-    skybox.material = skyMat;
-    this.skyMaterial = skyMat;
-
-    // ── DefaultRenderingPipeline ─────────────────────────────────────────────
-    // Skip on WebGPU (driver incompatibilities) and when the active quality
-    // tier disables post-processing entirely (e.g. the "low" preset).
-    if (this.engine.name !== "WebGPU" && this.graphics.performance.postProcessEnabled) {
-      const pp = this.graphics.postProcess;
-      const pipeline = new DefaultRenderingPipeline(
-        "defaultPipeline",
-        true,              // HDR
-        this.scene,
-        [this.player.camera],
-      );
-
-      // Bloom — cinematic glow on bright surfaces (sun highlights, emissive torches)
-      pipeline.bloomEnabled   = pp.bloom.enabled;
-      pipeline.bloomThreshold = pp.bloom.threshold;
-      pipeline.bloomWeight    = pp.bloom.weight;
-      pipeline.bloomKernel    = pp.bloom.kernel;
-      pipeline.bloomScale     = pp.bloom.scale;
-
-      // FXAA — smooth jagged edges
-      pipeline.fxaaEnabled = pp.fxaa;
-
-      // Sharpen — recover crisp detail that FXAA softens
-      pipeline.sharpenEnabled = pp.sharpenEdgeAmount > 0;
-      pipeline.sharpen.edgeAmount = pp.sharpenEdgeAmount;
-
-      // Depth of field — subtle focus falloff for cinematic depth
-      pipeline.depthOfFieldEnabled = false; // disabled by default; enable per-scene as needed
-
-      // Image processing — ACES filmic tone mapping + colour grading
-      pipeline.imageProcessingEnabled = true;
-      pipeline.imageProcessing.toneMappingEnabled = pp.toneMappingType !== "none";
-      pipeline.imageProcessing.toneMappingType = ImageProcessingConfiguration.TONEMAPPING_ACES;
-      pipeline.imageProcessing.exposure  = pp.exposure;
-      pipeline.imageProcessing.contrast  = pp.contrast;
-      pipeline.imageProcessing.vignetteEnabled = true;
-      pipeline.imageProcessing.vignetteWeight  = pp.vignetteWeight;
-      pipeline.imageProcessing.vignetteBlendMode = ImageProcessingConfiguration.VIGNETTEMODE_MULTIPLY;
-      pipeline.imageProcessing.colorCurvesEnabled = false;
-
-      this.renderingPipeline = pipeline;
-    }
+    // ── Post-processing stack ────────────────────────────────────────────────
+    // HDR pipeline (bloom, AA, grade, grain…), SSAO, god rays and lens flare,
+    // each gated by the quality tier.  Skipped on WebGPU (driver issues).
+    this._postFx = createPostFx(this.scene, this.player.camera, this.graphics, this.skyDome);
+    this.renderingPipeline = this._postFx.pipeline;
   }
 
   /** Remove world loot objects whose item IDs are now in inventory or equipment (called after load). */
@@ -5332,7 +5496,9 @@ export class Game {
   /** Map the equipped main-hand item to a combat weapon archetype (default: sword). */
   private _syncWeaponArchetype(): void {
       const weapon = this.equipmentSystem.getEquipped().get("mainHand");
-      this.combatSystem.setWeaponArchetype(this._weaponArchetypeForItem(weapon));
+      const archetype = this._weaponArchetypeForItem(weapon);
+      this.combatSystem.setWeaponArchetype(archetype);
+      this._viewModel?.setWeapon(archetype);
   }
 
   private _weaponArchetypeForItem(item: Item | undefined): WeaponArchetype {
@@ -5742,6 +5908,7 @@ export class Game {
       this.combatSystem.updateNPCAI(deltaTime * this._hostileTimeScale);
 
       for (const npc of this.scheduleSystem.npcs) {
+        if (npc.mesh.position.y < NPC_FALL_RECOVERY_Y && !npc.isDead) this._recoverFallenNpc(npc);
         const hitReact = npc.justTakenDamageVisual;
         if (hitReact) npc.justTakenDamageVisual = false;
         // Animation LOD: beyond 100u a capsule is a few pixels and its loop
@@ -5760,6 +5927,7 @@ export class Game {
         );
       }
 
+      this._updateNpcRigs(deltaTime);
       this._updatePetAI(deltaTime);
       this.interactionSystem.update();
 
@@ -5870,6 +6038,9 @@ export class Game {
 
       const frameDelta = this.engine.getDeltaTime() / 1000;
 
+      const scaleLevel = this._adaptiveRes?.update(frameDelta, this.engine.getFps());
+      if (scaleLevel) this.engine.setHardwareScalingLevel(scaleLevel);
+
       // Poll gamepad state every frame
       this._gamepadInput.update(frameDelta);
 
@@ -5886,17 +6057,23 @@ export class Game {
         }
       }
 
-      // Keep the shadow frustum centred on the player — only the light position
-      // moves (uniform update); direction, colour, and intensity are constant.
-      this._sunLight?.position.set(
-          this.player.camera.position.x + 80,
-          this.player.camera.position.y + 120,
-          this.player.camera.position.z + 50,
-      );
-
       this._gameplayLoop.tick(frameDelta, (deltaTime) => {
           this._updateGameplayStep(deltaTime);
       });
+
+      // After the gameplay step: WeatherSystem writes raw light/fog values on
+      // its ticks, and the atmosphere composes the final ones on top.
+      this._updateAtmosphere(frameDelta);
+
+      if (this._viewModel) {
+        this._viewModel.setVisible(
+          this.player.health > 0 && !this.dialogueSystem.isInDialogue && !this.mapEditorSystem.isEnabled,
+        );
+        this._viewModel.update(frameDelta, {
+          blocking: this.combatSystem.isBlocking,
+          sprinting: this.stealthSystem.movementMode === "running",
+        });
+      }
 
       // Only update UI bars when values have actually changed
       if (this.player.health !== this._lastHealth) {
@@ -6141,6 +6318,53 @@ export class Game {
       // Sync world visibility with cell type (hide exterior when in interior)
       const isInterior = this.cellManager.isInterior;
       this.world.setVisible(!isInterior);
+      if (isInterior) this._dressInterior(cellId);
+  }
+
+  /**
+   * Give a freshly built interior cell real surfaces (rock walls, earthen
+   * floor) and torchlight.  Torch meshes are named after the cell's walls so
+   * they go when the cell's meshes are disposed on exit.
+   */
+  private _dressInterior(cellId: string): void {
+      const tm = this.world.textureManager;
+      const anchor = this.scene.getMeshByName("floor_" + cellId);
+      for (const mesh of this.scene.meshes) {
+          const mat = mesh.material;
+          if (!(mat instanceof StandardMaterial) || mat.metadata?.dressed) continue;
+          if (mat.name === "intFloor_" + cellId) {
+              tm.applySurface(mat, "dirt", 3, 3, { tintStrength: 0 });
+              mat.specularColor = new Color3(0.06, 0.05, 0.04);
+              mat.metadata = { dressed: true };
+          } else if (mat.name === "intWall_" + cellId) {
+              tm.applySurface(mat, "rock", 4, 1, { tintStrength: 0 });
+              mat.specularColor = new Color3(0.1, 0.09, 0.08);
+              mat.specularPower = 32;
+              mat.metadata = { dressed: true };
+          }
+      }
+      if (!anchor) return;
+      const torchMat = new StandardMaterial(`intTorchFlame_${cellId}`, this.scene);
+      torchMat.emissiveColor = new Color3(1.0, 0.4, 0.05);
+      torchMat.disableLighting = true;
+      for (const [x, z] of [[-5.7, 0], [5.7, 0]] as const) {
+          const flame = MeshBuilder.CreateCylinder(
+              `intTorch_${cellId}_${x}`, { height: 0.3, diameterTop: 0, diameterBottom: 0.13, tessellation: 6 }, this.scene,
+          );
+          flame.position.set(x, 2.1, z);
+          flame.material = torchMat;
+          flame.isPickable = false;
+          // Disposed with the room.
+          flame.parent = anchor;
+          flame.position.set(x - anchor.position.x, 2.1 - anchor.position.y, z - anchor.position.z);
+          const light = new PointLight(`intTorch_${cellId}_${x}_light`, new Vector3(x, 2.2, z), this.scene);
+          light.diffuse = new Color3(1.0, 0.6, 0.2);
+          light.intensity = 1.1;
+          light.range = 10;
+          flame.onDisposeObservable.addOnce(() => light.dispose());
+          this._fireFx?.attach({ flame, light, kind: "torch" });
+      }
+      anchor.onDisposeObservable.addOnce(() => torchMat.dispose());
   }
 
   private _beginPortalTransition(portalId: string): void {

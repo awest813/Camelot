@@ -45,8 +45,11 @@ export interface PostProcessConfig {
   fxaa: boolean;
   /** Sharpening edge-detection amount applied after FXAA.  Range [0, 1]. */
   sharpenEdgeAmount: number;
-  /** ACES filmic tone-mapping type or "none" to disable. */
-  toneMappingType: "aces" | "none";
+  /**
+   * Tone-mapping curve: "neutral" (Khronos PBR Neutral — keeps hue and
+   * saturation, the default), "aces" (filmic, more contrast), or "none".
+   */
+  toneMappingType: "neutral" | "aces" | "none";
   /** Overall scene exposure multiplier.  Must be > 0. */
   exposure: number;
   /** Contrast multiplier applied during image processing.  Must be > 0. */
@@ -121,12 +124,63 @@ export interface LightingConfig {
  */
 export interface TextureConfig {
   /** Resolution for procedural world and material textures. */
-  resolution: 64 | 128 | 256;
+  resolution: 64 | 128 | 256 | 512;
+  /** Attach synthesized normal maps (bump mapping) to world materials. */
+  normalMaps?: boolean;
   /** Anisotropic filtering level (1 = off, 2-8 = anisotropic filtering). */
   anisotropicFiltering: number;
   /** Whether to generate mipmaps for textures. */
   mipmaps: boolean;
 }
+
+// ── Effects configuration ────────────────────────────────────────────────────
+
+/**
+ * Tier-driven "modern effects" layered on top of the base renderer by
+ * `src/rendering/render-pipeline.ts` and the world renderers.
+ */
+export interface EffectsConfig {
+  /** Screen-space ambient occlusion (SSAO2). */
+  ssao: boolean;
+  /** Volumetric light scattering (god rays) from the sun. */
+  godRays: boolean;
+  /** Sun lens flare. */
+  lensFlare: boolean;
+  /** Animated film grain. */
+  grain: boolean;
+  /** Subtle radial chromatic aberration. */
+  chromaticAberration: boolean;
+  /** MSAA samples on the HDR target (1 = off; FXAA covers AA instead). */
+  msaaSamples: 1 | 2 | 4;
+  /** Cascaded-shadow-map cascade count (0 = single classic shadow map). */
+  shadowCascades: 0 | 2 | 3 | 4;
+  /** Grass blade density multiplier (0 disables the grass field). */
+  grassDensity: number;
+  /** Wind sway on foliage and grass. */
+  wind: boolean;
+  /** Ambient particles (dust motes, pollen, fireflies). */
+  ambientParticles: boolean;
+}
+
+/** Per-tier effect presets. */
+export const TIER_EFFECTS: Record<"low" | "medium" | "high" | "ultra", EffectsConfig> = {
+  low: {
+    ssao: false, godRays: false, lensFlare: false, grain: false, chromaticAberration: false,
+    msaaSamples: 1, shadowCascades: 0, grassDensity: 0, wind: true, ambientParticles: false,
+  },
+  medium: {
+    ssao: false, godRays: false, lensFlare: true, grain: true, chromaticAberration: false,
+    msaaSamples: 1, shadowCascades: 2, grassDensity: 0.5, wind: true, ambientParticles: true,
+  },
+  high: {
+    ssao: true, godRays: false, lensFlare: true, grain: true, chromaticAberration: true,
+    msaaSamples: 1, shadowCascades: 3, grassDensity: 1.0, wind: true, ambientParticles: true,
+  },
+  ultra: {
+    ssao: true, godRays: true, lensFlare: true, grain: true, chromaticAberration: true,
+    msaaSamples: 4, shadowCascades: 4, grassDensity: 1.5, wind: true, ambientParticles: true,
+  },
+};
 
 // ── Default presets ───────────────────────────────────────────────────────────
 
@@ -146,18 +200,18 @@ export const DEFAULT_SHADOW: ShadowConfig = {
 /** Default post-processing preset (clear mid-morning, WebGL renderer). */
 export const DEFAULT_POST_PROCESS: PostProcessConfig = {
   bloom: {
-    enabled:   false,
-    threshold: 0.55,
-    weight:    0.35,
-    kernel:    24,
+    enabled:   true,
+    threshold: 0.95,
+    weight:    0.28,
+    kernel:    64,
     scale:     0.5,
   },
-  fxaa:              false,
-  sharpenEdgeAmount: 0,
-  toneMappingType:   "aces",
-  exposure:          1.10,
-  contrast:          1.18,
-  vignetteWeight:    3.2,
+  fxaa:              true,
+  sharpenEdgeAmount: 0.22,
+  toneMappingType:   "neutral",
+  exposure:          1.05,
+  contrast:          1.08,
+  vignetteWeight:    0.9,
 };
 
 /** Default sky-dome parameters for a vivid clear-day atmosphere. */
@@ -305,8 +359,8 @@ export function validateGraphicsConfig(config: {
 
   // ── Texture ───────────────────────────────────────────────────────────────
   if (config.texture) {
-    if (![64, 128, 256].includes(config.texture.resolution)) {
-      errors.push(`texture.resolution must be 64, 128, or 256, got ${config.texture.resolution}`);
+    if (![64, 128, 256, 512].includes(config.texture.resolution)) {
+      errors.push(`texture.resolution must be 64, 128, 256, or 512, got ${config.texture.resolution}`);
     }
     if (!Number.isFinite(config.texture.anisotropicFiltering) || config.texture.anisotropicFiltering < 1) {
       errors.push(`texture.anisotropicFiltering must be >= 1, got ${config.texture.anisotropicFiltering}`);
@@ -361,6 +415,7 @@ export interface PerformanceConfig {
 
 /** Full tier preset: every config block + perf knobs. */
 export interface TierPreset {
+  effects?:    EffectsConfig;
   shadow:      ShadowConfig;
   postProcess: PostProcessConfig;
   fog:         FogConfig;
@@ -395,9 +450,9 @@ export const LOW_TIER_PRESET: TierPreset = {
     },
     fxaa:              false,
     sharpenEdgeAmount: 0,
-    toneMappingType:   "aces",
-    exposure:          1.10,
-    contrast:          1.15,
+    toneMappingType:   "neutral",
+    exposure:          1.05,
+    contrast:          1.08,
     vignetteWeight:    0,
   },
   fog: {
@@ -420,6 +475,7 @@ export const LOW_TIER_PRESET: TierPreset = {
     resolution:           128,
     anisotropicFiltering: 1,
     mipmaps:              true,
+    normalMaps:           false,
   },
 };
 
@@ -430,13 +486,13 @@ export const MEDIUM_TIER_PRESET: TierPreset = {
     blurKernel: 6,
   },
   postProcess: {
-    bloom: { ...DEFAULT_POST_PROCESS.bloom, enabled: false },
+    bloom: { ...DEFAULT_POST_PROCESS.bloom, kernel: 32 },
     fxaa:              true,
-    sharpenEdgeAmount: 0,
-    toneMappingType:   "aces",
-    exposure:          1.10,
-    contrast:          1.18,
-    vignetteWeight:    1.5,
+    sharpenEdgeAmount: 0.15,
+    toneMappingType:   "neutral",
+    exposure:          1.05,
+    contrast:          1.08,
+    vignetteWeight:    0.7,
   },
   fog:      { ...DEFAULT_FOG, color: { ...DEFAULT_FOG.color } },
   lighting: { ...DEFAULT_LIGHTING },
@@ -488,17 +544,17 @@ export const ULTRA_TIER_PRESET: TierPreset = {
   postProcess: {
     bloom: {
       enabled:   true,
-      threshold: 0.55,
-      weight:    0.35,
-      kernel:    24,
+      threshold: 0.95,
+      weight:    0.3,
+      kernel:    96,
       scale:     0.5,
     },
     fxaa:              true,
-    sharpenEdgeAmount: 0.3,
-    toneMappingType:   "aces",
-    exposure:          1.10,
-    contrast:          1.18,
-    vignetteWeight:    3.2,
+    sharpenEdgeAmount: 0.25,
+    toneMappingType:   "neutral",
+    exposure:          1.05,
+    contrast:          1.08,
+    vignetteWeight:    0.9,
   },
   fog:      { ...DEFAULT_FOG, color: { ...DEFAULT_FOG.color } },
   lighting: { ...DEFAULT_LIGHTING },
@@ -511,7 +567,7 @@ export const ULTRA_TIER_PRESET: TierPreset = {
     targetFps:            60,
   },
   texture: {
-    resolution:           256,
+    resolution:           512,
     anisotropicFiltering: 8,
     mipmaps:              true,
   },
@@ -535,6 +591,21 @@ export interface HardwareHints {
   hardwareConcurrency?: number;
   /** Network save-data hint.  Browser: `navigator.connection.saveData`. */
   saveData?: boolean;
+  /** Unmasked WebGL renderer string (e.g. "ANGLE (Intel, Intel(R) UHD Graphics 620 …)"). */
+  gpuRenderer?: string;
+}
+
+/** Coarse GPU class from a WebGL renderer string. */
+export type GpuClass = "software" | "mobile" | "integrated" | "discrete" | "unknown";
+
+export function classifyGpu(renderer: string | undefined): GpuClass {
+  if (!renderer) return "unknown";
+  const r = renderer.toLowerCase();
+  if (/swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/.test(r)) return "software";
+  if (/mali|adreno|powervr|videocore|tegra|apple a\d/.test(r)) return "mobile";
+  if (/nvidia|geforce|quadro|rtx|gtx|radeon (rx|pro)|\brx \d|arc a\d|apple m\d/.test(r)) return "discrete";
+  if (/intel|uhd|iris|hd graphics|radeon\(tm\) graphics|vega \d+ graphics/.test(r)) return "integrated";
+  return "unknown";
 }
 
 /**
@@ -552,6 +623,16 @@ export interface HardwareHints {
  * ultra path.
  */
 export function detectQualityTier(hints: HardwareHints = {}): QualityTier {
+  const tier = detectTierFromSystem(hints);
+  // The GPU is usually the real limit: cap software rasterizers and mobile
+  // GPUs at low and integrated graphics at medium.
+  const gpu = classifyGpu(hints.gpuRenderer);
+  if (gpu === "software" || gpu === "mobile") return "low";
+  if (gpu === "integrated" && (tier === "high" || tier === "ultra")) return "medium";
+  return tier;
+}
+
+function detectTierFromSystem(hints: HardwareHints): QualityTier {
   const { deviceMemoryGB, hardwareConcurrency, saveData } = hints;
 
   const hasAnyHint =
@@ -587,7 +668,29 @@ export function readNavigatorHardwareHints(
   if (nav.connection && typeof nav.connection.saveData === "boolean") {
     hints.saveData = nav.connection.saveData;
   }
+  const gpu = readGpuRenderer();
+  if (gpu) hints.gpuRenderer = gpu;
   return hints;
+}
+
+/**
+ * Unmasked renderer of the game's existing WebGL context (the render canvas
+ * is created before the Game).  Returns undefined outside a browser or when
+ * the debug extension is unavailable.
+ */
+export function readGpuRenderer(): string | undefined {
+  try {
+    if (typeof document === "undefined") return undefined;
+    const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement | null;
+    // getContext returns the engine's existing context for the same type.
+    const gl = (canvas?.getContext("webgl2") ?? canvas?.getContext("webgl")) as WebGLRenderingContext | null;
+    if (!gl) return undefined;
+    const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    const renderer = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    return typeof renderer === "string" ? renderer : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 // ── GraphicsSystem ────────────────────────────────────────────────────────────
@@ -626,6 +729,7 @@ export class GraphicsSystem {
   public readonly lighting:    LightingConfig;
   public readonly performance: PerformanceConfig;
   public readonly texture:     TextureConfig;
+  public readonly effects:     EffectsConfig;
   public readonly tier:        QualityTier;
 
   constructor(overrides: {
@@ -645,6 +749,7 @@ export class GraphicsSystem {
     lighting?:    Partial<LightingConfig>;
     performance?: Partial<PerformanceConfig>;
     texture?:     Partial<TextureConfig>;
+    effects?:     Partial<EffectsConfig>;
   } = {}) {
     this.tier = overrides.tier ?? "high";
     const base = overrides.tier ? presetForTier(overrides.tier) : {
@@ -676,6 +781,7 @@ export class GraphicsSystem {
     this.lighting    = { ...base.lighting,    ...overrides.lighting };
     this.performance = { ...base.performance, ...overrides.performance };
     this.texture     = { ...base.texture,     ...overrides.texture };
+    this.effects     = { ...TIER_EFFECTS[this.tier], ...overrides.effects };
   }
 
   /**

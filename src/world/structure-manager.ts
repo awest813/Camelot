@@ -1,3 +1,4 @@
+import type { SurfaceKind } from "../rendering/texture-synth";
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
@@ -13,11 +14,12 @@ import { Loot } from "../entities/loot";
 import { BiomeType } from "./world-manager";
 import type { WorldSeed } from "./world-seed";
 import type { ProceduralTextureManager } from "../systems/procedural-texture-manager";
-import type { RawTexture } from "@babylonjs/core/Materials/Textures/rawTexture";
 import type { LodSystem } from "../systems/lod-system";
 
 interface StructureSpawn {
   meshes: Mesh[];
+  /** Invisible physics-only sources left behind by {@link StructureManager.mergeStatic}. */
+  colliders?: Mesh[];
   loot: Loot[];
   bodies: PhysicsAggregate[];
   npcs: NPC[];
@@ -136,6 +138,7 @@ export class StructureManager {
     }
 
     this._chunkStructures.set(key, spawn);
+    if (this.mergeStatic) this._mergeStaticMeshes(spawn, key);
 
     // Static masonry — freeze world matrices so Babylon skips per-frame updates
     for (const m of spawn.meshes) {
@@ -165,6 +168,7 @@ export class StructureManager {
   public dispose(): void {
     for (const [, spawn] of this._chunkStructures) {
       for (const body of spawn.bodies) body.dispose();
+      for (const m of spawn.colliders ?? []) m.dispose(false, false);
       for (const m of spawn.meshes) {
         this.lodSystem?.unregister(m);
         this._shadows?.removeShadowCaster(m, false);
@@ -207,6 +211,7 @@ export class StructureManager {
 
     // Dispose physics bodies BEFORE their meshes to avoid dangling references
     for (const body of spawn.bodies) body.dispose();
+    for (const m of spawn.colliders ?? []) m.dispose(false, false);
     // Materials are shared across all structure instances — preserve them
     for (const m of spawn.meshes) {
       this.lodSystem?.unregister(m);
@@ -598,6 +603,7 @@ export class StructureManager {
     light.intensity = 0.85;
     light.range     = 6.0;
     lights.push(light);
+    this.onFire?.({ flame, light, kind: "torch" });
   }
 
   /**
@@ -665,6 +671,7 @@ export class StructureManager {
     light.intensity = 1.2;
     light.range     = 8.0;
     lights.push(light);
+    this.onFire?.({ flame, light, kind: "campfire" });
   }
 
   /**
@@ -805,6 +812,68 @@ export class StructureManager {
     return { mesh: chest, body };
   }
 
+  /**
+   * Called for every torch / campfire flame so the renderer can add fire
+   * particles and flicker (see rendering/fire-fx.ts).  Null in tests.
+   */
+  public onFire: ((info: { flame: Mesh; light: PointLight; kind: "torch" | "campfire" }) => void) | null = null;
+
+  /**
+   * Merge each spawn's static pieces per material (one draw call per material
+   * per structure instead of one per stone/plank/barrel).  Enabled by the
+   * game; off in unit tests that mock mesh merging.
+   */
+  public mergeStatic = false;
+
+  /** Merged groups smaller than this (bounding diagonal, m) don't cast shadows. */
+  public minShadowCasterSize = 1.2;
+
+  private _mergeStaticMeshes(spawn: StructureSpawn, key: string): void {
+    const bodyMeshes = new Set(spawn.bodies.map((b) => b.transformNode));
+    const casters = new Set(this._shadows?.getShadowMap()?.renderList ?? []);
+    const groups = new Map<StandardMaterial, Mesh[]>();
+    for (const m of spawn.meshes) {
+      const mat = m.material;
+      if (!(mat instanceof StandardMaterial)) continue;
+      // Flames (FireFx), interactive pieces and parented parts stay separate.
+      if (m.metadata || m.parent || /flame/i.test(m.name) || mat.disableLighting) continue;
+      const g = groups.get(mat) ?? [];
+      g.push(m);
+      groups.set(mat, g);
+    }
+    const consumed = new Set<Mesh>();
+    let i = 0;
+    for (const group of groups.values()) {
+      if (group.length < 2) continue;
+      const merged = Mesh.MergeMeshes(group, false, true);
+      if (!merged) continue;
+      merged.name = `struct_merged_${key}_${i++}`;
+      merged.receiveShadows = true;
+      const castsShadow = group.some((m) => casters.has(m));
+      const size = merged.getBoundingInfo().boundingBox.extendSizeWorld.length() * 2;
+      if (castsShadow && size >= this.minShadowCasterSize) this._shadows?.addShadowCaster(merged, false);
+      for (const m of group) {
+        consumed.add(m);
+        this._shadows?.removeShadowCaster(m, false);
+        if (bodyMeshes.has(m)) {
+          // Physics keeps its mesh; it just stops drawing.
+          m.isVisible = false;
+          (spawn.colliders ??= []).push(m);
+        } else {
+          m.dispose(false, false);
+        }
+      }
+      spawn.meshes.push(merged);
+    }
+    if (consumed.size > 0) spawn.meshes = spawn.meshes.filter((m) => !consumed.has(m));
+    // Lone tiny props don't need to cast shadows either.
+    for (const m of spawn.meshes) {
+      if (!casters.has(m)) continue;
+      const size = m.getBoundingInfo().boundingBox.extendSizeWorld.length() * 2;
+      if (size < this.minShadowCasterSize * 0.5) this._shadows?.removeShadowCaster(m, false);
+    }
+  }
+
   /** Register a mesh as a shadow caster and enable it to receive shadows. */
   private _shadow(mesh: Mesh): Mesh {
     this._shadows?.addShadowCaster(mesh, false);
@@ -834,21 +903,12 @@ export class StructureManager {
       if (opts?.disableLighting) mat.disableLighting  = true;
       if (opts?.backFaceCulling === false) mat.backFaceCulling = false;
 
-      // Attach procedural masonry or timber textures when texture manager is active
-      if (this._textureManager) {
-        let tex: RawTexture | null = null;
-        if (name.includes("ruins")) {
-          tex = this._textureManager.getStructureTexture("stone_ruins", 128);
-        } else if (name.includes("shrine") || name.includes("sandstone")) {
-          tex = this._textureManager.getStructureTexture("desert_sandstone", 128);
-        } else if (name.includes("tower") || name.includes("wood") || name.includes("timber")) {
-          tex = this._textureManager.getStructureTexture("watchtower_timber", 128);
-        }
-        if (tex) {
-          tex.uScale = 2;
-          tex.vScale = 2;
-          mat.diffuseTexture = tex;
-        }
+      // Attach procedural masonry / timber / metal surfaces (albedo + normal
+      // map) when the texture manager is active.  Self-lit materials (flames,
+      // glows) stay flat.
+      if (this._textureManager && !opts?.disableLighting && !opts?.emissive) {
+        const surface = StructureManager.surfaceForMaterial(name);
+        if (surface) this._textureManager.applySurface(mat, surface, 2, 2);
       }
 
       if (typeof (mat as any).freeze === "function") {
@@ -857,6 +917,17 @@ export class StructureManager {
       this._sharedMaterials.set(name, mat);
     }
     return mat;
+  }
+
+  /** Synthesized surface used for a shared structure material, by name. */
+  public static surfaceForMaterial(name: string): SurfaceKind | null {
+    if (name.includes("iron") || name.includes("metal")) return "iron_metal";
+    if (name.includes("ruins")) return "stone_ruins";
+    if (name.includes("shrine") || name.includes("sandstone")) return "desert_sandstone";
+    if (name.includes("tower") || name.includes("wood") || name.includes("timber")
+      || name.includes("log") || name.includes("pole")) return "watchtower_timber";
+    if (name.includes("stone") || name.includes("altar") || name.includes("rune")) return "mossy_stone";
+    return null;
   }
 
   /** Deterministic pseudo-random in [0, 1) seeded by chunk coords and slot.

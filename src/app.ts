@@ -87,6 +87,11 @@ class App {
 
     new MainScene(this.scene, this.canvas, this.engine);
 
+    // Dev-only handle for in-browser debugging and the visual-shots e2e spec.
+    if (import.meta.env.DEV) {
+      (window as unknown as { __camelotScene?: Scene }).__camelotScene = this.scene;
+    }
+
     this._config();
     this._renderer();
   }
