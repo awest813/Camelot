@@ -45,6 +45,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Desktop shell syntax
+        run: npm run desktop:check
+
       - name: Upload dist artifact
         uses: actions/upload-artifact@v4
         with:

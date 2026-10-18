@@ -168,6 +168,7 @@ describe('UIManager', () => {
             expect(uiManager.exportButton).toBeDefined();
             expect(uiManager.importButton).toBeDefined();
             expect(uiManager.settingsButton).toBeDefined();
+            expect(uiManager.creditsButton).toBeDefined();
             expect(uiManager.quitButton).toBeDefined();
         });
     });

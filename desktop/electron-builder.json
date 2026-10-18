@@ -1,0 +1,41 @@
+{
+  "electronVersion": "44.9.0",
+  "appId": "org.babylonpress.camelot",
+  "productName": "Camelot",
+  "copyright": "Copyright © 2026 Andrei Stepanov",
+  "asar": false,
+  "directories": {
+    "output": "release",
+    "buildResources": "desktop"
+  },
+  "files": [
+    "dist/**/*",
+    "desktop/main.mjs",
+    "desktop/preload.mjs",
+    "desktop/paths.mjs",
+    "desktop/steam.mjs",
+    "desktop/steam-app-id.json",
+    "desktop/icon.png",
+    "package.json",
+    "!node_modules/**"
+  ],
+  "extraMetadata": {
+    "main": "desktop/main.mjs",
+    "dependencies": {}
+  },
+  "linux": {
+    "target": ["dir"],
+    "category": "Game",
+    "icon": "desktop/icon.png",
+    "synopsis": "Arthurian open-world RPG"
+  },
+  "win": {
+    "target": ["dir"],
+    "icon": "desktop/icon.png"
+  },
+  "mac": {
+    "target": ["dir"],
+    "category": "public.app-category.games",
+    "icon": "desktop/icon.png"
+  }
+}

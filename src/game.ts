@@ -43,6 +43,10 @@ import { applyDamageWithResistance } from "./systems/combat-shared";
 import type { DamageType } from "./entities/npc";
 import { EquipmentSystem } from "./systems/equipment-system";
 import { SaveSystem } from "./systems/save-system";
+import { AchievementSystem } from "./platform/achievement-system";
+import { getDesktopBridge } from "./platform/desktop-bridge";
+import { desktopMirroredSaveStore } from "./platform/save-store";
+import { CreditsUI } from "./ui/credits-ui";
 import { QuestSystem } from "./systems/quest-system";
 import { InteractionSystem } from "./systems/interaction-system";
 import { SkillTreeSystem } from "./systems/skill-tree-system";
@@ -535,6 +539,9 @@ export class Game {
   private readonly _inputAdapter = new BabylonInputAdapter();
   /** Gamepad input polling system — feeds controller input into the adapter. */
   private readonly _gamepadInput = new GamepadInputSystem(this._inputAdapter);
+  /** Launch achievements. Forwarded to Steamworks when the desktop shell is up. */
+  private _achievements: AchievementSystem | null = null;
+  private _creditsUI: CreditsUI | null = null;
   /** Tracks whether the current key event was consumed by the input adapter. */
   private _keyConsumedByAdapter: boolean = false;
   /**
@@ -726,6 +733,8 @@ export class Game {
     };
     this._syncWeaponArchetype();
     this.saveSystem         = new SaveSystem(this.player, this.inventorySystem, this.equipmentSystem, this.ui);
+    const mirroredSaves = desktopMirroredSaveStore();
+    if (mirroredSaves) this.saveSystem.setStorage(mirroredSaves);
     this.saveSystem.setCombatSystem(this.combatSystem);
     this.questSystem        = new QuestSystem(this.ui);
     this.questSystem.onOpen = () => {
@@ -1328,6 +1337,14 @@ export class Game {
 
     // ── v3 system wiring ──────────────────────────────────────────────────────
     this.eventBus        = new GameEventBus();
+    this._achievements = new AchievementSystem();
+    this._achievements.onUnlocked = (definition) => {
+      this.ui.showNotification(`Achievement unlocked: ${definition.name}`, 4000);
+      const bridge = getDesktopBridge();
+      if (bridge) void bridge.unlockAchievement(definition.id);
+    };
+    this._achievements.bind(this.eventBus);
+    void this._achievements.syncWithDesktop();
     this.lootTableSystem = new LootTableSystem();
     for (const t of STARTER_LOOT_TABLES) this.lootTableSystem.registerTable(t);
 
@@ -1862,6 +1879,11 @@ export class Game {
         this.player.camera.attachControl(this.canvas, true);
       }
     };
+    if (getDesktopBridge()) {
+      this.graphicsSettingsUI.onToggleFullscreen = () => {
+        void getDesktopBridge()?.toggleFullscreen();
+      };
+    }
     this._wireGraphicsSettingsButton();
 
     // ── v18 DailyScheduleSystem ───────────────────────────────────────────────
@@ -1902,6 +1924,7 @@ export class Game {
     this.horseSystem.onMount = (horse, speed) => {
       (this.player as unknown as { moveSpeedMultiplier?: number }).moveSpeedMultiplier = speed;
       this.ui.showNotification(`Mounted ${horse.name}`, 1800);
+      this._achievements?.unlock("ACH_SADDLED");
       this.saveSystem.markDirty();
     };
     this.horseSystem.onDismount = (horse) => {
@@ -1911,6 +1934,7 @@ export class Game {
     };
     this.horseSystem.onHorsePurchased = (horse) => {
       this.ui.showNotification(`Purchased ${horse.name}!`, 2500);
+      this._achievements?.unlock("ACH_SADDLED");
       this.saveSystem.markDirty();
     };
     this.saveSystem.setHorseSystem(this.horseSystem);
@@ -2755,7 +2779,8 @@ export class Game {
       this.canvas.requestPointerLock();
       this.player.camera.attachControl(this.canvas, true);
     });
-    this.questSystem.onQuestComplete = (xp) => {
+    this.questSystem.onQuestComplete = (xp: number, questId?: string) => {
+      this.eventBus.emit("quest:completed", { questId: questId ?? "legacy", xpReward: xp });
       this.player.addExperience(xp);
       this.fameSystem.addFame(10);
       this.saveSystem.markDirty();
@@ -3024,6 +3049,8 @@ export class Game {
 
     // Wire quest event callbacks
     this.combatSystem.onNPCDeath = (name, xp, npc) => {
+        const npcName = /dragon/i.test(npc.mesh.name) ? npc.mesh.name : name;
+        this.eventBus.emit("player:kill", { npcId: npc.mesh.name, npcName, xp });
         // Bandit Bounty: activate on the first bandit kill so that kill counts.
         if (!this._banditQuestStarted && this._toFrameworkTargetId(name) === "Bandit") {
             this._banditQuestStarted = true;
@@ -3500,6 +3527,9 @@ export class Game {
                     this.interactionSystem.isBlocked = false;
                     this.canvas.requestPointerLock();
                     this.player.camera.attachControl(this.canvas, true);
+                } else if (this._creditsUI?.isVisible) {
+                    this._creditsUI.hide();
+                    this._creditsUI.onClose?.();
                 } else if (this.graphicsSettingsUI.isVisible) {
                     this.graphicsSettingsUI.hide();
                     this.graphicsSettingsUI.onClose?.();
@@ -4231,7 +4261,25 @@ export class Game {
         this._cameraSensitivity,
       );
     });
-    this.ui.quitButton.onPointerUpObservable.add(() => window.location.reload());
+    this._creditsUI = new CreditsUI();
+    this._creditsUI.onClose = () => {
+      if (this.isPaused) return;
+      this.interactionSystem.isBlocked = false;
+      this.canvas.requestPointerLock();
+      this.player.camera.attachControl(this.canvas, true);
+    };
+    this.ui.creditsButton.onPointerUpObservable.add(() => {
+      this._creditsUI?.show();
+    });
+    const desktop = getDesktopBridge();
+    if (desktop) {
+      this.ui.setQuitButtonLabel("Quit to Desktop");
+      this.ui.quitButton.onPointerUpObservable.add(() => {
+        desktop.quit();
+      });
+    } else {
+      this.ui.quitButton.onPointerUpObservable.add(() => window.location.reload());
+    }
 
     // Wire decoupled input adapter after all systems are initialized
     this._wireInputAdapter();
@@ -4724,6 +4772,7 @@ export class Game {
       if (this.pickpocketUI.isVisible) { this._pickpocketTargetId = null; this.pickpocketUI.hide(); this._restoreGameplayInput(); return; }
       if (this.stableUI.isVisible) { this.stableUI.close(); return; }
       if (this.saddlebagUI.isVisible) { this.saddlebagUI.close(); return; }
+      if (this._creditsUI?.isVisible) { this._creditsUI.hide(); this._creditsUI.onClose?.(); return; }
       if (this.graphicsSettingsUI.isVisible) { this.graphicsSettingsUI.hide(); this.graphicsSettingsUI.onClose?.(); return; }
       if (this.questCreatorUI.isVisible) { this.questCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
       if (this.dialogueCreatorUI.isVisible) { this.dialogueCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
@@ -4978,6 +5027,7 @@ export class Game {
     persistSkipOnboardingTips(selection.skipGameplayTips);
     this._startOnboardingTutorialIfNeeded();
     this._inCharacterCreation = false;
+    this._achievements?.unlock("ACH_TAKE_UP_THE_SWORD");
 
     this.ui.showNotification(`Welcome, ${this.player.name}! Character creation complete.`, 2800);
     this.interactionSystem.isBlocked = false;
@@ -5016,6 +5066,7 @@ export class Game {
       this.skillProgressionSystem,
     );
     this._startOnboardingTutorialIfNeeded();
+    this._achievements?.unlock("ACH_TAKE_UP_THE_SWORD");
   }
 
   private _wireOnboardingTutorialUi(): void {
@@ -5147,7 +5198,7 @@ export class Game {
     btn.setAttribute("aria-label", "Open graphics settings");
     btn.textContent = "⚙";
     btn.addEventListener("click", () => {
-      if (this._inCharacterCreation || this.graphicsSettingsUI.isVisible || this._isCombatInputBlocked()) return;
+      if (this._inCharacterCreation || this.graphicsSettingsUI.isVisible || this._creditsUI?.isVisible || this._isCombatInputBlocked()) return;
       this.graphicsSettingsUI.show(
         this.graphics.tier,
         this._difficulty,
@@ -5672,6 +5723,7 @@ export class Game {
       const updates = this.frameworkRuntime.applyQuestEvent({ type, targetId, amount });
       for (const update of updates) {
           if (!update.questCompleted) continue;
+          this.eventBus.emit("quest:completed", { questId: update.questId, xpReward: update.xpReward });
           this.ui.showNotification(`Framework quest complete: ${update.questId}`, 2800);
           if (update.xpReward > 0) {
               this.player.addExperience(update.xpReward);
@@ -6082,6 +6134,7 @@ export class Game {
 
            if (this.player.health <= 0 && !this._playerAtZeroHP) {
                this._playerAtZeroHP = true;
+               this.eventBus.emit("player:died", {});
                this.ui.showHitFlash("rgba(180, 0, 0, 0.55)");
                this.ui.showNotification("You have fallen...", 4000);
                // Death has consequences: after 4 seconds you wake at the
@@ -6256,7 +6309,8 @@ export class Game {
           this.petUI.isVisible ||
           this.followerUI.isVisible ||
           this.pickpocketUI.isVisible ||
-          this.graphicsSettingsUI.isVisible
+          this.graphicsSettingsUI.isVisible ||
+          !!this._creditsUI?.isVisible
       );
 
       // Update active effects HUD (30 Hz, same as activeEffectsSystem)
@@ -7119,6 +7173,7 @@ export class Game {
           this.pickpocketUI.isVisible ||
           this.characterSheetUI.isVisible ||
           this.graphicsSettingsUI.isVisible ||
+          !!this._creditsUI?.isVisible ||
           this.dialogueSystem.isInDialogue ||
           this.interactionSystem.isBlocked
       );

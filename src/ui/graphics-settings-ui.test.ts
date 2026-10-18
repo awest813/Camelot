@@ -234,5 +234,22 @@ describe("GraphicsSettingsUI", () => {
     ui.showStatus("Settings updated successfully");
     expect(statusEl.textContent).toBe("Settings updated successfully");
   });
+
+  it("hides the fullscreen control until the desktop shell provides one", () => {
+    ui.show("high");
+    expect(document.body.textContent).not.toContain("Toggle Fullscreen");
+    ui.destroy();
+
+    ui = new GraphicsSettingsUI();
+    const toggle = vi.fn();
+    ui.onToggleFullscreen = toggle;
+    ui.show("high");
+    const button = Array.from(document.querySelectorAll("button")).find((candidate) =>
+      candidate.textContent === "Toggle Fullscreen",
+    );
+    expect(button).toBeDefined();
+    button!.click();
+    expect(toggle).toHaveBeenCalledOnce();
+  });
 });
 

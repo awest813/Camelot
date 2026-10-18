@@ -6149,3 +6149,25 @@ body::before {
   }
 }
 
+/* ── Credits (pause menu) ──────────────────────────────────────────────────── */
+
+.credits-dialog__panel {
+  width: min(560px, 92vw);
+  max-height: min(80vh, 720px);
+  overflow: auto;
+}
+
+.credits-dialog__heading {
+  font-family: Cinzel, serif;
+  color: #e6d3a3;
+  font-size: 16px;
+  margin: 14px 0 6px;
+}
+
+.credits-dialog__line {
+  color: #d9d0c1;
+  font-size: 14px;
+  line-height: 1.45;
+  margin: 0 0 6px;
+}
+

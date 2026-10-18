@@ -51,8 +51,10 @@ import type { TravelEventSystem } from "./travel-event-system";
 import type { AmbientEventSystem } from "./ambient-event-system";
 import type { StealthSystem } from "./stealth-system";
 import type { CombatSystem } from "./combat-system";
+import { SAVE_STORAGE_KEY } from "../platform/constants";
+import type { SaveStore } from "../platform/save-store";
 
-const SAVE_KEY = "camelot_save";
+const SAVE_KEY = SAVE_STORAGE_KEY;
 // v29: stealth crouch state + player combat status effects.
 const SAVE_VERSION = 29;
 /** Oldest save version that can still be loaded (forward-compat window). */
@@ -331,6 +333,8 @@ export class SaveSystem {
   private _autosaveIntervalSeconds = 30;
   private _autosaveAccumulator = 0;
   private _autosaveDirty = false;
+  /** Optional store. The default reads localStorage at call time so tests can stub it. */
+  private _store: SaveStore | null = null;
 
   /** Called after a successful load so Game can clean up world state (e.g. remove already-collected loot). */
   public onAfterLoad: (() => void) | null = null;
@@ -340,6 +344,23 @@ export class SaveSystem {
     this._inventory = inventory;
     this._equipment = equipment;
     this._ui = ui;
+  }
+
+  /**
+   * Replace the save slot backend. The desktop shell passes a store that
+   * mirrors the primary slot to a file Steam Auto-Cloud can watch.
+   */
+  public setStorage(store: SaveStore): void {
+    this._store = store;
+  }
+
+  private _storage(): SaveStore {
+    if (this._store) return this._store;
+    return {
+      getItem: (key) => localStorage.getItem(key),
+      setItem: (key, value) => { localStorage.setItem(key, value); },
+      removeItem: (key) => { localStorage.removeItem(key); },
+    };
   }
 
   /** Inject QuestSystem after construction (avoids circular init order in Game). */
@@ -571,7 +592,7 @@ export class SaveSystem {
     if (this._stealthSystem) data.stealth = this._stealthSystem.getSaveState();
     if (this._combatSystem) data.combatEffects = this._combatSystem.getSaveState();
 
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    this._storage().setItem(SAVE_KEY, JSON.stringify(data));
     if (!silent) this._ui.showNotification("Game Saved!", 2500);
     this._autosaveDirty = false;
     this._autosaveAccumulator = 0;
@@ -611,7 +632,7 @@ export class SaveSystem {
   }
 
   public load(): boolean {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = this._storage().getItem(SAVE_KEY);
     if (!raw) {
       this._ui.showNotification("No save file found.", 2500);
       return false;
@@ -854,11 +875,11 @@ export class SaveSystem {
   }
 
   public hasSave(): boolean {
-    return localStorage.getItem(SAVE_KEY) !== null;
+    return this._storage().getItem(SAVE_KEY) !== null;
   }
 
   public deleteSave(): void {
-    localStorage.removeItem(SAVE_KEY);
+    this._storage().removeItem(SAVE_KEY);
     this._autosaveDirty = false;
     this._autosaveAccumulator = 0;
   }
@@ -872,7 +893,7 @@ export class SaveSystem {
    * The exported file can be re-imported with `importFromFile()`.
    */
   public exportToFile(): void {
-    const raw = localStorage.getItem(SAVE_KEY);
+    const raw = this._storage().getItem(SAVE_KEY);
     if (!raw) {
       this._ui.showNotification("Nothing to export — save first.", 2500);
       return;
@@ -943,8 +964,8 @@ export class SaveSystem {
       return false;
     }
 
-    // Write into localStorage then immediately load
-    localStorage.setItem(SAVE_KEY, json);
+    // Write into the active slot then immediately load
+    this._storage().setItem(SAVE_KEY, json);
     const ok = this.load();
     if (ok) {
       this._ui.showNotification("Save imported successfully!", 2500);
