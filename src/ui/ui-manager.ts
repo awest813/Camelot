@@ -112,6 +112,7 @@ export class UIManager {
   public exportButton: Button;
   public importButton: Button;
   public settingsButton: Button;
+  public creditsButton: Button;
   public quitButton: Button;
 
   private _hpPulseObs: any = null;
@@ -614,7 +615,7 @@ export class UIManager {
     // Central card
     const card = new Rectangle();
     card.width = "340px";
-    card.height = "620px";
+    card.height = "680px";
     card.cornerRadius = 10;
     card.color = T.PANEL_BORDER;
     card.thickness = 2;
@@ -661,6 +662,7 @@ export class UIManager {
     this.exportButton   = this._createButton("Export Save",   panel);
     this.importButton   = this._createButton("Import Save…",  panel);
     this.settingsButton = this._createButton("Settings",      panel);
+    this.creditsButton  = this._createButton("Credits",       panel);
     this.quitButton     = this._createButton("Quit to Menu",  panel);
   }
 
@@ -1043,7 +1045,7 @@ export class UIManager {
     if (!this._pauseCard) return;
     const vp = this._getViewportSize();
     this._pauseCard.width = `${Math.min(340, Math.max(260, vp.width - 24))}px`;
-    this._pauseCard.height = `${Math.min(560, Math.max(360, vp.height - 24))}px`;
+    this._pauseCard.height = `${Math.min(680, Math.max(420, vp.height - 24))}px`;
   }
 
   private _adaptQuestLogLayout(): void {
@@ -1093,6 +1095,13 @@ export class UIManager {
     if (visible) this._adaptPauseLayout();
     this.pausePanel.isVisible = visible;
     this._syncCrosshairVisibility();
+  }
+
+  /** Desktop builds say "Quit to Desktop"; the browser keeps "Quit to Menu". */
+  public setQuitButtonLabel(label: string): void {
+    const block = this.quitButton?.textBlock;
+    if (block) block.text = label;
+    if (this.quitButton) this.quitButton.accessibilityTag = { description: label };
   }
 
   public toggleQuestLog(visible: boolean): void {

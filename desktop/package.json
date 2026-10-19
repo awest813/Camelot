@@ -1,0 +1,10 @@
+{
+  "name": "camelot-desktop",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Electron shell for the Camelot Steam depot. Install with npm install --prefix desktop.",
+  "devDependencies": {
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
+  }
+}

@@ -7,6 +7,7 @@ import { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 import HavokPhysics from "@babylonjs/havok";
 
 import MainScene from "./playground/main-scene";
+import { hydrateDesktopSave } from "./platform/desktop-bridge";
 
 class App {
   public engine: Engine | WebGPUEngine;
@@ -84,6 +85,10 @@ class App {
 
     // Add physics. If not needed, you can annotate it to improve loading speed and environment performance.
     await this._setPhysics();
+
+    // Desktop builds mirror the save into a file. Pull the newer slot in
+    // before Game constructs SaveSystem.
+    await hydrateDesktopSave();
 
     new MainScene(this.scene, this.canvas, this.engine);
 

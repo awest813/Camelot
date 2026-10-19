@@ -1,0 +1,4 @@
+{
+  "appId": 0,
+  "comment": "Set appId to the Steamworks app id before packaging a depot. 0 keeps Steamworks offline and still writes local achievements. Do not commit 480."
+}

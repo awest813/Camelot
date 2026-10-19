@@ -20,6 +20,14 @@ These systems are complete with full test coverage but are **not reachable in-ga
 
 ---
 
+## Steam release (1.0.0)
+
+- ✅ Desktop shell (`desktop/main.mjs`) — Electron window, `app://` protocol, single-instance lock, Alt+Enter fullscreen, Steam Deck starts fullscreen, quit from the pause menu.
+- ✅ On-disk save slot (`userData/saves/slot.json`) mirrored from SaveSystem and hydrated before the game boots, so Steam Auto-Cloud has a file to watch.
+- ✅ Launch achievements (`steam/achievements.json` + `AchievementSystem`) with an offline file and an optional `steamworks.js` client. App id is opt-in; 480 is not baked in.
+- ✅ Credits / third-party notice in the pause menu. Remote CDN props stay off unless `VITE_ENABLE_REMOTE_PROPS=true`.
+- ✅ Depot build: `npm run desktop:pack` → `release/linux-unpacked/`. Upload steps are in `docs/steam-release.md`.
+
 ## Current Platform Snapshot
 
 ### Core Runtime

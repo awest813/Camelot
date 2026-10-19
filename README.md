@@ -215,6 +215,16 @@ npm run preview
 The production build uses relative asset paths (`./`), so `dist/` can be served
 from any static host or subpath (e.g. GitHub Pages, itch.io).
 
+### Desktop build (Steam)
+
+Install the shell once with `npm install --prefix desktop`. `npm run desktop:pack` produces a Steam depot folder at `release/linux-unpacked/`
+(add `--win dir` or `--mac dir` on those hosts). Saves go to a real file under
+the Camelot user-data directory, achievements record locally and through
+Steamworks when an app id is configured, and the pause menu can quit the
+process. See [docs/steam-release.md](docs/steam-release.md) for the upload
+checklist. Remote Babylon.js props stay off unless `VITE_ENABLE_REMOTE_PROPS=true`,
+so the depot does not need a network connection.
+
 ### Run unit tests
 
 ```bash

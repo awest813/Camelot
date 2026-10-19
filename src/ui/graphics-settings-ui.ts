@@ -65,6 +65,8 @@ export class GraphicsSettingsUI {
   public onAudioMuteToggle: ((isMuted: boolean) => void) | null = null;
   public onVolumeChange: ((volume: number) => void) | null = null;
   public onCameraSensitivityChange: ((sensitivity: CameraSensitivity) => void) | null = null;
+  /** Set by the desktop shell. Absent in the browser, so the row stays hidden. */
+  public onToggleFullscreen: (() => void) | null = null;
   public onClose: (() => void) | null = null;
 
   private _root: HTMLDivElement | null = null;
@@ -363,6 +365,29 @@ export class GraphicsSettingsUI {
     }
 
     panel.appendChild(sensRow);
+
+    // ── Section 5: Display (desktop / Steam only) ────────────────────────────
+    if (this.onToggleFullscreen) {
+      const displayTitle = document.createElement("h3");
+      displayTitle.className = "graphics-settings__title";
+      displayTitle.textContent = "Display";
+      displayTitle.style.marginTop = "18px";
+      panel.appendChild(displayTitle);
+
+      const displayRow = document.createElement("div");
+      displayRow.className = "graphics-settings__sens-row";
+      const fullscreenBtn = document.createElement("button");
+      fullscreenBtn.type = "button";
+      fullscreenBtn.className = "graphics-settings__chip-btn";
+      fullscreenBtn.textContent = "Toggle Fullscreen";
+      fullscreenBtn.title = "Alt+Enter also toggles fullscreen in the desktop build";
+      fullscreenBtn.addEventListener("click", () => {
+        this.showStatus("Toggled fullscreen");
+        this.onToggleFullscreen?.();
+      });
+      displayRow.appendChild(fullscreenBtn);
+      panel.appendChild(displayRow);
+    }
 
     // ── Status Bar ───────────────────────────────────────────────────────────
     const statusBar = document.createElement("div");

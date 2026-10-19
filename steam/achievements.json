@@ -1,0 +1,53 @@
+[
+  {
+    "id": "ACH_TAKE_UP_THE_SWORD",
+    "name": "Take Up the Sword",
+    "description": "Create your character and step into Camelot."
+  },
+  {
+    "id": "ACH_FIRST_BLOOD",
+    "name": "First Blood",
+    "description": "Defeat an enemy."
+  },
+  {
+    "id": "ACH_DRAGONSLAYER",
+    "name": "Dragonslayer",
+    "description": "Slay a dragon."
+  },
+  {
+    "id": "ACH_OATH_KEPT",
+    "name": "Oath Kept",
+    "description": "Complete a quest."
+  },
+  {
+    "id": "ACH_SEASONED",
+    "name": "Seasoned",
+    "description": "Reach level 5."
+  },
+  {
+    "id": "ACH_KNIGHT_OF_THE_REALM",
+    "name": "Knight of the Realm",
+    "description": "Reach level 10."
+  },
+  {
+    "id": "ACH_ONCE_AND_FUTURE",
+    "name": "Once and Future",
+    "description": "Fall in battle.",
+    "hidden": true
+  },
+  {
+    "id": "ACH_FIRST_SPELL",
+    "name": "First Spell",
+    "description": "Cast a spell."
+  },
+  {
+    "id": "ACH_COMPANION",
+    "name": "A Friend Indeed",
+    "description": "Gain a companion."
+  },
+  {
+    "id": "ACH_SADDLED",
+    "name": "Saddled",
+    "description": "Mount a horse."
+  }
+]

@@ -3,6 +3,28 @@
 All notable changes to Camelot are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.0] — Steam release
+
+Desktop shell for Steam, with on-disk saves, a quit path, credits, and the
+launch achievement set. In the browser, Quit still reloads the page and
+achievements stay in localStorage.
+
+### Added
+- Electron shell (`desktop/`) that loads the production build over an `app://`
+  protocol, toggles fullscreen (Alt+Enter or Settings), and quits from the
+  pause menu. Steam Deck (`SteamDeck=1`) starts fullscreen.
+- Save slot mirrored to `userData/saves/slot.json` for Steam Auto-Cloud. On
+  boot the newer of the disk slot and the browser slot is kept.
+- Ten launch achievements (`steam/achievements.json`). Unlocks persist locally
+  and are forwarded to Steamworks when `steamworks.js` is installed and an app
+  id is set (`STEAM_APP_ID`, a dev-only `steam_appid.txt`, or
+  `desktop/steam-app-id.json`).
+- Credits dialog on the pause menu (engine, KayKit, Quaternius, fonts).
+- `npm run desktop:pack` writes a depot folder with electron-builder.
+
+### Changed
+- Version 1.0.0. Save format stays at version 29.
+
 ## [1.0.0-rc.1] — Release candidate
 
 First release-candidate cut: all advertised features are wired and playable,
