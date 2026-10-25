@@ -5,7 +5,7 @@
     "minibao (https://github.com/minibao/babylon-vite)"
   ],
   "private": true,
-  "description": "Arthurian open-world RPG",
+  "description": "Camelot Rift — a King Arthur 3v3 mobile MOBA",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
