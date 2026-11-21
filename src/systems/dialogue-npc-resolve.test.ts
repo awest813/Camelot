@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { NpcArchetypeDefinition } from "../framework/content/content-types";
 import { resolveDialogueIdForNpcMeshName } from "./dialogue-npc-resolve";
+import { frameworkBaseContent } from "../framework/content/base-content";
 
 const baseArchetype = (overrides: Partial<NpcArchetypeDefinition>): NpcArchetypeDefinition => ({
   id: "x",
@@ -61,5 +62,11 @@ describe("resolveDialogueIdForNpcMeshName", () => {
     expect(
       resolveDialogueIdForNpcMeshName("Villager_1", [baseArchetype({ id: "v", name: "Villager" })]),
     ).toBeNull();
+  });
+
+  it("the Village Smith gets the smith's dialogue, not the generic /smith/ shop fallback", () => {
+    const archetypes = frameworkBaseContent.npcArchetypes ?? [];
+    expect(resolveDialogueIdForNpcMeshName("Village Smith_3_-2", archetypes)).toBe("trainer_armorer_intro");
+    expect(frameworkBaseContent.dialogues.some((d) => d.id === "trainer_armorer_intro")).toBe(true);
   });
 });

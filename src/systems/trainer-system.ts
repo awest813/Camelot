@@ -138,12 +138,28 @@ export const BUILT_IN_TRAINERS: TrainerDefinition[] = [
     costPerLevel: 6,
   },
   {
+    id: "trainer_armorer_smith",
+    name: "Village Smith",
+    skillId: "armorer",
+    maxLevel: 50,
+    baseCost: 25,
+    costPerLevel: 5,
+  },
+  {
     id: "trainer_grand_blade_master",
     name: "Grand Blade Master",
     skillId: "blade",
     maxLevel: 100,
     baseCost: 100,
     costPerLevel: 15,
+  },
+  {
+    id: "trainer_master_smith",
+    name: "Master Smith",
+    skillId: "armorer",
+    maxLevel: 100,
+    baseCost: 90,
+    costPerLevel: 14,
   },
   {
     id: "trainer_archmage",

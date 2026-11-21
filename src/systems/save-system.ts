@@ -696,6 +696,9 @@ export class SaveSystem {
     this._player.perkPowerAttackStaminaMultiplier = 1.0;
     this._player.perkSneakAttackMultiplier = 1.0;
     this._player.perkHealingMultiplier = 1.0;
+    this._player.perkRepairMultiplier = 1.0;
+    this._player.perkWearMultiplier = 1.0;
+    this._player.perkSmithingQualityBonus = 0;
 
     // Restore inventory
     this._inventory.items = data.inventory;

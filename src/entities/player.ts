@@ -67,6 +67,12 @@ export class Player {
   public perkSneakAttackMultiplier: number = 1.0;
   /** Multiplier applied to healing spell magnitude. PerkSystem increases this above 1.0. */
   public perkHealingMultiplier: number = 1.0;
+  /** Multiplier on Repair Hammer restoration (Armorer perks). */
+  public perkRepairMultiplier: number = 1.0;
+  /** Multiplier on equipment wear per hit (Armorer perks; < 1 = slower wear). */
+  public perkWearMultiplier: number = 1.0;
+  /** Extra effective Armorer levels when the forge judges crafted quality. */
+  public perkSmithingQualityBonus: number = 0;
 
   // Level & experience
   public level: number = 1;

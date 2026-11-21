@@ -1,8 +1,8 @@
 /**
  * PerkSystem — Skill-level-gated character perks.
  *
- * Each of the nine ProgressionSkills (blade, blunt, block, destruction,
- * restoration, marksman, sneak, speechcraft, alchemy) has a four-tier perk
+ * Each of the ten ProgressionSkills (blade, blunt, block, destruction,
+ * restoration, marksman, sneak, speechcraft, alchemy, armorer) has a four-tier perk
  * tree.  Perks unlock when the corresponding skill reaches a milestone level
  * (25 / 50 / 75 / 100) and cost one perk point each.
  *
@@ -33,7 +33,7 @@ import type { SkillProgressionSystem } from "./skill-progression-system";
 export type PerkSkillId =
   | "blade" | "blunt" | "block"
   | "destruction" | "restoration"
-  | "marksman" | "sneak" | "speechcraft" | "alchemy";
+  | "marksman" | "sneak" | "speechcraft" | "alchemy" | "armorer";
 
 export interface PerkDefinition {
   readonly id: string;
@@ -58,7 +58,7 @@ export interface PerkSaveState {
   perkPoints: number;
 }
 
-// ── Perk Definitions (36 total — 9 skills × 4 tiers) ─────────────────────────
+// ── Perk Definitions (40 total — 10 skills × 4 tiers) ────────────────────────
 
 export const PERK_DEFINITIONS: readonly PerkDefinition[] = [
   // ─── BLADE ────────────────────────────────────────────────────────────────
@@ -293,6 +293,32 @@ export const PERK_DEFINITIONS: readonly PerkDefinition[] = [
     description: "Complete mastery of alchemical arts. +1 magicka regen, +20% healing effectiveness.",
     prerequisites: ["alchemy_snakeblood"],
     apply: (p) => { p.magickaRegen += 1; p.perkHealingMultiplier += 0.20; },
+  },
+
+  // ─── ARMORER ──────────────────────────────────────────────────────────────
+  {
+    id: "armorer_field_repairs", name: "Field Repairs", skillId: "armorer", requiredLevel: 25,
+    description: "You know where to strike a dent. Repair Hammers restore 50% more condition.",
+    prerequisites: [],
+    apply: (p) => { p.perkRepairMultiplier += 0.5; },
+  },
+  {
+    id: "armorer_tempered", name: "Tempered Steel", skillId: "armorer", requiredLevel: 50,
+    description: "You keep your kit oiled and true. Equipped gear wears 30% slower.",
+    prerequisites: ["armorer_field_repairs"],
+    apply: (p) => { p.perkWearMultiplier *= 0.7; },
+  },
+  {
+    id: "armorer_master_craftsman", name: "Master Craftsman", skillId: "armorer", requiredLevel: 75,
+    description: "Your forgework counts as 15 Armorer levels higher when judging quality.",
+    prerequisites: ["armorer_tempered"],
+    apply: (p) => { p.perkSmithingQualityBonus += 15; },
+  },
+  {
+    id: "armorer_unbreakable", name: "Unbreakable", skillId: "armorer", requiredLevel: 100,
+    description: "Gear in your hands barely wears (another 50% slower), and you wear it well: +10 armor.",
+    prerequisites: ["armorer_master_craftsman"],
+    apply: (p) => { p.perkWearMultiplier *= 0.5; p.bonusArmor += 10; },
   },
 ] as const;
 

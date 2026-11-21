@@ -28,7 +28,12 @@ import {
   type ItemQuality,
   type MaterialInventory,
 } from "./crafting-system";
-import { ItemConditionSystem, MAX_CONDITION } from "./item-condition-system";
+import {
+  ItemConditionSystem,
+  MAX_CONDITION,
+  BASE_REPAIR_KIT_AMOUNT,
+  REPAIR_KIT_SKILL_SCALE,
+} from "./item-condition-system";
 import type { Item } from "./inventory-system";
 
 // ── Collaborator interfaces (narrow, so the controller tests headlessly) ─────
@@ -47,6 +52,12 @@ export interface SmithingEquipment {
 export interface SmithingPlayer {
   gearDamagePenalty: number;
   gearArmorPenalty: number;
+  /** Armorer perk: multiplier on repair-hammer restoration (default 1). */
+  perkRepairMultiplier?: number;
+  /** Armorer perk: multiplier on wear per hit (default 1; lower = slower wear). */
+  perkWearMultiplier?: number;
+  /** Armorer perk: extra effective skill when judging crafted quality (default 0). */
+  perkSmithingQualityBonus?: number;
 }
 
 export interface SmithingControllerDeps {
@@ -232,7 +243,10 @@ export class SmithingController {
       return failure;
     }
 
-    const outcome = this.crafting.craft(recipeId, materials, skill);
+    // Requirements were checked at the real skill above; the Master Craftsman
+    // perk only lifts the skill the forge uses to judge quality.
+    const qualitySkill = skill + (this._deps.player.perkSmithingQualityBonus ?? 0);
+    const outcome = this.crafting.craft(recipeId, materials, qualitySkill);
     if (!outcome.success || !recipe) return outcome;
 
     for (const m of recipe.requiredMaterials) {
@@ -330,7 +344,9 @@ export class SmithingController {
 
   private _wear(item: Item, amount: number): void {
     if (this.condition.getCondition(item.id) === undefined) this.condition.initItem(item.id, MAX_CONDITION);
-    this.condition.degradeItem(item.id, amount);
+    const scaled = amount * Math.max(0, this._deps.player.perkWearMultiplier ?? 1);
+    if (scaled <= 0) return;
+    this.condition.degradeItem(item.id, scaled);
     this.refreshPenalties();
   }
 
@@ -367,7 +383,10 @@ export class SmithingController {
       return true;
     }
     const before = this.condition.getCondition(target.id) ?? MAX_CONDITION;
-    const after = this.condition.repairWithKit(target.id, this._deps.getArmorerSkill()) ?? before;
+    const skill = Math.max(0, Math.min(100, this._deps.getArmorerSkill()));
+    const amount = (BASE_REPAIR_KIT_AMOUNT + skill * REPAIR_KIT_SKILL_SCALE)
+      * Math.max(0, this._deps.player.perkRepairMultiplier ?? 1);
+    const after = this.condition.repairItem(target.id, amount) ?? before;
     this._deps.inventory.removeItem(REPAIR_HAMMER_ID, 1);
     this._deps.gainArmorerXp(REPAIR_XP);
     this.refreshPenalties();

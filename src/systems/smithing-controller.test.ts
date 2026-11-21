@@ -278,6 +278,36 @@ describe("SmithingController", () => {
     ]);
   });
 
+  // ── Armorer perks ──────────────────────────────────────────────────────────
+
+  it("the wear perk multiplier slows wear", () => {
+    (player as { perkWearMultiplier?: number }).perkWearMultiplier = 0.5;
+    equipped.set("head", { ...helm });
+    ctrl.onPlayerStruck();
+    expect(condition.getCondition("iron_helm_01")).toBe(99.5);
+  });
+
+  it("the repair perk multiplier boosts hammer repairs", () => {
+    (player as { perkRepairMultiplier?: number }).perkRepairMultiplier = 1.5;
+    equipped.set("mainHand", { ...sword });
+    condition.initItem("iron_sword", 10);
+    inventory.items.push(smithingMaterialStack(REPAIR_HAMMER_ID, 1));
+    ctrl.tryUseRepairItem(inventory.items[0]);
+    expect(condition.getCondition("iron_sword")).toBe(25);
+  });
+
+  it("the quality perk raises quality without bypassing the skill gate", () => {
+    (player as { perkSmithingQualityBonus?: number }).perkSmithingQualityBonus = 40;
+    inventory.items.push(smithingMaterialStack("iron_ingot", 4), smithingMaterialStack("leather_strips", 2));
+    const outcome = ctrl.craft("smith_iron_sword");
+    expect(outcome.success).toBe(true);
+    if (outcome.success) expect(outcome.result.quality).not.toBe("base");
+    expect(inventory.items.some((i) => i.id.startsWith("iron_sword_"))).toBe(true);
+    // Steel still needs real Armorer 25.
+    inventory.items.push(smithingMaterialStack("steel_ingot", 2));
+    expect(ctrl.craft("smith_steel_sword").success).toBe(false);
+  });
+
   // ── Persistence ────────────────────────────────────────────────────────────
 
   it("condition and crafting state round-trip through their save states", () => {

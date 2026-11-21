@@ -51,12 +51,12 @@ describe("PerkSystem — construction", () => {
     expect(sys.perkPoints).toBe(0);
   });
 
-  it("PERK_DEFINITIONS contains 36 entries (9 skills × 4 tiers)", () => {
-    expect(PERK_DEFINITIONS.length).toBe(36);
+  it("PERK_DEFINITIONS contains 40 entries (10 skills × 4 tiers)", () => {
+    expect(PERK_DEFINITIONS.length).toBe(40);
   });
 
   it("each skill has exactly 4 perks", () => {
-    const skills = ["blade","blunt","block","destruction","restoration","marksman","sneak","speechcraft","alchemy"];
+    const skills = ["blade","blunt","block","destruction","restoration","marksman","sneak","speechcraft","alchemy","armorer"];
     for (const skill of skills) {
       const count = PERK_DEFINITIONS.filter(p => p.skillId === skill).length;
       expect(count).toBe(4);

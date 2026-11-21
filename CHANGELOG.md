@@ -15,6 +15,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   character sheet shows each equipped piece's condition.
 - Repair Hammers: click one in the inventory to repair the most worn equipped
   piece. Higher Armorer skill repairs more.
+- Village Smith: some plains cottages now have a smith with a forge and anvil.
+  The smith trains Armorer (up to 50), opens the forge, and sells ingots and
+  hammers.
+- Four Armorer perks: Field Repairs (hammers repair 50% more), Tempered Steel
+  (gear wears 30% slower), Master Craftsman (forged items come out at a higher
+  quality) and Unbreakable (wear halved again, +10 armor).
 - Smithing materials and hammers are sold by the arms and armor merchants and
   drop from bandits and dungeons. New characters start with a small kit.
 

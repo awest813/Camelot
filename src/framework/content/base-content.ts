@@ -511,6 +511,44 @@ export const frameworkBaseContent: RpgContentBundle = {
       ],
     },
     {
+      id: "trainer_armorer_intro",
+      startNodeId: "greet",
+      nodes: [
+        {
+          id: "greet",
+          speaker: "Village Smith",
+          text: "Mind the sparks. Iron forgives a clumsy hand, steel does not. Want to learn, buy, or borrow my anvil?",
+          choices: [
+            {
+              id: "train",
+              text: "Teach me to work metal (train Armorer).",
+              endsDialogue: true,
+              effects: [
+                { type: "emit_event", eventId: "trainer:train", payload: { trainerId: "trainer_armorer_smith" } },
+              ],
+            },
+            {
+              id: "forge",
+              text: "Let me use your forge.",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "smithing:open" }],
+            },
+            {
+              id: "trade",
+              text: "I need ingots and hammers.",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_armor_01" } }],
+            },
+            {
+              id: "leave",
+              text: "Another time.",
+              endsDialogue: true,
+            },
+          ],
+        },
+      ],
+    },
+    {
       id: "trainer_destruction_intro",
       startNodeId: "greet",
       nodes: [
@@ -1034,6 +1072,24 @@ export const frameworkBaseContent: RpgContentBundle = {
       respawns: false,
       voiceType: "neutral",
       personalityTraits: ["cunning"],
+    },
+    {
+      id: "archetype_trainer_armorer",
+      name: "Village Smith",
+      description: "A soot-streaked smith who teaches the forge between commissions.",
+      role: "trainer",
+      factionId: "merchants_guild",
+      isHostile: false,
+      isMerchant: false,
+      scheduleId: "sched_villager",
+      dialogueId: "trainer_armorer_intro",
+      baseHealth: 110,
+      level: 4,
+      skills: { "armorer": 70, "blunt": 45, "block": 30 },
+      disposition: 52,
+      respawns: false,
+      voiceType: "neutral",
+      personalityTraits: ["brave"],
     },
     {
       id: "archetype_trainer_destruction",

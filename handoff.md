@@ -25,9 +25,13 @@ Delivered:
 
 Verification: tsc clean · 187 files / 5,811 unit tests · `npm run build` ✓ · boot-smoke ✓.
 
+Follow-up (same branch): Village Smith cottage trainer with Forge/Anvil props + `smithing:open`
+dialogue event; `trainer_armorer_smith` / `trainer_master_smith` (the master smith is registered but not
+placed in the world, like the other master trainers); 4 Armorer perks (perk tree now 40).
+
 Known limits: condition is tracked per item **id**, so two copies of the same item share one condition
-value. Crafting has no world station (the panel itself is the forge), and the Forge/Anvil GLBs exist
-but are not placed in the world. Armorer has no perks or trainers yet.
+value. The forge panel works anywhere (Shift+B); the Forge/Anvil props at Village Smith cottages are
+decoration plus a dialogue shortcut, not a station requirement.
 
 ---
 

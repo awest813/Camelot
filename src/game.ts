@@ -468,6 +468,8 @@ export class Game {
   private readonly _containerUI = new ContainerUI();
   /** When set, open barter after dialogue teardown (pointer lock restored first). */
   private _pendingBarterMerchantId: string | null = null;
+  /** Set by the smith's "use your forge" dialogue choice; opened once dialogue closes. */
+  private _pendingSmithingOpen = false;
 
   public isPaused: boolean = false;
 
@@ -2113,8 +2115,23 @@ export class Game {
           "archetype_trainer_blade",
           "archetype_trainer_alchemy",
           "archetype_trainer_destruction",
-        ][((cx + cz) % 3 + 3) % 3];
+          "archetype_trainer_armorer",
+        ][((cx + cz) % 4 + 4) % 4];
         this._spawnArchetypeNpc(cottageTrainer, chunkRecord, cx2 - 2, cz2 + 1);
+        // The smith works out of a forge and anvil beside the homestead.
+        if (cottageTrainer === "archetype_trainer_armorer") {
+          const smithy: Array<["qForge" | "qAnvil", number, number]> = [
+            ["qForge", cx2 - 4.5, cz2 + 2.5],
+            ["qAnvil", cx2 - 3, cz2 + 3.5],
+          ];
+          for (const [key, px, pz] of smithy) {
+            this.fantasyAssets.getInstance(key, (root) => {
+              if (!root) return;
+              root.position.set(px, 0, pz);
+              this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
+            });
+          }
+        }
         if (_chunkRand(cx, cz, 91) < 0.3) {
           this._spawnArchetypeNpc("archetype_guard", chunkRecord, cx2 + 3, cz2 - 2);
         }
@@ -3244,6 +3261,10 @@ export class Game {
       this.barterSystem.playerGold = this._getInventoryGold();
       this._syncInventoryGoldToFramework();
       this._flushPendingBarter();
+      if (this._pendingSmithingOpen) {
+        this._pendingSmithingOpen = false;
+        this._openSmithingForge();
+      }
       this._currentDialogueNpcName = null;
     };
 
@@ -4604,9 +4625,7 @@ export class Game {
         return;
       }
       if (this._isCombatInputBlocked()) return;
-      this.craftingUI.show();
-      this._refreshCraftingUI();
-      this._suspendGameplayInput();
+      this._openSmithingForge();
     });
     adapter.onAction("toggleSpellMaking", () => {
       if (this.spellMakingUI.isVisible) {
@@ -6980,6 +6999,10 @@ export class Game {
         }
         return;
       }
+      if (eventId === "smithing:open") {
+        this._pendingSmithingOpen = true;
+        return;
+      }
       if (eventId === "barter:open") {
         const merchantId = typeof payload?.merchantId === "string" ? payload.merchantId : "merchant_01";
         if (this._barterUI.isVisible) {
@@ -7236,6 +7259,14 @@ export class Game {
       perks:           this.perkSystem.getAllPerks(),
       gearCondition:   this.smithing.getEquippedConditionSummary(),
     });
+  }
+
+  /** Open the smithing forge panel and hand input to it. */
+  private _openSmithingForge(): void {
+      if (this.craftingUI.isVisible) return;
+      this.craftingUI.show();
+      this._refreshCraftingUI();
+      this._suspendGameplayInput();
   }
 
   /** Re-render the smithing panel from live inventory + Armorer skill. */
