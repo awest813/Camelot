@@ -45,6 +45,13 @@ export class Player {
   public bonusDamage: number = 0;
   public bonusArmor: number = 0;
   public bonusMagicDamage: number = 0;
+  /**
+   * Damage / armor lost to equipment wear (ItemConditionSystem via
+   * SmithingController).  Kept separate from the bonus accumulators so wear
+   * never corrupts them; combat subtracts these at hit time.
+   */
+  public gearDamagePenalty: number = 0;
+  public gearArmorPenalty: number = 0;
 
   /**
    * Critical-hit probability in [0, 1].

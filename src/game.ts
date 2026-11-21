@@ -81,6 +81,10 @@ import { NpcScheduleSystem, SCHED_GUARD } from "./systems/npc-schedule-system";
 import { FixedStepLoop } from "./systems/fixed-step-loop";
 import { AlchemySystem } from "./systems/alchemy-system";
 import { AlchemyUI } from "./ui/alchemy-ui";
+import { CraftingSystem } from "./systems/crafting-system";
+import { CraftingUI } from "./ui/crafting-ui";
+import { ItemConditionSystem } from "./systems/item-condition-system";
+import { SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
 import { EnchantingSystem } from "./systems/enchanting-system";
 import { EnchantingUI } from "./ui/enchanting-ui";
 import { LodSystem } from "./systems/lod-system";
@@ -360,6 +364,12 @@ export class Game {
   // v4 systems (Oblivion-lite: alchemy)
   public alchemySystem: AlchemySystem;
   public alchemyUI: AlchemyUI;
+
+  // Smithing + gear wear (CraftingSystem / ItemConditionSystem, glued by SmithingController)
+  public craftingSystem: CraftingSystem;
+  public itemConditionSystem: ItemConditionSystem;
+  public smithing: SmithingController;
+  public craftingUI: CraftingUI;
 
   // v5 systems (Oblivion parity: enchanting)
   public enchantingSystem: EnchantingSystem;
@@ -728,6 +738,9 @@ export class Game {
     // Equipped weapon drives the combat weapon archetype (sword/bow/staff/...).
     this.equipmentSystem.onEquipmentChanged = () => {
       this._syncWeaponArchetype();
+      // New gear starts pristine; swapping pieces changes the wear penalty.
+      this.smithing?.trackEquippedGear();
+      this.smithing?.refreshPenalties();
       // Equipped gear is persistent state — keep the dirty-gated autosave aware.
       this.saveSystem.markDirty();
     };
@@ -749,6 +762,9 @@ export class Game {
       this._syncInventoryGoldToFramework();
       // Saved equipment bypasses equip() — re-sync the weapon archetype.
       this._syncWeaponArchetype();
+      // Restored condition values change the wear penalty on the player.
+      this.smithing?.trackEquippedGear();
+      this.smithing?.refreshPenalties();
       // Don't re-announce the bandit bounty if it's already live/finished.
       if (this.frameworkRuntime.questEngine.getQuestStatus("quest_bandit_bounty") !== "inactive") {
         this._banditQuestStarted = true;
@@ -1431,6 +1447,38 @@ export class Game {
 
     this.saveSystem.setEnchantingSystem(this.enchantingSystem);
 
+    // ── Smithing + gear wear ──────────────────────────────────────────────────
+    // Shift+B opens the forge.  Gear wears in combat; Repair Hammers mend it.
+    this.craftingSystem = new CraftingSystem();
+    this.itemConditionSystem = new ItemConditionSystem();
+    this.smithing = new SmithingController(this.craftingSystem, this.itemConditionSystem, {
+      inventory: this.inventorySystem,
+      equipment: this.equipmentSystem,
+      player: this.player,
+      getArmorerSkill: () => this.skillProgressionSystem?.getSkill("armorer")?.level ?? 0,
+      gainArmorerXp: (amount) => {
+        this.skillProgressionSystem?.gainXP("armorer", amount * (this.classSystem?.xpMultiplierFor("armorer") ?? 1));
+      },
+      notify: (message, durationMs) => this.ui.showNotification(message, durationMs),
+    });
+    this.craftingUI = new CraftingUI({ title: "Smithing Forge" });
+    this.craftingUI.materialLabel = (id) => SMITHING_MATERIAL_ITEMS[id]?.name ?? id;
+    this.craftingUI.onCraft = (recipeId) => {
+      const outcome = this.smithing.craft(recipeId);
+      if (outcome.success) this.saveSystem.markDirty();
+      this._refreshCraftingUI();
+    };
+    this.craftingUI.onClose = () => this._restoreGameplayInput();
+    this.saveSystem.setCraftingSystem(this.craftingSystem);
+    this.saveSystem.setItemConditionSystem(this.itemConditionSystem);
+    // Starter kit so the forge is usable before the first merchant visit.
+    this.inventorySystem.items.push(
+      smithingMaterialStack("iron_ingot", 3),
+      smithingMaterialStack("leather_strips", 2),
+      smithingMaterialStack("repair_hammer", 2),
+    );
+    this.player.carryWeight = this.inventorySystem.totalWeight;
+
     // ── v6 system wiring (Weather + QuickSlots) ────────────────────────────────
     // WeatherSystem: Markov-chain atmospheric weather with fog/light integration.
     // Pass scene and light references so it can directly update visuals each tick.
@@ -1466,6 +1514,10 @@ export class Game {
 
     this.ui.onInventoryItemClick = (item) => {
       if (this._tryAssignQuickSlotFromClick(item)) return;
+      if (this.smithing.tryUseRepairItem(item)) {
+        this.saveSystem.markDirty();
+        return;
+      }
       if (this.quickSlotSystem.tryConsumeFromInventoryRow(item)) {
         this.saveSystem.markDirty();
         return;
@@ -1516,6 +1568,7 @@ export class Game {
     // Bolt-riding status effects (burn, freeze, …) land on the player.
     this.projectileSystem.onPlayerDamaged = (_dmg, _sourceName, effect) => {
       if (effect) this.combatSystem.applyPlayerStatusEffect(effect);
+      this.smithing.onPlayerStruck();
     };
     this.projectileSystem.isPlayerDodging = () => this.combatSystem.isDodging;
     this.projectileSystem.onHostileHit = (npc, damage) => {
@@ -1697,6 +1750,9 @@ export class Game {
       [
         { id: "iron_sword", name: "Iron Sword", description: "A basic iron sword.", stackable: false, quantity: 2, slot: "mainHand", weight: 3, stats: { damage: 10, value: 80 } },
         { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 6, weight: 1, stats: { value: 15 } },
+        smithingMaterialStack("iron_ingot", 10),
+        smithingMaterialStack("steel_ingot", 4),
+        smithingMaterialStack("repair_hammer", 5),
       ],
       800,
       72,
@@ -1707,6 +1763,9 @@ export class Game {
       [
         { id: "leather_chest_01", name: "Leather Chest", description: "Light armor. +15 Armor Rating.", stackable: false, quantity: 1, slot: "chest", weight: 4, stats: { armor: 15, value: 55 } },
         { id: "iron_helm_01", name: "Iron Helm", description: "A sturdy iron helmet. +12 Armor Rating.", stackable: false, quantity: 2, slot: "head", weight: 2.5, stats: { armor: 12, value: 45 } },
+        smithingMaterialStack("iron_ingot", 6),
+        smithingMaterialStack("leather_strips", 10),
+        smithingMaterialStack("repair_hammer", 5),
       ],
       650,
       72,
@@ -2910,6 +2969,9 @@ export class Game {
       inventory: [
         { id: "iron_sword", name: "Iron Sword", description: "A basic iron sword.", stackable: false, quantity: 2, slot: "mainHand", weight: 3, stats: { damage: 10, value: 80 } },
         { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 6, weight: 1, stats: { value: 15 } },
+        smithingMaterialStack("iron_ingot", 10),
+        smithingMaterialStack("steel_ingot", 4),
+        smithingMaterialStack("repair_hammer", 5),
       ],
       gold: 800,
       priceMultiplier: 1.15,
@@ -2924,6 +2986,9 @@ export class Game {
       inventory: [
         { id: "leather_chest_01", name: "Leather Chest", description: "Light armor. +15 Armor Rating.", stackable: false, quantity: 1, slot: "chest", weight: 4, stats: { armor: 15, value: 55 } },
         { id: "iron_helm_01", name: "Iron Helm", description: "A sturdy iron helmet. +12 Armor Rating.", stackable: false, quantity: 2, slot: "head", weight: 2.5, stats: { armor: 12, value: 45 } },
+        smithingMaterialStack("iron_ingot", 6),
+        smithingMaterialStack("leather_strips", 10),
+        smithingMaterialStack("repair_hammer", 5),
       ],
       gold: 650,
       priceMultiplier: 1.12,
@@ -3137,8 +3202,10 @@ export class Game {
         this._lastAssaultCrimeMs = nowMs;
         this.crimeSystem.commitCrime("assault", npc.factionId ?? "village_guard", this.timeSystem.elapsedGameTime);
     };
+    this.combatSystem.onWeaponHit = (powerAttack) => this.smithing.onWeaponHit(powerAttack);
     this.combatSystem.onPlayerHit = () => {
         this.audioSystem.playPlayerHit();
+        this.smithing.onPlayerStruck();
         // Small chance to contract a random disease on each hit (Oblivion-style).
         // ~5 % base chance per strike; resistance is factored inside contractDisease().
         if (Math.random() < 0.05) {
@@ -3151,6 +3218,7 @@ export class Game {
         }
     };
     this.combatSystem.onBlockSuccess = () => {
+        this.smithing.onBlock();
         this.skillProgressionSystem.gainXP("block", 5 * this.classSystem.xpMultiplierFor("block"));
     };
     this.interactionSystem.onLootPickup = (id) => {
@@ -4337,7 +4405,7 @@ export class Game {
   /** Panel toggles that may be pressed again from inside their open DOM dialog. */
   private static readonly _DIALOG_TOGGLE_ACTIONS: ReadonlySet<InputAction> = new Set<InputAction>([
     "toggleInventory", "toggleQuestLog", "toggleSkillTree", "toggleAttributePanel",
-    "toggleAlchemy", "toggleEnchanting", "toggleSpellMaking", "toggleFastTravel",
+    "toggleAlchemy", "toggleEnchanting", "toggleSmithing", "toggleSpellMaking", "toggleFastTravel",
     "toggleWaitDialog", "togglePetPanel", "toggleFollowerPanel", "toggleShoutMenu",
     "stableOrSaddlebag", "favoritesMenu",
   ]);
@@ -4527,6 +4595,17 @@ export class Game {
       }
       if (this._isCombatInputBlocked()) return;
       this.enchantingUI.toggle(true);
+      this._suspendGameplayInput();
+    });
+    adapter.onAction("toggleSmithing", () => {
+      if (this.craftingUI.isVisible) {
+        this.craftingUI.hide();
+        this._restoreGameplayInput();
+        return;
+      }
+      if (this._isCombatInputBlocked()) return;
+      this.craftingUI.show();
+      this._refreshCraftingUI();
       this._suspendGameplayInput();
     });
     adapter.onAction("toggleSpellMaking", () => {
@@ -4763,6 +4842,7 @@ export class Game {
       if (this.ui.isAttributePanelOpen) { this.ui.toggleAttributePanel(false); this._restoreGameplayInput(); return; }
       if (this.alchemyUI.isVisible) { this.alchemyUI.toggle(false); this._restoreGameplayInput(); return; }
       if (this.enchantingUI.isVisible) { this.enchantingUI.toggle(false); this._restoreGameplayInput(); return; }
+      if (this.craftingUI.isVisible) { this.craftingUI.hide(); this._restoreGameplayInput(); return; }
       if (this.spellMakingUI.isVisible) { this.spellMakingUI.close(); return; }
       if (this._barterUI.isVisible) { this._barterUI.onClose?.(); return; }
       if (this._containerUI.isVisible) { this._containerUI.onClose?.(); return; }
@@ -4952,6 +5032,7 @@ export class Game {
           }
           if (this.alchemyUI.isVisible) { this.alchemyUI.toggle(false); }
           if (this.enchantingUI.isVisible) { this.enchantingUI.toggle(false); }
+          if (this.craftingUI.isVisible) { this.craftingUI.hide(); }
           if (this.spellMakingUI.isVisible) { this.spellMakingUI.close(); }
           if (this.fastTravelUI.isVisible) { this.fastTravelUI.close(); }
           if (this.petUI.isVisible) { this.petUI.close(); }
@@ -5133,6 +5214,7 @@ export class Game {
       this.ui.isWaitDialogOpen ||
       this.alchemyUI.isVisible ||
       this.enchantingUI.isVisible ||
+      this.craftingUI.isVisible ||
       this.spellMakingUI.isVisible ||
       this.editorHubUI.isVisible
     ) {
@@ -6309,6 +6391,7 @@ export class Game {
           this.petUI.isVisible ||
           this.followerUI.isVisible ||
           this.pickpocketUI.isVisible ||
+          this.craftingUI.isVisible ||
           this.graphicsSettingsUI.isVisible ||
           !!this._creditsUI?.isVisible
       );
@@ -7151,7 +7234,18 @@ export class Game {
       infamyLabel:     this.fameSystem.infamyLabel,
       perkPoints:      this.perkSystem.perkPoints,
       perks:           this.perkSystem.getAllPerks(),
+      gearCondition:   this.smithing.getEquippedConditionSummary(),
     });
+  }
+
+  /** Re-render the smithing panel from live inventory + Armorer skill. */
+  private _refreshCraftingUI(): void {
+      if (!this.craftingUI.isVisible) return;
+      this.craftingUI.update(
+          this.craftingSystem,
+          this.smithing.getMaterials(),
+          this.skillProgressionSystem.getSkill("armorer")?.level ?? 0,
+      );
   }
 
   private _isCombatInputBlocked(): boolean {
@@ -7171,6 +7265,7 @@ export class Game {
           this.saddlebagUI.isVisible ||
           this.petUI.isVisible ||
           this.pickpocketUI.isVisible ||
+          this.craftingUI.isVisible ||
           this.characterSheetUI.isVisible ||
           this.graphicsSettingsUI.isVisible ||
           !!this._creditsUI?.isVisible ||

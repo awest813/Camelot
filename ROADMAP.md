@@ -13,12 +13,14 @@ This roadmap tracks where Camelot is today and where it is heading next. It is o
 
 These systems are complete with full test coverage but are **not reachable in-game**; cutting them from v1 keeps every advertised feature playable. Their `saveSystem.set*` hooks are already in place, so wiring one in later is a game.ts-only change:
 
-- ⏸️ **CraftingSystem + CraftingUI** (smithing/forging) — never instantiated; alchemy/enchanting cover v1 crafting.
-- ⏸️ **ItemConditionSystem** (weapon/armor degradation + repair) — never instantiated.
-
-*(DragonShoutSystem was previously on this list; it is now wired — see the Thu'um entry below.)*
+*(Nothing is currently deferred. DragonShoutSystem, CraftingSystem and ItemConditionSystem were previously on this list; all three are now wired — see the Thu'um and Smithing entries.)*
 
 ---
+
+## Smithing & gear wear (post-1.0)
+
+- ✅ **Smithing forge (Shift+B)** — `CraftingSystem` + `CraftingUI` are live, glued to the game by `SmithingController` (`src/systems/smithing-controller.ts`): 11 recipes (repair hammers, iron dagger/sword/helm/shield/cuirass, leather chest, steel smelting, steel sword/shield/cuirass) consume real inventory materials (Iron Ingot, Steel Ingot, Leather Strips), check bag space first, and award XP to the new **Armorer** skill (Endurance-governed, a Combat specialization skill). Skill above a recipe's requirement raises quality (Fine → Masterwork), which scales damage/armor/value and gives the item its own id. Materials come from a starter kit, the arms and armor merchants, and bandit/dungeon loot. Craft counts persist in the save (`crafting`, optional field, no version bump).
+- ✅ **Gear wear and repair** — `ItemConditionSystem` is live: melee hits wear the main-hand weapon (power attacks twice as fast), blocks wear the shield (or the weapon), and blows or arrows that land wear a random armor piece. Worn gear loses up to half its damage/armor through `Player.gearDamagePenalty` / `gearArmorPenalty`, which combat and arrows subtract. Clicking a Repair Hammer in the inventory mends the most worn equipped piece (+10, +0.5 per Armorer level). The character sheet lists each piece's condition. Condition persists in the existing `itemCondition` save slot.
 
 ## Steam release (1.0.0)
 

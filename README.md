@@ -134,6 +134,7 @@ The in-engine **Map Editor** (activated with F2) lets you author world content w
 | U              | Toggle attribute panel                                   |
 | L              | Open alchemy workbench                                   |
 | B              | Open enchanting altar                                    |
+| Shift+B        | Open smithing forge (craft gear; materials from inventory) |
 | V              | Activate racial power                                    |
 | H              | Show fame / infamy status and active effects             |
 | T              | Wait / Rest (choose 1–24 hours)                          |

@@ -121,6 +121,19 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
   await page.keyboard.up("w");
   expect(pageErrors, `walking threw inside the render loop:\n${pageErrors.join("\n")}`).toEqual([]);
 
+  // Shift+B — the smithing forge opens, crafts from the starter kit, and closes.
+  await page.keyboard.press("Shift+B");
+  const forge = page.locator(".crafting-ui");
+  await expect(forge).toBeVisible();
+  await expect(forge.locator(".crafting-ui__title")).toHaveText("Smithing Forge");
+  await forge.locator('[data-recipe-id="smith_iron_sword"]').click();
+  await expect(forge.locator(".crafting-ui__mat-name").first()).toHaveText("Iron Ingot");
+  await forge.locator(".crafting-ui__craft-btn").click();
+  await expect(forge.locator('[data-recipe-id="smith_iron_sword"] .crafting-ui__craft-count')).toHaveText("×1");
+  await forge.locator(".crafting-ui__close").click();
+  await expect(forge).toBeHidden();
+  await page.locator("#renderCanvas").click({ force: true });
+
   // F5 — manual save.  Assert the full game-state graph serialised.
   await page.keyboard.press("F5");
   const saveRaw = await page.evaluate(() => localStorage.getItem("camelot_save"));
@@ -131,6 +144,9 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
   expect(save.survival, "survival state persists").toBeDefined();
   expect(save.travelEvents, "travel event cooldowns persist").toBeDefined();
   expect(save.ambientEvents, "ambient event cooldowns persist").toBeDefined();
+  expect(save.crafting?.recipeSnapshots, "smithing state persists").toContainEqual({ id: "smith_iron_sword", craftCount: 1 });
+  expect(save.itemCondition, "gear condition persists").toBeDefined();
+  expect(save.inventory.some((i: { id: string }) => i.id.startsWith("iron_sword")), "forged sword is in the bag").toBe(true);
 
   // F9 — load the save back into the live game without crashing.
   await page.keyboard.press("F9");

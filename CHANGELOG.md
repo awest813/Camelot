@@ -3,6 +3,26 @@
 All notable changes to Camelot are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Smithing forge (Shift+B): 11 recipes that use Iron Ingots, Steel Ingots and
+  Leather Strips from the inventory. Better Armorer skill gives Fine to
+  Masterwork gear with higher stats.
+- Armorer skill. It goes up by smithing and repairing.
+- Gear wear: weapons wear when they hit, shields when they block, and armor
+  when the player is hit. Worn gear deals less damage and blocks less. The
+  character sheet shows each equipped piece's condition.
+- Repair Hammers: click one in the inventory to repair the most worn equipped
+  piece. Higher Armorer skill repairs more.
+- Smithing materials and hammers are sold by the arms and armor merchants and
+  drop from bandits and dungeons. New characters start with a small kit.
+
+### Changed
+- Plain B still opens Enchanting. B with Shift held now opens Smithing.
+- Saves gain an optional `crafting` field. Save version stays at 29, and older
+  saves still load.
+
 ## [1.0.0] — Steam release
 
 Desktop shell for Steam, with on-disk saves, a quit path, credits, and the

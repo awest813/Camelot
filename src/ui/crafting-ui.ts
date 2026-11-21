@@ -81,6 +81,14 @@ export class CraftingUI {
   public onCraft: ((recipeId: string) => void) | null = null;
   /** Fired when the ✕ button closes the panel (Escape is owned by the game cascade). */
   public onClose: (() => void) | null = null;
+  /** Maps a material id to its display name (defaults to the raw id). */
+  public materialLabel: ((materialId: string) => string) | null = null;
+
+  private readonly _title: string;
+
+  constructor(options: { title?: string } = {}) {
+    this._title = options.title ?? "Crafting Workbench";
+  }
 
   private _root:        HTMLDivElement   | null = null;
   private _tabBar:      HTMLDivElement   | null = null;
@@ -217,7 +225,7 @@ export class CraftingUI {
     root.className = "crafting-ui";
     root.setAttribute("role", "dialog");
     root.setAttribute("aria-modal", "true");
-    root.setAttribute("aria-label", "Crafting Workbench");
+    root.setAttribute("aria-label", this._title);
     root.style.display = "none";
 
     // ── Header ────────────────────────────────────────────────────────────────
@@ -227,7 +235,7 @@ export class CraftingUI {
 
     const titleEl = document.createElement("h2");
     titleEl.className = "crafting-ui__title";
-    titleEl.textContent = "Crafting Workbench";
+    titleEl.textContent = this._title;
     header.appendChild(titleEl);
 
     // ── Tab bar ───────────────────────────────────────────────────────────────
@@ -527,7 +535,7 @@ export class CraftingUI {
 
     const nameEl = document.createElement("span");
     nameEl.className = "crafting-ui__mat-name";
-    nameEl.textContent = mat.materialId;
+    nameEl.textContent = this.materialLabel?.(mat.materialId) ?? mat.materialId;
     li.appendChild(nameEl);
 
     const qtyEl = document.createElement("span");

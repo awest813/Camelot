@@ -397,6 +397,13 @@ describe("BabylonInputAdapter", () => {
     expect(adapter.matchAction("F9", "down", { shift: true })).toBeNull();
   });
 
+  it("Shift+B opens smithing while plain B still opens enchanting", () => {
+    const adapter = new BabylonInputAdapter();
+    expect(adapter.matchAction("B", "down", { shift: true })).toBe("toggleSmithing");
+    expect(adapter.matchAction("b", "down", { shift: false })).toBe("toggleEnchanting");
+    expect(adapter.matchAction("b", "down")).toBe("toggleEnchanting");
+  });
+
   it("binds each key/action pair once (G was listed twice)", () => {
     const seen = new Set<string>();
     for (const b of DEFAULT_BINDINGS) {

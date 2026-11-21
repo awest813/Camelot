@@ -58,7 +58,8 @@ export type ProgressionSkillId =
   | "marksman"
   | "sneak"
   | "speechcraft"
-  | "alchemy";
+  | "alchemy"
+  | "armorer";
 
 export interface ProgressionSkill {
   id: ProgressionSkillId;
@@ -100,6 +101,7 @@ export class SkillProgressionSystem {
       { id: "sneak",       name: "Sneak" },
       { id: "speechcraft", name: "Speechcraft" },
       { id: "alchemy",     name: "Alchemy" },
+      { id: "armorer",     name: "Armorer" },
     ];
     for (const def of definitions) {
       this._skills.set(def.id, {

@@ -77,6 +77,7 @@ export const SKILL_GOVERNING_ATTRIBUTE: Readonly<Record<ProgressionSkillId, Attr
   sneak:       "speed",
   speechcraft: "luck",
   alchemy:     "intelligence",
+  armorer:     "endurance",
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────

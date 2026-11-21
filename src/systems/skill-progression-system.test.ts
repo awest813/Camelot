@@ -16,10 +16,10 @@ describe("SkillProgressionSystem", () => {
 
   // ── Initial state ─────────────────────────────────────────────────────────
 
-  it("initialises all nine skills at level 0 with 0 XP", () => {
+  it("initialises all ten skills at level 0 with 0 XP", () => {
     const ids: ProgressionSkillId[] = [
       "blade", "blunt", "block", "destruction", "restoration", "marksman",
-      "sneak", "speechcraft", "alchemy",
+      "sneak", "speechcraft", "alchemy", "armorer",
     ];
     for (const id of ids) {
       const skill = sps.getSkill(id);
@@ -29,8 +29,8 @@ describe("SkillProgressionSystem", () => {
     }
   });
 
-  it("getAllSkills returns exactly 9 skills", () => {
-    expect(sps.getAllSkills()).toHaveLength(9);
+  it("getAllSkills returns exactly 10 skills", () => {
+    expect(sps.getAllSkills()).toHaveLength(10);
   });
 
   // ── XP gain ───────────────────────────────────────────────────────────────

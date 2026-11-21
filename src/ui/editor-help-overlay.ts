@@ -5,7 +5,7 @@ const BASE_CONTROLS: readonly string[] = [
   "Left Click: Attack · Right Click (hold): Block · E: Interact (talk / take / open) · Shift+E: Power Attack",
   "F: Dodge Roll · R (hold): Draw Bow, release to fire",
   "I: Inventory · Tab: Character Sheet · J: Quest Log · K: Skills · U: Attributes",
-  "Q: Cast Spell · Z: Cycle Spells · X: Spellmaking · L: Alchemy · B: Enchanting · T: Wait",
+  "Q: Cast Spell · Z: Cycle Spells · X: Spellmaking · L: Alchemy · B: Enchanting · Shift+B: Smithing · T: Wait",
   "V: Racial Power · H: Fame / Status · Y: Fast Travel Menu (Recall) · Shift+M: Mark",
   "N: Shouts (Thu'um) · Shift+N: Shout! · Slay dragons for souls & Words of Power",
   "C: Crouch (sneak) · E while undetected: Pickpocket · P: Pets · G: Followers",

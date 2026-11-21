@@ -4294,6 +4294,17 @@ body::before {
   padding-bottom: 5px;
 }
 
+.character-sheet-ui__subsection-title {
+  font-family: 'Cinzel', serif;
+  font-size: 0.9rem;
+  color: #c9a646;
+  margin: 12px 0 6px;
+}
+
+.character-sheet-ui__gear-row--worn .character-sheet-ui__row-value {
+  color: #e07a5f;
+}
+
 .character-sheet-ui__identity {
   display: grid;
   /* 130px columns forced "Birthsign" + "The Warrior" to wrap into each other. */

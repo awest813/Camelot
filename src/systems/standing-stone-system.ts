@@ -74,6 +74,7 @@ export const SKILL_FAMILY: Readonly<Partial<Record<ProgressionSkillId, StandingS
   blunt:    "combat",
   block:    "combat",
   marksman: "combat",
+  armorer:  "combat",
   // ── Magic (Mage family) ───────────────────────────────────────────────────
   destruction: "magic",
   restoration: "magic",

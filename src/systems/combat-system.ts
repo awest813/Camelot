@@ -365,6 +365,9 @@ export class CombatSystem {
   /** Fired whenever the player's attack damages an NPC (assault/crime ingestion). */
   public onNpcDamaged: ((npc: NPC, damage: number) => void) | null = null;
 
+  /** Fired when the player's melee weapon lands a blow (true for power attacks) — drives weapon wear. */
+  public onWeaponHit: ((powerAttack: boolean) => void) | null = null;
+
   /** Fired whenever the player takes damage from an NPC. */
   public onPlayerHit: (() => void) | null = null;
 
@@ -858,7 +861,7 @@ export class CombatSystem {
       const rawMeleeDmg = Math.max(
         1,
         Math.round(
-          (MELEE_DAMAGE + this.player.bonusDamage + this._strengthBonus())
+          (MELEE_DAMAGE + this.player.bonusDamage - (this.player.gearDamagePenalty ?? 0) + this._strengthBonus())
           * meleeProfile.damageMultiplier
           * weaponProfile.damageMultiplier
           * fatigueFactor
@@ -875,6 +878,7 @@ export class CombatSystem {
 
       npc.takeDamage(meleeDmg);
       this.onNpcDamaged?.(npc, meleeDmg);
+      this.onWeaponHit?.(false);
       this._ui.applyHitStop(isFinisher ? 160 : isCrit ? 120 : 60);
       this._ui.shakeCamera(isFinisher ? 0.7 : isCrit ? 0.6 : 0.25);
 
@@ -1041,7 +1045,7 @@ export class CombatSystem {
         const rawDmg = Math.max(
           1,
           Math.round(
-            (MELEE_DAMAGE + this.player.bonusDamage + this._strengthBonus())
+            (MELEE_DAMAGE + this.player.bonusDamage - (this.player.gearDamagePenalty ?? 0) + this._strengthBonus())
             * meleeProfile.damageMultiplier
             * weaponProfile.damageMultiplier
             * POWER_ATTACK_DAMAGE_MULTIPLIER
@@ -1063,6 +1067,7 @@ export class CombatSystem {
           : applyDamageWithResistance(rawDmg, npc, "physical", weaponProfile.armorPenFraction);
         npc.takeDamage(finalDmg);
         this.onNpcDamaged?.(npc, finalDmg);
+        this.onWeaponHit?.(true);
 
         this._ui.applyHitStop(isExecute ? 200 : 140);
         this._ui.shakeCamera(isExecute ? 0.85 : 0.65);
@@ -2003,7 +2008,7 @@ export class CombatSystem {
     if (npcArchetype === "magic") {
       dmg = Math.max(1, npc.attackDamage);
     } else {
-      const playerAR = Math.max(0, this.player.bonusArmor);
+      const playerAR = Math.max(0, this.player.bonusArmor - (this.player.gearArmorPenalty ?? 0));
       const rawDmg = npcArchetype === "ranged"
         ? Math.round(npc.attackDamage * 0.85)
         : npc.attackDamage;

@@ -340,6 +340,8 @@ export const STARTER_LOOT_TABLES: LootTable[] = [
       { itemId: "iron_shield",   itemName: "Iron Shield",   weight: 15,                  itemTemplate: { stackable: false, weight: 5.0, slot: "offHand",  stats: { armor: 6,  value: 60 } } },
       { itemId: "leather_armor", itemName: "Leather Armor", weight: 15,                  itemTemplate: { stackable: false, weight: 7.0, slot: "chest",    stats: { armor: 4,  value: 50 } } },
       { itemId: "health_potion", itemName: "Health Potion", weight: 15, maxQuantity: 2,  itemTemplate: { stackable: true, weight: 0.5, stats: { value: 25 } } },
+      { itemId: "iron_ingot",     itemName: "Iron Ingot",     weight: 10, maxQuantity: 2,  itemTemplate: { description: "A bar of smelted iron. Used at the forge (Shift+B).", stackable: true, weight: 1.0, stats: { value: 7 } } },
+      { itemId: "leather_strips", itemName: "Leather Strips", weight: 10, maxQuantity: 3,  itemTemplate: { description: "Cured hide cut into strips for grips and straps.", stackable: true, weight: 0.1, stats: { value: 3 } } },
     ],
   },
   {
@@ -353,6 +355,8 @@ export const STARTER_LOOT_TABLES: LootTable[] = [
       { itemId: "magic_scroll",    itemName: "Magic Scroll",    weight: 8,  maxQuantity: 2,   itemTemplate: { stackable: true, weight: 0.2, stats: { value: 75 } } },
       { itemId: "health_potion",   itemName: "Health Potion",   weight: 13, maxQuantity: 3,   itemTemplate: { stackable: true, weight: 0.5, stats: { value: 25 } } },
       { itemId: "lockpick",        itemName: "Lockpick",        weight: 10, maxQuantity: 5,   itemTemplate: { stackable: true, weight: 0.1, stats: { value: 8 } } },
+      { itemId: "steel_ingot",     itemName: "Steel Ingot",     weight: 8,  maxQuantity: 2,   itemTemplate: { description: "Tempered steel, stronger than iron. Used at the forge (Shift+B).", stackable: true, weight: 1.0, stats: { value: 20 } } },
+      { itemId: "repair_hammer",   itemName: "Repair Hammer",   weight: 8,  maxQuantity: 2,   itemTemplate: { description: "Click to mend your most worn equipped piece.", stackable: true, weight: 0.5, stats: { value: 12 } } },
     ],
   },
   {

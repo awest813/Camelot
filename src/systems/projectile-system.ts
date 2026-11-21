@@ -528,7 +528,7 @@ export class ProjectileSystem {
     aggregate.body.applyImpulse(direction.scale(launchSpeed * 0.1), mesh.position);
 
     const baseDamage = Math.max(1, Math.round(
-      (BASE_ARROW_DAMAGE + skillBonus + this._player.bonusDamage + this._agilityRangedBonus())
+      (BASE_ARROW_DAMAGE + skillBonus + this._player.bonusDamage - (this._player.gearDamagePenalty ?? 0) + this._agilityRangedBonus())
       * arrowProfile.damageMultiplier
       * drawFraction
       * bowProf.damageMultiplier

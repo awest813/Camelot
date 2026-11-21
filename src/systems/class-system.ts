@@ -11,7 +11,7 @@
  *   - `majorSkills`         — Three to four distinct skills that start at +25
  *                             and gain 1.5× XP.
  *
- * All nine skills not listed in `majorSkills` are automatically treated as
+ * All skills not listed in `majorSkills` are automatically treated as
  * minor skills (1.25× XP, starting +10).
  *
  * Integration:
@@ -41,7 +41,7 @@ import type { SkillProgressionSystem, ProgressionSkillId } from "./skill-progres
 /** Combat specialization group. */
 export type ClassSpecialization = "combat" | "magic" | "stealth";
 
-/** All seven progression skill ids in a stable order. */
+/** All progression skill ids in a stable order. */
 const ALL_SKILL_IDS: ReadonlyArray<ProgressionSkillId> = [
   "blade",
   "blunt",
@@ -52,6 +52,7 @@ const ALL_SKILL_IDS: ReadonlyArray<ProgressionSkillId> = [
   "sneak",
   "speechcraft",
   "alchemy",
+  "armorer",
 ];
 
 /** A character class definition. */
@@ -293,7 +294,7 @@ export const CHARACTER_CLASSES: ReadonlyArray<CharacterClass> = [
  * the original groupings.
  */
 const SPECIALIZATION_SKILLS: Record<ClassSpecialization, ReadonlySet<ProgressionSkillId>> = {
-  combat:  new Set(["blade", "blunt", "block", "marksman"]),
+  combat:  new Set(["blade", "blunt", "block", "marksman", "armorer"]),
   magic:   new Set(["destruction", "restoration", "alchemy"]),
   stealth: new Set(["sneak", "speechcraft", "marksman"]),
 };

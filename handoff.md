@@ -1,5 +1,36 @@
 # Camelot — Handoff
 
+## 2026-11-21 — Smithing + gear wear wired (branch `claude/gallant-hopper-rhmqa3`)
+
+Baseline on arrival: `main` @ 6eab0ae (1.0.0 Steam release), tsc clean, 186 files / 5,787 tests green.
+The Sep-20 notes below are older: pickpocket UI, ranged/magic enemy AI and quest failure are **already
+wired** on `main`. The only systems still deferred were CraftingSystem and ItemConditionSystem (ROADMAP ⏸️).
+
+Delivered:
+- `src/systems/smithing-controller.ts` (+23 tests) connects CraftingSystem and ItemConditionSystem to
+  the inventory, equipment, player and skills. It holds the recipe catalog, material items, quality
+  scaling, wear hooks and repair hammers.
+- New **Armorer** skill (`ProgressionSkillId`), governed by Endurance, and a Combat specialization skill
+  in ClassSystem. Smithing and repairing give Armorer XP.
+- Shift+B opens `toggleSmithing` (input adapter; plain B is now `shift:false` → enchanting). Smithing
+  takes part in the pause cascade, close-all, onboarding guard, crosshair hiding and combat-input block.
+- Wear hooks: `CombatSystem.onWeaponHit(powerAttack)` (new), `onPlayerHit`, `onBlockSuccess`, and
+  projectile `onPlayerDamaged`. Combat and arrows subtract `Player.gearDamagePenalty` /
+  `gearArmorPenalty`. These are recomputed on equip change and after load (`onAfterLoad`).
+- Save: new optional `crafting` field (no version bump); `itemCondition` already existed and is now
+  populated.
+- Character sheet: "Gear Condition" rows. CraftingUI: `title` option + `materialLabel` hook.
+- E2E boot-smoke now opens the forge, crafts an Iron Sword, and asserts it is in the save. The test
+  passes on headless Chromium (`PW_CHROMIUM_PATH=/opt/pw-browsers/chromium`).
+
+Verification: tsc clean · 187 files / 5,811 unit tests · `npm run build` ✓ · boot-smoke ✓.
+
+Known limits: condition is tracked per item **id**, so two copies of the same item share one condition
+value. Crafting has no world station (the panel itself is the forge), and the Forge/Anvil GLBs exist
+but are not placed in the world. Armorer has no perks or trainers yet.
+
+---
+
 Date: 2026-09-20 (evening) · Branch: `main` · Prior HEAD `4a42028` committed 18:22
 (Sep-16 handoff's phases 0–5 + menu polish are now committed; what follows is new.)
 

@@ -67,6 +67,7 @@ export type InputAction =
   | "toggleAttributePanel"
   | "toggleAlchemy"
   | "toggleEnchanting"
+  | "toggleSmithing"
   | "toggleSpellMaking"
   | "toggleFastTravel"
   | "togglePetPanel"
@@ -178,7 +179,9 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   { key: "k", action: "toggleSkillTree", caseInsensitive: true },
   { key: "u", action: "toggleAttributePanel", caseInsensitive: true },
   { key: "l", action: "toggleAlchemy", caseInsensitive: true, shift: false },
-  { key: "b", action: "toggleEnchanting", caseInsensitive: true },
+  // Shift+B = Smithing forge; plain B = Enchanting (shift binding must come first)
+  { key: "b", action: "toggleSmithing", shift: true, caseInsensitive: true },
+  { key: "b", action: "toggleEnchanting", caseInsensitive: true, shift: false },
   { key: "x", action: "toggleSpellMaking", caseInsensitive: true },
   // Y = Fast travel (ctrlOrMeta:false so Ctrl+Y falls through to editor redo)
   { key: "y", action: "toggleFastTravel", caseInsensitive: true, ctrlOrMeta: false },

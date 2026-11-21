@@ -52,6 +52,8 @@ export interface CharacterSheetData {
   perkPoints?:        number;
   /** All perk entries (with unlock/eligibility state) from PerkSystem. */
   perks?:             ReadonlyArray<PerkEntry>;
+  /** Condition (0–100 %) of each equipped piece that wears, most worn first. */
+  gearCondition?:     ReadonlyArray<{ slot: string; name: string; condition: number }>;
 }
 
 /** Display order and labels for attribute rows. */
@@ -457,6 +459,18 @@ export class CharacterSheetUI {
       this._derivedEl.appendChild(
         this._buildRow("derived", row.label, row.value, row.icon),
       );
+    }
+
+    if (data.gearCondition && data.gearCondition.length > 0) {
+      const gearHeading = document.createElement("h4");
+      gearHeading.className = "character-sheet-ui__subsection-title";
+      gearHeading.textContent = "Gear Condition";
+      this._derivedEl.appendChild(gearHeading);
+      for (const piece of data.gearCondition) {
+        const row = this._buildRow("gear", piece.name, `${Math.round(piece.condition)}%`);
+        if (piece.condition < 40) row.classList.add("character-sheet-ui__gear-row--worn");
+        this._derivedEl.appendChild(row);
+      }
     }
   }
 
