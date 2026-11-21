@@ -16,8 +16,10 @@
  * - **Repair**: using a Repair Hammer from the inventory mends the most
  *   damaged equipped piece by an amount that scales with Armorer skill.
  *
- * Condition is tracked per item id (the inventory identifies items by id),
- * so two copies of the same item share one condition value.
+ * Condition is tracked per piece: every wearable gets an `instanceId` the
+ * first time it is forged, equipped or worn, so two Iron Swords wear
+ * independently.  The id travels with the item through equip/unequip, barter
+ * and saves (items are serialized whole).
  */
 
 import {
@@ -71,6 +73,19 @@ export interface SmithingControllerDeps {
   notify: (message: string, durationMs?: number) => void;
   /** RNG for picking which armor piece takes a hit (tests inject one). */
   random?: () => number;
+  /** Instance-id factory (tests inject a deterministic one). */
+  newInstanceId?: (itemId: string) => string;
+}
+
+let _instanceCounter = 0;
+function defaultInstanceId(itemId: string): string {
+  _instanceCounter = (_instanceCounter + 1) % 1_679_616;
+  return `${itemId}#${Date.now().toString(36)}${_instanceCounter.toString(36)}`;
+}
+
+/** Key under which an item's condition is stored (its instance id, else its item id). */
+export function conditionKey(item: Item): string {
+  return item.instanceId ?? item.id;
 }
 
 // ── Item catalog ──────────────────────────────────────────────────────────────
@@ -253,10 +268,12 @@ export class SmithingController {
       this._deps.inventory.removeItem(m.materialId, m.quantity);
     }
     const item = this.buildOutputItem(outcome.result.outputItemId, outcome.result.quality, outcome.result.quantity);
-    this._deps.inventory.addItem(item);
-    if (item.slot && this.condition.getCondition(item.id) === undefined) {
-      this.condition.initItem(item.id, MAX_CONDITION);
+    if (this._isWearable(item)) {
+      // Fresh from the anvil: its own instance, pristine.
+      item.instanceId = this._newInstanceId(item.id);
+      this.condition.initItem(item.instanceId, MAX_CONDITION);
     }
+    this._deps.inventory.addItem(item);
     this._deps.gainArmorerXp(outcome.result.xpAwarded);
     this._deps.notify(`Forged ${item.quantity > 1 ? `${item.quantity}× ` : ""}${item.name}`, 2200);
     return outcome;
@@ -307,9 +324,7 @@ export class SmithingController {
   /** Start tracking any equipped gear that has no condition yet (new items start pristine). */
   public trackEquippedGear(): void {
     for (const item of this._deps.equipment.getEquipped().values()) {
-      if (this._isWearable(item) && this.condition.getCondition(item.id) === undefined) {
-        this.condition.initItem(item.id, MAX_CONDITION);
-      }
+      if (this._isWearable(item)) this._ensureTracked(item);
     }
   }
 
@@ -343,11 +358,32 @@ export class SmithingController {
   }
 
   private _wear(item: Item, amount: number): void {
-    if (this.condition.getCondition(item.id) === undefined) this.condition.initItem(item.id, MAX_CONDITION);
+    const key = this._ensureTracked(item);
     const scaled = amount * Math.max(0, this._deps.player.perkWearMultiplier ?? 1);
     if (scaled <= 0) return;
-    this.condition.degradeItem(item.id, scaled);
+    this.condition.degradeItem(key, scaled);
     this.refreshPenalties();
+  }
+
+  /**
+   * Give a wearable its own instance id (mutating the item in place, so the
+   * equipped copy carries it back to the bag) and a condition entry.
+   * Returns the condition key.
+   */
+  private _ensureTracked(item: Item): string {
+    if (!item.instanceId) {
+      item.instanceId = this._newInstanceId(item.id);
+      // Saves from before per-piece tracking keyed condition by item id.
+      const legacy = this.condition.getCondition(item.id);
+      this.condition.initItem(item.instanceId, legacy ?? MAX_CONDITION);
+    } else if (this.condition.getCondition(item.instanceId) === undefined) {
+      this.condition.initItem(item.instanceId, MAX_CONDITION);
+    }
+    return item.instanceId;
+  }
+
+  private _newInstanceId(itemId: string): string {
+    return (this._deps.newInstanceId ?? defaultInstanceId)(itemId);
   }
 
   /**
@@ -360,7 +396,7 @@ export class SmithingController {
     for (const item of this._deps.equipment.getEquipped().values()) {
       const stats = item.stats;
       if (!stats) continue;
-      const lost = 1 - this.condition.getDamageMult(item.id);
+      const lost = 1 - this.condition.getDamageMult(conditionKey(item));
       if (lost <= 0) continue;
       if (typeof stats.damage === "number" && stats.damage > 0) damagePenalty += stats.damage * lost;
       if (typeof stats.armor === "number" && stats.armor > 0) armorPenalty += stats.armor * lost;
@@ -382,11 +418,12 @@ export class SmithingController {
       this._deps.notify("Your equipped gear is in good repair.", 2000);
       return true;
     }
-    const before = this.condition.getCondition(target.id) ?? MAX_CONDITION;
+    const key = this._ensureTracked(target);
+    const before = this.condition.getCondition(key) ?? MAX_CONDITION;
     const skill = Math.max(0, Math.min(100, this._deps.getArmorerSkill()));
     const amount = (BASE_REPAIR_KIT_AMOUNT + skill * REPAIR_KIT_SKILL_SCALE)
       * Math.max(0, this._deps.player.perkRepairMultiplier ?? 1);
-    const after = this.condition.repairItem(target.id, amount) ?? before;
+    const after = this.condition.repairItem(key, amount) ?? before;
     this._deps.inventory.removeItem(REPAIR_HAMMER_ID, 1);
     this._deps.gainArmorerXp(REPAIR_XP);
     this.refreshPenalties();
@@ -399,7 +436,7 @@ export class SmithingController {
     const rows: Array<{ slot: string; name: string; condition: number }> = [];
     for (const [slot, item] of this._deps.equipment.getEquipped()) {
       if (!this._isWearable(item)) continue;
-      rows.push({ slot, name: item.name, condition: Math.round(this.condition.getCondition(item.id) ?? MAX_CONDITION) });
+      rows.push({ slot, name: item.name, condition: Math.round(this.condition.getCondition(conditionKey(item)) ?? MAX_CONDITION) });
     }
     return rows.sort((a, b) => a.condition - b.condition);
   }
@@ -409,7 +446,7 @@ export class SmithingController {
     let worstCondition = MAX_CONDITION;
     for (const item of this._deps.equipment.getEquipped().values()) {
       if (!this._isWearable(item)) continue;
-      const c = this.condition.getCondition(item.id) ?? MAX_CONDITION;
+      const c = this.condition.getCondition(conditionKey(item)) ?? MAX_CONDITION;
       if (c < worstCondition) {
         worst = item;
         worstCondition = c;
@@ -418,11 +455,30 @@ export class SmithingController {
     return worst;
   }
 
-  private _equippedName(itemId: string): string | null {
+  private _equippedName(key: string): string | null {
     for (const item of this._deps.equipment.getEquipped().values()) {
-      if (item.id === itemId) return item.name;
+      if (conditionKey(item) === key) return item.name;
     }
     return null;
+  }
+
+  /** Condition (0–100) of any item, or null when it has never been tracked. */
+  public getItemCondition(item: Item): number | null {
+    if (!this._isWearable(item)) return null;
+    const c = this.condition.getCondition(conditionKey(item));
+    return c === undefined ? null : c;
+  }
+
+  /**
+   * Drop condition entries for pieces the player no longer has (sold, dropped).
+   * Pass every item the player owns (bag + equipped).
+   */
+  public pruneConditions(owned: Iterable<Item>): void {
+    const keep = new Set<string>();
+    for (const item of owned) keep.add(conditionKey(item));
+    for (const key of this.condition.registeredItemIds) {
+      if (!keep.has(key)) this.condition.removeItem(key);
+    }
   }
 
   /** Gear with combat stats wears; rings, amulets and clothes without stats do not. */

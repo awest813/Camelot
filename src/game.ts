@@ -1472,6 +1472,19 @@ export class Game {
     };
     this.craftingUI.onClose = () => this._restoreGameplayInput();
     this.saveSystem.setCraftingSystem(this.craftingSystem);
+    // Forget condition for gear the player sold or dropped (keeps saves lean).
+    this.saveSystem.onBeforeSave = () => {
+      this.smithing.pruneConditions([
+        ...this.inventorySystem.items,
+        ...this.equipmentSystem.getEquipped().values(),
+        ...(this.horseSystem?.ownedHorses ?? []).flatMap((h) => this.horseSystem.getSaddlebag(h.id) ?? []),
+      ]);
+    };
+    // Hovering a piece of gear in the inventory shows its condition.
+    this.ui.itemDetailSuffix = (item) => {
+      const c = this.smithing.getItemCondition(item);
+      return c === null ? "" : `\nCondition: ${Math.round(c)}%`;
+    };
     this.saveSystem.setItemConditionSystem(this.itemConditionSystem);
     // Starter kit so the forge is usable before the first merchant visit.
     this.inventorySystem.items.push(

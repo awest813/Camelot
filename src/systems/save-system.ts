@@ -343,6 +343,8 @@ export class SaveSystem {
 
   /** Called after a successful load so Game can clean up world state (e.g. remove already-collected loot). */
   public onAfterLoad: (() => void) | null = null;
+  /** Called at the start of every save (manual or autosave) so Game can tidy state first. */
+  public onBeforeSave: (() => void) | null = null;
 
   constructor(player: Player, inventory: InventorySystem, equipment: EquipmentSystem, ui: UIManager) {
     this._player = player;
@@ -505,6 +507,7 @@ export class SaveSystem {
    * @param silent suppress the "Game Saved!" notification (used by autosave)
    */
   public save(silent = false): void {
+    this.onBeforeSave?.();
     const equipmentEntries: EquipmentEntry[] = [];
     for (const [slot, item] of this._equipment.getEquipped()) {
       equipmentEntries.push({ slot, item });

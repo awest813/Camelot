@@ -96,6 +96,8 @@ export class UIManager {
 
   /** Called when the player clicks an inventory item slot. Set by Game to hook into EquipmentSystem. */
   public onInventoryItemClick: ((item: Item) => void) | null = null;
+  /** Extra detail line(s) appended to an inventory item's hover text (e.g. gear condition). */
+  public itemDetailSuffix: ((item: Item) => string) | null = null;
 
   /**
    * When set (by Game), inventory rows show a drink/use hint for consumables
@@ -1270,7 +1272,7 @@ export class UIManager {
       const setHoverState = () => {
         const equipped = this._equippedIds.has(item.id);
         const hint = useHint();
-        this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}${hint}`;
+        this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}${this.itemDetailSuffix?.(item) ?? ""}${hint}`;
         slot.background = hoverColor;
         if (slot.thickness !== 3) slot.thickness = equipped ? 2 : 1;
       };
@@ -1278,7 +1280,7 @@ export class UIManager {
         isFocused = true;
         const equipped = this._equippedIds.has(item.id);
         const hint = useHint();
-        this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}${hint}`;
+        this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}${this.itemDetailSuffix?.(item) ?? ""}${hint}`;
         slot.background = hoverColor;
         slot.thickness = 3; // Distinct visual indicator for keyboard focus
       };

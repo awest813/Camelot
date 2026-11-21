@@ -146,7 +146,10 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
   expect(save.ambientEvents, "ambient event cooldowns persist").toBeDefined();
   expect(save.crafting?.recipeSnapshots, "smithing state persists").toContainEqual({ id: "smith_iron_sword", craftCount: 1 });
   expect(save.itemCondition, "gear condition persists").toBeDefined();
-  expect(save.inventory.some((i: { id: string }) => i.id.startsWith("iron_sword")), "forged sword is in the bag").toBe(true);
+  const forged = save.inventory.find((i: { id: string }) => i.id.startsWith("iron_sword"));
+  expect(forged, "forged sword is in the bag").toBeDefined();
+  expect(forged.instanceId, "forged gear has its own instance").toBeTruthy();
+  expect(save.itemCondition.conditions[forged.instanceId], "forged gear starts pristine").toBe(100);
 
   // F9 — load the save back into the live game without crashing.
   await page.keyboard.press("F9");

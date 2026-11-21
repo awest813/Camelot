@@ -12,6 +12,11 @@ export interface Item {
   /** Item weight in units (per single item). Used for encumbrance. */
   weight?: number;
   stats?: any;
+  /**
+   * Distinguishes individual copies of the same non-stackable item (e.g. two
+   * Iron Swords with different wear).  Assigned lazily by SmithingController.
+   */
+  instanceId?: string;
 }
 
 export class InventorySystem {
@@ -70,6 +75,26 @@ export class InventorySystem {
     this._syncCarryWeight();
     this._updateUI();
     this._ui.showNotification(`Added ${newItem.name}`);
+    return true;
+  }
+
+  /**
+   * Remove one specific item entry: the same object if it is in the bag,
+   * else the entry with its instance id, else the first entry with its id.
+   */
+  public removeInstance(item: Item, amount: number = 1): boolean {
+    if (amount <= 0) return false;
+    let index = this.items.indexOf(item);
+    if (index === -1 && item.instanceId) index = this.items.findIndex(i => i.instanceId === item.instanceId);
+    if (index === -1) return this.removeItem(item.id, amount);
+    const entry = this.items[index];
+    if (entry.quantity > amount) {
+      entry.quantity -= amount;
+    } else {
+      this.items.splice(index, 1);
+    }
+    this._syncCarryWeight();
+    this._updateUI();
     return true;
   }
 

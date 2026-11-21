@@ -91,6 +91,22 @@ describe('SaveSystem', () => {
         expect(data.equipment[0].item.id).toBe('sword_01');
     });
 
+    it('runs onBeforeSave before serialising, so its changes land in the save', () => {
+        saveSystem.onBeforeSave = () => { mockInventory.items[0].instanceId = 'tidied'; };
+        saveSystem.save();
+        const data: SaveData = JSON.parse(localStorageMock['camelot_save']);
+        expect(data.inventory[0].instanceId).toBe('tidied');
+    });
+
+    it('persists crafting state when a crafting system is attached', () => {
+        saveSystem.setCraftingSystem({
+            getSystemState: () => ({ recipeSnapshots: [{ id: 'r1', craftCount: 2 }], discoveredRecipeIds: ['r1'] }),
+        } as any);
+        saveSystem.save();
+        const data = JSON.parse(localStorageMock['camelot_save']);
+        expect(data.crafting.recipeSnapshots).toEqual([{ id: 'r1', craftCount: 2 }]);
+    });
+
     it('should show a save notification', () => {
         saveSystem.save();
         expect(mockUI.showNotification).toHaveBeenCalledWith('Game Saved!', 2500);

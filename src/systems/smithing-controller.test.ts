@@ -68,6 +68,10 @@ describe("SmithingController", () => {
       gainArmorerXp: (n) => { xp += n; },
       notify: (m) => { messages.push(m); },
       random: () => 0,
+      // Instance key = item id, so these tests can read condition by item id
+      // (this is also the legacy-save migration path).  Per-copy behaviour has
+      // its own describe block below.
+      newInstanceId: (id) => id,
     });
   });
 
@@ -306,6 +310,76 @@ describe("SmithingController", () => {
     // Steel still needs real Armorer 25.
     inventory.items.push(smithingMaterialStack("steel_ingot", 2));
     expect(ctrl.craft("smith_steel_sword").success).toBe(false);
+  });
+
+  // ── Per-copy condition ─────────────────────────────────────────────────────
+
+  describe("per-copy condition", () => {
+    let n: number;
+    beforeEach(() => {
+      n = 0;
+      crafting = new CraftingSystem();
+      condition = new ItemConditionSystem();
+      ctrl = new SmithingController(crafting, condition, {
+        inventory,
+        equipment: { getEquipped: () => equipped },
+        player,
+        getArmorerSkill: () => skill,
+        gainArmorerXp: (amount) => { xp += amount; },
+        notify: (m) => { messages.push(m); },
+        random: () => 0,
+        newInstanceId: (id) => `${id}#${++n}`,
+      });
+    });
+
+    it("two copies of the same sword wear independently", () => {
+      const a = { ...sword };
+      const b = { ...sword };
+      equipped.set("mainHand", a);
+      for (let i = 0; i < 20; i++) ctrl.onWeaponHit(true);
+      equipped.set("mainHand", b);
+      ctrl.onWeaponHit(false);
+      expect(a.instanceId).toBe("iron_sword#1");
+      expect(b.instanceId).toBe("iron_sword#2");
+      expect(ctrl.getItemCondition(a)).toBe(80);
+      expect(ctrl.getItemCondition(b)).toBe(99.5);
+    });
+
+    it("each forged piece is its own pristine instance", () => {
+      equipped.set("mainHand", { ...sword });
+      for (let i = 0; i < 30; i++) ctrl.onWeaponHit(true);
+      inventory.items.push(smithingMaterialStack("iron_ingot", 2), smithingMaterialStack("leather_strips", 1));
+      ctrl.craft("smith_iron_sword");
+      const forged = inventory.items.find((i) => i.slot === "mainHand")!;
+      expect(forged.instanceId).toBeDefined();
+      expect(ctrl.getItemCondition(forged)).toBe(100);
+      // The worn one is untouched by the new forge.
+      expect(ctrl.getItemCondition(equipped.get("mainHand")!)).toBe(70);
+    });
+
+    it("migrates a legacy id-keyed condition onto the first instance", () => {
+      condition.initItem("iron_sword", 42);
+      const s1 = { ...sword };
+      equipped.set("mainHand", s1);
+      ctrl.trackEquippedGear();
+      expect(ctrl.getItemCondition(s1)).toBe(42);
+    });
+
+    it("untracked items report no condition; stats-less items never do", () => {
+      expect(ctrl.getItemCondition({ ...sword })).toBeNull();
+      expect(ctrl.getItemCondition({ ...ring })).toBeNull();
+    });
+
+    it("prunes condition for pieces the player no longer owns", () => {
+      const kept = { ...sword };
+      const sold = { ...helm };
+      equipped.set("mainHand", kept);
+      equipped.set("head", sold);
+      ctrl.trackEquippedGear();
+      equipped.delete("head");
+      ctrl.pruneConditions([kept]);
+      expect(condition.registeredItemIds).toEqual([kept.instanceId]);
+    });
   });
 
   // ── Persistence ────────────────────────────────────────────────────────────

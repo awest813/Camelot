@@ -42,7 +42,8 @@ export class EquipmentSystem {
     }
 
     // Remove from inventory (non-stackable equippables — remove one)
-    this._inventory.removeItem(item.id, 1);
+    // Remove the exact copy that was clicked (two Iron Swords may differ in wear).
+    this._inventory.removeInstance(item, 1);
 
     // Equip
     this._slots.set(slot, { ...item, quantity: 1 });

@@ -29,9 +29,13 @@ Follow-up (same branch): Village Smith cottage trainer with Forge/Anvil props + 
 dialogue event; `trainer_armorer_smith` / `trainer_master_smith` (the master smith is registered but not
 placed in the world, like the other master trainers); 4 Armorer perks (perk tree now 40).
 
-Known limits: condition is tracked per item **id**, so two copies of the same item share one condition
-value. The forge panel works anywhere (Shift+B); the Forge/Anvil props at Village Smith cottages are
-decoration plus a dialogue shortcut, not a station requirement.
+Second follow-up: per-piece condition (`Item.instanceId`, `conditionKey()`, `InventorySystem.removeInstance`,
+`SaveSystem.onBeforeSave` pruning, inventory hover shows condition). Verified: 187 files / 5,823 tests, boot-smoke ✓.
+
+Known limits: the forge panel works anywhere (Shift+B); the Forge/Anvil props at Village Smith cottages
+are decoration plus a dialogue shortcut, not a station requirement. Barter sells the *first* copy of an
+item id (the player can't choose which of two identical swords to sell), and sell prices ignore condition.
+Saddlebag removal is by id too.
 
 ---
 

@@ -18,6 +18,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Village Smith: some plains cottages now have a smith with a forge and anvil.
   The smith trains Armorer (up to 50), opens the forge, and sells ingots and
   hammers.
+- Each piece of gear wears on its own: two Iron Swords keep separate
+  condition. Hovering gear in the inventory shows its condition. Equipping
+  now takes the exact copy you clicked.
 - Four Armorer perks: Field Repairs (hammers repair 50% more), Tempered Steel
   (gear wears 30% slower), Master Craftsman (forged items come out at a higher
   quality) and Unbreakable (wear halved again, +10 armor).

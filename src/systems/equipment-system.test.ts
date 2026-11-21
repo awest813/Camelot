@@ -45,6 +45,12 @@ describe('EquipmentSystem', () => {
                 if (idx !== -1) mockInventory.items.splice(idx, 1);
                 return true;
             }),
+            removeInstance: vi.fn((item: Item, _amount: number) => {
+                let idx = mockInventory.items.indexOf(item);
+                if (idx === -1) idx = mockInventory.items.findIndex((i: Item) => i.id === item.id);
+                if (idx !== -1) mockInventory.items.splice(idx, 1);
+                return true;
+            }),
             addItem: vi.fn((item: Item) => {
                 mockInventory.items.push({ ...item });
                 return true;
@@ -62,7 +68,18 @@ describe('EquipmentSystem', () => {
     it('should equip an item and apply stats', () => {
         equipmentSystem.equip(sword);
         expect(mockPlayer.bonusDamage).toBe(10);
-        expect(mockInventory.removeItem).toHaveBeenCalledWith('sword_01', 1);
+        expect(mockInventory.removeInstance).toHaveBeenCalledWith(sword, 1);
+    });
+
+    it('removes the exact copy clicked when two share an id', () => {
+        const worn  = { ...sword, instanceId: 'sword_01#a' };
+        const fresh = { ...sword, instanceId: 'sword_01#b' };
+        mockInventory.items = [worn, fresh];
+        equipmentSystem.equip(fresh);
+        expect(mockInventory.items).toEqual([worn]);
+        expect(equipmentSystem.getEquipped().get('mainHand')?.instanceId).toBe('sword_01#b');
+        equipmentSystem.unequip('mainHand');
+        expect(mockInventory.items.map((i: Item) => i.instanceId)).toEqual(['sword_01#a', 'sword_01#b']);
     });
 
     it('should unequip an item and remove stats', () => {
