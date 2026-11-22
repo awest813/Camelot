@@ -259,6 +259,8 @@ export class CrimeSystem {
   private _findNearbyWitnesses(): NPC[] {
     return this._npcs.filter((npc) => {
       if (npc.isDead) return false;
+      // Indoors / hidden (e.g. asleep at home) — can't see anything.
+      if (typeof npc.mesh.isEnabled === "function" && !npc.mesh.isEnabled()) return false;
       const playerPos = this._player.camera.position;
       const npcPos    = npc.mesh.position;
       const toPlayer  = playerPos.subtract(npcPos);

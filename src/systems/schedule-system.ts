@@ -44,6 +44,9 @@ export class ScheduleSystem {
    */
   public walkable: ((x: number, z: number) => boolean) | null = null;
 
+  /** Fired each update while a sleeping NPC stands at its bed spot (home). */
+  public onSleepArrive: ((npc: NPC) => void) | null = null;
+
   // Scratch vectors for performance optimization
   private _direction: Vector3 = new Vector3();
   private _velocity: Vector3 = new Vector3();
@@ -181,7 +184,7 @@ export class ScheduleSystem {
    */
   private _applySleepBehavior(npc: NPC, deltaTime: number): void {
     const target = npc.homePosition ?? npc.spawnPosition;
-    this._moveTowardTarget(npc, target, deltaTime, 0.5);
+    if (this._moveTowardTarget(npc, target, deltaTime, 0.5)) this.onSleepArrive?.(npc);
     npc.aiState = AIState.IDLE;
   }
 

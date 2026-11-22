@@ -93,6 +93,11 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Every village square has a proper well: a curb of staggered stones with
   dark water below, timber posts with a winch, rope and bucket, and a small
   tiled roof. You can no longer walk through it.
+- At night villagers walk home and go inside, then come back out in the
+  morning, instead of standing on their doorsteps all night. The
+  "<name> has gone to sleep / woken up" pop-ups are gone; a village going to
+  bed used to post a dozen of them, with internal NPC names. Villagers asleep
+  indoors can't witness crimes.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

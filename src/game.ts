@@ -497,6 +497,52 @@ export class Game {
   /** Footprints of loaded buildings (centre, yaw, half sizes incl. margin) — NPCs keep out. */
   private readonly _buildingFootprints = new Set<{ x: number; z: number; cos: number; sin: number; hw: number; hd: number }>();
 
+  /** NPCs asleep indoors (hidden, no collisions) → their shape's collision masks. */
+  private readonly _indoorNpcs = new Map<NPC, { membership: number; collide: number }>();
+
+  /** Whether (x, z) is within `margin` m of a loaded building. */
+  private _nearBuilding(x: number, z: number, margin: number): boolean {
+      for (const f of this._buildingFootprints) {
+        const dx = x - f.x, dz = z - f.z;
+        const lx = dx * f.cos - dz * f.sin;
+        const lz = dx * f.sin + dz * f.cos;
+        if (Math.abs(lx) < f.hw + margin && Math.abs(lz) < f.hd + margin) return true;
+      }
+      return false;
+  }
+
+  /** Hide a sleeping NPC "inside" (it stands at its door): no mesh, no collisions. */
+  private _sendIndoors(npc: NPC): void {
+      const body = npc.physicsAggregate?.body;
+      const shape = npc.physicsAggregate?.shape;
+      this._indoorNpcs.set(npc, { membership: shape?.filterMembershipMask ?? ~0, collide: shape?.filterCollideMask ?? ~0 });
+      npc.mesh.setEnabled(false);
+      if (body) {
+        body.setLinearVelocity(Vector3.Zero());
+        body.setGravityFactor(0);
+      }
+      if (shape) {
+        shape.filterMembershipMask = 0;
+        shape.filterCollideMask = 0;
+      }
+  }
+
+  /** Undo {@link _sendIndoors} when the NPC wakes (or is needed). */
+  private _bringOutdoors(npc: NPC): void {
+      const saved = this._indoorNpcs.get(npc);
+      if (!saved) return;
+      this._indoorNpcs.delete(npc);
+      if (npc.mesh.isDisposed()) return;
+      npc.mesh.setEnabled(true);
+      const body = npc.physicsAggregate?.body;
+      const shape = npc.physicsAggregate?.shape;
+      if (body) body.setGravityFactor(1);
+      if (shape) {
+        shape.filterMembershipMask = saved.membership;
+        shape.filterCollideMask = saved.collide;
+      }
+  }
+
   /** Whether (x, z) is open ground, i.e. not inside a loaded building. */
   private _isWalkable(x: number, z: number): boolean {
       for (const f of this._buildingFootprints) {
@@ -582,7 +628,6 @@ export class Game {
   private _helpOverlayVisible: boolean = false;
   public activeEffectHUD: ActiveEffectHUD;
   public quickSlotHUD: QuickSlotHUD;
-  private _lastSleepNotificationPerNPC: Map<NPC, number> = new Map();
   private _activeGuardChallenge: { guard: NPC; factionId: string; bounty: number } | null = null;
 
   /** Decoupled input action adapter — maps named actions to key/mouse/gamepad events. */
@@ -2034,19 +2079,19 @@ export class Game {
       this.scheduleSystem,
       this.timeSystem,
     );
-    this.dailyScheduleSystem.onNPCSleep = (npc) => {
-      const now = this._systemTickCounter;
-      if ((this._lastSleepNotificationPerNPC.get(npc) ?? -9999) + 1800 > now) return;
-      this._lastSleepNotificationPerNPC.set(npc, now);
-      this.ui.showNotification(`${npc.mesh.name} has gone to sleep.`, 2000);
+    // No toasts: a village going to bed would post a dozen of them.
+    this.dailyScheduleSystem.onNPCSleep = () => {
       this.saveSystem.markDirty();
     };
     this.dailyScheduleSystem.onNPCWake = (npc) => {
-      const now = this._systemTickCounter;
-      if ((this._lastSleepNotificationPerNPC.get(npc) ?? -9999) + 1800 > now) return;
-      this._lastSleepNotificationPerNPC.set(npc, now);
-      this.ui.showNotification(`${npc.mesh.name} has woken up.`, 2000);
+      this._bringOutdoors(npc);
       this.saveSystem.markDirty();
+    };
+    // Villagers who reach their door at bedtime go inside until morning.
+    this.scheduleSystem.onSleepArrive = (npc) => {
+      if (this._indoorNpcs.has(npc)) return;
+      const p = npc.mesh.position;
+      if (this._nearBuilding(p.x, p.z, 2.5)) this._sendIndoors(npc);
     };
     this.saveSystem.setDailyScheduleSystem(this.dailyScheduleSystem);
 
@@ -2483,6 +2528,7 @@ export class Game {
           this.spellSystem.removeNPC(npc);
           this.projectileSystem.removeNPC(npc);
           this.lodSystem.unregister(npc.mesh);
+          this._indoorNpcs.delete(npc);
           npc.mesh.dispose();
         }
       };

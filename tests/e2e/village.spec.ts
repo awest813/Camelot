@@ -167,5 +167,24 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   expect(boardJob, "the notice board opens the job window; jobs can be taken and abandoned")
     .toEqual({ before: 0, opened: true, taken: 1, logged: true, after: 0, inLog: false, closed: true });
 
+  // ── Bedtime: villagers walk to their doors and go inside; they're back by morning ──
+  const villagerState = () => page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    const vs = g.scheduleSystem.npcs.filter((n: any) => /^Villager_/.test(n.mesh.name));
+    return { total: vs.length, hidden: vs.filter((n: any) => !n.mesh.isEnabled()).length };
+  });
+  await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    g.timeSystem.advanceHours((23 - g.timeSystem.hour + 24) % 24);
+  });
+  await expect.poll(async () => (await villagerState()).hidden, { timeout: 60_000, message: "villagers go indoors at night" })
+    .toBeGreaterThan(0);
+  await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    g.timeSystem.advanceHours((9 - g.timeSystem.hour + 24) % 24);
+  });
+  await expect.poll(async () => (await villagerState()).hidden, { timeout: 10_000, message: "and come out in the morning" })
+    .toBe(0);
+
   expect(pageErrors, `uncaught page errors:\n${pageErrors.join("\n")}`).toEqual([]);
 });
