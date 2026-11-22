@@ -88,7 +88,8 @@ import { buildingFootprint, buildingWallColliders, buildingLayout, toWorld, WALL
 import { hasVillage, planVillage, VILLAGE_DISCOVER_RADIUS, VILLAGE_CLEAR_RADIUS, type VillagePlan } from "./world/village-settlement";
 import { Kernel } from "./core/kernel";
 import { VillageRaidFeature, RaidsKey, type RaidsService } from "./features/village-raids/raid-feature";
-import { ClockKey, FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, VillageWorldKey } from "./features/services";
+import { BuildingsKey, ClockKey, FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, ScheduleKey, VillageWorldKey } from "./features/services";
+import { IndoorsFeature } from "./features/indoors/indoors-feature";
 import { VillageJobsFeature, JobsKey, type JobsService } from "./features/village-jobs/jobs-feature";
 import { createNoticeMaterials } from "./rendering/notice-texture";
 import { buildVillageWell, WELL_RADIUS } from "./world/village-well";
@@ -510,9 +511,6 @@ export class Game {
   /** Footprints of loaded buildings (centre, yaw, half sizes incl. margin) — NPCs keep out. */
   private readonly _buildingFootprints = new Set<{ x: number; z: number; cos: number; sin: number; hw: number; hd: number }>();
 
-  /** NPCs asleep indoors (hidden, no collisions) → their shape's collision masks. */
-  private readonly _indoorNpcs = new Map<NPC, { membership: number; collide: number }>();
-
   /** Whether (x, z) is within `margin` m of a loaded building. */
   private _nearBuilding(x: number, z: number, margin: number): boolean {
       for (const f of this._buildingFootprints) {
@@ -522,38 +520,6 @@ export class Game {
         if (Math.abs(lx) < f.hw + margin && Math.abs(lz) < f.hd + margin) return true;
       }
       return false;
-  }
-
-  /** Hide a sleeping NPC "inside" (it stands at its door): no mesh, no collisions. */
-  private _sendIndoors(npc: NPC): void {
-      const body = npc.physicsAggregate?.body;
-      const shape = npc.physicsAggregate?.shape;
-      this._indoorNpcs.set(npc, { membership: shape?.filterMembershipMask ?? ~0, collide: shape?.filterCollideMask ?? ~0 });
-      npc.mesh.setEnabled(false);
-      if (body) {
-        body.setLinearVelocity(Vector3.Zero());
-        body.setGravityFactor(0);
-      }
-      if (shape) {
-        shape.filterMembershipMask = 0;
-        shape.filterCollideMask = 0;
-      }
-  }
-
-  /** Undo {@link _sendIndoors} when the NPC wakes (or is needed). */
-  private _bringOutdoors(npc: NPC): void {
-      const saved = this._indoorNpcs.get(npc);
-      if (!saved) return;
-      this._indoorNpcs.delete(npc);
-      if (npc.mesh.isDisposed()) return;
-      npc.mesh.setEnabled(true);
-      const body = npc.physicsAggregate?.body;
-      const shape = npc.physicsAggregate?.shape;
-      if (body) body.setGravityFactor(1);
-      if (shape) {
-        shape.filterMembershipMask = saved.membership;
-        shape.filterCollideMask = saved.collide;
-      }
   }
 
   /** Whether (x, z) is open ground, i.e. not inside a loaded building. */
@@ -2091,11 +2057,8 @@ export class Game {
       this.saveSystem.markDirty();
     };
     // Villagers who reach their door at bedtime go inside until morning.
-    this.scheduleSystem.onSleepArrive = (npc) => {
-      if (this._indoorNpcs.has(npc)) return;
-      const p = npc.mesh.position;
-      if (this._nearBuilding(p.x, p.z, 2.5)) this._sendIndoors(npc);
-    };
+    // (The indoors feature takes them inside.)
+    this.scheduleSystem.onSleepArrive = (npc) => this.eventBus.emit("npc:atBed", { npc });
     this.saveSystem.setDailyScheduleSystem(this.dailyScheduleSystem);
 
     // ── v19: Horse system ──────────────────────────────────────────────────
@@ -6226,13 +6189,8 @@ export class Game {
       this._updateDynamicWorldEventsOnHourChange();
 
       this.scheduleSystem.update(deltaTime);
-      // Anyone asleep indoors whose schedule no longer says "sleep" comes out
-      // (covers NPCs that went in without a sleep/wake hour transition).
-      for (const npc of this._indoorNpcs.keys()) {
-        if (this.raids.isSheltered(npc)) continue;
-        if (this.scheduleSystem.behaviorOf(npc) !== "sleep") this._bringOutdoors(npc);
-      }
-      // Kernel features (raids, …) run their fixed-step systems here.
+      // Kernel features (indoors, raids, …) run their fixed-step systems here,
+      // right after the schedules they react to.
       this.kernel.phases.run("sim", deltaTime);
       this.combatSystem.update(deltaTime);
       this._updateShoutBuffs(deltaTime);
@@ -7803,7 +7761,6 @@ export class Game {
       this.spellSystem.removeNPC(npc);
       this.projectileSystem.removeNPC(npc);
       this.lodSystem.unregister(npc.mesh);
-      this._indoorNpcs.delete(npc);
       this.eventBus.emit("npc:released", { npcName: npc.mesh.name });
       npc.mesh.dispose();
   }
@@ -7838,8 +7795,6 @@ export class Game {
           return record ? this._spawnArchetypeNpc(archetype, record, x, z) : null;
         },
         despawn: (npc) => this._despawnNpc(npc),
-        sendIndoors: (npc) => this._sendIndoors(npc),
-        isIndoors: (npc) => this._indoorNpcs.has(npc),
         isTalkingTo: (npc) => npc.isInDialogue || npc.mesh.name === this._currentDialogueNpcName,
         innBoardOf: (npcName) => {
           const npc = this.scheduleSystem.npcs.find((n) => n.mesh.name === npcName);
@@ -7858,10 +7813,18 @@ export class Game {
         quests: () => this.questSystem.getQuests(),
         add: (quest) => this.questSystem.addQuest(quest, true),
       });
+      k.services.provide(ScheduleKey, {
+        behaviorOf: (npc) => this.scheduleSystem.behaviorOf(npc),
+      });
+      k.services.provide(BuildingsKey, {
+        nearBuilding: (x, z, margin) => this._nearBuilding(x, z, margin),
+      });
       k.services.provide(ModalKey, {
         suspendGameplay: () => this._suspendGameplayInput(),
         restoreGameplay: () => this._restoreGameplayInput(),
       });
+
+      k.install(new IndoorsFeature());
 
       const raids = new VillageRaidFeature();
       k.install(raids);

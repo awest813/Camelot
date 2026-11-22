@@ -17,6 +17,10 @@ import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { VillageRaidSystem, raiderCount } from "../../systems/village-raids";
 import type { VillagePlan } from "../../world/village-settlement";
+import { IndoorsKey, type IndoorsService } from "../indoors/indoors-feature";
+
+/** Hold name used to keep sheltering townsfolk inside. */
+const SHELTER_HOLD = "raid";
 import {
   ClockKey, FeedbackKey, PlayerKey, VillageWorldKey,
   type FeedbackService, type GameClockService, type PlayerService, type VillageWorldService,
@@ -25,6 +29,7 @@ import {
 /** Service accessors, resolved at call time (the game provides them). */
 interface RaidDeps {
   readonly world: VillageWorldService;
+  readonly indoors: IndoorsService;
   readonly player: PlayerService;
   readonly clock: GameClockService;
   readonly feedback: FeedbackService;
@@ -56,6 +61,7 @@ export class VillageRaidFeature implements Feature {
     const s = ctx.kernel.services;
     const deps: RaidDeps = {
       get world() { return s.get(VillageWorldKey); },
+      get indoors() { return s.get(IndoorsKey); },
       get player() { return s.get(PlayerKey); },
       get clock() { return s.get(ClockKey); },
       get feedback() { return s.get(FeedbackKey); },
@@ -87,7 +93,7 @@ export class VillageRaidFeature implements Feature {
       const won = this.rules.onKill(npcId);
       if (!won) return;
       this._raiders.clear();
-      this._sheltered.clear();
+      this._endShelter();
       deps.feedback.addFame(10);
       deps.feedback.grant({
         gold: won.rewardGold,
@@ -170,14 +176,21 @@ export class VillageRaidFeature implements Feature {
     this.rules.start(plan.id, plan.name, raiders.map((r) => r.mesh.name), services.clock.elapsedHours());
     // Townsfolk hide; guards stay out; nobody vanishes mid-conversation.
     for (const npc of world.residents(chunkKey)) {
-      if (npc.isDead || raiders.includes(npc) || world.isIndoors(npc) || world.isTalkingTo(npc)) continue;
+      if (npc.isDead || raiders.includes(npc) || world.isTalkingTo(npc)) continue;
       if (/^(Town Guard|Guard)_/.test(npc.mesh.name) || npc.factionId === "bandits") continue;
-      world.sendIndoors(npc);
+      // (Already asleep inside? The hold keeps them in for the raid too.)
+      services.indoors.hold(npc, SHELTER_HOLD);
       this._sheltered.add(npc);
     }
     services.feedback.notify(`⚔ Bandits are raiding ${plan.name}! Drive them off.`, 5000);
     services.feedback.markDirty();
     return raiders;
+  }
+
+  /** Townsfolk may come out (their schedules decide when). */
+  private _endShelter(): void {
+    this._sheltered.clear();
+    this._deps?.indoors.releaseHolds(SHELTER_HOLD);
   }
 
   /** An unbeaten raid ends: raiders leave, townsfolk come out. */
@@ -189,6 +202,6 @@ export class VillageRaidFeature implements Feature {
     }
     this._raiders.clear();
     this.rules.abandon();
-    this._sheltered.clear();
+    this._endShelter();
   }
 }

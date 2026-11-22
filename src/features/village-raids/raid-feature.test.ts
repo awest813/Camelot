@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Kernel } from "../../core/kernel";
 import { ClockKey, FeedbackKey, PlayerKey, VillageWorldKey } from "../services";
 import { VillageRaidFeature, RaidsKey, RAID_LEAVE_DISTANCE } from "./raid-feature";
+import { IndoorsKey } from "../indoors/indoors-feature";
 import { planVillage, hasVillage } from "../../world/village-settlement";
 import type { NPC } from "../../entities/npc";
 
@@ -46,15 +47,20 @@ function setup(opts: { level?: number } = {}) {
     residents: () => townsfolk,
     spawnArchetype: (_c, archetype) => fakeNpc(archetype === "archetype_bandit_chief" ? "Bandit Chief" : "Bandit"),
     despawn: (npc) => { despawned.push(npc); (npc.mesh as any).dispose(); },
-    sendIndoors: (npc) => { indoors.add(npc); },
-    isIndoors: (npc) => indoors.has(npc),
     isTalkingTo: (npc) => npc === talkingTo,
     innBoardOf: () => null,
+  });
+  const holds = new Map<NPC, Set<string>>();
+  k.services.provide(IndoorsKey, {
+    send: (npc) => { indoors.add(npc); },
+    isIndoors: (npc) => indoors.has(npc),
+    hold: (npc, holder) => { indoors.add(npc); (holds.get(npc) ?? holds.set(npc, new Set()).get(npc)!).add(holder); },
+    releaseHolds: (holder) => { for (const h of holds.values()) h.delete(holder); },
   });
   const feature = new VillageRaidFeature();
   k.install(feature);
   return {
-    k, feature, plan, chunkKey, pos, townsfolk, indoors, despawned, notes, grants,
+    k, feature, plan, chunkKey, pos, townsfolk, indoors, holds, despawned, notes, grants,
     raids: k.services.get(RaidsKey),
     talkTo: (npc: NPC | null) => { talkingTo = npc; },
   };
@@ -84,6 +90,7 @@ describe("VillageRaidFeature (headless, through the kernel)", () => {
     expect(t.raids.rules.active).toBeNull();
     expect(t.grants[0]?.gold).toBe(35 * 4);
     expect(t.raids.isSheltered(t.townsfolk[0]), "townsfolk come out").toBe(false);
+    expect(t.holds.get(t.townsfolk[0])?.has("raid"), "the raid's hold is released").toBe(false);
   });
 
   it("leaving the village abandons the raid and sends the raiders away", () => {

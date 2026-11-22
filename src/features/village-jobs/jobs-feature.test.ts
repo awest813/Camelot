@@ -28,7 +28,7 @@ function setup(boardId: string) {
   k.services.provide(ModalKey, modal);
   k.services.provide(VillageWorldKey, {
     currentVillage: () => null, loadedVillage: () => null, residents: () => [],
-    spawnArchetype: () => null, despawn: vi.fn(), sendIndoors: vi.fn(), isIndoors: () => false,
+    spawnArchetype: () => null, despawn: vi.fn(),
     isTalkingTo: () => false,
     innBoardOf: (name) => (name.startsWith("Innkeeper") ? { boardId, placeName: "Camcross" } : null),
   });

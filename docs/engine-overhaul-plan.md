@@ -312,6 +312,10 @@ state, scope and save codec.
      `dialogue:closed` events and `questlog:opened`. This added inventory,
      quest-log and modal services. 3 headless tests click through the real
      window.
+  3. **Indoors** (`src/features/indoors/`): sleepers going inside, and named
+     holds (the raid's `"raid"` hold replaces the raid ↔ game coupling).
+     Bedtime arrival is now an `npc:atBed` event; this added schedule and
+     building services.
 
 ### Phase 2 — Input, modals and camera (2 weeks)
 

@@ -1,4 +1,5 @@
 import type { Item } from "./inventory-system";
+import type { NPC } from "../entities/npc";
 
 // ── Typed event catalogue ────────────────────────────────────────────────────
 
@@ -63,6 +64,11 @@ export interface GameEvents {
   "dialogue:closed": Record<string, never>;
   /** The quest log was opened. */
   "questlog:opened": Record<string, never>;
+  /**
+   * A sleeping NPC is standing at its bed spot.  Carries the NPC object until
+   * the entity store gives NPCs ids (Phase 3).
+   */
+  "npc:atBed": { npc: NPC };
 }
 
 export type GameEventType = keyof GameEvents;

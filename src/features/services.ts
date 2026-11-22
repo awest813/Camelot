@@ -42,13 +42,22 @@ export interface VillageWorldService {
   spawnArchetype(chunkKey: string, archetype: string, x: number, z: number): NPC | null;
   /** Remove an NPC from the world and every system. */
   despawn(npc: NPC): void;
-  /** Hide an NPC indoors (no mesh, no collisions) until released. */
-  sendIndoors(npc: NPC): void;
-  isIndoors(npc: NPC): boolean;
   /** Whether the player is talking or trading with this NPC. */
   isTalkingTo(npc: NPC): boolean;
   /** The inn job board an NPC (by mesh name) belongs to: inn chunk + place name. */
   innBoardOf(npcName: string): { boardId: string; placeName: string } | null;
+}
+
+/** NPC schedules (read-only queries). */
+export interface ScheduleQueryService {
+  /** The NPC's scheduled behaviour right now ("sleep", "work", …) or null. */
+  behaviorOf(npc: NPC): string | null;
+}
+
+/** Loaded buildings as world geometry. */
+export interface BuildingsService {
+  /** Whether (x, z) is within `margin` m of a loaded building. */
+  nearBuilding(x: number, z: number, margin: number): boolean;
 }
 
 export interface InventoryService {
@@ -77,3 +86,5 @@ export const VillageWorldKey = createServiceKey<VillageWorldService>("village-wo
 export const InventoryKey = createServiceKey<InventoryService>("inventory");
 export const QuestLogKey = createServiceKey<QuestLogService>("quest-log");
 export const ModalKey = createServiceKey<ModalService>("modal");
+export const ScheduleKey = createServiceKey<ScheduleQueryService>("schedules");
+export const BuildingsKey = createServiceKey<BuildingsService>("buildings");
