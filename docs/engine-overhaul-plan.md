@@ -347,6 +347,11 @@ state, scope and save codec.
      events, as data plus a `time:hour` listener. New `world-state` and
      `loot` services. Loot drops roll on a seeded stream.
 
+  8. **Mounts** (`src/features/mounts/`): the horse roster, the stable
+     master, mounting, and the stable and saddlebag windows. A single pair of
+     actions replaces two full copies of the O / Shift+O logic (input
+     adapter and legacy keyboard path). The windows use the modal service.
+
   Render counts after the extraction match the pre-extraction baseline
   (2,066 village meshes), so villages are built identically. The render
   budget check now also has floors, so a scene that failed to render can't

@@ -1,0 +1,179 @@
+/**
+ * Horses as a kernel feature: the horse roster and stable master, mounting,
+ * the stable (buy a horse) and saddlebag (take items) windows.
+ *
+ * One pair of actions — `toggleMount` (O) and `toggleStableOrSaddlebag`
+ * (Shift+O) — serves both the input adapter and the legacy keyboard path,
+ * which used to carry two full copies of this logic.
+ *
+ * Inputs:   services feedback, modal, mount-host.
+ * Outputs:  the `mounts` service.
+ *
+ * Extracted from game.ts (engine overhaul, Phase 1).
+ */
+import type { Feature, FeatureContext } from "../../core/kernel";
+import { createServiceKey } from "../../core/kernel";
+import { HorseSystem } from "../../systems/horse-system";
+import { StableUI } from "../../ui/stable-ui";
+import { SaddlebagUI } from "../../ui/saddlebag-ui";
+import type { Item } from "../../systems/inventory-system";
+import { FeedbackKey, ModalKey } from "../services";
+
+/** What riding needs from the game. */
+export interface MountHostService {
+  /** Whether gameplay actions are allowed now (not paused, not talking). */
+  canAct(): boolean;
+  setMoveSpeedMultiplier(multiplier: number): void;
+  unlockAchievement(id: string): void;
+  gold(): number;
+  spendGold(amount: number): boolean;
+  give(item: Item): void;
+}
+
+export interface MountsService {
+  readonly horses: HorseSystem;
+  readonly stable: StableUI;
+  readonly saddlebag: SaddlebagUI;
+  /** O: mount the first owned horse, or dismount. */
+  toggleMount(): void;
+  /** Shift+O: the saddlebag while mounted, otherwise the stable. */
+  toggleStableOrSaddlebag(): void;
+}
+
+export const MountHostKey = createServiceKey<MountHostService>("mount-host");
+export const MountsKey = createServiceKey<MountsService>("mounts");
+
+const STABLE_MASTER = "Stable Master";
+
+export class MountsFeature implements Feature {
+  public readonly id = "mounts";
+  public readonly horses = new HorseSystem();
+  public readonly stable = new StableUI();
+  public readonly saddlebag = new SaddlebagUI();
+
+  constructor() {
+    // Starter horses available at world stables.
+    this.horses.registerHorse({ id: "bay_mare", name: "Bay Mare", speed: 1.8, saddlebagCapacity: 8, stableId: "starter_stable" });
+    this.horses.registerHorse({ id: "black_stallion", name: "Black Stallion", speed: 2.2, saddlebagCapacity: 6, stableId: "starter_stable" });
+    this.horses.registerHorse({ id: "grey_gelding", name: "Grey Gelding", speed: 2.0, saddlebagCapacity: 10, stableId: "starter_stable" });
+    this.horses.registerStableNPC({
+      npcName: STABLE_MASTER,
+      availableHorseIds: ["bay_mare", "black_stallion", "grey_gelding"],
+      prices: { bay_mare: 500, black_stallion: 1000, grey_gelding: 750 },
+    });
+  }
+
+  public install(ctx: FeatureContext): void {
+    const s = ctx.kernel.services;
+    const host = () => s.get(MountHostKey);
+    const feedback = () => s.get(FeedbackKey);
+    const modal = () => s.get(ModalKey);
+
+    this.horses.onMount = (horse, speed) => {
+      host().setMoveSpeedMultiplier(speed);
+      feedback().notify(`Mounted ${horse.name}`, 1800);
+      host().unlockAchievement("ACH_SADDLED");
+      feedback().markDirty();
+    };
+    this.horses.onDismount = (horse) => {
+      host().setMoveSpeedMultiplier(1);
+      feedback().notify(`Dismounted ${horse.name}`, 1800);
+      feedback().markDirty();
+    };
+    this.horses.onHorsePurchased = (horse) => {
+      feedback().notify(`Purchased ${horse.name}!`, 2500);
+      host().unlockAchievement("ACH_SADDLED");
+      feedback().markDirty();
+    };
+
+    this.stable.onClose = () => modal().restoreGameplay();
+    this.stable.onPurchase = (horseId) => {
+      if (!this.horses.getStableNPC(STABLE_MASTER)) return;
+      const price = this.horses.purchaseHorse(STABLE_MASTER, horseId, host().gold());
+      if (price === -2) {
+        this.stable.showStatus("You already own this horse.", true);
+      } else if (price < 0) {
+        this.stable.showStatus("Unable to complete the purchase.", true);
+      } else {
+        host().spendGold(price);
+        this.stable.markOwned(horseId);
+        this.stable.setPlayerGold(host().gold());
+        this.stable.showStatus(`You purchased a horse for ${price}g.`);
+      }
+    };
+
+    this.saddlebag.onClose = () => modal().restoreGameplay();
+    this.saddlebag.onRemoveItem = (itemId) => {
+      const horse = this.horses.currentHorse;
+      if (!horse) return;
+      const entry = this.horses.getSaddlebag(horse.id)?.find((i) => i.id === itemId);
+      if (!entry) return;
+      if (this.horses.saddlebagRemoveItem(horse.id, itemId)) {
+        host().give({ ...entry, quantity: 1 });
+        this._refreshSaddlebag();
+        this.saddlebag.showStatus(`Took ${entry.name}.`);
+      }
+    };
+
+    ctx.provide(MountsKey, {
+      horses: this.horses,
+      stable: this.stable,
+      saddlebag: this.saddlebag,
+      toggleMount: () => {
+        if (!host().canAct()) return;
+        if (this.horses.isMounted) {
+          this.horses.dismountHorse();
+          return;
+        }
+        const owned = this.horses.ownedHorses;
+        if (owned.length === 0) feedback().notify("You don't own a horse. Visit a stable (Shift+O).", 2500);
+        else this.horses.mountHorse(owned[0].id);
+      },
+      toggleStableOrSaddlebag: () => {
+        if (!host().canAct()) return;
+        if (this.horses.isMounted) {
+          if (this.saddlebag.isVisible) { this.saddlebag.close(); return; }
+          const horse = this.horses.currentHorse!;
+          const bag = this.horses.getSaddlebag(horse.id) ?? [];
+          this.saddlebag.open(horse.name, bag.map(toRow), bag.length, horse.saddlebagCapacity);
+          modal().suspendGameplay();
+          return;
+        }
+        if (this.stable.isVisible) { this.stable.close(); return; }
+        const stable = this.horses.getStableNPC(STABLE_MASTER);
+        if (!stable) {
+          feedback().notify("No stable nearby.", 1500);
+          return;
+        }
+        const offers = stable.availableHorseIds.map((id) => {
+          const h = this.horses.getHorse(id)!;
+          return {
+            id: h.id, name: h.name, speed: h.speed,
+            saddlebagCapacity: h.saddlebagCapacity, price: stable.prices[id] ?? 0, isOwned: h.isOwned,
+          };
+        });
+        this.stable.open(STABLE_MASTER, offers, host().gold());
+        modal().suspendGameplay();
+      },
+    });
+
+    ctx.scope.add(() => {
+      this.horses.onMount = null;
+      this.horses.onDismount = null;
+      this.horses.onHorsePurchased = null;
+      if (this.stable.isVisible) this.stable.close();
+      if (this.saddlebag.isVisible) this.saddlebag.close();
+    });
+  }
+
+  private _refreshSaddlebag(): void {
+    const horse = this.horses.currentHorse;
+    if (!horse) return;
+    const bag = this.horses.getSaddlebag(horse.id) ?? [];
+    this.saddlebag.refresh(bag.map(toRow), bag.length, horse.saddlebagCapacity);
+  }
+}
+
+function toRow(i: { id: string; name: string; quantity: number; stackable: boolean }) {
+  return { id: i.id, name: i.name, quantity: i.quantity, stackable: i.stackable };
+}

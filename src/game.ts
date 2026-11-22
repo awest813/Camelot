@@ -95,6 +95,7 @@ import {
 import { VillagesFeature, VillagesKey, type VillagesService } from "./features/villages/villages-feature";
 import { WorldSitesFeature, WorldSitesKey, type WorldSitesService } from "./features/world-sites/world-sites-feature";
 import { IndoorsFeature } from "./features/indoors/indoors-feature";
+import { MountsFeature, MountsKey, MountHostKey, type MountsService } from "./features/mounts/mounts-feature";
 import { WorldEventsFeature, WorldEventsKey } from "./features/world-events/world-events-feature";
 import { VillageJobsFeature, JobsKey, type JobsService } from "./features/village-jobs/jobs-feature";
 import { ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
@@ -293,8 +294,8 @@ export class Game {
   public levelUpUI: LevelUpUI;
   /** Tab-open HTML overlay — identity, attributes, skills, reputation. */
   public characterSheetUI!: CharacterSheetUI;
-  public stableUI: StableUI;
-  public saddlebagUI: SaddlebagUI;
+  public get stableUI(): StableUI { return this.mounts.stable; }
+  public get saddlebagUI(): SaddlebagUI { return this.mounts.saddlebag; }
   public uiAnimator: UIAnimator = new UIAnimator();
   public graphicsSettingsUI: GraphicsSettingsUI;
 
@@ -384,6 +385,11 @@ export class Game {
     return this.kernel.services.get(VillagesKey);
   }
 
+  /** Horses, the stable and saddlebags (mounts feature). */
+  public get mounts(): MountsService {
+    return this.kernel.services.get(MountsKey);
+  }
+
   /** What goes where as chunks load (world-sites feature). */
   public get worldSites(): WorldSitesService {
     return this.kernel.services.get(WorldSitesKey);
@@ -435,7 +441,7 @@ export class Game {
   public dailyScheduleSystem: DailyScheduleSystem;
 
   // v19 systems
-  public horseSystem: HorseSystem;
+  public get horseSystem(): HorseSystem { return this.mounts.horses; }
 
   // v20 systems
   public swimSystem: SwimmingSystem;
@@ -1548,35 +1554,6 @@ export class Game {
     this.scheduleSystem.onSleepArrive = (npc) => this.eventBus.emit("npc:atBed", { npc });
     this.saveSystem.setDailyScheduleSystem(this.dailyScheduleSystem);
 
-    // ── v19: Horse system ──────────────────────────────────────────────────
-    this.horseSystem = new HorseSystem();
-    // Register starter horses available at world stables
-    this.horseSystem.registerHorse({ id: "bay_mare", name: "Bay Mare", speed: 1.8, saddlebagCapacity: 8, stableId: "starter_stable" });
-    this.horseSystem.registerHorse({ id: "black_stallion", name: "Black Stallion", speed: 2.2, saddlebagCapacity: 6, stableId: "starter_stable" });
-    this.horseSystem.registerHorse({ id: "grey_gelding", name: "Grey Gelding", speed: 2.0, saddlebagCapacity: 10, stableId: "starter_stable" });
-    this.horseSystem.registerStableNPC({
-      npcName: "Stable Master",
-      availableHorseIds: ["bay_mare", "black_stallion", "grey_gelding"],
-      prices: { bay_mare: 500, black_stallion: 1000, grey_gelding: 750 },
-    });
-    this.horseSystem.onMount = (horse, speed) => {
-      (this.player as unknown as { moveSpeedMultiplier?: number }).moveSpeedMultiplier = speed;
-      this.ui.showNotification(`Mounted ${horse.name}`, 1800);
-      this._achievements?.unlock("ACH_SADDLED");
-      this.saveSystem.markDirty();
-    };
-    this.horseSystem.onDismount = (horse) => {
-      (this.player as unknown as { moveSpeedMultiplier?: number }).moveSpeedMultiplier = 1;
-      this.ui.showNotification(`Dismounted ${horse.name}`, 1800);
-      this.saveSystem.markDirty();
-    };
-    this.horseSystem.onHorsePurchased = (horse) => {
-      this.ui.showNotification(`Purchased ${horse.name}!`, 2500);
-      this._achievements?.unlock("ACH_SADDLED");
-      this.saveSystem.markDirty();
-    };
-    this.saveSystem.setHorseSystem(this.horseSystem);
-
     // ── v20: Swimming system ───────────────────────────────────────────────
     this.swimSystem = new SwimmingSystem();
     // Argonian racial water breathing — suppress breath drain for this race
@@ -1914,55 +1891,6 @@ export class Game {
     this.ui.onInventoryClosed = () => { this._quickSlotAssignKey = null; };
     this.quickSlotHUD.show();
     this.quickSlotHUD.update(this.quickSlotSystem);
-
-    // ── Stable UI ─────────────────────────────────────────────────────────
-    this.stableUI = new StableUI();
-    this.stableUI.onClose = () => {
-      this.interactionSystem.isBlocked = false;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
-    };
-    this.stableUI.onPurchase = (horseId) => {
-      const stable = this.horseSystem.getStableNPC("Stable Master");
-      if (!stable) return;
-      const playerGold = this._getInventoryGold();
-      const price = this.horseSystem.purchaseHorse("Stable Master", horseId, playerGold);
-      if (price === -2) {
-        this.stableUI.showStatus("You already own this horse.", true);
-      } else if (price < 0) {
-        this.stableUI.showStatus("Unable to complete the purchase.", true);
-      } else {
-        this._consumeInventoryGold(price);
-        this.stableUI.markOwned(horseId);
-        this.stableUI.setPlayerGold(this._getInventoryGold());
-        this.stableUI.showStatus(`You purchased a horse for ${price}g.`);
-      }
-    };
-
-    // ── Saddlebag UI ───────────────────────────────────────────────────────
-    this.saddlebagUI = new SaddlebagUI();
-    this.saddlebagUI.onClose = () => {
-      this.interactionSystem.isBlocked = false;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
-    };
-    this.saddlebagUI.onRemoveItem = (itemId) => {
-      const horse = this.horseSystem.currentHorse;
-      if (!horse) return;
-      const bag = this.horseSystem.getSaddlebag(horse.id);
-      const entry = bag?.find(i => i.id === itemId);
-      if (!entry) return;
-      if (this.horseSystem.saddlebagRemoveItem(horse.id, itemId)) {
-        this.inventorySystem.addItem({ ...entry, quantity: 1 });
-        const updatedBag = this.horseSystem.getSaddlebag(horse.id) ?? [];
-        this.saddlebagUI.refresh(
-          updatedBag.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, stackable: i.stackable })),
-          updatedBag.length,
-          horse.saddlebagCapacity,
-        );
-        this.saddlebagUI.showStatus(`Took ${entry.name}.`);
-      }
-    };
 
     // ── UI animations (Motion library) ─────────────────────────────────────────
     const uiAnimator = new UIAnimator();
@@ -3366,65 +3294,8 @@ export class Game {
                 }
             } else if (kbInfo.event.key === "o" || kbInfo.event.key === "O") {
                 // O: Mount/Dismount · Shift+O: Stable (unmounted) or Saddlebag (mounted)
-                if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
-                    if (kbInfo.event.shiftKey) {
-                        if (this.horseSystem.isMounted) {
-                            // Shift+O while mounted — toggle saddlebag
-                            const horse = this.horseSystem.currentHorse!;
-                            if (this.saddlebagUI.isVisible) {
-                                this.saddlebagUI.close();
-                            } else {
-                                const bag = this.horseSystem.getSaddlebag(horse.id) ?? [];
-                                this.saddlebagUI.open(
-                                    horse.name,
-                                    bag.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, stackable: i.stackable })),
-                                    bag.length,
-                                    horse.saddlebagCapacity,
-                                );
-                                this.interactionSystem.isBlocked = true;
-                                document.exitPointerLock();
-                                this.player.camera.detachControl();
-                            }
-                        } else {
-                            // Shift+O while unmounted — toggle stable dialog
-                            if (this.stableUI.isVisible) {
-                                this.stableUI.close();
-                            } else {
-                                const stable = this.horseSystem.getStableNPC("Stable Master");
-                                if (stable) {
-                                    const horses = stable.availableHorseIds.map(id => {
-                                        const h = this.horseSystem.getHorse(id)!;
-                                        return {
-                                            id: h.id,
-                                            name: h.name,
-                                            speed: h.speed,
-                                            saddlebagCapacity: h.saddlebagCapacity,
-                                            price: stable.prices[id] ?? 0,
-                                            isOwned: h.isOwned,
-                                        };
-                                    });
-                                    this.stableUI.open("Stable Master", horses, this._getInventoryGold());
-                                    this.interactionSystem.isBlocked = true;
-                                    document.exitPointerLock();
-                                    this.player.camera.detachControl();
-                                } else {
-                                    this.ui.showNotification("No stable nearby.", 1500);
-                                }
-                            }
-                        }
-                    } else if (this.horseSystem.isMounted) {
-                        // O while mounted — dismount
-                        this.horseSystem.dismountHorse();
-                    } else {
-                        // O while unmounted — mount the first owned horse
-                        const owned = this.horseSystem.ownedHorses;
-                        if (owned.length === 0) {
-                            this.ui.showNotification("You don't own a horse. Visit a stable (Shift+O).", 2500);
-                        } else {
-                            this.horseSystem.mountHorse(owned[0].id);
-                        }
-                    }
-                }
+                if (kbInfo.event.shiftKey) this.mounts.toggleStableOrSaddlebag();
+                else this.mounts.toggleMount();
             } else if (kbInfo.event.key === "F3") {
                 const shown = this.ui.toggleDebugOverlay();
                 this.ui.showNotification(shown ? "Debug overlay ON" : "Debug overlay OFF", 1200);
@@ -3865,62 +3736,8 @@ export class Game {
       this.ui.toggleWaitDialog(true);
       this._suspendGameplayInput();
     });
-    adapter.onAction("mountDismount", () => {
-      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
-        if (this.horseSystem.isMounted) {
-          this.horseSystem.dismountHorse();
-        } else {
-          const owned = this.horseSystem.ownedHorses;
-          if (owned.length === 0) {
-            this.ui.showNotification("You don't own a horse. Visit a stable (Shift+O).", 2500);
-          } else {
-            this.horseSystem.mountHorse(owned[0].id);
-          }
-        }
-      }
-    });
-    adapter.onAction("stableOrSaddlebag", () => {
-      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
-        if (this.horseSystem.isMounted) {
-          const horse = this.horseSystem.currentHorse!;
-          if (this.saddlebagUI.isVisible) {
-            this.saddlebagUI.close();
-          } else {
-            const bag = this.horseSystem.getSaddlebag(horse.id) ?? [];
-            this.saddlebagUI.open(
-              horse.name,
-              bag.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, stackable: i.stackable })),
-              bag.length,
-              horse.saddlebagCapacity,
-            );
-            this.interactionSystem.isBlocked = true;
-            document.exitPointerLock();
-            this.player.camera.detachControl();
-          }
-        } else {
-          if (this.stableUI.isVisible) {
-            this.stableUI.close();
-          } else {
-            const stable = this.horseSystem.getStableNPC("Stable Master");
-            if (stable) {
-              const horses = stable.availableHorseIds.map(id => {
-                const h = this.horseSystem.getHorse(id)!;
-                return {
-                  id: h.id, name: h.name, speed: h.speed,
-                  saddlebagCapacity: h.saddlebagCapacity, price: stable.prices[id] ?? 0, isOwned: h.isOwned,
-                };
-              });
-              this.stableUI.open("Stable Master", horses, this._getInventoryGold());
-              this.interactionSystem.isBlocked = true;
-              document.exitPointerLock();
-              this.player.camera.detachControl();
-            } else {
-              this.ui.showNotification("No stable nearby.", 1500);
-            }
-          }
-        }
-      }
-    });
+    adapter.onAction("mountDismount", () => this.mounts.toggleMount());
+    adapter.onAction("stableOrSaddlebag", () => this.mounts.toggleStableOrSaddlebag());
     adapter.onAction("showFameStatus", () => {
       if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
         const effects = this.activeEffectsSystem.activeEffects;
@@ -6680,6 +6497,18 @@ export class Game {
       // Persist flavor-event cooldowns so reloading can't reroll one-shots.
       this.saveSystem.setTravelEventSystem(worldEvents.travel);
       this.saveSystem.setAmbientEventSystem(worldEvents.ambient);
+
+      k.services.provide(MountHostKey, {
+        canAct: () => !this.isPaused && !this.dialogueSystem.isInDialogue,
+        setMoveSpeedMultiplier: (m) => { (this.player as unknown as { moveSpeedMultiplier?: number }).moveSpeedMultiplier = m; },
+        unlockAchievement: (id) => { this._achievements?.unlock(id as never); },
+        gold: () => this._getInventoryGold(),
+        spendGold: (amount) => this._consumeInventoryGold(amount),
+        give: (item) => { this.inventorySystem.addItem(item); },
+      });
+      const mounts = new MountsFeature();
+      k.install(mounts);
+      this.saveSystem.setHorseSystem(mounts.horses);
 
       k.install(new IndoorsFeature());
       k.install(new VillagesFeature());

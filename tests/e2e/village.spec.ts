@@ -258,7 +258,9 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     const raiders = g.raids.start(key, plan);
     const c = g.player.camera.position;
     c.set(plan.center.x + 90, 3, plan.center.z);
-    await new Promise((r) => setTimeout(r, 1500));
+    // The raid watch checks twice a second of game time; under load frames
+    // are slow, so wait for it rather than a fixed delay.
+    for (let t = 0; t < 40 && g.raids.rules.active; t++) await new Promise((r) => setTimeout(r, 250));
     const out = {
       raiders: raiders.length,
       active: !!g.raids.rules.active,
