@@ -171,6 +171,11 @@ export const frameworkBaseContent: RpgContentBundle = {
           text: "What can I get you? Ale, mead, or something to eat? The stew's fresh.",
           choices: [
             {
+              id: "rest",
+              text: "I need a room for the night.",
+              nextNodeId: "rest_reply",
+            },
+            {
               id: "buy_ale",
               text: "I'll have an ale. (2 gold)",
               nextNodeId: "ale_reply",
@@ -237,6 +242,24 @@ export const frameworkBaseContent: RpgContentBundle = {
           choices: [
             { id: "back", text: "Smells good.", nextNodeId: "greet" },
             { id: "leave", text: "Much better.", endsDialogue: true },
+          ],
+        },
+        {
+          id: "rest_reply",
+          speaker: "Barkeeper",
+          text: "There's a bed upstairs. 10 gold, and keep the noise down — folk are sleeping.",
+          choices: [
+            {
+              id: "pay",
+              text: "Here you go. (10 gold)",
+              endsDialogue: true,
+              conditions: [{ type: "has_item", itemId: "gold_coins", minQuantity: 10 }],
+              effects: [
+                { type: "consume_item", itemId: "gold_coins", quantity: 10 },
+                { type: "emit_event", eventId: "rest:inn", payload: { hours: 8 } },
+              ],
+            },
+            { id: "decline", text: "Maybe later.", nextNodeId: "greet" },
           ],
         },
         {
@@ -962,7 +985,7 @@ export const frameworkBaseContent: RpgContentBundle = {
       role: "innkeeper",
       isHostile: false,
       isMerchant: false,
-      scheduleId: "sched_innkeeper",
+      scheduleId: "sched_barkeeper",
       dialogueId: "barkeeper_intro",
       baseHealth: 65,
       level: 1,

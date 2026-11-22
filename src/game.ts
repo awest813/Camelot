@@ -2083,8 +2083,7 @@ export class Game {
     this.dailyScheduleSystem.onNPCSleep = () => {
       this.saveSystem.markDirty();
     };
-    this.dailyScheduleSystem.onNPCWake = (npc) => {
-      this._bringOutdoors(npc);
+    this.dailyScheduleSystem.onNPCWake = () => {
       this.saveSystem.markDirty();
     };
     // Villagers who reach their door at bedtime go inside until morning.
@@ -6223,6 +6222,11 @@ export class Game {
       this._updateDynamicWorldEventsOnHourChange();
 
       this.scheduleSystem.update(deltaTime);
+      // Anyone asleep indoors whose schedule no longer says "sleep" comes out
+      // (covers NPCs that went in without a sleep/wake hour transition).
+      for (const npc of this._indoorNpcs.keys()) {
+        if (this.scheduleSystem.behaviorOf(npc) !== "sleep") this._bringOutdoors(npc);
+      }
       this.combatSystem.update(deltaTime);
       this._updateShoutBuffs(deltaTime);
       // Slow Time squeezes the NPC AI clock (movement, telegraphs, strikes).

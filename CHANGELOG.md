@@ -98,6 +98,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   "<name> has gone to sleep / woken up" pop-ups are gone; a village going to
   bed used to post a dozen of them, with internal NPC names. Villagers asleep
   indoors can't witness crimes.
+- Inns stay open all night: the barkeeper works the night shift (16:00–08:00)
+  while the innkeeper has the day, and the barkeeper will rent you a room too.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

@@ -37,6 +37,8 @@ export const SCHED_VILLAGER  = "sched_villager";
 export const SCHED_INNKEEPER = "sched_innkeeper";
 /** Works 08:00–20:00, wanders 20:00–22:00, sleeps 22:00–08:00. */
 export const SCHED_MERCHANT  = "sched_merchant";
+/** Night shift at the inn: works 16:00–08:00, sleeps 08:00–16:00. */
+export const SCHED_BARKEEPER = "sched_barkeeper";
 
 // ── System ────────────────────────────────────────────────────────────────────
 
@@ -155,6 +157,16 @@ export class NpcScheduleSystem {
         { startHour: 8,  endHour: 18, behavior: "work"   },
         { startHour: 18, endHour: 22, behavior: "wander" },
         { startHour: 22, endHour: 8,  behavior: "sleep"  },
+      ],
+    });
+
+    this.registerSchedule({
+      id: SCHED_BARKEEPER,
+      name: "Barkeeper",
+      description: "Keeps the bar through the night (the innkeeper has the day), sleeps by day.",
+      blocks: [
+        { startHour: 16, endHour: 8,  behavior: "work"  },
+        { startHour: 8,  endHour: 16, behavior: "sleep" },
       ],
     });
 

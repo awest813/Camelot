@@ -179,6 +179,14 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   });
   await expect.poll(async () => (await villagerState()).hidden, { timeout: 60_000, message: "villagers go indoors at night" })
     .toBeGreaterThan(0);
+  // The inn stays open: the barkeeper keeps the night shift.
+  const barkeep = await page.evaluate(() => {
+    const g = (window as any).__camelotGame; const c = g.player.camera.position;
+    const b = g.scheduleSystem.npcs.find((n: any) => /^Barkeeper_/.test(n.mesh.name)
+      && Math.hypot(n.mesh.position.x - c.x, n.mesh.position.z - c.z) < 40);
+    return { found: !!b, visible: !!b?.mesh.isEnabled(), talks: !!b?.mesh.metadata };
+  });
+  expect(barkeep, "the barkeeper is up and serving at 23:00").toEqual({ found: true, visible: true, talks: true });
   await page.evaluate(() => {
     const g = (window as any).__camelotGame;
     g.timeSystem.advanceHours((9 - g.timeSystem.hour + 24) % 24);

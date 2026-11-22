@@ -7,6 +7,7 @@ import {
   SCHED_VILLAGER,
   SCHED_INNKEEPER,
   SCHED_MERCHANT,
+  SCHED_BARKEEPER,
 } from "./npc-schedule-system";
 import type { NPC, ScheduleBlock } from "../entities/npc";
 
@@ -24,9 +25,21 @@ function makeNPC(overrides: Partial<Pick<NPC, "homePosition" | "workPosition">> 
 // ── Construction ──────────────────────────────────────────────────────────────
 
 describe("NpcScheduleSystem — construction", () => {
-  it("registers 4 built-in schedules by default", () => {
+  it("registers 5 built-in schedules by default", () => {
     const sys = new NpcScheduleSystem();
-    expect(sys.registeredIds).toHaveLength(4);
+    expect(sys.registeredIds).toHaveLength(5);
+  });
+
+  it("the innkeeper and barkeeper between them keep the inn open around the clock", () => {
+    const sys = new NpcScheduleSystem();
+    const working = (id: string, h: number) => sys.getSchedule(id)!.blocks.some((b) => {
+      const wraps = b.startHour > b.endHour;
+      const inBlock = wraps ? (h >= b.startHour || h < b.endHour) : (h >= b.startHour && h < b.endHour);
+      return inBlock && b.behavior === "work";
+    });
+    for (let h = 0; h < 24; h++) {
+      expect(working(SCHED_INNKEEPER, h) || working(SCHED_BARKEEPER, h), `someone at the inn at ${h}:00`).toBe(true);
+    }
   });
 
   it("registers no built-ins when registerBuiltins=false", () => {

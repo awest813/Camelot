@@ -146,6 +146,11 @@ export class ScheduleSystem {
    * `this.currentHour` and the NPC's schedule blocks.
    * Returns null when no blocks are defined or `currentHour` is -1.
    */
+  /** The NPC's scheduled behaviour right now (null: no schedule / hour unset). */
+  public behaviorOf(npc: NPC): ScheduleBehaviorType | null {
+    return this._getScheduledBehavior(npc);
+  }
+
   private _getScheduledBehavior(npc: NPC): ScheduleBehaviorType | null {
     if (this.currentHour < 0 || npc.scheduleBlocks.length === 0) return null;
 
