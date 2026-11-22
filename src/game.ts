@@ -6415,8 +6415,9 @@ export class Game {
       // its ticks, and the atmosphere composes the final ones on top.
       this._updateAtmosphere(frameDelta);
 
-      // Conversation framing (turn to the speaker, zoom in / back out).
-      this.dialogueSystem.camera.update(frameDelta);
+      // Conversation framing (turn to the speaker, zoom in / back out), and
+      // ending it if the speaker is gone or the player was moved away.
+      this.dialogueSystem.update(frameDelta);
 
       if (this._viewModel) {
         this._viewModel.setVisible(

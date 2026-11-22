@@ -20,6 +20,7 @@ vi.mock("@babylonjs/core/Maths/math.vector", () => {
     addInPlace(_: unknown) { return this; }
     addInPlaceFromFloats(_x: number, _y: number, _z: number) { return this; }
     copyFrom(_: unknown) { return this; }
+    set(x: number, y: number, z: number) { this.x = x; this.y = y; this.z = z; return this; }
     static Zero() { return new Vector3(0, 0, 0); }
   }
   return { Vector3 };
@@ -86,6 +87,7 @@ vi.mock("@babylonjs/gui/2D", () => {
       VERTICAL_ALIGNMENT_BOTTOM: 2,
       VERTICAL_ALIGNMENT_TOP: 0,
       HORIZONTAL_ALIGNMENT_LEFT: 0,
+      HORIZONTAL_ALIGNMENT_CENTER: 2,
     },
     Rectangle,
     StackPanel,
@@ -118,6 +120,8 @@ function makeScene() {
 function makePlayer() {
   const cam = {
     position: { x: 0, y: 0, z: 0, subtractToRef: vi.fn() },
+    rotation: { x: 0, y: 0 },
+    fov: 0.8,
     detachControl: vi.fn(),
     attachControl: vi.fn(),
   };
@@ -272,5 +276,109 @@ describe("DialogueSystem", () => {
     const evt = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
     window.dispatchEvent(evt);
     expect(closed).not.toHaveBeenCalled();
+  });
+
+  describe("polish", () => {
+    /** A framework-style session with three choices, the middle one locked. */
+    function sessionWithLockedMiddle() {
+      const chosen: string[] = [];
+      const node = {
+        id: "start", speaker: "Innkeeper", text: "What'll it be?", terminal: false,
+        choices: [
+          { id: "a", text: "Ale.", isAvailable: true },
+          { id: "room", text: "A room.", isAvailable: false, blockedBy: "needs 10 gold coins" },
+          { id: "bye", text: "Goodbye.", isAvailable: true },
+        ],
+      };
+      const session = {
+        getCurrentNode: () => node,
+        choose: (id: string) => { chosen.push(id); return { success: true, message: "", isComplete: false, currentNode: node }; },
+      };
+      return { session, chosen };
+    }
+    const key = (k: string, repeat = false) => {
+      const evt = new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, repeat });
+      window.dispatchEvent(evt);
+      return evt;
+    };
+
+    it("numbers choices by position, locked ones included, with the reason shown", () => {
+      const { session, chosen } = sessionWithLockedMiddle();
+      sys.dialogueSessionProvider = () => session as never;
+      sys.startDialogue(makeNpc("Innkeeper_10042"));
+      expect(sys.choices.map((c) => c.enabled)).toEqual([true, false, true]);
+      expect(sys.choices[1].reason).toBe("needs 10 gold coins");
+      key("2");                      // the locked one: nothing happens
+      expect(chosen).toEqual([]);
+      key("3");                      // "Goodbye." keeps its number
+      expect(chosen).toEqual(["bye"]);
+    });
+
+    it("keeps digit keys away from the game (quick slots) during a conversation", () => {
+      sys.startDialogue(makeNpc());
+      const evt = key("7");          // no 7th choice
+      expect(evt.defaultPrevented).toBe(true);
+      expect(sys.isInDialogue).toBe(true);
+    });
+
+    it("arrow keys move the highlight past locked choices; Enter picks it", () => {
+      const { session, chosen } = sessionWithLockedMiddle();
+      sys.dialogueSessionProvider = () => session as never;
+      sys.startDialogue(makeNpc());
+      key("ArrowDown");              // skips the locked "A room."
+      key("Enter");
+      expect(chosen).toEqual(["bye"]);
+      // The node re-renders: the highlight starts on the first choice again.
+      key("Enter");
+      expect(chosen).toEqual(["bye", "a"]);
+      key("ArrowUp");                // wraps round to the last
+      key("Enter");
+      expect(chosen).toEqual(["bye", "a", "bye"]);
+    });
+
+    it("a held key doesn't fire a choice twice", () => {
+      const { session, chosen } = sessionWithLockedMiddle();
+      sys.dialogueSessionProvider = () => session as never;
+      sys.startDialogue(makeNpc());
+      key("1");
+      key("1", true);                // auto-repeat
+      expect(chosen).toEqual(["a"]);
+    });
+
+    it("ends the conversation if the speaker dies, turns hostile, or the player is moved away", () => {
+      const npc = makeNpc() as unknown as { isDead: boolean; isAggressive: boolean };
+      sys.startDialogue(npc as never);
+      sys.update(0.016);
+      expect(sys.isInDialogue).toBe(true);
+      npc.isDead = true;
+      sys.update(0.016);
+      expect(sys.isInDialogue).toBe(false);
+
+      // Merely suspicious (legacy isAggressive set by ALERT) doesn't end it…
+      const npc2 = makeNpc() as unknown as { isAggressive: boolean; aiState: string };
+      sys.startDialogue(npc2 as never);
+      npc2.isAggressive = true;
+      npc2.aiState = "ALERT";
+      sys.update(0.016);
+      expect(sys.isInDialogue).toBe(true);
+      // …attacking does.
+      npc2.aiState = "ATTACK";
+      sys.update(0.016);
+      expect(sys.isInDialogue).toBe(false);
+
+      const { sys: sys2, player } = makeSystem();
+      sys2.startDialogue(makeNpc());
+      (player.camera.position as { x: number }).x = 20;
+      sys2.update(0.016);
+      expect(sys2.isInDialogue).toBe(false);
+    });
+
+    it("shows a readable speaker name in the fallback conversation", async () => {
+      const { displayNameOf, estimateLines } = await import("./dialogue-system");
+      expect(displayNameOf("Innkeeper_10042")).toBe("Innkeeper");
+      expect(displayNameOf("Town Guard_7")).toBe("Town Guard");
+      expect(estimateLines("short")).toBe(1);
+      expect(estimateLines("x".repeat(200))).toBe(3);
+    });
   });
 });

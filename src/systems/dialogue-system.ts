@@ -1,7 +1,7 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { AdvancedDynamicTexture, Button, Control, Rectangle, StackPanel, TextBlock } from "@babylonjs/gui/2D";
-import { NPC } from "../entities/npc";
+import { NPC, AIState } from "../entities/npc";
 import { Player } from "../entities/player";
 import { DialogueSession } from "../framework/dialogue/dialogue-engine";
 import { DialogueNodeView } from "../framework/dialogue/dialogue-types";
@@ -11,11 +11,35 @@ import { DialogueCamera } from "./dialogue-camera";
 
 /** Speaker's face, relative to the NPC capsule centre (1 m above its feet). */
 const NPC_FACE_OFFSET_Y = 0.62;
+/** A conversation ends if the player ends up farther than this (m) from the speaker. */
+const MAX_TALK_DISTANCE = 7;
+
+// Panel layout (px).
+const PANEL_WIDTH = 820;
+const HEADER_HEIGHT = 58;
+const CHOICE_HEIGHT = 42;
+const LINE_HEIGHT = 24;
+/** Rough characters per line of the italic speech text at 17px in the panel. */
+const CHARS_PER_LINE = 86;
 
 export interface DialogueChoiceOption {
   text: string;
   callback: () => void;
   enabled: boolean;
+  /** Why a locked choice is unavailable (shown next to it). */
+  reason?: string;
+}
+
+/** "Innkeeper_10234" → "Innkeeper". */
+export function displayNameOf(meshName: string): string {
+  return meshName.replace(/_\d+$/, "");
+}
+
+/** Estimated wrapped line count for the speech text. */
+export function estimateLines(text: string, charsPerLine = CHARS_PER_LINE): number {
+  let lines = 0;
+  for (const para of text.split("\n")) lines += Math.max(1, Math.ceil(para.length / charsPerLine));
+  return lines;
 }
 
 export class DialogueSystem {
@@ -36,6 +60,11 @@ export class DialogueSystem {
   public readonly camera = new DialogueCamera();
   private _isInDialogue: boolean = false;
   private _choiceCount: number = 0;
+  private _buttons: Button[] = [];
+  /** Highlighted choice (keyboard / hover); -1 = none. */
+  private _selected = -1;
+  /** Bumped on every render so stale button callbacks can't fire twice. */
+  private _renderToken = 0;
   private _activeSession: DialogueSession | null = null;
   private _activeNpc: NPC | null = null;
   private _choices: DialogueChoiceOption[] = [];
@@ -73,7 +102,7 @@ export class DialogueSystem {
 
     // Main Panel (Bottom)
     this._dialoguePanel = new Rectangle();
-    this._dialoguePanel.width = "820px";
+    this._dialoguePanel.width = `${PANEL_WIDTH}px`;
     this._dialoguePanel.height = "290px";
     this._dialoguePanel.cornerRadius = 8;
     this._dialoguePanel.color = D.PANEL_BORDER;
@@ -116,9 +145,9 @@ export class DialogueSystem {
     this._textBlock.fontSize = 17;
     this._textBlock.fontStyle = "italic";
     this._textBlock.textWrapping = true;
-    this._textBlock.height = "80px";
+    this._textBlock.height = `${LINE_HEIGHT * 2}px`;
     this._textBlock.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this._textBlock.paddingTop = "62px";
+    this._textBlock.top = `${HEADER_HEIGHT + 4}px`;
     this._textBlock.paddingLeft = "20px";
     this._textBlock.paddingRight = "20px";
     this._textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
@@ -131,8 +160,10 @@ export class DialogueSystem {
     this._choicesPanel.height = "130px";
     this._choicesPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
     this._choicesPanel.paddingBottom = "16px";
-    this._choicesPanel.paddingLeft = "20px";
-    this._choicesPanel.paddingRight = "20px";
+    // An explicit width (rather than side padding) keeps 100%-wide buttons
+    // inside the panel; with padding their right edge was clipped.
+    this._choicesPanel.width = `${PANEL_WIDTH - 40}px`;
+    this._choicesPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
     this._dialoguePanel.addControl(this._choicesPanel);
   }
 
@@ -147,13 +178,18 @@ export class DialogueSystem {
     // Frame the speaker with the player's own camera (no cut, so the post
     // pipeline and fog stay as they are): turn to the face and zoom in.
     this.camera.begin(this.player.camera, () => {
-      if (npc.mesh.isDisposed()) return null;
+      if (npc.mesh.isDisposed?.()) return null;
       const p = npc.mesh.position;
       return this._face.set(p.x, p.y + NPC_FACE_OFFSET_Y, p.z);
     });
 
-    // Detach player controls
+    // Detach player controls and free the cursor so choices can be clicked.
     this.player.camera.detachControl();
+    try {
+      if (typeof document !== "undefined" && document.pointerLockElement) document.exitPointerLock();
+    } catch (_) {
+      // headless — ignore
+    }
 
     // Show UI
     this._choiceCount = 0;
@@ -165,7 +201,6 @@ export class DialogueSystem {
     if (session && node) {
       this._activeSession = session;
       this._renderNode(node);
-      this._installKeyHandler();
       return;
     }
 
@@ -181,46 +216,55 @@ export class DialogueSystem {
     }
 
     // Fallback dialogue with generic rumors when no framework session exists.
-    this._nameLabel.text = `✦  ${npc.mesh.name}`;
-    this._textBlock.text = `"Greetings, traveler. What can I do for you?"`;
-    this._addChoice("Just passing through.", () => this.endDialogue());
-    this._addChoice("Any rumors worth hearing?", () => {
-      this._textBlock.text = `"Aye, there's talk of strange lights near the old ruins to the north. Folk say it's best not to linger after dark."`;
-      this._choicesPanel.clearControls();
-      this._choiceCount = 0;
-      this._choices = [];
-      this._addChoice("Sounds dangerous.", () => {
-        this._textBlock.text = `"That it is. But fortune favors the bold, they say. Safe travels."`;
-        this._choicesPanel.clearControls();
-        this._choiceCount = 0;
-        this._choices = [];
-        this._addChoice("Farewell.", () => this.endDialogue());
-        this._installKeyHandler();
-      });
-      this._addChoice("I'll keep that in mind. Goodbye.", () => this.endDialogue());
-      this._installKeyHandler();
-    });
-    this._addChoice("Goodbye.", () => this.endDialogue());
-    this._installKeyHandler();
+    const name = displayNameOf(npc.mesh.name);
+    const farewell = (text: string) => ({ text, callback: () => this.endDialogue(), enabled: true });
+    const rumours = () => this._render(name, "Aye, there's talk of strange lights near the old ruins to the north. Folk say it's best not to linger after dark.", [
+      { text: "Sounds dangerous.", enabled: true, callback: () => this._render(name, "That it is. But fortune favors the bold, they say. Safe travels.", [farewell("Farewell.")]) },
+      farewell("I'll keep that in mind. Goodbye."),
+    ]);
+    this._render(name, "Greetings, traveler. What can I do for you?", [
+      farewell("Just passing through."),
+      { text: "Any rumors worth hearing?", enabled: true, callback: rumours },
+      farewell("Goodbye."),
+    ]);
   }
 
   private _renderNode(node: DialogueNodeView): void {
-    this._nameLabel.text = `✦  ${node.speaker}`;
-    this._textBlock.text = `"${node.text}"`;
+    const options: DialogueChoiceOption[] = node.choices.length === 0
+      ? [{ text: "Goodbye.", callback: () => this.endDialogue(), enabled: true }]
+      : node.choices.map((choice) => ({
+        text: choice.text,
+        enabled: choice.isAvailable,
+        reason: choice.isAvailable ? undefined : choice.blockedBy,
+        callback: () => this._handleFrameworkChoice(choice.id),
+      }));
+    this._render(node.speaker, node.text, options);
+  }
+
+  /**
+   * Show a line and its choices.  Every choice is numbered by position
+   * (locked ones too, so numbers never shift); the panel grows to fit the
+   * text and the choice list.
+   */
+  private _render(speaker: string, text: string, options: DialogueChoiceOption[]): void {
+    const token = ++this._renderToken;
+    this._nameLabel.text = `✦  ${speaker}`;
+    this._textBlock.text = `"${text}"`;
     this._choicesPanel.clearControls();
     this._choiceCount = 0;
-    this._choices = [];
+    this._buttons = [];
+    this._choices = options;
+    options.forEach((opt, i) => this._addChoice(opt, i, token));
 
-    if (node.choices.length === 0) {
-      this._addChoice("Goodbye.", () => this.endDialogue());
-      this._installKeyHandler();
-      return;
-    }
+    // Fit the panel to the content.
+    const textHeight = estimateLines(this._textBlock.text) * LINE_HEIGHT + 8;
+    const listHeight = options.length * CHOICE_HEIGHT;
+    this._textBlock.height = `${textHeight}px`;
+    this._choicesPanel.height = `${listHeight + 12}px`;
+    this._dialoguePanel.height = `${HEADER_HEIGHT + textHeight + listHeight + 30}px`;
 
-    for (const choice of node.choices) {
-      const label = choice.isAvailable ? choice.text : `${choice.text} (locked)`;
-      this._addChoice(label, () => this._handleFrameworkChoice(choice.id), choice.isAvailable);
-    }
+    this._setSelected(options.findIndex((o) => o.enabled));
+    this._installKeyHandler();
   }
 
   private _handleFrameworkChoice(choiceId: string): void {
@@ -232,7 +276,6 @@ export class DialogueSystem {
     const result = this._activeSession.choose(choiceId);
     if (!result.success && result.currentNode) {
       this._renderNode(result.currentNode);
-      this._installKeyHandler();
       return;
     }
     if (result.isComplete || !result.currentNode) {
@@ -240,27 +283,56 @@ export class DialogueSystem {
       return;
     }
     this._renderNode(result.currentNode);
-    this._installKeyHandler();
   }
 
-  private _addChoice(text: string, callback: () => void, enabled: boolean = true): void {
-    const idx = this._choices.length + 1;
-    const label = idx <= 9 ? `[${idx}]  ${text}` : text;
+  /** Run a choice once, and only if it belongs to the current render. */
+  private _activate(index: number, token = this._renderToken): void {
+    if (token !== this._renderToken || !this._isInDialogue) return;
+    const choice = this._choices[index];
+    if (!choice?.enabled) return;
+    this._renderToken++; // a second click / key repeat can't fire it again
+    choice.callback();
+  }
 
-    // Track choice for keyboard shortcuts
-    if (enabled) {
-      this._choices.push({ text, callback, enabled });
+  private _setSelected(index: number): void {
+    this._selected = index;
+    this._buttons.forEach((b, i) => {
+      if (!this._choices[i]?.enabled) return;
+      const on = i === index;
+      b.background = on ? D.BTN_HOVER : D.BTN_BG;
+      b.color = on ? D.TITLE : D.TEXT;
+      b.thickness = on ? 2 : 1;
+    });
+  }
+
+  /** Move the highlight to the next enabled choice in `dir` (wrapping). */
+  private _moveSelection(dir: 1 | -1): void {
+    const n = this._choices.length;
+    if (n === 0) return;
+    let i = this._selected;
+    for (let step = 0; step < n; step++) {
+      i = (i + dir + n) % n;
+      if (this._choices[i].enabled) {
+        this._setSelected(i);
+        return;
+      }
     }
+  }
+
+  private _addChoice(opt: DialogueChoiceOption, index: number, token: number): void {
+    const enabled = opt.enabled;
+    const num = index < 9 ? `[${index + 1}]  ` : "";
+    const label = enabled ? `${num}${opt.text}` : `${num}${opt.text}  —  ${opt.reason ?? "unavailable"}`;
 
     const button = Button.CreateSimpleButton(`btn_choice_${this._choiceCount++}`, label);
     button.width = "100%";
-    button.height = "44px";
+    button.height = `${CHOICE_HEIGHT}px`;
     button.color = enabled ? D.TEXT : D.DIM;
     button.background = enabled ? D.BTN_BG : "rgba(20, 16, 10, 0.9)";
     button.cornerRadius = 6;
     button.thickness = 1;
     button.fontSize = 15;
-    button.paddingBottom = "8px";
+    button.paddingBottom = "6px";
     button.hoverCursor = enabled ? "pointer" : "default";
     button.isEnabled = enabled;
     // Disabled GUI buttons paint disabledColor (#9a9a9a) instead of background.
@@ -277,37 +349,13 @@ export class DialogueSystem {
     button.tabIndex = 0;
     button.accessibilityTag = { description: label };
 
-    const setHover = () => {
-      button.background = D.BTN_HOVER;
-      button.color = D.TITLE;
-      if (button.thickness !== 2) button.thickness = 1;
-    };
-    const setFocus = () => {
-      button.background = D.BTN_HOVER;
-      button.color = D.TITLE;
-      button.thickness = 2;
-    };
-    const setNormal = () => {
-      button.background = D.BTN_BG;
-      button.color = D.TEXT;
-      button.thickness = 1;
-    };
-
     if (enabled) {
-      button.onPointerEnterObservable.add(setHover);
-      button.onPointerOutObservable.add(setNormal);
-      button.onFocusObservable.add(setFocus);
-      button.onBlurObservable.add(setNormal);
+      // Mouse and keyboard share one highlight.
+      button.onPointerEnterObservable.add(() => this._setSelected(index));
+      button.onFocusObservable.add(() => this._setSelected(index));
+      button.onPointerUpObservable.add(() => this._activate(index, token));
     }
-
-    button.onKeyboardEventProcessedObservable.add((evt) => {
-      if (!enabled) return;
-      if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
-        callback();
-      }
-    });
-
-    if (enabled) button.onPointerUpObservable.add(callback);
+    this._buttons.push(button);
     this._choicesPanel.addControl(button);
   }
 
@@ -315,18 +363,33 @@ export class DialogueSystem {
     this._removeKeyHandler();
     this._keyHandler = (e: KeyboardEvent) => {
       if (!this._isInDialogue) return;
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        this.endDialogue();
-        return;
+      const swallow = () => { e.preventDefault(); e.stopPropagation(); };
+      switch (e.key) {
+        case "Escape":
+          swallow();
+          this.endDialogue();
+          return;
+        case "ArrowDown": case "s": case "S":
+          swallow();
+          this._moveSelection(1);
+          return;
+        case "ArrowUp": case "w": case "W":
+          swallow();
+          this._moveSelection(-1);
+          return;
+        case "Enter": case " ": case "e": case "E":
+          swallow();
+          if (!e.repeat && this._selected >= 0) this._activate(this._selected);
+          return;
       }
       const n = parseInt(e.key, 10);
-      if (n >= 1 && n <= 9) {
+      if (n >= 0 && n <= 9) {
+        // Digits belong to the conversation (never the quick-slot bar).
+        swallow();
+        if (e.repeat || n === 0) return;
         const choice = this._choices[n - 1];
         if (choice && choice.enabled) {
-          e.preventDefault();
-          e.stopPropagation();
+          this._renderToken++;
           choice.callback();
         }
       }
@@ -341,6 +404,24 @@ export class DialogueSystem {
     }
   }
 
+  /**
+   * Per frame: drive the camera, and end the conversation if the speaker is
+   * gone (dead, unloaded, hidden, hostile) or the player was moved away.
+   */
+  public update(dt: number): void {
+    this.camera.update(dt);
+    const npc = this._activeNpc;
+    if (!this._isInDialogue || !npc) return;
+    const mesh = npc.mesh as { isDisposed?: () => boolean; isEnabled?: () => boolean; position: { x: number; z: number } };
+    // Actually fighting or fleeing — not merely suspicious (ALERT/INVESTIGATE
+    // also set the legacy isAggressive flag).
+    const fighting = npc.aiState === AIState.CHASE || npc.aiState === AIState.ATTACK || npc.aiState === AIState.FLEE;
+    const gone = mesh.isDisposed?.() || npc.isDead || fighting || mesh.isEnabled?.() === false;
+    const p = this.player.camera.position;
+    const far = Math.hypot(p.x - mesh.position.x, p.z - mesh.position.z) > MAX_TALK_DISTANCE;
+    if (gone || far) this.endDialogue();
+  }
+
   public endDialogue(): void {
     if (!this._isInDialogue) return;
     this._isInDialogue = false;
@@ -351,6 +432,9 @@ export class DialogueSystem {
     }
     this._activeSession = null;
     this._choices = [];
+    this._buttons = [];
+    this._selected = -1;
+    this._renderToken++;
 
     // Hide UI
     this._dialoguePanel.isVisible = false;

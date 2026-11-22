@@ -10,6 +10,29 @@ import {
   DialogueSessionSnapshot,
 } from "./dialogue-types";
 
+/** "gold_coins" / "oneHanded" → "gold coins" / "one handed". */
+function pretty(id: string): string {
+  return id.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").toLowerCase().trim();
+}
+
+/** Player-facing reason a condition isn't met (shown beside a locked choice). */
+export function describeUnmet(condition: DialogueChoiceCondition): string {
+  switch (condition.type) {
+    case "has_item":
+      return `needs ${condition.minQuantity} ${pretty(condition.itemId)}`;
+    case "skill_min":
+      return `needs ${pretty(condition.skillId)} ${condition.min}`;
+    case "faction_min":
+      return `needs standing ${condition.min} with ${pretty(condition.factionId)}`;
+    case "quest_status":
+      return "not yet";
+    case "random_chance":
+      return "not this time";
+    default:
+      return "not now";
+  }
+}
+
 export class DialogueEngine {
   private _definitions: Map<string, DialogueDefinition> = new Map();
   private _nodeMaps: Map<string, Map<string, DialogueNode>> = new Map();
@@ -78,6 +101,12 @@ export class DialogueSession {
   private _nodeMap: Map<string, DialogueNode>;
   private _currentNodeId: string | null;
   private _completed = false;
+  /**
+   * Chance rolls for the current node, made once per visit so a choice that
+   * shows as available stays available when picked (and doesn't flicker
+   * between renders).
+   */
+  private readonly _rolls = new Map<DialogueChoiceCondition, boolean>();
 
   constructor(definition: DialogueDefinition, context: DialogueContext, nodeMap: Map<string, DialogueNode>) {
     this._definition = definition;
@@ -133,7 +162,7 @@ export class DialogueSession {
     if (blockedBy) {
       return {
         success: false,
-        message: blockedBy,
+        message: `Choice blocked: ${blockedBy}.`,
         isComplete: this._completed,
         currentNode: this._toNodeView(node),
       };
@@ -154,6 +183,7 @@ export class DialogueSession {
     }
 
     this._currentNodeId = choice.nextNodeId ?? null;
+    this._rolls.clear();
     const nextNode = this.getCurrentNode();
     if (!nextNode) {
       this._completed = true;
@@ -207,9 +237,7 @@ export class DialogueSession {
     if (!choice.conditions || choice.conditions.length === 0) return null;
     for (const condition of choice.conditions) {
       const isMet = this._evaluateCondition(condition);
-      if (!isMet) {
-        return `Choice blocked by ${condition.type}.`;
-      }
+      if (!isMet) return describeUnmet(condition);
     }
     return null;
   }
@@ -226,8 +254,14 @@ export class DialogueSession {
         return this._context.getInventoryCount(condition.itemId) >= condition.minQuantity;
       case "skill_min":
         return (this._context.getSkillLevel?.(condition.skillId) ?? 0) >= condition.min;
-      case "random_chance":
-        return Math.random() < Math.max(0, Math.min(1, condition.chance));
+      case "random_chance": {
+        let hit = this._rolls.get(condition);
+        if (hit === undefined) {
+          hit = Math.random() < Math.max(0, Math.min(1, condition.chance));
+          this._rolls.set(condition, hit);
+        }
+        return hit;
+      }
       default:
         return false;
     }

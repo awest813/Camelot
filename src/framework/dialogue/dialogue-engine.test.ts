@@ -430,7 +430,7 @@ describe("DialogueEngine", () => {
     vi.restoreAllMocks();
   });
 
-  it("random_chance: uses Math.random for evaluation", () => {
+  it("random_chance: rolls once per visit, so what's shown is what you get", () => {
     vi.spyOn(Math, "random").mockReturnValueOnce(0.3).mockReturnValueOnce(0.8);
     const engine = new DialogueEngine([
       {
@@ -459,10 +459,28 @@ describe("DialogueEngine", () => {
     const node1 = session.getCurrentNode();
     expect(node1?.choices.find(c => c.id === "risky")?.isAvailable).toBe(true);
 
-    // Second call: Math.random() = 0.8 → 0.8 < 0.5 → not available
+    // Re-rendering the same visit doesn't re-roll (no flicker)…
     const node2 = session.getCurrentNode();
-    expect(node2?.choices.find(c => c.id === "risky")?.isAvailable).toBe(false);
+    expect(node2?.choices.find(c => c.id === "risky")?.isAvailable).toBe(true);
+    // …and picking it uses the same roll.
+    expect(session.choose("risky").success).toBe(true);
+    expect(Math.random).toHaveBeenCalledTimes(1);
 
     vi.restoreAllMocks();
+  });
+
+  it("explains why a choice is locked in player terms", async () => {
+    const { describeUnmet } = await import("./dialogue-engine");
+    expect(describeUnmet({ type: "has_item", itemId: "gold_coins", minQuantity: 10 })).toBe("needs 10 gold coins");
+    expect(describeUnmet({ type: "skill_min", skillId: "speechcraft", min: 40 })).toBe("needs speechcraft 40");
+    expect(describeUnmet({ type: "faction_min", factionId: "village_guard", min: 20 })).toBe("needs standing 20 with village guard");
+    const engine = new DialogueEngine([{
+      id: "inn", startNodeId: "start",
+      nodes: [{ id: "start", speaker: "Innkeeper", text: "A room?", choices: [
+        { id: "pay", text: "Here you go.", conditions: [{ type: "has_item", itemId: "gold_coins", minQuantity: 10 }], endsDialogue: true },
+      ] }],
+    }]);
+    const view = engine.createSession("inn", makeContext()).getCurrentNode()!;
+    expect(view.choices[0]).toMatchObject({ isAvailable: false, blockedBy: "needs 10 gold coins" });
   });
 });

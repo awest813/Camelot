@@ -166,6 +166,25 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   - Hidden NPCs (asleep indoors or sheltering from a raid) no longer keep
     walking with collisions off, which could leave them inside a wall or
     under the ground when they came back out.
+- Dialogue polish:
+  - The panel grows to fit the line and every choice. Speakers with more
+    than three choices (the innkeeper has four, the barkeeper six) used to
+    have the last ones cut off, and the buttons' right edges were clipped.
+  - The cursor is released while you talk, so choices can be clicked. Before,
+    pointer lock stayed on and only number keys worked.
+  - Use ↑/↓ (or W/S) to move between choices and Enter, Space or E to pick.
+    Hovering highlights a choice too.
+  - Choices keep their numbers: a locked choice no longer shares its number
+    with the next one, and its key no longer picks a different choice.
+    Locked choices say what they need ("needs 10 gold coins",
+    "needs speechcraft 40") instead of "(locked)".
+  - Number keys no longer fire quick slots in the middle of a conversation.
+    A held key or a double click can't pick a choice twice.
+  - "Chance" choices are rolled once per visit, so one that shows as
+    available stays available when you pick it.
+  - A conversation ends by itself if the speaker dies, attacks or unloads,
+    or you're moved away from them.
+  - The fallback greeting shows "Innkeeper", not "Innkeeper_10234".
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace
