@@ -52,6 +52,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   fungus are scattered by biome. The smith's forge is a stone-and-brick hearth
   from the Medieval Village kit.
 - KayKit textures are colour-graded darker and less saturated to match.
+- Bandit camps in the desert are now a rough wooden palisade with red
+  banners at the entrance, a wagon, crates, barrels, a weapon rack and the
+  chief's chest. They replace the online-only cartoon pirate fort and cannon.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

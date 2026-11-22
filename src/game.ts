@@ -2263,23 +2263,9 @@ export class Game {
         const fx = worldX + (_chunkRand(cx, cz, 41) - 0.5) * this.world.chunkSize * 0.62;
         const fz = worldZ + (_chunkRand(cx, cz, 42) - 0.5) * this.world.chunkSize * 0.62;
         const fortRot = _chunkRand(cx, cz, 43) * Math.PI * 2;
-        this.fantasyAssets.getInstance("pirateFort", (root) => {
-          if (!root) return;
-          root.position.set(fx, 0, fz);
-          setInstanceYaw(root, fortRot);
-          root.scaling.setAll(1.0);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
-        });
-        const rad = 6 + _chunkRand(cx, cz, 44) * 4;
-        const cannonX = fx + Math.cos(fortRot + 0.7) * rad;
-        const cannonZ = fz + Math.sin(fortRot + 0.7) * rad;
-        this.fantasyAssets.getInstance("cannon", (root) => {
-          if (!root) return;
-          root.position.set(cannonX, 0, cannonZ);
-          setInstanceYaw(root, fortRot + Math.PI * 0.35);
-          root.scaling.setAll(1.0);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
-        });
+        // Bandit camp: a rough palisade, banners, a wagon and stolen goods
+        // (Quaternius props — the old CDN pirate fort was online-only).
+        this._dressBanditCamp(chunkKey, chunkRecord, { x: fx, z: fz, rot: fortRot });
         // Garrison the bandit camp: two lookouts, an archer on the edge,
         // and their chief. Bandits carry bandit_loot (including the
         // Bandit Bounty quest token).
@@ -7413,6 +7399,33 @@ export class Game {
         P("qFlag", -3.5, -2.5, 0.5);
         if (extras.alchemist) P("qCauldron", -2.6, 2.4);
       }
+  }
+
+  /** Bandit camp dressing around a camp origin (entrance on local +Z). */
+  private _dressBanditCamp(
+      chunkKey: string,
+      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
+      origin: { x: number; z: number; rot: number },
+  ): void {
+      const P = (key: FantasyAssetKey, dx: number, dz: number, rot = 0) =>
+        this._placeSiteProp(chunkKey, chunkRecord, key, origin, dx, dz, rot);
+      // Palisade ring (radius 8.5) with a gap for the entrance at +Z.
+      const radius = 8.5;
+      for (let i = 0; i < 24; i++) {
+        const a = (i / 24) * Math.PI * 2;
+        if (Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) < 0.4) continue; // entrance
+        P("vFence", Math.sin(a) * radius, Math.cos(a) * radius, a);
+      }
+      P("qBannerStand", 2.6, radius - 0.6);
+      P("qBannerStand", -2.6, radius - 0.6);
+      P("vWagon", -5.2, -1.5, 0.35);
+      P("qCrate", 4.2, -3.2, 0.3);
+      P("qCrate", 5.0, -2.2, 1.1);
+      P("qBarrel", -3.6, -4.6);
+      P("qBarrel", -2.8, -5.3, 0.8);
+      P("qChest", 0, -2.6, Math.PI);
+      P("qSignPost", 3.6, 1.4, -Math.PI / 2); // weapon rack
+      P("qLantern", -1.6, 2.2);
   }
 
   /** A few grim nature pieces per chunk (dead / twisted trees, rocks, shelf fungus). */
