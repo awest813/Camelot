@@ -144,6 +144,20 @@ export interface ModalService {
   restoreGameplay(): void;
 }
 
+/** Live world conditions features read (weather, the player's standing). */
+export interface WorldStateService {
+  weather(): string;
+  /** Whether the player has a bounty anywhere (raises bandit activity). */
+  hasBounty(): boolean;
+  biomeAt(x: number, z: number): BiomeType;
+}
+
+/** Loot in the world. */
+export interface LootService {
+  /** Roll a loot table and drop up to `count` items around the player. */
+  dropNear(tableId: string, count: number): void;
+}
+
 export const ClockKey = createServiceKey<GameClockService>("clock");
 export const PlayerKey = createServiceKey<PlayerService>("player");
 export const FeedbackKey = createServiceKey<FeedbackService>("feedback");
@@ -154,6 +168,8 @@ export const FastTravelKey = createServiceKey<FastTravelService>("fast-travel");
 export const SiteBuilderKey = createServiceKey<SiteBuilderService>("site-builder");
 export const InventoryKey = createServiceKey<InventoryService>("inventory");
 export const QuestLogKey = createServiceKey<QuestLogService>("quest-log");
+export const WorldStateKey = createServiceKey<WorldStateService>("world-state");
+export const LootKey = createServiceKey<LootService>("loot");
 export const ModalKey = createServiceKey<ModalService>("modal");
 export const ScheduleKey = createServiceKey<ScheduleQueryService>("schedules");
 export const BuildingsKey = createServiceKey<BuildingsService>("buildings");

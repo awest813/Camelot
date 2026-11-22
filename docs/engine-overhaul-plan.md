@@ -342,6 +342,11 @@ state, scope and save codec.
      old fields through getters until Phase 9 makes this the editor app.
      A new `editor-smoke.spec.ts` opens every tool in the running game.
 
+  7. **World events** (`src/features/world-events/`): hourly dynamic events
+     (caches, lost supplies, chained follow-ups), ambient flavour and travel
+     events, as data plus a `time:hour` listener. New `world-state` and
+     `loot` services. Loot drops roll on a seeded stream.
+
   Render counts after the extraction match the pre-extraction baseline
   (2,066 village meshes), so villages are built identically. The render
   budget check now also has floors, so a scene that failed to render can't

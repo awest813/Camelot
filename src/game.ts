@@ -88,10 +88,14 @@ import { buildingFootprint, buildingWallColliders, buildingLayout, toWorld, WALL
 import { Kernel } from "./core/kernel";
 import { EditorSuite } from "./features/editor/editor-suite";
 import { VillageRaidFeature, RaidsKey, type RaidsService } from "./features/village-raids/raid-feature";
-import { ActorsKey, BuildingsKey, ClockKey, FastTravelKey, FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey } from "./features/services";
+import {
+  ActorsKey, BuildingsKey, ClockKey, FastTravelKey, FeedbackKey, InventoryKey, LootKey, ModalKey, PlayerKey,
+  QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey,
+} from "./features/services";
 import { VillagesFeature, VillagesKey, type VillagesService } from "./features/villages/villages-feature";
 import { WorldSitesFeature, WorldSitesKey, type WorldSitesService } from "./features/world-sites/world-sites-feature";
 import { IndoorsFeature } from "./features/indoors/indoors-feature";
+import { WorldEventsFeature, WorldEventsKey } from "./features/world-events/world-events-feature";
 import { VillageJobsFeature, JobsKey, type JobsService } from "./features/village-jobs/jobs-feature";
 import { ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
 import { EnchantingSystem } from "./systems/enchanting-system";
@@ -441,8 +445,8 @@ export class Game {
 
   // v28+ survival / flavor-event systems
   public survivalSystem!: SurvivalSystem;
-  public travelEventSystem!: TravelEventSystem;
-  public ambientEventSystem!: AmbientEventSystem;
+  public get travelEventSystem(): TravelEventSystem { return this.kernel.services.get(WorldEventsKey).travel; }
+  public get ambientEventSystem(): AmbientEventSystem { return this.kernel.services.get(WorldEventsKey).ambient; }
   public leveledListSystem!: LeveledListSystem;
 
   // v22 systems
@@ -465,7 +469,7 @@ export class Game {
   public perkSystem!: PerkSystem;
 
   // v28 systems
-  public dynamicWorldEventSystem!: DynamicWorldEventSystem;
+  public get dynamicWorldEventSystem(): DynamicWorldEventSystem { return this.kernel.services.get(WorldEventsKey).dynamic; }
 
   // Thu'um — dragon shouts (wired post-alpha; state persists via saveSystem)
   public dragonShoutSystem: DragonShoutSystem;
@@ -1836,159 +1840,11 @@ export class Game {
     };
     this.saveSystem.setPerkSystem(this.perkSystem);
 
-    // ── v28: Dynamic world events ─────────────────────────────────────────
-    this.dynamicWorldEventSystem = new DynamicWorldEventSystem();
-    this.dynamicWorldEventSystem.addTemplate({
-      id: "roadside_bandit_cache",
-      label: "Roadside Bandit Cache",
-      description: "Fresh tracks lead to a small stash left by raiders.",
-      tableId: "treasure_chest",
-      minCount: 1,
-      maxCount: 1,
-      cooldownHours: 36,
-      baseChance: 0.08,
-      hostileFactionIds: ["bandits"],
-      factionThreatMultiplier: 1.75,
-      nightMultiplier: 1.4,
-      rewards: { xp: 20, gold: 15, label: "Recovered a roadside cache" },
-      chainEventId: "hidden_cache_followup",
-    });
-    this.dynamicWorldEventSystem.addTemplate({
-      id: "storm_lost_supplies",
-      label: "Lost Supplies",
-      description: "Bad weather uncovers a dropped bundle near the road.",
-      tableId: "common_loot",
-      minCount: 1,
-      maxCount: 2,
-      cooldownHours: 24,
-      baseChance: 0.05,
-      boostedWeatherIds: ["rain", "storm"],
-      weatherBoostMultiplier: 2.5,
-      rewards: { xp: 10, gold: 8, label: "Found storm-scattered supplies" },
-    });
-    this.dynamicWorldEventSystem.addTemplate({
-      id: "hidden_cache_followup",
-      label: "Hidden Cache",
-      description: "The first stash points toward a better-hidden cache nearby.",
-      tableId: "treasure_chest",
-      minCount: 1,
-      maxCount: 1,
-      cooldownHours: 72,
-      baseChance: 0.12,
-      rewards: { xp: 35, gold: 30, label: "Uncovered a hidden cache" },
-    });
-    this.dynamicWorldEventSystem.onEventFired = (result) => {
-      this.ui.showNotification(`World event: ${result.label}`, 2500);
-      // Materialize the event's loot table as findable caches near the player —
-      // the XP/gold reward arrives via onRewardGranted; these are the goods.
-      const context = { playerLevel: this.player.level };
-      const caches = Math.max(1, Math.min(3, result.count));
-      for (let i = 0; i < caches; i++) {
-        const drop = this.lootTableSystem.rollTable(result.tableId, undefined, context).items[0];
-        if (!drop) continue;
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 6 + Math.random() * 6;
-        new Loot(this.scene, new Vector3(
-          this.player.camera.position.x + Math.cos(angle) * dist,
-          0.5,
-          this.player.camera.position.z + Math.sin(angle) * dist,
-        ), {
-          id: drop.id,
-          name: drop.name,
-          description: drop.description ?? "",
-          stackable: drop.stackable ?? false,
-          quantity: drop.quantity ?? 1,
-          weight: drop.weight,
-          stats: drop.stats,
-          slot: drop.slot as any,
-        });
-      }
-    };
-    this.dynamicWorldEventSystem.onRewardGranted = (reward) => {
-      this._grantDynamicWorldEventReward(reward);
-    };
-    this.saveSystem.setDynamicWorldEventSystem(this.dynamicWorldEventSystem);
     this._lastDynamicWorldEventHour = Math.floor(this.timeSystem.elapsedGameHours);
-
-    // ── Travel events (rolled on fast-travel arrival) ────────────────────────
-    this.travelEventSystem = new TravelEventSystem();
-    this.travelEventSystem.addEvent({
-      id: "travel_wanderer_rumor",
-      label: "Wandering Hunter",
-      description: "A hunter by the road shares rumors of old ruins.",
-      conditions: { biomeIds: ["plains", "forest"] },
-      outcome: { notification: "A wandering hunter trades rumors with you about old ruins nearby." },
-      weight: 2,
-      cooldownHours: 24,
-    });
-    this.travelEventSystem.addEvent({
-      id: "travel_sandstorm_tales",
-      label: "Desert Caravan",
-      description: "A caravan merchant warns of sandstorms ahead.",
-      conditions: { biomeIds: ["desert"] },
-      outcome: { notification: "A caravan merchant warns you: 'The dunes are restless this season.'" },
-      weight: 2,
-      cooldownHours: 24,
-    });
-    this.travelEventSystem.addEvent({
-      id: "travel_storm_refuge",
-      label: "Storm Refuge",
-      description: "You share shelter with a fellow traveler during a downpour.",
-      conditions: { weather: ["rain", "storm"] },
-      outcome: { notification: "You shelter from the storm beside a fellow traveler and swap stories." },
-      weight: 3,
-      cooldownHours: 12,
-    });
-    this.travelEventSystem.addEvent({
-      id: "travel_frost_warning",
-      label: "Frostbitten Scout",
-      description: "A half-frozen scout stumbles out of the snow.",
-      conditions: { biomeIds: ["tundra"], minPlayerLevel: 2 },
-      outcome: { notification: "A frostbitten scout mutters about shapes moving in the whiteout before wandering off." },
-      weight: 2,
-      cooldownHours: 24,
-    });
-
-    // ── Ambient events (hourly flavor) ──────────────────────────────────────
-    this.ambientEventSystem = new AmbientEventSystem();
-    this.ambientEventSystem.addEvent({
-      id: "ambient_wolf_howl",
-      label: "Wolf Howl",
-      conditions: { timeRange: { minHour: 20, maxHour: 5 }, biomeIds: ["forest", "tundra"] },
-      effect: { notification: "A wolf howls somewhere in the dark." },
-      cooldownHours: 8,
-    });
-    this.ambientEventSystem.addEvent({
-      id: "ambient_shooting_star",
-      label: "Shooting Star",
-      conditions: { timeRange: { minHour: 22, maxHour: 4 }, weather: ["clear"] },
-      effect: { notification: "A shooting star streaks across the night sky." },
-      cooldownHours: 12,
-    });
-    this.ambientEventSystem.addEvent({
-      id: "ambient_market_news",
-      label: "Traveling News",
-      conditions: { timeRange: { minHour: 8, maxHour: 18 } },
-      effect: { notification: "You overhear travelers gossiping about bandit trouble on the trade road." },
-      cooldownHours: 10,
-    });
-    this.ambientEventSystem.addEvent({
-      id: "ambient_birdsong",
-      label: "Birdsong",
-      conditions: { timeRange: { minHour: 6, maxHour: 10 }, biomeIds: ["forest", "plains"], weather: ["clear", "overcast"] },
-      effect: { notification: "Birdsong fills the morning air." },
-      cooldownHours: 6,
-    });
-    this.ambientEventSystem.onEventTriggered = (_id, effect) => {
-      if (effect.notification) this.ui.showNotification(effect.notification, 3000);
-    };
 
     // ── Leveled lists (tiered boss loot) ─────────────────────────────────────
     this.leveledListSystem = new LeveledListSystem();
     this.leveledListSystem.registerAll(ALL_BUILT_IN_LEVELED_LISTS);
-    // Persist flavor-event cooldowns so reloading can't reroll one-shots.
-    this.saveSystem.setTravelEventSystem(this.travelEventSystem);
-    this.saveSystem.setAmbientEventSystem(this.ambientEventSystem);
 
     // Wire sneak-attack detection into combat.
     this.combatSystem.setStealthSystem(this.stealthSystem);
@@ -5927,32 +5783,14 @@ export class Game {
       return goldEntry?.quantity ?? 0;
   }
 
+  /** Once per in-game hour: features (world events, raids, …) react to `time:hour`. */
   private _updateDynamicWorldEventsOnHourChange(): void {
       const elapsedHour = Math.floor(this.timeSystem.elapsedGameHours);
       if (elapsedHour === this._lastDynamicWorldEventHour) return;
       this._lastDynamicWorldEventHour = elapsedHour;
-
-      this.dynamicWorldEventSystem.update({
-        gameTimeHours: this.timeSystem.elapsedGameHours,
-        playerLevel: this.playerLevelSystem.characterLevel,
-        activeFactionIds: this.crimeSystem.getTotalBounty() > 0 ? ["bandits"] : [],
-        weatherId: this.weatherSystem.state,
-      });
-
       this.eventBus.emit("time:hour", { hour: this.timeSystem.hour, elapsedHours: this.timeSystem.elapsedGameHours });
-
-      // Ambient flavor events share the same hourly tick.
-      const p = this.player.camera.position;
-      this.ambientEventSystem.update({
-        gameTimeHours: this.timeSystem.elapsedGameHours % 24,
-        weatherId: this.weatherSystem.state,
-        activeBiomeIds: [this.world.getBiome(
-          Math.floor(p.x / this.world.chunkSize),
-          Math.floor(p.z / this.world.chunkSize),
-        )],
-        playerLevel: this.playerLevelSystem.characterLevel,
-      });
   }
+
 
   private _grantDynamicWorldEventReward(reward: DynamicEventReward): void {
       const xp = Math.max(0, Math.floor(reward.xp ?? 0));
@@ -6806,6 +6644,42 @@ export class Game {
         suspendGameplay: () => this._suspendGameplayInput(),
         restoreGameplay: () => this._restoreGameplayInput(),
       });
+
+      k.services.provide(WorldStateKey, {
+        weather: () => this.weatherSystem.state,
+        hasBounty: () => this.crimeSystem.getTotalBounty() > 0,
+        biomeAt: (x, z) => this.world.getBiome(Math.floor(x / this.world.chunkSize), Math.floor(z / this.world.chunkSize)),
+      });
+      const lootRng = k.rng.stream("loot-drops");
+      k.services.provide(LootKey, {
+        dropNear: (tableId, count) => {
+          const context = { playerLevel: this.player.level };
+          for (let i = 0; i < count; i++) {
+            const drop = this.lootTableSystem.rollTable(tableId, undefined, context).items[0];
+            if (!drop) continue;
+            const angle = lootRng.next() * Math.PI * 2;
+            const dist = 6 + lootRng.next() * 6;
+            const p = this.player.camera.position;
+            new Loot(this.scene, new Vector3(p.x + Math.cos(angle) * dist, 0.5, p.z + Math.sin(angle) * dist), {
+              id: drop.id,
+              name: drop.name,
+              description: drop.description ?? "",
+              stackable: drop.stackable ?? false,
+              quantity: drop.quantity ?? 1,
+              weight: drop.weight,
+              stats: drop.stats,
+              slot: drop.slot as Item["slot"],
+            });
+          }
+        },
+      });
+
+      const worldEvents = new WorldEventsFeature();
+      k.install(worldEvents);
+      this.saveSystem.setDynamicWorldEventSystem(worldEvents.dynamic);
+      // Persist flavor-event cooldowns so reloading can't reroll one-shots.
+      this.saveSystem.setTravelEventSystem(worldEvents.travel);
+      this.saveSystem.setAmbientEventSystem(worldEvents.ambient);
 
       k.install(new IndoorsFeature());
       k.install(new VillagesFeature());
