@@ -54,7 +54,7 @@ function installSummary(): void {
       gold: g._getInventoryGold() as number,
       items: g.inventorySystem.items.map((i: any) => `${i.id}×${i.quantity}`).sort() as string[],
       hour: Math.floor(g.timeSystem.hour) as number,
-      activeJobs: g.villageJobs.getActive().map((j: any) => `${j.boardId}:${j.templateId}:${j.progress}`).sort() as string[],
+      activeJobs: g.jobs.rules.getActive().map((j: any) => `${j.boardId}:${j.templateId}:${j.progress}`).sort() as string[],
       discovered: (g.fastTravelSystem.discoveredLocations ?? []).map((l: any) => l.id).sort() as string[],
       activeQuests: g.questSystem.getQuests().filter((q: any) => q.isActive).map((q: any) => q.id).sort() as string[],
     };
@@ -66,7 +66,6 @@ type Summary = {
   activeJobs: string[]; discovered: string[]; activeQuests: string[];
 };
 
-const summarize = (page: Page) => page.evaluate(() => (window as any).__fixtureSummary()) as Promise<Summary>;
 
 test.describe("save fixtures", () => {
   test.skip(!!process.env.SAVE_FIXTURE_CAPTURE, "capturing instead");
@@ -85,15 +84,18 @@ test.describe("save fixtures", () => {
       await page.goto("/", { waitUntil: "domcontentloaded", timeout: 60_000 });
       await createCharacter(page, "fixture-check");
 
-      const loaded = await page.evaluate((save) => {
+      // Load and read the restored state in the same tick: game time runs
+      // fast (and hourly events can grant gold), so no frames in between.
+      const { loaded, summary } = await page.evaluate((save) => {
         const g = (window as any).__camelotGame;
         localStorage.setItem("camelot_save", JSON.stringify(save));
-        return g.saveSystem.load();
+        const ok = g.saveSystem.load();
+        return { loaded: ok as boolean, summary: (window as any).__fixtureSummary() };
       }, fixture.save);
       expect(loaded, `${file} loads`).toBe(true);
+      expect(summary, `${file}: restored state`).toEqual(fixture.expect);
+      // …and the game keeps running cleanly afterwards.
       await page.waitForTimeout(1500);
-
-      expect(await summarize(page), `${file}: restored state`).toEqual(fixture.expect);
       expect(errors, `${file}: page errors`).toEqual([]);
     });
   }
@@ -125,9 +127,9 @@ test("capture a fixture from this build", async ({ page }) => {
     const g = (window as any).__camelotGame;
     const [key, plan] = [...g._loadedVillages.entries()][0];
     const [cx, cz] = key.split(",").map(Number);
-    g._askForWork({ boardId: `inn_${cx}_${cz}`, placeName: plan.name });
+    g.jobs.open({ boardId: `inn_${cx}_${cz}`, placeName: plan.name });
     (document.querySelector(".job-board__btn--primary") as HTMLButtonElement)?.click();
-    g.jobBoardUI.hide(); g.jobBoardUI.onClose?.();
+    g.jobs.window.hide(); g.jobs.window.onClose?.();
     g.timeSystem.advanceHours(5);
   });
   // Let the hour change's world events (rewards, caches) settle, then save

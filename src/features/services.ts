@@ -8,6 +8,7 @@
  */
 import type { NPC } from "../entities/npc";
 import type { VillagePlan } from "../world/village-settlement";
+import type { Quest } from "../systems/quest-system";
 import { createServiceKey } from "../core/kernel";
 
 export interface GameClockService {
@@ -46,9 +47,33 @@ export interface VillageWorldService {
   isIndoors(npc: NPC): boolean;
   /** Whether the player is talking or trading with this NPC. */
   isTalkingTo(npc: NPC): boolean;
+  /** The inn job board an NPC (by mesh name) belongs to: inn chunk + place name. */
+  innBoardOf(npcName: string): { boardId: string; placeName: string } | null;
+}
+
+export interface InventoryService {
+  count(itemId: string): number;
+  /** Remove across stacks, all or nothing. */
+  remove(itemId: string, amount: number): boolean;
+}
+
+/** The quest log (legacy QuestSystem list until Phase 4 unifies quests). */
+export interface QuestLogService {
+  /** The live, mutable list of quests. */
+  quests(): Quest[];
+  add(quest: Quest): void;
+}
+
+/** Full-screen windows: pause gameplay input while one is open. */
+export interface ModalService {
+  suspendGameplay(): void;
+  restoreGameplay(): void;
 }
 
 export const ClockKey = createServiceKey<GameClockService>("clock");
 export const PlayerKey = createServiceKey<PlayerService>("player");
 export const FeedbackKey = createServiceKey<FeedbackService>("feedback");
 export const VillageWorldKey = createServiceKey<VillageWorldService>("village-world");
+export const InventoryKey = createServiceKey<InventoryService>("inventory");
+export const QuestLogKey = createServiceKey<QuestLogService>("quest-log");
+export const ModalKey = createServiceKey<ModalService>("modal");

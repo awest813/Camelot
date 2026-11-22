@@ -49,6 +49,7 @@ function setup(opts: { level?: number } = {}) {
     sendIndoors: (npc) => { indoors.add(npc); },
     isIndoors: (npc) => indoors.has(npc),
     isTalkingTo: (npc) => npc === talkingTo,
+    innBoardOf: () => null,
   });
   const feature = new VillageRaidFeature();
   k.install(feature);

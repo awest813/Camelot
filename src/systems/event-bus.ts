@@ -57,6 +57,12 @@ export interface GameEvents {
   "save:loaded": Record<string, never>;
   /** An NPC left the world (despawned or its chunk unloaded); drop references. */
   "npc:released": { npcName: string };
+  /** A dialogue choice fired a host action (e.g. "jobs:ask"), with the speaker. */
+  "dialogue:action": { eventId: string; npcName: string | null };
+  /** A conversation ended and the dialogue UI is gone. */
+  "dialogue:closed": Record<string, never>;
+  /** The quest log was opened. */
+  "questlog:opened": Record<string, never>;
 }
 
 export type GameEventType = keyof GameEvents;

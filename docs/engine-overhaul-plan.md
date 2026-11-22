@@ -306,6 +306,12 @@ state, scope and save codec.
   1. **Village raids** (`src/features/village-raids/`). Events in, services
      out, no reference to `Game`. Its rules roll on a seeded stream, and
      5 headless tests run it through the kernel with fake services.
+  2. **Village jobs** (`src/features/village-jobs/`): the job board rules,
+     the job window (owned by the feature and removed on uninstall), and the
+     quest-log mirroring. Triggers are the `dialogue:action` and
+     `dialogue:closed` events and `questlog:opened`. This added inventory,
+     quest-log and modal services. 3 headless tests click through the real
+     window.
 
 ### Phase 2 — Input, modals and camera (2 weeks)
 

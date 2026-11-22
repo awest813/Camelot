@@ -86,11 +86,10 @@ import { CraftingUI } from "./ui/crafting-ui";
 import { ItemConditionSystem } from "./systems/item-condition-system";
 import { buildingFootprint, buildingWallColliders, buildingLayout, toWorld, WALL_HEIGHT, type BuildingKind } from "./world/village-buildings";
 import { hasVillage, planVillage, VILLAGE_DISCOVER_RADIUS, VILLAGE_CLEAR_RADIUS, type VillagePlan } from "./world/village-settlement";
-import { VillageJobBoard } from "./systems/village-jobs";
-import { JobBoardUI } from "./ui/job-board-ui";
 import { Kernel } from "./core/kernel";
 import { VillageRaidFeature, RaidsKey, type RaidsService } from "./features/village-raids/raid-feature";
-import { ClockKey, FeedbackKey, PlayerKey, VillageWorldKey } from "./features/services";
+import { ClockKey, FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, VillageWorldKey } from "./features/services";
+import { VillageJobsFeature, JobsKey, type JobsService } from "./features/village-jobs/jobs-feature";
 import { createNoticeMaterials } from "./rendering/notice-texture";
 import { buildVillageWell, WELL_RADIUS } from "./world/village-well";
 import { ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
@@ -389,8 +388,6 @@ export class Game {
   public readonly forges = new ForgeRegistry();
   public craftingUI: CraftingUI;
   /** Radiant work offered by innkeepers ("Any work going?"). */
-  public readonly villageJobs = new VillageJobBoard();
-  public readonly jobBoardUI = new JobBoardUI();
   /** Feature runtime (engine overhaul): events, phases, services, RNG, scopes. */
   public kernel!: Kernel;
 
@@ -398,8 +395,11 @@ export class Game {
   public get raids(): RaidsService {
     return this.kernel.services.get(RaidsKey);
   }
-  /** Board the job window is showing (inn chunk id + place name). */
-  private _activeJobBoard: { boardId: string; placeName: string } | null = null;
+
+  /** The village jobs feature's service (job window, rules). */
+  public get jobs(): JobsService {
+    return this.kernel.services.get(JobsKey);
+  }
 
   // v5 systems (Oblivion parity: enchanting)
   public enchantingSystem: EnchantingSystem;
@@ -500,8 +500,6 @@ export class Game {
   private _pendingBarterMerchantId: string | null = null;
   /** Set by the smith's "use your forge" dialogue choice; opened once dialogue closes. */
   private _pendingSmithingOpen = false;
-  /** Set by the innkeeper's "Any work going?"; the job window opens after the dialogue. */
-  private _pendingJobBoard: { boardId: string; placeName: string } | null = null;
   /** Shared parchment material for village notice boards. */
   private _noticeMats: StandardMaterial[] | null = null;
   private _candleMat: StandardMaterial | null = null;
@@ -857,7 +855,7 @@ export class Game {
     this.saveSystem.setCombatSystem(this.combatSystem);
     this.questSystem        = new QuestSystem(this.ui);
     this.questSystem.onOpen = () => {
-      for (const job of this.villageJobs.getActive()) this._syncJobQuest(job.boardId);
+      this.eventBus.emit("questlog:opened", {});
       if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === "quests") {
         this._onboardingTutorial.advance();
       }
@@ -869,10 +867,6 @@ export class Game {
       this._syncInventoryGoldToFramework();
       // Saved equipment bypasses equip() — re-sync the weapon archetype.
       this._syncWeaponArchetype();
-      // Village jobs live in their own save slot: drop job entries the loaded
-      // state no longer has (taken after that save), then mirror it back in.
-      this._pruneStaleJobQuests();
-      for (const job of this.villageJobs.getActive()) this._syncJobQuest(job.boardId);
       // Features reset their transient state (e.g. a raid in progress).
       this.eventBus.emit("save:loaded", {});
       // Restored condition values change the wear penalty on the player.
@@ -1584,19 +1578,7 @@ export class Game {
     };
     this.craftingUI.onClose = () => this._restoreGameplayInput();
     this.saveSystem.setCraftingSystem(this.craftingSystem);
-    this.saveSystem.setVillageJobs(this.villageJobs);
     this._installFeatures();
-    this._initJobBoardUI();
-    this.villageJobs.onProgress = (job, template) => {
-      this._syncJobQuest(job.boardId);
-      const left = template.required - job.progress;
-      this.ui.showNotification(
-        left > 0 ? `${template.title}: ${job.progress}/${template.required}`
-                 : `${template.title}: done — return to ${job.placeName} for your pay.`,
-        2600,
-      );
-      this.saveSystem.markDirty();
-    };
     // Forget condition for gear that left the world (dropped, or wiped by a shop restock).
     this.saveSystem.onBeforeSave = () => {
       this.smithing.pruneConditions([
@@ -3283,7 +3265,6 @@ export class Game {
             this.crimeSystem.commitCrime("murder", npc.factionId ?? "village_guard", this.timeSystem.elapsedGameTime);
         }
         this.questSystem.onKill(name);
-        this.villageJobs.onKill(name);
         this._applyFrameworkQuestEvent("kill", this._toFrameworkTargetId(name));
         // Killing someone a quest needed alive fails the dependent quests.
         this._failQuestsForDeadTarget(name, this._toFrameworkTargetId(name));
@@ -3404,11 +3385,8 @@ export class Game {
         this._pendingSmithingOpen = false;
         this._openSmithingForge();
       }
-      if (this._pendingJobBoard) {
-        const board = this._pendingJobBoard;
-        this._pendingJobBoard = null;
-        this._askForWork(board);
-      }
+      // Features waiting on the conversation (e.g. the job window) act now.
+      this.eventBus.emit("dialogue:closed", {});
       this._currentDialogueNpcName = null;
     };
 
@@ -5006,7 +4984,7 @@ export class Game {
       if (this.alchemyUI.isVisible) { this.alchemyUI.toggle(false); this._restoreGameplayInput(); return; }
       if (this.enchantingUI.isVisible) { this.enchantingUI.toggle(false); this._restoreGameplayInput(); return; }
       if (this.craftingUI.isVisible) { this.craftingUI.hide(); this._restoreGameplayInput(); return; }
-      if (this.jobBoardUI.isVisible) { this.jobBoardUI.hide(); this.jobBoardUI.onClose?.(); return; }
+      if (this.jobs.window.isVisible) { this.jobs.window.hide(); this.jobs.window.onClose?.(); return; }
       if (this.spellMakingUI.isVisible) { this.spellMakingUI.close(); return; }
       if (this._barterUI.isVisible) { this._barterUI.onClose?.(); return; }
       if (this._containerUI.isVisible) { this._containerUI.onClose?.(); return; }
@@ -5197,7 +5175,7 @@ export class Game {
           if (this.alchemyUI.isVisible) { this.alchemyUI.toggle(false); }
           if (this.enchantingUI.isVisible) { this.enchantingUI.toggle(false); }
           if (this.craftingUI.isVisible) { this.craftingUI.hide(); }
-          if (this.jobBoardUI.isVisible) { this.jobBoardUI.hide(); this._activeJobBoard = null; }
+          if (this.jobs.window.isVisible) this.jobs.window.hide();
           if (this.spellMakingUI.isVisible) { this.spellMakingUI.close(); }
           if (this.fastTravelUI.isVisible) { this.fastTravelUI.close(); }
           if (this.petUI.isVisible) { this.petUI.close(); }
@@ -6624,7 +6602,7 @@ export class Game {
           this.followerUI.isVisible ||
           this.pickpocketUI.isVisible ||
           this.craftingUI.isVisible ||
-          this.jobBoardUI.isVisible ||
+          this.jobs.window.isVisible ||
           this.graphicsSettingsUI.isVisible ||
           !!this._creditsUI?.isVisible
       );
@@ -7191,6 +7169,8 @@ export class Game {
   }
 
   private _handleDialogueHostEvent(eventId: string, payload?: Record<string, unknown>): void {
+      // Features react to dialogue actions through the bus (e.g. "jobs:ask").
+      this.eventBus.emit("dialogue:action", { eventId, npcName: this._currentDialogueNpcName });
       if (eventId === "trainer:train") {
         const trainerId = typeof payload?.trainerId === "string" ? payload.trainerId : "";
         if (!trainerId) return;
@@ -7218,11 +7198,6 @@ export class Game {
             3200,
           );
         }
-        return;
-      }
-      if (eventId === "jobs:ask") {
-        // Open once the dialogue has closed (it restores input on close).
-        this._pendingJobBoard = this._jobBoardForCurrentSpeaker();
         return;
       }
       if (eventId === "smithing:open") {
@@ -7619,142 +7594,6 @@ export class Game {
       }
   }
 
-  /** Board id + place name for the innkeeper the player is talking to. */
-  private _jobBoardForCurrentSpeaker(): { boardId: string; placeName: string } | null {
-      const name = this._currentDialogueNpcName;
-      const npc = name ? this.scheduleSystem.npcs.find((n) => n.mesh.name === name) : undefined;
-      if (!npc) return null;
-      const cx = Math.round(npc.spawnPosition.x / this.world.chunkSize);
-      const cz = Math.round(npc.spawnPosition.z / this.world.chunkSize);
-      const village = this._villagePlans.get(`${cx},${cz}`) ?? null;
-      return { boardId: `inn_${cx}_${cz}`, placeName: village?.name ?? "the inn" };
-  }
-
-  /** The job context (player level, bag) for the village job board. */
-  private _jobContext() {
-      return {
-        playerLevel: this.playerLevelSystem.characterLevel,
-        countItem: (id: string) => this.inventorySystem.items.reduce((n, i) => (i.id === id ? n + i.quantity : n), 0),
-        removeItem: (id: string, amount: number) => this.inventorySystem.removeQuantity(id, amount),
-      };
-  }
-
-  /** "Any work going?" / the notice board: open the job board window. */
-  private _askForWork(board = this._jobBoardForCurrentSpeaker()): void {
-      if (!board) return;
-      this._activeJobBoard = board;
-      const view = this.villageJobs.view(board.boardId, board.placeName, this._jobContext());
-      if (this.jobBoardUI.isVisible) {
-        this.jobBoardUI.render(board.placeName, view);
-        return;
-      }
-      this.jobBoardUI.show(board.placeName, view);
-      this._suspendGameplayInput();
-  }
-
-  /** Wire the job board window's buttons. */
-  private _initJobBoardUI(): void {
-      const refresh = () => {
-        const b = this._activeJobBoard;
-        if (b && this.villageJobs.activeAt(b.boardId)) this._syncJobQuest(b.boardId);
-        if (b && this.jobBoardUI.isVisible) {
-          this.jobBoardUI.render(b.placeName, this.villageJobs.view(b.boardId, b.placeName, this._jobContext()));
-        }
-        this.saveSystem.markDirty();
-      };
-      this.jobBoardUI.onAccept = () => {
-        const b = this._activeJobBoard;
-        if (!b) return;
-        const job = this.villageJobs.accept(b.boardId, b.placeName, this.playerLevelSystem.characterLevel);
-        this._syncJobQuest(job.boardId);
-        const t = VillageJobBoard.template(job.templateId);
-        if (t) this.ui.showNotification(`New job: ${t.title}`, 2600);
-        refresh();
-      };
-      this.jobBoardUI.onHandIn = () => {
-        const b = this._activeJobBoard;
-        if (!b) return;
-        const questId = this._jobQuestId(b.boardId); // before handIn bumps the count
-        const done = this.villageJobs.handIn(b.boardId, this._jobContext());
-        if (!done) { refresh(); return; }
-        const quest = this.questSystem.getQuests().find((q) => q.id === questId);
-        if (quest) {
-          quest.isCompleted = true;
-          quest.isActive = false;
-          for (const o of quest.objectives) { o.current = o.required; o.completed = true; }
-        }
-        this.fameSystem.addFame(5);
-        this._grantDynamicWorldEventReward({ gold: done.rewardGold, xp: done.rewardXp, label: `Job done: ${done.template.title}` });
-        refresh();
-      };
-      this.jobBoardUI.onDecline = () => {
-        const b = this._activeJobBoard;
-        if (!b) return;
-        this._removeJobQuest(b.boardId);
-        this.villageJobs.decline(b.boardId);
-        refresh();
-      };
-      this.jobBoardUI.onClose = () => {
-        this._activeJobBoard = null;
-        this._restoreGameplayInput();
-      };
-  }
-
-  /** Quest-log id for a board's current job (one entry per job taken there). */
-  private _jobQuestId(boardId: string): string {
-      const n = this.villageJobs.completedAt(boardId);
-      return n === 0 ? `job_${boardId}` : `job_${boardId}_${n}`;
-  }
-
-  /** Drop an abandoned job's quest-log entry. */
-  private _removeJobQuest(boardId: string): void {
-      const quests = this.questSystem.getQuests();
-      const id = this._jobQuestId(boardId);
-      const i = quests.findIndex((q) => q.id === id && !q.isCompleted);
-      if (i >= 0) quests.splice(i, 1);
-  }
-
-  /** Mirror an active village job into the quest log (created on first sync). */
-  private _syncJobQuest(boardId: string): void {
-      const job = this.villageJobs.activeAt(boardId);
-      if (!job) return;
-      const template = VillageJobBoard.template(job.templateId);
-      if (!template) return;
-      const id = this._jobQuestId(boardId);
-      let quest = this.questSystem.getQuests().find((q) => q.id === id);
-      if (!quest) {
-        quest = {
-          id,
-          name: `${template.title} (${job.placeName})`,
-          description: VillageJobBoard.describe(template, job.placeName),
-          isCompleted: false,
-          isActive: true,
-          reward: `${template.rewardGold} gold`,
-          objectives: [{
-            id: `${id}_obj`,
-            // Never matched by QuestSystem's own kill/pickup hooks — the job board drives it.
-            type: template.kind === "bounty" ? "kill" : "fetch",
-            targetId: `__job__${template.target}`,
-            description: template.kind === "bounty"
-              ? `Kill ${template.required} (${template.target.replace(/([a-z])([A-Z])/g, "$1 $2")})`
-              : `Bring ${template.required} × ${template.target.replace(/_/g, " ")}`,
-            required: template.required,
-            current: 0,
-            completed: false,
-          }],
-        };
-        this.questSystem.addQuest(quest, true);
-      }
-      const obj = quest.objectives[0];
-      // Supply runs count what's in the bag; bounties count kills.
-      const have = template.kind === "supply" ? this._jobContext().countItem(template.target) : job.progress;
-      obj.current = Math.min(have, obj.required);
-      // Never mark it complete: QuestSystem would then close the quest (and
-      // announce it) on the next kill/talk event, before the job is paid.
-      // The job board completes it on hand-in.
-      obj.completed = false;
-  }
-
   /** The village plan for chunk (cx, cz), or null (cached; never on ponds). */
   private _villagePlanFor(cx: number, cz: number): VillagePlan | null {
       const key = `${cx},${cz}`;
@@ -7932,7 +7771,7 @@ export class Game {
       hit.metadata = {
         type: "activator",
         label: `Read the ${plan.name} notice board`,
-        onActivate: () => this._askForWork(board),
+        onActivate: () => this.jobs.open(board),
       };
       chunkRecord.roots.push(hit);
   }
@@ -8002,11 +7841,35 @@ export class Game {
         sendIndoors: (npc) => this._sendIndoors(npc),
         isIndoors: (npc) => this._indoorNpcs.has(npc),
         isTalkingTo: (npc) => npc.isInDialogue || npc.mesh.name === this._currentDialogueNpcName,
+        innBoardOf: (npcName) => {
+          const npc = this.scheduleSystem.npcs.find((n) => n.mesh.name === npcName);
+          if (!npc) return null;
+          const cx = Math.round(npc.spawnPosition.x / this.world.chunkSize);
+          const cz = Math.round(npc.spawnPosition.z / this.world.chunkSize);
+          const village = this._villagePlans.get(`${cx},${cz}`) ?? null;
+          return { boardId: `inn_${cx}_${cz}`, placeName: village?.name ?? "the inn" };
+        },
+      });
+      k.services.provide(InventoryKey, {
+        count: (id) => this.inventorySystem.items.reduce((n, i) => (i.id === id ? n + i.quantity : n), 0),
+        remove: (id, amount) => this.inventorySystem.removeQuantity(id, amount),
+      });
+      k.services.provide(QuestLogKey, {
+        quests: () => this.questSystem.getQuests(),
+        add: (quest) => this.questSystem.addQuest(quest, true),
+      });
+      k.services.provide(ModalKey, {
+        suspendGameplay: () => this._suspendGameplayInput(),
+        restoreGameplay: () => this._restoreGameplayInput(),
       });
 
       const raids = new VillageRaidFeature();
       k.install(raids);
       this.saveSystem.setVillageRaids(raids.rules);
+
+      const jobs = new VillageJobsFeature();
+      k.install(jobs);
+      this.saveSystem.setVillageJobs(jobs.rules);
   }
 
   /** The loaded, discovered village the player is standing in, if any. */
@@ -8027,16 +7890,6 @@ export class Game {
         if (i >= 0) { record.npcs.splice(i, 1); break; }
       }
       this._releaseNpc(npc);
-  }
-
-  /** Drop quest-log entries for village jobs that are no longer active. */
-  private _pruneStaleJobQuests(): void {
-      const live = new Set(this.villageJobs.getActive().map((j) => this._jobQuestId(j.boardId)));
-      const quests = this.questSystem.getQuests();
-      for (let i = quests.length - 1; i >= 0; i--) {
-        const q = quests[i];
-        if (q.id.startsWith("job_") && !q.isCompleted && !live.has(q.id)) quests.splice(i, 1);
-      }
   }
 
   /** Bandit camp dressing around a camp origin (entrance on local +Z). */
@@ -8178,7 +8031,7 @@ export class Game {
           this.petUI.isVisible ||
           this.pickpocketUI.isVisible ||
           this.craftingUI.isVisible ||
-          this.jobBoardUI.isVisible ||
+          this.jobs.window.isVisible ||
           this.characterSheetUI.isVisible ||
           this.graphicsSettingsUI.isVisible ||
           !!this._creditsUI?.isVisible ||

@@ -99,21 +99,20 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
       && Math.hypot(n.mesh.position.x - g.player.camera.position.x, n.mesh.position.z - g.player.camera.position.z) < 25);
     g._currentDialogueNpcName = inn.mesh.name;
     g._handleDialogueHostEvent("jobs:ask");
-    // The window opens once the dialogue closes.
-    const pending = g._pendingJobBoard;
-    g._askForWork(pending);
-    g._pendingJobBoard = null;
-    const opened = g.jobBoardUI.isVisible;
+    // Not yet: the window waits for the conversation to close…
+    const waited = !g.jobs.window.isVisible;
+    g.eventBus.emit("dialogue:closed", {});
+    const opened = waited && g.jobs.window.isVisible;
     click("Accept");
-    const active = g.villageJobs.getActive()[0];
-    const quest = g.questSystem.getQuests().find((q: any) => q.id === g._jobQuestId(active.boardId));
-    const t = g.villageJobs.constructor.template(active.templateId);
+    const active = g.jobs.rules.getActive()[0];
+    const quest = g.questSystem.getQuests().find((q: any) => q.id === g.jobs.questIdOf(active.boardId));
+    const t = g.jobs.rules.constructor.template(active.templateId);
     const handInEnabledEarly = !document.querySelector<HTMLButtonElement>(".job-board__btn--primary")!.disabled;
     // Fulfil it (supply: stock the bag; bounty: fake the kills) and collect.
     if (t.kind === "supply") {
       g.inventorySystem.addItem({ id: t.target, name: t.target, description: "", stackable: true, quantity: t.required, weight: 0 });
     } else {
-      for (let i = 0; i < t.required; i++) g.villageJobs.onKill(`${t.target}_${i}`);
+      for (let i = 0; i < t.required; i++) g.jobs.rules.onKill(`${t.target}_${i}`);
     }
     // Any kill/pickup/talk event re-checks quest completion; a done-but-unpaid
     // job must stay open until it's handed in.
@@ -122,14 +121,14 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     g.saveSystem.save(true);
     const saved = JSON.parse(localStorage.getItem("camelot_save")!).villageJobs;
     const goldBefore = g._getInventoryGold();
-    g._askForWork(pending); // re-render with the goods in hand
+    g.jobs.open({ boardId: active.boardId, placeName: active.placeName }); // re-render with the goods in hand
     click("Hand in");
     click("Close");
     return {
-      opened: !!pending && opened, handInEnabledEarly, closed: !g.jobBoardUI.isVisible, openBeforeHandIn,
+      opened, handInEnabledEarly, closed: !g.jobs.window.isVisible, openBeforeHandIn,
       template: t.id, place: active.placeName, questName: quest?.name,
       savedActive: saved.active.length, paid: g._getInventoryGold() - goldBefore,
-      reward: t.rewardGold, questDone: quest?.isCompleted, left: g.villageJobs.getActive().length,
+      reward: t.rewardGold, questDone: quest?.isCompleted, left: g.jobs.rules.getActive().length,
     };
   });
   expect(job.opened, "the job window opens").toBe(true);
@@ -157,17 +156,17 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     const g = (window as any).__camelotGame;
     const btn = (label: string) =>
       Array.from(document.querySelectorAll<HTMLButtonElement>(".job-board__btn")).find((b) => b.textContent === label)!;
-    const before = g.villageJobs.getActive().length;
+    const before = g.jobs.rules.getActive().length;
     g.interactionSystem.interact();
-    const opened = g.jobBoardUI.isVisible;
+    const opened = g.jobs.window.isVisible;
     btn("Accept").click();
-    const taken = g.villageJobs.getActive().length;
-    const questId = g._jobQuestId(g.villageJobs.getActive()[0]?.boardId);
+    const taken = g.jobs.rules.getActive().length;
+    const questId = g.jobs.questIdOf(g.jobs.rules.getActive()[0]?.boardId);
     const logged = g.questSystem.getQuests().some((q: any) => q.id === questId && !q.isCompleted);
     btn("Abandon").click();
     const inLog = g.questSystem.getQuests().some((q: any) => q.id === questId);
     btn("Close").click();
-    return { before, opened, taken, logged, after: g.villageJobs.getActive().length, inLog, closed: !g.jobBoardUI.isVisible };
+    return { before, opened, taken, logged, after: g.jobs.rules.getActive().length, inLog, closed: !g.jobs.window.isVisible };
   });
   expect(boardJob, "the notice board opens the job window; jobs can be taken and abandoned")
     .toEqual({ before: 0, opened: true, taken: 1, logged: true, after: 0, inLog: false, closed: true });
