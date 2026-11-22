@@ -83,6 +83,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   ("Not now" rolls a different one), hand it in once it's done, or abandon
   it. Each job you take gets its own quest-log entry, so a second job at the
   same inn no longer reuses the finished one's entry.
+  The notices pinned to the board now show headings, handwriting, wax seals
+  and a "wanted" sketch instead of blank paper.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

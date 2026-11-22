@@ -88,6 +88,7 @@ import { buildingFootprint, buildingLayout, toWorld, WALL_HEIGHT, type BuildingK
 import { hasVillage, planVillage, VILLAGE_DISCOVER_RADIUS, type VillagePlan } from "./world/village-settlement";
 import { VillageJobBoard } from "./systems/village-jobs";
 import { JobBoardUI } from "./ui/job-board-ui";
+import { createNoticeMaterials } from "./rendering/notice-texture";
 import { ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
 import { EnchantingSystem } from "./systems/enchanting-system";
 import { EnchantingUI } from "./ui/enchanting-ui";
@@ -491,7 +492,7 @@ export class Game {
   /** Set by the innkeeper's "Any work going?"; the job window opens after the dialogue. */
   private _pendingJobBoard: { boardId: string; placeName: string } | null = null;
   /** Shared parchment material for village notice boards. */
-  private _noticeMat: StandardMaterial | null = null;
+  private _noticeMats: StandardMaterial[] | null = null;
 
   public isPaused: boolean = false;
 
@@ -7684,15 +7685,7 @@ export class Game {
       hit.visibility = 0;
       hit.isPickable = true;
       // Pinned notices: parchment quads (one shared material) on the board face.
-      this._noticeMat ??= (() => {
-        const m = new StandardMaterial("notice_parchment", this.scene);
-        m.diffuseColor = new Color3(0.86, 0.78, 0.60);
-        m.emissiveColor = new Color3(0.14, 0.12, 0.09); // readable in shade
-        m.specularColor = new Color3(0.02, 0.02, 0.02);
-        m.backFaceCulling = false;
-        m.freeze();
-        return m;
-      })();
+      this._noticeMats ??= createNoticeMaterials(this.scene);
       const notices: Array<[number, number, number]> = [[-0.42, 1.55, 0.08], [0.05, 1.62, -0.05], [0.45, 1.5, 0.12], [-0.15, 1.24, -0.1], [0.36, 1.2, 0.04]];
       notices.forEach(([lx, ly, tilt], i) => {
         const q = MeshBuilder.CreatePlane(`notice_${chunkKey}_${i}`, { width: 0.3, height: 0.36, sideOrientation: Mesh.DOUBLESIDE }, this.scene);
@@ -7700,7 +7693,8 @@ export class Game {
         const w = toWorld({ x: -lx, z: 0.07 }, { x: nb.x, z: nb.z, rot: nb.rot });
         q.position.set(w.x, ly, w.z);
         q.rotation.set(0, nb.rot, tilt);
-        q.material = this._noticeMat!;
+        const mats = this._noticeMats!;
+        q.material = mats[(((i + cx * 7 + cz * 3) % mats.length) + mats.length) % mats.length];
         q.isPickable = false;
         q.freezeWorldMatrix();
         chunkRecord.roots.push(q);
