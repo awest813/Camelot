@@ -82,13 +82,25 @@ export class BarterSystem {
    * Price the player pays to buy one unit of `item` from `merchantId`.
    * Improves (decreases) as `barterSkill` increases.
    */
+  /**
+   * Optional value scale per item (e.g. gear condition: worn pieces are worth
+   * less).  Returns a factor in [0, 1]; null/undefined means full value.
+   */
+  public itemValueMultiplier: ((item: Item) => number) | null = null;
+
+  private _baseValue(item: Item): number {
+    const raw = item.stats?.value ?? 10;
+    const mult = this.itemValueMultiplier?.(item) ?? 1;
+    return raw * Math.max(0, Math.min(1, mult));
+  }
+
   public getBuyPrice(item: Item, merchantId: string): number {
     const merchant = this._merchants.get(merchantId);
     const priceMultiplier = merchant?.priceMultiplier ?? 1.0;
     // Factor: 1.4 at skill 0 → 1.0 at skill 100
     const barterFactor = 1.4 - this.barterSkill / 250;
     const rapportFactor = 1 - this._getRapport(merchantId) * 0.003;
-    const baseValue = item.stats?.value ?? 10;
+    const baseValue = this._baseValue(item);
     return Math.max(1, Math.round(
       baseValue * priceMultiplier * barterFactor * rapportFactor * this.sessionBuyPriceFactor
     ));
@@ -103,7 +115,7 @@ export class BarterSystem {
     const barterFactor = 0.30 + this.barterSkill / 400;
     const rapportFactor = merchantId ? (1 + this._getRapport(merchantId) * 0.0015) : 1;
     const demandFactor = merchantId ? this._getDemandFactor(merchantId, item.id) : 1;
-    const baseValue = item.stats?.value ?? 10;
+    const baseValue = this._baseValue(item);
     return Math.max(1, Math.round(baseValue * barterFactor * rapportFactor * demandFactor));
   }
 
@@ -137,14 +149,16 @@ export class BarterSystem {
   // ── Transactions ───────────────────────────────────────────────────────────
 
   /**
-   * Buy one unit of `itemId` from the merchant.
+   * Buy one unit of `itemId` from the merchant.  Pass `instanceId` to buy a
+   * specific copy (e.g. one of two resold swords in different condition).
    * @returns false if insufficient gold or item not in stock.
    */
-  public buyItem(merchantId: string, itemId: string): boolean {
+  public buyItem(merchantId: string, itemId: string, instanceId?: string): boolean {
     const merchant = this._merchants.get(merchantId);
     if (!merchant) return false;
 
-    const idx = merchant.inventory.findIndex((i) => i.id === itemId);
+    let idx = instanceId ? merchant.inventory.findIndex((i) => i.instanceId === instanceId) : -1;
+    if (idx === -1) idx = merchant.inventory.findIndex((i) => i.id === itemId);
     if (idx === -1) return false;
 
     const item  = merchant.inventory[idx];
@@ -189,13 +203,16 @@ export class BarterSystem {
 
   /**
    * Sell one unit of `itemId` from the player's inventory to the merchant.
+   * Pass `instanceId` to sell a specific copy (two Iron Swords may differ in wear).
    * @returns false if the merchant can't afford it or the item isn't in inventory.
    */
-  public sellItem(merchantId: string, itemId: string): boolean {
+  public sellItem(merchantId: string, itemId: string, instanceId?: string): boolean {
     const merchant = this._merchants.get(merchantId);
     if (!merchant) return false;
 
-    const inventoryItem = this._inventory.items.find((i) => i.id === itemId);
+    const inventoryItem =
+      (instanceId ? this._inventory.items.find((i) => i.instanceId === instanceId) : undefined)
+      ?? this._inventory.items.find((i) => i.id === itemId);
     if (!inventoryItem) return false;
 
     const sellPrice = this.getSellPrice(inventoryItem, merchantId);
@@ -204,7 +221,7 @@ export class BarterSystem {
       return false;
     }
 
-    const removed = this._inventory.removeItem(itemId, 1);
+    const removed = this._inventory.removeInstance(inventoryItem, 1);
     if (!removed) return false;
 
     this.playerGold  += sellPrice;

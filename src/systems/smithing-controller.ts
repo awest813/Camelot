@@ -194,6 +194,8 @@ export const WEAPON_WEAR_PER_POWER_ATTACK = 1;
 export const ARMOR_WEAR_PER_HIT = 1;
 /** Condition lost by the shield (or weapon, when parrying) per blocked blow. */
 export const BLOCK_WEAR_PER_BLOCK = 1;
+/** Trade value of a broken (0%) piece, as a fraction of its full value. */
+export const MIN_VALUE_FACTOR = 0.25;
 /** Armorer XP per successful repair. */
 export const REPAIR_XP = 4;
 
@@ -467,6 +469,16 @@ export class SmithingController {
     if (!this._isWearable(item)) return null;
     const c = this.condition.getCondition(conditionKey(item));
     return c === undefined ? null : c;
+  }
+
+  /**
+   * Trade-value factor for an item: 1 for untracked or pristine gear, falling
+   * linearly to {@link MIN_VALUE_FACTOR} for a broken piece.
+   */
+  public getValueMultiplier(item: Item): number {
+    const c = this.getItemCondition(item);
+    if (c === null) return 1;
+    return MIN_VALUE_FACTOR + (1 - MIN_VALUE_FACTOR) * (c / MAX_CONDITION);
   }
 
   /**

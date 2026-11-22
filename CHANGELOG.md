@@ -21,6 +21,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Each piece of gear wears on its own: two Iron Swords keep separate
   condition. Hovering gear in the inventory shows its condition. Equipping
   now takes the exact copy you clicked.
+- Worn gear is worth less: a broken piece sells and buys for a quarter of its
+  value. Barter rows show each piece's condition, and Sell and Buy act on the
+  exact copy you click. Gear you sell keeps its wear while it sits in the shop,
+  so buying it back doesn't repair it.
 - Four Armorer perks: Field Repairs (hammers repair 50% more), Tempered Steel
   (gear wears 30% slower), Master Craftsman (forged items come out at a higher
   quality) and Unbreakable (wear halved again, +10 armor).

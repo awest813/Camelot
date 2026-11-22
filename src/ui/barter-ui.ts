@@ -42,9 +42,11 @@ export class BarterUI {
   private _focusSession: DialogFocusSession | null = null;
 
   /** Called when the player clicks "Buy" on a merchant item row. */
-  public onBuy: ((itemId: string) => void) | null = null;
+  public onBuy: ((itemId: string, instanceId?: string) => void) | null = null;
   /** Called when the player clicks "Sell" on a player item row. */
-  public onSell: ((itemId: string) => void) | null = null;
+  public onSell: ((itemId: string, instanceId?: string) => void) | null = null;
+  /** Optional short tag shown after an item's name (e.g. gear condition "73%"). */
+  public itemTag: ((item: Item) => string | null) | null = null;
   /** Called when the panel's close button is pressed. */
   public onClose: (() => void) | null = null;
 
@@ -311,6 +313,7 @@ export class BarterUI {
     li.className = "barter-ui__item-row";
     li.setAttribute("role", "listitem");
     li.setAttribute("data-item-id", item.id);
+    if (item.instanceId) li.setAttribute("data-instance-id", item.instanceId);
 
     const iconEl = document.createElement("span");
     iconEl.className = "barter-ui__item-icon";
@@ -322,6 +325,14 @@ export class BarterUI {
     nameEl.className = "barter-ui__item-name";
     nameEl.textContent = item.name;
     li.appendChild(nameEl);
+
+    const tag = this.itemTag?.(item);
+    if (tag) {
+      const tagEl = document.createElement("span");
+      tagEl.className = "barter-ui__item-tag";
+      tagEl.textContent = tag;
+      li.appendChild(tagEl);
+    }
 
     if (item.quantity > 1) {
       const qtyEl = document.createElement("span");
@@ -353,9 +364,9 @@ export class BarterUI {
     btn.addEventListener("click", () => {
       if (btn.getAttribute("aria-disabled") === "true") return;
       if (action === "buy") {
-        this.onBuy?.(item.id);
+        this.onBuy?.(item.id, item.instanceId);
       } else {
-        this.onSell?.(item.id);
+        this.onSell?.(item.id, item.instanceId);
       }
     });
     li.appendChild(btn);

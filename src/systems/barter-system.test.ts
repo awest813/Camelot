@@ -49,6 +49,14 @@ describe("BarterSystem", () => {
         else this.items.splice(idx, 1);
         return true;
       },
+      removeInstance(item: typeof potion & { instanceId?: string }, amount: number) {
+        let idx = this.items.indexOf(item);
+        if (idx === -1) return this.removeItem(item.id, amount);
+        const row = this.items[idx];
+        if (row.quantity > amount) row.quantity -= amount;
+        else this.items.splice(idx, 1);
+        return true;
+      },
     };
 
     barter = new BarterSystem(mockInventory, mockUI);
@@ -206,6 +214,36 @@ describe("BarterSystem", () => {
     barter.sellItem("merch_01", "sword");
     expect(barter.playerGold).toBe(200 + sellPrice);
     expect(barter.getMerchant("merch_01")!.gold).toBe(500 - sellPrice);
+  });
+
+  it("sellItem sells the exact copy named by instanceId", () => {
+    const worn  = { ...sampleItem, instanceId: "sword#worn" };
+    const fresh = { ...sampleItem, instanceId: "sword#fresh" };
+    mockInventory.items = [worn, fresh];
+    expect(barter.sellItem("merch_01", "sword", "sword#fresh")).toBe(true);
+    expect(mockInventory.items.map((i: { instanceId?: string }) => i.instanceId)).toEqual(["sword#worn"]);
+    const stock = barter.getMerchant("merch_01")!.inventory;
+    expect(stock.some((i) => i.instanceId === "sword#fresh")).toBe(true);
+  });
+
+  it("buyItem buys the exact copy named by instanceId", () => {
+    const m = barter.getMerchant("merch_01")!;
+    m.inventory.push({ ...sampleItem, instanceId: "sword#a" }, { ...sampleItem, instanceId: "sword#b" });
+    expect(barter.buyItem("merch_01", "sword", "sword#b")).toBe(true);
+    expect(mockInventory.items.some((i: { instanceId?: string }) => i.instanceId === "sword#b")).toBe(true);
+    expect(m.inventory.some((i) => i.instanceId === "sword#a")).toBe(true);
+    expect(m.inventory.some((i) => i.instanceId === "sword#b")).toBe(false);
+  });
+
+  it("itemValueMultiplier lowers both buy and sell prices", () => {
+    const full = { ...sampleItem };
+    const sellFull = barter.getSellPrice(full, "merch_01");
+    const buyFull = barter.getBuyPrice(full, "merch_01");
+    barter.itemValueMultiplier = () => 0.5;
+    expect(barter.getSellPrice(full, "merch_01")).toBe(Math.max(1, Math.round(sellFull / 2)));
+    expect(barter.getBuyPrice(full, "merch_01")).toBeLessThan(buyFull);
+    barter.itemValueMultiplier = () => 5; // clamped to full value
+    expect(barter.getSellPrice(full, "merch_01")).toBe(sellFull);
   });
 
   it("sellItem returns false when item not in player inventory", () => {

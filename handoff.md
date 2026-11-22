@@ -33,9 +33,9 @@ Second follow-up: per-piece condition (`Item.instanceId`, `conditionKey()`, `Inv
 `SaveSystem.onBeforeSave` pruning, inventory hover shows condition). Verified: 187 files / 5,823 tests, boot-smoke ✓.
 
 Known limits: the forge panel works anywhere (Shift+B); the Forge/Anvil props at Village Smith cottages
-are decoration plus a dialogue shortcut, not a station requirement. Barter sells the *first* copy of an
-item id (the player can't choose which of two identical swords to sell), and sell prices ignore condition.
-Saddlebag removal is by id too.
+are decoration plus a dialogue shortcut, not a station requirement. The saddlebag takes out the *first* copy of an item
+id (it is consistent, so nothing is lost, but the player can't choose which of two identical swords to take).
+Barter is instance-aware and prices worn gear down (third follow-up).
 
 ---
 

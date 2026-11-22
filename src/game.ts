@@ -1472,13 +1472,21 @@ export class Game {
     };
     this.craftingUI.onClose = () => this._restoreGameplayInput();
     this.saveSystem.setCraftingSystem(this.craftingSystem);
-    // Forget condition for gear the player sold or dropped (keeps saves lean).
+    // Forget condition for gear that left the world (dropped, or wiped by a shop restock).
     this.saveSystem.onBeforeSave = () => {
       this.smithing.pruneConditions([
         ...this.inventorySystem.items,
         ...this.equipmentSystem.getEquipped().values(),
         ...(this.horseSystem?.ownedHorses ?? []).flatMap((h) => this.horseSystem.getSaddlebag(h.id) ?? []),
+        // Sold gear keeps its wear while it sits in a shop (no free repair by buyback).
+        ...[...(this.barterSystem?.merchants.values() ?? [])].flatMap((m) => m.inventory),
       ]);
+    };
+    // Worn gear trades for less, and barter rows show each piece's condition.
+    this.barterSystem.itemValueMultiplier = (item) => this.smithing.getValueMultiplier(item);
+    this._barterUI.itemTag = (item) => {
+      const c = this.smithing.getItemCondition(item);
+      return c === null ? null : `${Math.round(c)}%`;
     };
     // Hovering a piece of gear in the inventory shows its condition.
     this.ui.itemDetailSuffix = (item) => {
@@ -3090,17 +3098,17 @@ export class Game {
     ];
     this.shopSystem.registerAll(starterShops);
 
-    this._barterUI.onBuy = (itemId) => {
+    this._barterUI.onBuy = (itemId, instanceId) => {
       const mid = this.barterSystem.activeMerchantId;
       if (!mid) return;
-      this.barterSystem.buyItem(mid, itemId);
+      this.barterSystem.buyItem(mid, itemId, instanceId);
       this._barterUI.update(this.barterSystem, this.inventorySystem.items);
       this.saveSystem.markDirty();
     };
-    this._barterUI.onSell = (itemId) => {
+    this._barterUI.onSell = (itemId, instanceId) => {
       const mid = this.barterSystem.activeMerchantId;
       if (!mid) return;
-      this.barterSystem.sellItem(mid, itemId);
+      this.barterSystem.sellItem(mid, itemId, instanceId);
       this._barterUI.update(this.barterSystem, this.inventorySystem.items);
       this.saveSystem.markDirty();
     };

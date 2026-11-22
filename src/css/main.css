@@ -4689,6 +4689,16 @@ body::before {
   align-items: center;
 }
 
+/* Gear condition tag: sits right after the name; the auto margin keeps
+   price + button pushed to the right edge. */
+.barter-ui__item-tag {
+  font-size: 0.76rem;
+  color: #c9b38a;
+  margin-left: 6px;
+  margin-right: auto;
+  font-variant-numeric: tabular-nums;
+}
+
 .barter-ui__item-price {
   color: #e8c656;
   font-weight: 700;

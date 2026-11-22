@@ -423,7 +423,7 @@ describe("BarterUI", () => {
         "[aria-label='Merchant inventory'] .barter-ui__action-btn--buy",
       );
       btn?.click();
-      expect(onBuy).toHaveBeenCalledWith("health_potion");
+      expect(onBuy).toHaveBeenCalledWith("health_potion", undefined);
     });
 
     it("does not fire onBuy when button is disabled", () => {
@@ -449,7 +449,19 @@ describe("BarterUI", () => {
         "[aria-label='Player inventory'] .barter-ui__action-btn--sell",
       );
       btn?.click();
-      expect(onSell).toHaveBeenCalledWith("my_sword");
+      expect(onSell).toHaveBeenCalledWith("my_sword", undefined);
+    });
+
+    it("passes the instance id and shows the item tag", () => {
+      const onSell = vi.fn();
+      ui.onSell = onSell;
+      ui.itemTag = (item) => (item.instanceId ? "73%" : null);
+      ui.show();
+      ui.update(makeSystem(), [makeItem({ id: "my_sword", instanceId: "my_sword#2" })]);
+      const row = document.querySelector<HTMLElement>("[aria-label='Player inventory'] [data-instance-id='my_sword#2']");
+      expect(row?.querySelector(".barter-ui__item-tag")?.textContent).toBe("73%");
+      row?.querySelector<HTMLButtonElement>(".barter-ui__action-btn--sell")?.click();
+      expect(onSell).toHaveBeenCalledWith("my_sword", "my_sword#2");
     });
   });
 

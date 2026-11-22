@@ -9,6 +9,7 @@ import {
   REPAIR_XP,
   WEAPON_WEAR_PER_HIT,
   WEAPON_WEAR_PER_POWER_ATTACK,
+  MIN_VALUE_FACTOR,
   smithingMaterialStack,
   type SmithingInventory,
 } from "./smithing-controller";
@@ -363,6 +364,18 @@ describe("SmithingController", () => {
       equipped.set("mainHand", s1);
       ctrl.trackEquippedGear();
       expect(ctrl.getItemCondition(s1)).toBe(42);
+    });
+
+    it("trade value falls with condition: full when untracked, a quarter when broken", () => {
+      const fresh = { ...sword };
+      expect(ctrl.getValueMultiplier(fresh)).toBe(1);
+      equipped.set("mainHand", fresh);
+      ctrl.trackEquippedGear();
+      expect(ctrl.getValueMultiplier(fresh)).toBe(1);
+      condition.initItem(fresh.instanceId!, 0);
+      expect(ctrl.getValueMultiplier(fresh)).toBe(MIN_VALUE_FACTOR);
+      condition.initItem(fresh.instanceId!, 50);
+      expect(ctrl.getValueMultiplier(fresh)).toBeCloseTo(MIN_VALUE_FACTOR + (1 - MIN_VALUE_FACTOR) / 2);
     });
 
     it("untracked items report no condition; stats-less items never do", () => {
