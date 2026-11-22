@@ -85,6 +85,11 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   same inn no longer reuses the finished one's entry.
   The notices pinned to the board now show headings, handwriting, wax seals
   and a "wanted" sketch instead of blank paper.
+- Villagers no longer walk into walls. When strolling in the evening they only
+  pick spots they can reach in a straight line without passing through a
+  building. If something blocks them anyway, they step aside to get round it,
+  and if that keeps failing they stop rather than push against the wall
+  forever.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

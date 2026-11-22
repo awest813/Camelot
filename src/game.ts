@@ -493,6 +493,20 @@ export class Game {
   private _pendingJobBoard: { boardId: string; placeName: string } | null = null;
   /** Shared parchment material for village notice boards. */
   private _noticeMats: StandardMaterial[] | null = null;
+  /** Footprints of loaded buildings (centre, yaw, half sizes incl. margin) — NPCs keep out. */
+  private readonly _buildingFootprints = new Set<{ x: number; z: number; cos: number; sin: number; hw: number; hd: number }>();
+
+  /** Whether (x, z) is open ground, i.e. not inside a loaded building. */
+  private _isWalkable(x: number, z: number): boolean {
+      for (const f of this._buildingFootprints) {
+        const dx = x - f.x, dz = z - f.z;
+        if (Math.abs(dx) > f.hw + f.hd || Math.abs(dz) > f.hw + f.hd) continue; // cheap reject
+        const lx = dx * f.cos - dz * f.sin;
+        const lz = dx * f.sin + dz * f.cos;
+        if (Math.abs(lx) < f.hw && Math.abs(lz) < f.hd) return false;
+      }
+      return true;
+  }
 
   public isPaused: boolean = false;
 
@@ -734,6 +748,7 @@ export class Game {
     this._initFoliage();
     this.navigationSystem = new NavigationSystem(this.scene);
     this.scheduleSystem = new ScheduleSystem();
+    this.scheduleSystem.walkable = (x, z) => this._isWalkable(x, z);
 
     // ── v2 Oblivion-lite systems ──────────────────────────────────────────────
     this.attributeSystem = new AttributeSystem();
@@ -7451,6 +7466,10 @@ export class Game {
       box.isPickable = false;
       box.checkCollisions = false;
       box.freezeWorldMatrix();
+      // Footprint (plus a body's width) for NPC wander / path checks.
+      const fp = { x: origin.x, z: origin.z, cos: Math.cos(origin.rot), sin: Math.sin(origin.rot), hw: width / 2 + 0.5, hd: depth / 2 + 0.5 };
+      this._buildingFootprints.add(fp);
+      box.onDisposeObservable.addOnce(() => this._buildingFootprints.delete(fp));
       try {
         const agg = new PhysicsAggregate(box, PhysicsShapeType.BOX, { mass: 0 }, this.scene);
         box.onDisposeObservable.addOnce(() => agg.dispose());

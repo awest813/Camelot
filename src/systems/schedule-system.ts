@@ -3,6 +3,29 @@ import { NPC, AIState, ScheduleBehaviorType } from "../entities/npc";
 
 /** How far a "wander" destination is picked from the NPC's home position. */
 const WANDER_RADIUS = 8;
+/** An NPC that covers less than this (m) in {@link STUCK_SECONDS} is stuck. */
+const STUCK_PROGRESS = 0.35;
+const STUCK_SECONDS = 1.5;
+/** How long a sidestep lasts once stuck. */
+const DETOUR_SECONDS = 1.1;
+/** Give up on a target after this many sidesteps that didn't help. */
+const MAX_DETOURS = 4;
+
+/** Per-NPC progress tracking for the stuck check. */
+interface StuckTracker {
+  x: number;
+  z: number;
+  /** Seconds since the last real progress. */
+  idle: number;
+  /** Seconds of sidestep left (0 = heading straight for the target). */
+  detour: number;
+  /** +1 / −1: which side to sidestep to. */
+  side: number;
+  detours: number;
+  /** Target this tracker belongs to (reset when it changes). */
+  tx: number;
+  tz: number;
+}
 
 export class ScheduleSystem {
   public npcs: NPC[] = [];
@@ -13,6 +36,13 @@ export class ScheduleSystem {
    * NPCs fall back to their normal patrol logic.
    */
   public currentHour: number = -1;
+
+  /**
+   * Optional: whether a point on the ground is open (not inside a building).
+   * Used to keep wander destinations, and the straight walk to them, out of
+   * walls.  Unset means everywhere is walkable.
+   */
+  public walkable: ((x: number, z: number) => boolean) | null = null;
 
   // Scratch vectors for performance optimization
   private _direction: Vector3 = new Vector3();
@@ -25,6 +55,7 @@ export class ScheduleSystem {
 
   /** Per-NPC wander destination (refreshed when reached or expired). */
   private _wanderTargets: WeakMap<NPC, Vector3> = new WeakMap();
+  private _stuck: WeakMap<NPC, StuckTracker> = new WeakMap();
 
   public addNPC(npc: NPC): void {
     this.npcs.push(npc);
@@ -168,16 +199,22 @@ export class ScheduleSystem {
    * Wander: NPC picks random destinations near its spawn position.
    */
   private _applyWanderBehavior(npc: NPC, deltaTime: number): void {
+    if (npc.waitTime > 0) {
+      npc.waitTime -= deltaTime;
+      this._applyStopHorizontal(npc);
+      return;
+    }
     let wanderTarget = this._wanderTargets.get(npc);
     const origin = npc.homePosition ?? npc.spawnPosition;
 
     if (!wanderTarget) {
-      wanderTarget = this._pickRandomWanderPoint(origin);
+      wanderTarget = this._pickRandomWanderPoint(origin, npc.mesh.position);
       this._wanderTargets.set(npc, wanderTarget);
     }
 
     const reached = this._moveTowardTarget(npc, wanderTarget, deltaTime, npc.moveSpeed);
-    if (reached) {
+    if (reached || this._gaveUp(npc)) {
+      this._stuck.delete(npc);
       this._wanderTargets.delete(npc);
       npc.waitTime = this._getPatrolWaitSeconds(npc);
     }
@@ -190,7 +227,7 @@ export class ScheduleSystem {
   private _moveTowardTarget(
     npc: NPC,
     target: Vector3,
-    _deltaTime: number,
+    deltaTime: number,
     speed: number,
   ): boolean {
     target.subtractToRef(npc.mesh.position, this._direction);
@@ -199,10 +236,24 @@ export class ScheduleSystem {
 
     if (distSq < 1.0) {
       this._applyStopHorizontal(npc);
+      this._stuck.delete(npc);
       return true;
     }
 
+    const st = this._trackProgress(npc, target, deltaTime);
+    if (st.detours >= MAX_DETOURS) {
+      // Blocked for good (e.g. the target is behind a wall): stand still
+      // rather than walk into it forever.
+      this._applyStopHorizontal(npc);
+      return false;
+    }
+
     this._direction.normalize();
+    if (st.detour > 0) {
+      // Sidestep: mostly sideways, a little forward, to slide round the obstacle.
+      const fx = this._direction.x, fz = this._direction.z;
+      this._direction.set(fz * st.side + fx * 0.3, 0, -fx * st.side + fz * 0.3).normalize();
+    }
     this._direction.scaleToRef(speed, this._velocity);
 
     if (npc.physicsAggregate?.body) {
@@ -210,22 +261,78 @@ export class ScheduleSystem {
       this._newVel.set(this._velocity.x, this._currentVel.y, this._velocity.z);
       npc.physicsAggregate.body.setLinearVelocity(this._newVel);
 
-      this._lookAtTarget.set(target.x, npc.mesh.position.y, target.z);
+      this._lookAtTarget.set(
+        npc.mesh.position.x + this._direction.x, npc.mesh.position.y, npc.mesh.position.z + this._direction.z,
+      );
       npc.mesh.lookAt(this._lookAtTarget);
     }
 
     return false;
   }
 
-  /** Generate a random point within WANDER_RADIUS of origin. */
-  private _pickRandomWanderPoint(origin: Vector3): Vector3 {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = Math.random() * WANDER_RADIUS;
-    return new Vector3(
-      origin.x + Math.cos(angle) * radius,
-      origin.y,
-      origin.z + Math.sin(angle) * radius,
-    );
+  /**
+   * Update the NPC's progress toward `target`: after {@link STUCK_SECONDS}
+   * without real progress start a sidestep (alternating sides).
+   */
+  private _trackProgress(npc: NPC, target: Vector3, deltaTime: number): StuckTracker {
+    const p = npc.mesh.position;
+    let st = this._stuck.get(npc);
+    if (!st || st.tx !== target.x || st.tz !== target.z) {
+      st = { x: p.x, z: p.z, idle: 0, detour: 0, side: 1, detours: 0, tx: target.x, tz: target.z };
+      this._stuck.set(npc, st);
+      return st;
+    }
+    if (st.detour > 0) {
+      st.detour = Math.max(0, st.detour - deltaTime);
+      if (st.detour === 0) { st.x = p.x; st.z = p.z; st.idle = 0; }
+      return st;
+    }
+    if (Math.hypot(p.x - st.x, p.z - st.z) >= STUCK_PROGRESS) {
+      st.x = p.x; st.z = p.z; st.idle = 0;
+      return st;
+    }
+    st.idle += deltaTime;
+    if (st.idle >= STUCK_SECONDS) {
+      st.detours += 1;
+      st.detour = DETOUR_SECONDS;
+      st.side = st.detours % 2 === 1 ? 1 : -1;
+      st.idle = 0;
+    }
+    return st;
+  }
+
+  /** Whether the NPC has given up on its current movement target. */
+  private _gaveUp(npc: NPC): boolean {
+    const st = this._stuck.get(npc);
+    return !!st && st.detours >= MAX_DETOURS;
+  }
+
+  /**
+   * A random point within WANDER_RADIUS of origin.  With {@link walkable}
+   * set, tries for one that is open and reachable in a straight line from
+   * `from`; falls back to the origin itself.
+   */
+  private _pickRandomWanderPoint(origin: Vector3, from?: Vector3): Vector3 {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * WANDER_RADIUS;
+      const x = origin.x + Math.cos(angle) * radius;
+      const z = origin.z + Math.sin(angle) * radius;
+      if (!this.walkable || this._clearLine(from ?? origin, x, z)) return new Vector3(x, origin.y, z);
+    }
+    return origin.clone();
+  }
+
+  /** Every point on the segment (from → x,z), sampled each 0.5 m, is walkable. */
+  private _clearLine(from: Vector3, x: number, z: number): boolean {
+    const walkable = this.walkable!;
+    const len = Math.hypot(x - from.x, z - from.z);
+    const steps = Math.max(1, Math.ceil(len / 0.5));
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      if (!walkable(from.x + (x - from.x) * t, from.z + (z - from.z) * t)) return false;
+    }
+    return true;
   }
 
   // ── Patrol helpers (unchanged) ────────────────────────────────────────────
