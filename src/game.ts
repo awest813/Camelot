@@ -84,7 +84,7 @@ import { AlchemyUI } from "./ui/alchemy-ui";
 import { CraftingSystem, type CraftingStationId } from "./systems/crafting-system";
 import { CraftingUI } from "./ui/crafting-ui";
 import { ItemConditionSystem } from "./systems/item-condition-system";
-import { buildingLayout, toWorld, type BuildingKind } from "./world/village-buildings";
+import { buildingFootprint, buildingLayout, toWorld, WALL_HEIGHT, type BuildingKind } from "./world/village-buildings";
 import { hasVillage, planVillage, VILLAGE_DISCOVER_RADIUS, type VillagePlan } from "./world/village-settlement";
 import { ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
 import { EnchantingSystem } from "./systems/enchanting-system";
@@ -7369,6 +7369,7 @@ export class Game {
       kind: BuildingKind,
       origin: { x: number; z: number; rot: number },
   ): void {
+      this._addBuildingCollider(chunkKey, chunkRecord, kind, origin);
       for (const part of buildingLayout(kind)) {
         const { x, z } = toWorld(part, origin);
         this.fantasyAssets.getInstance(part.key, (root) => {
@@ -7386,6 +7387,38 @@ export class Game {
           this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
         });
       }
+  }
+
+  /**
+   * Invisible static box over a building's footprint so NPC bodies (and
+   * physics projectiles) can't walk or fly through it.  The player collides
+   * with the real walls (camera collisions) and can still use the doorway.
+   */
+  private _addBuildingCollider(
+      chunkKey: string,
+      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
+      kind: BuildingKind,
+      origin: { x: number; z: number; rot: number },
+  ): void {
+      if (this._chunkFantasyContent.get(chunkKey) !== chunkRecord) return;
+      const { width, depth } = buildingFootprint(kind);
+      const box = MeshBuilder.CreateBox(`bldg_collider_${chunkKey}_${chunkRecord.roots.length}`, {
+        width: width - 0.2, depth: depth - 0.2, height: WALL_HEIGHT,
+      }, this.scene);
+      box.position.set(origin.x, WALL_HEIGHT / 2, origin.z);
+      box.rotation.y = origin.rot;
+      box.isVisible = false;
+      box.isPickable = false;
+      box.checkCollisions = false;
+      box.freezeWorldMatrix();
+      try {
+        const agg = new PhysicsAggregate(box, PhysicsShapeType.BOX, { mass: 0 }, this.scene);
+        box.onDisposeObservable.addOnce(() => agg.dispose());
+      } catch (err) {
+        // No physics engine (e.g. headless tooling) — the box is harmless.
+        console.warn("[buildings] collider unavailable", err);
+      }
+      chunkRecord.roots.push(box);
   }
 
   /**

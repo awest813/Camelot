@@ -59,7 +59,7 @@ root's handedness scaling (models were mirrored) and `setInstanceYaw` (rotation.
 
 Seventh follow-up — **village settlements**: see ROADMAP "Village settlements". Plans cached in
 `game._villagePlans`; loaded ones in `_loadedVillages` (dropped on chunk unload). The well is still the
-generated stand-in (darkened). NPC schedules don't path around buildings.
+generated stand-in (darkened). Buildings carry a static Havok box collider (`_addBuildingCollider`), so NPC bodies are blocked; schedules still don't path around them (NPCs slide along walls).
 
 Known limits: The saddlebag takes out the *first* copy of an item
 id (it is consistent, so nothing is lost, but the player can't choose which of two identical swords to take).

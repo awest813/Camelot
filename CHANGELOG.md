@@ -88,6 +88,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
     pipeline is off, so the grade is applied by the materials instead.
 
 ### Fixed
+- NPCs no longer walk through buildings: each cottage, house and inn now
+  physically blocks them, and physics projectiles too. You can still walk
+  through the doorway.
 - A townsperson you'd fought could stay hostile for good if it calmed down
   without first walking all the way home (for example after losing track of
   you, or after fleeing). Townsfolk now settle whenever they go back to their
