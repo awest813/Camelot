@@ -352,6 +352,12 @@ state, scope and save codec.
      actions replaces two full copies of the O / Shift+O logic (input
      adapter and legacy keyboard path). The windows use the modal service.
 
+  9. **Pets** (`src/features/pets/`): the companion roster, the companion
+     panel, the summoned companion's body, and its follow-and-fight AI (now a
+     sim-phase system). One `togglePanel` replaces the two copies of the P
+     logic. New `animation` and `gameplay` services; `actors.all()` lists
+     every NPC.
+
   Render counts after the extraction match the pre-extraction baseline
   (2,066 village meshes), so villages are built identically. The render
   budget check now also has floors, so a scene that failed to render can't

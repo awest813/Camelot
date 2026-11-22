@@ -19,7 +19,7 @@ function setup(opts: { pond?: boolean; village?: boolean; biome?: BiomeType } = 
     currentVillage: () => null, innBoardOf: () => null,
   });
   k.services.provide(ActorsKey, {
-    residents: () => [], despawn: () => undefined, isTalkingTo: () => false, byName: () => undefined,
+    residents: () => [], despawn: () => undefined, isTalkingTo: () => false, byName: () => undefined, all: () => [],
     spawnArchetype: (_c, a) => { spawned.push(a); return null; },
   });
   k.services.provide(SiteBuilderKey, {

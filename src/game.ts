@@ -15,7 +15,7 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
-import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
+import { PhysicsShapeType } from "@babylonjs/core/Physics";
 import { AtmosphereController } from "./rendering/sky-dome";
 import { createTerrainMaterial } from "./rendering/terrain-material";
 import { HorizonMountains } from "./rendering/horizon";
@@ -89,7 +89,7 @@ import { Kernel } from "./core/kernel";
 import { EditorSuite } from "./features/editor/editor-suite";
 import { VillageRaidFeature, RaidsKey, type RaidsService } from "./features/village-raids/raid-feature";
 import {
-  ActorsKey, BuildingsKey, ClockKey, FastTravelKey, FeedbackKey, InventoryKey, LootKey, ModalKey, PlayerKey,
+  ActorsKey, AnimationKey, BuildingsKey, ClockKey, FastTravelKey, FeedbackKey, GameplayKey, InventoryKey, LootKey, ModalKey, PlayerKey,
   QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey,
 } from "./features/services";
 import { VillagesFeature, VillagesKey, type VillagesService } from "./features/villages/villages-feature";
@@ -163,9 +163,9 @@ import { LeveledListSystem, ALL_BUILT_IN_LEVELED_LISTS } from "./systems/leveled
 import { EventManagerSystem } from "./systems/event-manager-system";
 import { AnimationSystem } from "./systems/animation-system";
 import { FantasyAssetLoader, setInstanceScale, setInstanceYaw, type FantasyAssetKey } from "./systems/fantasy-asset-loader";
-import { PetSystem } from "./systems/pet-system";
-import type { Pet } from "./systems/pet-system";
-import { PetUI } from "./ui/pet-ui";
+import type { PetSystem } from "./systems/pet-system";
+import type { PetUI } from "./ui/pet-ui";
+import { PetsFeature, PetsKey, type PetsService } from "./features/pets/pets-feature";
 import { PickpocketSystem } from "./systems/pickpocket-system";
 import type { PickpocketableItem } from "./systems/pickpocket-system";
 import { PickpocketUI } from "./ui/pickpocket-ui";
@@ -460,8 +460,9 @@ export class Game {
 
   // v23 systems
   public animationSystem: AnimationSystem;
-  public petSystem: PetSystem;
-  public petUI: PetUI;
+  public get pets(): PetsService { return this.kernel.services.get(PetsKey); }
+  public get petSystem(): PetSystem { return this.pets.pets; }
+  public get petUI(): PetUI { return this.pets.panel; }
 
   // v24 systems
   public markRecallSystem: MarkRecallSystem;
@@ -588,12 +589,6 @@ export class Game {
   // Death feedback: true while health is at 0 so the notification fires once per "death"
   private _playerAtZeroHP: boolean = false;
 
-  // Pet world state — in-world capsule mesh + physics body for the active companion
-  private _petMesh: Mesh | null = null;
-  private _petPhysicsAggregate: PhysicsAggregate | null = null;
-  private _petAttackTimer: number = 0;
-  private _petScratchVec = new Vector3();
-  private _petLookTarget = new Vector3();
   // Cache for pet HUD dirty-checking
   private _lastPetHealth: number = -1;
   private _lastPetId: string | null = null;
@@ -1660,64 +1655,6 @@ export class Game {
         for (const npc of record.npcs) this._releaseNpc(npc);
       };
     }
-
-    // ── v23 Pet System ─────────────────────────────────────────────────────
-    this.petSystem = new PetSystem();
-    this.petSystem.onPetAcquired = (pet) => {
-      this.ui.showNotification(`You gained a companion: ${pet.name}!`, 3000);
-      this.eventBus.emit("pet:acquired", { petId: pet.id, petName: pet.name, species: pet.species });
-    };
-    this.petSystem.onPetSummoned = (pet) => {
-      this._spawnPetMesh(pet);
-      this.eventBus.emit("pet:summoned", { petId: pet.id, petName: pet.name });
-    };
-    this.petSystem.onPetDismissed = (pet) => {
-      this._despawnPetMesh();
-      this.eventBus.emit("pet:dismissed", { petId: pet.id, petName: pet.name });
-    };
-    this.petSystem.onPetDied = (pet) => {
-      this.ui.showNotification(`${pet.name} has fallen in battle!`, 3500);
-      this.eventBus.emit("pet:died", { petId: pet.id, petName: pet.name });
-
-      // Capture refs before clearing so the death animation can play on the mesh
-      const dyingMesh     = this._petMesh;
-      const dyingPhysics  = this._petPhysicsAggregate;
-      this._petMesh              = null;
-      this._petPhysicsAggregate  = null;
-
-      if (dyingMesh && dyingPhysics) {
-        dyingPhysics.body.setMotionType(PhysicsMotionType.STATIC);
-        this.animationSystem.playDeath(dyingMesh);
-        setTimeout(() => {
-          this.animationSystem.unregisterMesh(dyingMesh.name);
-          dyingPhysics.dispose();
-          dyingMesh.dispose();
-        }, 3000);
-      }
-    };
-    this.petSystem.onPetLevelUp = (pet, newLevel) => {
-      this.ui.showNotification(`${pet.name} reached level ${newLevel}!`, 2500);
-      this.eventBus.emit("pet:levelUp", { petId: pet.id, petName: pet.name, newLevel });
-    };
-    this.saveSystem.setPetSystem(this.petSystem);
-    // Grant a starter wolf companion for new games
-    this.petSystem.grantPet("pet_wolf");
-
-    // ── v23 Pet UI ─────────────────────────────────────────────────────────
-    this.petUI = new PetUI();
-    this.petUI.onSummon = (petId) => {
-      this.petSystem.summonPet(petId);
-      this.petUI.refresh(this.petSystem.pets, this.petSystem.activePet?.id ?? null);
-    };
-    this.petUI.onDismiss = () => {
-      this.petSystem.dismissPet();
-      this.petUI.refresh(this.petSystem.pets, null);
-    };
-    this.petUI.onClose = () => {
-      this.interactionSystem.isBlocked = false;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
-    };
 
     // ── v24: Mark & Recall ────────────────────────────────────────────────
     this.markRecallSystem = new MarkRecallSystem();
@@ -3275,23 +3212,7 @@ export class Game {
                 }
             } else if (kbInfo.event.key === "p" || kbInfo.event.key === "P") {
                 // P: Open/close companion panel
-                if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
-                    if (this.petUI.isVisible) {
-                        this.petUI.close();
-                        this.interactionSystem.isBlocked = false;
-                        this.canvas.requestPointerLock();
-                        this.player.camera.attachControl(this.canvas, true);
-                    } else {
-                        if (!this.petSystem.hasPet) {
-                            this.ui.showNotification("You have no companions yet.", 2000);
-                        } else {
-                            this.petUI.open(this.petSystem.pets, this.petSystem.activePet?.id ?? null);
-                            this.interactionSystem.isBlocked = true;
-                            document.exitPointerLock();
-                            this.player.camera.detachControl();
-                        }
-                    }
-                }
+                this.pets.togglePanel();
             } else if (kbInfo.event.key === "o" || kbInfo.event.key === "O") {
                 // O: Mount/Dismount · Shift+O: Stable (unmounted) or Saddlebag (mounted)
                 if (kbInfo.event.shiftKey) this.mounts.toggleStableOrSaddlebag();
@@ -3652,20 +3573,7 @@ export class Game {
       this.markRecallSystem.mark({ x: p.x, y: p.y, z: p.z });
       this.saveSystem.markDirty();
     });
-    adapter.onAction("togglePetPanel", () => {
-      if (this.petUI.isVisible) {
-        this.petUI.close();
-        this._restoreGameplayInput();
-        return;
-      }
-      if (this._isCombatInputBlocked()) return;
-      if (!this.petSystem.hasPet) {
-        this.ui.showNotification("You have no companions yet.", 2000);
-        return;
-      }
-      this.petUI.open(this.petSystem.pets, this.petSystem.activePet?.id ?? null);
-      this._suspendGameplayInput();
-    });
+    adapter.onAction("togglePetPanel", () => this.pets.togglePanel());
     adapter.onAction("toggleFollowerPanel", () => {
       // In map-editor mode G cycles the gizmo (the adapter consumes the key
       // before the legacy editor branch can see it).
@@ -4964,7 +4872,6 @@ export class Game {
       }
 
       this._updateNpcRigs(deltaTime);
-      this._updatePetAI(deltaTime);
       this.interactionSystem.update();
 
       const weatherScale = this.weatherSystem?.state === "clear" ? 1.0 : (this.weatherSystem?.fogDensity ? 0.7 : 1.0);
@@ -6388,6 +6295,7 @@ export class Game {
         despawn: (npc) => this._despawnNpc(npc),
         isTalkingTo: (npc) => npc.isInDialogue || npc.mesh.name === this._currentDialogueNpcName,
         byName: (name) => this.scheduleSystem.npcs.find((n) => n.mesh.name === name),
+        all: () => this.scheduleSystem.npcs,
       });
       k.services.provide(WorldInfoKey, {
         get chunkSize() { return game.world.chunkSize; },
@@ -6497,6 +6405,20 @@ export class Game {
       // Persist flavor-event cooldowns so reloading can't reroll one-shots.
       this.saveSystem.setTravelEventSystem(worldEvents.travel);
       this.saveSystem.setAmbientEventSystem(worldEvents.ambient);
+
+      k.services.provide(AnimationKey, {
+        idle: (m) => this.animationSystem.playIdle(m),
+        walk: (m) => this.animationSystem.playWalk(m),
+        run: (m) => this.animationSystem.playRun(m),
+        death: (m) => this.animationSystem.playDeath(m),
+        release: (name) => this.animationSystem.unregisterMesh(name),
+      });
+      k.services.provide(GameplayKey, { canAct: () => !this._isCombatInputBlocked() });
+      const pets = new PetsFeature(this.scene);
+      k.install(pets);
+      this.saveSystem.setPetSystem(pets.pets);
+      // A starter wolf companion for new games.
+      pets.pets.grantPet("pet_wolf");
 
       k.services.provide(MountHostKey, {
         canAct: () => !this.isPaused && !this.dialogueSystem.isInDialogue,
@@ -6654,145 +6576,6 @@ export class Game {
       return m.type === "npc" || m.type === "loot" || m.type === "portal" || m.type === "container";
     }
     return false;
-  }
-
-  // ── Pet world management ───────────────────────────────────────────────────
-
-  /**
-   * Create a capsule mesh + physics body for the given pet near the player.
-   * Called via petSystem.onPetSummoned.
-   */
-  private _spawnPetMesh(pet: Pet): void {
-    this._despawnPetMesh();
-
-    const spawnPos = this.player.camera.position.clone();
-    spawnPos.y = Math.max(1.5, spawnPos.y - 0.5);
-    spawnPos.x += 2; // offset so it doesn't spawn inside the player
-
-    const s     = pet.meshScale;
-    const meshName = `pet_${pet.id}`;
-
-    const mesh = MeshBuilder.CreateCapsule(
-      meshName,
-      { radius: 0.5 * s, height: 2 * s },
-      this.scene,
-    );
-    mesh.position = spawnPos.clone();
-
-    const mat = new StandardMaterial(`${meshName}_mat`, this.scene);
-    mat.diffuseColor  = new Color3(pet.meshColor.r, pet.meshColor.g, pet.meshColor.b);
-    mat.specularColor = new Color3(0.1, 0.08, 0.06);
-    mat.specularPower = 18;
-    mesh.material = mat;
-    mesh.receiveShadows = true;
-
-    this._petPhysicsAggregate = new PhysicsAggregate(
-      mesh,
-      PhysicsShapeType.CAPSULE,
-      { mass: 0.5, restitution: 0 },
-      this.scene,
-    );
-    this._petPhysicsAggregate.body.setMotionType(PhysicsMotionType.DYNAMIC);
-    // Lock rotation axes so the capsule stays upright
-    this._petPhysicsAggregate.body.setMassProperties({ inertia: new Vector3(0, 0, 0) });
-
-    this._petMesh        = mesh;
-    this._petAttackTimer = 0;
-
-    this.animationSystem.playIdle(mesh);
-  }
-
-  /** Remove the pet mesh and physics body from the scene immediately. */
-  private _despawnPetMesh(): void {
-    if (!this._petMesh) return;
-    this.animationSystem.unregisterMesh(this._petMesh.name);
-    this._petPhysicsAggregate?.dispose();
-    this._petMesh.dispose();
-    this._petMesh              = null;
-    this._petPhysicsAggregate  = null;
-  }
-
-  // ── Pet AI update ──────────────────────────────────────────────────────────
-
-  private static readonly _PET_ATTACK_COOLDOWN = 2.0;
-
-  /** Follow-player + attack-enemy AI for the active companion. */
-  private _updatePetAI(deltaTime: number): void {
-    const pet = this.petSystem?.activePet;
-    if (!pet || !this._petMesh || !this._petPhysicsAggregate?.body) return;
-
-    this.petSystem.updateMood(deltaTime);
-
-    const petPos   = this._petMesh.position;
-    const playerPos = this.player.camera.position;
-    const body     = this._petPhysicsAggregate.body;
-
-    const dx      = playerPos.x - petPos.x;
-    const dz      = playerPos.z - petPos.z;
-    const distSq  = dx * dx + dz * dz;
-    const follow  = pet.followDistance + 0.8;
-
-    body.getLinearVelocityToRef(this._petScratchVec);
-
-    if (distSq > follow * follow) {
-      const dist  = Math.sqrt(distSq);
-      const speed = dist > pet.followDistance + 5 ? pet.moveSpeed : pet.moveSpeed * 0.65;
-      const nx    = (dx / dist) * speed;
-      const nz    = (dz / dist) * speed;
-      const blend = Math.min(1, 8 * deltaTime);
-
-      const cvx = this._petScratchVec.x;
-      const cvy = this._petScratchVec.y;
-      const cvz = this._petScratchVec.z;
-
-      body.setLinearVelocity(this._petScratchVec.set(
-        cvx + (nx - cvx) * blend,
-        cvy,
-        cvz + (nz - cvz) * blend,
-      ));
-
-      this._petLookTarget.set(petPos.x + nx, petPos.y, petPos.z + nz);
-      this._petMesh.lookAt(this._petLookTarget);
-
-      if (dist > pet.followDistance + 5) {
-        this.animationSystem.playRun(this._petMesh);
-      } else {
-        this.animationSystem.playWalk(this._petMesh);
-      }
-    } else {
-      body.setLinearVelocity(this._petScratchVec.set(0, this._petScratchVec.y, 0));
-      this.animationSystem.playIdle(this._petMesh);
-    }
-
-    this._petAttackTimer -= deltaTime;
-    if (this._petAttackTimer > 0) return;
-
-    let closestNpc: NPC | null = null;
-    let closestDistSq = pet.attackRange * pet.attackRange;
-
-    for (const npc of this.scheduleSystem.npcs) {
-      if (npc.isDead) continue;
-      if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK && !npc.isAggressive) continue;
-      const ex = npc.mesh.position.x - petPos.x;
-      const ez = npc.mesh.position.z - petPos.z;
-      const dSq = ex * ex + ez * ez;
-      if (dSq < closestDistSq) {
-        closestDistSq = dSq;
-        closestNpc    = npc;
-      }
-    }
-
-    if (closestNpc) {
-      const damage   = this.petSystem.getEffectiveAttackDamage();
-      closestNpc.takeDamage(damage);
-      const levelled = this.petSystem.petGainXP(5);
-      if (levelled) {
-        this.petUI.refresh(this.petSystem.pets, this.petSystem.activePet?.id ?? null);
-      }
-      this._petAttackTimer = Game._PET_ATTACK_COOLDOWN;
-    } else {
-      this._petAttackTimer = 0.4;
-    }
   }
 
   /** Opens a hidden file-input to let the user choose a map JSON to import. */

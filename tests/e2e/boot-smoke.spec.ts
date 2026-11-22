@@ -141,6 +141,22 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
   await expect(forge).toBeHidden();
   await page.locator("#renderCanvas").click({ force: true });
 
+  // P — the companion panel; summon the starter wolf, then put it away.
+  await page.keyboard.press("p");
+  const pets = await page.evaluate(async () => {
+    const g = (window as any).__camelotGame;
+    const panelOpen = g.petUI.isVisible as boolean;
+    g.petUI.onSummon("pet_wolf");
+    await new Promise((r) => setTimeout(r, 500));
+    const body = g.scene.getMeshByName("pet_pet_wolf");
+    const out = { panelOpen, spawned: !!body, physics: !!body?.physicsBody, same: g.petSystem === g.pets.pets };
+    g.petUI.onDismiss();
+    return { ...out, gone: !g.scene.getMeshByName("pet_pet_wolf") };
+  });
+  expect(pets, "companion panel, summon and dismiss").toEqual({ panelOpen: true, spawned: true, physics: true, same: true, gone: true });
+  await page.keyboard.press("p");
+  await page.locator("#renderCanvas").click({ force: true });
+
   // F5 — manual save.  Assert the full game-state graph serialised.
   await page.keyboard.press("F5");
   const saveRaw = await page.evaluate(() => localStorage.getItem("camelot_save"));

@@ -50,6 +50,7 @@ function setup(opts: { level?: number } = {}) {
   k.services.provide(ActorsKey, {
     residents: () => townsfolk,
     byName: (n) => townsfolk.find((t) => t.mesh.name === n),
+    all: () => townsfolk,
     spawnArchetype: (_c, archetype) => fakeNpc(archetype === "archetype_bandit_chief" ? "Bandit Chief" : "Bandit"),
     despawn: (npc) => { despawned.push(npc); (npc.mesh as any).dispose(); },
     isTalkingTo: (npc) => npc === talkingTo,

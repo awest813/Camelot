@@ -6,6 +6,7 @@
  * overhaul proceeds (entity store, scopes per chunk) the implementations
  * move out of game.ts too; the interfaces are the contract.
  */
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { NPC } from "../entities/npc";
 import type { Quest } from "../systems/quest-system";
 import type { Scene } from "@babylonjs/core/scene";
@@ -24,7 +25,8 @@ export interface GameClockService {
 }
 
 export interface PlayerService {
-  position(): { x: number; z: number };
+  /** Where the player stands (`y` is eye height, when known). */
+  position(): { x: number; y?: number; z: number };
   level(): number;
 }
 
@@ -66,6 +68,8 @@ export interface ActorsService {
   isTalkingTo(npc: NPC): boolean;
   /** Look an NPC up by mesh name (until entity ids, Phase 3). */
   byName(name: string): NPC | undefined;
+  /** Every live NPC the simulation tracks. */
+  all(): readonly NPC[];
 }
 
 /** Static facts about the streamed world. */
@@ -152,6 +156,21 @@ export interface WorldStateService {
   biomeAt(x: number, z: number): BiomeType;
 }
 
+/** Procedural animation on simple meshes (pets, props). */
+export interface AnimationService {
+  idle(mesh: Mesh): void;
+  walk(mesh: Mesh): void;
+  run(mesh: Mesh): void;
+  death(mesh: Mesh): void;
+  /** Stop animating a mesh (before disposing it). */
+  release(meshName: string): void;
+}
+
+/** Whether gameplay input may act now (not paused, talking, or in a menu). */
+export interface GameplayService {
+  canAct(): boolean;
+}
+
 /** Loot in the world. */
 export interface LootService {
   /** Roll a loot table and drop up to `count` items around the player. */
@@ -169,6 +188,8 @@ export const SiteBuilderKey = createServiceKey<SiteBuilderService>("site-builder
 export const InventoryKey = createServiceKey<InventoryService>("inventory");
 export const QuestLogKey = createServiceKey<QuestLogService>("quest-log");
 export const WorldStateKey = createServiceKey<WorldStateService>("world-state");
+export const AnimationKey = createServiceKey<AnimationService>("animation");
+export const GameplayKey = createServiceKey<GameplayService>("gameplay");
 export const LootKey = createServiceKey<LootService>("loot");
 export const ModalKey = createServiceKey<ModalService>("modal");
 export const ScheduleKey = createServiceKey<ScheduleQueryService>("schedules");
