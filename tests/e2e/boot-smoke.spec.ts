@@ -112,6 +112,13 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
   // Babylon keyboard input requires canvas focus — click it so F5/F9 reach the game.
   await page.locator("#renderCanvas").click({ force: true });
 
+  // The starting forge is within reach of the spawn point: the forge panel
+  // opens bound to it, so steel recipes are station-eligible here.
+  await page.keyboard.press("Shift+B");
+  await expect(page.locator(".crafting-ui")).toHaveAttribute("data-active-station", "forge");
+  await page.locator(".crafting-ui__close").click();
+  await page.locator("#renderCanvas").click({ force: true });
+
   // Walk forward. The camera's first collision query needs Babylon's collision
   // coordinator side-effect import; without it the query throws inside the
   // render loop and Babylon never queues another frame (the game froze on the

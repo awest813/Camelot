@@ -81,10 +81,10 @@ import { NpcScheduleSystem, SCHED_GUARD } from "./systems/npc-schedule-system";
 import { FixedStepLoop } from "./systems/fixed-step-loop";
 import { AlchemySystem } from "./systems/alchemy-system";
 import { AlchemyUI } from "./ui/alchemy-ui";
-import { CraftingSystem } from "./systems/crafting-system";
+import { CraftingSystem, type CraftingStationId } from "./systems/crafting-system";
 import { CraftingUI } from "./ui/crafting-ui";
 import { ItemConditionSystem } from "./systems/item-condition-system";
-import { SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
+import { ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
 import { EnchantingSystem } from "./systems/enchanting-system";
 import { EnchantingUI } from "./ui/enchanting-ui";
 import { LodSystem } from "./systems/lod-system";
@@ -369,6 +369,8 @@ export class Game {
   public craftingSystem: CraftingSystem;
   public itemConditionSystem: ItemConditionSystem;
   public smithing: SmithingController;
+  /** World forges (smithies, armorer inns, the starting forge) — steel work needs one in reach. */
+  public readonly forges = new ForgeRegistry();
   public craftingUI: CraftingUI;
 
   // v5 systems (Oblivion parity: enchanting)
@@ -1466,7 +1468,7 @@ export class Game {
     this.craftingUI = new CraftingUI({ title: "Smithing Forge" });
     this.craftingUI.materialLabel = (id) => SMITHING_MATERIAL_ITEMS[id]?.name ?? id;
     this.craftingUI.onCraft = (recipeId) => {
-      const outcome = this.smithing.craft(recipeId);
+      const outcome = this.smithing.craft(recipeId, this._currentCraftingStation());
       if (outcome.success) this.saveSystem.markDirty();
       this._refreshCraftingUI();
     };
@@ -2086,10 +2088,16 @@ export class Game {
     // ── Fantasy Asset Loader ───────────────────────────────────────────────
     // Preload Babylon CDN models only; Quaternius packs load on first `getInstance`
     // to avoid startup bandwidth, decode work, and memory spikes from ~80+ local GLBs.
-    this.fantasyAssets = new FantasyAssetLoader(this.scene);
+    // Remote (Babylon CDN) props stay off unless VITE_ENABLE_REMOTE_PROPS=true, so
+    // the offline Steam depot never touches the network.  World *population*
+    // (settlement NPCs, shops, trainers, bandit camps, smithies) always runs:
+    // with remote props off, CDN buildings are simply absent and local props
+    // (Quaternius) still load.  Previously the whole block below was gated,
+    // which silently removed every inn/cottage/fort NPC from default builds.
     const remotePropsEnabled = import.meta.env.VITE_ENABLE_REMOTE_PROPS === "true";
-    if (remotePropsEnabled) {
-      this.fantasyAssets.preloadRemoteCdnAssets();
+    this.fantasyAssets = new FantasyAssetLoader(this.scene, { allowRemote: remotePropsEnabled });
+    {
+      if (remotePropsEnabled) this.fantasyAssets.preloadRemoteCdnAssets();
 
       // ── CDN model world placement via chunk lifecycle ──────────────────────
       // Deterministic seeding: same chunk always produces same props.
@@ -2141,17 +2149,7 @@ export class Game {
         this._spawnArchetypeNpc(cottageTrainer, chunkRecord, cx2 - 2, cz2 + 1);
         // The smith works out of a forge and anvil beside the homestead.
         if (cottageTrainer === "archetype_trainer_armorer") {
-          const smithy: Array<["qForge" | "qAnvil", number, number]> = [
-            ["qForge", cx2 - 4.5, cz2 + 2.5],
-            ["qAnvil", cx2 - 3, cz2 + 3.5],
-          ];
-          for (const [key, px, pz] of smithy) {
-            this.fantasyAssets.getInstance(key, (root) => {
-              if (!root) return;
-              root.position.set(px, 0, pz);
-              this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
-            });
-          }
+          this._placeSmithy(chunkKey, chunkRecord, cx2 - 4.5, cz2 + 2.5);
         }
         if (_chunkRand(cx, cz, 91) < 0.3) {
           this._spawnArchetypeNpc("archetype_guard", chunkRecord, cx2 + 3, cz2 - 2);
@@ -2217,6 +2215,10 @@ export class Game {
           "archetype_merchant",
         ][((cx + cz) % 5 + 5) % 5];
         this._spawnArchetypeNpc(innSpecial, chunkRecord, ix + 4, iz - 3);
+        // Arms and armor sellers keep a working forge out back.
+        if (innSpecial === "archetype_shopkeeper_weapons" || innSpecial === "archetype_shopkeeper_armor") {
+          this._placeSmithy(chunkKey, chunkRecord, ix + 6.5, iz - 5);
+        }
         if (_chunkRand(cx, cz, 90) < 0.4) {
           this._spawnArchetypeNpc("archetype_guard", chunkRecord, ix - 4, iz - 3);
         }
@@ -2408,6 +2410,7 @@ export class Game {
       this.world.onChunkUnloaded = (cx, cz) => {
         const key = `${cx},${cz}`;
         const record = this._chunkFantasyContent.get(key);
+        this.forges.removeGroup(key);
         if (!record) return;
         this._chunkFantasyContent.delete(key);
 
@@ -2948,6 +2951,9 @@ export class Game {
     };
 
     // Spell cast events forwarded to event bus
+    // A forge near the starting area so steel work is reachable from day one.
+    this._placeSmithy(null, null, -4, -5);
+
     // Spawn a test container chest
     this.containerSystem.spawnContainer({
       id: "chest_01",
@@ -7282,12 +7288,50 @@ export class Game {
     });
   }
 
+  /**
+   * Place a forge + anvil at (x, z) and register the forge as a usable station.
+   * With a chunk key/record the props and the station are chunk-scoped;
+   * without (the starting forge) they are permanent.
+   */
+  private _placeSmithy(
+      chunkKey: string | null,
+      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] } | null,
+      x: number,
+      z: number,
+  ): void {
+      this.forges.add(`forge_${x.toFixed(1)}_${z.toFixed(1)}`, x, z, chunkKey);
+      const props: Array<["qForge" | "qAnvil", number, number]> = [
+        ["qForge", x, z],
+        ["qAnvil", x + 1.5, z + 1],
+      ];
+      for (const [key, px, pz] of props) {
+        this.fantasyAssets.getInstance(key, (root) => {
+          if (!root) return;
+          root.position.set(px, 0, pz);
+          if (chunkKey && chunkRecord) {
+            this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
+          } else {
+            this.shadowGenerator?.addShadowCaster(root, true);
+          }
+        });
+      }
+  }
+
+  /** "forge" when the player stands within reach of one, else undefined (field smithing). */
+  private _currentCraftingStation(): CraftingStationId | undefined {
+      const p = this.player.camera.position;
+      return this.forges.stationAt(p.x, p.z);
+  }
+
   /** Open the smithing forge panel and hand input to it. */
   private _openSmithingForge(): void {
       if (this.craftingUI.isVisible) return;
       this.craftingUI.show();
       this._refreshCraftingUI();
       this._suspendGameplayInput();
+      if (!this._currentCraftingStation()) {
+        this.ui.showNotification("No forge nearby: field smithing only. Steel work needs a forge.", 3000);
+      }
   }
 
   /** Re-render the smithing panel from live inventory + Armorer skill. */
@@ -7297,6 +7341,7 @@ export class Game {
           this.craftingSystem,
           this.smithing.getMaterials(),
           this.skillProgressionSystem.getSkill("armorer")?.level ?? 0,
+          this._currentCraftingStation(),
       );
   }
 

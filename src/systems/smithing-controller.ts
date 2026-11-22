@@ -25,6 +25,7 @@
 import {
   CraftingSystem,
   ITEM_QUALITY_LABELS,
+  type CraftingStationId,
   type CraftingRecipe,
   type CraftOutcome,
   type ItemQuality,
@@ -145,7 +146,10 @@ export const QUALITY_STAT_MULTIPLIERS: Readonly<Record<ItemQuality, number>> = {
   masterwork: 1.45,
 };
 
-/** Default smithing recipes.  None needs a station: the forge panel is the bench. */
+/**
+ * Default smithing recipes.  Iron basics and hammers can be field-smithed
+ * anywhere; smelting steel, steel gear and the iron cuirass need a forge.
+ */
 export const SMITHING_RECIPES: readonly CraftingRecipe[] = [
   { id: "smith_repair_hammer", label: "Repair Hammers (×2)", category: "misc", tier: "iron",
     requiredMaterials: [{ materialId: "iron_ingot", quantity: 1 }, { materialId: "leather_strips", quantity: 1 }],
@@ -166,20 +170,20 @@ export const SMITHING_RECIPES: readonly CraftingRecipe[] = [
   { id: "smith_iron_shield", label: "Iron Shield", category: "armor", tier: "iron",
     requiredMaterials: [{ materialId: "iron_ingot", quantity: 3 }, { materialId: "leather_strips", quantity: 1 }],
     outputItemId: "iron_shield", outputItemName: "Iron Shield", requiredSkill: 5, craftingXp: 14 },
-  { id: "smith_iron_cuirass", label: "Iron Cuirass", category: "armor", tier: "iron",
+  { id: "smith_iron_cuirass", label: "Iron Cuirass", stationId: "forge", category: "armor", tier: "iron",
     requiredMaterials: [{ materialId: "iron_ingot", quantity: 5 }, { materialId: "leather_strips", quantity: 2 }],
     outputItemId: "iron_cuirass", outputItemName: "Iron Cuirass", requiredSkill: 10, craftingXp: 18 },
-  { id: "smith_steel_ingot", label: "Steel Ingot (smelt)", category: "misc", tier: "steel",
+  { id: "smith_steel_ingot", label: "Steel Ingot (smelt)", stationId: "forge", category: "misc", tier: "steel",
     requiredMaterials: [{ materialId: "iron_ingot", quantity: 2 }],
     outputItemId: "steel_ingot", outputItemName: "Steel Ingot", requiredSkill: 15, craftingXp: 8,
     description: "Fold two iron ingots into one bar of steel." },
-  { id: "smith_steel_sword", label: "Steel Sword", category: "weapon", tier: "steel",
+  { id: "smith_steel_sword", label: "Steel Sword", stationId: "forge", category: "weapon", tier: "steel",
     requiredMaterials: [{ materialId: "steel_ingot", quantity: 2 }, { materialId: "leather_strips", quantity: 1 }],
     outputItemId: "steel_sword", outputItemName: "Steel Sword", requiredSkill: 25, craftingXp: 16 },
-  { id: "smith_steel_shield", label: "Steel Shield", category: "armor", tier: "steel",
+  { id: "smith_steel_shield", label: "Steel Shield", stationId: "forge", category: "armor", tier: "steel",
     requiredMaterials: [{ materialId: "steel_ingot", quantity: 3 }, { materialId: "leather_strips", quantity: 1 }],
     outputItemId: "steel_shield", outputItemName: "Steel Shield", requiredSkill: 30, craftingXp: 18 },
-  { id: "smith_steel_cuirass", label: "Steel Cuirass", category: "armor", tier: "steel",
+  { id: "smith_steel_cuirass", label: "Steel Cuirass", stationId: "forge", category: "armor", tier: "steel",
     requiredMaterials: [{ materialId: "steel_ingot", quantity: 5 }, { materialId: "leather_strips", quantity: 2 }],
     outputItemId: "steel_cuirass", outputItemName: "Steel Cuirass", requiredSkill: 35, craftingXp: 22 },
 ];
@@ -201,6 +205,50 @@ export const REPAIR_XP = 4;
 
 const ARMOR_SLOTS = ["head", "chest", "legs", "feet", "offHand"] as const;
 
+// ── Forges in the world ───────────────────────────────────────────────────────
+
+/** How close (world units, XZ plane) the player must be to use a forge. */
+export const FORGE_USE_RADIUS = 8;
+
+/**
+ * Positions of usable forges.  Forges are registered when their site is
+ * generated (not when the mesh finishes loading) and removed with their chunk.
+ */
+export class ForgeRegistry {
+  private readonly _forges = new Map<string, { x: number; z: number; group: string | null }>();
+
+  /** Register (or move) a forge.  `group` is usually the owning chunk key. */
+  public add(id: string, x: number, z: number, group: string | null = null): void {
+    this._forges.set(id, { x, z, group });
+  }
+
+  /** Remove every forge registered under `group` (e.g. on chunk unload). */
+  public removeGroup(group: string): void {
+    for (const [id, f] of this._forges) {
+      if (f.group === group) this._forges.delete(id);
+    }
+  }
+
+  public get size(): number {
+    return this._forges.size;
+  }
+
+  /** Distance from (x, z) to the nearest forge, or Infinity when there is none. */
+  public nearestDistance(x: number, z: number): number {
+    let best = Infinity;
+    for (const f of this._forges.values()) {
+      const d = Math.hypot(f.x - x, f.z - z);
+      if (d < best) best = d;
+    }
+    return best;
+  }
+
+  /** The station the player is standing at: "forge" when one is in reach. */
+  public stationAt(x: number, z: number, radius = FORGE_USE_RADIUS): CraftingStationId | undefined {
+    return this.nearestDistance(x, z) <= radius ? "forge" : undefined;
+  }
+}
+
 // ── Controller ────────────────────────────────────────────────────────────────
 
 export class SmithingController {
@@ -218,6 +266,7 @@ export class SmithingController {
     for (const recipe of SMITHING_RECIPES) {
       if (!crafting.getRecipe(recipe.id)) crafting.addRecipe(recipe);
     }
+    crafting.materialLabel = (id) => SMITHING_MATERIAL_ITEMS[id]?.name ?? id;
 
     condition.onItemBroken = (itemId) => {
       const name = this._equippedName(itemId) ?? itemId;
@@ -240,12 +289,12 @@ export class SmithingController {
    * Craft a recipe for real: validate, check bag space, consume materials,
    * add the output (quality-scaled) and award XP.  Notifies the player either way.
    */
-  public craft(recipeId: string): CraftOutcome {
+  public craft(recipeId: string, stationId?: CraftingStationId): CraftOutcome {
     const recipe = this.crafting.getRecipe(recipeId);
     const skill = this._deps.getArmorerSkill();
     const materials = this.getMaterials();
 
-    const blocked = this.crafting.whyCannotCraft(recipeId, materials, skill);
+    const blocked = this.crafting.whyCannotCraft(recipeId, materials, skill, stationId);
     if (blocked) {
       this._deps.notify(blocked.message, 2400);
       return blocked;
@@ -263,7 +312,7 @@ export class SmithingController {
     // Requirements were checked at the real skill above; the Master Craftsman
     // perk only lifts the skill the forge uses to judge quality.
     const qualitySkill = skill + (this._deps.player.perkSmithingQualityBonus ?? 0);
-    const outcome = this.crafting.craft(recipeId, materials, qualitySkill);
+    const outcome = this.crafting.craft(recipeId, materials, qualitySkill, stationId);
     if (!outcome.success || !recipe) return outcome;
 
     for (const m of recipe.requiredMaterials) {

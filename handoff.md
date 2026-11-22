@@ -32,8 +32,17 @@ placed in the world, like the other master trainers); 4 Armorer perks (perk tree
 Second follow-up: per-piece condition (`Item.instanceId`, `conditionKey()`, `InventorySystem.removeInstance`,
 `SaveSystem.onBeforeSave` pruning, inventory hover shows condition). Verified: 187 files / 5,823 tests, boot-smoke ✓.
 
-Known limits: the forge panel works anywhere (Shift+B); the Forge/Anvil props at Village Smith cottages
-are decoration plus a dialogue shortcut, not a station requirement. The saddlebag takes out the *first* copy of an item
+Fourth follow-up — **important pre-existing fix**: `VITE_ENABLE_REMOTE_PROPS` (off by default since
+`2c92427`) gated the *entire* chunk population block, so default builds had no inns/cottages/forts or
+their NPCs (shops, trainers, bandits, dragons). Population now always runs; `FantasyAssetLoader`
+takes `{ allowRemote }` and fails CDN keys without fetching (this also stopped three CDN weapon models
+that were downloaded at boot even offline). Verified by teleport probe: Innkeeper, Barkeeper, Traveling
+Merchant, Villager, Alchemy Tutor, Village Smith, DragonBoss all spawn; no page errors. NPCs stand
+where the (absent) CDN building would be. A local stand-in building would be a good follow-up.
+Forge stations: steel recipes + iron cuirass need a forge (`ForgeRegistry`, radius 8). New e2e
+`tests/e2e/smithing-flow.spec.ts` uses `window.__camelotGame` (dev builds only).
+
+Known limits: The saddlebag takes out the *first* copy of an item
 id (it is consistent, so nothing is lost, but the player can't choose which of two identical swords to take).
 Barter is instance-aware and prices worn gear down (third follow-up).
 

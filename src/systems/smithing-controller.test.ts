@@ -3,6 +3,8 @@ import { CraftingSystem } from "./crafting-system";
 import { ItemConditionSystem } from "./item-condition-system";
 import type { Item } from "./inventory-system";
 import {
+  ForgeRegistry,
+  FORGE_USE_RADIUS,
   SmithingController,
   SMITHING_RECIPES,
   REPAIR_HAMMER_ID,
@@ -125,16 +127,32 @@ describe("SmithingController", () => {
     if (!outcome.success) expect(outcome.reason).toBe("missing_materials");
     expect(ctrl.getMaterials().iron_ingot).toBe(1);
     expect(xp).toBe(0);
-    expect(messages.at(-1)).toMatch(/Missing materials/);
+    expect(messages.at(-1)).toMatch(/Missing materials: 2× Iron Ingot \(have 1\)/);
   });
 
   it("gates recipes on Armorer skill", () => {
     inventory.items.push(smithingMaterialStack("steel_ingot", 2), smithingMaterialStack("leather_strips", 1));
-    const outcome = ctrl.craft("smith_steel_sword");
+    const outcome = ctrl.craft("smith_steel_sword", "forge");
     expect(outcome.success).toBe(false);
     if (!outcome.success) expect(outcome.reason).toBe("skill_too_low");
     skill = 25;
-    expect(ctrl.craft("smith_steel_sword").success).toBe(true);
+    expect(ctrl.craft("smith_steel_sword", "forge").success).toBe(true);
+  });
+
+  it("steel work needs a forge; iron basics can be field-smithed", () => {
+    skill = 50;
+    inventory.items.push(
+      smithingMaterialStack("steel_ingot", 2),
+      smithingMaterialStack("iron_ingot", 2),
+      smithingMaterialStack("leather_strips", 2),
+    );
+    const away = ctrl.craft("smith_steel_sword");
+    expect(away.success).toBe(false);
+    if (!away.success) expect(away.reason).toBe("wrong_station");
+    expect(messages.at(-1)).toBe("Steel Sword requires a Forge.");
+    expect(ctrl.getMaterials().steel_ingot).toBe(2);
+    expect(ctrl.craft("smith_iron_sword").success).toBe(true);
+    expect(ctrl.craft("smith_steel_sword", "forge").success).toBe(true);
   });
 
   it("refuses when the bag has no room for the output", () => {
@@ -308,9 +326,11 @@ describe("SmithingController", () => {
     expect(outcome.success).toBe(true);
     if (outcome.success) expect(outcome.result.quality).not.toBe("base");
     expect(inventory.items.some((i) => i.id.startsWith("iron_sword_"))).toBe(true);
-    // Steel still needs real Armorer 25.
+    // Steel still needs real Armorer 25, even at a forge.
     inventory.items.push(smithingMaterialStack("steel_ingot", 2));
-    expect(ctrl.craft("smith_steel_sword").success).toBe(false);
+    const steel = ctrl.craft("smith_steel_sword", "forge");
+    expect(steel.success).toBe(false);
+    if (!steel.success) expect(steel.reason).toBe("skill_too_low");
   });
 
   // ── Per-copy condition ─────────────────────────────────────────────────────
@@ -412,5 +432,35 @@ describe("SmithingController", () => {
     condition2.restoreFromSave(condition.getSaveState());
     expect(crafting2.getTotalCrafted("smith_iron_helm")).toBe(1);
     expect(condition2.getCondition("iron_sword")).toBe(42);
+  });
+});
+
+describe("ForgeRegistry", () => {
+  it("reports a forge only within reach", () => {
+    const reg = new ForgeRegistry();
+    expect(reg.stationAt(0, 0)).toBeUndefined();
+    reg.add("f1", 3, 4);
+    expect(reg.nearestDistance(0, 0)).toBe(5);
+    expect(reg.stationAt(0, 0)).toBe("forge");
+    expect(reg.stationAt(3 + FORGE_USE_RADIUS + 1, 4)).toBeUndefined();
+  });
+
+  it("drops a chunk's forges on unload but keeps permanent ones", () => {
+    const reg = new ForgeRegistry();
+    reg.add("start", 0, 0, null);
+    reg.add("a", 100, 100, "6,6");
+    reg.add("b", 120, 100, "7,6");
+    reg.removeGroup("6,6");
+    expect(reg.size).toBe(2);
+    expect(reg.stationAt(100, 100)).toBeUndefined();
+    expect(reg.stationAt(0, 0)).toBe("forge");
+  });
+
+  it("re-adding the same id moves the forge instead of duplicating it", () => {
+    const reg = new ForgeRegistry();
+    reg.add("f", 0, 0);
+    reg.add("f", 50, 50);
+    expect(reg.size).toBe(1);
+    expect(reg.stationAt(0, 0)).toBeUndefined();
   });
 });

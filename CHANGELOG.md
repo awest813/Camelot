@@ -31,6 +31,25 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Smithing materials and hammers are sold by the arms and armor merchants and
   drop from bandits and dungeons. New characters start with a small kit.
 
+- Forges: steel work (smelting, steel gear) and the iron cuirass need you
+  standing at a forge; other iron gear and hammers can be made anywhere.
+  There are forges near the starting area, at Village Smith cottages, and
+  behind inns whose shopkeeper sells arms or armor.
+
+### Fixed
+- Inns, cottages, pirate forts and their people (innkeepers, shopkeepers,
+  trainers, bandits, dragons) were missing from default builds. The setting
+  that keeps the remote Babylon.js models off was also stopping every one of
+  these sites from being set up. Sites now always appear; with remote models
+  off, the CDN buildings are left out but the people and local props still
+  appear.
+- With remote models off, the three starting-area weapon pickups still
+  downloaded their models from the Babylon.js CDN. Remote models are now
+  never fetched in that case, and those pickups show their plain loot marker
+  instead.
+- Crafting messages use names ("Steel Sword requires a Forge.",
+  "2× Iron Ingot") instead of internal ids.
+
 ### Changed
 - Plain B still opens Enchanting. B with Shift held now opens Smithing.
 - Saves gain an optional `crafting` field. Save version stays at 29, and older

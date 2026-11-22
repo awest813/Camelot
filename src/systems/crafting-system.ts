@@ -348,6 +348,9 @@ export class CraftingSystem {
    */
   public onItemCrafted: ((result: CraftingResult) => void) | null = null;
 
+  /** Display name for a material id in player-facing messages (defaults to the id). */
+  public materialLabel: ((materialId: string) => string) | null = null;
+
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
   /**
@@ -657,7 +660,7 @@ export class CraftingSystem {
       return {
         success: false,
         reason: "wrong_station",
-        message: `Recipe "${recipe.id}" requires a ${expected}.`,
+        message: `${recipe.label} requires a ${expected}.`,
       };
     }
 
@@ -676,7 +679,8 @@ export class CraftingSystem {
     for (const mat of recipe.requiredMaterials) {
       const available = materials[mat.materialId] ?? 0;
       if (available < mat.quantity) {
-        missing.push(`${mat.quantity}× ${mat.materialId} (have ${available})`);
+        const name = this.materialLabel?.(mat.materialId) ?? mat.materialId;
+        missing.push(`${mat.quantity}× ${name} (have ${available})`);
       }
     }
     if (missing.length > 0) {

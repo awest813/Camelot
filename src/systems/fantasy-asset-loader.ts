@@ -335,6 +335,12 @@ const ASSET_URLS: Record<FantasyAssetKey, string> = {
  * Keys whose resolved URL is absolute (`http(s)://`) — Babylon CDN assets only.
  * Self-hosted Quaternius models (relative paths) are excluded so they load on demand.
  */
+/** True when the asset is fetched from a remote CDN rather than shipped locally. */
+export function isRemoteAssetKey(key: FantasyAssetKey): boolean {
+  const url = ASSET_URLS[key];
+  return typeof url === "string" && /^https?:\/\//i.test(url);
+}
+
 export function getRemoteCdnAssetKeys(): FantasyAssetKey[] {
   return (Object.keys(ASSET_URLS) as FantasyAssetKey[]).filter((key) => {
     const url = ASSET_URLS[key];
@@ -414,8 +420,16 @@ export class FantasyAssetLoader {
   private readonly _assets: Map<FantasyAssetKey, AssetEntry> = new Map();
   private _instanceCounter = 0;
 
-  constructor(scene: Scene) {
+  /**
+   * When false, remote (CDN) assets are never fetched: they resolve as failed
+   * immediately, so callers take their no-model fallback.  Local packs
+   * (Quaternius, KayKit) are unaffected.  The offline Steam build sets this off.
+   */
+  public readonly allowRemote: boolean;
+
+  constructor(scene: Scene, options: { allowRemote?: boolean } = {}) {
     this._scene = scene;
+    this.allowRemote = options.allowRemote ?? true;
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
@@ -504,6 +518,11 @@ export class FantasyAssetLoader {
       pendingCallbacks: [],
     };
     this._assets.set(key, entry);
+
+    if (!this.allowRemote && isRemoteAssetKey(key)) {
+      entry.failed = true;
+      return;
+    }
 
     const url = ASSET_URLS[key];
 
