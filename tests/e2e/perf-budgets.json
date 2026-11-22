@@ -16,5 +16,22 @@
       "materials": 252,
       "textures": 357
     }
+  },
+  "floor": 0.5,
+  "floors": {
+    "start": {
+      "drawCalls": 86,
+      "activeMeshes": 44,
+      "meshes": 274,
+      "materials": 54,
+      "textures": 70
+    },
+    "village": {
+      "drawCalls": 233,
+      "activeMeshes": 204,
+      "meshes": 1033,
+      "materials": 109,
+      "textures": 155
+    }
   }
 }

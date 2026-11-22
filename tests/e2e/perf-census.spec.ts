@@ -98,7 +98,7 @@ test("perf census", async ({ page }) => {
   await page.evaluate(() => {
     const g = (window as any).__camelotGame;
     for (let r = 3; r < 40; r++) for (let cx = -r; cx <= r; cx++) for (const cz of [-r, r]) {
-      const p = g._villagePlanFor(cx, cz);
+      const p = g.villages.planFor(cx, cz);
       if (p) { const c = g.player.camera; c.position.set(p.center.x + 6, 2, p.center.z + 6); c.setTarget(new c.position.constructor(p.center.x, 1.5, p.center.z)); return; }
     }
   });

@@ -316,6 +316,18 @@ state, scope and save codec.
      holds (the raid's `"raid"` hold replaces the raid ↔ game coupling).
      Bedtime arrival is now an `npc:atBed` event; this added schedule and
      building services.
+  4. **Villages** (`src/features/villages/`): planning, building as chunks
+     load, the well, notice board and candles, discovery, and the village
+     queries (current village, inn boards). Building goes through a new
+     **site-builder** service (place buildings, props and smithies into a
+     chunk; ownership; keep-outs; night flames), which the remaining site
+     types (camps, inns, dragons) will use next. The old village-world
+     service split into `actors` and `villages`.
+
+  Render counts after the extraction match the pre-extraction baseline
+  (2,066 village meshes), so villages are built identically. The render
+  budget check now also has floors, so a scene that failed to render can't
+  pass.
 
 ### Phase 2 — Input, modals and camera (2 weeks)
 

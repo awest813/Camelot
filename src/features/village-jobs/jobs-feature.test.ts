@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Kernel } from "../../core/kernel";
-import { FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, VillageWorldKey } from "../services";
+import { FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, VillagesKey } from "../services";
 import { VillageJobsFeature, JobsKey } from "./jobs-feature";
 import { VillageJobBoard } from "../../systems/village-jobs";
 import type { Quest } from "../../systems/quest-system";
@@ -26,10 +26,9 @@ function setup(boardId: string) {
   });
   k.services.provide(QuestLogKey, { quests: () => quests, add: (q) => { quests.push(q); } });
   k.services.provide(ModalKey, modal);
-  k.services.provide(VillageWorldKey, {
-    currentVillage: () => null, loadedVillage: () => null, residents: () => [],
-    spawnArchetype: () => null, despawn: vi.fn(),
-    isTalkingTo: () => false,
+  k.services.provide(VillagesKey, {
+    currentVillage: () => null, loadedVillage: () => null, planFor: () => null, clearingAt: () => null,
+    populate: () => false, loaded: () => new Map(),
     innBoardOf: (name) => (name.startsWith("Innkeeper") ? { boardId, placeName: "Camcross" } : null),
   });
   const feature = new VillageJobsFeature();

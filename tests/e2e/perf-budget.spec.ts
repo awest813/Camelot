@@ -21,6 +21,11 @@ const BUDGET_FILE = fileURLToPath(new URL("./perf-budgets.json", import.meta.url
 const SEED = "camelot-perf-1";
 /** Budgets sit this far above the measured baseline (scenes animate a little). */
 const HEADROOM = 1.15;
+/**
+ * Floors sit this far below it: a scene that suddenly draws far less than
+ * its baseline didn't render (a load failure), which must not pass.
+ */
+const FLOOR = 0.5;
 
 type Metrics = {
   drawCalls: number;
@@ -101,7 +106,7 @@ test("render counts stay within budget", async ({ page }) => {
   const found = await page.evaluate(() => {
     const g = (window as any).__camelotGame;
     for (let r = 3; r < 40; r++) for (let cx = -r; cx <= r; cx++) for (const cz of [-r, r]) {
-      const p = g._villagePlanFor(cx, cz);
+      const p = g.villages.planFor(cx, cz);
       if (p) {
         const c = g.player.camera;
         c.position.set(p.center.x + 6, 2, p.center.z + 6);
@@ -118,21 +123,30 @@ test("render counts stay within budget", async ({ page }) => {
   console.log("perf budget measurements:", JSON.stringify(scenes));
 
   if (process.env.PERF_BUDGET_UPDATE) {
-    const budgets = Object.fromEntries(Object.entries(scenes).map(([name, m]) => [
+    const scale = (f: number, round: (n: number) => number) => Object.fromEntries(Object.entries(scenes).map(([name, m]) => [
       name,
-      Object.fromEntries(Object.entries(m).map(([k, v]) => [k, Math.ceil(v * HEADROOM)])),
+      Object.fromEntries(Object.entries(m).map(([k, v]) => [k, round(v * f)])),
     ]));
-    writeFileSync(BUDGET_FILE, JSON.stringify({ seed: SEED, headroom: HEADROOM, budgets }, null, 2) + "\n");
+    const budgets = scale(HEADROOM, Math.ceil);
+    const floors = scale(FLOOR, Math.floor);
+    writeFileSync(BUDGET_FILE, JSON.stringify({ seed: SEED, headroom: HEADROOM, floor: FLOOR, budgets, floors }, null, 2) + "\n");
     return;
   }
 
-  const { budgets } = JSON.parse(readFileSync(BUDGET_FILE, "utf8")) as { budgets: Record<string, Metrics> };
+  const { budgets, floors } = JSON.parse(readFileSync(BUDGET_FILE, "utf8")) as {
+    budgets: Record<string, Metrics>;
+    floors?: Record<string, Metrics>;
+  };
   const over: string[] = [];
+  const under: string[] = [];
   for (const [name, m] of Object.entries(scenes)) {
     for (const [k, v] of Object.entries(m) as Array<[keyof Metrics, number]>) {
       const max = budgets[name]?.[k];
+      const min = floors?.[name]?.[k];
       if (max !== undefined && v > max) over.push(`${name}.${k}: ${v} > ${max}`);
+      if (min !== undefined && v < min) under.push(`${name}.${k}: ${v} < ${min}`);
     }
   }
+  expect(under, "scenes far below their baseline — they didn't render").toEqual([]);
   expect(over, "scenes over their render budgets").toEqual([]);
 });

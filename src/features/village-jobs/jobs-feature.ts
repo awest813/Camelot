@@ -16,9 +16,9 @@ import { VillageJobBoard, type JobContext } from "../../systems/village-jobs";
 import { JobBoardUI } from "../../ui/job-board-ui";
 import type { Quest } from "../../systems/quest-system";
 import {
-  FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, VillageWorldKey,
+  FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, VillagesKey,
   type FeedbackService, type InventoryService, type ModalService, type PlayerService,
-  type QuestLogService, type VillageWorldService,
+  type QuestLogService, type VillagesService,
 } from "../services";
 
 export interface JobBoardRef {
@@ -45,7 +45,7 @@ interface JobDeps {
   readonly inventory: InventoryService;
   readonly questLog: QuestLogService;
   readonly modal: ModalService;
-  readonly world: VillageWorldService;
+  readonly villages: VillagesService;
 }
 
 export class VillageJobsFeature implements Feature {
@@ -70,7 +70,7 @@ export class VillageJobsFeature implements Feature {
       get inventory() { return s.get(InventoryKey); },
       get questLog() { return s.get(QuestLogKey); },
       get modal() { return s.get(ModalKey); },
-      get world() { return s.get(VillageWorldKey); },
+      get villages() { return s.get(VillagesKey); },
     };
     this._deps = deps;
 
@@ -96,7 +96,7 @@ export class VillageJobsFeature implements Feature {
     ctx.scope.add(() => { this.rules.onProgress = null; });
 
     ctx.on("dialogue:action", ({ eventId, npcName }) => {
-      if (eventId === "jobs:ask" && npcName) this._pending = deps.world.innBoardOf(npcName);
+      if (eventId === "jobs:ask" && npcName) this._pending = deps.villages.innBoardOf(npcName);
     });
     ctx.on("dialogue:closed", () => {
       const board = this._pending;

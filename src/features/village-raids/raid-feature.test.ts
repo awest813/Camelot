@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Kernel } from "../../core/kernel";
-import { ClockKey, FeedbackKey, PlayerKey, VillageWorldKey } from "../services";
+import { ActorsKey, ClockKey, FeedbackKey, PlayerKey, VillagesKey } from "../services";
 import { VillageRaidFeature, RaidsKey, RAID_LEAVE_DISTANCE } from "./raid-feature";
 import { IndoorsKey } from "../indoors/indoors-feature";
 import { planVillage, hasVillage } from "../../world/village-settlement";
@@ -41,14 +41,18 @@ function setup(opts: { level?: number } = {}) {
     addFame: vi.fn(),
     markDirty: vi.fn(),
   });
-  k.services.provide(VillageWorldKey, {
+  k.services.provide(VillagesKey, {
     currentVillage: () => ({ chunkKey, plan }),
     loadedVillage: (id) => (id === plan.id ? plan : null),
+    planFor: () => plan, clearingAt: () => null, populate: () => false, loaded: () => new Map([[chunkKey, plan]]),
+    innBoardOf: () => null,
+  });
+  k.services.provide(ActorsKey, {
     residents: () => townsfolk,
+    byName: (n) => townsfolk.find((t) => t.mesh.name === n),
     spawnArchetype: (_c, archetype) => fakeNpc(archetype === "archetype_bandit_chief" ? "Bandit Chief" : "Bandit"),
     despawn: (npc) => { despawned.push(npc); (npc.mesh as any).dispose(); },
     isTalkingTo: (npc) => npc === talkingTo,
-    innBoardOf: () => null,
   });
   const holds = new Map<NPC, Set<string>>();
   k.services.provide(IndoorsKey, {

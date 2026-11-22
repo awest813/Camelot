@@ -22,13 +22,14 @@ import { IndoorsKey, type IndoorsService } from "../indoors/indoors-feature";
 /** Hold name used to keep sheltering townsfolk inside. */
 const SHELTER_HOLD = "raid";
 import {
-  ClockKey, FeedbackKey, PlayerKey, VillageWorldKey,
-  type FeedbackService, type GameClockService, type PlayerService, type VillageWorldService,
+  ActorsKey, ClockKey, FeedbackKey, PlayerKey, VillagesKey,
+  type ActorsService, type FeedbackService, type GameClockService, type PlayerService, type VillagesService,
 } from "../services";
 
 /** Service accessors, resolved at call time (the game provides them). */
 interface RaidDeps {
-  readonly world: VillageWorldService;
+  readonly villages: VillagesService;
+  readonly actors: ActorsService;
   readonly indoors: IndoorsService;
   readonly player: PlayerService;
   readonly clock: GameClockService;
@@ -60,7 +61,8 @@ export class VillageRaidFeature implements Feature {
   public install(ctx: FeatureContext): void {
     const s = ctx.kernel.services;
     const deps: RaidDeps = {
-      get world() { return s.get(VillageWorldKey); },
+      get villages() { return s.get(VillagesKey); },
+      get actors() { return s.get(ActorsKey); },
       get indoors() { return s.get(IndoorsKey); },
       get player() { return s.get(PlayerKey); },
       get clock() { return s.get(ClockKey); },
@@ -77,7 +79,7 @@ export class VillageRaidFeature implements Feature {
 
     // Hourly roll while the player is in a discovered village.
     ctx.on("time:hour", ({ elapsedHours }) => {
-      const here = deps.world.currentVillage();
+      const here = deps.villages.currentVillage();
       if (!here) return;
       const go = this.rules.shouldRaid({
         villageId: here.plan.id,
@@ -122,7 +124,7 @@ export class VillageRaidFeature implements Feature {
         this._checkTimer -= dt;
         if (this._checkTimer > 0) return;
         this._checkTimer = 0.5;
-        const plan = deps.world.loadedVillage(raid.villageId);
+        const plan = deps.villages.loadedVillage(raid.villageId);
         const p = deps.player.position();
         if (plan && Math.hypot(p.x - plan.center.x, p.z - plan.center.z) < RAID_LEAVE_DISTANCE) return;
         this._clearAftermath();
@@ -140,7 +142,7 @@ export class VillageRaidFeature implements Feature {
   private _start(chunkKey: string, plan: VillagePlan): NPC[] {
     const services = this._deps;
     if (!services) return [];
-    const world = services.world;
+    const world = services.actors;
     const c = plan.center;
     const rx = plan.arrival.x - c.x, rz = plan.arrival.z - c.z;
     const len = Math.hypot(rx, rz) || 1;
@@ -195,7 +197,7 @@ export class VillageRaidFeature implements Feature {
 
   /** An unbeaten raid ends: raiders leave, townsfolk come out. */
   private _clearAftermath(): void {
-    const world = this._deps?.world;
+    const world = this._deps?.actors;
     for (const npc of this._raiders) {
       if (npc.isDead || npc.mesh.isDisposed()) continue;
       world?.despawn(npc);

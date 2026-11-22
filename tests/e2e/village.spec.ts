@@ -44,7 +44,7 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     for (let r = 3; r < 40; r++) {
       for (let cx = -r; cx <= r; cx++) {
         for (const cz of [-r, r]) {
-          const p = g._villagePlanFor(cx, cz);
+          const p = g.villages.planFor(cx, cz);
           if (p) return { id: p.id, name: p.name, x: p.center.x, z: p.center.z };
         }
       }
@@ -145,7 +145,7 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   // ── The notice board in the square: press E to open the window, then abandon ──
   await page.evaluate(() => {
     const g = (window as any).__camelotGame;
-    const p = g._villagePlans.get([...g._loadedVillages.keys()][0]);
+    const p = [...g.villages.loaded().values()][0];
     const nb = p.noticeBoard; const c = g.player.camera;
     c.position.set(nb.x + Math.sin(nb.rot) * 1.8, 1.6, nb.z + Math.cos(nb.rot) * 1.8);
     c.setTarget(new c.position.constructor(nb.x, 1.45, nb.z));
@@ -174,7 +174,7 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   // ── Talking: the camera turns to the speaker's face and zooms in, then eases back ──
   const talk = await page.evaluate(async () => {
     const g = (window as any).__camelotGame; const c = g.player.camera;
-    const plan = [...g._loadedVillages.values()][0];
+    const plan = [...g.villages.loaded().values()][0];
     const npc = g.scheduleSystem.npcs.find((n: any) => /^(Innkeeper|Barkeeper|Villager)_/.test(n.mesh.name)
       && n.mesh.isEnabled() && Math.hypot(n.mesh.position.x - plan.center.x, n.mesh.position.z - plan.center.z) < 25);
     const p = npc.mesh.position;
@@ -211,8 +211,8 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   // ── A bandit raid: raiders march in up the road, townsfolk hide; beat them for a reward ──
   const raid = await page.evaluate(() => {
     const g = (window as any).__camelotGame;
-    const key = [...g._loadedVillages.keys()][0];
-    const plan = g._loadedVillages.get(key);
+    const key = [...g.villages.loaded().keys()][0];
+    const plan = g.villages.loaded().get(key);
     g.player.camera.position.set(plan.center.x + 2, 2, plan.center.z + 2);
     const raiders = g.raids.start(key, plan);
     (window as any).__raiders = raiders;
@@ -230,7 +230,7 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   // They come up the road toward the square.
   await expect.poll(() => page.evaluate(() => {
     const g = (window as any).__camelotGame;
-    const plan = [...g._loadedVillages.values()][0];
+    const plan = [...g.villages.loaded().values()][0];
     return Math.min(...(window as any).__raiders.map((n: any) =>
       Math.hypot(n.mesh.position.x - plan.center.x, n.mesh.position.z - plan.center.z)));
   }), { timeout: 30_000, message: "raiders advance on the square" }).toBeLessThan(raid.startDist - 5);
@@ -253,8 +253,8 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   // ── An abandoned raid: the raiders leave and the townsfolk come back out ──
   const abandoned = await page.evaluate(async () => {
     const g = (window as any).__camelotGame;
-    const key = [...g._loadedVillages.keys()][0];
-    const plan = g._loadedVillages.get(key);
+    const key = [...g.villages.loaded().keys()][0];
+    const plan = g.villages.loaded().get(key);
     const raiders = g.raids.start(key, plan);
     const c = g.player.camera.position;
     c.set(plan.center.x + 90, 3, plan.center.z);
@@ -278,7 +278,7 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   // ── Buildings are walled, not solid: the doorway leads into an open interior ──
   const interior = await page.evaluate(() => {
     const g = (window as any).__camelotGame;
-    const plan = [...g._loadedVillages.values()][0];
+    const plan = [...g.villages.loaded().values()][0];
     const b = plan.buildings.find((x: any) => x.role === "inn");
     const s = Math.sin(b.rot), co = Math.cos(b.rot);
     const at = (x: number, z: number) => ({ x: b.x + x * co + z * s, z: b.z - x * s + z * co });

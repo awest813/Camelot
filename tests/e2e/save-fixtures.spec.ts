@@ -117,15 +117,15 @@ test("capture a fixture from this build", async ({ page }) => {
     g.inventorySystem.addItem({ id: "iron_ingot", name: "Iron Ingot", description: "", stackable: true, quantity: 3, weight: 1 });
     g.inventorySystem.addItem({ id: "potion_hp_01", name: "Health Potion", description: "", stackable: true, quantity: 2, weight: 0.5 });
     for (let r = 3; r < 40; r++) for (let cx = -r; cx <= r; cx++) for (const cz of [-r, r]) {
-      const p = g._villagePlanFor(cx, cz);
+      const p = g.villages.planFor(cx, cz);
       if (p) { g.player.camera.position.set(p.center.x, 3, p.center.z); r = 99; cx = 99; break; }
     }
   });
-  await expect.poll(() => page.evaluate(() => (window as any).__camelotGame._loadedVillages.size), { timeout: 60_000 }).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(() => (window as any).__camelotGame.villages.loaded().size), { timeout: 60_000 }).toBeGreaterThan(0);
   await page.waitForTimeout(3000);
   await page.evaluate(() => {
     const g = (window as any).__camelotGame;
-    const [key, plan] = [...g._loadedVillages.entries()][0];
+    const [key, plan] = [...g.villages.loaded().entries()][0];
     const [cx, cz] = key.split(",").map(Number);
     g.jobs.open({ boardId: `inn_${cx}_${cz}`, placeName: plan.name });
     (document.querySelector(".job-board__btn--primary") as HTMLButtonElement)?.click();

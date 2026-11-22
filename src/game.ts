@@ -85,14 +85,15 @@ import { CraftingSystem, type CraftingStationId } from "./systems/crafting-syste
 import { CraftingUI } from "./ui/crafting-ui";
 import { ItemConditionSystem } from "./systems/item-condition-system";
 import { buildingFootprint, buildingWallColliders, buildingLayout, toWorld, WALL_HEIGHT, type BuildingKind } from "./world/village-buildings";
-import { hasVillage, planVillage, VILLAGE_DISCOVER_RADIUS, VILLAGE_CLEAR_RADIUS, type VillagePlan } from "./world/village-settlement";
 import { Kernel } from "./core/kernel";
 import { VillageRaidFeature, RaidsKey, type RaidsService } from "./features/village-raids/raid-feature";
-import { BuildingsKey, ClockKey, FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, ScheduleKey, VillageWorldKey } from "./features/services";
+import {
+  ActorsKey, BuildingsKey, ClockKey, FastTravelKey, FeedbackKey, InventoryKey, ModalKey, PlayerKey,
+  QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey,
+} from "./features/services";
+import { VillagesFeature, VillagesKey, type VillagesService } from "./features/villages/villages-feature";
 import { IndoorsFeature } from "./features/indoors/indoors-feature";
 import { VillageJobsFeature, JobsKey, type JobsService } from "./features/village-jobs/jobs-feature";
-import { createNoticeMaterials } from "./rendering/notice-texture";
-import { buildVillageWell, WELL_RADIUS } from "./world/village-well";
 import { ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
 import { EnchantingSystem } from "./systems/enchanting-system";
 import { EnchantingUI } from "./ui/enchanting-ui";
@@ -162,7 +163,7 @@ import { AmbientEventSystem } from "./systems/ambient-event-system";
 import { LeveledListSystem, ALL_BUILT_IN_LEVELED_LISTS } from "./systems/leveled-list-system";
 import { EventManagerSystem } from "./systems/event-manager-system";
 import { AnimationSystem } from "./systems/animation-system";
-import { FantasyAssetLoader, setInstanceScale, setInstanceYaw, getQuaterniusBasePath, type FantasyAssetKey } from "./systems/fantasy-asset-loader";
+import { FantasyAssetLoader, setInstanceScale, setInstanceYaw, type FantasyAssetKey } from "./systems/fantasy-asset-loader";
 import { PetSystem } from "./systems/pet-system";
 import type { Pet } from "./systems/pet-system";
 import { PetUI } from "./ui/pet-ui";
@@ -286,10 +287,6 @@ export class Game {
   private _characterModels: CharacterModelLibrary | null = null;
   private readonly _npcRigs: Map<NPC, CharacterRig> = new Map();
   /** Village plans by chunk key (null = no village there); deterministic, cached. */
-  private readonly _villagePlans = new Map<string, VillagePlan | null>();
-  /** Villages whose chunk is currently loaded (for discovery checks). */
-  private readonly _loadedVillages = new Map<string, VillagePlan>();
-  private _villageCheckTimer = 0;
   /** Dragon bosses' bodies (generated dark-fantasy dragon parented to the capsule). */
   private readonly _dragonVisuals = new Map<NPC, { root: AbstractMesh; yaw: number; last: Vector3; t: number }>();
   /** SSAO / god rays / lens flare / HDR pipeline handle. */
@@ -397,6 +394,11 @@ export class Game {
     return this.kernel.services.get(RaidsKey);
   }
 
+  /** The villages feature's service (plans, loaded villages, where the player is). */
+  public get villages(): VillagesService {
+    return this.kernel.services.get(VillagesKey);
+  }
+
   /** The village jobs feature's service (job window, rules). */
   public get jobs(): JobsService {
     return this.kernel.services.get(JobsKey);
@@ -502,7 +504,6 @@ export class Game {
   /** Set by the smith's "use your forge" dialogue choice; opened once dialogue closes. */
   private _pendingSmithingOpen = false;
   /** Shared parchment material for village notice boards. */
-  private _noticeMats: StandardMaterial[] | null = null;
   private _candleMat: StandardMaterial | null = null;
   private _hudInDialogue = false;
   private _windowGlass: Array<{ emissiveColor?: Color3 }> = [];
@@ -766,10 +767,8 @@ export class Game {
     this.world = new WorldManager(this.scene, this.shadowGenerator, null, this.graphics.texture);
     this.world.terrainMaterial = createTerrainMaterial(this.scene, this.world.textureManager);
     // Village settlements keep their footprint clear of trees, rocks and ruins.
-    this.world.clearingAt = (cx, cz) => {
-      const v = this._villagePlanFor(cx, cz);
-      return v ? { x: v.center.x, z: v.center.z, radius: v.clearRadius } : null;
-    };
+    // (Called once chunks stream in, after the villages feature is installed.)
+    this.world.clearingAt = (cx, cz) => this.villages.clearingAt(cx, cz);
     this._initFoliage();
     this.navigationSystem = new NavigationSystem(this.scene);
     this.scheduleSystem = new ScheduleSystem();
@@ -2180,11 +2179,7 @@ export class Game {
         // Pond chunks are quiet clearings — no props dropped into the water.
         if (this.world.pondAt(cx, cz)) return;
         // A village takes the whole chunk: no other sites or wild scatter.
-        const village = this._villagePlanFor(cx, cz);
-        if (village) {
-          this._buildVillage(chunkKey, chunkRecord, village);
-          return;
-        }
+        if (this.villages.populate(chunkKey, cx, cz)) return;
         this._scatterGrimNature(chunkKey, chunkRecord, biome, worldX, worldZ, (slot) => _chunkRand(cx, cz, slot));
 
       // ── Obelisks in desert / plains (1-in-8 chance per chunk) ────────────
@@ -2475,7 +2470,7 @@ export class Game {
         const key = `${cx},${cz}`;
         const record = this._chunkFantasyContent.get(key);
         this.forges.removeGroup(key);
-        this._loadedVillages.delete(key);
+        this.eventBus.emit("chunk:unloaded", { chunkKey: key });
         if (!record) return;
         this._chunkFantasyContent.delete(key);
 
@@ -6218,7 +6213,6 @@ export class Game {
       }
 
       this._updateNpcRigs(deltaTime);
-      this._checkVillageDiscovery(deltaTime);
       this._updatePetAI(deltaTime);
       this.interactionSystem.update();
 
@@ -7552,69 +7546,13 @@ export class Game {
       }
   }
 
-  /** The village plan for chunk (cx, cz), or null (cached; never on ponds). */
-  private _villagePlanFor(cx: number, cz: number): VillagePlan | null {
-      const key = `${cx},${cz}`;
-      let plan = this._villagePlans.get(key);
-      if (plan === undefined) {
-        plan = hasVillage(cx, cz, this.world.getBiome(cx, cz)) && !this.world.pondAt(cx, cz)
-          ? planVillage(cx, cz, this.world.chunkSize)
-          : null;
-        this._villagePlans.set(key, plan);
-      }
-      return plan;
-  }
-
-  /** Build a planned village: buildings, square, smithy forge and residents. */
-  private _buildVillage(
-      chunkKey: string,
-      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
-      plan: VillagePlan,
-  ): void {
-      for (const b of plan.buildings) {
-        this._placeBuilding(chunkKey, chunkRecord, b.kind, { x: b.x, z: b.z, rot: b.rot });
-      }
-      const here = { x: 0, z: 0, rot: 0 };
-      for (const p of plan.props) {
-        if (p.key === "qWell") this._placeVillageWell(chunkKey, chunkRecord, p.x, p.z, p.rot);
-        else this._placeSiteProp(chunkKey, chunkRecord, p.key, here, p.x, p.z, p.rot);
-        if (p.key === "qLantern") this._addCandleFlame(chunkKey, chunkRecord, p.x, 1.33, p.z);
-      }
-      this._placeSmithy(chunkKey, chunkRecord, plan.forge.x, plan.forge.z, plan.forge.rot);
-      this._placeNoticeBoard(chunkKey, chunkRecord, plan);
-      const at = (p: { x: number; z: number }) => new Vector3(p.x, 2, p.z);
-      for (const r of plan.residents) {
-        const npc = this._spawnArchetypeNpc(r.archetype, chunkRecord, r.x, r.z);
-        if (!npc) continue;
-        // Daily routine anchors (ScheduleSystem: work / wander / sleep / patrol).
-        if (r.work) npc.workPosition = at(r.work);
-        if (r.home) npc.homePosition = at(r.home);
-        if (r.patrol) npc.patrolPoints = r.patrol.map(at);
-        // Night watch: patrols 18:00–08:00 (overlapping the day guard's
-        // 06:00–22:00), sleeps by day.
-        if (r.nightWatch) {
-          npc.scheduleBlocks = [
-            { startHour: 18, endHour: 8, behavior: "patrol" },
-            { startHour: 8, endHour: 18, behavior: "sleep" },
-          ];
-        }
-      }
-      this._loadedVillages.set(chunkKey, plan);
-  }
-
   /**
-   * A candle-stand flame: a small glowing core plus a warm point light,
-   * lit only at night (FireFx manages flicker, particles and which few
-   * lights are on).
+   * A night-only flame: a small glowing core plus a warm point light
+   * (FireFx manages flicker, particles and which few lights are on).
+   * The caller owns the returned mesh; disposing it removes the light.
    */
-  private _addCandleFlame(
-      chunkKey: string,
-      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
-      x: number,
-      y: number,
-      z: number,
-  ): void {
-      if (this._chunkFantasyContent.get(chunkKey) !== chunkRecord || !this._fireFx) return;
+  private _nightFlame(name: string, x: number, y: number, z: number): Mesh | null {
+      if (!this._fireFx) return null;
       this._candleMat ??= (() => {
         const m = new StandardMaterial("candle_flame", this.scene);
         m.emissiveColor = new Color3(1.0, 0.62, 0.22);
@@ -7623,19 +7561,19 @@ export class Game {
         m.freeze();
         return m;
       })();
-      const flame = MeshBuilder.CreateSphere(`candle_${chunkKey}_${chunkRecord.roots.length}`, { diameter: 0.14, segments: 6 }, this.scene);
+      const flame = MeshBuilder.CreateSphere(name, { diameter: 0.14, segments: 6 }, this.scene);
       flame.position.set(x, y, z);
       flame.material = this._candleMat;
       flame.isPickable = false;
       flame.freezeWorldMatrix();
-      const light = new PointLight(`${flame.name}_light`, new Vector3(x, y + 0.1, z), this.scene);
+      const light = new PointLight(`${name}_light`, new Vector3(x, y + 0.1, z), this.scene);
       light.diffuse = new Color3(1.0, 0.6, 0.22);
       light.specular = new Color3(0.4, 0.25, 0.08);
       light.intensity = 1.1;
       light.range = 9;
       flame.onDisposeObservable.addOnce(() => light.dispose());
       this._fireFx.attach({ flame, light, kind: "torch", nightOnly: true });
-      chunkRecord.roots.push(flame);
+      return flame;
   }
 
   /**
@@ -7654,101 +7592,6 @@ export class Game {
         if (!m.emissiveColor) continue;
         // A uniform, so no markDirty() / shader rebuild is needed.
         m.emissiveColor.set(1.0 * glow, 0.58 * glow, 0.22 * glow);
-      }
-  }
-
-  /** The well on a village square: stone curb, winch and roof, with a collider. */
-  private _placeVillageWell(
-      chunkKey: string,
-      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
-      x: number,
-      z: number,
-      rot: number,
-  ): void {
-      if (this._chunkFantasyContent.get(chunkKey) !== chunkRecord) return;
-      const well = buildVillageWell(this.scene, `village_well_${chunkKey}`,
-        `${getQuaterniusBasePath()}village/textures/medieval-village-megakit/`);
-      well.position.set(x, 0, z);
-      well.rotation.y = rot;
-      well.freezeWorldMatrix();
-      for (const part of well.getChildMeshes(false)) part.freezeWorldMatrix();
-      this._trackChunkProp(chunkKey, chunkRecord, well, "structure");
-
-      const fp = { x, z, cos: 1, sin: 0, hw: WELL_RADIUS + 0.5, hd: WELL_RADIUS + 0.5 };
-      this._buildingFootprints.add(fp);
-      const col = MeshBuilder.CreateCylinder(`village_well_collider_${chunkKey}`, { diameter: WELL_RADIUS * 2, height: 1, tessellation: 12 }, this.scene);
-      col.position.set(x, 0.5, z);
-      col.isVisible = false;
-      col.isPickable = false;
-      col.freezeWorldMatrix();
-      col.onDisposeObservable.addOnce(() => this._buildingFootprints.delete(fp));
-      try {
-        const agg = new PhysicsAggregate(col, PhysicsShapeType.CYLINDER, { mass: 0 }, this.scene);
-        col.onDisposeObservable.addOnce(() => agg.dispose());
-      } catch (err) {
-        console.warn("[village] well collider unavailable", err);
-      }
-      chunkRecord.roots.push(col);
-  }
-
-  /**
-   * The village notice board: the same job board as the village inn (one
-   * job per village), read with E.
-   */
-  private _placeNoticeBoard(
-      chunkKey: string,
-      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
-      plan: VillagePlan,
-  ): void {
-      const nb = plan.noticeBoard;
-      this._placeSiteProp(chunkKey, chunkRecord, "qNoticeBoard", { x: 0, z: 0, rot: 0 }, nb.x, nb.z, nb.rot);
-      if (this._chunkFantasyContent.get(chunkKey) !== chunkRecord) return;
-      const [cx, cz] = chunkKey.split(",").map(Number);
-      const board = { boardId: `inn_${cx}_${cz}`, placeName: plan.name };
-      // Invisible (visibility 0, still pickable) hit box over the board face.
-      const hit = MeshBuilder.CreateBox(`notice_board_${chunkKey}`, { width: 1.6, height: 1.2, depth: 0.4 }, this.scene);
-      hit.position.set(nb.x, 1.45, nb.z);
-      hit.rotation.y = nb.rot;
-      hit.visibility = 0;
-      hit.isPickable = true;
-      // Pinned notices: parchment quads (one shared material) on the board face.
-      this._noticeMats ??= createNoticeMaterials(this.scene);
-      const notices: Array<[number, number, number]> = [[-0.42, 1.55, 0.08], [0.05, 1.62, -0.05], [0.45, 1.5, 0.12], [-0.15, 1.24, -0.1], [0.36, 1.2, 0.04]];
-      notices.forEach(([lx, ly, tilt], i) => {
-        const q = MeshBuilder.CreatePlane(`notice_${chunkKey}_${i}`, { width: 0.3, height: 0.36, sideOrientation: Mesh.DOUBLESIDE }, this.scene);
-        // The board model is mirrored in X by the glTF handedness conversion.
-        const w = toWorld({ x: -lx, z: 0.07 }, { x: nb.x, z: nb.z, rot: nb.rot });
-        q.position.set(w.x, ly, w.z);
-        q.rotation.set(0, nb.rot, tilt);
-        const mats = this._noticeMats!;
-        q.material = mats[(((i + cx * 7 + cz * 3) % mats.length) + mats.length) % mats.length];
-        q.isPickable = false;
-        q.freezeWorldMatrix();
-        chunkRecord.roots.push(q);
-      });
-      hit.metadata = {
-        type: "activator",
-        label: `Read the ${plan.name} notice board`,
-        onActivate: () => this.jobs.open(board),
-      };
-      chunkRecord.roots.push(hit);
-  }
-
-  /** Walking into a village's square discovers it as a fast-travel destination. */
-  private _checkVillageDiscovery(dt: number): void {
-      this._villageCheckTimer -= dt;
-      if (this._villageCheckTimer > 0 || this._loadedVillages.size === 0) return;
-      this._villageCheckTimer = 0.5;
-      const p = this.player.camera.position;
-      for (const v of this._loadedVillages.values()) {
-        const dx = p.x - v.center.x, dz = p.z - v.center.z;
-        if (dx * dx + dz * dz > VILLAGE_DISCOVER_RADIUS * VILLAGE_DISCOVER_RADIUS) continue;
-        if (this.fastTravelSystem.isDiscovered(v.id)) continue;
-        // Arrive on the entrance road, not inside the well at the centre.
-        this.fastTravelSystem.discoverLocation(v.id, v.name, { x: v.arrival.x, y: 2, z: v.arrival.z });
-        this.ui.showNotification(`Discovered: ${v.name}`, 3200);
-        this.eventBus.emit("location:discovered" as any, { id: v.id, name: v.name });
-        this.saveSystem.markDirty();
       }
   }
 
@@ -7772,6 +7615,8 @@ export class Game {
    */
   private _installFeatures(): void {
       const k = this.kernel;
+      // eslint-disable-next-line @typescript-eslint/no-this-alias -- getters below
+      const game = this;
       k.services.provide(ClockKey, {
         hour: () => this.timeSystem.hour,
         elapsedHours: () => this.timeSystem.elapsedGameHours,
@@ -7786,9 +7631,7 @@ export class Game {
         addFame: (n) => this.fameSystem.addFame(n),
         markDirty: () => this.saveSystem.markDirty(),
       });
-      k.services.provide(VillageWorldKey, {
-        currentVillage: () => this._currentVillage(),
-        loadedVillage: (id) => [...this._loadedVillages.values()].find((v) => v.id === id) ?? null,
+      k.services.provide(ActorsKey, {
         residents: (chunkKey) => this._chunkFantasyContent.get(chunkKey)?.npcs ?? [],
         spawnArchetype: (chunkKey, archetype, x, z) => {
           const record = this._chunkFantasyContent.get(chunkKey);
@@ -7796,14 +7639,48 @@ export class Game {
         },
         despawn: (npc) => this._despawnNpc(npc),
         isTalkingTo: (npc) => npc.isInDialogue || npc.mesh.name === this._currentDialogueNpcName,
-        innBoardOf: (npcName) => {
-          const npc = this.scheduleSystem.npcs.find((n) => n.mesh.name === npcName);
-          if (!npc) return null;
-          const cx = Math.round(npc.spawnPosition.x / this.world.chunkSize);
-          const cz = Math.round(npc.spawnPosition.z / this.world.chunkSize);
-          const village = this._villagePlans.get(`${cx},${cz}`) ?? null;
-          return { boardId: `inn_${cx}_${cz}`, placeName: village?.name ?? "the inn" };
+        byName: (name) => this.scheduleSystem.npcs.find((n) => n.mesh.name === name),
+      });
+      k.services.provide(WorldInfoKey, {
+        get chunkSize() { return game.world.chunkSize; },
+        biome: (cx, cz) => this.world.getBiome(cx, cz),
+        pondAt: (cx, cz) => !!this.world.pondAt(cx, cz),
+      });
+      k.services.provide(FastTravelKey, {
+        isDiscovered: (id) => this.fastTravelSystem.isDiscovered(id),
+        discover: (id, name, at) => this.fastTravelSystem.discoverLocation(id, name, at),
+      });
+      const record = (chunkKey: string) => this._chunkFantasyContent.get(chunkKey);
+      k.services.provide(SiteBuilderKey, {
+        get scene() { return game.scene; },
+        isLive: (chunkKey) => !!record(chunkKey),
+        placeBuilding: (chunkKey, kind, origin) => {
+          const r = record(chunkKey);
+          if (r) this._placeBuilding(chunkKey, r, kind, origin);
         },
+        placeProp: (chunkKey, key, x, z, rot) => {
+          const r = record(chunkKey);
+          if (r) this._placeSiteProp(chunkKey, r, key, { x: 0, z: 0, rot: 0 }, x, z, rot);
+        },
+        placeSmithy: (chunkKey, x, z, rot) => {
+          const r = record(chunkKey);
+          if (r) this._placeSmithy(chunkKey, r, x, z, rot);
+        },
+        ownStructure: (chunkKey, mesh) => {
+          const r = record(chunkKey);
+          if (r) this._trackChunkProp(chunkKey, r, mesh, "structure");
+          else mesh.dispose();
+        },
+        own: (chunkKey, mesh) => {
+          const r = record(chunkKey);
+          if (r) r.roots.push(mesh);
+          else mesh.dispose();
+        },
+        addKeepOut: (fp) => {
+          this._buildingFootprints.add(fp);
+          return () => { this._buildingFootprints.delete(fp); };
+        },
+        nightFlame: (name, x, y, z) => this._nightFlame(name, x, y, z),
       });
       k.services.provide(InventoryKey, {
         count: (id) => this.inventorySystem.items.reduce((n, i) => (i.id === id ? n + i.quantity : n), 0),
@@ -7825,6 +7702,7 @@ export class Game {
       });
 
       k.install(new IndoorsFeature());
+      k.install(new VillagesFeature());
 
       const raids = new VillageRaidFeature();
       k.install(raids);
@@ -7833,17 +7711,6 @@ export class Game {
       const jobs = new VillageJobsFeature();
       k.install(jobs);
       this.saveSystem.setVillageJobs(jobs.rules);
-  }
-
-  /** The loaded, discovered village the player is standing in, if any. */
-  private _currentVillage(): { chunkKey: string; plan: VillagePlan } | null {
-      const p = this.player.camera.position;
-      for (const [chunkKey, plan] of this._loadedVillages) {
-        if (Math.hypot(p.x - plan.center.x, p.z - plan.center.z) > VILLAGE_CLEAR_RADIUS + 4) continue;
-        if (!this.fastTravelSystem.isDiscovered(plan.id)) continue;
-        return { chunkKey, plan };
-      }
-      return null;
   }
 
   /** Remove one NPC from the world and every system (and its chunk's list). */

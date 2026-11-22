@@ -7,8 +7,13 @@
  * move out of game.ts too; the interfaces are the contract.
  */
 import type { NPC } from "../entities/npc";
-import type { VillagePlan } from "../world/village-settlement";
 import type { Quest } from "../systems/quest-system";
+import type { Scene } from "@babylonjs/core/scene";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import type { BiomeType } from "../world/world-manager";
+import type { BuildingKind } from "../world/village-buildings";
+import type { VillagePlan } from "../world/village-settlement";
+import type { FantasyAssetKey } from "../systems/fantasy-asset-loader";
 import { createServiceKey } from "../core/kernel";
 
 export interface GameClockService {
@@ -31,11 +36,26 @@ export interface FeedbackService {
   markDirty(): void;
 }
 
-/** Villages and the people in them (streamed chunks). */
-export interface VillageWorldService {
+/** Villages: plans, loaded ones, and where the player is (villages feature). */
+export interface VillagesService {
+  /** The village plan for chunk (cx, cz), or null (deterministic, cached). */
+  planFor(cx: number, cz: number): VillagePlan | null;
+  /** Clearing the world keeps free of trees and ruins for chunk (cx, cz). */
+  clearingAt(cx: number, cz: number): { x: number; z: number; radius: number } | null;
+  /** Build the chunk's village if it has one; true when a village took the chunk. */
+  populate(chunkKey: string, cx: number, cz: number): boolean;
+  /** Loaded villages by chunk key. */
+  loaded(): ReadonlyMap<string, VillagePlan>;
+  loadedVillage(villageId: string): VillagePlan | null;
   /** The loaded, discovered village the player is standing in, if any. */
   currentVillage(): { chunkKey: string; plan: VillagePlan } | null;
-  loadedVillage(villageId: string): VillagePlan | null;
+  /** The inn job board an NPC (by mesh name) belongs to. */
+  innBoardOf(npcName: string): { boardId: string; placeName: string } | null;
+}
+
+
+/** NPCs in the streamed world (chunk-owned). */
+export interface ActorsService {
   /** NPCs living in a loaded chunk. */
   residents(chunkKey: string): readonly NPC[];
   /** Spawn an archetype NPC into a loaded chunk (owned by that chunk). */
@@ -44,8 +64,47 @@ export interface VillageWorldService {
   despawn(npc: NPC): void;
   /** Whether the player is talking or trading with this NPC. */
   isTalkingTo(npc: NPC): boolean;
-  /** The inn job board an NPC (by mesh name) belongs to: inn chunk + place name. */
-  innBoardOf(npcName: string): { boardId: string; placeName: string } | null;
+  /** Look an NPC up by mesh name (until entity ids, Phase 3). */
+  byName(name: string): NPC | undefined;
+}
+
+/** Static facts about the streamed world. */
+export interface WorldInfoService {
+  readonly chunkSize: number;
+  biome(cx: number, cz: number): BiomeType;
+  pondAt(cx: number, cz: number): boolean;
+}
+
+/** Fast-travel destinations. */
+export interface FastTravelService {
+  isDiscovered(id: string): boolean;
+  /** Returns true when newly discovered. */
+  discover(id: string, name: string, at: { x: number; y: number; z: number }): boolean;
+}
+
+/** A keep-out footprint (oriented box, half sizes incl. margin) NPCs path around. */
+export interface KeepOut { x: number; z: number; cos: number; sin: number; hw: number; hd: number }
+
+/**
+ * Places content into a loaded chunk; everything placed is owned by (and
+ * disposed with) that chunk.  Calls for a chunk that has since unloaded are
+ * ignored.  Becomes the data-driven site builder in Phase 6.
+ */
+export interface SiteBuilderService {
+  readonly scene: Scene;
+  /** Whether the chunk is still loaded (async callbacks check before placing). */
+  isLive(chunkKey: string): boolean;
+  placeBuilding(chunkKey: string, kind: BuildingKind, origin: { x: number; z: number; rot: number }): void;
+  placeProp(chunkKey: string, key: FantasyAssetKey, x: number, z: number, rot: number): void;
+  placeSmithy(chunkKey: string, x: number, z: number, rot: number): void;
+  /** Own a mesh in the chunk: shadows and distance culling ("structure" tier). */
+  ownStructure(chunkKey: string, mesh: AbstractMesh): void;
+  /** Own a mesh in the chunk with no extras (colliders, hit boxes, decals). */
+  own(chunkKey: string, mesh: AbstractMesh): void;
+  /** Register a keep-out footprint; returns a function that removes it. */
+  addKeepOut(fp: KeepOut): () => void;
+  /** A night-only flame + light (FireFx-managed); null when fire FX are off. */
+  nightFlame(name: string, x: number, y: number, z: number): AbstractMesh | null;
 }
 
 /** NPC schedules (read-only queries). */
@@ -82,7 +141,11 @@ export interface ModalService {
 export const ClockKey = createServiceKey<GameClockService>("clock");
 export const PlayerKey = createServiceKey<PlayerService>("player");
 export const FeedbackKey = createServiceKey<FeedbackService>("feedback");
-export const VillageWorldKey = createServiceKey<VillageWorldService>("village-world");
+export const VillagesKey = createServiceKey<VillagesService>("villages");
+export const ActorsKey = createServiceKey<ActorsService>("actors");
+export const WorldInfoKey = createServiceKey<WorldInfoService>("world-info");
+export const FastTravelKey = createServiceKey<FastTravelService>("fast-travel");
+export const SiteBuilderKey = createServiceKey<SiteBuilderService>("site-builder");
 export const InventoryKey = createServiceKey<InventoryService>("inventory");
 export const QuestLogKey = createServiceKey<QuestLogService>("quest-log");
 export const ModalKey = createServiceKey<ModalService>("modal");
