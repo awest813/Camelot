@@ -334,6 +334,14 @@ state, scope and save codec.
      novelty pumpkin, rabbit) were dropped, along with 18 never-used remote
      asset keys.
 
+  6. **Editor tools** (`src/features/editor/editor-suite.ts`): the map
+     editor and its panels, the seven content creators, the world builder,
+     content bundles, asset browser, bundle merge, mod manifest, workspace
+     drafts and the editor hub (35 fields, ~470 wiring lines, 6 helpers).
+     They moved as one unit behind an `EditorHost`; `game.ts` forwards the
+     old fields through getters until Phase 9 makes this the editor app.
+     A new `editor-smoke.spec.ts` opens every tool in the running game.
+
   Render counts after the extraction match the pre-extraction baseline
   (2,066 village meshes), so villages are built identically. The render
   budget check now also has floors, so a scene that failed to render can't

@@ -9,7 +9,7 @@ import type { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
-import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration";
+
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
@@ -86,11 +86,9 @@ import { CraftingUI } from "./ui/crafting-ui";
 import { ItemConditionSystem } from "./systems/item-condition-system";
 import { buildingFootprint, buildingWallColliders, buildingLayout, toWorld, WALL_HEIGHT, type BuildingKind } from "./world/village-buildings";
 import { Kernel } from "./core/kernel";
+import { EditorSuite } from "./features/editor/editor-suite";
 import { VillageRaidFeature, RaidsKey, type RaidsService } from "./features/village-raids/raid-feature";
-import {
-  ActorsKey, BuildingsKey, ClockKey, FastTravelKey, FeedbackKey, InventoryKey, ModalKey, PlayerKey,
-  QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey,
-} from "./features/services";
+import { ActorsKey, BuildingsKey, ClockKey, FastTravelKey, FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey } from "./features/services";
 import { VillagesFeature, VillagesKey, type VillagesService } from "./features/villages/villages-feature";
 import { WorldSitesFeature, WorldSitesKey, type WorldSitesService } from "./features/world-sites/world-sites-feature";
 import { IndoorsFeature } from "./features/indoors/indoors-feature";
@@ -119,12 +117,7 @@ import { PlayerLevelSystem } from "./systems/player-level-system";
 import { CharacterCreationUI } from "./ui/character-creation-ui";
 import { CharacterSheetUI } from "./ui/character-sheet-ui";
 import { TutorialSystem } from "./systems/tutorial-system";
-import {
-  hasCompletedOnboardingTips,
-  persistOnboardingTipsCompleted,
-  persistSkipOnboardingTips,
-  shouldSkipOnboardingTips,
-} from "./onboarding-preferences";
+import { hasCompletedOnboardingTips, persistOnboardingTipsCompleted, persistSkipOnboardingTips, shouldSkipOnboardingTips } from "./onboarding-preferences";
 import { QuestCreatorSystem } from "./systems/quest-creator-system";
 import { QuestCreatorUI } from "./ui/quest-creator-ui";
 import { DialogueCreatorSystem } from "./systems/dialogue-creator-system";
@@ -142,12 +135,12 @@ import { SpawnCreatorSystem } from "./systems/spawn-creator-system";
 import { SpawnCreatorUI } from "./ui/spawn-creator-ui";
 import { WorldBuilderSystem } from "./systems/world-builder-system";
 import { WorldBuilderUI } from "./ui/world-builder-ui";
-import { DungeonGenerator } from "./world/dungeon-generator";
+
 import { ContentBundleSystem } from "./systems/content-bundle-system";
 import { ContentBundleUI } from "./ui/content-bundle-ui";
-import { EditorHubUI, type EditorToolId } from "./ui/editor-hub-ui";
+import { EditorHubUI } from "./ui/editor-hub-ui";
 import { EditorLayout } from "./ui/editor-layout";
-import { buildHelpOverlayLines, summarizeValidationReport } from "./ui/editor-help-overlay";
+import { buildHelpOverlayLines } from "./ui/editor-help-overlay";
 import { FastTravelUI, type FastTravelOptionView } from "./ui/fast-travel-ui";
 import { SpellMakingUI } from "./ui/spell-making-ui";
 import { GuardEncounterUI, type GuardEncounterAction } from "./ui/guard-encounter-ui";
@@ -186,7 +179,7 @@ import { UIAnimator } from "./ui/ui-animator";
 import { MarkRecallSystem } from "./systems/mark-recall-system";
 import { TrainerSystem } from "./systems/trainer-system";
 import { FollowerSystem } from "./systems/follower-system";
-import type { ActiveFollowerState } from "./systems/follower-system";
+
 import { FollowerUI } from "./ui/follower-ui";
 import { ActiveEffectHUD } from "./ui/active-effect-hud";
 import { QuickSlotHUD } from "./ui/quickslot-hud";
@@ -213,21 +206,6 @@ const FRAMEWORK_ITEM_TO_GAME: Readonly<Record<string, string>> = {
   iron_sword: "sword_01",
 };
 /**
- * Asset Browser type → hub tool for the "Insert" action (opens the asset's
- * authoring tool through the same dispatch as the Editor Hub).
- */
-const ASSET_TYPE_TO_EDITOR_TOOL: Readonly<Record<string, EditorToolId>> = {
-  item: "item",
-  npc: "npc",
-  quest: "quest",
-  dialogue: "dialogue",
-  faction: "faction",
-  lootTable: "lootTable",
-  spawn: "spawn",
-  map: "map",
-};
-
-/**
  * Item templates for leveled-list drops (LeveledListSystem values).
  * Stats scale with tier so boss loot stays relevant to the player's level.
  */
@@ -249,7 +227,6 @@ const LEVEL_ITEM_TEMPLATES: Readonly<Record<string, {
 /** Merchant / restock health potions: `value` for barter pricing, `heal` for consumable use. */
 const HEALTH_POTION_STATS = { value: 25, heal: 50 } as const;
 /** Persisted local author identity for layer ownership workflows. */
-const MAP_EDITOR_AUTHOR_STORAGE_KEY = "camelot_map_editor_author";
 
 export class Game {
   public scene: Scene;
@@ -306,41 +283,6 @@ export class Game {
   public audioSystem: AudioSystem;
   public navigationSystem: NavigationSystem;
   public frameworkRuntime: FrameworkRuntime;
-  public mapEditorSystem: MapEditorSystem;
-  public mapEditorPropertyPanel: MapEditorPropertyPanel;
-  public mapEditorToolbar: MapEditorToolbar;
-  public mapEditorHierarchyPanel: MapEditorHierarchyPanel;
-  public mapEditorValidationPanel: MapEditorValidationPanel;
-  public mapEditorPalettePanel: MapEditorPalettePanel;
-  public mapEditorLayerPanel: MapEditorLayerPanel;
-  public mapEditorNotesPanel: MapEditorNotesPanel;
-  public questCreatorSystem: QuestCreatorSystem;
-  public questCreatorUI: QuestCreatorUI;
-  public dialogueCreatorSystem: DialogueCreatorSystem;
-  public dialogueCreatorUI: DialogueCreatorUI;
-  public npcCreatorSystem: NpcCreatorSystem;
-  public npcCreatorUI: NpcCreatorUI;
-  public itemCreatorSystem: ItemCreatorSystem;
-  public itemCreatorUI: ItemCreatorUI;
-  public factionCreatorSystem: FactionCreatorSystem;
-  public factionCreatorUI: FactionCreatorUI;
-  public lootTableCreatorSystem: LootTableCreatorSystem;
-  public lootTableCreatorUI: LootTableCreatorUI;
-  public spawnCreatorSystem: SpawnCreatorSystem;
-  public spawnCreatorUI: SpawnCreatorUI;
-  public worldBuilderSystem: WorldBuilderSystem;
-  public worldBuilderUI: WorldBuilderUI;
-  public contentBundleSystem: ContentBundleSystem;
-  public contentBundleUI: ContentBundleUI;
-  public assetBrowserSystem: AssetBrowserSystem;
-  public assetBrowserUI: AssetBrowserUI;
-  public bundleMergeSystem: BundleMergeSystem;
-  public bundleMergeUI: BundleMergeUI;
-  public modManifestSystem: ModManifestSystem;
-  public modManifestUI: ModManifestUI;
-  public workspaceDraftSystem: WorkspaceDraftSystem;
-  public editorHubUI: EditorHubUI;
-  public editorLayout: EditorLayout;
   public fastTravelUI: FastTravelUI;
   public spellMakingUI: SpellMakingUI;
   public guardEncounterUI: GuardEncounterUI;
@@ -387,6 +329,44 @@ export class Game {
   public readonly forges = new ForgeRegistry();
   public craftingUI: CraftingUI;
   /** Radiant work offered by innkeepers ("Any work going?"). */
+  /** In-game editor tools (moves to the separate editor app in Phase 9). */
+  public editors!: EditorSuite;
+  public get mapEditorSystem(): MapEditorSystem { return this.editors.mapEditorSystem; }
+  public get mapEditorPropertyPanel(): MapEditorPropertyPanel { return this.editors.mapEditorPropertyPanel; }
+  public get mapEditorToolbar(): MapEditorToolbar { return this.editors.mapEditorToolbar; }
+  public get mapEditorHierarchyPanel(): MapEditorHierarchyPanel { return this.editors.mapEditorHierarchyPanel; }
+  public get mapEditorValidationPanel(): MapEditorValidationPanel { return this.editors.mapEditorValidationPanel; }
+  public get mapEditorPalettePanel(): MapEditorPalettePanel { return this.editors.mapEditorPalettePanel; }
+  public get mapEditorLayerPanel(): MapEditorLayerPanel { return this.editors.mapEditorLayerPanel; }
+  public get mapEditorNotesPanel(): MapEditorNotesPanel { return this.editors.mapEditorNotesPanel; }
+  public get questCreatorSystem(): QuestCreatorSystem { return this.editors.questCreatorSystem; }
+  public get questCreatorUI(): QuestCreatorUI { return this.editors.questCreatorUI; }
+  public get dialogueCreatorSystem(): DialogueCreatorSystem { return this.editors.dialogueCreatorSystem; }
+  public get dialogueCreatorUI(): DialogueCreatorUI { return this.editors.dialogueCreatorUI; }
+  public get npcCreatorSystem(): NpcCreatorSystem { return this.editors.npcCreatorSystem; }
+  public get npcCreatorUI(): NpcCreatorUI { return this.editors.npcCreatorUI; }
+  public get itemCreatorSystem(): ItemCreatorSystem { return this.editors.itemCreatorSystem; }
+  public get itemCreatorUI(): ItemCreatorUI { return this.editors.itemCreatorUI; }
+  public get factionCreatorSystem(): FactionCreatorSystem { return this.editors.factionCreatorSystem; }
+  public get factionCreatorUI(): FactionCreatorUI { return this.editors.factionCreatorUI; }
+  public get lootTableCreatorSystem(): LootTableCreatorSystem { return this.editors.lootTableCreatorSystem; }
+  public get lootTableCreatorUI(): LootTableCreatorUI { return this.editors.lootTableCreatorUI; }
+  public get spawnCreatorSystem(): SpawnCreatorSystem { return this.editors.spawnCreatorSystem; }
+  public get spawnCreatorUI(): SpawnCreatorUI { return this.editors.spawnCreatorUI; }
+  public get worldBuilderSystem(): WorldBuilderSystem { return this.editors.worldBuilderSystem; }
+  public get worldBuilderUI(): WorldBuilderUI { return this.editors.worldBuilderUI; }
+  public get contentBundleSystem(): ContentBundleSystem { return this.editors.contentBundleSystem; }
+  public get contentBundleUI(): ContentBundleUI { return this.editors.contentBundleUI; }
+  public get assetBrowserSystem(): AssetBrowserSystem { return this.editors.assetBrowserSystem; }
+  public get assetBrowserUI(): AssetBrowserUI { return this.editors.assetBrowserUI; }
+  public get bundleMergeSystem(): BundleMergeSystem { return this.editors.bundleMergeSystem; }
+  public get bundleMergeUI(): BundleMergeUI { return this.editors.bundleMergeUI; }
+  public get modManifestSystem(): ModManifestSystem { return this.editors.modManifestSystem; }
+  public get modManifestUI(): ModManifestUI { return this.editors.modManifestUI; }
+  public get workspaceDraftSystem(): WorkspaceDraftSystem { return this.editors.workspaceDraftSystem; }
+  public get editorHubUI(): EditorHubUI { return this.editors.editorHubUI; }
+  public get editorLayout(): EditorLayout { return this.editors.editorLayout; }
+
   /** Feature runtime (engine overhaul): events, phases, services, RNG, scopes. */
   public kernel!: Kernel;
 
@@ -707,43 +687,13 @@ export class Game {
     this._registerFantasyChunkLod(root, tier);
   }
 
-  private _refreshEditorToolbar(): void {
-    const { undo, redo } = this.mapEditorSystem.historySize;
-    this.mapEditorToolbar.update({
-      placementType:      this.mapEditorSystem.currentPlacementType,
-      gizmoMode:          this.mapEditorSystem.mode,
-      terrainTool:        this.mapEditorSystem.terrainTool,
-      entityCount:        this.mapEditorSystem.entityCount,
-      activePatrolGroupId: this.mapEditorSystem.activePatrolGroupId,
-      snapSize:           this.mapEditorSystem.snapSize,
-      undoCount:          undo,
-      redoCount:          redo,
-      typeCounts:         this.mapEditorSystem.getTypeCounts(),
-    });
-    this.mapEditorPalettePanel.setActivePlacementType(this.mapEditorSystem.currentPlacementType);
-  }
 
-  /** Refresh the layer panel after any layer or entity change. */
-  private _refreshLayerPanel(): void {
-    this.mapEditorLayerPanel.currentAuthor = this.mapEditorSystem.currentAuthor;
-    this.mapEditorLayerPanel.activeLayerName = this.mapEditorSystem.activeLayerName;
-    this.mapEditorLayerPanel.refresh(
-      this.mapEditorSystem.getLayers(),
-      this.mapEditorSystem.getLayerEntityCounts(),
-    );
-  }
 
-  private _loadMapEditorAuthor(): string {
-    if (typeof localStorage === "undefined") {
-      return "Local Author";
-    }
-    return localStorage.getItem(MAP_EDITOR_AUTHOR_STORAGE_KEY)?.trim() || "Local Author";
-  }
 
-  private _persistMapEditorAuthor(author: string): void {
-    if (typeof localStorage === "undefined") return;
-    localStorage.setItem(MAP_EDITOR_AUTHOR_STORAGE_KEY, author);
-  }
+
+  private _refreshEditorToolbar(): void { return this.editors.refreshToolbar(); }
+
+  private _refreshLayerPanel(): void { return this.editors.refreshLayerPanel(); }
 
   init(): void {
     // Apply the tier's hardware scaling level before the first render.
@@ -871,480 +821,8 @@ export class Game {
       return this._createFrameworkDialogueSession(targetNpc.mesh.name);
     };
     this._loadFrameworkMods();
-    this.mapEditorSystem = new MapEditorSystem(this.scene);
-    this.mapEditorSystem.currentAuthor = this._loadMapEditorAuthor();
-
-    // ── Editor layout — panel registry and unified selection model ────────────
-    this.editorLayout = new EditorLayout();
-    this.editorLayout.registerPanel("hierarchy",  { side: "left",   size: 240, isVisible: false });
-    this.editorLayout.registerPanel("palette",    { side: "left",   size: 220, isVisible: false });
-    this.editorLayout.registerPanel("layers",     { side: "left",   size: 220, isVisible: false });
-    this.editorLayout.registerPanel("notes",      { side: "float",             isVisible: false });
-    this.editorLayout.registerPanel("properties", { side: "right",  size: 300, isVisible: false });
-    this.editorLayout.registerPanel("validation", { side: "bottom", size: 200, isVisible: false });
-
-    // ── Map editor property panel ─────────────────────────────────────────────
-    this.mapEditorPropertyPanel = new MapEditorPropertyPanel(this.ui.uiTexture);
-    this.mapEditorPropertyPanel.onApply = (entityId, props, layerName) => {
-      this.mapEditorSystem.setEntityProperties(entityId, props);
-      this.mapEditorSystem.setEntityLayer(entityId, layerName);
-      this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-      this._refreshLayerPanel();
-      this.ui.showNotification("Properties applied", 1200);
-    };
-    this.mapEditorPropertyPanel.onDelete = (entityId) => {
-      this.mapEditorSystem.removeEntity(entityId);
-      this.ui.showNotification("Entity deleted", 1200);
-      this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-      this._refreshLayerPanel();
-      this._refreshEditorToolbar();
-    };
-    // Route entity selection through the unified EditorLayout selection model.
-    this.mapEditorSystem.onEntitySelectionChanged = (entityId) => {
-      this.editorLayout.setSelection(entityId);
-    };
-    this.editorLayout.onSelectionChanged = (entityId) => {
-      if (entityId === null) {
-        this.mapEditorPropertyPanel.hide();
-        this.editorLayout.setVisible("properties", false);
-        this.mapEditorHierarchyPanel.setSelection(null);
-        return;
-      }
-      const entity = this.mapEditorSystem.getEntityProperties(entityId);
-      const mesh = this.scene.getMeshByName(entityId);
-      const type = mesh?.metadata?.editorType;
-      const position = this.mapEditorSystem.getEntityPosition(entityId) ?? undefined;
-      if (type && entity !== null) {
-        this.mapEditorPropertyPanel.show(
-          entityId,
-          type,
-          entity,
-          position,
-          this.mapEditorSystem.getEntityLayer(entityId) ?? "objects",
-        );
-        this.editorLayout.setVisible("properties", true);
-      }
-      this.mapEditorHierarchyPanel.setSelection(entityId);
-    };
-    // Drive panel show/hide from layout changes (enables hideAll() to work).
-    this.editorLayout.onLayoutChanged = (state) => {
-      switch (state.panelId) {
-        case "hierarchy":
-          state.isVisible ? this.mapEditorHierarchyPanel.show() : this.mapEditorHierarchyPanel.hide();
-          break;
-        case "palette":
-          state.isVisible ? this.mapEditorPalettePanel.show() : this.mapEditorPalettePanel.hide();
-          break;
-        case "layers":
-          if (state.isVisible) {
-            this._refreshLayerPanel();
-            this.mapEditorLayerPanel.show();
-          } else {
-            this.mapEditorLayerPanel.hide();
-          }
-          break;
-        case "notes":
-          state.isVisible
-            ? this.mapEditorNotesPanel.show(this.mapEditorSystem.notes)
-            : this.mapEditorNotesPanel.hide();
-          break;
-        case "properties":
-          if (!state.isVisible) this.mapEditorPropertyPanel.hide();
-          break;
-        case "validation":
-          if (!state.isVisible) this.mapEditorValidationPanel.hide();
-          break;
-      }
-    };
-
-    // ── Map editor toolbar ────────────────────────────────────────────────────
-    this.mapEditorToolbar = new MapEditorToolbar(this.ui.uiTexture);
-    this.mapEditorToolbar.onPlacementTypeChange = (ptype) => {
-      this.mapEditorSystem.currentPlacementType = ptype;
-      this._refreshEditorToolbar();
-    };
-    this.mapEditorToolbar.onGizmoModeChange = (gmode) => {
-      this.mapEditorSystem.setGizmoMode(gmode);
-      this._refreshEditorToolbar();
-    };
-    this.mapEditorToolbar.onSnapSizeChange = (delta) => {
-      const SNAP_MIN = 0.25;
-      const SNAP_MAX = 16;
-      this.mapEditorSystem.snapSize = Math.min(SNAP_MAX, Math.max(SNAP_MIN, this.mapEditorSystem.snapSize + delta));
-      this._refreshEditorToolbar();
-    };
-
-    // ── Map editor hierarchy panel ────────────────────────────────────────────
-    this.mapEditorHierarchyPanel = new MapEditorHierarchyPanel(this.ui.uiTexture);
-    this.mapEditorHierarchyPanel.onEntityClick = (entityId) => {
-      this.mapEditorSystem.selectEntityById(entityId);
-    };
-
-    // ── Map editor validation panel ───────────────────────────────────────────
-    this.mapEditorValidationPanel = new MapEditorValidationPanel(this.ui.uiTexture);
-    this.mapEditorValidationPanel.onRevalidate = () => {
-      const report = this.mapEditorSystem.validateMap(0.5, {
-        knownLootTableIds: this.lootTableSystem.getTableIds(),
-      });
-      this.mapEditorValidationPanel.update(report);
-    };
-    this.mapEditorValidationPanel.onEntityFocus = (entityId) => {
-      this.mapEditorSystem.selectEntityById(entityId);
-    };
-
-    // ── Map editor palette panel ──────────────────────────────────────────────
-    this.mapEditorPalettePanel = new MapEditorPalettePanel(this.ui.uiTexture);
-    this.mapEditorPalettePanel.onPlacementTypeChange = (ptype) => {
-      this.mapEditorSystem.currentPlacementType = ptype;
-      this._refreshEditorToolbar();
-    };
-    this.mapEditorPalettePanel.onPlace = (ptype) => {
-      this.mapEditorSystem.currentPlacementType = ptype;
-      const placeAt = this.player.camera.position.add(this.player.getForwardDirection(8).scale(4));
-      placeAt.y = Math.max(1, placeAt.y);
-      this.mapEditorSystem.placeEntity(placeAt, ptype);
-      this.ui.showNotification(`Placed: ${ptype}`, 1200);
-      this._refreshEditorToolbar();
-      this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-      this._refreshLayerPanel();
-    };
-    this.mapEditorPalettePanel.onDuplicate = () => {
-      const selId = this.mapEditorSystem.selectedEntityId;
-      if (!selId) {
-        this.ui.showNotification("No entity selected", 1200);
-        return;
-      }
-      const newMesh = this.mapEditorSystem.duplicateEntity(selId);
-      if (newMesh) {
-        this.ui.showNotification("Entity duplicated", 1200);
-        this._refreshEditorToolbar();
-        this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-        this._refreshLayerPanel();
-      }
-    };
-    this.mapEditorPalettePanel.onDelete = () => {
-      const selId = this.mapEditorSystem.selectedEntityId;
-      if (!selId) {
-        this.ui.showNotification("No entity selected", 1200);
-        return;
-      }
-      this.mapEditorSystem.removeEntity(selId);
-      this.ui.showNotification("Entity deleted", 1200);
-      this._refreshEditorToolbar();
-      this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-      this._refreshLayerPanel();
-    };
-
-    // ── Map editor property panel: copy ID + position ─────────────────────────
-    this.mapEditorPropertyPanel.onCopyId = (entityId) => {
-      this.ui.showNotification(`Copied: ${entityId}`, 1200);
-    };
-
-    // ── Map editor system: entity moved (gizmo drag-end) ──────────────────────
-    this.mapEditorSystem.onEntityMoved = (_entityId, position) => {
-      this.mapEditorPropertyPanel.updatePosition(position);
-      this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-    };
-
-    // ── Map editor layer panel ────────────────────────────────────────────────
-    this.mapEditorLayerPanel = new MapEditorLayerPanel(this.ui.uiTexture);
-    this.mapEditorLayerPanel.onLayerVisibilityChange = (name, visible) => {
-      this.mapEditorSystem.setLayerVisible(name, visible);
-      this._refreshLayerPanel();
-    };
-    this.mapEditorLayerPanel.onLayerActivate = (name) => {
-      const next = this.mapEditorSystem.activeLayerName === name ? null : name;
-      this.mapEditorSystem.setActiveLayer(next);
-      this._refreshLayerPanel();
-      const msg = next === null
-        ? "Layer targeting reset to placement defaults"
-        : `New placements now target "${name}"`;
-      this.ui.showNotification(msg, 1400);
-    };
-    this.mapEditorLayerPanel.onLayerLockChange = (name, locked) => {
-      this.mapEditorSystem.setLayerLocked(name, locked);
-      this._refreshLayerPanel();
-      const msg = locked ? `Layer "${name}" locked` : `Layer "${name}" unlocked`;
-      this.ui.showNotification(msg, 1200);
-    };
-    this.mapEditorLayerPanel.onLayerOwnerChange = (name, owner) => {
-      this.mapEditorSystem.setLayerOwner(name, owner);
-      this._persistMapEditorAuthor(this.mapEditorSystem.currentAuthor);
-      this._refreshLayerPanel();
-      const trimmedOwner = owner.trim();
-      const msg = trimmedOwner === ""
-        ? `Cleared owner for "${name}"`
-        : `Layer "${name}" claimed by ${trimmedOwner}`;
-      this.ui.showNotification(msg, 1400);
-    };
-    this.mapEditorSystem.onLayerChanged = () => {
-      this._refreshLayerPanel();
-    };
-
-    // ── Map editor notes panel ────────────────────────────────────────────────
-    this.mapEditorNotesPanel = new MapEditorNotesPanel(this.ui.uiTexture);
-    this.mapEditorNotesPanel.onSave = (text) => {
-      this.mapEditorSystem.notes = text;
-      this.ui.showNotification("Scene notes saved", 1200);
-    };
-
-    // ── Toolbar: camera frame callbacks ──────────────────────────────────────
-    this.mapEditorToolbar.onFrameSelected = () => {
-      const selId = this.mapEditorSystem.selectedEntityId;
-      if (!selId) { this.ui.showNotification("No entity selected", 1000); return; }
-      const pos = this.mapEditorSystem.getEntityPosition(selId);
-      if (pos) {
-        this.player.camera.target.set(pos.x, pos.y, pos.z);
-        this.ui.showNotification("Framed selected entity", 1000);
-      }
-    };
-    this.mapEditorToolbar.onFrameAll = () => {
-      const summaries = this.mapEditorSystem.listEntitySummaries();
-      if (summaries.length === 0) { this.ui.showNotification("No entities to frame", 1000); return; }
-      let cx = 0, cy = 0, cz = 0;
-      for (const s of summaries) { cx += s.position.x; cy += s.position.y; cz += s.position.z; }
-      cx /= summaries.length; cy /= summaries.length; cz /= summaries.length;
-      this.player.camera.target.set(cx, cy, cz);
-      this.ui.showNotification(`Framed ${summaries.length} entities`, 1000);
-    };
-
-    // ── Quest Creator ──────────────────────────────────────────────────────────
-    this.questCreatorSystem = new QuestCreatorSystem();
-    this.questCreatorUI = new QuestCreatorUI(this.questCreatorSystem);
-    this.questCreatorUI.onClose = () => {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      this.workspaceDraftSystem.markDirty();
-    };
-
-    // ── Dialogue Creator ───────────────────────────────────────────────────────
-    this.dialogueCreatorSystem = new DialogueCreatorSystem();
-    this.dialogueCreatorUI = new DialogueCreatorUI(this.dialogueCreatorSystem);
-    this.dialogueCreatorUI.onClose = () => {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      this.workspaceDraftSystem.markDirty();
-    };
-
-    // ── NPC Creator ────────────────────────────────────────────────────────────
-    this.npcCreatorSystem = new NpcCreatorSystem();
-    this.npcCreatorUI = new NpcCreatorUI(this.npcCreatorSystem);
-    this.npcCreatorUI.onClose = () => {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      this.workspaceDraftSystem.markDirty();
-    };
-
-    // ── Item Creator ───────────────────────────────────────────────────────────
-    this.itemCreatorSystem = new ItemCreatorSystem();
-    this.itemCreatorUI = new ItemCreatorUI(this.itemCreatorSystem);
-    this.itemCreatorUI.onClose = () => {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      this.workspaceDraftSystem.markDirty();
-    };
-
-    // ── Faction Creator ────────────────────────────────────────────────────────
-    this.factionCreatorSystem = new FactionCreatorSystem();
-    this.factionCreatorUI = new FactionCreatorUI(this.factionCreatorSystem);
-    this.factionCreatorUI.onClose = () => {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      this.workspaceDraftSystem.markDirty();
-    };
-
-    // ── Loot Table Creator ─────────────────────────────────────────────────────
-    this.lootTableCreatorSystem = new LootTableCreatorSystem();
-    this.lootTableCreatorUI = new LootTableCreatorUI(this.lootTableCreatorSystem);
-    this.lootTableCreatorUI.onClose = () => {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      this.workspaceDraftSystem.markDirty();
-    };
-
-    // ── Spawn Creator ──────────────────────────────────────────────────────────
-    this.spawnCreatorSystem = new SpawnCreatorSystem();
-    this.spawnCreatorUI = new SpawnCreatorUI(this.spawnCreatorSystem);
-    this.spawnCreatorUI.onClose = () => {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      this.workspaceDraftSystem.markDirty();
-    };
-
-    // ── World Builder ───────────────────────────────────────────────────────────
-    this.worldBuilderSystem = new WorldBuilderSystem();
-    this.worldBuilderUI = new WorldBuilderUI(this.worldBuilderSystem);
-    this.worldBuilderUI.onClose = () => {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      this.workspaceDraftSystem.markDirty();
-      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
-    };
-    this.worldBuilderUI.onApplyToWorld = (worldSeed, config) => {
-      this.world.setSeed(worldSeed);
-      if (config) {
-        this.world.vegetationDensity = config.vegetationDensity;
-        this.world.elevationScale = config.elevationScale;
-      }
-      this.world.setRegions(this.worldBuilderSystem.regions);
-
-      // Register procedural settlements as discoverable fast-travel landmarks
-      if (this.fastTravelSystem && this.worldBuilderSystem.settlements.length > 0) {
-        for (const s of this.worldBuilderSystem.settlements) {
-          const wp = new Vector3(s.cx * this.world.chunkSize, 2, s.cz * this.world.chunkSize);
-          this.fastTravelSystem.discoverLocation(`settlement_${s.id}`, s.name, wp);
-        }
-      }
-
-      // Generate seeded Arthurian barrows & crypts and register with CellManager and fast travel
-      if (this.cellManager) {
-        for (const d of this.worldBuilderSystem.dungeons) {
-          const dungeonGen = new DungeonGenerator({
-            seed: `${worldSeed.seedString}_${d.id}`,
-            dangerLevel: d.dangerLevel,
-            maxRooms: d.roomCount,
-            theme: d.theme,
-          });
-          const cellDef = dungeonGen.toCellDefinition();
-          cellDef.id = d.id;
-          cellDef.name = d.name;
-          this.cellManager.registerCell(cellDef);
-
-          if (this.fastTravelSystem) {
-            const dwp = new Vector3(d.cx * this.world.chunkSize, 2, d.cz * this.world.chunkSize);
-            this.fastTravelSystem.discoverLocation(`dungeon_${d.id}`, d.name, dwp);
-          }
-        }
-      }
-
-      this.ui.showNotification(
-        `Applied world seed: ${worldSeed.seedString} (${worldSeed.options.worldType} / ${worldSeed.options.biomeScale})`,
-        3000,
-      );
-    };
-
-    // ── Content Bundle ─────────────────────────────────────────────────────────
-    this.contentBundleSystem = new ContentBundleSystem();
-    this.contentBundleSystem
-      .attachQuest(this.questCreatorSystem)
-      .attachDialogue(this.dialogueCreatorSystem)
-      .attachFaction(this.factionCreatorSystem)
-      .attachLootTable(this.lootTableCreatorSystem)
-      .attachNpc(this.npcCreatorSystem)
-      .attachItem(this.itemCreatorSystem)
-      .attachSpawn(this.spawnCreatorSystem)
-      .attachWorldBuilder(this.worldBuilderSystem);
-    this.contentBundleUI = new ContentBundleUI(this.contentBundleSystem);
-    this.contentBundleUI.onClose = () => {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
-    };
-    this.contentBundleUI.onPlayFromHere = (systemId) => {
-      this.interactionSystem.isBlocked = true;
-      document.exitPointerLock();
-      this.player.camera.detachControl();
-      switch (systemId) {
-        case "map":
-          if (!this.mapEditorSystem.isEnabled) {
-            this.mapEditorSystem.toggle();
-            this.mapEditorToolbar.show();
-            this.editorLayout.setVisible("hierarchy", true);
-            this.editorLayout.setVisible("palette", true);
-            this.editorLayout.setVisible("layers", true);
-            this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-            this._refreshEditorToolbar();
-          }
-          break;
-        case "quest":        this.questCreatorUI.open();        break;
-        case "dialogue":     this.dialogueCreatorUI.open();     break;
-        case "faction":      this.factionCreatorUI.open();      break;
-        case "lootTable":    this.lootTableCreatorUI.open();    break;
-        case "npc":          this.npcCreatorUI.open();          break;
-        case "item":         this.itemCreatorUI.open();         break;
-        case "spawn":        this.spawnCreatorUI.open();        break;
-        case "worldBuilder": this.worldBuilderUI.open();        break;
-        default: break;
-      }
-    };
-
-    // ── Asset Browser ──────────────────────────────────────────────────────────
-    this.assetBrowserSystem = new AssetBrowserSystem();
-    this.assetBrowserUI = new AssetBrowserUI(this.assetBrowserSystem);
-    this.assetBrowserUI.onClose = () => {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
-    };
-    // Insert opens the asset's authoring tool (same dispatch as the hub).
-    this.assetBrowserUI.onInsert = (asset) => {
-      const tool = ASSET_TYPE_TO_EDITOR_TOOL[asset.type];
-      if (tool) this._openEditorTool(tool);
-    };
-    this.assetBrowserUI.onImportBundle = () => {
-      const inp = document.createElement("input");
-      inp.type = "file";
-      inp.accept = ".json,.bundle.json";
-      inp.addEventListener("change", () => {
-        const file = inp.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const parsed = JSON.parse(reader.result as string);
-            const n = this.assetBrowserSystem.importFromBundle(parsed);
-            this.assetBrowserUI.refresh();
-            this.editorHubUI.setBadge("assets", this.assetBrowserSystem.size);
-            this.ui.showNotification(`Asset Browser: imported ${n} asset${n !== 1 ? "s" : ""} from bundle.`, 2500);
-          } catch {
-            this.ui.showNotification("Asset Browser: failed to parse bundle JSON.", 2500);
-          }
-        };
-        reader.readAsText(file);
-      });
-      inp.click();
-    };
-
-    // ── Bundle Merge ────────────────────────────────────────────────────────────
-    this.bundleMergeSystem = new BundleMergeSystem();
-    this.bundleMergeUI = new BundleMergeUI(this.bundleMergeSystem);
-    this.bundleMergeUI.onClose = () => {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
-    };
-
-    // ── Mod Manifest ────────────────────────────────────────────────────────────
-    this.modManifestSystem = new ModManifestSystem();
-    this.modManifestUI = new ModManifestUI(this.modManifestSystem);
-    this.modManifestUI.onClose = () => {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
-    };
-
-    // ── Workspace Draft ─────────────────────────────────────────────────────────
-    this.workspaceDraftSystem = new WorkspaceDraftSystem();
-    this.workspaceDraftSystem
-      .attachQuest(this.questCreatorSystem)
-      .attachDialogue(this.dialogueCreatorSystem)
-      .attachFaction(this.factionCreatorSystem)
-      .attachLootTable(this.lootTableCreatorSystem)
-      .attachNpc(this.npcCreatorSystem)
-      .attachItem(this.itemCreatorSystem)
-      .attachSpawn(this.spawnCreatorSystem)
-      .attachMap(this.mapEditorSystem)
-      .attachWorldBuilder(this.worldBuilderSystem);
-    this.workspaceDraftSystem.onSaved = () => {
-      this.ui.showNotification("Workspace draft auto-saved.", 1500);
-    };
-
-    // ── Editor Hub ─────────────────────────────────────────────────────────────
-    this.editorHubUI = new EditorHubUI({
-      onOpen: (tool) => this._openEditorTool(tool),
-    });
-    this.editorHubUI.onClose = () => {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-    };
-    this._seedAssetBrowser();
+    // Editor tools (map editor, creators, bundles, asset browser, hub).
+    this.editors = new EditorSuite(this);
 
     // ── Fast Travel UI ────────────────────────────────────────────────────────
     this.fastTravelUI = new FastTravelUI();
@@ -5518,124 +4996,7 @@ export class Game {
       return null;
   }
 
-  /**
-   * Open an editor tool: suspends gameplay input, then dispatches to the
-   * matching creator UI. Shared by the Editor Hub and Asset Browser Insert.
-   */
-  private _openEditorTool(tool: EditorToolId): void {
-      this.interactionSystem.isBlocked = true;
-      document.exitPointerLock();
-      this.player.camera.detachControl();
-      switch (tool) {
-        case "map":
-          if (!this.mapEditorSystem.isEnabled) {
-            this.mapEditorSystem.toggle();
-            this.mapEditorToolbar.show();
-            this.editorLayout.setVisible("hierarchy", true);
-            this.editorLayout.setVisible("palette", true);
-            this.editorLayout.setVisible("layers", true);
-            this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-            this._refreshEditorToolbar();
-            this.ui.showNotification("Map Editor enabled (F2 to exit)", 2500);
-          }
-          break;
-        case "quest":
-          this.questCreatorUI.open();
-          break;
-        case "dialogue":
-          this.dialogueCreatorUI.open();
-          break;
-        case "npc":
-          this.npcCreatorUI.open();
-          break;
-        case "item":
-          this.itemCreatorUI.open();
-          break;
-        case "faction":
-          this.factionCreatorUI.open();
-          break;
-        case "lootTable":
-          this.lootTableCreatorUI.open();
-          break;
-        case "spawn":
-          this.spawnCreatorUI.open();
-          break;
-        case "worldBuilder":
-          this.worldBuilderUI.open();
-          break;
-        case "bundle":
-          this.contentBundleUI.open();
-          break;
-        case "assets":
-          this.assetBrowserUI.open();
-          break;
-        case "merge":
-          this.bundleMergeUI.open();
-          break;
-        case "modManifest":
-          this.modManifestUI.open();
-          break;
-      }
-  }
 
-  /**
-   * Register shipped base content so the Asset Browser opens populated
-   * instead of empty (bundle imports add to the same registry).
-   */
-  private _seedAssetBrowser(): void {
-      const bundle = frameworkBaseContent;
-      for (const d of bundle.dialogues) {
-          this.assetBrowserSystem.register({
-              id: d.id,
-              name: `Dialogue: ${d.id}`,
-              type: "dialogue",
-              tags: ["dialogue"],
-              description: `${d.nodes.length} dialogue nodes.`,
-              dependencies: [],
-          });
-      }
-      for (const q of bundle.quests) {
-          this.assetBrowserSystem.register({
-              id: q.id,
-              name: q.name,
-              type: "quest",
-              tags: ["quest"],
-              description: q.description ?? "",
-              dependencies: [],
-          });
-      }
-      for (const i of bundle.items) {
-          this.assetBrowserSystem.register({
-              id: i.id,
-              name: i.name,
-              type: "item",
-              tags: ["item", ...(i.tags ?? [])],
-              description: i.description,
-              dependencies: [],
-          });
-      }
-      for (const f of bundle.factions) {
-          this.assetBrowserSystem.register({
-              id: f.id,
-              name: f.name,
-              type: "faction",
-              tags: ["faction"],
-              description: f.description ?? "",
-              dependencies: [],
-          });
-      }
-      for (const n of bundle.npcArchetypes) {
-          this.assetBrowserSystem.register({
-              id: n.id,
-              name: n.name,
-              type: "npc",
-              tags: ["npc", n.role],
-              description: n.description ?? "",
-              dependencies: [],
-          });
-      }
-      this.editorHubUI.setBadge("assets", this.assetBrowserSystem.size);
-  }
 
   /**
    * Fail quests that needed the killed NPC alive: framework quests with an
