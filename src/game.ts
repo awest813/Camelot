@@ -89,6 +89,7 @@ import { hasVillage, planVillage, VILLAGE_DISCOVER_RADIUS, type VillagePlan } fr
 import { VillageJobBoard } from "./systems/village-jobs";
 import { JobBoardUI } from "./ui/job-board-ui";
 import { createNoticeMaterials } from "./rendering/notice-texture";
+import { buildVillageWell, WELL_RADIUS } from "./world/village-well";
 import { ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
 import { EnchantingSystem } from "./systems/enchanting-system";
 import { EnchantingUI } from "./ui/enchanting-ui";
@@ -158,7 +159,7 @@ import { AmbientEventSystem } from "./systems/ambient-event-system";
 import { LeveledListSystem, ALL_BUILT_IN_LEVELED_LISTS } from "./systems/leveled-list-system";
 import { EventManagerSystem } from "./systems/event-manager-system";
 import { AnimationSystem } from "./systems/animation-system";
-import { FantasyAssetLoader, setInstanceScale, setInstanceYaw, type FantasyAssetKey } from "./systems/fantasy-asset-loader";
+import { FantasyAssetLoader, setInstanceScale, setInstanceYaw, getQuaterniusBasePath, type FantasyAssetKey } from "./systems/fantasy-asset-loader";
 import { PetSystem } from "./systems/pet-system";
 import type { Pet } from "./systems/pet-system";
 import { PetUI } from "./ui/pet-ui";
@@ -7667,7 +7668,8 @@ export class Game {
       }
       const here = { x: 0, z: 0, rot: 0 };
       for (const p of plan.props) {
-        this._placeSiteProp(chunkKey, chunkRecord, p.key, here, p.x, p.z, p.rot);
+        if (p.key === "qWell") this._placeVillageWell(chunkKey, chunkRecord, p.x, p.z, p.rot);
+        else this._placeSiteProp(chunkKey, chunkRecord, p.key, here, p.x, p.z, p.rot);
       }
       this._placeSmithy(chunkKey, chunkRecord, plan.forge.x, plan.forge.z, plan.forge.rot);
       this._placeNoticeBoard(chunkKey, chunkRecord, plan);
@@ -7687,6 +7689,39 @@ export class Game {
    * The village notice board: the same job board as the village inn (one
    * job per village), read with E.
    */
+  /** The well on a village square: stone curb, winch and roof, with a collider. */
+  private _placeVillageWell(
+      chunkKey: string,
+      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
+      x: number,
+      z: number,
+      rot: number,
+  ): void {
+      if (this._chunkFantasyContent.get(chunkKey) !== chunkRecord) return;
+      const well = buildVillageWell(this.scene, `village_well_${chunkKey}`,
+        `${getQuaterniusBasePath()}village/textures/medieval-village-megakit/`);
+      well.position.set(x, 0, z);
+      well.rotation.y = rot;
+      well.freezeWorldMatrix();
+      this._trackChunkProp(chunkKey, chunkRecord, well, "structure");
+
+      const fp = { x, z, cos: 1, sin: 0, hw: WELL_RADIUS + 0.5, hd: WELL_RADIUS + 0.5 };
+      this._buildingFootprints.add(fp);
+      const col = MeshBuilder.CreateCylinder(`village_well_collider_${chunkKey}`, { diameter: WELL_RADIUS * 2, height: 1, tessellation: 12 }, this.scene);
+      col.position.set(x, 0.5, z);
+      col.isVisible = false;
+      col.isPickable = false;
+      col.freezeWorldMatrix();
+      col.onDisposeObservable.addOnce(() => this._buildingFootprints.delete(fp));
+      try {
+        const agg = new PhysicsAggregate(col, PhysicsShapeType.CYLINDER, { mass: 0 }, this.scene);
+        col.onDisposeObservable.addOnce(() => agg.dispose());
+      } catch (err) {
+        console.warn("[village] well collider unavailable", err);
+      }
+      chunkRecord.roots.push(col);
+  }
+
   private _placeNoticeBoard(
       chunkKey: string,
       chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
