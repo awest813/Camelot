@@ -211,6 +211,31 @@ describe('ScheduleSystem', () => {
       expect(vel.z).toBe(0);
     });
 
+    it('only sidesteps onto open ground, trying the other side first', () => {
+      const sys = new ScheduleSystem();
+      sys.currentHour = 12;
+      const { npc, vel } = walker('work', new Vector3(0, 0, 10));
+      sys.addNPC(npc);
+      // Open ground only to the left (x < 0): a sidestep must go that way.
+      sys.walkable = (x) => x < 0.01;
+      for (let i = 0; i < 17; i++) sys.update(0.1);
+      expect(vel.x).toBeLessThan(0);
+      // Nothing open on either side: hold still instead of stepping into a building.
+      const sys2 = new ScheduleSystem();
+      sys2.currentHour = 12;
+      const w2 = walker('work', new Vector3(0, 0, 10));
+      sys2.addNPC(w2.npc);
+      sys2.walkable = (x) => Math.abs(x) < 0.01;
+      let sideways = 0;
+      for (let i = 0; i < 200; i++) {
+        sys2.update(0.1);
+        if (Math.abs(w2.vel.x) > 1e-6) sideways++;
+      }
+      expect(sideways, "never steps sideways into blocked ground").toBe(0);
+      // …and, as before, eventually gives up rather than pushing forever.
+      expect(w2.vel.z).toBe(0);
+    });
+
     it('does not count steady progress as stuck', () => {
       const sys = new ScheduleSystem();
       sys.currentHour = 12;

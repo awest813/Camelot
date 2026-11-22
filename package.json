@@ -16,6 +16,8 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
+    "check:guardrails": "node tools/check-guardrails.mjs",
+    "check:bundle": "node tools/check-bundle.mjs",
     "dev:e2e": "vite --config vite.e2e.config.ts",
     "assets:filler": "node tools/generate-filler-assets.mjs",
     "assets:quaternius": "node tools/import-quaternius.mjs",

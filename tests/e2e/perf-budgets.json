@@ -1,0 +1,20 @@
+{
+  "seed": "camelot-perf-1",
+  "headroom": 1.15,
+  "budgets": {
+    "start": {
+      "drawCalls": 199,
+      "activeMeshes": 103,
+      "meshes": 632,
+      "materials": 126,
+      "textures": 163
+    },
+    "village": {
+      "drawCalls": 538,
+      "activeMeshes": 470,
+      "meshes": 2376,
+      "materials": 252,
+      "textures": 357
+    }
+  }
+}

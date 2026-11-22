@@ -6670,12 +6670,16 @@ export class Game {
   }
 
   private _onCellEntered(cellId: string, cellName: string): void {
-      const isNew = this.fastTravelSystem.discoverLocation(
-          cellId, cellName, this.player.camera.position.clone()
-      );
-      this.ui.showNotification(
-          isNew ? `Discovered: ${cellName}` : `Entered: ${cellName}`, 2500
-      );
+      // Interiors become fast-travel destinations; the open world ("exterior",
+      // entered on the way out of one) is not a place to travel to.
+      if (this.cellManager.currentCell?.type !== "exterior") {
+        const isNew = this.fastTravelSystem.discoverLocation(
+            cellId, cellName, this.player.camera.position.clone()
+        );
+        this.ui.showNotification(
+            isNew ? `Discovered: ${cellName}` : `Entered: ${cellName}`, 2500
+        );
+      }
 
       // LodSystem prunes disposed meshes in update(); chunk CDN props keep stable
       // refs for the exterior world, so we do not clear the registry here.
@@ -6750,9 +6754,10 @@ export class Game {
       this.cellManager.hydrateActiveCellFromState();
       const cell = this.cellManager.currentCell;
       if (cell) {
-          this.fastTravelSystem.discoverLocation(
-              cell.id, cell.name, this.player.camera.position.clone()
-          );
+          // (Only interiors are destinations; see _onCellEntered.)
+          if (cell.type !== "exterior") {
+            this.fastTravelSystem.discoverLocation(cell.id, cell.name, this.player.camera.position.clone());
+          }
           // Sync world visibility with cell type
           this.world.setVisible(cell.type !== "interior");
       }

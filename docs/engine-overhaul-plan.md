@@ -261,6 +261,20 @@ safety net.
 
 **Exit:** CI reports perf, bundle size and lint, and save fixtures load.
 
+**Status: done (2026-11-22).** What landed:
+
+| Guardrail | Where | Baseline |
+|---|---|---|
+| Architecture rules and ratchets | `tools/check-guardrails.mjs` (+ `guardrails-baseline.json`), CI build job | framework has no Babylon imports; `game.ts` 8,456 lines (+40 slack); 60 unseeded `Math.random`; 199 callback wirings; 12 Babylon GUI files |
+| Bundle budgets | `tools/check-bundle.mjs` (+ `bundle-budgets.json`), CI build job | entry 1,412 KB, all JS 6,075 KB, largest chunk 2,809 KB, models 32 MB (budgets +3%) |
+| Render budgets | `tests/e2e/perf-budget.spec.ts` (+ `perf-budgets.json`), CI e2e | seed `camelot-perf-1`: start 173 draw calls, village 467 (budgets +15%) |
+| Headless harness | `src/testing/headless/` | a village day on real plans, schedules and wall colliders, with a control that proves the wall check can fail |
+| Save fixtures | `tests/fixtures/saves/`, `tests/e2e/save-fixtures.spec.ts` | `v29-midgame.json`: gold, goods, a discovered village and an active job round-trip exactly |
+
+Bugs these found on day one: villagers could sidestep through a doorway
+into a building (sidesteps now only go to open ground), and every load
+added a junk "Exterior" fast-travel destination.
+
 ### Phase 1 — Kernel and features (3–4 weeks)
 
 - Kernel: phase scheduler, typed event bus, scopes, services, RNG streams.

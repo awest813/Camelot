@@ -1,0 +1,1037 @@
+{
+  "description": "Mid-game: 250 gold, iron and potions, a discovered village with an active job, clock advanced 5 h.",
+  "saveVersion": 29,
+  "capturedAt": "2026-11-22",
+  "save": {
+    "version": 29,
+    "timestamp": 1795379244136,
+    "player": {
+      "position": {
+        "x": 1.2686834433116019,
+        "y": 3,
+        "z": 147.7175831180066
+      },
+      "health": 240,
+      "magicka": 140,
+      "stamina": 170,
+      "level": 1,
+      "experience": 20,
+      "experienceToNextLevel": 100,
+      "carryWeight": 8.2,
+      "maxCarryWeight": 450,
+      "name": "Fixture"
+    },
+    "inventory": [
+      {
+        "id": "iron_ingot",
+        "name": "Iron Ingot",
+        "description": "A bar of smelted iron. Used at the forge (Shift+B).",
+        "stackable": true,
+        "quantity": 6,
+        "weight": 1,
+        "stats": {
+          "value": 7
+        }
+      },
+      {
+        "id": "leather_strips",
+        "name": "Leather Strips",
+        "description": "Cured hide cut into strips for grips and straps.",
+        "stackable": true,
+        "quantity": 2,
+        "weight": 0.1,
+        "stats": {
+          "value": 3
+        }
+      },
+      {
+        "id": "repair_hammer",
+        "name": "Repair Hammer",
+        "description": "Click to mend your most worn equipped piece. Armorer skill makes each use count for more.",
+        "stackable": true,
+        "quantity": 2,
+        "weight": 0.5,
+        "stats": {
+          "value": 12
+        }
+      },
+      {
+        "id": "gold_coins",
+        "name": "Gold Coins",
+        "description": "",
+        "stackable": true,
+        "quantity": 265,
+        "weight": 0
+      },
+      {
+        "id": "potion_hp_01",
+        "name": "Health Potion",
+        "description": "",
+        "stackable": true,
+        "quantity": 2,
+        "weight": 0.5
+      }
+    ],
+    "equipment": [],
+    "quests": [
+      {
+        "id": "quest_kill_guard",
+        "isCompleted": false,
+        "isActive": true,
+        "isFailed": false,
+        "objectives": [
+          {
+            "id": "obj_kill_guard",
+            "current": 0,
+            "completed": false
+          }
+        ]
+      },
+      {
+        "id": "quest_collect_potions",
+        "isCompleted": false,
+        "isActive": true,
+        "isFailed": false,
+        "objectives": [
+          {
+            "id": "obj_collect_potions",
+            "current": 0,
+            "completed": false
+          }
+        ]
+      },
+      {
+        "id": "quest_speak_guard",
+        "isCompleted": false,
+        "isActive": true,
+        "isFailed": false,
+        "objectives": [
+          {
+            "id": "obj_talk_guard",
+            "current": 0,
+            "completed": false
+          }
+        ]
+      },
+      {
+        "id": "job_inn_0_3",
+        "isCompleted": false,
+        "isActive": true,
+        "isFailed": false,
+        "objectives": [
+          {
+            "id": "job_inn_0_3_obj",
+            "current": 2,
+            "completed": false
+          }
+        ]
+      }
+    ],
+    "skills": [],
+    "skillPoints": 0,
+    "framework": "{\"schemaVersion\":1,\"savedAt\":1795379244137,\"profileId\":\"default\",\"state\":{\"dialogueState\":{},\"questState\":{\"quests\":{\"quest_guard_resolution\":{\"status\":\"inactive\",\"nodes\":{\"talk_to_guard\":{\"active\":false,\"completed\":false,\"progress\":0},\"defeat_ruin_guard\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_bandit_bounty\":{\"status\":\"inactive\",\"nodes\":{\"kill_bandits\":{\"active\":false,\"completed\":false,\"progress\":0},\"collect_proof\":{\"active\":false,\"completed\":false,\"progress\":0}}}}},\"inventoryState\":{\"capacity\":20,\"items\":[{\"itemId\":\"gold_coins\",\"quantity\":265}],\"equipped\":{}},\"factionState\":{\"reputations\":{\"village_guard\":10,\"bandits\":-50,\"merchants_guild\":10,\"mages_college\":0}},\"flags\":{},\"legacyState\":{}}}",
+    "attributes": {
+      "base": {
+        "strength": 70,
+        "endurance": 70,
+        "intelligence": 40,
+        "agility": 40,
+        "willpower": 40,
+        "speed": 40,
+        "luck": 40
+      },
+      "pendingPoints": 0
+    },
+    "time": {
+      "gameTime": 789.2000000000004,
+      "elapsedGameTime": 789.2000000000004
+    },
+    "crime": {
+      "bounties": {},
+      "crimes": []
+    },
+    "containers": {
+      "containers": [
+        {
+          "id": "chest_01",
+          "contents": [
+            {
+              "id": "gold_coins",
+              "name": "Gold Coins",
+              "description": "A handful of gold coins.",
+              "stackable": true,
+              "quantity": 50,
+              "weight": 0.1,
+              "stats": {
+                "value": 1
+              }
+            },
+            {
+              "id": "iron_sword",
+              "name": "Iron Sword",
+              "description": "A basic iron sword.",
+              "stackable": false,
+              "quantity": 1,
+              "slot": "mainHand",
+              "weight": 3,
+              "stats": {
+                "damage": 10,
+                "value": 80
+              }
+            }
+          ],
+          "isLocked": false
+        }
+      ]
+    },
+    "barter": {
+      "merchants": [
+        {
+          "id": "merchant_01",
+          "inventory": [
+            {
+              "id": "potion_hp_01",
+              "name": "Health Potion",
+              "description": "Restores 50 health.",
+              "stackable": true,
+              "quantity": 5,
+              "weight": 0.3,
+              "stats": {
+                "value": 25,
+                "heal": 50
+              }
+            },
+            {
+              "id": "arrow_bundle",
+              "name": "Arrows (20)",
+              "description": "A bundle of iron arrows.",
+              "stackable": true,
+              "quantity": 3,
+              "weight": 1,
+              "stats": {
+                "value": 15
+              }
+            }
+          ],
+          "gold": 500
+        },
+        {
+          "id": "merchant_general_01",
+          "inventory": [
+            {
+              "id": "potion_hp_01",
+              "name": "Health Potion",
+              "description": "Restores 50 health.",
+              "stackable": true,
+              "quantity": 8,
+              "weight": 0.3,
+              "stats": {
+                "value": 25,
+                "heal": 50
+              }
+            },
+            {
+              "id": "arrow_bundle",
+              "name": "Arrows (20)",
+              "description": "A bundle of iron arrows.",
+              "stackable": true,
+              "quantity": 4,
+              "weight": 1,
+              "stats": {
+                "value": 15
+              }
+            },
+            {
+              "id": "bread",
+              "name": "Loaf of Bread",
+              "description": "Hearty bread. Restores hunger.",
+              "stackable": true,
+              "quantity": 6,
+              "weight": 0.2,
+              "stats": {
+                "value": 5,
+                "nutrition": 30
+              }
+            },
+            {
+              "id": "ale",
+              "name": "Mug of Ale",
+              "description": "Watered-down but filling.",
+              "stackable": true,
+              "quantity": 6,
+              "weight": 0.4,
+              "stats": {
+                "value": 4,
+                "nutrition": 15
+              }
+            },
+            {
+              "id": "stew",
+              "name": "Bowl of Stew",
+              "description": "Hot and hearty. Restores a lot of hunger.",
+              "stackable": true,
+              "quantity": 4,
+              "weight": 0.5,
+              "stats": {
+                "value": 8,
+                "nutrition": 50
+              }
+            }
+          ],
+          "gold": 450
+        },
+        {
+          "id": "merchant_weapons_01",
+          "inventory": [
+            {
+              "id": "iron_sword",
+              "name": "Iron Sword",
+              "description": "A basic iron sword.",
+              "stackable": false,
+              "quantity": 2,
+              "slot": "mainHand",
+              "weight": 3,
+              "stats": {
+                "damage": 10,
+                "value": 80
+              }
+            },
+            {
+              "id": "arrow_bundle",
+              "name": "Arrows (20)",
+              "description": "A bundle of iron arrows.",
+              "stackable": true,
+              "quantity": 6,
+              "weight": 1,
+              "stats": {
+                "value": 15
+              }
+            },
+            {
+              "id": "iron_ingot",
+              "name": "Iron Ingot",
+              "description": "A bar of smelted iron. Used at the forge (Shift+B).",
+              "stackable": true,
+              "quantity": 10,
+              "weight": 1,
+              "stats": {
+                "value": 7
+              }
+            },
+            {
+              "id": "steel_ingot",
+              "name": "Steel Ingot",
+              "description": "Tempered steel, stronger than iron. Used at the forge (Shift+B).",
+              "stackable": true,
+              "quantity": 4,
+              "weight": 1,
+              "stats": {
+                "value": 20
+              }
+            },
+            {
+              "id": "repair_hammer",
+              "name": "Repair Hammer",
+              "description": "Click to mend your most worn equipped piece. Armorer skill makes each use count for more.",
+              "stackable": true,
+              "quantity": 5,
+              "weight": 0.5,
+              "stats": {
+                "value": 12
+              }
+            }
+          ],
+          "gold": 800
+        },
+        {
+          "id": "merchant_armor_01",
+          "inventory": [
+            {
+              "id": "leather_chest_01",
+              "name": "Leather Chest",
+              "description": "Light armor. +15 Armor Rating.",
+              "stackable": false,
+              "quantity": 1,
+              "slot": "chest",
+              "weight": 4,
+              "stats": {
+                "armor": 15,
+                "value": 55
+              }
+            },
+            {
+              "id": "iron_helm_01",
+              "name": "Iron Helm",
+              "description": "A sturdy iron helmet. +12 Armor Rating.",
+              "stackable": false,
+              "quantity": 2,
+              "slot": "head",
+              "weight": 2.5,
+              "stats": {
+                "armor": 12,
+                "value": 45
+              }
+            },
+            {
+              "id": "iron_ingot",
+              "name": "Iron Ingot",
+              "description": "A bar of smelted iron. Used at the forge (Shift+B).",
+              "stackable": true,
+              "quantity": 6,
+              "weight": 1,
+              "stats": {
+                "value": 7
+              }
+            },
+            {
+              "id": "leather_strips",
+              "name": "Leather Strips",
+              "description": "Cured hide cut into strips for grips and straps.",
+              "stackable": true,
+              "quantity": 10,
+              "weight": 0.1,
+              "stats": {
+                "value": 3
+              }
+            },
+            {
+              "id": "repair_hammer",
+              "name": "Repair Hammer",
+              "description": "Click to mend your most worn equipped piece. Armorer skill makes each use count for more.",
+              "stackable": true,
+              "quantity": 5,
+              "weight": 0.5,
+              "stats": {
+                "value": 12
+              }
+            }
+          ],
+          "gold": 650
+        },
+        {
+          "id": "merchant_alchemist_01",
+          "inventory": [
+            {
+              "id": "potion_hp_01",
+              "name": "Health Potion",
+              "description": "Restores 50 health.",
+              "stackable": true,
+              "quantity": 12,
+              "weight": 0.3,
+              "stats": {
+                "value": 25,
+                "heal": 50
+              }
+            }
+          ],
+          "gold": 520
+        }
+      ],
+      "playerGold": 100,
+      "merchantRapport": {
+        "merchant_01": 0,
+        "merchant_general_01": 0,
+        "merchant_weapons_01": 0,
+        "merchant_armor_01": 0,
+        "merchant_alchemist_01": 0
+      }
+    },
+    "cell": {
+      "currentCellId": "exterior",
+      "visitedCellIds": [
+        "exterior"
+      ]
+    },
+    "spells": {
+      "knownSpellIds": [
+        "flames",
+        "healing"
+      ],
+      "equippedSpellId": "flames"
+    },
+    "persuasion": {
+      "dispositions": {}
+    },
+    "alchemy": {
+      "ingredients": {
+        "aloe_vera_leaves": 5,
+        "cairn_bolete_cap": 4,
+        "fennel_seeds": 4,
+        "dragon_tongue": 3,
+        "bergamot_seeds": 3
+      },
+      "discoveredEffects": [],
+      "craftedPotions": []
+    },
+    "enchanting": {
+      "soulGems": {
+        "petty": 3,
+        "lesser": 2,
+        "common": 1
+      },
+      "enchantingSkill": 10
+    },
+    "weather": {
+      "state": "clear",
+      "nextChangeIn": 244.6981366574726
+    },
+    "quickSlots": {
+      "slots": {
+        "0": null,
+        "1": null,
+        "2": null,
+        "3": null,
+        "4": null,
+        "5": null,
+        "6": null,
+        "7": "potion_hp_01",
+        "8": null,
+        "9": null
+      }
+    },
+    "wait": {
+      "totalHoursWaited": 0
+    },
+    "skillProgression": {
+      "skills": [
+        {
+          "id": "blade",
+          "level": 40,
+          "xp": 0
+        },
+        {
+          "id": "blunt",
+          "level": 15,
+          "xp": 0
+        },
+        {
+          "id": "block",
+          "level": 30,
+          "xp": 0
+        },
+        {
+          "id": "destruction",
+          "level": 10,
+          "xp": 0
+        },
+        {
+          "id": "restoration",
+          "level": 10,
+          "xp": 0
+        },
+        {
+          "id": "marksman",
+          "level": 30,
+          "xp": 0
+        },
+        {
+          "id": "sneak",
+          "level": 10,
+          "xp": 0
+        },
+        {
+          "id": "speechcraft",
+          "level": 10,
+          "xp": 0
+        },
+        {
+          "id": "alchemy",
+          "level": 10,
+          "xp": 0
+        },
+        {
+          "id": "armorer",
+          "level": 15,
+          "xp": 0
+        }
+      ]
+    },
+    "fastTravel": {
+      "discoveredIds": [
+        "start_village",
+        "village_0_3"
+      ],
+      "locations": [
+        {
+          "id": "start_village",
+          "name": "Starting Village",
+          "position": {
+            "x": 0,
+            "y": 2,
+            "z": 0
+          }
+        },
+        {
+          "id": "village_0_3",
+          "name": "Craigagel Cross",
+          "position": {
+            "x": 8.357253982420122,
+            "y": 2,
+            "z": 155.4636897343709
+          }
+        }
+      ]
+    },
+    "fame": {
+      "fame": 0,
+      "infamy": 0
+    },
+    "activeEffects": {
+      "effects": []
+    },
+    "jail": {
+      "records": []
+    },
+    "spellMaking": {
+      "customSpells": []
+    },
+    "respawn": {
+      "zones": [
+        {
+          "zoneId": "cave_01",
+          "respawnAfterHours": 72,
+          "lastClearedAt": null,
+          "pendingRespawn": false
+        }
+      ]
+    },
+    "merchantRestock": {
+      "entries": [
+        {
+          "merchantId": "merchant_01",
+          "intervalHours": 72,
+          "nextRestockAt": 4800
+        },
+        {
+          "merchantId": "merchant_general_01",
+          "intervalHours": 72,
+          "nextRestockAt": 4800
+        },
+        {
+          "merchantId": "merchant_weapons_01",
+          "intervalHours": 72,
+          "nextRestockAt": 4800
+        },
+        {
+          "merchantId": "merchant_armor_01",
+          "intervalHours": 72,
+          "nextRestockAt": 4800
+        },
+        {
+          "merchantId": "merchant_alchemist_01",
+          "intervalHours": 72,
+          "nextRestockAt": 4800
+        }
+      ]
+    },
+    "birthsign": {
+      "chosenId": "warrior",
+      "lastPowerUseTime": null
+    },
+    "characterClass": {
+      "chosenId": "warrior"
+    },
+    "race": {
+      "chosenId": "nord",
+      "lastPowerUseTime": null
+    },
+    "playerLevel": {
+      "characterLevel": 1,
+      "majorLevelUpsThisLevel": 0,
+      "attributeLevelUpCounts": {
+        "strength": 0,
+        "endurance": 0,
+        "intelligence": 0,
+        "agility": 0,
+        "willpower": 0,
+        "speed": 0,
+        "luck": 0
+      },
+      "levelUpPending": false
+    },
+    "dailySchedule": {
+      "sleepingNpcNames": [
+        "Town Guard_10002",
+        "Barkeeper_10006"
+      ]
+    },
+    "horse": {
+      "horses": [
+        {
+          "id": "bay_mare",
+          "name": "Bay Mare",
+          "speed": 1.8,
+          "saddlebagCapacity": 8,
+          "isOwned": false,
+          "stableId": "starter_stable",
+          "saddlebag": []
+        },
+        {
+          "id": "black_stallion",
+          "name": "Black Stallion",
+          "speed": 2.2,
+          "saddlebagCapacity": 6,
+          "isOwned": false,
+          "stableId": "starter_stable",
+          "saddlebag": []
+        },
+        {
+          "id": "grey_gelding",
+          "name": "Grey Gelding",
+          "speed": 2,
+          "saddlebagCapacity": 10,
+          "isOwned": false,
+          "stableId": "starter_stable",
+          "saddlebag": []
+        }
+      ],
+      "currentHorseId": null,
+      "isMounted": false
+    },
+    "swimming": {
+      "currentBreath": 30,
+      "maxBreath": 30,
+      "isSubmerged": false
+    },
+    "disease": {
+      "activeDiseases": []
+    },
+    "eventManager": {
+      "personality": {
+        "difficulty": "normal",
+        "eventFrequency": 0.5,
+        "aggressiveness": 0.5,
+        "narrativeTone": "balanced",
+        "enableAmbushes": true,
+        "enableRandomEncounters": true,
+        "enableWeatherEvents": true,
+        "enableNPCInteractions": true
+      },
+      "eventLog": [],
+      "scheduledEvents": []
+    },
+    "pets": {
+      "activePetId": null,
+      "pets": [
+        {
+          "id": "pet_wolf",
+          "health": 120,
+          "level": 1,
+          "experience": 0,
+          "mood": 80,
+          "isDead": false
+        }
+      ]
+    },
+    "markRecall": {
+      "hasMarked": false,
+      "position": null,
+      "cellId": null
+    },
+    "trainer": {
+      "sessionsThisLevel": 0,
+      "maxSessionsPerLevel": 5
+    },
+    "pickpocket": {
+      "totalAttempts": 0,
+      "totalSuccesses": 0,
+      "totalCaught": 0
+    },
+    "itemCondition": {
+      "conditions": {}
+    },
+    "crafting": {
+      "recipeSnapshots": [
+        {
+          "id": "smith_repair_hammer",
+          "craftCount": 0
+        },
+        {
+          "id": "smith_iron_dagger",
+          "craftCount": 0
+        },
+        {
+          "id": "smith_iron_sword",
+          "craftCount": 0
+        },
+        {
+          "id": "smith_iron_helm",
+          "craftCount": 0
+        },
+        {
+          "id": "smith_leather_chest",
+          "craftCount": 0
+        },
+        {
+          "id": "smith_iron_shield",
+          "craftCount": 0
+        },
+        {
+          "id": "smith_iron_cuirass",
+          "craftCount": 0
+        },
+        {
+          "id": "smith_steel_ingot",
+          "craftCount": 0
+        },
+        {
+          "id": "smith_steel_sword",
+          "craftCount": 0
+        },
+        {
+          "id": "smith_steel_shield",
+          "craftCount": 0
+        },
+        {
+          "id": "smith_steel_cuirass",
+          "craftCount": 0
+        }
+      ],
+      "discoveredRecipeIds": [
+        "smith_repair_hammer",
+        "smith_iron_dagger",
+        "smith_iron_sword",
+        "smith_iron_helm",
+        "smith_leather_chest",
+        "smith_iron_shield",
+        "smith_iron_cuirass",
+        "smith_steel_ingot",
+        "smith_steel_sword",
+        "smith_steel_shield",
+        "smith_steel_cuirass"
+      ]
+    },
+    "villageJobs": {
+      "active": [
+        {
+          "boardId": "inn_0_3",
+          "placeName": "Craigagel Cross",
+          "templateId": "supply_leather",
+          "progress": 0
+        }
+      ],
+      "completed": {},
+      "declined": {}
+    },
+    "villageRaids": {
+      "lastRaidAt": {}
+    },
+    "dragonShouts": {
+      "dragonSouls": 0,
+      "equippedShoutId": null,
+      "shoutStates": {
+        "unrelenting_force": {
+          "learned": [
+            false,
+            false,
+            false
+          ],
+          "unlocked": [
+            false,
+            false,
+            false
+          ],
+          "lastUsedMinutes": null
+        },
+        "whirlwind_sprint": {
+          "learned": [
+            false,
+            false,
+            false
+          ],
+          "unlocked": [
+            false,
+            false,
+            false
+          ],
+          "lastUsedMinutes": null
+        },
+        "become_ethereal": {
+          "learned": [
+            false,
+            false,
+            false
+          ],
+          "unlocked": [
+            false,
+            false,
+            false
+          ],
+          "lastUsedMinutes": null
+        },
+        "fire_breath": {
+          "learned": [
+            false,
+            false,
+            false
+          ],
+          "unlocked": [
+            false,
+            false,
+            false
+          ],
+          "lastUsedMinutes": null
+        },
+        "ice_form": {
+          "learned": [
+            false,
+            false,
+            false
+          ],
+          "unlocked": [
+            false,
+            false,
+            false
+          ],
+          "lastUsedMinutes": null
+        },
+        "slow_time": {
+          "learned": [
+            false,
+            false,
+            false
+          ],
+          "unlocked": [
+            false,
+            false,
+            false
+          ],
+          "lastUsedMinutes": null
+        },
+        "clear_skies": {
+          "learned": [
+            false,
+            false,
+            false
+          ],
+          "unlocked": [
+            false,
+            false,
+            false
+          ],
+          "lastUsedMinutes": null
+        },
+        "elemental_fury": {
+          "learned": [
+            false,
+            false,
+            false
+          ],
+          "unlocked": [
+            false,
+            false,
+            false
+          ],
+          "lastUsedMinutes": null
+        }
+      }
+    },
+    "follower": {
+      "activeFollower": null,
+      "deceasedFollowerIds": [],
+      "stance": "aggressive",
+      "abilityLastUsedAtHours": null,
+      "comboLastUsedAtHours": {}
+    },
+    "perks": {
+      "unlockedPerkIds": [],
+      "perkPoints": 0
+    },
+    "survival": {
+      "hunger": 99.68055555555563,
+      "fatigue": 99.36111111111126,
+      "cold": 100
+    },
+    "dynamicWorldEvents": [
+      {
+        "id": "roadside_bandit_cache",
+        "lastTriggeredAt": 13.103333333333328,
+        "triggerCount": 1
+      },
+      {
+        "id": "storm_lost_supplies",
+        "lastTriggeredAt": null,
+        "triggerCount": 0
+      },
+      {
+        "id": "hidden_cache_followup",
+        "lastTriggeredAt": null,
+        "triggerCount": 0
+      }
+    ],
+    "travelEvents": [
+      {
+        "id": "travel_wanderer_rumor",
+        "lastFiredAt": null,
+        "fired": false
+      },
+      {
+        "id": "travel_sandstorm_tales",
+        "lastFiredAt": null,
+        "fired": false
+      },
+      {
+        "id": "travel_storm_refuge",
+        "lastFiredAt": null,
+        "fired": false
+      },
+      {
+        "id": "travel_frost_warning",
+        "lastFiredAt": null,
+        "fired": false
+      }
+    ],
+    "ambientEvents": [
+      {
+        "id": "ambient_wolf_howl",
+        "lastFiredAt": null,
+        "fired": false
+      },
+      {
+        "id": "ambient_shooting_star",
+        "lastFiredAt": null,
+        "fired": false
+      },
+      {
+        "id": "ambient_market_news",
+        "lastFiredAt": 13.103333333333328,
+        "fired": true
+      },
+      {
+        "id": "ambient_birdsong",
+        "lastFiredAt": null,
+        "fired": false
+      }
+    ],
+    "stealth": {
+      "isCrouching": false
+    },
+    "combatEffects": []
+  },
+  "expect": {
+    "playerName": "Fixture",
+    "level": 1,
+    "gold": 265,
+    "items": [
+      "gold_coins×265",
+      "iron_ingot×6",
+      "leather_strips×2",
+      "potion_hp_01×2",
+      "repair_hammer×2"
+    ],
+    "hour": 13,
+    "activeJobs": [
+      "inn_0_3:supply_leather:0"
+    ],
+    "discovered": [
+      "start_village",
+      "village_0_3"
+    ],
+    "activeQuests": [
+      "job_inn_0_3",
+      "quest_collect_potions",
+      "quest_kill_guard",
+      "quest_speak_guard"
+    ]
+  }
+}

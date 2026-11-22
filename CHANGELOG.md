@@ -185,6 +185,18 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   - A conversation ends by itself if the speaker dies, attacks or unloads,
     or you're moved away from them.
   - The fallback greeting shows "Innkeeper", not "Innkeeper_10234".
+- Engine overhaul, Phase 0 (guardrails). CI now also checks:
+  - architecture rules and ratchets (`npm run check:guardrails`)
+  - bundle-size budgets (`npm run check:bundle`)
+  - render budgets on a fixed-seed world (`perf-budget.spec.ts`)
+  - that a corpus of real saves still loads and restores exactly
+    (`save-fixtures.spec.ts`)
+
+  A headless harness runs village days on the real planner, schedules and
+  wall colliders in unit tests.
+- Fixed: loading a game added a junk "Exterior" destination to the
+  fast-travel list.
+- Fixed: villagers could sidestep through a doorway into a building.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

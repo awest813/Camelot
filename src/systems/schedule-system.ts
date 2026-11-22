@@ -8,6 +8,8 @@ const STUCK_PROGRESS = 0.35;
 const STUCK_SECONDS = 1.5;
 /** How long a sidestep lasts once stuck. */
 const DETOUR_SECONDS = 1.1;
+/** How far ahead (m) a sidestep checks for open ground. */
+const SIDESTEP_PROBE = 0.9;
 /** Give up on a target after this many sidesteps that didn't help. */
 const MAX_DETOURS = 4;
 
@@ -265,8 +267,22 @@ export class ScheduleSystem {
 
     this._direction.normalize();
     if (st.detour > 0) {
-      // Sidestep: mostly sideways, a little forward, to slide round the obstacle.
+      // Sidestep: mostly sideways, a little forward, to slide round the
+      // obstacle — but only onto open ground (never through a doorway into a
+      // building): try this side, then the other, else hold still.
       const fx = this._direction.x, fz = this._direction.z;
+      const p = npc.mesh.position;
+      const open = (side: number) => {
+        const dx = fz * side + fx * 0.3, dz = -fx * side + fz * 0.3;
+        const l = Math.hypot(dx, dz) || 1;
+        return !this.walkable || this.walkable(p.x + (dx / l) * SIDESTEP_PROBE, p.z + (dz / l) * SIDESTEP_PROBE);
+      };
+      if (!open(st.side)) st.side = -st.side;
+      if (!open(st.side)) {
+        st.detour = 0;
+        this._applyStopHorizontal(npc);
+        return false;
+      }
       this._direction.set(fz * st.side + fx * 0.3, 0, -fx * st.side + fz * 0.3).normalize();
     }
     this._direction.scaleToRef(speed, this._velocity);

@@ -45,6 +45,15 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Engine-overhaul guardrails: architecture rules + ratchets (game.ts
+      # size, unseeded randomness, callback wiring, Babylon GUI usage) and
+      # bundle-size budgets. See docs/engine-overhaul-plan.md (Phase 0).
+      - name: Architecture guardrails
+        run: npm run check:guardrails
+
+      - name: Bundle budgets
+        run: npm run check:bundle
+
       - name: Desktop shell syntax
         run: npm run desktop:check
 
@@ -73,7 +82,8 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       # The Playwright webServer config starts the Vite dev server itself
-      # (see playwright.config.ts, port 8099).
+      # (see playwright.config.ts, port 8099). Includes the render budgets
+      # (perf-budget.spec.ts) and the save-fixture corpus (save-fixtures.spec.ts).
       - name: E2E tests
         run: npm run test:e2e
 
