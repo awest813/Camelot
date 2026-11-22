@@ -324,6 +324,16 @@ state, scope and save codec.
      types (camps, inns, dragons) will use next. The old village-world
      service split into `actors` and `villages`.
 
+  5. **World sites** (`src/features/world-sites/`): what appears where as
+     chunks load. That covers ponds, villages, wild nature, homesteads,
+     forest inns, bandit camps, the tundra dragon, and the remote-only
+     obelisks, haunted houses, graveyards, snow fields and skulls. The
+     dressing layouts are data in the feature, and the per-chunk hash is
+     pinned by a test. The chunk loader in `game.ts` is now one call. 8
+     Babylon demo models (d20, chair, alien, underwater scene, octopus, buoy,
+     novelty pumpkin, rabbit) were dropped, along with 18 never-used remote
+     asset keys.
+
   Render counts after the extraction match the pre-extraction baseline
   (2,066 village meshes), so villages are built identically. The render
   budget check now also has floors, so a scene that failed to render can't

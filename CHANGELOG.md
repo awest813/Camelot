@@ -197,6 +197,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Fixed: loading a game added a junk "Exterior" destination to the
   fast-travel list.
 - Fixed: villagers could sidestep through a doorway into a building.
+- Removed leftover Babylon.js demo models from world generation: a d20, a
+  chair, an alien, an underwater scene, an octopus, a buoy, a novelty
+  pumpkin and a rabbit. They only appeared with remote assets enabled. 18
+  remote asset entries that nothing used were removed too.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

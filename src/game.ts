@@ -92,6 +92,7 @@ import {
   QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey,
 } from "./features/services";
 import { VillagesFeature, VillagesKey, type VillagesService } from "./features/villages/villages-feature";
+import { WorldSitesFeature, WorldSitesKey, type WorldSitesService } from "./features/world-sites/world-sites-feature";
 import { IndoorsFeature } from "./features/indoors/indoors-feature";
 import { VillageJobsFeature, JobsKey, type JobsService } from "./features/village-jobs/jobs-feature";
 import { ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
@@ -397,6 +398,11 @@ export class Game {
   /** The villages feature's service (plans, loaded villages, where the player is). */
   public get villages(): VillagesService {
     return this.kernel.services.get(VillagesKey);
+  }
+
+  /** What goes where as chunks load (world-sites feature). */
+  public get worldSites(): WorldSitesService {
+    return this.kernel.services.get(WorldSitesKey);
   }
 
   /** The village jobs feature's service (job window, rules). */
@@ -2165,303 +2171,14 @@ export class Game {
     {
       if (remotePropsEnabled) this.fantasyAssets.preloadRemoteCdnAssets();
 
-      // ── CDN model world placement via chunk lifecycle ──────────────────────
-      // Deterministic seeding: same chunk always produces same props.
-      const _chunkRand = (cx: number, cz: number, slot: number) =>
-        Math.abs(Math.sin(cx * 311.7 + cz * 127.1 + slot * 59.3)) % 1;
-
+      // ── Chunk content (placement rules: world-sites feature) ──────────────
       this.world.onChunkLoaded = (cx, cz, biome) => {
-        const worldX = cx * this.world.chunkSize;
-        const worldZ = cz * this.world.chunkSize;
         const chunkKey = `${cx},${cz}`;
         const chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] } = { roots: [], npcs: [] };
         this._chunkFantasyContent.set(chunkKey, chunkRecord);
-        // Pond chunks are quiet clearings — no props dropped into the water.
-        if (this.world.pondAt(cx, cz)) return;
-        // A village takes the whole chunk: no other sites or wild scatter.
-        if (this.villages.populate(chunkKey, cx, cz)) return;
-        this._scatterGrimNature(chunkKey, chunkRecord, biome, worldX, worldZ, (slot) => _chunkRand(cx, cz, slot));
-
-      // ── Obelisks in desert / plains (1-in-8 chance per chunk) ────────────
-      if ((biome === "desert" || biome === "plains") && _chunkRand(cx, cz, 0) < 0.125) {
-        const ox = worldX + (_chunkRand(cx, cz, 1) - 0.5) * this.world.chunkSize * 0.7;
-        const oz = worldZ + (_chunkRand(cx, cz, 2) - 0.5) * this.world.chunkSize * 0.7;
-        this.fantasyAssets.getInstance("obelisk", (root) => {
-          if (!root) return;
-          const s = 0.8 + _chunkRand(cx, cz, 3) * 0.6;
-          root.position.set(ox, 0, oz);
-          setInstanceYaw(root, _chunkRand(cx, cz, 4) * Math.PI * 2);
-          setInstanceScale(root, s);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
-        });
-      }
-
-      // ── Cottage in plains (1-in-12 chance) ───────────────────────────────
-      if (biome === "plains" && _chunkRand(cx, cz, 5) < 0.083) {
-        const cx2 = worldX + (_chunkRand(cx, cz, 6) - 0.5) * this.world.chunkSize * 0.5;
-        const cz2 = worldZ + (_chunkRand(cx, cz, 7) - 0.5) * this.world.chunkSize * 0.5;
-        // Plaster-and-timber cottage from Medieval Village modules.
-        this._placeBuilding(chunkKey, chunkRecord, "cottage", { x: cx2, z: cz2 - 5, rot: 0 });
-        // Homestead: a villager and a visiting instructor rotating per chunk.
-        this._spawnArchetypeNpc("archetype_villager", chunkRecord, cx2 + 2, cz2 + 2);
-        const cottageTrainer = [
-          "archetype_trainer_blade",
-          "archetype_trainer_alchemy",
-          "archetype_trainer_destruction",
-          "archetype_trainer_armorer",
-        ][((cx + cz) % 4 + 4) % 4];
-        this._spawnArchetypeNpc(cottageTrainer, chunkRecord, cx2 - 2, cz2 + 1);
-        this._dressSite(chunkKey, chunkRecord, "cottage", { x: cx2, z: cz2, rot: 0 }, {
-          alchemist: cottageTrainer === "archetype_trainer_alchemy",
-        });
-        // The smith works out of a forge and anvil beside the homestead.
-        if (cottageTrainer === "archetype_trainer_armorer") {
-          this._placeSmithy(chunkKey, chunkRecord, cx2 - 4.5, cz2 + 2.5);
-        }
-        if (_chunkRand(cx, cz, 91) < 0.3) {
-          this._spawnArchetypeNpc("archetype_guard", chunkRecord, cx2 + 3, cz2 - 2);
-        }
-      }
-
-      // ── Dragon encounter in tundra (1-in-20 chance — very rare) ──────────
-      if (biome === "tundra" && _chunkRand(cx, cz, 9) < 0.05) {
-        const dx = worldX + (_chunkRand(cx, cz, 10) - 0.5) * this.world.chunkSize * 0.6;
-        const dz = worldZ + (_chunkRand(cx, cz, 11) - 0.5) * this.world.chunkSize * 0.6;
-        // Register the boss NPC first so the AI/combat system tracks it
-        const dragonNpc = new NPC(this.scene, new Vector3(dx, 2, dz), `DragonBoss_${cx}_${cz}`);
-        dragonNpc.maxHealth    = 500;
-        dragonNpc.health       = 500;
-        dragonNpc.attackDamage = 40;
-        dragonNpc.aggroRange   = 25;
-        dragonNpc.xpReward     = 500;
-        dragonNpc.armorRating  = 60;
-        dragonNpc.lootTableId  = "boss_loot";
-        // Hide the default capsule — the CDN model provides the visual
-        dragonNpc.mesh.isVisible = false;
-        this.scheduleSystem.addNPC(dragonNpc);
-        const reg = this.world.getRegionAt(cx, cz);
-        this.levelScalingSystem?.scaleNPC(dragonNpc, this.player.level, reg?.dangerLevel);
-        chunkRecord.npcs.push(dragonNpc);
-        // NOTE: the capsule stays unregistered in LodSystem — visibility toggling
-        // would reveal it; the CDN model root is LOD-tracked via _trackChunkProp.
-
-        // Local dark-fantasy dragon body, parented to the capsule so it moves,
-        // turns and fights with the boss (works offline; the old CDN model
-        // was static and never followed the NPC).
-        this.fantasyAssets.getInstance("qDragonSmall", (root) => {
-          if (!root) return;
-          if (dragonNpc.isDead || dragonNpc.mesh.isDisposed() || this._chunkFantasyContent.get(chunkKey) !== chunkRecord) {
-            root.dispose();
-            return;
-          }
-          root.parent = dragonNpc.mesh;
-          root.position.set(0, -1, 0); // capsule origin sits 1 unit above its feet
-          setInstanceScale(root, 2.5);
-          const yaw = _chunkRand(cx, cz, 12) * Math.PI * 2;
-          setInstanceYaw(root, yaw);
-          for (const m of root.getChildMeshes(false)) m.isPickable = false;
-          this._dragonVisuals.set(dragonNpc, { root, yaw, last: dragonNpc.mesh.position.clone(), t: 0 });
-          dragonNpc.mesh.onDisposeObservable.addOnce(() => this._dragonVisuals.delete(dragonNpc));
-          this._trackChunkProp(chunkKey, chunkRecord, root, "boss");
-        });
-      }
-
-      // ── Inn in forest (1-in-15 chance) ────────────────────────────────────
-      if (biome === "forest" && _chunkRand(cx, cz, 13) < 0.067) {
-        const ix = worldX + (_chunkRand(cx, cz, 14) - 0.5) * this.world.chunkSize * 0.5;
-        const iz = worldZ + (_chunkRand(cx, cz, 15) - 0.5) * this.world.chunkSize * 0.5;
-        // Brick inn assembled from Medieval Village modules, set back so its
-        // door faces the yard where the staff and dressing stand.
-        this._placeBuilding(chunkKey, chunkRecord, "inn", { x: ix, z: iz - 8, rot: 0 });
-        this._dressSite(chunkKey, chunkRecord, "inn", { x: ix, z: iz, rot: 0 }, {
-          merchant: ((cx + cz) % 5 + 5) % 5 === 4,
-        });
-        // Settle the inn: proprietor, barkeep, and a rotating specialist
-        // shopkeeper (deterministic per chunk) — occasionally a guard.
-        this._spawnArchetypeNpc("archetype_innkeeper", chunkRecord, ix + 2.5, iz + 2.5);
-        this._spawnArchetypeNpc("archetype_barkeeper", chunkRecord, ix - 2.5, iz + 2);
-        const innSpecial = [
-          "archetype_shopkeeper_general",
-          "archetype_shopkeeper_weapons",
-          "archetype_shopkeeper_armor",
-          "archetype_shopkeeper_alchemist",
-          "archetype_merchant",
-        ][((cx + cz) % 5 + 5) % 5];
-        this._spawnArchetypeNpc(innSpecial, chunkRecord, ix + 4, iz - 3);
-        // Arms and armor sellers keep a working forge out back.
-        if (innSpecial === "archetype_shopkeeper_weapons" || innSpecial === "archetype_shopkeeper_armor") {
-          this._placeSmithy(chunkKey, chunkRecord, ix + 6.5, iz - 5);
-        }
-        if (_chunkRand(cx, cz, 90) < 0.4) {
-          this._spawnArchetypeNpc("archetype_guard", chunkRecord, ix - 4, iz - 3);
-        }
-      }
-
-      // ── Haunted house in tundra (1-in-10 chance — Skyrim abandoned shacks) ──
-      if (biome === "tundra" && _chunkRand(cx, cz, 17) < 0.10) {
-        const hx = worldX + (_chunkRand(cx, cz, 18) - 0.5) * this.world.chunkSize * 0.55;
-        const hz = worldZ + (_chunkRand(cx, cz, 19) - 0.5) * this.world.chunkSize * 0.55;
-        this.fantasyAssets.getInstance("hauntedHouse", (root) => {
-          if (!root) return;
-          root.position.set(hx, 0, hz);
-          setInstanceYaw(root, _chunkRand(cx, cz, 20) * Math.PI * 2);
-          setInstanceScale(root, 1.2);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
-        });
-      }
-
-      // ── Graveyard near ruins in plains/forest (1-in-10 chance) ───────────
-      if ((biome === "plains" || biome === "forest") && _chunkRand(cx, cz, 21) < 0.10) {
-        const gx = worldX + (_chunkRand(cx, cz, 22) - 0.5) * this.world.chunkSize * 0.6;
-        const gz = worldZ + (_chunkRand(cx, cz, 23) - 0.5) * this.world.chunkSize * 0.6;
-        this.fantasyAssets.getInstance("graveYardScene", (root) => {
-          if (!root) return;
-          root.position.set(gx, 0, gz);
-          setInstanceYaw(root, _chunkRand(cx, cz, 24) * Math.PI * 2);
-          setInstanceScale(root, 1.0);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "scene");
-        });
-      }
-
-      // ── Pirate fort + cannon in desert (bandit camp) ─────────────────────
-      if (biome === "desert" && _chunkRand(cx, cz, 40) < 0.048) {
-        const fx = worldX + (_chunkRand(cx, cz, 41) - 0.5) * this.world.chunkSize * 0.62;
-        const fz = worldZ + (_chunkRand(cx, cz, 42) - 0.5) * this.world.chunkSize * 0.62;
-        const fortRot = _chunkRand(cx, cz, 43) * Math.PI * 2;
-        // Bandit camp: a rough palisade, banners, a wagon and stolen goods
-        // (Quaternius props — the old CDN pirate fort was online-only).
-        this._dressBanditCamp(chunkKey, chunkRecord, { x: fx, z: fz, rot: fortRot });
-        // Garrison the bandit camp: two lookouts, an archer on the edge,
-        // and their chief. Bandits carry bandit_loot (including the
-        // Bandit Bounty quest token).
-        this._spawnArchetypeNpc("archetype_bandit", chunkRecord, fx + 3, fz + 2);
-        this._spawnArchetypeNpc("archetype_bandit", chunkRecord, fx - 3, fz - 2);
-        this._spawnArchetypeNpc("archetype_bandit_archer", chunkRecord, fx, fz + 5);
-        this._spawnArchetypeNpc("archetype_bandit_chief", chunkRecord, fx, fz);
-      }
-
-      // ── Tundra snow-field patch (ground dressing) ─────────────────────────
-      if (biome === "tundra" && _chunkRand(cx, cz, 45) < 0.085) {
-        const sx = worldX + (_chunkRand(cx, cz, 46) - 0.5) * this.world.chunkSize * 0.75;
-        const sz = worldZ + (_chunkRand(cx, cz, 47) - 0.5) * this.world.chunkSize * 0.75;
-        this.fantasyAssets.getInstance("snowField", (root) => {
-          if (!root) return;
-          root.position.set(sx, 0, sz);
-          setInstanceYaw(root, _chunkRand(cx, cz, 48) * Math.PI * 2);
-          const s = 0.85 + _chunkRand(cx, cz, 49) * 0.35;
-          setInstanceScale(root, s);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
-        });
-      }
-
-      // ── Forest / plains wildlife & props ──────────────────────────────────
-      if ((biome === "forest" || biome === "plains") && _chunkRand(cx, cz, 50) < 0.055) {
-        const rx = worldX + (_chunkRand(cx, cz, 51) - 0.5) * this.world.chunkSize * 0.85;
-        const rz = worldZ + (_chunkRand(cx, cz, 52) - 0.5) * this.world.chunkSize * 0.85;
-        this.fantasyAssets.getInstance("rabbit", (root) => {
-          if (!root) return;
-          root.position.set(rx, 0, rz);
-          setInstanceYaw(root, _chunkRand(cx, cz, 53) * Math.PI * 2);
-          setInstanceScale(root, 0.9 + _chunkRand(cx, cz, 54) * 0.25);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
-        });
-      }
-
-      if (biome === "forest" && _chunkRand(cx, cz, 55) < 0.038) {
-        const px = worldX + (_chunkRand(cx, cz, 56) - 0.5) * this.world.chunkSize * 0.55;
-        const pz = worldZ + (_chunkRand(cx, cz, 57) - 0.5) * this.world.chunkSize * 0.55;
-        this.fantasyAssets.getInstance("pumpkinCarved", (root) => {
-          if (!root) return;
-          root.position.set(px, 0, pz);
-          setInstanceYaw(root, _chunkRand(cx, cz, 58) * Math.PI * 2);
-          setInstanceScale(root, 1.0);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
-        });
-      }
-
-      if (biome === "plains" && _chunkRand(cx, cz, 59) < 0.032) {
-        const dx = worldX + (_chunkRand(cx, cz, 60) - 0.5) * this.world.chunkSize * 0.5;
-        const dz = worldZ + (_chunkRand(cx, cz, 61) - 0.5) * this.world.chunkSize * 0.5;
-        this.fantasyAssets.getInstance("d20Animated", (root) => {
-          if (!root) return;
-          root.position.set(dx, 0.15, dz);
-          setInstanceYaw(root, _chunkRand(cx, cz, 62) * Math.PI * 2);
-          setInstanceScale(root, 1.0);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
-        });
-      }
-
-      if (biome === "plains" && _chunkRand(cx, cz, 63) < 0.028) {
-        const cx3 = worldX + (_chunkRand(cx, cz, 64) - 0.5) * this.world.chunkSize * 0.45;
-        const cz3 = worldZ + (_chunkRand(cx, cz, 65) - 0.5) * this.world.chunkSize * 0.45;
-        this.fantasyAssets.getInstance("sheenChair", (root) => {
-          if (!root) return;
-          root.position.set(cx3, 0, cz3);
-          setInstanceYaw(root, _chunkRand(cx, cz, 66) * Math.PI * 2);
-          setInstanceScale(root, 1.0);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
-        });
-      }
-
-      if (biome === "desert" && _chunkRand(cx, cz, 67) < 0.022) {
-        const ax = worldX + (_chunkRand(cx, cz, 68) - 0.5) * this.world.chunkSize * 0.7;
-        const az = worldZ + (_chunkRand(cx, cz, 69) - 0.5) * this.world.chunkSize * 0.7;
-        this.fantasyAssets.getInstance("alien", (root) => {
-          if (!root) return;
-          root.position.set(ax, 0.2, az);
-          setInstanceYaw(root, _chunkRand(cx, cz, 70) * Math.PI * 2);
-          setInstanceScale(root, 1.0);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
-        });
-      }
-
-      // ── Skull scatter (desert / tundra) ─────────────────────────────────────
-      if ((biome === "desert" || biome === "tundra") && _chunkRand(cx, cz, 71) < 0.065) {
-        const kx = worldX + (_chunkRand(cx, cz, 72) - 0.5) * this.world.chunkSize * 0.9;
-        const kz = worldZ + (_chunkRand(cx, cz, 73) - 0.5) * this.world.chunkSize * 0.9;
-        this.fantasyAssets.getInstance("skull", (root) => {
-          if (!root) return;
-          root.position.set(kx, 0, kz);
-          setInstanceYaw(root, _chunkRand(cx, cz, 74) * Math.PI * 2);
-          setInstanceScale(root, 0.55 + _chunkRand(cx, cz, 75) * 0.5);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
-        });
-      }
-
-      // ── Extra BabylonJS CDN samples (underwater / shoreline) ───────────────
-      if (biome === "forest" && _chunkRand(cx, cz, 76) < 0.017) {
-        const ux = worldX + (_chunkRand(cx, cz, 77) - 0.5) * this.world.chunkSize * 0.65;
-        const uz = worldZ + (_chunkRand(cx, cz, 78) - 0.5) * this.world.chunkSize * 0.65;
-        this.fantasyAssets.getInstance("underwaterScene", (root) => {
-          if (!root) return;
-          root.position.set(ux, -0.5, uz);
-          setInstanceYaw(root, _chunkRand(cx, cz, 79) * Math.PI * 2);
-          setInstanceScale(root, 1.0);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "scene");
-        });
-      }
-      if ((biome === "forest" || biome === "plains") && _chunkRand(cx, cz, 80) < 0.02) {
-        const opx = worldX + (_chunkRand(cx, cz, 81) - 0.5) * this.world.chunkSize * 0.72;
-        const opz = worldZ + (_chunkRand(cx, cz, 82) - 0.5) * this.world.chunkSize * 0.72;
-        this.fantasyAssets.getInstance("octopusCustomRig", (root) => {
-          if (!root) return;
-          root.position.set(opx, 0.4, opz);
-          setInstanceYaw(root, _chunkRand(cx, cz, 83) * Math.PI * 2);
-          setInstanceScale(root, 1.0);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
-        });
-      }
-      if (biome === "plains" && _chunkRand(cx, cz, 84) < 0.014) {
-        const bx = worldX + (_chunkRand(cx, cz, 85) - 0.5) * this.world.chunkSize * 0.8;
-        const bz = worldZ + (_chunkRand(cx, cz, 86) - 0.5) * this.world.chunkSize * 0.8;
-        this.fantasyAssets.getInstance("babylonBuoy", (root) => {
-          if (!root) return;
-          root.position.set(bx, 0, bz);
-          setInstanceYaw(root, _chunkRand(cx, cz, 87) * Math.PI * 2);
-          setInstanceScale(root, 1.0);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
-        });
-      }
+        // What goes where lives in the world-sites feature (villages, camps,
+        // inns, homesteads, the dragon, wild nature).
+        this.worldSites.populate(chunkKey, cx, cz, biome);
       };
 
       // Dispose chunk-scoped CDN props and NPCs when their chunk unloads so
@@ -7514,37 +7231,6 @@ export class Game {
       });
   }
 
-  /**
-   * Dress a settlement with Quaternius props so it reads as lived-in even
-   * when the remote CDN building is absent (offline builds).
-   */
-  private _dressSite(
-      chunkKey: string,
-      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
-      kind: "inn" | "cottage",
-      origin: { x: number; z: number; rot: number },
-      extras: { merchant?: boolean; alchemist?: boolean } = {},
-  ): void {
-      const P = (key: FantasyAssetKey, dx: number, dz: number, rot = 0) =>
-        this._placeSiteProp(chunkKey, chunkRecord, key, origin, dx, dz, rot);
-      if (kind === "inn") {
-        P("qBarrel", 5.5, 1.2);
-        P("qBarrel", 6.2, 2.1, 0.7);
-        P("qCrate", 5.8, -0.4, 0.3);
-        P("qBench", 0, 5.5);
-        P("qTable", 0, 6.8);
-        P("qBannerStand", -3.2, 4.8, Math.PI);
-        P("qLantern", 2.4, 4.6);
-        P("qLantern", -2.4, 4.6);
-        if (extras.merchant) P("qMarketStall", 5.2, -4.5, -Math.PI / 2);
-      } else {
-        P("qBarrel", 3.4, 0.8);
-        P("qCrate", 3.6, -0.6, 0.4);
-        P("qBench", -0.5, 3.6, 0.1);
-        P("qFlag", -3.5, -2.5, 0.5);
-        if (extras.alchemist) P("qCauldron", -2.6, 2.4);
-      }
-  }
 
   /**
    * A night-only flame: a small glowing core plus a warm point light
@@ -7593,6 +7279,52 @@ export class Game {
         // A uniform, so no markDirty() / shader rebuild is needed.
         m.emissiveColor.set(1.0 * glow, 0.58 * glow, 0.22 * glow);
       }
+  }
+
+  /**
+   * The tundra dragon boss: an NPC the combat AI tracks, with the
+   * Quaternius dragon body parented to its capsule.  Owned by the chunk.
+   */
+  private _spawnDragon(chunkKey: string, x: number, z: number, yaw: number): void {
+        const chunkRecord = this._chunkFantasyContent.get(chunkKey);
+        if (!chunkRecord) return;
+        const [cx, cz] = chunkKey.split(",").map(Number);
+        // Register the boss NPC first so the AI/combat system tracks it
+        const dragonNpc = new NPC(this.scene, new Vector3(x, 2, z), `DragonBoss_${cx}_${cz}`);
+        dragonNpc.maxHealth    = 500;
+        dragonNpc.health       = 500;
+        dragonNpc.attackDamage = 40;
+        dragonNpc.aggroRange   = 25;
+        dragonNpc.xpReward     = 500;
+        dragonNpc.armorRating  = 60;
+        dragonNpc.lootTableId  = "boss_loot";
+        // Hide the default capsule — the CDN model provides the visual
+        dragonNpc.mesh.isVisible = false;
+        this.scheduleSystem.addNPC(dragonNpc);
+        const reg = this.world.getRegionAt(cx, cz);
+        this.levelScalingSystem?.scaleNPC(dragonNpc, this.player.level, reg?.dangerLevel);
+        chunkRecord.npcs.push(dragonNpc);
+        // NOTE: the capsule stays unregistered in LodSystem — visibility toggling
+        // would reveal it; the CDN model root is LOD-tracked via _trackChunkProp.
+
+        // Local dark-fantasy dragon body, parented to the capsule so it moves,
+        // turns and fights with the boss (works offline; the old CDN model
+        // was static and never followed the NPC).
+        this.fantasyAssets.getInstance("qDragonSmall", (root) => {
+          if (!root) return;
+          if (dragonNpc.isDead || dragonNpc.mesh.isDisposed() || this._chunkFantasyContent.get(chunkKey) !== chunkRecord) {
+            root.dispose();
+            return;
+          }
+          root.parent = dragonNpc.mesh;
+          root.position.set(0, -1, 0); // capsule origin sits 1 unit above its feet
+          setInstanceScale(root, 2.5);
+          setInstanceYaw(root, yaw);
+          for (const m of root.getChildMeshes(false)) m.isPickable = false;
+          this._dragonVisuals.set(dragonNpc, { root, yaw, last: dragonNpc.mesh.position.clone(), t: 0 });
+          dragonNpc.mesh.onDisposeObservable.addOnce(() => this._dragonVisuals.delete(dragonNpc));
+          this._trackChunkProp(chunkKey, chunkRecord, root, "boss");
+        });
   }
 
   /** Unregister an NPC from every system and dispose it. */
@@ -7681,6 +7413,19 @@ export class Game {
           return () => { this._buildingFootprints.delete(fp); };
         },
         nightFlame: (name, x, y, z) => this._nightFlame(name, x, y, z),
+        placeAsset: (chunkKey, key, at) => {
+          if (!record(chunkKey)) return;
+          this.fantasyAssets.getInstance(key, (root) => {
+            if (!root) return;
+            const r = record(chunkKey);
+            if (!r) { root.dispose(); return; }
+            root.position.set(at.x, at.y ?? 0, at.z);
+            setInstanceYaw(root, at.yaw);
+            if (at.scale !== undefined) setInstanceScale(root, at.scale);
+            this._trackChunkProp(chunkKey, r, root, at.tier ?? "prop");
+          });
+        },
+        spawnDragon: (chunkKey, x, z, yaw) => this._spawnDragon(chunkKey, x, z, yaw),
       });
       k.services.provide(InventoryKey, {
         count: (id) => this.inventorySystem.items.reduce((n, i) => (i.id === id ? n + i.quantity : n), 0),
@@ -7703,6 +7448,7 @@ export class Game {
 
       k.install(new IndoorsFeature());
       k.install(new VillagesFeature());
+      k.install(new WorldSitesFeature());
 
       const raids = new VillageRaidFeature();
       k.install(raids);
@@ -7722,64 +7468,7 @@ export class Game {
       this._releaseNpc(npc);
   }
 
-  /** Bandit camp dressing around a camp origin (entrance on local +Z). */
-  private _dressBanditCamp(
-      chunkKey: string,
-      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
-      origin: { x: number; z: number; rot: number },
-  ): void {
-      const P = (key: FantasyAssetKey, dx: number, dz: number, rot = 0) =>
-        this._placeSiteProp(chunkKey, chunkRecord, key, origin, dx, dz, rot);
-      // Palisade ring (radius 8.5) with a gap for the entrance at +Z.
-      const radius = 8.5;
-      for (let i = 0; i < 24; i++) {
-        const a = (i / 24) * Math.PI * 2;
-        if (Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) < 0.4) continue; // entrance
-        P("vFence", Math.sin(a) * radius, Math.cos(a) * radius, a);
-      }
-      P("qBannerStand", 2.6, radius - 0.6);
-      P("qBannerStand", -2.6, radius - 0.6);
-      P("vWagon", -5.2, -1.5, 0.35);
-      P("qCrate", 4.2, -3.2, 0.3);
-      P("qCrate", 5.0, -2.2, 1.1);
-      P("qBarrel", -3.6, -4.6);
-      P("qBarrel", -2.8, -5.3, 0.8);
-      P("qChest", 0, -2.6, Math.PI);
-      P("qSignPost", 3.6, 1.4, -Math.PI / 2); // weapon rack
-      P("qLantern", -1.6, 2.2);
-  }
 
-  /** A few grim nature pieces per chunk (dead / twisted trees, rocks, shelf fungus). */
-  private _scatterGrimNature(
-      chunkKey: string,
-      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
-      biome: string,
-      worldX: number,
-      worldZ: number,
-      rand: (slot: number) => number,
-  ): void {
-      const pools: Record<string, Array<[FantasyAssetKey, number]>> = {
-        forest: [["qWillowTree", 0.35], ["qDeadTree", 0.25], ["qMushroom", 0.5], ["qRockMedium", 0.3], ["qFern", 0.6]],
-        plains: [["qDeadTree", 0.3], ["qRockLarge", 0.25], ["qBushLarge", 0.35], ["qGrassClump", 0.6]],
-        tundra: [["qDeadTree", 0.55], ["qRockLarge", 0.45], ["qPineTree", 0.4]],
-        desert: [["qDeadTree", 0.35], ["qRockLarge", 0.5], ["qRockSmall", 0.5]],
-      };
-      const pool = pools[biome];
-      if (!pool) return;
-      const span = this.world.chunkSize * 0.8;
-      pool.forEach(([key, chance], i) => {
-        if (rand(40 + i) >= chance) return;
-        const x = worldX + (rand(50 + i) - 0.5) * span;
-        const z = worldZ + (rand(60 + i) - 0.5) * span;
-        this.fantasyAssets.getInstance(key, (root) => {
-          if (!root) return;
-          root.position.set(x, 0, z);
-          setInstanceYaw(root, rand(70 + i) * Math.PI * 2);
-          const tree = key === "qDeadTree" || key === "qWillowTree" || key === "qPineTree";
-          this._trackChunkProp(chunkKey, chunkRecord, root, tree ? "structure" : "prop");
-        });
-      });
-  }
 
   /**
    * Place a forge + anvil at (x, z) and register the forge as a usable station.

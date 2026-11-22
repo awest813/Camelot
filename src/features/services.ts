@@ -96,6 +96,12 @@ export interface SiteBuilderService {
   isLive(chunkKey: string): boolean;
   placeBuilding(chunkKey: string, kind: BuildingKind, origin: { x: number; z: number; rot: number }): void;
   placeProp(chunkKey: string, key: FantasyAssetKey, x: number, z: number, rot: number): void;
+  /** Place an asset with height, scale and culling tier (default "prop"). */
+  placeAsset(chunkKey: string, key: FantasyAssetKey, at: {
+    x: number; y?: number; z: number; yaw: number; scale?: number; tier?: "structure" | "scene" | "prop";
+  }): void;
+  /** The tundra dragon boss (NPC + body), owned by the chunk. */
+  spawnDragon(chunkKey: string, x: number, z: number, yaw: number): void;
   placeSmithy(chunkKey: string, x: number, z: number, rot: number): void;
   /** Own a mesh in the chunk: shadows and distance culling ("structure" tier). */
   ownStructure(chunkKey: string, mesh: AbstractMesh): void;

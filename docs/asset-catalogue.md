@@ -20,7 +20,7 @@ Assets are loaded via `FantasyAssetLoader` (`src/systems/fantasy-asset-loader.ts
 
 ```ts
 // Preload specific assets at startup
-assetLoader.preload(["cottage", "pirateFort", "qKnight", "qOakTree"]);
+assetLoader.preload(["cottage", "obelisk", "qKnight", "qOakTree"]);
 
 // Request an instance (fires callback when ready, or immediately if cached)
 assetLoader.getInstance("qKnight", (root, meshes) => {
@@ -260,13 +260,7 @@ These assets are registered in `FantasyAssetLoader` and ready to use via their
 
 | Key | Description | CDN Path | Format |
 |-----|-------------|----------|--------|
-| `elfAnimated` | Animated elf — humanoid NPC with full animation set | `Elf/Elf_allAnimations.gltf` | glTF |
-| `elfRun` | Elf run cycle — locomotion animation variant | `Elf/Elf_run.gltf` | glTF |
-| `elfDie` | Elf death animation — NPC death variant | `Elf/Elf_die.gltf` | glTF |
-| `dude` | Animated humanoid — generic NPC / villager | `Dude/dude.babylon` | Babylon |
 | `dragon` | Georgia Tech dragon — rare world encounter (scale 2×) | `Georgia-Tech-Dragon/dragon.glb` | GLB |
-| `seagull` | Seagull — ambient coastal creature | `seagulf.glb` | GLB |
-| `fish` | Fish — market stall / fishing prop | `fish.glb` | GLB |
 
 ### Weapons
 
@@ -283,17 +277,12 @@ These assets are registered in `FantasyAssetLoader` and ready to use via their
 | `cottage` | Thatched roof cottage — settlement building | `cottage.glb` | GLB |
 | `inn` | Roadside inn — settlement building | `inn.glb` | GLB |
 | `hauntedHouse` | Haunted house — ruins/fort variant | `haunted_house.glb` | GLB |
-| `mausoleum` | Stone mausoleum — graveyard structure | `mausoleumLarge.glb` | GLB |
-| `pirateFort` | Fort structure — bandit camp / ruins | `pirateFort/pirateFort.glb` | GLB |
-| `houseScene` | Single house scene — hamlet / farmstead | `house_scene.glb` | GLB |
-| `bothHousesScene` | Two-house scene — small settlement | `both_houses_scene.glb` | GLB |
 
 ### Scenes & Settlements
 
 | Key | Description | CDN Path | Format |
 |-----|-------------|----------|--------|
 | `village` | Village cluster — settlement scene | `village.glb` | GLB |
-| `valleyVillage` | Valley village with terrain — large settlement | `valleyvillage.glb` | GLB |
 | `graveYardScene` | Graveyard scene — cemetery near ruins | `graveyardScene.glb` | GLB |
 
 ### Props & Decorations
@@ -301,28 +290,13 @@ These assets are registered in `FantasyAssetLoader` and ready to use via their
 | Key | Description | CDN Path | Format |
 |-----|-------------|----------|--------|
 | `obelisk` | Ancient obelisk — shrine / standing stone | `obelisk1.glb` | GLB |
-| `cannon` | Cannon — fort / siege decoration | `pirateFort/cannon.glb` | GLB |
-| `explodingBarrel` | Barrel — interactive prop / dungeon hazard | `ExplodingBarrel.glb` | GLB |
 | `skull` | Skull — dungeon / necromancer decoration (scale 0.5×) | `skull.babylon` | Babylon |
-| `lamp` | Oil lamp — interior lighting prop | `lamp.babylon` | Babylon |
-| `candle` | Candle — interior / shrine decoration | `candle.babylon` | Babylon |
-| `hexTile` | Hex tile — modular terrain piece | `hexTile.glb` | GLB |
 
 ### Extra characters, props & dressing (integrated)
 
 | Key | Description | CDN Path | Format |
 |-----|-------------|----------|--------|
-| `hvGirl` | Animated female humanoid | `HVGirl.glb` | GLB |
-| `alien` | Alien creature (rare desert prop) | `alien.glb` | GLB |
-| `rabbit` | Rabbit wildlife | `Rabbit.babylon` | Babylon |
-| `shark` | Shark model (preload; decorative use) | `shark.glb` | GLB |
 | `snowField` | Snow terrain patch — tundra dressing | `Demos/Snow_Man_Scene/snowField.glb` | GLB |
-| `d20Animated` | Animated twenty-sided die | `D20_Animation.glb` | GLB |
-| `pumpkinCarved` | Carved pumpkin bucket | `pumpkinBucketCarved.glb` | GLB |
-| `sheenChair` | Sheen chair furniture | `SheenChair.glb` | GLB |
-| `underwaterScene` | Underwater demo environment (sunken vista) | `Demos/UnderWaterScene/underwaterScene.glb` | GLB |
-| `octopusCustomRig` | Rigged octopus | `octopus_customRig.glb` | GLB |
-| `babylonBuoy` | Buoy prop | `babylonBuoy.glb` | GLB |
 
 ---
 
@@ -331,12 +305,6 @@ These assets are registered in `FantasyAssetLoader` and ready to use via their
 The BabylonJS Assets CDN contains many more models that could be added to the
 catalogue.  Below are candidates that may be useful for Camelot but have not
 yet been integrated into `FantasyAssetLoader`.
-
-### Environments
-
-| Asset | CDN Path | Notes |
-|-------|----------|-------|
-| `underwaterSceneNavMesh.glb` | `Demos/UnderWaterScene/navMesh/underwaterSceneNavMesh.glb` | Pre-built navmesh for underwater area |
 
 ---
 

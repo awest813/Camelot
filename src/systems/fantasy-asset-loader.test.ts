@@ -6,7 +6,7 @@ describe("getRemoteCdnAssetKeys", () => {
   it("lists Babylon CDN keys and omits self-hosted Quaternius paths", () => {
     const keys = getRemoteCdnAssetKeys();
     expect(keys).toContain("runeSword");
-    expect(keys).toContain("underwaterScene");
+    expect(keys).toContain("obelisk");
     expect(keys).not.toContain("qKnight");
   });
 });

@@ -39,46 +39,20 @@ import "@babylonjs/loaders/glTF";
 // ── Asset catalogue ──────────────────────────────────────────────────────────
 
 export type FantasyAssetKey =
-  | "elfAnimated"     // Animated elf character — Oblivion-style humanoid NPC
   | "runeSword"       // Rune-inscribed longsword — high-tier loot
   | "frostAxe"        // Frost-enchanted axe — ice dungeon loot (Demos path)
   | "moltenDagger"    // Molten obsidian dagger — assassin loot
-  | "mausoleum"       // Stone mausoleum — graveyard structure
   | "obelisk"         // Ancient obelisk — desert shrine / standing stone
   | "cottage"         // Thatched roof cottage — settlement structure
   | "inn"             // Roadside inn — settlement structure
   | "dragon"          // Dragon — rare world encounter
   | "hauntedHouse"    // Haunted house — ruins/fort structure variant
   | "village"         // Village scene — settlement cluster
-  | "valleyVillage"   // Valley village with terrain — large settlement
   | "graveYardScene"  // Graveyard scene — cemetery near ruins
   // ── Additional assets from BabylonJS Assets CDN (CC BY 4.0) ───────────────
-  | "pirateFort"      // Fort structure — bandit camp / ruins variant
-  | "cannon"          // Cannon prop — fort / siege decoration
-  | "explodingBarrel" // Exploding barrel — interactive prop / dungeon hazard
   | "skull"           // Skull — dungeon decoration / necromancer prop
-  | "bothHousesScene" // Two-house scene — small settlement variant
-  | "houseScene"      // Single house scene — hamlet / farmstead structure
-  | "lamp"            // Oil lamp — interior lighting prop
-  | "candle"          // Candle — interior / shrine decoration
-  | "fish"            // Fish — market stall / fishing prop
-  | "seagull"         // Seagull — ambient coastal creature
-  | "hexTile"         // Hex tile — modular terrain / board piece
-  | "elfRun"          // Elf run animation — NPC locomotion variant
-  | "elfDie"          // Elf death animation — NPC death variant
-  | "dude"            // Animated humanoid — generic NPC / villager
   // ── More BabylonJS Assets CDN samples (CC BY 4.0) ───────────────────────────
-  | "hvGirl"          // Animated female humanoid — NPC / settlement ambience
-  | "alien"           // Alien creature — rare oddity / Daedric stand-in prop
-  | "rabbit"          // Rabbit — forest / plains wildlife
-  | "shark"           // Shark — decorative aquatic / trophy prop
   | "snowField"       // Snow terrain patch — tundra ground dressing
-  | "d20Animated"     // Animated D20 — camp / tavern gambling prop
-  | "pumpkinCarved"   // Carved pumpkin bucket — seasonal forest prop
-  | "sheenChair"      // Sheen chair — interior / exterior furniture
-  | "underwaterScene" // Underwater demo environment — rare sunken vista
-  | "octopusCustomRig" // Rigged octopus — shoreline / oddity encounter
-  | "babylonBuoy"     // Buoy — shoreline / marker prop
   // ── Quaternius: Fantasy Props Mega Kit (CC0) ──────────────────────────────
   | "qBarrel"         // Wooden barrel — tavern / warehouse prop
   | "qCrate"          // Wooden crate — warehouse / dungeon prop
@@ -194,7 +168,6 @@ export type FantasyAssetKey =
 
 const CDN      = "https://assets.babylonjs.com/meshes/";
 const CDN_DEMO = CDN + "Demos/weaponsDemo/meshes/";
-const CDN_ELF  = CDN + "Elf/";
 
 /**
  * Base path for self-hosted Quaternius assets.
@@ -228,46 +201,20 @@ const qAnims    = () => QUATERNIUS_BASE + "animations/";
 
 /** CDN URL for each asset key. */
 const ASSET_URLS: Record<FantasyAssetKey, string> = {
-  elfAnimated:    CDN_ELF  + "Elf_allAnimations.gltf",
   // Weapons: confirmed at both root and Demos sub-path; use Demos path as primary
   runeSword:      CDN_DEMO + "runeSword.glb",
   frostAxe:       CDN_DEMO + "frostAxe.glb",
   moltenDagger:   CDN_DEMO + "moltenDagger.glb",
-  mausoleum:      CDN      + "mausoleumLarge.glb",
   obelisk:        CDN      + "obelisk1.glb",
   cottage:        CDN      + "cottage.glb",
   inn:            CDN      + "inn.glb",
   dragon:         CDN      + "Georgia-Tech-Dragon/dragon.glb",
   hauntedHouse:   CDN      + "haunted_house.glb",
   village:        CDN      + "village.glb",
-  valleyVillage:  CDN      + "valleyvillage.glb",
   graveYardScene: CDN      + "graveyardScene.glb",
   // Additional assets from BabylonJS Assets CDN (CC BY 4.0)
-  pirateFort:     CDN      + "pirateFort/pirateFort.glb",
-  cannon:         CDN      + "pirateFort/cannon.glb",
-  explodingBarrel: CDN     + "ExplodingBarrel.glb",
   skull:          CDN      + "skull.babylon",
-  bothHousesScene: CDN     + "both_houses_scene.glb",
-  houseScene:     CDN      + "house_scene.glb",
-  lamp:           CDN      + "lamp.babylon",
-  candle:         CDN      + "candle.babylon",
-  fish:           CDN      + "fish.glb",
-  seagull:        CDN      + "seagulf.glb",
-  hexTile:        CDN      + "hexTile.glb",
-  elfRun:         CDN_ELF  + "Elf_run.gltf",
-  elfDie:         CDN_ELF  + "Elf_die.gltf",
-  dude:           CDN      + "Dude/dude.babylon",
-  hvGirl:         CDN      + "HVGirl.glb",
-  alien:          CDN      + "alien.glb",
-  rabbit:         CDN      + "Rabbit.babylon",
-  shark:          CDN      + "shark.glb",
   snowField:      CDN      + "Demos/Snow_Man_Scene/snowField.glb",
-  d20Animated:    CDN      + "D20_Animation.glb",
-  pumpkinCarved:  CDN      + "pumpkinBucketCarved.glb",
-  sheenChair:     CDN      + "SheenChair.glb",
-  underwaterScene: CDN     + "Demos/UnderWaterScene/underwaterScene.glb",
-  octopusCustomRig: CDN    + "octopus_customRig.glb",
-  babylonBuoy:    CDN     + "babylonBuoy.glb",
   // ── Quaternius: Fantasy Props Mega Kit (CC0) ──────────────────────────────
   // NOTE: ASSET_URLS for Quaternius assets use lazy getters (resolved at load
   // time) so setQuaterniusBasePath() can be called before preload.
@@ -428,23 +375,14 @@ export function getRemoteCdnAssetKeys(): FantasyAssetKey[] {
 // ── Scale overrides (world-unit scale applied after load) ────────────────────
 
 const ASSET_SCALE: Partial<Record<FantasyAssetKey, number>> = {
-  elfAnimated:    1.0,
-  mausoleum:      1.0,
   obelisk:        1.0,
   cottage:        1.0,
   inn:            1.0,
   dragon:         2.0,
   hauntedHouse:   1.0,
   village:        1.0,
-  valleyVillage:  1.0,
   graveYardScene: 1.0,
-  pirateFort:     1.0,
-  cannon:         1.0,
-  explodingBarrel: 1.0,
   skull:          0.5,
-  bothHousesScene: 1.0,
-  houseScene:     1.0,
-  dude:           1.0,
   // Quaternius characters (scale to match Camelot world units)
   qKnight:        1.0,
   qMage:          1.0,
@@ -467,17 +405,7 @@ const ASSET_SCALE: Partial<Record<FantasyAssetKey, number>> = {
   qWolf:          0.7,
   qBat:           0.4,
   qGhost:         1.0,
-  hvGirl:         0.04,
-  alien:          0.45,
-  rabbit:         0.42,
-  shark:          0.22,
   snowField:      0.038,
-  d20Animated:    0.55,
-  pumpkinCarved:  0.75,
-  sheenChair:     0.85,
-  underwaterScene: 0.022,
-  octopusCustomRig: 0.32,
-  babylonBuoy:    1.0,
 };
 
 // ── Internal state per asset ──────────────────────────────────────────────────

@@ -65,6 +65,8 @@ function setup() {
     own: (_c, m) => { owned.push(m); },
     addKeepOut: (fp) => { keepOuts.add(fp); return () => keepOuts.delete(fp); },
     nightFlame: () => null,
+    placeAsset: () => undefined,
+    spawnDragon: () => undefined,
   });
   k.services.provide(JobsKey, { open: (b) => { opened.push(b); } } as never);
   k.install(new VillagesFeature());

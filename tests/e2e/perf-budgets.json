@@ -1,34 +1,34 @@
 {
   "seed": "camelot-perf-1",
   "headroom": 1.15,
+  "floor": 0.5,
   "budgets": {
     "start": {
-      "drawCalls": 199,
+      "drawCalls": 201,
       "activeMeshes": 103,
-      "meshes": 632,
+      "meshes": 633,
       "materials": 126,
       "textures": 163
     },
     "village": {
-      "drawCalls": 538,
-      "activeMeshes": 470,
-      "meshes": 2376,
+      "drawCalls": 612,
+      "activeMeshes": 478,
+      "meshes": 2378,
       "materials": 252,
       "textures": 357
     }
   },
-  "floor": 0.5,
   "floors": {
     "start": {
-      "drawCalls": 86,
+      "drawCalls": 87,
       "activeMeshes": 44,
-      "meshes": 274,
+      "meshes": 275,
       "materials": 54,
       "textures": 70
     },
     "village": {
-      "drawCalls": 233,
-      "activeMeshes": 204,
+      "drawCalls": 266,
+      "activeMeshes": 207,
       "meshes": 1033,
       "materials": 109,
       "textures": 155

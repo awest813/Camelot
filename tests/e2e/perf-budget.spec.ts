@@ -55,16 +55,37 @@ async function createCharacterWithSeed(page: Page, seed: string) {
   await expect(root).toHaveCount(0, { timeout: 30_000 });
 }
 
+/**
+ * Wait until streaming settles: the scene's mesh count unchanged for three
+ * one-second polls (at most `maxMs`).  A fixed wait under-measured when
+ * parallel specs slowed asset loading.
+ */
+async function settle(page: Page, minMs: number, maxMs = 60_000): Promise<void> {
+  await page.waitForTimeout(minMs);
+  const t0 = Date.now();
+  let last = -1, stable = 0;
+  while (Date.now() - t0 < maxMs && stable < 3) {
+    const n = await page.evaluate(() => (window as any).__camelotGame.scene.meshes.length as number);
+    stable = n === last ? stable + 1 : 0;
+    last = n;
+    await page.waitForTimeout(1000);
+  }
+}
+
 async function measure(page: Page): Promise<Metrics> {
-  // The engine's draw-call counter only grows: diff two consecutive frames.
+  // The engine's draw-call counter only grows: average the per-frame
+  // difference over several frames (some passes, e.g. shadow refreshes, don't
+  // run every frame, so a single frame is noisy).
   const drawCalls = await page.evaluate(() => new Promise<number>((resolve) => {
+    const FRAMES = 8;
     const sc = (window as any).__camelotGame.scene; const eng = sc.getEngine();
-    let first = -1;
+    let first = -1, frames = 0;
     const obs = sc.onAfterRenderObservable.add(() => {
       const now = eng._drawCalls.current;
       if (first < 0) { first = now; return; }
+      if (++frames < FRAMES) return;
       sc.onAfterRenderObservable.remove(obs);
-      resolve(now - first);
+      resolve(Math.round((now - first) / FRAMES));
     });
   }));
   const rest = await page.evaluate(() => {
@@ -99,7 +120,7 @@ test("render counts stay within budget", async ({ page }) => {
     c.position.set(0, 3, 0);
     c.setTarget(new c.position.constructor(30, 2, 40));
   });
-  await page.waitForTimeout(10_000);
+  await settle(page, 6_000);
   scenes.start = await measure(page);
 
   // First village of the seed, looking across the square.
@@ -117,7 +138,7 @@ test("render counts stay within budget", async ({ page }) => {
     return false;
   });
   expect(found, "the perf seed has a village").toBe(true);
-  await page.waitForTimeout(12_000);
+  await settle(page, 8_000);
   scenes.village = await measure(page);
 
   console.log("perf budget measurements:", JSON.stringify(scenes));
