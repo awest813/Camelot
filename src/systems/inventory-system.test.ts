@@ -59,6 +59,23 @@ describe('InventorySystem', () => {
         expect(inventorySystem.items.length).toBe(2);
     });
 
+    it('removeQuantity takes units across stacks, all or nothing', () => {
+        const ingot = (q: number): Item => ({ id: 'ingot', name: 'Ingot', description: '', stackable: true, quantity: q });
+        inventorySystem.items = [ingot(1), { id: 'x', name: 'X', description: '', stackable: false, quantity: 1 }, ingot(2)];
+        expect(inventorySystem.removeQuantity('ingot', 2)).toBe(true);
+        expect(inventorySystem.items.filter((i) => i.id === 'ingot').reduce((n, i) => n + i.quantity, 0)).toBe(1);
+        expect(inventorySystem.removeQuantity('ingot', 5)).toBe(false);
+        expect(inventorySystem.items.filter((i) => i.id === 'ingot').reduce((n, i) => n + i.quantity, 0)).toBe(1);
+    });
+
+    it('removeInstance removes the exact entry passed in', () => {
+        const a: Item = { id: 'sword', name: 'Sword', description: '', stackable: false, quantity: 1, instanceId: 'a' };
+        const b: Item = { id: 'sword', name: 'Sword', description: '', stackable: false, quantity: 1, instanceId: 'b' };
+        inventorySystem.items = [a, b];
+        expect(inventorySystem.removeInstance(b)).toBe(true);
+        expect(inventorySystem.items.map((i) => i.instanceId)).toEqual(['a']);
+    });
+
     it('should remove an item', () => {
         const item: Item = { id: '1', name: 'Test Item', description: 'Desc', stackable: false, quantity: 1 };
         inventorySystem.addItem(item);

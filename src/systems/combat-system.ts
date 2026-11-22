@@ -1608,11 +1608,10 @@ export class CombatSystem {
 
   private _transitionTo(npc: NPC, newState: AIState): void {
     // Anyone who starts chasing / attacking has been provoked (hit, a resisted
-    // guard, a pack call); townsfolk calm down once they are home again.
+    // guard, a pack call); townsfolk calm down whenever they settle back into
+    // idle or patrol — via RETURN, a timed-out INVESTIGATE, or after fleeing.
     if (newState === AIState.CHASE || newState === AIState.ATTACK) npc.provoked = true;
-    if ((newState === AIState.IDLE || newState === AIState.PATROL) && npc.aiState === AIState.RETURN) {
-      npc.provoked = false;
-    }
+    if (newState === AIState.IDLE || newState === AIState.PATROL) npc.provoked = false;
     npc.aiState = newState;
 
     // Keep legacy flag in sync for ScheduleSystem / DialogueSystem

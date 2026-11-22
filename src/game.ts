@@ -155,7 +155,7 @@ import { AmbientEventSystem } from "./systems/ambient-event-system";
 import { LeveledListSystem, ALL_BUILT_IN_LEVELED_LISTS } from "./systems/leveled-list-system";
 import { EventManagerSystem } from "./systems/event-manager-system";
 import { AnimationSystem } from "./systems/animation-system";
-import { FantasyAssetLoader, setInstanceYaw, type FantasyAssetKey } from "./systems/fantasy-asset-loader";
+import { FantasyAssetLoader, setInstanceScale, setInstanceYaw, type FantasyAssetKey } from "./systems/fantasy-asset-loader";
 import { PetSystem } from "./systems/pet-system";
 import type { Pet } from "./systems/pet-system";
 import { PetUI } from "./ui/pet-ui";
@@ -2143,7 +2143,7 @@ export class Game {
           const s = 0.8 + _chunkRand(cx, cz, 3) * 0.6;
           root.position.set(ox, 0, oz);
           setInstanceYaw(root, _chunkRand(cx, cz, 4) * Math.PI * 2);
-          root.scaling.setAll(s);
+          setInstanceScale(root, s);
           this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
         });
       }
@@ -2208,7 +2208,7 @@ export class Game {
           }
           root.parent = dragonNpc.mesh;
           root.position.set(0, -1, 0); // capsule origin sits 1 unit above its feet
-          root.scaling.scaleInPlace(2.5);
+          setInstanceScale(root, 2.5);
           const yaw = _chunkRand(cx, cz, 12) * Math.PI * 2;
           setInstanceYaw(root, yaw);
           for (const m of root.getChildMeshes(false)) m.isPickable = false;
@@ -2257,7 +2257,7 @@ export class Game {
           if (!root) return;
           root.position.set(hx, 0, hz);
           setInstanceYaw(root, _chunkRand(cx, cz, 20) * Math.PI * 2);
-          root.scaling.setAll(1.2);
+          setInstanceScale(root, 1.2);
           this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
         });
       }
@@ -2270,7 +2270,7 @@ export class Game {
           if (!root) return;
           root.position.set(gx, 0, gz);
           setInstanceYaw(root, _chunkRand(cx, cz, 24) * Math.PI * 2);
-          root.scaling.setAll(1.0);
+          setInstanceScale(root, 1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "scene");
         });
       }
@@ -2301,7 +2301,7 @@ export class Game {
           root.position.set(sx, 0, sz);
           setInstanceYaw(root, _chunkRand(cx, cz, 48) * Math.PI * 2);
           const s = 0.85 + _chunkRand(cx, cz, 49) * 0.35;
-          root.scaling.setAll(s);
+          setInstanceScale(root, s);
           this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
         });
       }
@@ -2314,7 +2314,7 @@ export class Game {
           if (!root) return;
           root.position.set(rx, 0, rz);
           setInstanceYaw(root, _chunkRand(cx, cz, 53) * Math.PI * 2);
-          root.scaling.setAll(0.9 + _chunkRand(cx, cz, 54) * 0.25);
+          setInstanceScale(root, 0.9 + _chunkRand(cx, cz, 54) * 0.25);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
@@ -2326,7 +2326,7 @@ export class Game {
           if (!root) return;
           root.position.set(px, 0, pz);
           setInstanceYaw(root, _chunkRand(cx, cz, 58) * Math.PI * 2);
-          root.scaling.setAll(1.0);
+          setInstanceScale(root, 1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
@@ -2338,7 +2338,7 @@ export class Game {
           if (!root) return;
           root.position.set(dx, 0.15, dz);
           setInstanceYaw(root, _chunkRand(cx, cz, 62) * Math.PI * 2);
-          root.scaling.setAll(1.0);
+          setInstanceScale(root, 1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
@@ -2350,7 +2350,7 @@ export class Game {
           if (!root) return;
           root.position.set(cx3, 0, cz3);
           setInstanceYaw(root, _chunkRand(cx, cz, 66) * Math.PI * 2);
-          root.scaling.setAll(1.0);
+          setInstanceScale(root, 1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
@@ -2362,7 +2362,7 @@ export class Game {
           if (!root) return;
           root.position.set(ax, 0.2, az);
           setInstanceYaw(root, _chunkRand(cx, cz, 70) * Math.PI * 2);
-          root.scaling.setAll(1.0);
+          setInstanceScale(root, 1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
@@ -2375,7 +2375,7 @@ export class Game {
           if (!root) return;
           root.position.set(kx, 0, kz);
           setInstanceYaw(root, _chunkRand(cx, cz, 74) * Math.PI * 2);
-          root.scaling.setAll(0.55 + _chunkRand(cx, cz, 75) * 0.5);
+          setInstanceScale(root, 0.55 + _chunkRand(cx, cz, 75) * 0.5);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
@@ -2388,7 +2388,7 @@ export class Game {
           if (!root) return;
           root.position.set(ux, -0.5, uz);
           setInstanceYaw(root, _chunkRand(cx, cz, 79) * Math.PI * 2);
-          root.scaling.setAll(1.0);
+          setInstanceScale(root, 1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "scene");
         });
       }
@@ -2399,7 +2399,7 @@ export class Game {
           if (!root) return;
           root.position.set(opx, 0.4, opz);
           setInstanceYaw(root, _chunkRand(cx, cz, 83) * Math.PI * 2);
-          root.scaling.setAll(1.0);
+          setInstanceScale(root, 1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
@@ -2410,7 +2410,7 @@ export class Game {
           if (!root) return;
           root.position.set(bx, 0, bz);
           setInstanceYaw(root, _chunkRand(cx, cz, 87) * Math.PI * 2);
-          root.scaling.setAll(1.0);
+          setInstanceScale(root, 1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
       }
@@ -3371,7 +3371,7 @@ export class Game {
         }
         root.parent   = loot.mesh;
         root.position = new Vector3(0, modelOffsetY, 0);
-        root.scaling.setAll(modelScale);
+        setInstanceScale(root, modelScale);
         this.shadowGenerator?.addShadowCaster(root, true);
       });
       return loot;
@@ -7446,7 +7446,7 @@ export class Game {
       for (const p of plan.props) {
         this._placeSiteProp(chunkKey, chunkRecord, p.key, here, p.x, p.z, p.rot);
       }
-      this._placeSmithy(chunkKey, chunkRecord, plan.forge.x, plan.forge.z);
+      this._placeSmithy(chunkKey, chunkRecord, plan.forge.x, plan.forge.z, plan.forge.rot);
       for (const r of plan.residents) {
         this._spawnArchetypeNpc(r.archetype, chunkRecord, r.x, r.z);
       }
@@ -7463,7 +7463,8 @@ export class Game {
         const dx = p.x - v.center.x, dz = p.z - v.center.z;
         if (dx * dx + dz * dz > VILLAGE_DISCOVER_RADIUS * VILLAGE_DISCOVER_RADIUS) continue;
         if (this.fastTravelSystem.isDiscovered(v.id)) continue;
-        this.fastTravelSystem.discoverLocation(v.id, v.name, { x: v.center.x, y: 2, z: v.center.z });
+        // Arrive on the entrance road, not inside the well at the centre.
+        this.fastTravelSystem.discoverLocation(v.id, v.name, { x: v.arrival.x, y: 2, z: v.arrival.z });
         this.ui.showNotification(`Discovered: ${v.name}`, 3200);
         this.eventBus.emit("location:discovered" as any, { id: v.id, name: v.name });
         this.saveSystem.markDirty();
@@ -7539,16 +7540,21 @@ export class Game {
       chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] } | null,
       x: number,
       z: number,
+      yaw = 0,
   ): void {
       this.forges.add(`forge_${x.toFixed(1)}_${z.toFixed(1)}`, x, z, chunkKey);
+      // The anvil sits beside the forge in the forge's own frame, so it stays
+      // clear of whatever wall the forge backs onto.
+      const anvil = toWorld({ x: 1.5, z: 1 }, { x, z, rot: yaw });
       const props: Array<["qForge" | "qAnvil", number, number]> = [
         ["qForge", x, z],
-        ["qAnvil", x + 1.5, z + 1],
+        ["qAnvil", anvil.x, anvil.z],
       ];
       for (const [key, px, pz] of props) {
         this.fantasyAssets.getInstance(key, (root) => {
           if (!root) return;
           root.position.set(px, 0, pz);
+          setInstanceYaw(root, yaw);
           if (chunkKey && chunkRecord) {
             this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
           } else {

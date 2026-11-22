@@ -83,6 +83,23 @@ describe("village settlements", () => {
     }
   });
 
+  it("arrives travellers on the entrance road, clear of the well and buildings", () => {
+    for (const [cx, cz] of villageChunks(40)) {
+      const v = planVillage(cx, cz, CHUNK);
+      const d = Math.hypot(v.arrival.x - v.center.x, v.arrival.z - v.center.z);
+      expect(d).toBeGreaterThan(PLAZA_RADIUS);
+      for (const b of v.buildings) {
+        const { width, depth } = buildingFootprint(b.kind);
+        expect(Math.hypot(v.arrival.x - b.x, v.arrival.z - b.z)).toBeGreaterThan(Math.min(width, depth) / 2 + 1);
+      }
+    }
+  });
+
+  it("village names rarely repeat", () => {
+    const names = villageChunks(120).map(([cx, cz]) => planVillage(cx, cz, CHUNK).name);
+    expect(new Set(names).size / names.length).toBeGreaterThan(0.85);
+  });
+
   it("fits inside its clearing and its chunk", () => {
     for (const [cx, cz] of villageChunks(40)) {
       const v = planVillage(cx, cz, CHUNK);

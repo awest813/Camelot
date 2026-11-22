@@ -260,11 +260,13 @@ async function attachSkinned(json, bin, files, packsRoot, extra, imagePack) {
             out[i * n + c] = name === "JOINTS_0" ? jointMap[value] : value;
           }
         });
-        let extraProps = {};
+        // Keep normalized-integer attributes (UVs / weights stored as
+        // UNSIGNED_BYTE/SHORT) normalized — otherwise they read as 0–255.
+        let extraProps = acc.normalized && name !== "JOINTS_0" ? { normalized: true } : {};
         if (name === "POSITION") {
           const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
           for (let i = 0; i < out.length; i += 3) for (let c = 0; c < 3; c++) { min[c] = Math.min(min[c], out[i + c]); max[c] = Math.max(max[c], out[i + c]); }
-          extraProps = { min, max };
+          extraProps = { ...extraProps, min, max };
         }
         const componentType = name === "JOINTS_0" ? 5123 : acc.componentType;
         let accIndex;

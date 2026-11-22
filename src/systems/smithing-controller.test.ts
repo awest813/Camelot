@@ -28,6 +28,17 @@ class FakeInventory implements SmithingInventory {
     this.items.push({ ...item });
     return true;
   }
+  removeQuantity(itemId: string, amount: number): boolean {
+    const total = this.items.filter((i) => i.id === itemId).reduce((n, i) => n + i.quantity, 0);
+    if (total < amount) return false;
+    let left = amount;
+    for (let i = 0; i < this.items.length && left > 0; ) {
+      const e = this.items[i];
+      if (e.id !== itemId) { i++; continue; }
+      if (e.quantity > left) { e.quantity -= left; left = 0; } else { left -= e.quantity; this.items.splice(i, 1); }
+    }
+    return true;
+  }
   removeItem(itemId: string, amount = 1): boolean {
     const idx = this.items.findIndex((i) => i.id === itemId);
     if (idx === -1) return false;
@@ -118,6 +129,17 @@ describe("SmithingController", () => {
     expect(made?.slot).toBe("mainHand");
     expect(xp).toBe(12);
     expect(condition.getCondition(made!.id)).toBe(100);
+  });
+
+  it("consumes materials across several stacks of the same id", () => {
+    inventory.items.push(
+      smithingMaterialStack("iron_ingot", 1),
+      smithingMaterialStack("leather_strips", 1),
+      smithingMaterialStack("iron_ingot", 2),
+    );
+    expect(ctrl.craft("smith_iron_sword").success).toBe(true);
+    // 3 ingots − 2 = 1, not the 2 a first-stack-only removal would leave.
+    expect(ctrl.getMaterials().iron_ingot).toBe(1);
   });
 
   it("refuses without materials and leaves the inventory untouched", () => {

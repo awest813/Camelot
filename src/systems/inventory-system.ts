@@ -79,6 +79,32 @@ export class InventorySystem {
   }
 
   /**
+   * Remove `amount` units of `itemId` across every matching entry (stacks of
+   * the same id can coexist).  Removes nothing and returns false when the
+   * bag holds fewer than `amount` in total.
+   */
+  public removeQuantity(itemId: string, amount: number): boolean {
+    if (amount <= 0) return false;
+    const total = this.items.reduce((n, i) => (i.id === itemId ? n + i.quantity : n), 0);
+    if (total < amount) return false;
+    let left = amount;
+    for (let i = 0; i < this.items.length && left > 0; ) {
+      const entry = this.items[i];
+      if (entry.id !== itemId) { i++; continue; }
+      if (entry.quantity > left) {
+        entry.quantity -= left;
+        left = 0;
+      } else {
+        left -= entry.quantity;
+        this.items.splice(i, 1);
+      }
+    }
+    this._syncCarryWeight();
+    this._updateUI();
+    return true;
+  }
+
+  /**
    * Remove one specific item entry: the same object if it is in the bag,
    * else the entry with its instance id, else the first entry with its id.
    */

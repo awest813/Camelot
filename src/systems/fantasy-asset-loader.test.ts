@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { FantasyAssetLoader, getRemoteCdnAssetKeys, isRemoteAssetKey } from "./fantasy-asset-loader";
+import { FantasyAssetLoader, getRemoteCdnAssetKeys, isRemoteAssetKey, setInstanceScale } from "./fantasy-asset-loader";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
 describe("getRemoteCdnAssetKeys", () => {
   it("lists Babylon CDN keys and omits self-hosted Quaternius paths", () => {
@@ -25,5 +26,13 @@ describe("FantasyAssetLoader offline mode", () => {
     expect(loader.isLoaded("runeSword")).toBe(false);
     loader.preload(getRemoteCdnAssetKeys());
     expect(loader.isLoaded("inn")).toBe(false);
+  });
+});
+
+describe("setInstanceScale", () => {
+  it("sets the magnitude but keeps the glTF handedness flip", () => {
+    const root = { scaling: new Vector3(0.5, 0.5, -0.5) } as never;
+    setInstanceScale(root, 2.5);
+    expect((root as { scaling: Vector3 }).scaling.asArray()).toEqual([2.5, 2.5, -2.5]);
   });
 });

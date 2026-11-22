@@ -199,6 +199,20 @@ describe('CombatSystem', () => {
         expect(mockNpcs[0].isAggressive).toBe(false);
     });
 
+    it('a provoked townsperson also calms down when an investigation times out', () => {
+        mockNpcs[0].hostileOnSight = false;
+        mockNpcs[0].provoked = true;
+        mockNpcs[0].patrolPoints = [];
+        mockNpcs[0].aiState = "INVESTIGATE";
+        mockNpcs[0].investigateTimer = 999;
+        mockNpcs[0].investigateDuration = 1;
+        mockNpcs[0].lastKnownPlayerPos = new Vector3(0, 0, 0);
+        mockPlayer.camera.position = new Vector3(500, 0, 500);
+        combatSystem.updateNPCAI(0.1);
+        expect(mockNpcs[0].aiState).toBe("IDLE");
+        expect(mockNpcs[0].provoked).toBe(false);
+    });
+
     it('hostile-on-sight NPCs still aggro on proximity', () => {
         mockNpcs[0].aiState = "PATROL";
         combatSystem.updateNPCAI(0.1);

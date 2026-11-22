@@ -390,6 +390,16 @@ export function isRemoteAssetKey(key: FantasyAssetKey): boolean {
 }
 
 /**
+ * Set a fantasy-asset instance's uniform scale to `scale`, keeping the sign
+ * of each axis (glTF roots carry z = −1 for the handedness conversion;
+ * `scaling.setAll` would drop it and mirror the model).
+ */
+export function setInstanceScale(root: AbstractMesh, scale: number): void {
+  const s = root.scaling;
+  s.set(Math.sign(s.x || 1) * scale, Math.sign(s.y || 1) * scale, Math.sign(s.z || 1) * scale);
+}
+
+/**
  * Turn a fantasy-asset instance to `yaw` radians about +Y.  Imported glTF
  * roots carry a rotationQuaternion (the handedness conversion), which makes
  * Babylon ignore `rotation.y` — so compose the yaw with that base rotation.

@@ -88,6 +88,16 @@ This project adheres to [Semantic Versioning](https://semver.org/).
     pipeline is off, so the grade is applied by the materials instead.
 
 ### Fixed
+- A townsperson you'd fought could stay hostile for good if it calmed down
+  without first walking all the way home (for example after losing track of
+  you, or after fleeing). Townsfolk now settle whenever they go back to their
+  routine.
+- Smithing could take fewer materials than a recipe costs when the same
+  material sat in more than one bag slot.
+- Fast travel to a village used to land you inside the well; you now arrive on
+  the entrance road. Village names repeat far less often, and the smithy's
+  anvil no longer clips into its wall.
+- Forging an item no longer shows two notifications.
 - Dragons were invisible in offline and Steam builds. Their body was a
   downloaded model that never loaded offline, so players fought an unseen
   500-HP boss. They now have a local dark dragon body (horned head, spined

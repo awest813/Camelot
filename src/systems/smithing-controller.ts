@@ -46,6 +46,8 @@ export interface SmithingInventory {
   maxCapacity: number;
   addItem(item: Item): boolean;
   removeItem(itemId: string, amount?: number): boolean;
+  /** Remove `amount` units across every stack of `itemId` (all or nothing). */
+  removeQuantity(itemId: string, amount: number): boolean;
 }
 
 export interface SmithingEquipment {
@@ -316,7 +318,8 @@ export class SmithingController {
     if (!outcome.success || !recipe) return outcome;
 
     for (const m of recipe.requiredMaterials) {
-      this._deps.inventory.removeItem(m.materialId, m.quantity);
+      // Materials may sit in several stacks — getMaterials() counted them all.
+      this._deps.inventory.removeQuantity(m.materialId, m.quantity);
     }
     const item = this.buildOutputItem(outcome.result.outputItemId, outcome.result.quality, outcome.result.quantity);
     if (this._isWearable(item)) {
@@ -324,9 +327,9 @@ export class SmithingController {
       item.instanceId = this._newInstanceId(item.id);
       this.condition.initItem(item.instanceId, MAX_CONDITION);
     }
+    // addItem announces "Added <item>" itself; no second toast here.
     this._deps.inventory.addItem(item);
     this._deps.gainArmorerXp(outcome.result.xpAwarded);
-    this._deps.notify(`Forged ${item.quantity > 1 ? `${item.quantity}× ` : ""}${item.name}`, 2200);
     return outcome;
   }
 

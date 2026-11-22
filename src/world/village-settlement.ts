@@ -50,9 +50,15 @@ export interface VillagePlan {
   buildings: VillageBuilding[];
   props: Array<{ key: FantasyAssetKey; x: number; z: number; rot: number }>;
   residents: Array<{ archetype: string; x: number; z: number }>;
-  /** Outdoor forge beside the smithy (a crafting station). */
-  forge: { x: number; z: number };
+  /** Outdoor forge beside the smithy (a crafting station); `rot` is the smithy's yaw. */
+  forge: { x: number; z: number; rot: number };
+  /** Fast-travel arrival: on the entrance road, facing into the square. */
+  arrival: { x: number; z: number };
 }
+
+/** Qualifiers that make village names (far) less likely to repeat. */
+const NAME_PREFIXES = ["Upper ", "Lower ", "Old ", "Little ", "Great ", "East ", "West ", "North ", "South "];
+const NAME_SUFFIXES = [" Green", " Cross", " Mill", "-on-Wye", "-under-Hill", " Ford", " Hollow", " Market"];
 
 /** Deterministic 0..1 stream for a chunk (Mulberry32). */
 function chunkRng(cx: number, cz: number, salt: number): () => number {
@@ -81,7 +87,10 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
     x: cx * chunkSize + (rng() * 2 - 1) * jitter,
     z: cz * chunkSize + (rng() * 2 - 1) * jitter,
   };
-  const name = ArthurianNameGenerator.generateSettlementName(`village:${cx},${cz}`, "town");
+  let name = ArthurianNameGenerator.generateSettlementName(`village:${cx},${cz}`, "town");
+  const q = rng();
+  if (q < 0.3) name = NAME_PREFIXES[Math.floor(rng() * NAME_PREFIXES.length)] + name;
+  else if (q < 0.6) name += NAME_SUFFIXES[Math.floor(rng() * NAME_SUFFIXES.length)];
 
   // Ring roles: slot 0 is the entrance road; the inn is always across from it.
   const others: VillageRole[] = ["smithy", "shop", "home", "home", "home"];
@@ -101,7 +110,8 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
   const buildings: VillageBuilding[] = [];
   const props: VillagePlan["props"] = [];
   const residents: VillagePlan["residents"] = [];
-  let forge = { x: center.x, z: center.z };
+  let forge = { x: center.x, z: center.z, rot: 0 };
+  let arrival = { x: center.x, z: center.z };
 
   roles.forEach((role, s) => {
     const a = slotAngle(s);
@@ -110,6 +120,7 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
       const gate = PLAZA_RADIUS + 3;
       const side = { x: Math.cos(a), z: -Math.sin(a) }; // tangent
       const g = polar(a, gate);
+      arrival = polar(a, PLAZA_RADIUS + 1.5);
       residents.push({ archetype: "archetype_guard", x: g.x + side.x * 2.5, z: g.z + side.z * 2.5 });
       residents.push({ archetype: "archetype_guard", x: g.x - side.x * 2.5, z: g.z - side.z * 2.5 });
       props.push({ key: "qBannerStand", x: g.x + side.x * 4, z: g.z + side.z * 4, rot: a + Math.PI });
@@ -135,7 +146,7 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
         break;
       }
       case "smithy": {
-        forge = toWorld({ x: width / 2 + 1.6, z: depth / 2 - 1 }, origin);
+        forge = { ...toWorld({ x: width / 2 + 1.6, z: depth / 2 - 1 }, origin), rot };
         residents.push({ archetype: "archetype_trainer_armorer", ...front(1.2) });
         const c = toWorld({ x: width / 2 + 1.4, z: depth / 2 + 1.2 }, origin);
         props.push({ key: "qCrate", ...c, rot: rot });
@@ -181,5 +192,6 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
     props,
     residents,
     forge,
+    arrival,
   };
 }
