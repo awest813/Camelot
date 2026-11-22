@@ -511,22 +511,22 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
   private _getBiomeColors(biome: BiomeType): { diffuse: Color3; specular: Color3; specularPower: number } {
     switch (biome) {
       case "plains": return {
-        diffuse:       new Color3(0.30, 0.58, 0.18),
+        diffuse:       new Color3(0.24, 0.36, 0.16),
         specular:      new Color3(0.08, 0.14, 0.05),
         specularPower: 24,
       };
       case "forest": return {
-        diffuse:       new Color3(0.10, 0.34, 0.08),
+        diffuse:       new Color3(0.10, 0.22, 0.08),
         specular:      new Color3(0.05, 0.10, 0.04),
         specularPower: 18,
       };
       case "desert": return {
-        diffuse:       new Color3(0.88, 0.74, 0.40),
+        diffuse:       new Color3(0.62, 0.53, 0.38),
         specular:      new Color3(0.22, 0.16, 0.06),
         specularPower: 48,
       };
       case "tundra": return {
-        diffuse:       new Color3(0.90, 0.94, 0.98),
+        diffuse:       new Color3(0.74, 0.77, 0.80),
         specular:      new Color3(0.45, 0.52, 0.60),
         specularPower: 96,
       };
@@ -562,7 +562,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
   private _getTreeTrunkMaterial(): StandardMaterial {
     if (!this.treeTrunkMaterial) {
       this.treeTrunkMaterial = new StandardMaterial("tree_trunk_mat", this.scene);
-      this.treeTrunkMaterial.diffuseColor  = new Color3(0.34, 0.19, 0.06);
+      this.treeTrunkMaterial.diffuseColor  = new Color3(0.26, 0.18, 0.12);
       this.treeTrunkMaterial.specularColor = new Color3(0.06, 0.04, 0.01);
       this.treeTrunkMaterial.specularPower = 12;
 
@@ -582,13 +582,13 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     if (!material) {
       material = new StandardMaterial(`tree_crown_mat_${key}`, this.scene);
       if (key === "forest") {
-        material.diffuseColor  = new Color3(0.08, 0.38, 0.08);
+        material.diffuseColor  = new Color3(0.10, 0.24, 0.09);
       } else if (key === "plains") {
-        material.diffuseColor  = new Color3(0.18, 0.48, 0.12);
+        material.diffuseColor  = new Color3(0.17, 0.30, 0.12);
       } else if (key === "tundra") {
-        material.diffuseColor  = new Color3(0.20, 0.32, 0.26);
+        material.diffuseColor  = new Color3(0.18, 0.24, 0.22);
       } else {
-        material.diffuseColor  = new Color3(0.18, 0.54, 0.12);
+        material.diffuseColor  = new Color3(0.16, 0.30, 0.11);
       }
       material.specularColor = new Color3(0.05, 0.10, 0.04);
       material.specularPower = 18;
@@ -607,7 +607,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
   private _getCactusMaterial(): StandardMaterial {
     if (!this.cactusMaterial) {
       this.cactusMaterial = new StandardMaterial("cactus_mat", this.scene);
-      this.cactusMaterial.diffuseColor  = new Color3(0.14, 0.48, 0.14);
+      this.cactusMaterial.diffuseColor  = new Color3(0.18, 0.32, 0.16);
       this.cactusMaterial.specularColor = new Color3(0.10, 0.22, 0.08);
       this.cactusMaterial.specularPower = 28;
       this.cactusMaterial.freeze();
@@ -1101,7 +1101,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     });
     const stemMat = this._envMat("flower_stem", () => {
       const sm = new StandardMaterial("flower_stem", this.scene);
-      sm.diffuseColor = new Color3(0.18, 0.44, 0.12);
+      sm.diffuseColor = new Color3(0.16, 0.28, 0.12);
       sm.freeze();
       return sm;
     });

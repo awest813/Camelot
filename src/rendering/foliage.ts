@@ -175,13 +175,13 @@ export function createFoliageMaterials(scene: Scene, textures: ProceduralTexture
   bark.diffuseColor = new Color3(0.9, 0.86, 0.82);
 
   const broadleaf = cutoutMaterial("foliage_broadleaf", scene, textures, "leaf_card");
-  broadleaf.diffuseColor = new Color3(1.0, 1.0, 0.92);
+  broadleaf.diffuseColor = new Color3(0.80, 0.84, 0.68);
   const pine = cutoutMaterial("foliage_pine", scene, textures, "leaf_card");
-  pine.diffuseColor = new Color3(0.62, 0.78, 0.66);
+  pine.diffuseColor = new Color3(0.52, 0.64, 0.56);
   const palm = cutoutMaterial("foliage_palm", scene, textures, "palm_frond");
-  palm.diffuseColor = new Color3(1.0, 0.98, 0.86);
+  palm.diffuseColor = new Color3(0.84, 0.82, 0.70);
   const grass = cutoutMaterial("foliage_grass", scene, textures, "grass_blades");
-  grass.diffuseColor = new Color3(0.72, 0.78, 0.62);
+  grass.diffuseColor = new Color3(0.62, 0.66, 0.52);
   grass.alphaCutOff = 0.5;
   // Grass normals all point up so it shades like the ground it grows from.
 

@@ -121,21 +121,22 @@ export function moonDirection(hour: number): { dir: Vec3; elevation: number } {
   return { dir, elevation: -Math.PI / 2 };
 }
 
-// Palette keyed by sun elevation.
-const ZENITH_DAY: RGB = [0.13, 0.32, 0.74];
-const ZENITH_DUSK: RGB = [0.20, 0.24, 0.46];
-const ZENITH_NIGHT: RGB = [0.012, 0.02, 0.05];
-const HORIZON_DAY: RGB = [0.60, 0.73, 0.88];
-const HORIZON_DUSK: RGB = [0.96, 0.58, 0.36];
-const HORIZON_NIGHT: RGB = [0.04, 0.06, 0.11];
-const SUN_HIGH: RGB = [1.0, 0.96, 0.88];
-const SUN_LOW: RGB = [1.0, 0.62, 0.34];
-const MOON_LIGHT: RGB = [0.55, 0.66, 0.92];
-const AMB_SKY_DAY: RGB = [0.62, 0.72, 0.88];
-const AMB_SKY_DUSK: RGB = [0.72, 0.56, 0.54];
-const AMB_SKY_NIGHT: RGB = [0.30, 0.38, 0.62];
-const AMB_GROUND_DAY: RGB = [0.44, 0.39, 0.30];
-const AMB_GROUND_NIGHT: RGB = [0.08, 0.09, 0.13];
+// Palette keyed by sun elevation — dark fantasy: overcast steel skies, grey
+// haze on the horizon, blood-red dusks, cold moonlit nights.
+const ZENITH_DAY: RGB = [0.19, 0.26, 0.38];
+const ZENITH_DUSK: RGB = [0.15, 0.14, 0.24];
+const ZENITH_NIGHT: RGB = [0.010, 0.015, 0.035];
+const HORIZON_DAY: RGB = [0.50, 0.54, 0.58];
+const HORIZON_DUSK: RGB = [0.70, 0.36, 0.24];
+const HORIZON_NIGHT: RGB = [0.035, 0.045, 0.08];
+const SUN_HIGH: RGB = [0.96, 0.90, 0.80];
+const SUN_LOW: RGB = [0.95, 0.52, 0.30];
+const MOON_LIGHT: RGB = [0.46, 0.56, 0.80];
+const AMB_SKY_DAY: RGB = [0.50, 0.55, 0.62];
+const AMB_SKY_DUSK: RGB = [0.56, 0.44, 0.44];
+const AMB_SKY_NIGHT: RGB = [0.24, 0.30, 0.50];
+const AMB_GROUND_DAY: RGB = [0.34, 0.31, 0.26];
+const AMB_GROUND_NIGHT: RGB = [0.06, 0.07, 0.10];
 
 /**
  * Full atmosphere state for an hour of day.

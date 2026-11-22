@@ -10,6 +10,8 @@
  * generated textures wrap seamlessly in U and V.
  */
 
+import { gradeRgb255InPlace, WORLD_GRADE } from "./dark-grade";
+
 // ── Seeded hashing ────────────────────────────────────────────────────────────
 
 function mulberry32(seed: number): () => number {
@@ -302,6 +304,8 @@ function synth(size: number, bumpStrength: number, hasAlpha: boolean, fn: PixelF
     for (let x = 0; x < size; x++) {
       const u = x * inv;
       const r = fn(u, v, x, y, rgb);
+      // Every synthesized surface shares the world's dark-fantasy grade.
+      gradeRgb255InPlace(rgb, WORLD_GRADE);
       const i = y * size + x;
       height[i] = r.h;
       const o = i * 4;
@@ -356,7 +360,8 @@ export function synthesizeSurface(kind: SurfaceKind, size: number, seed = 7): Sy
 
   switch (kind) {
     case "grass": {
-      const deep: RGB = [52, 84, 30], lush: RGB = [96, 128, 48], dry: RGB = [146, 140, 74], soil: RGB = [86, 68, 44];
+      // Olive, tired grass rather than meadow green (dark-fantasy palette).
+      const deep: RGB = [46, 68, 32], lush: RGB = [84, 100, 50], dry: RGB = [132, 122, 76], soil: RGB = [80, 64, 44];
       return synth(size, 1.6, false, (u, v, _x, _y, c) => {
         const macro = n.fbm(u, v, 3, 3) * 0.5 + 0.5;
         const clumps = n.fbm(u, v, 24, 3) * 0.5 + 0.5;

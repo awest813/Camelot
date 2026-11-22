@@ -52,6 +52,17 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   fungus are scattered by biome. The smith's forge is a stone-and-brick hearth
   from the Medieval Village kit.
 - KayKit textures are colour-graded darker and less saturated to match.
+- The whole world now shares one dark-fantasy colour grade (with
+  `src/rendering/dark-grade.ts` as the single source):
+  - Every texture the game generates (ground, bark, foliage, stone, plaster)
+    is graded as it is made.
+  - Trees, grass and plant colours are olive and moss instead of bright green.
+  - Skies are overcast grey-blue with a grey haze on the horizon, dusks are
+    blood-red, and nights are cold moonlight.
+  - The screen grade is more muted, with more contrast, cold shadows, warm
+    highlights and a heavier vignette. It now applies on every quality
+    setting: on the lowest setting, and in the WebGPU renderer, the effects
+    pipeline is off, so the grade is applied by the materials instead.
 
 ### Fixed
 - Inns, cottages, pirate forts and their people (innkeepers, shopkeepers,

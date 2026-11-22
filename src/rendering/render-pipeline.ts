@@ -32,7 +32,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
-import type { GraphicsSystem } from "../systems/graphics-system";
+import type { GraphicsSystem, PostProcessConfig } from "../systems/graphics-system";
 import type { AtmosphereState } from "./atmosphere";
 
 // ── Shadows ───────────────────────────────────────────────────────────────────
@@ -132,6 +132,41 @@ export interface PostFxHandle {
 /** Distance of the sun emitter from the camera (inside the 900 u sky dome). */
 const SUN_EMITTER_DISTANCE = 700;
 
+/**
+ * Camelot's screen-space dark-fantasy grade: muted saturation, deeper
+ * contrast, cold teal shadows, ember-warm highlights and a heavy vignette.
+ * Applied to the HDR pipeline when it exists, otherwise to the scene's own
+ * image-processing configuration so low-tier / WebGPU players get it too.
+ */
+export function applyDarkFantasyGrade(ip: ImageProcessingConfiguration, pp: PostProcessConfig): void {
+  ip.toneMappingEnabled = pp.toneMappingType !== "none";
+  ip.toneMappingType = pp.toneMappingType === "aces"
+    ? ImageProcessingConfiguration.TONEMAPPING_ACES
+    : ImageProcessingConfiguration.TONEMAPPING_KHR_PBR_NEUTRAL;
+  ip.exposure = pp.exposure * 0.94;
+  ip.contrast = pp.contrast * 1.08;
+  const vignette = Math.max(pp.vignetteWeight, 0.6) * 1.35;
+  ip.vignetteEnabled = vignette > 0;
+  ip.vignetteWeight = vignette;
+  ip.vignetteStretch = 0.25;
+  ip.vignetteColor.set(0.015, 0.01, 0.02, 0);
+  ip.vignetteBlendMode = ImageProcessingConfiguration.VIGNETTEMODE_MULTIPLY;
+
+  const curves = new ColorCurves();
+  curves.globalSaturation = -18;
+  curves.shadowsHue = 205;
+  curves.shadowsDensity = 28;
+  curves.shadowsSaturation = 32;
+  curves.shadowsExposure = -12;
+  curves.midtonesSaturation = -8;
+  curves.highlightsHue = 32;
+  curves.highlightsDensity = 12;
+  curves.highlightsSaturation = 22;
+  ip.colorCurves = curves;
+  ip.colorCurvesEnabled = true;
+  ip.isEnabled = true;
+}
+
 export function createPostFx(
   scene: Scene,
   camera: Camera,
@@ -169,6 +204,10 @@ export function createPostFx(
   }
 
   // ── HDR pipeline ─────────────────────────────────────────────────────────
+  if (!postEnabled) {
+    // No post stack (low tier / WebGPU): grade in each material's shader instead.
+    applyDarkFantasyGrade(scene.imageProcessingConfiguration, pp);
+  }
   if (postEnabled) {
     pipeline = new DefaultRenderingPipeline("defaultPipeline", true, scene, [camera]);
     // MSAA on the HDR target forms a framebuffer feedback loop with SSAO's
@@ -188,31 +227,8 @@ export function createPostFx(
     pipeline.sharpen.colorAmount = 1;
     pipeline.depthOfFieldEnabled = false;
 
-    const ip = pipeline.imageProcessing;
     pipeline.imageProcessingEnabled = true;
-    ip.toneMappingEnabled = pp.toneMappingType !== "none";
-    ip.toneMappingType = pp.toneMappingType === "aces"
-      ? ImageProcessingConfiguration.TONEMAPPING_ACES
-      : ImageProcessingConfiguration.TONEMAPPING_KHR_PBR_NEUTRAL;
-    ip.exposure = pp.exposure;
-    ip.contrast = pp.contrast;
-    ip.vignetteEnabled = pp.vignetteWeight > 0;
-    ip.vignetteWeight = pp.vignetteWeight;
-    ip.vignetteStretch = 0.15;
-    ip.vignetteColor.set(0.02, 0.015, 0.03, 0);
-    ip.vignetteBlendMode = ImageProcessingConfiguration.VIGNETTEMODE_MULTIPLY;
-
-    // Cinematic grade: a touch more saturation, cool shadows, warm highlights.
-    const curves = new ColorCurves();
-    curves.globalSaturation = 14;
-    curves.shadowsHue = 215;
-    curves.shadowsDensity = 18;
-    curves.shadowsSaturation = 30;
-    curves.highlightsHue = 40;
-    curves.highlightsDensity = 6;
-    curves.highlightsSaturation = 15;
-    ip.colorCurves = curves;
-    ip.colorCurvesEnabled = true;
+    applyDarkFantasyGrade(pipeline.imageProcessing.imageProcessingConfiguration, pp);
 
     pipeline.grainEnabled = fx.grain;
     if (fx.grain) {
