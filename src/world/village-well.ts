@@ -101,10 +101,6 @@ export function buildVillageWell(scene: Scene, name: string, textureBase: string
   for (const side of [-1, 1]) {
     const post = add(MeshBuilder.CreateBox(`${name}_post`, { width: 0.14, height: 2.36, depth: 0.14 }, scene), mats.wood);
     post.position.set(side * postX, 1.18, 0);
-    // A short brace from the curb to each post.
-    const brace = add(MeshBuilder.CreateBox(`${name}_brace`, { width: 0.08, height: 0.6, depth: 0.08 }, scene), mats.wood);
-    brace.position.set(side * (postX - 0.16), 1.0, 0);
-    brace.rotation.z = side * 0.5;
   }
   const winch = add(MeshBuilder.CreateCylinder(`${name}_winch`, { diameter: 0.13, height: postX * 2 + 0.16, tessellation: 10 }, scene), mats.wood);
   winch.rotation.z = Math.PI / 2;

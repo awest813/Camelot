@@ -90,6 +90,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   building. If something blocks them anyway, they step aside to get round it,
   and if that keeps failing they stop rather than push against the wall
   forever.
+- Every village square has a proper well: a curb of staggered stones with
+  dark water below, timber posts with a winch, rope and bucket, and a small
+  tiled roof. You can no longer walk through it.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace
