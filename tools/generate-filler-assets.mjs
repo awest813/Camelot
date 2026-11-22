@@ -88,7 +88,7 @@ function getMaterial(pack, name) {
     if (name === "Goblin") return { color: [0.35, 0.58, 0.22, 1], metallic: 0.05, roughness: 0.78 };
     if (name === "Orc") return { color: [0.26, 0.46, 0.22, 1], metallic: 0.14, roughness: 0.72 };
     if (name === "Troll") return { color: [0.40, 0.45, 0.42, 1], metallic: 0.05, roughness: 0.95 };
-    if (name === "DragonSmall") return { color: [0.82, 0.18, 0.15, 1], metallic: 0.40, roughness: 0.42 };
+    if (name === "DragonSmall") return { color: [0.30, 0.09, 0.07, 1], metallic: 0.35, roughness: 0.5 };
     if (name === "Wolf") return { color: [0.46, 0.44, 0.42, 1], metallic: 0.02, roughness: 0.88 };
     if (name === "Bat") return { color: [0.20, 0.16, 0.20, 1], metallic: 0.05, roughness: 0.80 };
     if (name === "Ghost") return { color: [0.65, 0.88, 0.98, 0.75], metallic: 0.00, roughness: 0.25 };
@@ -268,6 +268,45 @@ function addWedge(builder, center, size, dir = "z") {
   }
 }
 
+
+/** Double-sided triangle (wing membranes, banners). */
+function addTri(builder, a, b, c) {
+  const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+  const len = Math.hypot(n[0], n[1], n[2]) || 1;
+  n = n.map((x) => x / len);
+  for (const [p, q, r, nn] of [[a, b, c, n], [a, c, b, n.map((x) => -x)]]) {
+    const start = builder.positions.length / 3;
+    builder.positions.push(...p, ...q, ...r);
+    builder.normals.push(...nn, ...nn, ...nn);
+    builder.indices.push(start, start + 1, start + 2);
+  }
+}
+
+/** Add a box or pyramid, then rotate it (Euler XYZ, radians) about its own centre. */
+function addTilted(builder, center, size, [rx, ry, rz], kind = "box") {
+  const startVert = builder.positions.length / 3;
+  if (kind === "pyramid") addPyramid(builder, center, size, 4);
+  else addBox(builder, center, size);
+  const [cx, cy, cz] = center;
+  const rot = (x, y, z) => {
+    // X
+    let y1 = y * Math.cos(rx) - z * Math.sin(rx), z1 = y * Math.sin(rx) + z * Math.cos(rx);
+    // Y
+    let x2 = x * Math.cos(ry) + z1 * Math.sin(ry), z2 = -x * Math.sin(ry) + z1 * Math.cos(ry);
+    // Z
+    const x3 = x2 * Math.cos(rz) - y1 * Math.sin(rz), y3 = x2 * Math.sin(rz) + y1 * Math.cos(rz);
+    return [x3, y3, z2];
+  };
+  for (let i = startVert; i < builder.positions.length / 3; i++) {
+    const p = rot(builder.positions[i * 3] - cx, builder.positions[i * 3 + 1] - cy, builder.positions[i * 3 + 2] - cz);
+    builder.positions[i * 3] = p[0] + cx; builder.positions[i * 3 + 1] = p[1] + cy; builder.positions[i * 3 + 2] = p[2] + cz;
+    const n = rot(builder.normals[i * 3], builder.normals[i * 3 + 1], builder.normals[i * 3 + 2]);
+    builder.normals[i * 3] = n[0]; builder.normals[i * 3 + 1] = n[1]; builder.normals[i * 3 + 2] = n[2];
+  }
+}
+
 function createGeometry(pack, name) {
   const builder = makeBuilder();
 
@@ -395,22 +434,63 @@ function createGeometry(pack, name) {
       addCone(builder, [0, 0.68, 0], 0.62, 0.45, 8);
       addBox(builder, [0, 0.35, 0], [0.24, 0.24, 0.24]); // inner nucleus
     } else if (name === "DragonSmall") {
-      // Quadruped reptilian body, neck, horned head, wings, tail
-      addBox(builder, [0, 0.48, 0], [0.46, 0.38, 0.85]); // body
-      addBox(builder, [0, 0.82, 0.45], [0.24, 0.42, 0.24]); // neck
-      addBox(builder, [0, 1.05, 0.62], [0.28, 0.24, 0.42]); // head & snout
-      addPyramid(builder, [-0.12, 1.25, 0.52], [0.10, 0.25, 0.10], 3); // horn
-      addPyramid(builder, [0.12, 1.25, 0.52], [0.10, 0.25, 0.10], 3);
-      // Wings
-      addBox(builder, [-0.75, 0.75, 0], [0.95, 0.06, 0.60]);
-      addBox(builder, [0.75, 0.75, 0], [0.95, 0.06, 0.60]);
-      // Tail
-      addBox(builder, [0, 0.38, -0.65], [0.18, 0.18, 0.65]);
-      // 4 legs
-      addBox(builder, [-0.22, 0.20, 0.30], [0.14, 0.40, 0.14]);
-      addBox(builder, [0.22, 0.20, 0.30], [0.14, 0.40, 0.14]);
-      addBox(builder, [-0.22, 0.20, -0.30], [0.14, 0.40, 0.14]);
-      addBox(builder, [0.22, 0.20, -0.30], [0.14, 0.40, 0.14]);
+      // Dark-fantasy wyvern-dragon (head toward +Z, ~2.8 m nose-to-tail at
+      // scale 1; the game scales the boss ×2.5).  Horned head on a long
+      // stepped neck, spined back, membrane wings, tapering bladed tail,
+      // heavy clawed legs.
+      addBox(builder, [0, 0.78, -0.05], [0.72, 0.62, 1.25]); // torso
+      addBox(builder, [0, 0.88, 0.55], [0.64, 0.58, 0.5]);   // deep chest
+      // Neck rising forward in segments.
+      addBox(builder, [0, 1.12, 0.92], [0.36, 0.34, 0.42]);
+      addBox(builder, [0, 1.38, 1.14], [0.31, 0.31, 0.38]);
+      addBox(builder, [0, 1.6, 1.33], [0.28, 0.28, 0.34]);
+      // Head: skull, snout, open lower jaw, brow ridge.
+      addBox(builder, [0, 1.78, 1.55], [0.4, 0.3, 0.5]);
+      addBox(builder, [0, 1.72, 1.92], [0.28, 0.2, 0.36]);
+      addBox(builder, [0, 1.56, 1.84], [0.26, 0.07, 0.44]);
+      addBox(builder, [0, 1.92, 1.62], [0.44, 0.06, 0.18]);
+      // Swept-back horns and cheek spikes.
+      for (const side of [-1, 1]) {
+        addTilted(builder, [side * 0.14, 2.02, 1.42], [0.09, 0.5, 0.09], [-0.9, 0, side * 0.25], "pyramid");
+        addTilted(builder, [side * 0.24, 1.7, 1.42], [0.06, 0.26, 0.06], [-1.2, 0, side * 0.6], "pyramid");
+      }
+      // Spine ridge from skull to tail.
+      for (let i = 0; i < 9; i++) {
+        const z = 1.2 - i * 0.36;
+        const y = i < 3 ? 1.55 - i * 0.22 : 1.12 - (i - 3) * 0.08;
+        addTilted(builder, [0, y + 0.06, z], [0.06, 0.26 - i * 0.015, 0.14], [-0.5, 0, 0], "pyramid");
+      }
+      // Tail tapering away, ending in a blade.
+      addBox(builder, [0, 0.72, -0.95], [0.42, 0.38, 0.6]);
+      addBox(builder, [0, 0.64, -1.48], [0.3, 0.28, 0.58]);
+      addBox(builder, [0, 0.56, -1.98], [0.2, 0.2, 0.54]);
+      addBox(builder, [0, 0.5, -2.42], [0.12, 0.12, 0.44]);
+      addTilted(builder, [0, 0.5, -2.78], [0.04, 0.34, 0.3], [-Math.PI / 2, 0, 0], "pyramid");
+      // Legs with claws: heavy hind legs, forelegs under the chest.
+      for (const side of [-1, 1]) {
+        addBox(builder, [side * 0.38, 0.52, -0.42], [0.28, 0.42, 0.36]); // thigh
+        addBox(builder, [side * 0.4, 0.2, -0.36], [0.2, 0.42, 0.22]);    // shank
+        addBox(builder, [side * 0.34, 0.42, 0.5], [0.2, 0.62, 0.22]);    // foreleg
+        for (const [fx, fz] of [[side * 0.4, -0.2], [side * 0.34, 0.66]]) {
+          for (const c of [-0.06, 0.06]) addTilted(builder, [fx + c, 0.05, fz], [0.04, 0.16, 0.04], [Math.PI / 2, 0, 0], "pyramid");
+        }
+      }
+      // Wings: arm bones + double-sided membranes.
+      for (const side of [-1, 1]) {
+        const shoulder = [side * 0.34, 1.12, 0.42];
+        const elbow = [side * 1.1, 1.62, 0.32];
+        const tip = [side * 2.35, 1.95, 0.02];
+        const trail1 = [side * 1.75, 0.95, -0.95];
+        const trail2 = [side * 0.9, 0.98, -0.82];
+        const root = [side * 0.32, 1.02, -0.5];
+        addTilted(builder, [(shoulder[0] + elbow[0]) / 2, (shoulder[1] + elbow[1]) / 2, 0.37], [0.86, 0.09, 0.09], [0, 0, side * 0.55], "box");
+        addTilted(builder, [(elbow[0] + tip[0]) / 2, (elbow[1] + tip[1]) / 2, 0.17], [1.3, 0.07, 0.07], [0, side * 0.2, side * 0.25], "box");
+        addTri(builder, shoulder, elbow, trail2);
+        addTri(builder, elbow, tip, trail1);
+        addTri(builder, elbow, trail1, trail2);
+        addTri(builder, shoulder, trail2, root);
+        addTilted(builder, tip, [0.05, 0.3, 0.05], [0, 0, side * -0.8], "pyramid"); // wing claw
+      }
     } else if (name === "Skeleton") {
       // Skull, ribcage, spine, thin limbs
       addBox(builder, [0, 1.25, 0], [0.26, 0.28, 0.26]); // skull

@@ -277,6 +277,8 @@ export class Game {
   /** Rigged NPC models (CC0 KayKit characters). */
   private _characterModels: CharacterModelLibrary | null = null;
   private readonly _npcRigs: Map<NPC, CharacterRig> = new Map();
+  /** Dragon bosses' bodies (generated dark-fantasy dragon parented to the capsule). */
+  private readonly _dragonVisuals = new Map<NPC, { root: AbstractMesh; yaw: number; last: Vector3; t: number }>();
   /** SSAO / god rays / lens flare / HDR pipeline handle. */
   private _postFx: PostFxHandle | null = null;
   /** DefaultRenderingPipeline (bloom, FXAA, sharpen, tone-mapping, vignette). */
@@ -2178,16 +2180,23 @@ export class Game {
         // NOTE: the capsule stays unregistered in LodSystem — visibility toggling
         // would reveal it; the CDN model root is LOD-tracked via _trackChunkProp.
 
-        // Attach CDN dragon model once loaded
-        this.fantasyAssets.getInstance("dragon", (root) => {
+        // Local dark-fantasy dragon body, parented to the capsule so it moves,
+        // turns and fights with the boss (works offline; the old CDN model
+        // was static and never followed the NPC).
+        this.fantasyAssets.getInstance("qDragonSmall", (root) => {
           if (!root) return;
-          if (dragonNpc.isDead || this._chunkFantasyContent.get(chunkKey) !== chunkRecord) {
+          if (dragonNpc.isDead || dragonNpc.mesh.isDisposed() || this._chunkFantasyContent.get(chunkKey) !== chunkRecord) {
             root.dispose();
             return;
           }
-          root.position.set(dx, 0, dz);
-          setInstanceYaw(root, _chunkRand(cx, cz, 12) * Math.PI * 2);
-          root.scaling.setAll(2.5);
+          root.parent = dragonNpc.mesh;
+          root.position.set(0, -1, 0); // capsule origin sits 1 unit above its feet
+          root.scaling.scaleInPlace(2.5);
+          const yaw = _chunkRand(cx, cz, 12) * Math.PI * 2;
+          setInstanceYaw(root, yaw);
+          for (const m of root.getChildMeshes(false)) m.isPickable = false;
+          this._dragonVisuals.set(dragonNpc, { root, yaw, last: dragonNpc.mesh.position.clone(), t: 0 });
+          dragonNpc.mesh.onDisposeObservable.addOnce(() => this._dragonVisuals.delete(dragonNpc));
           this._trackChunkProp(chunkKey, chunkRecord, root, "boss");
         });
       }
@@ -5445,8 +5454,41 @@ export class Game {
     this.scene.onAfterPhysicsObservable.addOnce(() => { body.disablePreStep = true; });
   }
 
+  /** Dragon bodies: face the player when fighting, else the travel direction; collapse on death. */
+  private _updateDragonVisuals(dt: number): void {
+    const playerPos = this.player.camera.position;
+    for (const [npc, v] of this._dragonVisuals) {
+      if (v.root.isDisposed()) { this._dragonVisuals.delete(npc); continue; }
+      v.t += dt;
+      const pos = npc.mesh.position;
+      if (npc.isDead) {
+        // Slump into the ground over a couple of seconds.
+        v.root.position.y = Math.max(-2.4, v.root.position.y - dt * 0.7);
+        continue;
+      }
+      let target: number | null = null;
+      if (npc.isAggressive || npc.aiState === AIState.ALERT) {
+        target = Math.atan2(playerPos.x - pos.x, playerPos.z - pos.z);
+      } else {
+        const dx = pos.x - v.last.x, dz = pos.z - v.last.z;
+        if (dx * dx + dz * dz > 1e-4) target = Math.atan2(dx, dz);
+      }
+      v.last.copyFrom(pos);
+      if (target !== null) {
+        let d = target - v.yaw;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        v.yaw += d * Math.min(1, dt * 3);
+        setInstanceYaw(v.root, v.yaw);
+      }
+      // Slow breathing bob.
+      v.root.position.y = -1 + Math.sin(v.t * 1.6) * 0.06;
+    }
+  }
+
   /** Per-frame rig facing, gait speed, hit flash and distance LOD. */
   private _updateNpcRigs(dt: number): void {
+    this._updateDragonVisuals(dt);
     if (this._npcRigs.size === 0) return;
     const playerPos = this.player.camera.position;
     for (const [npc, rig] of this._npcRigs) {

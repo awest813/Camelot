@@ -72,6 +72,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
     pipeline is off, so the grade is applied by the materials instead.
 
 ### Fixed
+- Dragons were invisible in offline and Steam builds. Their body was a
+  downloaded model that never loaded offline, so players fought an unseen
+  500-HP boss. They now have a local dark dragon body (horned head, spined
+  back, membrane wings, bladed tail) that moves with the boss, turns to face
+  you in combat, breathes, and slumps when slain. The old downloaded model
+  stood still and never followed the boss.
 - Imported models were drawn mirrored, and turning them had no effect: the
   loader discarded part of the model's orientation data and ignored its
   stored rotation. Placed props, scattered trees and rocks, and buildings now
