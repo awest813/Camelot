@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { buildingLayout, buildingFootprint, toWorld, WALL_HEIGHT } from "./village-buildings";
 
 describe("village building layouts", () => {
-  for (const kind of ["cottage", "inn"] as const) {
+  for (const kind of ["cottage", "house", "inn"] as const) {
     it(`${kind}: closed walls on every side with exactly one door`, () => {
       const layout = buildingLayout(kind);
       const { width, depth } = buildingFootprint(kind);

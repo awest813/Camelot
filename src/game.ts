@@ -85,6 +85,7 @@ import { CraftingSystem, type CraftingStationId } from "./systems/crafting-syste
 import { CraftingUI } from "./ui/crafting-ui";
 import { ItemConditionSystem } from "./systems/item-condition-system";
 import { buildingLayout, toWorld, type BuildingKind } from "./world/village-buildings";
+import { hasVillage, planVillage, VILLAGE_DISCOVER_RADIUS, type VillagePlan } from "./world/village-settlement";
 import { ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
 import { EnchantingSystem } from "./systems/enchanting-system";
 import { EnchantingUI } from "./ui/enchanting-ui";
@@ -277,6 +278,11 @@ export class Game {
   /** Rigged NPC models (CC0 KayKit characters). */
   private _characterModels: CharacterModelLibrary | null = null;
   private readonly _npcRigs: Map<NPC, CharacterRig> = new Map();
+  /** Village plans by chunk key (null = no village there); deterministic, cached. */
+  private readonly _villagePlans = new Map<string, VillagePlan | null>();
+  /** Villages whose chunk is currently loaded (for discovery checks). */
+  private readonly _loadedVillages = new Map<string, VillagePlan>();
+  private _villageCheckTimer = 0;
   /** Dragon bosses' bodies (generated dark-fantasy dragon parented to the capsule). */
   private readonly _dragonVisuals = new Map<NPC, { root: AbstractMesh; yaw: number; last: Vector3; t: number }>();
   /** SSAO / god rays / lens flare / HDR pipeline handle. */
@@ -708,6 +714,11 @@ export class Game {
     this.ui = new UIManager(this.scene);
     this.world = new WorldManager(this.scene, this.shadowGenerator, null, this.graphics.texture);
     this.world.terrainMaterial = createTerrainMaterial(this.scene, this.world.textureManager);
+    // Village settlements keep their footprint clear of trees, rocks and ruins.
+    this.world.clearingAt = (cx, cz) => {
+      const v = this._villagePlanFor(cx, cz);
+      return v ? { x: v.center.x, z: v.center.z, radius: v.clearRadius } : null;
+    };
     this._initFoliage();
     this.navigationSystem = new NavigationSystem(this.scene);
     this.scheduleSystem = new ScheduleSystem();
@@ -2115,6 +2126,12 @@ export class Game {
         this._chunkFantasyContent.set(chunkKey, chunkRecord);
         // Pond chunks are quiet clearings — no props dropped into the water.
         if (this.world.pondAt(cx, cz)) return;
+        // A village takes the whole chunk: no other sites or wild scatter.
+        const village = this._villagePlanFor(cx, cz);
+        if (village) {
+          this._buildVillage(chunkKey, chunkRecord, village);
+          return;
+        }
         this._scatterGrimNature(chunkKey, chunkRecord, biome, worldX, worldZ, (slot) => _chunkRand(cx, cz, slot));
 
       // ── Obelisks in desert / plains (1-in-8 chance per chunk) ────────────
@@ -2405,6 +2422,7 @@ export class Game {
         const key = `${cx},${cz}`;
         const record = this._chunkFantasyContent.get(key);
         this.forges.removeGroup(key);
+        this._loadedVillages.delete(key);
         if (!record) return;
         this._chunkFantasyContent.delete(key);
 
@@ -6135,6 +6153,7 @@ export class Game {
       }
 
       this._updateNpcRigs(deltaTime);
+      this._checkVillageDiscovery(deltaTime);
       this._updatePetAI(deltaTime);
       this.interactionSystem.update();
 
@@ -7398,6 +7417,56 @@ export class Game {
         P("qBench", -0.5, 3.6, 0.1);
         P("qFlag", -3.5, -2.5, 0.5);
         if (extras.alchemist) P("qCauldron", -2.6, 2.4);
+      }
+  }
+
+  /** The village plan for chunk (cx, cz), or null (cached; never on ponds). */
+  private _villagePlanFor(cx: number, cz: number): VillagePlan | null {
+      const key = `${cx},${cz}`;
+      let plan = this._villagePlans.get(key);
+      if (plan === undefined) {
+        plan = hasVillage(cx, cz, this.world.getBiome(cx, cz)) && !this.world.pondAt(cx, cz)
+          ? planVillage(cx, cz, this.world.chunkSize)
+          : null;
+        this._villagePlans.set(key, plan);
+      }
+      return plan;
+  }
+
+  /** Build a planned village: buildings, square, smithy forge and residents. */
+  private _buildVillage(
+      chunkKey: string,
+      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
+      plan: VillagePlan,
+  ): void {
+      for (const b of plan.buildings) {
+        this._placeBuilding(chunkKey, chunkRecord, b.kind, { x: b.x, z: b.z, rot: b.rot });
+      }
+      const here = { x: 0, z: 0, rot: 0 };
+      for (const p of plan.props) {
+        this._placeSiteProp(chunkKey, chunkRecord, p.key, here, p.x, p.z, p.rot);
+      }
+      this._placeSmithy(chunkKey, chunkRecord, plan.forge.x, plan.forge.z);
+      for (const r of plan.residents) {
+        this._spawnArchetypeNpc(r.archetype, chunkRecord, r.x, r.z);
+      }
+      this._loadedVillages.set(chunkKey, plan);
+  }
+
+  /** Walking into a village's square discovers it as a fast-travel destination. */
+  private _checkVillageDiscovery(dt: number): void {
+      this._villageCheckTimer -= dt;
+      if (this._villageCheckTimer > 0 || this._loadedVillages.size === 0) return;
+      this._villageCheckTimer = 0.5;
+      const p = this.player.camera.position;
+      for (const v of this._loadedVillages.values()) {
+        const dx = p.x - v.center.x, dz = p.z - v.center.z;
+        if (dx * dx + dz * dz > VILLAGE_DISCOVER_RADIUS * VILLAGE_DISCOVER_RADIUS) continue;
+        if (this.fastTravelSystem.isDiscovered(v.id)) continue;
+        this.fastTravelSystem.discoverLocation(v.id, v.name, { x: v.center.x, y: 2, z: v.center.z });
+        this.ui.showNotification(`Discovered: ${v.name}`, 3200);
+        this.eventBus.emit("location:discovered" as any, { id: v.id, name: v.name });
+        this.saveSystem.markDirty();
       }
   }
 

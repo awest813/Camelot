@@ -18,7 +18,7 @@
  */
 import type { FantasyAssetKey } from "../systems/fantasy-asset-loader";
 
-export type BuildingKind = "cottage" | "inn";
+export type BuildingKind = "cottage" | "house" | "inn";
 
 export interface ModulePlacement {
   key: FantasyAssetKey;
@@ -53,6 +53,11 @@ const SPECS: Record<BuildingKind, Spec> = {
     segsX: 2, segsZ: 2,
     wall: "vWallPlaster", wallDoor: "vWallPlasterDoor", wallWindow: "vWallPlasterWindow",
     wallBack: "vWallTimber", corner: "vCornerWood", roof: "vRoof4x4", gable: "vGable4",
+  },
+  house: {
+    segsX: 2, segsZ: 3,
+    wall: "vWallTimber", wallDoor: "vWallPlasterDoor", wallWindow: "vWallPlasterWindow",
+    wallBack: "vWallTimber", corner: "vCornerWood", roof: "vRoof4x6", gable: "vGable4",
   },
   inn: {
     segsX: 3, segsZ: 4,

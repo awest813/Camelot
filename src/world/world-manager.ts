@@ -102,6 +102,21 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
   public foliage: FoliageMaterials | null = null;
   private _foliageBatch: FoliageBatch | null = null;
   private _activePond: Pond | null = null;
+  /**
+   * Optional clearing provider (settlements): within the returned circle no
+   * trees, rocks or ruins are generated.  Set by the game before chunks load.
+   */
+  public clearingAt: ((cx: number, cz: number) => { x: number; z: number; radius: number } | null) | null = null;
+  private _activeClearing: { x: number; z: number; radius: number } | null = null;
+
+  /** True when (x, z) lies in the active chunk's clearing (plus `margin`). */
+  private _inClearing(x: number, z: number, margin = 0): boolean {
+    const c = this._activeClearing;
+    if (!c) return false;
+    const dx = x - c.x, dz = z - c.z;
+    const r = c.radius + margin;
+    return dx * dx + dz * dz < r * r;
+  }
 
   /** Pond water renderer (see rendering/water.ts); null disables ponds. */
   public water: WaterRenderer | null = null;
@@ -469,6 +484,8 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
 
     // Spawn vegetation for this chunk (merged per material to cut draw calls).
     // Procedural trees append into one geometry batch per material.
+    const clearing = this.clearingAt?.(x, z) ?? null;
+    this._activeClearing = clearing;
     this._foliageBatch = this.foliage ? new FoliageBatch() : null;
     let spawned = this._spawnVegetation(x, z, biome, pond);
     if (this._foliageBatch && this.foliage) {
@@ -479,6 +496,20 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       }
     }
     this._foliageBatch = null;
+    if (clearing) {
+      // Unbatched props (rocks, bushes, flowers…) inside the clearing go too.
+      spawned = spawned.filter((m) => {
+        if (m.name.startsWith("trees_")) return true;
+        m.computeWorldMatrix(true);
+        const c = m.getBoundingInfo().boundingBox.centerWorld;
+        if (this._inClearing(c.x, c.z, 1)) {
+          m.dispose();
+          return false;
+        }
+        return true;
+      });
+    }
+    this._activeClearing = null;
     if (pond) {
       spawned = spawned.filter((m) => {
         m.computeWorldMatrix(true);
@@ -502,7 +533,8 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     }
 
     // Spawn a structure for this chunk (ruins, shrine, or tower based on biome)
-    this.structures.trySpawnForChunk(x, z, biome, this.chunkSize);
+    // — not where a settlement stands.
+    if (!clearing) this.structures.trySpawnForChunk(x, z, biome, this.chunkSize);
 
     this.onChunkLoaded?.(x, z, biome);
   }
@@ -824,6 +856,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
   /** Spawn a tree: cylindrical trunk + conical foliage crown for a stylised pine look. */
   private _spawnTree(x: number, z: number, name: string, scale: number, biome: BiomeType = "forest"): Mesh[] {
     if (insidePond(this._activePond, x, z, 2.5)) return [];
+    if (this._inClearing(x, z, 3)) return [];
     if (this.foliage) {
       // Plains mix in broadleaf trees; forests and tundra are coniferous.
       const seed = Math.floor(Math.abs(x * 73.13 + z * 19.71)) + 1;

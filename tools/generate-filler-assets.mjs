@@ -41,7 +41,7 @@ function getMaterial(pack, name) {
     if (name === "Anvil") return { color: [0.24, 0.25, 0.28, 1], metallic: 0.85, roughness: 0.28 };
     if (name === "Cauldron") return { color: [0.18, 0.18, 0.22, 1], metallic: 0.75, roughness: 0.35 };
     if (name === "Altar") return { color: [0.68, 0.65, 0.60, 1], metallic: 0.05, roughness: 0.88 };
-    if (name === "Well" || name === "Fountain") return { color: [0.60, 0.58, 0.55, 1], metallic: 0.05, roughness: 0.85 };
+    if (name === "Well" || name === "Fountain") return { color: [0.30, 0.29, 0.27, 1], metallic: 0.05, roughness: 0.92 };
     if (name === "Lantern") return { color: [0.92, 0.78, 0.32, 1], metallic: 0.80, roughness: 0.25 };
     if (name === "Flag" || name === "BannerStand") return { color: [0.78, 0.18, 0.20, 1], metallic: 0.05, roughness: 0.80 };
     if (name === "MarketStall") return { color: [0.82, 0.35, 0.20, 1], metallic: 0.05, roughness: 0.75 };

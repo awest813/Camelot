@@ -282,6 +282,10 @@
     {
       "slot": "village/Wagon",
       "source": "medieval-village-megakit/Prop_Wagon"
+    },
+    {
+      "slot": "village/Roof4x6",
+      "source": "medieval-village-megakit/Roof_RoundTiles_4x6"
     }
   ]
 }

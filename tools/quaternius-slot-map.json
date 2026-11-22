@@ -375,6 +375,10 @@
       "Wagon": {
         "pack": "medieval-village-megakit",
         "model": "Prop_Wagon"
+      },
+      "Roof4x6": {
+        "pack": "medieval-village-megakit",
+        "model": "Roof_RoundTiles_4x6"
       }
     }
   }

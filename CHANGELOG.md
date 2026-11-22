@@ -6,6 +6,19 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Village settlements.** Named Arthurian villages (Camcross, ...) now appear
+  in plains and forests, roughly one area in seventeen, at least three areas
+  from the start. Each one has:
+  - six buildings around a square: an inn, a smithy with a working forge, a
+    general store, and cottages and longhouses;
+  - a well, benches, lanterns and market stalls in the square;
+  - gate guards and banners at the entrance road;
+  - residents: an innkeeper, a barkeep, the village smith (Armorer trainer), a
+    shopkeeper, a traveling merchant, and villagers.
+
+  Walking into the square shows "Discovered: <name>" and adds the village to
+  the fast-travel menu. Villages are always the same in the same place, and
+  their ground is kept clear of trees, rocks and ruins.
 - Smithing forge (Shift+B): 11 recipes that use Iron Ingots, Steel Ingots and
   Leather Strips from the inventory. Better Armorer skill gives Fine to
   Masterwork gear with higher stats.

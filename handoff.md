@@ -57,6 +57,10 @@ Sixth follow-up — **assembled buildings**: `src/world/village-buildings.ts` (p
 `checkCollisions` (verified: player stops ~1 m from the wall), meshes unpickable. Loader fixes: keep the glTF
 root's handedness scaling (models were mirrored) and `setInstanceYaw` (rotation.y was ignored on glTF roots).
 
+Seventh follow-up — **village settlements**: see ROADMAP "Village settlements". Plans cached in
+`game._villagePlans`; loaded ones in `_loadedVillages` (dropped on chunk unload). The well is still the
+generated stand-in (darkened). NPC schedules don't path around buildings.
+
 Known limits: The saddlebag takes out the *first* copy of an item
 id (it is consistent, so nothing is lost, but the player can't choose which of two identical swords to take).
 Barter is instance-aware and prices worn gear down (third follow-up).

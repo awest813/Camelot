@@ -179,6 +179,7 @@ export type FantasyAssetKey =
   | "vFloorWood"
   | "vRoof4x4"
   | "vRoof6x8"
+  | "vRoof4x6"
   | "vGable4"
   | "vGable6"
   | "vDoor"
@@ -367,6 +368,7 @@ const ASSET_URLS: Record<FantasyAssetKey, string> = {
   get vFloorWood() { return qVillage() + "FloorWood.glb"; },
   get vRoof4x4() { return qVillage() + "Roof4x4.glb"; },
   get vRoof6x8() { return qVillage() + "Roof6x8.glb"; },
+  get vRoof4x6() { return qVillage() + "Roof4x6.glb"; },
   get vGable4() { return qVillage() + "Gable4.glb"; },
   get vGable6() { return qVillage() + "Gable6.glb"; },
   get vDoor() { return qVillage() + "Door.glb"; },
