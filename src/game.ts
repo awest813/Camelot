@@ -153,7 +153,7 @@ import { AmbientEventSystem } from "./systems/ambient-event-system";
 import { LeveledListSystem, ALL_BUILT_IN_LEVELED_LISTS } from "./systems/leveled-list-system";
 import { EventManagerSystem } from "./systems/event-manager-system";
 import { AnimationSystem } from "./systems/animation-system";
-import { FantasyAssetLoader } from "./systems/fantasy-asset-loader";
+import { FantasyAssetLoader, type FantasyAssetKey } from "./systems/fantasy-asset-loader";
 import { PetSystem } from "./systems/pet-system";
 import type { Pet } from "./systems/pet-system";
 import { PetUI } from "./ui/pet-ui";
@@ -2112,6 +2112,7 @@ export class Game {
         this._chunkFantasyContent.set(chunkKey, chunkRecord);
         // Pond chunks are quiet clearings — no props dropped into the water.
         if (this.world.pondAt(cx, cz)) return;
+        this._scatterGrimNature(chunkKey, chunkRecord, biome, worldX, worldZ, (slot) => _chunkRand(cx, cz, slot));
 
       // ── Obelisks in desert / plains (1-in-8 chance per chunk) ────────────
       if ((biome === "desert" || biome === "plains") && _chunkRand(cx, cz, 0) < 0.125) {
@@ -2147,6 +2148,9 @@ export class Game {
           "archetype_trainer_armorer",
         ][((cx + cz) % 4 + 4) % 4];
         this._spawnArchetypeNpc(cottageTrainer, chunkRecord, cx2 - 2, cz2 + 1);
+        this._dressSite(chunkKey, chunkRecord, "cottage", { x: cx2, z: cz2, rot: 0 }, {
+          alchemist: cottageTrainer === "archetype_trainer_alchemy",
+        });
         // The smith works out of a forge and anvil beside the homestead.
         if (cottageTrainer === "archetype_trainer_armorer") {
           this._placeSmithy(chunkKey, chunkRecord, cx2 - 4.5, cz2 + 2.5);
@@ -2202,6 +2206,9 @@ export class Game {
           root.rotation.y = _chunkRand(cx, cz, 16) * Math.PI * 2;
           root.scaling.setAll(1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
+        });
+        this._dressSite(chunkKey, chunkRecord, "inn", { x: ix, z: iz, rot: 0 }, {
+          merchant: ((cx + cz) % 5 + 5) % 5 === 4,
         });
         // Settle the inn: proprietor, barkeep, and a rotating specialist
         // shopkeeper (deterministic per chunk) — occasionally a guard.
@@ -7286,6 +7293,95 @@ export class Game {
       perks:           this.perkSystem.getAllPerks(),
       gearCondition:   this.smithing.getEquippedConditionSummary(),
     });
+  }
+
+  /**
+   * Place one local (Quaternius) prop, chunk-scoped.  Offsets are relative to
+   * a site origin rotated by `siteRot`, so dressing follows the site layout.
+   */
+  private _placeSiteProp(
+      chunkKey: string,
+      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
+      key: FantasyAssetKey,
+      origin: { x: number; z: number; rot: number },
+      dx: number,
+      dz: number,
+      rotY = 0,
+      tier: "structure" | "prop" = "prop",
+  ): void {
+      const c = Math.cos(origin.rot), s = Math.sin(origin.rot);
+      const x = origin.x + dx * c - dz * s;
+      const z = origin.z + dx * s + dz * c;
+      this.fantasyAssets.getInstance(key, (root) => {
+        if (!root) return;
+        root.position.set(x, 0, z);
+        root.rotation.y = origin.rot + rotY;
+        this._trackChunkProp(chunkKey, chunkRecord, root, tier);
+      });
+  }
+
+  /**
+   * Dress a settlement with Quaternius props so it reads as lived-in even
+   * when the remote CDN building is absent (offline builds).
+   */
+  private _dressSite(
+      chunkKey: string,
+      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
+      kind: "inn" | "cottage",
+      origin: { x: number; z: number; rot: number },
+      extras: { merchant?: boolean; alchemist?: boolean } = {},
+  ): void {
+      const P = (key: FantasyAssetKey, dx: number, dz: number, rot = 0) =>
+        this._placeSiteProp(chunkKey, chunkRecord, key, origin, dx, dz, rot);
+      if (kind === "inn") {
+        P("qBarrel", 5.5, 1.2);
+        P("qBarrel", 6.2, 2.1, 0.7);
+        P("qCrate", 5.8, -0.4, 0.3);
+        P("qBench", 0, 5.5);
+        P("qTable", 0, 6.8);
+        P("qBannerStand", -3.2, 4.8, Math.PI);
+        P("qLantern", 2.4, 4.6);
+        P("qLantern", -2.4, 4.6);
+        if (extras.merchant) P("qMarketStall", 5.2, -4.5, -Math.PI / 2);
+      } else {
+        P("qBarrel", 3.4, 0.8);
+        P("qCrate", 3.6, -0.6, 0.4);
+        P("qBench", -0.5, 3.6, 0.1);
+        P("qFlag", -3.5, -2.5, 0.5);
+        if (extras.alchemist) P("qCauldron", -2.6, 2.4);
+      }
+  }
+
+  /** A few grim nature pieces per chunk (dead / twisted trees, rocks, shelf fungus). */
+  private _scatterGrimNature(
+      chunkKey: string,
+      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
+      biome: string,
+      worldX: number,
+      worldZ: number,
+      rand: (slot: number) => number,
+  ): void {
+      const pools: Record<string, Array<[FantasyAssetKey, number]>> = {
+        forest: [["qWillowTree", 0.35], ["qDeadTree", 0.25], ["qMushroom", 0.5], ["qRockMedium", 0.3], ["qFern", 0.6]],
+        plains: [["qDeadTree", 0.3], ["qRockLarge", 0.25], ["qBushLarge", 0.35], ["qGrassClump", 0.6]],
+        tundra: [["qDeadTree", 0.55], ["qRockLarge", 0.45], ["qPineTree", 0.4]],
+        desert: [["qDeadTree", 0.35], ["qRockLarge", 0.5], ["qRockSmall", 0.5]],
+      };
+      const pool = pools[biome];
+      if (!pool) return;
+      const span = this.world.chunkSize * 0.8;
+      pool.forEach(([key, chance], i) => {
+        if (rand(40 + i) >= chance) return;
+        const x = worldX + (rand(50 + i) - 0.5) * span;
+        const z = worldZ + (rand(60 + i) - 0.5) * span;
+        this.fantasyAssets.getInstance(key, (root) => {
+          if (!root) return;
+          root.position.set(x, 0, z);
+          root.rotation.y = rand(70 + i) * Math.PI * 2;
+          const tree = key === "qDeadTree" || key === "qWillowTree" || key === "qPineTree";
+          this._trackChunkProp(chunkKey, chunkRecord, root, tree ? "structure" : "prop");
+        });
+      });
   }
 
   /**

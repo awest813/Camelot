@@ -27,8 +27,8 @@ export const CREDITS_SECTIONS: readonly CreditsSection[] = [
   {
     heading: "Art",
     lines: [
-      "KayKit Character Pack: Adventurers — CC0, Kay Lousberg (kaylousberg.com). Credit appreciated.",
-      "Quaternius stylized filler meshes — CC0 / public domain.",
+      "Characters, props and nature by Quaternius (quaternius.com) — CC0: Fantasy Props MegaKit, Medieval Village MegaKit, Stylized Nature MegaKit, Modular Character Outfits – Fantasy, Universal Base Characters, Universal Animation Library, Characters – Fantasy Races, Bestiary – Dungeon Monsters.",
+      "KayKit Character Packs: Adventurers & Skeletons — CC0, Kay Lousberg (kaylousberg.com). Credit appreciated.",
       "Terrain, foliage, and surfaces are generated in-engine.",
       "Optional Babylon.js sample meshes — CC BY 4.0, Babylon.js. Used only when remote props are explicitly enabled; the Steam build leaves them off.",
     ],

@@ -191,6 +191,8 @@ export function getQuaterniusBasePath(): string {
 
 // Helpers for Quaternius sub-paths
 const qProps    = () => QUATERNIUS_BASE + "props/";
+/** KayKit (CC0) characters, dark-graded — used where no mature Quaternius model exists. */
+const kaykit    = () => `${import.meta.env.BASE_URL ?? "/"}model/kaykit/`;
 const qNature   = () => QUATERNIUS_BASE + "nature/";
 const qChars    = () => QUATERNIUS_BASE + "characters/";
 const qMonsters = () => QUATERNIUS_BASE + "monsters/";
@@ -280,18 +282,18 @@ const ASSET_URLS: Record<FantasyAssetKey, string> = {
   get qLog()         { return qNature()   + "Log.glb"; },
   get qMushroom()    { return qNature()   + "Mushroom.glb"; },
   // ── Quaternius: Ultimate RPG Characters (CC0) ─────────────────────────────
-  get qKnight()         { return qChars()    + "Knight.glb"; },
+  get qKnight()         { return kaykit()    + "Knight.glb"; },
   get qMage()           { return qChars()    + "Mage.glb"; },
   get qRogue()          { return qChars()    + "Rogue.glb"; },
   get qArcher()         { return qChars()    + "Archer.glb"; },
   get qBarbarian()      { return qChars()    + "Barbarian.glb"; },
   get qVillagerMale()   { return qChars()    + "VillagerMale.glb"; },
   get qVillagerFemale() { return qChars()    + "VillagerFemale.glb"; },
-  get qGuard()          { return qChars()    + "Guard.glb"; },
+  get qGuard()          { return kaykit()    + "Knight.glb"; },
   get qMerchant()       { return qChars()    + "Merchant.glb"; },
   get qInnkeeper()      { return qChars()    + "Innkeeper.glb"; },
   // ── Quaternius: Animated Monsters (CC0) ───────────────────────────────────
-  get qSkeleton()    { return qMonsters() + "Skeleton.glb"; },
+  get qSkeleton()    { return kaykit()    + "Skeleton_Warrior.glb"; },
   get qSpider()      { return qMonsters() + "Spider.glb"; },
   get qSlime()       { return qMonsters() + "Slime.glb"; },
   get qGoblin()      { return qMonsters() + "Goblin.glb"; },
@@ -526,7 +528,10 @@ export class FantasyAssetLoader {
 
     const url = ASSET_URLS[key];
 
-    SceneLoader.ImportMeshAsync("", url, "", this._scene)
+    // Split into folder + file so relative URIs inside the model (external
+    // textures such as ../_textures/<pack>/*.jpg) resolve against the folder.
+    const slash = url.lastIndexOf("/") + 1;
+    SceneLoader.ImportMeshAsync("", url.slice(0, slash), url.slice(slash), this._scene)
       .then((result) => {
         if (result.meshes.length === 0) {
           this._markFailed(key, entry);
@@ -552,7 +557,8 @@ export class FantasyAssetLoader {
         }
         entry.pendingCallbacks = [];
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        console.warn(`[FantasyAssetLoader] "${key}" failed to load from ${url}:`, error);
         this._markFailed(key, entry);
       });
   }

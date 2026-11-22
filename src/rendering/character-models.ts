@@ -1,9 +1,16 @@
 /**
  * character-models — rigged, animated humanoids for NPCs.
  *
- * Models: KayKit "Adventurers" character pack by Kay Lousberg (CC0), vendored
- * under `public/model/kaykit/` and compacted to the clips we play with
- * `tools/compact-glb.py`.
+ * Models:
+ *  • Humans: Quaternius "Modular Character Outfits – Fantasy" peasants and
+ *    rangers plus a "Characters – Fantasy Races" orc (CC0), imported into
+ *    `public/model/quaternius/characters/` by `tools/import-quaternius.mjs`.
+ *    They ship without clips; animation comes from Quaternius' Universal
+ *    Animation Library (same 65-bone rig), compacted to
+ *    `public/model/quaternius/animations/UAL_Clips.glb` and cloned onto each
+ *    rig by bone name.
+ *  • Undead: KayKit "Skeletons" (CC0, dark-graded) in `public/model/kaykit/`,
+ *    compacted to the clips we play with `tools/compact-glb.py`.
  *
  * Each GLB is loaded once into an AssetContainer and instantiated per NPC
  * (cloned skeleton + animation groups, shared materials).  The rig is
@@ -17,28 +24,54 @@ import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
-import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import "@babylonjs/loaders/glTF";
 import type { AnimationClip } from "../systems/animation-system";
 
+export type QuaterniusHumanId = "Peasant_Male" | "Peasant_Female" | "Ranger_Male" | "Ranger_Female" | "Orc_Brute";
+
 export type CharacterModelId =
   | "Knight" | "Barbarian" | "Mage" | "Rogue" | "Rogue_Hooded"
-  | "Skeleton_Warrior" | "Skeleton_Mage" | "Skeleton_Rogue" | "Skeleton_Minion";
+  | "Skeleton_Warrior" | "Skeleton_Mage" | "Skeleton_Rogue" | "Skeleton_Minion"
+  | QuaterniusHumanId;
 
 export const CHARACTER_MODEL_IDS: readonly CharacterModelId[] = [
   "Knight", "Barbarian", "Mage", "Rogue", "Rogue_Hooded",
   "Skeleton_Warrior", "Skeleton_Mage", "Skeleton_Rogue", "Skeleton_Minion",
+  "Peasant_Male", "Peasant_Female", "Ranger_Male", "Ranger_Female", "Orc_Brute",
 ];
 
 /** Models worth fetching at boot (the rest load on first use). */
 export const CHARACTER_MODELS_PRELOAD: readonly CharacterModelId[] = [
-  "Knight", "Rogue", "Barbarian", "Skeleton_Warrior",
+  "Ranger_Male", "Peasant_Male", "Skeleton_Warrior",
 ];
 
+/** Quaternius humans: file under `model/quaternius/characters/` (see tools/quaternius-slot-map.json). */
+export const QUATERNIUS_HUMAN_FILES: Readonly<Record<QuaterniusHumanId, string>> = {
+  Peasant_Male:   "VillagerMale.glb",
+  Peasant_Female: "VillagerFemale.glb",
+  Ranger_Male:    "Archer.glb",
+  Ranger_Female:  "Rogue.glb",
+  Orc_Brute:      "Barbarian.glb",
+};
+
+/** Shared Universal Animation Library clips for the Quaternius rig. */
+export const UAL_CLIPS_FILE = "UAL_Clips.glb";
+
+export const isQuaterniusHuman = (m: CharacterModelId): m is QuaterniusHumanId =>
+  Object.prototype.hasOwnProperty.call(QUATERNIUS_HUMAN_FILES, m);
+
 const isSkeleton = (m: CharacterModelId): boolean => m.startsWith("Skeleton_");
+
+/** Stable 0..1 hash of a name (for per-NPC variety that survives reloads). */
+function nameHash(name: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < name.length; i++) h = Math.imul(h ^ name.charCodeAt(i), 16777619);
+  return ((h >>> 0) % 1000) / 1000;
+}
 
 /** Standing height NPC rigs are normalised to (world units ≈ metres). */
 export const CHARACTER_HEIGHT = 1.85;
@@ -54,16 +87,38 @@ export function modelForNpcName(name: string): CharacterModelId | null {
     if (/minion|thrall|lesser/.test(n)) return "Skeleton_Minion";
     return "Skeleton_Warrior";
   }
-  if (/guard|knight|soldier|captain/.test(n)) return "Knight";
-  if (/mage|wizard|sorcer|witch|priest|healer|trainer/.test(n)) return "Mage";
-  if (/archer|ranger|hunter|scout/.test(n)) return "Rogue_Hooded";
-  if (/bandit|outlaw|robber|chief|boss|lord|barbarian|pirate|smith|blacksmith/.test(n)) return "Barbarian";
-  if (/thief|rogue|assassin/.test(n)) return "Rogue_Hooded";
-  return "Rogue";
+  // Humans are Quaternius outfit characters; gender varies by name hash.
+  const female = nameHash(name) < 0.45;
+  if (/chief|warlord|brute|barbarian|orc/.test(n)) return "Orc_Brute";
+  if (/guard|knight|soldier|captain|bandit|outlaw|robber|pirate|archer|ranger|hunter|scout|thief|rogue|assassin|instructor|battlemage|mage|wizard|sorcer|witch|priest|healer/.test(n)) {
+    return female ? "Ranger_Female" : "Ranger_Male";
+  }
+  return female ? "Peasant_Female" : "Peasant_Male";
+}
+
+/** UAL clip for an AnimationSystem clip on a Quaternius human. */
+function ualClipFor(clip: AnimationClip, model: QuaterniusHumanId): { name: string; loop: boolean } {
+  const armed = model.startsWith("Ranger") || model === "Orc_Brute";
+  switch (clip) {
+    case "idle":        return { name: "Idle_Loop", loop: true };
+    case "walk":
+    case "return":      return { name: "Walk_Loop", loop: true };
+    case "investigate": return { name: "Walk_Formal_Loop", loop: true };
+    case "run":         return { name: "Jog_Fwd_Loop", loop: true };
+    case "alert":       return { name: armed ? "Sword_Idle" : "Idle_Loop", loop: true };
+    case "victory":     return { name: "Idle_Talking_Loop", loop: true };
+    case "spawn":       return { name: "Idle_Loop", loop: false };
+    case "telegraph":   return { name: armed ? "Sword_Attack" : "Punch_Jab", loop: false };
+    case "stagger":     return { name: "Hit_Head", loop: false };
+    case "hit":         return { name: "Hit_Chest", loop: false };
+    case "death":       return { name: "Death01", loop: false };
+    default:            return { name: "Idle_Loop", loop: true };
+  }
 }
 
 /** Skeletal clip names played for each AnimationSystem clip, per model. */
 export function skeletalClipFor(clip: AnimationClip, model: CharacterModelId): { name: string; loop: boolean } {
+  if (isQuaterniusHuman(model)) return ualClipFor(clip, model);
   if (isSkeleton(model)) {
     switch (clip) {
       case "walk":
@@ -142,7 +197,7 @@ export class CharacterRig {
   public play(clip: AnimationClip, onDone?: () => void): void {
     if (this._disposed) return;
     const { name, loop } = skeletalClipFor(clip, this.model);
-    const group = this._groups.get(name) ?? this._groups.get("Idle");
+    const group = this._groups.get(name) ?? this._groups.get("Idle") ?? this._groups.get("Idle_Loop");
     if (!group) { onDone?.(); return; }
     if (clip === "hit" || clip === "stagger") this._flashTimer = 0.15;
     if (group === this._current && loop && group.isPlaying) return;
@@ -193,8 +248,10 @@ export class CharacterRig {
     this._hasLastPos = true;
 
     const g = this._current;
-    if (g && (this._currentName.startsWith("Walking") || this._currentName.startsWith("Running"))) {
-      const base = this._currentName.startsWith("Running") ? 5.5 : 1.8;
+    const clipName = this._currentName;
+    const running = clipName.startsWith("Running") || clipName.startsWith("Jog") || clipName.startsWith("Sprint");
+    if (g && (running || clipName.startsWith("Walk"))) {
+      const base = running ? 5.5 : 1.8;
       g.speedRatio = Math.max(0.6, Math.min(1.6, this.speed / base || 1));
     }
 
@@ -271,7 +328,10 @@ export function optimizeCharacterContainer(container: AssetContainer, scene: Sce
       && m.rotation.lengthSquared() < 1e-8
       && Math.abs(m.scaling.x - 1) + Math.abs(m.scaling.y - 1) + Math.abs(m.scaling.z - 1) < 1e-6;
     if (!identity) continue;
-    const key = `${m.parent?.uniqueId ?? "root"}|${m.skeleton.uniqueId}|${m.material.uniqueId}`;
+    // Parts can only merge when they carry the same vertex attributes
+    // (Quaternius outfit pieces differ in extra UV / colour sets).
+    const kinds = m.getVerticesDataKinds().slice().sort().join(",");
+    const key = `${m.parent?.uniqueId ?? "root"}|${m.skeleton.uniqueId}|${m.material.uniqueId}|${kinds}`;
     const g = groups.get(key) ?? [];
     g.push(m);
     groups.set(key, g);
@@ -310,12 +370,30 @@ interface LibraryEntry {
 export class CharacterModelLibrary {
   private readonly _entries = new Map<CharacterModelId, LibraryEntry>();
   private _counter = 0;
+  private _ualClips: Promise<AssetContainer | null> | null = null;
+  /** Folder holding the Quaternius humans (characters/) and UAL clips (animations/). */
+  private readonly _quaterniusBase: string;
 
   constructor(
     private readonly _scene: Scene,
     private readonly _baseUrl: string,
     private readonly _shadows: ShadowGenerator | null,
-  ) {}
+    quaterniusBase?: string,
+  ) {
+    this._quaterniusBase = quaterniusBase ?? _baseUrl.replace(/kaykit\/?$/, "quaternius/");
+  }
+
+  /** The shared Universal Animation Library clip container (loaded once). */
+  private _loadUalClips(): Promise<AssetContainer | null> {
+    if (!this._ualClips) {
+      this._ualClips = SceneLoader.LoadAssetContainerAsync(`${this._quaterniusBase}animations/`, UAL_CLIPS_FILE, this._scene)
+        .catch((err) => {
+          console.warn("[character-models] failed to load UAL clips", err);
+          return null;
+        });
+    }
+    return this._ualClips;
+  }
 
   public preload(ids: readonly CharacterModelId[] = CHARACTER_MODELS_PRELOAD): void {
     for (const id of ids) this._load(id);
@@ -325,7 +403,11 @@ export class CharacterModelLibrary {
     let entry = this._entries.get(id);
     if (entry) return entry;
     const e: LibraryEntry = { container: null, failed: false, scale: 1, promise: Promise.resolve(null) };
-    e.promise = SceneLoader.LoadAssetContainerAsync(this._baseUrl, `${id}.glb`, this._scene)
+    const [root, file] = isQuaterniusHuman(id)
+      ? [`${this._quaterniusBase}characters/`, QUATERNIUS_HUMAN_FILES[id]]
+      : [this._baseUrl, `${id}.glb`];
+    if (isQuaterniusHuman(id)) void this._loadUalClips();
+    e.promise = SceneLoader.LoadAssetContainerAsync(root, file, this._scene)
       .then((container) => {
         optimizeCharacterContainer(container, this._scene);
         // Measure standing height from the bind pose.
@@ -364,6 +446,7 @@ export class CharacterModelLibrary {
   public async attach(capsule: Mesh, id: CharacterModelId): Promise<CharacterRig | null> {
     const entry = this._load(id);
     const container = await entry.promise;
+    const clips = isQuaterniusHuman(id) ? await this._loadUalClips() : null;
     if (!container || capsule.isDisposed()) return null;
 
     const tag = `${capsule.name}#${++this._counter}`;
@@ -372,6 +455,24 @@ export class CharacterModelLibrary {
     for (const g of inst.animationGroups) {
       const clip = g.name.slice(g.name.lastIndexOf("|") + 1);
       g.name = `${tag}|${clip}`;
+    }
+    if (clips) {
+      // Retarget the shared UAL clips onto this rig's bone nodes by name.
+      const byName = new Map<string, unknown>();
+      for (const root of inst.rootNodes) {
+        for (const node of [root, ...root.getDescendants(false)]) {
+          byName.set(node.name.slice(node.name.lastIndexOf("|") + 1), node);
+        }
+      }
+      for (const group of clips.animationGroups) {
+        const cloned = new AnimationGroup(`${tag}|${group.name}`, this._scene);
+        for (const ta of group.targetedAnimations) {
+          const target = byName.get((ta.target as { name?: string })?.name ?? "");
+          if (target) cloned.addTargetedAnimation(ta.animation, target);
+        }
+        cloned.normalize(group.from, group.to);
+        inst.animationGroups.push(cloned);
+      }
     }
 
     const pivot = new TransformNode(`${tag}|pivot`, this._scene);

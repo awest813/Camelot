@@ -17,15 +17,22 @@ in `node_modules/@babylonjs/havok` after install.
 
 `recast-detour` wraps Recast Navigation. See that package's license after install.
 
-## KayKit Character Pack: Adventurers
+## KayKit Character Packs: Adventurers and Skeletons
 
 CC0 1.0 Universal. Kay Lousberg, kaylousberg.com. Credit is not required and
-is given anyway. License text: `public/model/kaykit/LICENSE.txt`.
+is given anyway. License text: `public/model/kaykit/LICENSE.txt`. Textures are
+colour-graded for Camelot's look (`tools/grade-kaykit-textures.mjs`).
 
-## Quaternius filler meshes
+## Quaternius models
 
-CC0 1.0 Universal / public domain. Generated stand-ins live in
-`public/model/quaternius/`.
+CC0 1.0 Universal / public domain, by Quaternius (quaternius.com). Credit is
+not required and is given anyway. From the free Standard versions of: Fantasy
+Props MegaKit, Medieval Village MegaKit, Stylized Nature MegaKit, Modular
+Character Outfits – Fantasy, Universal Base Characters, Universal Animation
+Library, Characters – Fantasy Races, and Bestiary – Dungeon Monsters Kit.
+They live in `public/model/quaternius/`; `quaternius-import-manifest.json`
+lists which model fills each slot. Textures are downscaled and colour-graded.
+Slots without an imported model use generated stand-ins (also CC0).
 
 ## Babylon.js sample meshes
 

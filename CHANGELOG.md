@@ -36,6 +36,23 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   There are forges near the starting area, at Village Smith cottages, and
   behind inns whose shopkeeper sells arms or armor.
 
+- Real Quaternius models (CC0) replace the generated stand-ins: props from the
+  Fantasy Props MegaKit, trees, rocks and plants from the Stylized Nature
+  MegaKit, characters and outfits from the Modular Character Outfits and
+  Universal Base Characters kits, plus an orc and two dungeon monsters. Slots
+  no free pack covers keep darker generated stand-ins.
+- People look like adults instead of chibi figures. Villagers, innkeepers,
+  merchants, guards, bandits and trainers are now realistic peasants and
+  rangers (with heads and hair from Universal Base Characters), animated with
+  the Universal Animation Library. Bandit chiefs are orcs. The undead stay
+  KayKit skeletons.
+- Towns and the countryside are furnished with those props: inns get tables,
+  benches, barrels, banners and candle stands, cottages get barrels, crates and
+  a cauldron at the alchemist's, and dead and twisted trees, rocks and shelf
+  fungus are scattered by biome. The smith's forge is a stone-and-brick hearth
+  from the Medieval Village kit.
+- KayKit textures are colour-graded darker and less saturated to match.
+
 ### Fixed
 - Inns, cottages, pirate forts and their people (innkeepers, shopkeepers,
   trainers, bandits, dragons) were missing from default builds. The setting

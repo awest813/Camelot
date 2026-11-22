@@ -42,6 +42,15 @@ where the (absent) CDN building would be. A local stand-in building would be a g
 Forge stations: steel recipes + iron cuirass need a forge (`ForgeRegistry`, radius 8). New e2e
 `tests/e2e/smithing-flow.spec.ts` uses `window.__camelotGame` (dev builds only).
 
+Fifth follow-up — **real Quaternius art**: `tools/import-quaternius.mjs` + `tools/quaternius-slot-map.json`
+import 50 catalogue slots from the free CC0 packs (downloaded from quaternius.itch.io; the unzipped
+packs are not in the repo — re-download to re-import). NPC humans are Quaternius outfit characters with
+spliced Universal Base Characters heads/hair, animated by `animations/UAL_Clips.glb` (UAL retargeted by
+bone name in `character-models.ts`); undead stay KayKit. KayKit textures dark-graded
+(`tools/grade-kaykit-textures.mjs`). Settlements dressed with props (`_dressSite`), grim nature scatter
+per chunk (`_scatterGrimNature`). Loader fixes: folder/file split so external textures resolve; merge
+groups keyed by vertex attributes. `public/model` is now ~44 MB.
+
 Known limits: The saddlebag takes out the *first* copy of an item
 id (it is consistent, so nothing is lost, but the player can't choose which of two identical swords to take).
 Barter is instance-aware and prices worn gear down (third follow-up).
