@@ -215,13 +215,13 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     const key = [...g._loadedVillages.keys()][0];
     const plan = g._loadedVillages.get(key);
     g.player.camera.position.set(plan.center.x + 2, 2, plan.center.z + 2);
-    const raiders = g._startRaid(key, plan);
+    const raiders = g.raids.start(key, plan);
     (window as any).__raiders = raiders;
     const d = (n: any) => Math.hypot(n.mesh.position.x - plan.center.x, n.mesh.position.z - plan.center.z);
     const townsfolk = g.scheduleSystem.npcs.filter((n: any) => /^Villager_/.test(n.mesh.name) && d(n) < 30);
     return {
       raiders: raiders.length, startDist: Math.min(...raiders.map(d)),
-      active: !!g.villageRaids.active, hidden: townsfolk.filter((n: any) => !n.mesh.isEnabled()).length,
+      active: !!g.raids.rules.active, hidden: townsfolk.filter((n: any) => !n.mesh.isEnabled()).length,
       townsfolk: townsfolk.length,
     };
   });
@@ -242,7 +242,7 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
       r.takeDamage(1e6);
       g.combatSystem.onNPCDeath(r.mesh.name, r.xpReward, r);
     }
-    return { paid: g._getInventoryGold() - gold, active: !!g.villageRaids.active };
+    return { paid: g._getInventoryGold() - gold, active: !!g.raids.rules.active };
   });
   expect(raidEnd.active).toBe(false);
   expect(raidEnd.paid, "beating the raid pays").toBe(35 * raid.raiders);
@@ -256,13 +256,13 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     const g = (window as any).__camelotGame;
     const key = [...g._loadedVillages.keys()][0];
     const plan = g._loadedVillages.get(key);
-    const raiders = g._startRaid(key, plan);
+    const raiders = g.raids.start(key, plan);
     const c = g.player.camera.position;
     c.set(plan.center.x + 90, 3, plan.center.z);
     await new Promise((r) => setTimeout(r, 1500));
     const out = {
       raiders: raiders.length,
-      active: !!g.villageRaids.active,
+      active: !!g.raids.rules.active,
       gone: raiders.every((r: any) => r.mesh.isDisposed()),
       inSchedule: raiders.filter((r: any) => g.scheduleSystem.npcs.includes(r)).length,
     };

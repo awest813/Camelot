@@ -51,6 +51,12 @@ export interface GameEvents {
   "pet:levelUp": { petId: string; petName: string; newLevel: number };
   /** The active pet died. */
   "pet:died": { petId: string; petName: string };
+  /** A new in-game hour began (fired once per hour, also when time skips). */
+  "time:hour": { hour: number; elapsedHours: number };
+  /** A save finished loading (features reset their transient state). */
+  "save:loaded": Record<string, never>;
+  /** An NPC left the world (despawned or its chunk unloaded); drop references. */
+  "npc:released": { npcName: string };
 }
 
 export type GameEventType = keyof GameEvents;
@@ -79,14 +85,18 @@ export class GameEventBus {
 
   // ── Subscribe ─────────────────────────────────────────────────────────────
 
-  /** Subscribe to an event.  The same callback can be registered once per event. */
-  public on<T extends GameEventType>(event: T, callback: GameEventCallback<T>): void {
+  /**
+   * Subscribe to an event.  The same callback can be registered once per event.
+   * Returns a function that unsubscribes (kernel scopes own these).
+   */
+  public on<T extends GameEventType>(event: T, callback: GameEventCallback<T>): () => void {
     let set = this._listeners.get(event);
     if (!set) {
       set = new Set();
       this._listeners.set(event, set);
     }
     set.add(callback as Function);
+    return () => this.off(event, callback);
   }
 
   /** Remove a previously registered callback. */

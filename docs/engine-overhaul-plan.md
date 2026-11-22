@@ -289,6 +289,24 @@ added a junk "Exterior" fast-travel destination.
 **Exit:** `game.ts` is under 2,500 lines, and the extracted features own their
 state, scope and save codec.
 
+**Progress:**
+
+- Kernel landed in `src/core/`:
+  - `Kernel` with a feature install/uninstall lifecycle
+  - `Scope` for ownership
+  - `PhaseScheduler` with ordering and per-system timings
+  - `ServiceRegistry` with typed keys
+  - `RngStreams`, seeded from the world seed
+  - the typed bus (`GameEventBus.on` returns an unsubscribe handle)
+- `game.ts` runs the `sim` phase each gameplay step and emits `time:hour`,
+  `save:loaded` and `npc:released`.
+- The service contracts for features are in `src/features/services.ts`
+  (clock, player, feedback, village world).
+- Extracted features:
+  1. **Village raids** (`src/features/village-raids/`). Events in, services
+     out, no reference to `Game`. Its rules roll on a seeded stream, and
+     5 headless tests run it through the kernel with fake services.
+
 ### Phase 2 — Input, modals and camera (2 weeks)
 
 - Input contexts plus a key-to-action map.

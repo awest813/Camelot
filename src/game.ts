@@ -88,7 +88,9 @@ import { buildingFootprint, buildingWallColliders, buildingLayout, toWorld, WALL
 import { hasVillage, planVillage, VILLAGE_DISCOVER_RADIUS, VILLAGE_CLEAR_RADIUS, type VillagePlan } from "./world/village-settlement";
 import { VillageJobBoard } from "./systems/village-jobs";
 import { JobBoardUI } from "./ui/job-board-ui";
-import { VillageRaidSystem, raiderCount } from "./systems/village-raids";
+import { Kernel } from "./core/kernel";
+import { VillageRaidFeature, RaidsKey, type RaidsService } from "./features/village-raids/raid-feature";
+import { ClockKey, FeedbackKey, PlayerKey, VillageWorldKey } from "./features/services";
 import { createNoticeMaterials } from "./rendering/notice-texture";
 import { buildVillageWell, WELL_RADIUS } from "./world/village-well";
 import { ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
@@ -389,12 +391,13 @@ export class Game {
   /** Radiant work offered by innkeepers ("Any work going?"). */
   public readonly villageJobs = new VillageJobBoard();
   public readonly jobBoardUI = new JobBoardUI();
-  public readonly villageRaids = new VillageRaidSystem();
-  /** Townsfolk hiding indoors from a raid (kept in until it's over). */
-  private readonly _raidSheltered = new Set<NPC>();
-  /** NPCs spawned by the current raid (despawned if it's abandoned). */
-  private readonly _raiders = new Set<NPC>();
-  private _raidCheckTimer = 0;
+  /** Feature runtime (engine overhaul): events, phases, services, RNG, scopes. */
+  public kernel!: Kernel;
+
+  /** The raids feature's service (tests and the indoor loop use it). */
+  public get raids(): RaidsService {
+    return this.kernel.services.get(RaidsKey);
+  }
   /** Board the job window is showing (inn chunk id + place name). */
   private _activeJobBoard: { boardId: string; placeName: string } | null = null;
 
@@ -870,8 +873,8 @@ export class Game {
       // state no longer has (taken after that save), then mirror it back in.
       this._pruneStaleJobQuests();
       for (const job of this.villageJobs.getActive()) this._syncJobQuest(job.boardId);
-      // Raids aren't saved: send off any raiders and let the townsfolk out.
-      this._clearRaidAftermath();
+      // Features reset their transient state (e.g. a raid in progress).
+      this.eventBus.emit("save:loaded", {});
       // Restored condition values change the wear penalty on the player.
       this.smithing?.trackEquippedGear();
       this.smithing?.refreshPenalties();
@@ -1463,6 +1466,7 @@ export class Game {
 
     // ── v3 system wiring ──────────────────────────────────────────────────────
     this.eventBus        = new GameEventBus();
+    this.kernel          = new Kernel({ events: this.eventBus });
     this._achievements = new AchievementSystem();
     this._achievements.onUnlocked = (definition) => {
       this.ui.showNotification(`Achievement unlocked: ${definition.name}`, 4000);
@@ -1581,7 +1585,7 @@ export class Game {
     this.craftingUI.onClose = () => this._restoreGameplayInput();
     this.saveSystem.setCraftingSystem(this.craftingSystem);
     this.saveSystem.setVillageJobs(this.villageJobs);
-    this.saveSystem.setVillageRaids(this.villageRaids);
+    this._installFeatures();
     this._initJobBoardUI();
     this.villageJobs.onProgress = (job, template) => {
       this._syncJobQuest(job.boardId);
@@ -3280,8 +3284,6 @@ export class Game {
         }
         this.questSystem.onKill(name);
         this.villageJobs.onKill(name);
-        const raidWon = this.villageRaids.onKill(npc.mesh.name);
-        if (raidWon) this._onRaidWon(raidWon);
         this._applyFrameworkQuestEvent("kill", this._toFrameworkTargetId(name));
         // Killing someone a quest needed alive fails the dependent quests.
         this._failQuestsForDeadTarget(name, this._toFrameworkTargetId(name));
@@ -5266,6 +5268,8 @@ export class Game {
 
     if (selection.worldSeed) {
       this.world.setSeed(selection.worldSeed);
+      // Feature randomness (raids, …) derives from the world seed too.
+      this.kernel.rng.reseed(selection.worldSeed.seedString);
     }
 
     persistSkipOnboardingTips(selection.skipGameplayTips);
@@ -6247,10 +6251,11 @@ export class Game {
       // Anyone asleep indoors whose schedule no longer says "sleep" comes out
       // (covers NPCs that went in without a sleep/wake hour transition).
       for (const npc of this._indoorNpcs.keys()) {
-        if (this._raidSheltered.has(npc)) continue;
+        if (this.raids.isSheltered(npc)) continue;
         if (this.scheduleSystem.behaviorOf(npc) !== "sleep") this._bringOutdoors(npc);
       }
-      this._watchRaid(deltaTime);
+      // Kernel features (raids, …) run their fixed-step systems here.
+      this.kernel.phases.run("sim", deltaTime);
       this.combatSystem.update(deltaTime);
       this._updateShoutBuffs(deltaTime);
       // Slow Time squeezes the NPC AI clock (movement, telegraphs, strikes).
@@ -6926,7 +6931,7 @@ export class Game {
         weatherId: this.weatherSystem.state,
       });
 
-      this._maybeStartRaid();
+      this.eventBus.emit("time:hour", { hour: this.timeSystem.hour, elapsedHours: this.timeSystem.elapsedGameHours });
 
       // Ambient flavor events share the same hourly tick.
       const p = this.player.camera.position;
@@ -7960,9 +7965,48 @@ export class Game {
       this.projectileSystem.removeNPC(npc);
       this.lodSystem.unregister(npc.mesh);
       this._indoorNpcs.delete(npc);
-      this._raidSheltered.delete(npc);
-      this._raiders.delete(npc);
+      this.eventBus.emit("npc:released", { npcName: npc.mesh.name });
       npc.mesh.dispose();
+  }
+
+  /**
+   * Provide the services features use and install the features
+   * (engine overhaul, Phase 1).  Services resolve lazily, so systems created
+   * later in the constructor are fine.
+   */
+  private _installFeatures(): void {
+      const k = this.kernel;
+      k.services.provide(ClockKey, {
+        hour: () => this.timeSystem.hour,
+        elapsedHours: () => this.timeSystem.elapsedGameHours,
+      });
+      k.services.provide(PlayerKey, {
+        position: () => this.player.camera.position,
+        level: () => this.playerLevelSystem.characterLevel,
+      });
+      k.services.provide(FeedbackKey, {
+        notify: (text, ms) => this.ui.showNotification(text, ms ?? 3000),
+        grant: (reward) => this._grantDynamicWorldEventReward(reward),
+        addFame: (n) => this.fameSystem.addFame(n),
+        markDirty: () => this.saveSystem.markDirty(),
+      });
+      k.services.provide(VillageWorldKey, {
+        currentVillage: () => this._currentVillage(),
+        loadedVillage: (id) => [...this._loadedVillages.values()].find((v) => v.id === id) ?? null,
+        residents: (chunkKey) => this._chunkFantasyContent.get(chunkKey)?.npcs ?? [],
+        spawnArchetype: (chunkKey, archetype, x, z) => {
+          const record = this._chunkFantasyContent.get(chunkKey);
+          return record ? this._spawnArchetypeNpc(archetype, record, x, z) : null;
+        },
+        despawn: (npc) => this._despawnNpc(npc),
+        sendIndoors: (npc) => this._sendIndoors(npc),
+        isIndoors: (npc) => this._indoorNpcs.has(npc),
+        isTalkingTo: (npc) => npc.isInDialogue || npc.mesh.name === this._currentDialogueNpcName,
+      });
+
+      const raids = new VillageRaidFeature();
+      k.install(raids);
+      this.saveSystem.setVillageRaids(raids.rules);
   }
 
   /** The loaded, discovered village the player is standing in, if any. */
@@ -7974,122 +8018,6 @@ export class Game {
         return { chunkKey, plan };
       }
       return null;
-  }
-
-  /** Hourly: maybe bandits raid the village the player is in. */
-  private _maybeStartRaid(): void {
-      const here = this._currentVillage();
-      if (!here) return;
-      const go = this.villageRaids.shouldRaid({
-        villageId: here.plan.id,
-        elapsedHours: this.timeSystem.elapsedGameHours,
-        hourOfDay: this.timeSystem.hour,
-        playerLevel: this.playerLevelSystem.characterLevel,
-        rand: Math.random(),
-      });
-      if (go) this._startRaid(here.chunkKey, here.plan);
-  }
-
-  /**
-   * Bandits come up the entrance road and into the square; townsfolk run
-   * indoors.  Returns the raiders spawned (empty if the chunk isn't loaded).
-   */
-  private _startRaid(chunkKey: string, plan: VillagePlan): NPC[] {
-      const record = this._chunkFantasyContent.get(chunkKey);
-      if (!record) return [];
-      const c = plan.center;
-      const rx = plan.arrival.x - c.x, rz = plan.arrival.z - c.z;
-      const len = Math.hypot(rx, rz) || 1;
-      const dir = { x: rx / len, z: rz / len };
-      const side = { x: dir.z, z: -dir.x };
-      const n = raiderCount(this.playerLevelSystem.characterLevel);
-      const raiders: NPC[] = [];
-      for (let i = 0; i < n; i++) {
-        const archetype = i === 0 && n >= 4 ? "archetype_bandit_chief"
-          : i % 3 === 2 ? "archetype_bandit_archer" : "archetype_bandit";
-        const lateral = (i - (n - 1) / 2) * 2.2;
-        const back = 26 + (i % 2) * 2;
-        const x = c.x + dir.x * back + side.x * lateral;
-        const z = c.z + dir.z * back + side.z * lateral;
-        const npc = this._spawnArchetypeNpc(archetype, record, x, z);
-        if (!npc) continue;
-        this._raiders.add(npc);
-        // March in along the road to the square (then the combat AI takes
-        // over as soon as the player is in range).
-        npc.scheduleBlocks = [];
-        npc.patrolPoints = [
-          new Vector3(plan.arrival.x + side.x * lateral * 0.5, 2, plan.arrival.z + side.z * lateral * 0.5),
-          new Vector3(c.x + dir.x * 3 + side.x * lateral, 2, c.z + dir.z * 3 + side.z * lateral),
-        ];
-        npc.currentPatrolIndex = 0;
-        npc.waitTime = 0;
-        npc.aiState = AIState.PATROL;
-        // Spawned hostiles start flagged aggressive, which leaves movement to
-        // the combat AI (which doesn't walk patrols); combat sets it again
-        // once they spot the player.
-        npc.isAggressive = false;
-        raiders.push(npc);
-      }
-      if (raiders.length === 0) return raiders;
-      this.villageRaids.start(plan.id, plan.name, raiders.map((r) => r.mesh.name), this.timeSystem.elapsedGameHours);
-      // Townsfolk hide; guards stay out.
-      for (const npc of record.npcs) {
-        if (npc.isDead || raiders.includes(npc) || this._indoorNpcs.has(npc)) continue;
-        // Don't vanish mid-conversation (or mid-trade).
-        if (npc.isInDialogue || npc.mesh.name === this._currentDialogueNpcName) continue;
-        if (/^(Town Guard|Guard)_/.test(npc.mesh.name) || npc.factionId === "bandits") continue;
-        this._sendIndoors(npc);
-        this._raidSheltered.add(npc);
-      }
-      this.ui.showNotification(`⚔ Bandits are raiding ${plan.name}! Drive them off.`, 5000);
-      this.saveSystem.markDirty();
-      return raiders;
-  }
-
-  /** Every half second during a raid: has the player left the village to it? */
-  private _watchRaid(dt: number): void {
-      const raid = this.villageRaids.active;
-      if (!raid) return;
-      this._raidCheckTimer -= dt;
-      if (this._raidCheckTimer > 0) return;
-      this._raidCheckTimer = 0.5;
-      const plan = [...this._loadedVillages.values()].find((v) => v.id === raid.villageId);
-      const p = this.player.camera.position;
-      if (plan && Math.hypot(p.x - plan.center.x, p.z - plan.center.z) < 80) return;
-      this.villageRaids.abandon();
-      this._clearRaidAftermath();
-      this.ui.showNotification(`You left ${raid.villageName} to the raiders.`, 4000);
-  }
-
-  private _onRaidWon(outcome: { villageName: string; rewardGold: number; rewardXp: number }): void {
-      this._raiders.clear();
-      this._endRaidShelter();
-      this.fameSystem.addFame(10);
-      this._grantDynamicWorldEventReward({
-        gold: outcome.rewardGold,
-        xp: outcome.rewardXp,
-        label: `${outcome.villageName} is safe — the raiders are beaten`,
-      });
-      this.saveSystem.markDirty();
-  }
-
-  /** Townsfolk come back out (unless it's their bedtime — the indoor loop decides). */
-  private _endRaidShelter(): void {
-      this._raidSheltered.clear();
-  }
-
-  /**
-   * A raid that ended without being beaten (abandoned, or a save loaded
-   * mid-raid): the raiders leave and the townsfolk come out.
-   */
-  private _clearRaidAftermath(): void {
-      for (const npc of this._raiders) {
-        if (npc.isDead || npc.mesh.isDisposed()) continue;
-        this._despawnNpc(npc);
-      }
-      this._raiders.clear();
-      this.villageRaids.abandon();
-      this._endRaidShelter();
   }
 
   /** Remove one NPC from the world and every system (and its chunk's list). */
