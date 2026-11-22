@@ -86,6 +86,7 @@ import { CraftingUI } from "./ui/crafting-ui";
 import { ItemConditionSystem } from "./systems/item-condition-system";
 import { buildingFootprint, buildingLayout, toWorld, WALL_HEIGHT, type BuildingKind } from "./world/village-buildings";
 import { hasVillage, planVillage, VILLAGE_DISCOVER_RADIUS, type VillagePlan } from "./world/village-settlement";
+import { VillageJobBoard } from "./systems/village-jobs";
 import { ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
 import { EnchantingSystem } from "./systems/enchanting-system";
 import { EnchantingUI } from "./ui/enchanting-ui";
@@ -381,6 +382,8 @@ export class Game {
   /** World forges (smithies, armorer inns, the starting forge) — steel work needs one in reach. */
   public readonly forges = new ForgeRegistry();
   public craftingUI: CraftingUI;
+  /** Radiant work offered by innkeepers ("Any work going?"). */
+  public readonly villageJobs = new VillageJobBoard();
 
   // v5 systems (Oblivion parity: enchanting)
   public enchantingSystem: EnchantingSystem;
@@ -780,6 +783,8 @@ export class Game {
       this._syncInventoryGoldToFramework();
       // Saved equipment bypasses equip() — re-sync the weapon archetype.
       this._syncWeaponArchetype();
+      // Village jobs live in their own save slot; mirror them back into the log.
+      for (const job of this.villageJobs.getActive()) this._syncJobQuest(job.boardId);
       // Restored condition values change the wear penalty on the player.
       this.smithing?.trackEquippedGear();
       this.smithing?.refreshPenalties();
@@ -1488,6 +1493,17 @@ export class Game {
     };
     this.craftingUI.onClose = () => this._restoreGameplayInput();
     this.saveSystem.setCraftingSystem(this.craftingSystem);
+    this.saveSystem.setVillageJobs(this.villageJobs);
+    this.villageJobs.onProgress = (job, template) => {
+      this._syncJobQuest(job.boardId);
+      const left = template.required - job.progress;
+      this.ui.showNotification(
+        left > 0 ? `${template.title}: ${job.progress}/${template.required}`
+                 : `${template.title}: done — return to ${job.placeName} for your pay.`,
+        2600,
+      );
+      this.saveSystem.markDirty();
+    };
     // Forget condition for gear that left the world (dropped, or wiped by a shop restock).
     this.saveSystem.onBeforeSave = () => {
       this.smithing.pruneConditions([
@@ -3184,6 +3200,7 @@ export class Game {
             this.crimeSystem.commitCrime("murder", npc.factionId ?? "village_guard", this.timeSystem.elapsedGameTime);
         }
         this.questSystem.onKill(name);
+        this.villageJobs.onKill(name);
         this._applyFrameworkQuestEvent("kill", this._toFrameworkTargetId(name));
         // Killing someone a quest needed alive fails the dependent quests.
         this._failQuestsForDeadTarget(name, this._toFrameworkTargetId(name));
@@ -7072,6 +7089,10 @@ export class Game {
         }
         return;
       }
+      if (eventId === "jobs:ask") {
+        this._askForWork();
+        return;
+      }
       if (eventId === "smithing:open") {
         this._pendingSmithingOpen = true;
         return;
@@ -7451,6 +7472,86 @@ export class Game {
         P("qFlag", -3.5, -2.5, 0.5);
         if (extras.alchemist) P("qCauldron", -2.6, 2.4);
       }
+  }
+
+  /** Board id + place name for the innkeeper the player is talking to. */
+  private _jobBoardForCurrentSpeaker(): { boardId: string; placeName: string } | null {
+      const name = this._currentDialogueNpcName;
+      const npc = name ? this.scheduleSystem.npcs.find((n) => n.mesh.name === name) : undefined;
+      if (!npc) return null;
+      const cx = Math.round(npc.spawnPosition.x / this.world.chunkSize);
+      const cz = Math.round(npc.spawnPosition.z / this.world.chunkSize);
+      const village = this._villagePlans.get(`${cx},${cz}`) ?? null;
+      return { boardId: `inn_${cx}_${cz}`, placeName: village?.name ?? "the inn" };
+  }
+
+  /** "Any work going?" — take a job, report progress, or collect pay. */
+  private _askForWork(): void {
+      const board = this._jobBoardForCurrentSpeaker();
+      if (!board) return;
+      const result = this.villageJobs.ask(board.boardId, board.placeName, {
+        playerLevel: this.playerLevelSystem.characterLevel,
+        countItem: (id) => this.inventorySystem.items.reduce((n, i) => (i.id === id ? n + i.quantity : n), 0),
+        removeItem: (id, amount) => this.inventorySystem.removeQuantity(id, amount),
+      });
+      switch (result.type) {
+        case "accepted":
+          this._syncJobQuest(board.boardId);
+          this.ui.showNotification(`New job — ${result.template.title}: ${result.text}`, 5000);
+          break;
+        case "progress":
+          this._syncJobQuest(board.boardId);
+          this.ui.showNotification(`${result.template.title}: ${result.text}`, 3200);
+          break;
+        case "completed": {
+          const quest = this.questSystem.getQuests().find((q) => q.id === `job_${board.boardId}`);
+          if (quest) {
+            quest.isCompleted = true;
+            quest.isActive = false;
+            for (const o of quest.objectives) { o.current = o.required; o.completed = true; }
+          }
+          this.fameSystem.addFame(5);
+          this._grantDynamicWorldEventReward({ gold: result.rewardGold, xp: result.rewardXp, label: `Job done: ${result.template.title}` });
+          break;
+        }
+      }
+      this.saveSystem.markDirty();
+  }
+
+  /** Mirror an active village job into the quest log (created on first sync). */
+  private _syncJobQuest(boardId: string): void {
+      const job = this.villageJobs.activeAt(boardId);
+      if (!job) return;
+      const template = VillageJobBoard.template(job.templateId);
+      if (!template) return;
+      const id = `job_${boardId}`;
+      let quest = this.questSystem.getQuests().find((q) => q.id === id);
+      if (!quest) {
+        quest = {
+          id,
+          name: `${template.title} (${job.placeName})`,
+          description: VillageJobBoard.describe(template, job.placeName),
+          isCompleted: false,
+          isActive: true,
+          reward: `${template.rewardGold} gold`,
+          objectives: [{
+            id: `${id}_obj`,
+            // Never matched by QuestSystem's own kill/pickup hooks — the job board drives it.
+            type: template.kind === "bounty" ? "kill" : "fetch",
+            targetId: `__job__${template.target}`,
+            description: template.kind === "bounty"
+              ? `Kill ${template.required} (${template.target.replace(/([a-z])([A-Z])/g, "$1 $2")})`
+              : `Bring ${template.required} × ${template.target.replace(/_/g, " ")}`,
+            required: template.required,
+            current: 0,
+            completed: false,
+          }],
+        };
+        this.questSystem.addQuest(quest, true);
+      }
+      const obj = quest.objectives[0];
+      obj.current = Math.min(job.progress, obj.required);
+      obj.completed = template.kind === "bounty" && obj.current >= obj.required;
   }
 
   /** The village plan for chunk (cx, cz), or null (cached; never on ponds). */

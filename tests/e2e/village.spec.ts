@@ -85,5 +85,39 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     expect(state.npcs, `${who} lives in ${v!.name}`).toContain(who);
   }
   expect(state.calm, "villagers don't attack a visitor").toBe(true);
+
+  // ── The innkeeper offers work; it lands in the quest log and the save ──
+  const job = await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    const inn = g.scheduleSystem.npcs.find((n: any) => /^Innkeeper_/.test(n.mesh.name)
+      && Math.hypot(n.mesh.position.x - g.player.camera.position.x, n.mesh.position.z - g.player.camera.position.z) < 25);
+    g._currentDialogueNpcName = inn.mesh.name;
+    g._handleDialogueHostEvent("jobs:ask");
+    const active = g.villageJobs.getActive()[0];
+    const quest = g.questSystem.getQuests().find((q: any) => q.id === `job_${active.boardId}`);
+    // Fulfil it (supply: stock the bag; bounty: fake the kills) and collect.
+    const t = g.villageJobs.constructor.template(active.templateId);
+    if (t.kind === "supply") {
+      g.inventorySystem.addItem({ id: t.target, name: t.target, description: "", stackable: true, quantity: t.required, weight: 0 });
+    } else {
+      for (let i = 0; i < t.required; i++) g.villageJobs.onKill(`${t.target}_${i}`);
+    }
+    g.saveSystem.save(true);
+    const saved = JSON.parse(localStorage.getItem("camelot_save")!).villageJobs;
+    const goldBefore = g._getInventoryGold();
+    g._handleDialogueHostEvent("jobs:ask");
+    return {
+      template: t.id, place: active.placeName, questName: quest?.name,
+      savedActive: saved.active.length, paid: g._getInventoryGold() - goldBefore,
+      reward: t.rewardGold, questDone: quest?.isCompleted, left: g.villageJobs.getActive().length,
+    };
+  });
+  expect(job.place).toBe(v!.name);
+  expect(job.questName).toContain(v!.name);
+  expect(job.savedActive).toBe(1);
+  expect(job.paid).toBe(job.reward);
+  expect(job.questDone).toBe(true);
+  expect(job.left).toBe(0);
+
   expect(pageErrors, `uncaught page errors:\n${pageErrors.join("\n")}`).toEqual([]);
 });

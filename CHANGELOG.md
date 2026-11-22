@@ -71,6 +71,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Bandit camps in the desert are now a rough wooden palisade with red
   banners at the entrance, a wagon, crates, barrels, a weapon rack and the
   chief's chest. They replace the online-only cartoon pirate fort and cannon.
+- **Village jobs.** Ask any innkeeper "Any work going?" to take a job. There
+  are bounties on bandits, the restless dead in the ruins, or (from level 5) a
+  dragon, and supply runs for iron, leather or healing potions. Jobs show in
+  the quest log under the village's name and track your kills. Supply runs pay
+  when you hand the goods over; bounties pay when you come back. Each inn
+  offers a new job once you finish one, and jobs are saved with your game.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

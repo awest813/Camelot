@@ -43,6 +43,7 @@ import type { TrainerSystem } from "./trainer-system";
 import type { PickpocketSystem } from "./pickpocket-system";
 import type { ItemConditionSystem } from "./item-condition-system";
 import type { CraftingSystem } from "./crafting-system";
+import type { VillageJobBoard } from "./village-jobs";
 import type { DragonShoutSystem } from "./dragon-shout-system";
 import type { FollowerSystem } from "./follower-system";
 import type { PerkSystem } from "./perk-system";
@@ -137,6 +138,8 @@ interface ParsedSaveData {
   itemCondition?: unknown;
   /** Smithing recipe craft counts + discoveries (optional; no version bump). */
   crafting?: unknown;
+  /** Village job board (innkeeper work): active jobs + jobs done per board. */
+  villageJobs?: unknown;
   // v26 additions
   dragonShouts?: unknown;
   follower?: unknown;
@@ -225,6 +228,7 @@ export interface SaveData {
   pickpocket?: any;
   itemCondition?: any;
   crafting?: any;
+  villageJobs?: any;
   // v26 additions
   dragonShouts?: any;
   follower?: any;
@@ -321,6 +325,7 @@ export class SaveSystem {
   private _pickpocketSystem: PickpocketSystem | null = null;
   private _itemConditionSystem: ItemConditionSystem | null = null;
   private _craftingSystem: CraftingSystem | null = null;
+  private _villageJobs: VillageJobBoard | null = null;
   // ── v26 optional systems ──────────────────────────────────────────────────
   private _dragonShoutSystem: DragonShoutSystem | null = null;
   private _followerSystem: FollowerSystem | null = null;
@@ -480,6 +485,7 @@ export class SaveSystem {
   public setPickpocketSystem(s: PickpocketSystem): void       { this._pickpocketSystem = s; }
   public setItemConditionSystem(s: ItemConditionSystem): void { this._itemConditionSystem = s; }
   public setCraftingSystem(s: CraftingSystem): void           { this._craftingSystem = s; }
+  public setVillageJobs(s: VillageJobBoard): void             { this._villageJobs = s; }
 
   // ── v26 system injection ──────────────────────────────────────────────────
 
@@ -592,6 +598,7 @@ export class SaveSystem {
     if (this._pickpocketSystem)       data.pickpocket       = this._pickpocketSystem.getSaveState();
     if (this._itemConditionSystem)    data.itemCondition    = this._itemConditionSystem.getSaveState();
     if (this._craftingSystem)         data.crafting         = this._craftingSystem.getSystemState();
+    if (this._villageJobs)            data.villageJobs      = this._villageJobs.getSaveState();
     if (this._dragonShoutSystem)      data.dragonShouts     = this._dragonShoutSystem.getSaveState();
     if (this._followerSystem)         data.follower         = this._followerSystem.getSaveState();
     if (this._perkSystem)             data.perks            = this._perkSystem.getSaveState();
@@ -839,6 +846,7 @@ export class SaveSystem {
       this._pickpocketSystem.restoreFromSave(data.pickpocket as any);
     if (this._itemConditionSystem && data.itemCondition)
       this._itemConditionSystem.restoreFromSave(data.itemCondition as any);
+    if (this._villageJobs) this._villageJobs.restoreFromSave(data.villageJobs as any);
     if (this._craftingSystem && data.crafting) {
       const c = data.crafting as any;
       if (Array.isArray(c.recipeSnapshots) && Array.isArray(c.discoveredRecipeIds))
@@ -1058,6 +1066,7 @@ export class SaveSystem {
       pickpocket: data.pickpocket,
       itemCondition: data.itemCondition,
       crafting: data.crafting,
+      villageJobs: data.villageJobs,
       dragonShouts: data.dragonShouts,
       follower: data.follower,
       perks: data.perks,

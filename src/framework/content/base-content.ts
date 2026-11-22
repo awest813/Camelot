@@ -117,6 +117,12 @@ export const frameworkBaseContent: RpgContentBundle = {
               nextNodeId: "rumors_reply",
             },
             {
+              id: "work",
+              text: "Any work going?",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "jobs:ask" }],
+            },
+            {
               id: "leave",
               text: "Nothing for now.",
               endsDialogue: true,
