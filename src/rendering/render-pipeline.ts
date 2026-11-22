@@ -32,6 +32,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { GraphicsSystem, PostProcessConfig } from "../systems/graphics-system";
 import type { AtmosphereState } from "./atmosphere";
 
@@ -67,6 +68,7 @@ export function createSunShadows(
     csm.normalBias = 0.018;
     // Shadows never go fully black — the sky still lights them.
     csm.darkness = 0.12;
+    cullCascadeCasters(csm);
     return csm;
   }
 
@@ -86,6 +88,48 @@ export function createSunShadows(
   const map = shadows.getShadowMap();
   if (map) map.refreshRate = 2;
   return shadows;
+}
+
+/**
+ * Smallest caster (bounding-sphere radius, m) drawn into each cascade.  The
+ * far cascades cover tens of metres per texel row; a lantern's or a barrel's
+ * shadow there is a few texels at most, so it is left out.
+ */
+const CASCADE_MIN_CASTER_RADIUS = [0, 0.45, 1.1, 2.0];
+
+/**
+ * Per-cascade caster lists: only casters whose bounds overlap a cascade's
+ * light-space rectangle (and aren't past its far plane), and — beyond the
+ * first cascade — big enough to matter.  Without this every caster is drawn
+ * into every cascade.  Casters between the light and the cascade are kept:
+ * with depth clamping they still cast into it.
+ */
+export function cullCascadeCasters(csm: CascadedShadowGenerator): void {
+  const map = csm.getShadowMap();
+  if (!map) return;
+  const lists: AbstractMesh[][] = [];
+  const p = new Vector3();
+  map.getCustomRenderList = (layer, renderList, renderListLength) => {
+    if (!renderList) return null;
+    const view = csm.getCascadeViewMatrix(layer);
+    const min = csm.getCascadeMinExtents(layer);
+    const max = csm.getCascadeMaxExtents(layer);
+    if (!view || !min || !max) return null;
+    const minRadius = CASCADE_MIN_CASTER_RADIUS[Math.min(layer, CASCADE_MIN_CASTER_RADIUS.length - 1)];
+    const out = (lists[layer] ??= []);
+    out.length = 0;
+    for (let i = 0; i < renderListLength; i++) {
+      const mesh = renderList[i];
+      const sphere = mesh.getBoundingInfo().boundingSphere;
+      const r = sphere.radiusWorld;
+      if (r < minRadius) continue;
+      Vector3.TransformCoordinatesToRef(sphere.centerWorld, view, p);
+      if (p.x + r < min.x || p.x - r > max.x || p.y + r < min.y || p.y - r > max.y) continue;
+      if (p.z - r > max.z) continue;
+      out.push(mesh);
+    }
+    return out;
+  };
 }
 
 function isWebGL2OrBetter(scene: Scene): boolean {

@@ -10,8 +10,8 @@ import type { Scene } from "@babylonjs/core/scene";
  * posts with a winch, rope and bucket, and a small tiled gable roof.
  *
  * Built from primitives using the Medieval Village textures (already
- * dark-graded), then merged into one multi-material mesh, so each well is
- * a single draw-call group. Origin at ground level, centred, with the winch
+ * dark-graded), then merged into one mesh per material (four draw calls),
+ * parented to a geometry-less root. Origin at ground level, centred, with the winch
  * axis along local X.
  */
 
@@ -127,9 +127,24 @@ export function buildVillageWell(scene: Scene, name: string, textureBase: string
   const ridge = add(MeshBuilder.CreateBox(`${name}_ridge`, { width: postX * 2 + 0.56, height: 0.1, depth: 0.1 }, scene), mats.wood);
   ridge.position.y = ridgeY + 0.03;
 
-  const merged = Mesh.MergeMeshes(parts, true, true, undefined, false, true);
-  if (!merged) throw new Error("well merge failed");
-  merged.name = name;
-  merged.isPickable = false;
-  return merged;
+  // One mesh per material (4 draw calls), under a geometry-less root.
+  // (A single multi-material merge keeps a submesh — a draw call — per part.)
+  const root = new Mesh(name, scene);
+  root.isPickable = false;
+  const byMaterial = new Map<StandardMaterial, Mesh[]>();
+  for (const m of parts) {
+    const mat = m.material as StandardMaterial;
+    const list = byMaterial.get(mat);
+    if (list) list.push(m); else byMaterial.set(mat, [m]);
+  }
+  for (const [mat, group] of byMaterial) {
+    const merged = Mesh.MergeMeshes(group, true, true);
+    if (!merged) continue;
+    merged.name = `${name}|${mat.name}`;
+    merged.material = mat;
+    merged.isPickable = false;
+    merged.receiveShadows = true;
+    merged.parent = root;
+  }
+  return root;
 }

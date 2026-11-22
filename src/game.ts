@@ -7770,6 +7770,7 @@ export class Game {
       well.position.set(x, 0, z);
       well.rotation.y = rot;
       well.freezeWorldMatrix();
+      for (const part of well.getChildMeshes(false)) part.freezeWorldMatrix();
       this._trackChunkProp(chunkKey, chunkRecord, well, "structure");
 
       const fp = { x, z, cos: 1, sin: 0, hw: WELL_RADIUS + 0.5, hd: WELL_RADIUS + 0.5 };

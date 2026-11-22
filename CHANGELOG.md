@@ -118,6 +118,11 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Far-away buildings and props are actually culled now. Distance culling used
   to switch off only the empty top-level node of each model, which hid
   nothing; it now disables the whole model, so it also skips per-mesh work.
+- Shadow maps only draw what each shadow cascade needs: casters outside a
+  cascade are skipped, and small props (lanterns, barrels, bushes) only cast
+  into the nearest cascades, where their shadows are visible. The village
+  well is now four meshes instead of 51 pieces. Together these took a village
+  frame from about 495 to 289 draw calls (the shadow pass from 351 to 169).
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace
