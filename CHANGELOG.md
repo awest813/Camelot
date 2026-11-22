@@ -110,6 +110,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   Killing them all pays 35 gold and 25 XP per raider plus fame; the kills also
   count toward bandit bounties. Leave the village and the raid ends with no
   reward.
+- **Performance:** repeated models (wall, roof and window pieces, rocks,
+  barrels, trees from the asset packs) are now drawn as hardware instances
+  instead of separate copies. A village scene went from about 1,960 draw calls
+  per frame to about 800, and the starting area from 375 to 226. Skinned or
+  morphing models (characters, the dragon) are still copied.
+- Far-away buildings and props are actually culled now. Distance culling used
+  to switch off only the empty top-level node of each model, which hid
+  nothing; it now disables the whole model, so it also skips per-mesh work.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

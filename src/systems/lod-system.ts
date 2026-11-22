@@ -15,6 +15,15 @@ export interface LodLevel {
   maxDistance: number;
 }
 
+/** A whole node hierarchy (e.g. a glTF asset root) culled by distance as one. */
+interface LodHierarchyEntry {
+  root: AbstractMesh;
+  cullDistance: number;
+  /** Bounding centre of a static (unparented) hierarchy, captured at registration. */
+  center: Vector3 | null;
+  culled: boolean;
+}
+
 interface LodLevelEntry {
   levels: LodLevel[];
 }
@@ -59,6 +68,7 @@ const DEFAULT_CONFIG: LODConfig = {
 
 export class LodSystem {
   private _entries: LodEntry[] = [];
+  private _hierarchies: LodHierarchyEntry[] = [];
   private _levelGroups: LodLevelEntry[] = [];
   private _frameCounter: number = 0;
   private _updateInterval: number;
@@ -153,6 +163,25 @@ export class LodSystem {
    * @param cullDistance - Distance in world units beyond which the mesh is
    *   hidden.  Must be a positive finite number; invalid values are clamped to 1.
    */
+  /**
+   * Register a node hierarchy (an asset root whose children hold the
+   * geometry) to be distance-culled as a unit: past `cullDistance` the root
+   * is disabled, which hides every descendant and takes them out of the
+   * scene's per-mesh evaluation.  (Toggling `isVisible` on a geometry-less
+   * root wouldn't hide anything.)  Frustum culling is left to Babylon's
+   * per-mesh culling.  Static roots are measured from their bounding centre.
+   */
+  public registerHierarchy(root: AbstractMesh, cullDistance: number): void {
+    if (this._hierarchies.some(e => e.root === root)) return;
+    const safeDist = Number.isFinite(cullDistance) && cullDistance > 0 ? cullDistance : 1;
+    let center: Vector3 | null = null;
+    if (!root.parent) {
+      const { min, max } = root.getHierarchyBoundingVectors(true);
+      if (Number.isFinite(min.x) && Number.isFinite(max.x)) center = min.add(max).scaleInPlace(0.5);
+    }
+    this._hierarchies.push({ root, cullDistance: safeDist, center, culled: false });
+  }
+
   public register(mesh: AbstractMesh, cullDistance: number): void {
     if (this._entries.some(e => e.mesh === mesh)) return;
     const safeDist = Number.isFinite(cullDistance) && cullDistance > 0 ? cullDistance : 1;
@@ -164,6 +193,13 @@ export class LodSystem {
    * tracking list.  Safe to call with a mesh that was never registered.
    */
   public unregister(mesh: AbstractMesh): void {
+    const h = this._hierarchies.findIndex(e => e.root === mesh);
+    if (h !== -1) {
+      const entry = this._hierarchies[h];
+      if (entry.culled && !entry.root.isDisposed()) entry.root.setEnabled(true);
+      this._hierarchies.splice(h, 1);
+      return;
+    }
     const idx = this._entries.findIndex(e => e.mesh === mesh);
     if (idx === -1) return;
     const entry = this._entries[idx];
@@ -293,6 +329,21 @@ export class LodSystem {
 
     this._entries = aliveEntries;
 
+    // ── Hierarchies: distance only, toggled via enabled state ──────────────
+    const aliveHierarchies: LodHierarchyEntry[] = [];
+    for (const h of this._hierarchies) {
+      if (h.root.isDisposed()) continue;
+      aliveHierarchies.push(h);
+      const pos = h.center ?? h.root.getAbsolutePosition();
+      const far = Vector3.DistanceSquared(pos, playerPosition) > h.cullDistance * h.cullDistance;
+      if (far !== h.culled) {
+        h.culled = far;
+        h.root.setEnabled(!far);
+      }
+      if (far) culled++;
+    }
+    this._hierarchies = aliveHierarchies;
+
     // ── Multi-level LOD groups ─────────────────────────────────────────────
     const aliveLevelGroups: LodLevelEntry[] = [];
 
@@ -349,7 +400,8 @@ export class LodSystem {
 
   /** Total number of currently tracked meshes (registered and not yet disposed). */
   public get entryCount(): number {
-    const singles = this._entries.filter(e => !e.mesh.isDisposed()).length;
+    const singles = this._entries.filter(e => !e.mesh.isDisposed()).length
+      + this._hierarchies.filter(e => !e.root.isDisposed()).length;
     const levels  = this._levelGroups.reduce(
       (sum, g) => sum + g.levels.filter(l => !l.mesh.isDisposed()).length,
       0,
@@ -366,6 +418,10 @@ export class LodSystem {
       if (!entry.mesh.isDisposed()) entry.mesh.isVisible = true;
     }
     this._entries = [];
+    for (const h of this._hierarchies) {
+      if (h.culled && !h.root.isDisposed()) h.root.setEnabled(true);
+    }
+    this._hierarchies = [];
 
     for (const group of this._levelGroups) {
       for (const level of group.levels) {

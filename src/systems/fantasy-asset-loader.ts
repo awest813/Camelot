@@ -30,6 +30,8 @@
 import { Scene } from "@babylonjs/core/scene";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import "@babylonjs/core/Meshes/instancedMesh"; // Mesh.prototype.createInstance
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Quaternion } from "@babylonjs/core/Maths/math.vector";
 import "@babylonjs/loaders/glTF";
@@ -654,7 +656,19 @@ export class FantasyAssetLoader {
     if (!entry.rootMesh) return { root: null, meshes: [] };
 
     const id = ++this._instanceCounter;
-    const cloned = entry.rootMesh.clone(`fantasy_${key}_${id}`, null);
+    // Static geometry becomes hardware instances of the template meshes, so
+    // every copy of a wall module, rock or barrel across the world draws in
+    // one call per unique mesh.  Skinned / morphing meshes need their own
+    // skeleton or morph state, so those stay real clones.
+    const rootName = `fantasy_${key}_${id}`;
+    const cloned = entry.rootMesh.instantiateHierarchy(null, {
+      doNotInstantiate: (node) => {
+        const m = node as Mesh;
+        return !!m.skeleton || !!m.morphTargetManager;
+      },
+    }, (source, node) => {
+      node.name = source === entry.rootMesh ? rootName : `${rootName}|${source.name}`;
+    }) as AbstractMesh | null;
     if (!cloned) return { root: null, meshes: [] };
 
     cloned.setEnabled(true);

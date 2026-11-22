@@ -702,7 +702,7 @@ export class Game {
     tier: "structure" | "scene" | "prop" | "boss",
   ): void {
     const dist = tier === "boss" ? 210 : tier === "scene" ? 185 : tier === "structure" ? 145 : 88;
-    this.lodSystem.register(root, dist);
+    this.lodSystem.registerHierarchy(root, dist);
   }
 
   /**

@@ -32,6 +32,17 @@ interface ProfileNode { id: number; callFrame: { functionName: string; url: stri
 interface Profile { nodes: ProfileNode[]; samples: number[]; timeDeltas: number[] }
 
 async function stats(page: Page, label: string) {
+  // Draw calls in one frame: the engine counter only grows, so diff two frames.
+  const perFrame = await page.evaluate(() => new Promise<number>((resolve) => {
+    const sc = (window as any).__camelotGame.scene; const eng = sc.getEngine();
+    let first = -1;
+    const obs = sc.onAfterRenderObservable.add(() => {
+      const now = eng._drawCalls.current;
+      if (first < 0) { first = now; return; }
+      sc.onAfterRenderObservable.remove(obs);
+      resolve(now - first);
+    });
+  }));
   const s = await page.evaluate(() => {
     const g = (window as any).__camelotGame; const sc = g.scene; const eng = sc.getEngine();
     const active = sc.getActiveMeshes();
@@ -41,7 +52,7 @@ async function stats(page: Page, label: string) {
     for (let i = 0; i < active.length; i++) { const n = active.data[i].name.replace(/[_\d.]+.*$/, "").slice(0, 24); byPrefix.set(n, (byPrefix.get(n) ?? 0) + 1); }
     return {
       meshes: sc.meshes.length, active: active.length, activeVerts,
-      drawCalls: eng._drawCalls?.current ?? -1,
+            instances: sc.meshes.filter((m: any) => m.getClassName() === "InstancedMesh").length,
       materials: sc.materials.length, textures: sc.textures.length,
       skeletons: sc.skeletons.length, animGroupsPlaying: sc.animationGroups.filter((a: any) => a.isPlaying).length,
       animGroups: sc.animationGroups.length, lights: sc.lights.length, shadowCasters: casters,
@@ -50,7 +61,7 @@ async function stats(page: Page, label: string) {
       topActive: [...byPrefix.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14),
     };
   });
-  console.log(`== ${label}: ${JSON.stringify(s)}`);
+  console.log(`== ${label}: ${JSON.stringify({ drawCallsPerFrame: perFrame, ...s })}`);
 }
 
 async function profile(page: Page, label: string, ms: number) {
@@ -93,5 +104,6 @@ test("perf census", async ({ page }) => {
   });
   await page.waitForTimeout(12_000);
   await stats(page, "village");
+  await page.screenshot({ path: "test-results/perf-village.png" });
   await profile(page, "village idle", 8000);
 });

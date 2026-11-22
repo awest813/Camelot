@@ -428,5 +428,62 @@ describe("LodSystem", () => {
     lod.update(new Vector3(190, 0, 0));
     expect(mesh.isVisible).toBe(true);
   });
-});
 
+  describe("registerHierarchy", () => {
+    function makeRoot(min: Vector3, max: Vector3, parent: unknown = null) {
+      let enabled = true;
+      const root = {
+        parent,
+        position: new Vector3(),
+        _disposed: false,
+        isDisposed() { return this._disposed; },
+        getHierarchyBoundingVectors: () => ({ min, max }),
+        getAbsolutePosition: () => new Vector3(1000, 0, 0),
+        setEnabled: vi.fn((v: boolean) => { enabled = v; }),
+        isEnabled: () => enabled,
+      };
+      return root as unknown as import("@babylonjs/core/Meshes/mesh").Mesh & { setEnabled: ReturnType<typeof vi.fn> };
+    }
+
+    it("disables the whole hierarchy past the cull distance, measured from its bounds", () => {
+      // A building whose root sits at the origin but whose bounds centre is at x=50.
+      const root = makeRoot(new Vector3(45, 0, -5), new Vector3(55, 6, 5));
+      lod.registerHierarchy(root, 60);
+      expect(lod.entryCount).toBe(1);
+      lod.update(new Vector3(0, 0, 0));          // 50 m from the centre: kept
+      expect(root.isEnabled()).toBe(true);
+      expect(root.setEnabled).not.toHaveBeenCalled();
+      lod.update(new Vector3(-20, 0, 0));        // 70 m: culled
+      expect(root.isEnabled()).toBe(false);
+      lod.update(new Vector3(-21, 0, 0));        // still culled: no redundant toggles
+      expect(root.setEnabled).toHaveBeenCalledTimes(1);
+      lod.update(new Vector3(20, 0, 0));         // back in range
+      expect(root.isEnabled()).toBe(true);
+    });
+
+    it("uses the live position for parented (moving) hierarchies", () => {
+      const root = makeRoot(new Vector3(0, 0, 0), new Vector3(1, 1, 1), {});
+      lod.registerHierarchy(root, 100);
+      lod.update(new Vector3(0, 0, 0));          // absolute position is 1000 m away
+      expect(root.isEnabled()).toBe(false);
+    });
+
+    it("re-enables on unregister / clear and drops disposed roots", () => {
+      const a = makeRoot(new Vector3(500, 0, 0), new Vector3(501, 1, 1));
+      const b = makeRoot(new Vector3(500, 0, 0), new Vector3(501, 1, 1));
+      lod.registerHierarchy(a, 10);
+      lod.registerHierarchy(b, 10);
+      lod.update(PLAYER_ORIGIN);
+      expect(a.isEnabled() || b.isEnabled()).toBe(false);
+      lod.unregister(a);
+      expect(a.isEnabled()).toBe(true);
+      lod.clear();
+      expect(b.isEnabled()).toBe(true);
+      const c = makeRoot(new Vector3(0, 0, 0), new Vector3(1, 1, 1));
+      lod.registerHierarchy(c, 10);
+      (c as unknown as { _disposed: boolean })._disposed = true;
+      lod.update(PLAYER_ORIGIN);
+      expect(lod.entryCount).toBe(0);
+    });
+  });
+});
