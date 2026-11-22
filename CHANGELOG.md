@@ -102,6 +102,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   while the innkeeper has the day, and the barkeeper will rent you a room too.
 - Villages are guarded at night: one of the two gate guards keeps the night
   watch (patrols 18:00–08:00) and sleeps at the inn by day.
+- **Bandit raids.** While you're in a village you've discovered, bandits may
+  raid it, more often at night. This only starts from level 2, never in the
+  first hours of a game, and at most once every three days per village.
+  Raiders (two to five, more as you level, with a chief in bigger raids) come
+  up the entrance road into the square, and the townsfolk run indoors.
+  Killing them all pays 35 gold and 25 XP per raider plus fame; the kills also
+  count toward bandit bounties. Leave the village and the raid ends with no
+  reward.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

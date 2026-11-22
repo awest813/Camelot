@@ -167,6 +167,48 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   expect(boardJob, "the notice board opens the job window; jobs can be taken and abandoned")
     .toEqual({ before: 0, opened: true, taken: 1, logged: true, after: 0, inLog: false, closed: true });
 
+  // ── A bandit raid: raiders march in up the road, townsfolk hide; beat them for a reward ──
+  const raid = await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    const key = [...g._loadedVillages.keys()][0];
+    const plan = g._loadedVillages.get(key);
+    g.player.camera.position.set(plan.center.x + 2, 2, plan.center.z + 2);
+    const raiders = g._startRaid(key, plan);
+    (window as any).__raiders = raiders;
+    const d = (n: any) => Math.hypot(n.mesh.position.x - plan.center.x, n.mesh.position.z - plan.center.z);
+    const townsfolk = g.scheduleSystem.npcs.filter((n: any) => /^Villager_/.test(n.mesh.name) && d(n) < 30);
+    return {
+      raiders: raiders.length, startDist: Math.min(...raiders.map(d)),
+      active: !!g.villageRaids.active, hidden: townsfolk.filter((n: any) => !n.mesh.isEnabled()).length,
+      townsfolk: townsfolk.length,
+    };
+  });
+  expect(raid.raiders).toBeGreaterThanOrEqual(2);
+  expect(raid.active).toBe(true);
+  expect(raid.hidden, "townsfolk run indoors").toBe(raid.townsfolk);
+  // They come up the road toward the square.
+  await expect.poll(() => page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    const plan = [...g._loadedVillages.values()][0];
+    return Math.min(...(window as any).__raiders.map((n: any) =>
+      Math.hypot(n.mesh.position.x - plan.center.x, n.mesh.position.z - plan.center.z)));
+  }), { timeout: 30_000, message: "raiders advance on the square" }).toBeLessThan(raid.startDist - 5);
+  const raidEnd = await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    const gold = g._getInventoryGold();
+    for (const r of (window as any).__raiders) {
+      r.takeDamage(1e6);
+      g.combatSystem.onNPCDeath(r.mesh.name, r.xpReward, r);
+    }
+    return { paid: g._getInventoryGold() - gold, active: !!g.villageRaids.active };
+  });
+  expect(raidEnd.active).toBe(false);
+  expect(raidEnd.paid, "beating the raid pays").toBe(35 * raid.raiders);
+  await expect.poll(() => page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    return g.scheduleSystem.npcs.filter((n: any) => /^Villager_/.test(n.mesh.name) && !n.mesh.isEnabled()).length;
+  }), { timeout: 5_000, message: "townsfolk come back out" }).toBe(0);
+
   // ── Bedtime: villagers walk to their doors and go inside; they're back by morning ──
   const villagerState = () => page.evaluate(() => {
     const g = (window as any).__camelotGame;
