@@ -129,6 +129,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   budget. They go out again at dawn.
 - At night, sharpening and film grain are eased off, because the higher
   night exposure turned them into crawling speckle on dark walls.
+- **The sky finally renders as designed.** Every colour on the sky shader
+  (zenith, horizon, sun glow, sun disc, cloud light and shade) was getting
+  the same value, because one scratch colour object was shared and the
+  material keeps a reference, not a copy. The sky came out as one flat
+  grey-lavender, with no gradient, sun or visible clouds. Now there's a
+  steel-blue gradient with horizon haze, a sun disc and glow, drifting clouds
+  with lit tops and shaded undersides, rosy dusks and moonlit night clouds.
+  Water (sun, zenith and ambient colours) and the distant mountains (light
+  and ambient) had the same bug and are fixed too.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

@@ -13,9 +13,9 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
-import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector2, Vector3, Vector4 } from "@babylonjs/core/Maths/math.vector";
 import type { AtmosphereState } from "./atmosphere";
+import { UniformCache } from "./uniform-cache";
 
 export interface Pond {
   x: number;
@@ -144,8 +144,7 @@ let _registered = false;
 export class WaterRenderer {
   private readonly _meshes = new Set<{ mesh: Mesh; mat: ShaderMaterial }>();
   private _time = 0;
-  private readonly _tmpC = new Color3();
-  private readonly _tmpV = new Vector3();
+  private readonly _uniforms = new UniformCache();
   private readonly _tmpW = new Vector2();
 
   constructor(private readonly _scene: Scene) {
@@ -191,16 +190,18 @@ export class WaterRenderer {
     for (const { mat } of this._meshes) {
       mat.setVector3("cameraPos", cam.globalPosition);
       mat.setFloat("time", this._time);
-      mat.setVector3("sunDir", this._tmpV.set(s.sunDir[0], s.sunDir[1], s.sunDir[2]));
+      // (Separate objects per uniform — setColor3/setVector3 keep a reference.)
+      const u = this._uniforms;
+      mat.setVector3("sunDir", u.vec3("sunDir", s.sunDir[0], s.sunDir[1], s.sunDir[2]));
       const li = Math.max(0, s.lightIntensity) * (s.sunDir[1] > 0 ? 1 : 0);
-      mat.setColor3("sunColor", this._tmpC.set(s.lightColor[0] * li, s.lightColor[1] * li, s.lightColor[2] * li));
-      mat.setColor3("zenith", this._tmpC.set(s.zenith[0], s.zenith[1], s.zenith[2]));
+      mat.setColor3("sunColor", u.color("sunColor", s.lightColor[0] * li, s.lightColor[1] * li, s.lightColor[2] * li));
+      mat.setColor3("zenith", u.color("zenith", s.zenith[0], s.zenith[1], s.zenith[2]));
       mat.setColor3("horizon", fog);
       mat.setColor3("fogColor", fog);
       mat.setFloat("fogDensity", this._scene.fogDensity);
       mat.setVector2("wind", this._tmpW.set(wind.x, wind.z));
       const a = s.ambientIntensity;
-      mat.setColor3("ambient", this._tmpC.set(s.ambientSky[0] * a, s.ambientSky[1] * a, s.ambientSky[2] * a));
+      mat.setColor3("ambient", u.color("ambient", s.ambientSky[0] * a, s.ambientSky[1] * a, s.ambientSky[2] * a));
     }
   }
 }

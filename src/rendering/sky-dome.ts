@@ -8,6 +8,7 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import type { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import type { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { computeAtmosphere, type AtmosphereState } from "./atmosphere";
+import { UniformCache } from "./uniform-cache";
 
 const SKY_VERTEX = `
 precision highp float;
@@ -153,6 +154,7 @@ export class AtmosphereController {
   public state: AtmosphereState;
   /** 0 clear … 1 storm; set from WeatherSystem each frame. */
   public cloudiness = 0.15;
+  private readonly _uniforms = new UniformCache();
   /** Fog colour blended toward this when the weather has its own fog colour. */
   public weatherFog: Color3 | null = null;
   /** How strongly weather fog overrides the clear-sky horizon colour. */
@@ -161,7 +163,6 @@ export class AtmosphereController {
   private _time = 0;
   private readonly _sunDirV = new Vector3();
   private readonly _moonDirV = new Vector3();
-  private readonly _tmpColor = new Color3();
 
   constructor(private readonly _scene: Scene) {
     registerShaders();
@@ -217,27 +218,29 @@ export class AtmosphereController {
       fg += (this.weatherFog.g * dim - fg) * w;
       fb += (this.weatherFog.b * dim - fb) * w;
     }
+    const m = this.material;
     this._scene.fogColor.set(fr, fg, fb);
 
-    const m = this.material;
-    m.setColor3("zenithColor", this._tmpColor.set(s.zenith[0], s.zenith[1], s.zenith[2]));
-    m.setColor3("horizonColor", this._tmpColor.set(fr, fg, fb));
+    // (Separate objects per uniform — setColor3 keeps a reference.)
+    const u = this._uniforms;
+    m.setColor3("zenithColor", u.color("zenithColor", s.zenith[0], s.zenith[1], s.zenith[2]));
+    m.setColor3("horizonColor", u.color("horizonColor", fr, fg, fb));
     m.setVector3("sunDir", this._sunDirV.set(s.sunDir[0], s.sunDir[1], s.sunDir[2]));
     m.setVector3("moonDir", this._moonDirV.set(s.moonDir[0], s.moonDir[1], s.moonDir[2]));
-    m.setColor3("sunGlow", this._tmpColor.set(s.sunGlow[0], s.sunGlow[1], s.sunGlow[2]));
-    m.setColor3("sunDisc", this._tmpColor.set(s.sunDisc[0], s.sunDisc[1], s.sunDisc[2]));
+    m.setColor3("sunGlow", u.color("sunGlow", s.sunGlow[0], s.sunGlow[1], s.sunGlow[2]));
+    m.setColor3("sunDisc", u.color("sunDisc", s.sunDisc[0], s.sunDisc[1], s.sunDisc[2]));
     m.setFloat("starIntensity", s.stars);
     m.setFloat("cloudCover", this.cloudiness);
     m.setFloat("time", this._time);
     // Clouds: sunlit tops pick up the light colour; undersides take the zenith.
     const day = Math.min(1, s.ambientIntensity);
-    m.setColor3("cloudLit", this._tmpColor.set(
+    m.setColor3("cloudLit", u.color("cloudLit",
       Math.min(1.4, 0.35 + s.lightColor[0] * s.lightIntensity * 1.05 + s.horizon[0] * 0.3) * (0.4 + 0.6 * day),
       Math.min(1.4, 0.35 + s.lightColor[1] * s.lightIntensity * 1.0 + s.horizon[1] * 0.3) * (0.4 + 0.6 * day),
       Math.min(1.4, 0.38 + s.lightColor[2] * s.lightIntensity * 0.95 + s.horizon[2] * 0.3) * (0.4 + 0.6 * day),
     ));
     const shadeK = 0.85 - this.cloudiness * 0.4;
-    m.setColor3("cloudShade", this._tmpColor.set(
+    m.setColor3("cloudShade", u.color("cloudShade",
       (s.horizon[0] * 0.6 + s.zenith[0] * 0.4) * shadeK + 0.02,
       (s.horizon[1] * 0.6 + s.zenith[1] * 0.4) * shadeK + 0.02,
       (s.horizon[2] * 0.6 + s.zenith[2] * 0.4) * shadeK + 0.03,

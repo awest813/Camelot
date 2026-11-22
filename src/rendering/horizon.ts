@@ -15,6 +15,7 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { TileableNoise } from "./texture-synth";
 import type { AtmosphereState } from "./atmosphere";
+import { UniformCache } from "./uniform-cache";
 
 const VERTEX = `
 precision highp float;
@@ -114,8 +115,7 @@ function ringGeometry(radius: number, segments: number, baseHeight: number, amp:
 export class HorizonMountains {
   public readonly meshes: Mesh[] = [];
   private readonly _material: ShaderMaterial;
-  private readonly _tmp = new Color3();
-  private readonly _tmpV = new Vector3();
+  private readonly _uniforms = new UniformCache();
 
   constructor(scene: Scene) {
     if (!_registered) {
@@ -154,11 +154,13 @@ export class HorizonMountains {
       m.position.z = cameraPos.z;
     }
     const mat = this._material;
-    mat.setVector3("lightDir", this._tmpV.set(s.lightDir[0], s.lightDir[1], s.lightDir[2]));
+    // (Separate objects per uniform — setColor3/setVector3 keep a reference.)
+    const u = this._uniforms;
+    mat.setVector3("lightDir", u.vec3("lightDir", s.lightDir[0], s.lightDir[1], s.lightDir[2]));
     const li = s.lightIntensity;
-    mat.setColor3("lightColor", this._tmp.set(s.lightColor[0] * li, s.lightColor[1] * li, s.lightColor[2] * li));
+    mat.setColor3("lightColor", u.color("lightColor", s.lightColor[0] * li, s.lightColor[1] * li, s.lightColor[2] * li));
     const ai = s.ambientIntensity * 0.8;
-    mat.setColor3("ambientColor", this._tmp.set(s.ambientSky[0] * ai, s.ambientSky[1] * ai, s.ambientSky[2] * ai));
+    mat.setColor3("ambientColor", u.color("ambientColor", s.ambientSky[0] * ai, s.ambientSky[1] * ai, s.ambientSky[2] * ai));
     mat.setColor3("hazeColor", fog);
     // Bad weather swallows the far ranges.
     mat.setFloat("hazeBoost", Math.max(0, cloudiness - 0.2) * 0.55);
