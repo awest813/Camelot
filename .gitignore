@@ -4,3 +4,6 @@ dev.log
 playwright-report
 test-results
 release/
+
+# Local throwaway Playwright probes
+tests/e2e/zz-*.spec.ts
