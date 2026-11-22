@@ -123,6 +123,12 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   into the nearest cascades, where their shadows are visible. The village
   well is now four meshes instead of 51 pieces. Together these took a village
   frame from about 495 to 289 draw calls (the shadow pass from 351 to 169).
+- **Villages light up at night.** Windows glow warm after dark, and the candle
+  stands on the square burn with flickering flames and pools of warm light.
+  Only the nearest few cast real light, sharing the torches' four-light
+  budget. They go out again at dawn.
+- At night, sharpening and film grain are eased off, because the higher
+  night exposure turned them into crawling speckle on dark walls.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

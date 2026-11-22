@@ -58,6 +58,8 @@ interface FireEntry {
   base: number;
   systems: ParticleSystem[];
   phase: number;
+  /** Lit only at night (village candle stands); dark and hidden by day. */
+  nightOnly: boolean;
 }
 
 export class FireFx {
@@ -65,6 +67,8 @@ export class FireFx {
   public maxActiveLights = 4;
   /** Lights farther than this are always off. */
   public lightRange = 45;
+  /** Whether it's dark enough for night-only fires to be lit. */
+  public night = true;
   private readonly _fires = new Set<FireEntry>();
   private readonly _flameTex: RawTexture;
   private readonly _softTex: RawTexture;
@@ -76,7 +80,7 @@ export class FireFx {
     this._softTex = sprite(_scene, "fxSoft", 32, 32, soft);
   }
 
-  public attach(info: { flame: Mesh; light: PointLight; kind: "torch" | "campfire" }): void {
+  public attach(info: { flame: Mesh; light: PointLight; kind: "torch" | "campfire"; nightOnly?: boolean }): void {
     const big = info.kind === "campfire";
     const systems: ParticleSystem[] = [];
     info.flame.computeWorldMatrix(true);
@@ -163,7 +167,10 @@ export class FireFx {
       info.flame.scaling.set(0.6, 0.55, 0.6);
     }
 
-    const entry: FireEntry = { flame: info.flame, light: info.light, base: info.light.intensity, systems, phase: Math.random() * 100 };
+    const entry: FireEntry = {
+      flame: info.flame, light: info.light, base: info.light.intensity, systems,
+      phase: Math.random() * 100, nightOnly: !!info.nightOnly,
+    };
     this._fires.add(entry);
     info.flame.onDisposeObservable.addOnce(() => {
       for (const s of entry.systems) s.dispose(false);
@@ -186,11 +193,15 @@ export class FireFx {
     const list = [...this._fires].map((f) => ({ f, d: Vector3.DistanceSquared(f.light.position, player) }));
     list.sort((a, b) => a.d - b.d);
     const maxD2 = this.lightRange * this.lightRange;
-    list.forEach(({ f, d }, i) => {
-      const on = i < this.maxActiveLights && d < maxD2;
+    let lit = 0;
+    list.forEach(({ f, d }) => {
+      const burning = !f.nightOnly || this.night;
+      if (f.nightOnly && f.flame.isEnabled() !== burning) f.flame.setEnabled(burning);
+      const on = burning && lit < this.maxActiveLights && d < maxD2;
+      if (on) lit++;
       if (f.light.isEnabled() !== on) f.light.setEnabled(on);
-      // Cull far particle systems too.
-      const near = d < 70 * 70;
+      // Cull far (or unlit) particle systems too.
+      const near = burning && d < 70 * 70;
       for (const s of f.systems) {
         if (near && !s.isStarted()) s.start();
         else if (!near && s.isStarted()) s.stop();

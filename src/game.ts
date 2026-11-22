@@ -499,6 +499,10 @@ export class Game {
   private _pendingJobBoard: { boardId: string; placeName: string } | null = null;
   /** Shared parchment material for village notice boards. */
   private _noticeMats: StandardMaterial[] | null = null;
+  private _candleMat: StandardMaterial | null = null;
+  private _windowGlass: Array<{ emissiveColor?: Color3 }> = [];
+  private _windowGlassScan = -1;
+  private _windowGlow = -1;
   /** Footprints of loaded buildings (centre, yaw, half sizes incl. margin) — NPCs keep out. */
   private readonly _buildingFootprints = new Set<{ x: number; z: number; cos: number; sin: number; hw: number; hd: number }>();
 
@@ -5661,11 +5665,21 @@ export class Game {
         }
       }
     }
-    if (this._fireFx && this.player) this._fireFx.update(dt, this.player.camera.position);
+    const daylight = Math.max(0, Math.min(1, (state.ambientIntensity - 0.42) / 0.58));
+    if (this._fireFx && this.player) {
+      this._fireFx.night = daylight < 0.3;
+      this._fireFx.update(dt, this.player.camera.position);
+    }
+    this._updateWindowGlow(daylight);
     this._water?.update(dt, state, { x: WindState.dirX * WindState.strength, z: WindState.dirZ * WindState.strength });
 
     if (this.renderingPipeline) {
       this.renderingPipeline.imageProcessing.exposure = this.graphics.postProcess.exposure * state.exposure * (1 + flash * 0.8);
+      // Night raises exposure, which also amplifies sharpening halos and
+      // grain into crawling speckle on dark surfaces: ease both off after dark.
+      const rp = this.renderingPipeline;
+      if (rp.sharpenEnabled) rp.sharpen.edgeAmount = this.graphics.postProcess.sharpenEdgeAmount * (0.4 + 0.6 * daylight);
+      if (rp.grainEnabled) rp.grain.intensity = 4 * (0.5 + 0.5 * daylight);
     }
 
     // Interiors: no daylight pouring in, and fog is dark rather than sky-blue.
@@ -7733,6 +7747,7 @@ export class Game {
       for (const p of plan.props) {
         if (p.key === "qWell") this._placeVillageWell(chunkKey, chunkRecord, p.x, p.z, p.rot);
         else this._placeSiteProp(chunkKey, chunkRecord, p.key, here, p.x, p.z, p.rot);
+        if (p.key === "qLantern") this._addCandleFlame(chunkKey, chunkRecord, p.x, 1.33, p.z);
       }
       this._placeSmithy(chunkKey, chunkRecord, plan.forge.x, plan.forge.z, plan.forge.rot);
       this._placeNoticeBoard(chunkKey, chunkRecord, plan);
@@ -7754,6 +7769,61 @@ export class Game {
         }
       }
       this._loadedVillages.set(chunkKey, plan);
+  }
+
+  /**
+   * A candle-stand flame: a small glowing core plus a warm point light,
+   * lit only at night (FireFx manages flicker, particles and which few
+   * lights are on).
+   */
+  private _addCandleFlame(
+      chunkKey: string,
+      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
+      x: number,
+      y: number,
+      z: number,
+  ): void {
+      if (this._chunkFantasyContent.get(chunkKey) !== chunkRecord || !this._fireFx) return;
+      this._candleMat ??= (() => {
+        const m = new StandardMaterial("candle_flame", this.scene);
+        m.emissiveColor = new Color3(1.0, 0.62, 0.22);
+        m.diffuseColor = new Color3(0, 0, 0);
+        m.disableLighting = true;
+        m.freeze();
+        return m;
+      })();
+      const flame = MeshBuilder.CreateSphere(`candle_${chunkKey}_${chunkRecord.roots.length}`, { diameter: 0.14, segments: 6 }, this.scene);
+      flame.position.set(x, y, z);
+      flame.material = this._candleMat;
+      flame.isPickable = false;
+      flame.freezeWorldMatrix();
+      const light = new PointLight(`${flame.name}_light`, new Vector3(x, y + 0.1, z), this.scene);
+      light.diffuse = new Color3(1.0, 0.6, 0.22);
+      light.specular = new Color3(0.4, 0.25, 0.08);
+      light.intensity = 1.1;
+      light.range = 9;
+      flame.onDisposeObservable.addOnce(() => light.dispose());
+      this._fireFx.attach({ flame, light, kind: "torch", nightOnly: true });
+      chunkRecord.roots.push(flame);
+  }
+
+  /**
+   * Windows glow warm after dark: the Medieval Village window-glass material
+   * (shared by every building) gets an emissive tint scaled by darkness.
+   */
+  private _updateWindowGlow(daylight: number): void {
+      const glow = Math.max(0, Math.min(1, 1 - daylight * 2.2));
+      if (Math.abs(glow - this._windowGlow) < 0.02 && this.scene.materials.length === this._windowGlassScan) return;
+      if (this.scene.materials.length !== this._windowGlassScan) {
+        this._windowGlassScan = this.scene.materials.length;
+        this._windowGlass = this.scene.materials.filter((m) => /WindowGlass/i.test(m.name)) as Array<{ emissiveColor?: Color3 }>;
+      }
+      this._windowGlow = glow;
+      for (const m of this._windowGlass) {
+        if (!m.emissiveColor) continue;
+        // A uniform, so no markDirty() / shader rebuild is needed.
+        m.emissiveColor.set(1.0 * glow, 0.58 * glow, 0.22 * glow);
+      }
   }
 
   /** The well on a village square: stone curb, winch and roof, with a collider. */
