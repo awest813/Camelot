@@ -167,6 +167,43 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   expect(boardJob, "the notice board opens the job window; jobs can be taken and abandoned")
     .toEqual({ before: 0, opened: true, taken: 1, logged: true, after: 0, inLog: false, closed: true });
 
+  // ── Talking: the camera turns to the speaker's face and zooms in, then eases back ──
+  const talk = await page.evaluate(async () => {
+    const g = (window as any).__camelotGame; const c = g.player.camera;
+    const plan = [...g._loadedVillages.values()][0];
+    const npc = g.scheduleSystem.npcs.find((n: any) => /^(Innkeeper|Barkeeper|Villager)_/.test(n.mesh.name)
+      && n.mesh.isEnabled() && Math.hypot(n.mesh.position.x - plan.center.x, n.mesh.position.z - plan.center.z) < 25);
+    const p = npc.mesh.position;
+    const dx = plan.center.x - p.x, dz = plan.center.z - p.z, l = Math.hypot(dx, dz) || 1;
+    // Stand 2.5 m away on the square side, looking away from them.
+    c.position.set(p.x + dx / l * 2.5, p.y + 0.7, p.z + dz / l * 2.5);
+    c.rotation.set(0, Math.atan2(dx, dz), 0);
+    const baseFov = c.fov;
+    g.dialogueSystem.startDialogue(npc);
+    await new Promise((r) => setTimeout(r, 1500));
+    // Where the face lands on screen (0..1, y down).
+    const eng = g.scene.getEngine();
+    const face = new c.position.constructor(p.x, p.y + 0.62, p.z);
+    const vp = c.viewport.toGlobal(eng.getRenderWidth(), eng.getRenderHeight());
+    const proj = (c.position.constructor as any).Project(face, (g.scene.getTransformMatrix() as any).constructor.IdentityReadOnly, g.scene.getTransformMatrix(), vp);
+    const during = {
+      fov: c.fov, sx: proj.x / eng.getRenderWidth(), sy: proj.y / eng.getRenderHeight(),
+      hotbarHidden: getComputedStyle(document.querySelector(".quickslot-hud") ?? document.body).display === "none"
+        || !document.querySelector(".quickslot-hud"),
+      npcStill: npc.mesh.position.clone(),
+    };
+    g.dialogueSystem.endDialogue();
+    await new Promise((r) => setTimeout(r, 1500));
+    return { baseFov, during: { ...during, npcStill: undefined }, after: { fov: c.fov, inDialogue: document.body.classList.contains("is-in-dialogue") } };
+  });
+  expect(talk.during.fov, "zooms in on the speaker").toBeLessThan(talk.baseFov * 0.8);
+  expect(Math.abs(talk.during.sx - 0.5), "face centred horizontally").toBeLessThan(0.08);
+  expect(talk.during.sy, "face in the upper part of the frame, above the dialogue panel").toBeGreaterThan(0.15);
+  expect(talk.during.sy).toBeLessThan(0.5);
+  expect(talk.during.hotbarHidden, "quick-slot bar hidden while talking").toBe(true);
+  expect(talk.after.fov, "zoom eases back out").toBeCloseTo(talk.baseFov, 3);
+  expect(talk.after.inDialogue).toBe(false);
+
   // ── A bandit raid: raiders march in up the road, townsfolk hide; beat them for a reward ──
   const raid = await page.evaluate(() => {
     const g = (window as any).__camelotGame;

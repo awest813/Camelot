@@ -1,7 +1,5 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
-import { Camera } from "@babylonjs/core/Cameras/camera";
 import { AdvancedDynamicTexture, Button, Control, Rectangle, StackPanel, TextBlock } from "@babylonjs/gui/2D";
 import { NPC } from "../entities/npc";
 import { Player } from "../entities/player";
@@ -9,6 +7,10 @@ import { DialogueSession } from "../framework/dialogue/dialogue-engine";
 import { DialogueNodeView } from "../framework/dialogue/dialogue-types";
 import { SHARED_UI_PANEL as D } from "../ui/ui-manager";
 import { keepGuiAtCssResolution } from "../ui/gui-resolution";
+import { DialogueCamera } from "./dialogue-camera";
+
+/** Speaker's face, relative to the NPC capsule centre (1 m above its feet). */
+const NPC_FACE_OFFSET_Y = 0.62;
 
 export interface DialogueChoiceOption {
   text: string;
@@ -27,8 +29,11 @@ export class DialogueSystem {
   private _nameLabel: TextBlock;
   private _textBlock: TextBlock;
   private _choicesPanel: StackPanel;
-  private _cinematicCamera: ArcRotateCamera;
-  private _originalCamera: Camera | null = null;
+  /**
+   * Bethesda-style framing: the player's own camera turns to the speaker and
+   * zooms in.  The game calls `camera.update(dt)` every frame.
+   */
+  public readonly camera = new DialogueCamera();
   private _isInDialogue: boolean = false;
   private _choiceCount: number = 0;
   private _activeSession: DialogueSession | null = null;
@@ -37,8 +42,7 @@ export class DialogueSystem {
   private _keyHandler: ((e: KeyboardEvent) => void) | null = null;
 
   // Scratch vectors for performance optimization
-  private _direction: Vector3 = new Vector3();
-  private _camPos: Vector3 = new Vector3();
+  private readonly _face: Vector3 = new Vector3();
 
   /** Fired with the NPC's mesh name when a conversation begins. */
   public onTalkStart: ((npcName: string) => void) | null = null;
@@ -61,7 +65,6 @@ export class DialogueSystem {
     this.npcs = npcs;
     this.canvas = canvas;
     this._initUI();
-    this._initCamera();
   }
 
   private _initUI(): void {
@@ -133,10 +136,6 @@ export class DialogueSystem {
     this._dialoguePanel.addControl(this._choicesPanel);
   }
 
-  private _initCamera(): void {
-    this._cinematicCamera = new ArcRotateCamera("cinematicCam", 0, 0, 5, Vector3.Zero(), this.scene);
-  }
-
   public startDialogue(npc: NPC): void {
     if (this._isInDialogue) return;
     this._isInDialogue = true;
@@ -145,24 +144,13 @@ export class DialogueSystem {
     this._activeSession = null;
     if (this.onTalkStart) this.onTalkStart(npc.mesh.name);
 
-    // Switch Camera
-    this._originalCamera = this.scene.activeCamera;
-
-    const npcHeadPos = npc.mesh.position.clone().add(new Vector3(0, 0.5, 0)); // Approx head height
-    this._cinematicCamera.setTarget(npcHeadPos);
-
-    // Position camera between player and NPC
-    this.player.camera.position.subtractToRef(npc.mesh.position, this._direction);
-    this._direction.normalize();
-
-    this._direction.scaleToRef(1.5, this._camPos);
-    this._camPos.addInPlace(npc.mesh.position);
-    this._camPos.addInPlaceFromFloats(0, 0.5, 0);
-
-    this._cinematicCamera.position.copyFrom(this._camPos);
-    this._cinematicCamera.minZ = 0.1;
-
-    this.scene.activeCamera = this._cinematicCamera;
+    // Frame the speaker with the player's own camera (no cut, so the post
+    // pipeline and fog stay as they are): turn to the face and zoom in.
+    this.camera.begin(this.player.camera, () => {
+      if (npc.mesh.isDisposed()) return null;
+      const p = npc.mesh.position;
+      return this._face.set(p.x, p.y + NPC_FACE_OFFSET_Y, p.z);
+    });
 
     // Detach player controls
     this.player.camera.detachControl();
@@ -368,8 +356,8 @@ export class DialogueSystem {
     this._dialoguePanel.isVisible = false;
     this._choicesPanel.clearControls();
 
-    // Restore Camera
-    this.scene.activeCamera = this._originalCamera;
+    // Ease the zoom back out (the player is left facing the speaker).
+    this.camera.end();
 
     // Restore controls and pointer lock so mouse-look works immediately.
     // Wrapped in try/catch so tests running in a headless Node environment

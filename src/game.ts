@@ -500,6 +500,7 @@ export class Game {
   /** Shared parchment material for village notice boards. */
   private _noticeMats: StandardMaterial[] | null = null;
   private _candleMat: StandardMaterial | null = null;
+  private _hudInDialogue = false;
   private _windowGlass: Array<{ emissiveColor?: Color3 }> = [];
   private _windowGlassScan = -1;
   private _windowGlow = -1;
@@ -5610,7 +5611,9 @@ export class Game {
       const far = Vector3.DistanceSquared(npc.mesh.position, playerPos) > NPC_ANIMATION_FAR_DISTANCE_SQ;
       rig.setPaused(far && !npc.isDead);
       if (far) continue;
-      const engaged = !npc.isDead && (npc.isAggressive || npc.aiState === AIState.ALERT || npc.isAttackTelegraphing);
+      // Fighters track the player; so does whoever the player is talking to.
+      const engaged = !npc.isDead
+        && (npc.isAggressive || npc.aiState === AIState.ALERT || npc.isAttackTelegraphing || npc.isInDialogue);
       rig.update(dt, npc.mesh.position, engaged ? playerPos : null);
     }
   }
@@ -6416,6 +6419,9 @@ export class Game {
       // its ticks, and the atmosphere composes the final ones on top.
       this._updateAtmosphere(frameDelta);
 
+      // Conversation framing (turn to the speaker, zoom in / back out).
+      this.dialogueSystem.camera.update(frameDelta);
+
       if (this._viewModel) {
         this._viewModel.setVisible(
           this.player.health > 0 && !this.dialogueSystem.isInDialogue && !this.mapEditorSystem.isEnabled,
@@ -6596,7 +6602,14 @@ export class Game {
 
       // Hide the crosshair while any HTML modal overlay owns the screen
       // (barter, level-up, guard challenge, travel, stable, settings, …).
+      // Conversations hide the crosshair and the quick-slot bar (Bethesda-style).
+      const talking = this.dialogueSystem.isInDialogue;
+      if (talking !== this._hudInDialogue) {
+        this._hudInDialogue = talking;
+        document.body.classList.toggle("is-in-dialogue", talking);
+      }
       this.ui.setHtmlOverlayActive(
+          talking ||
           this._barterUI.isVisible ||
           this._containerUI.isVisible ||
           this.levelUpUI.isVisible ||

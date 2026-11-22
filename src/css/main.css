@@ -6254,3 +6254,8 @@ body::before {
 .job-board__btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .job-board__btn--primary { background: rgba(120, 88, 24, 0.9); }
 .job-board__btn--danger { border-color: rgba(170, 60, 50, 0.6); color: #e2b3a8; }
+
+/* Conversations: the camera frames the speaker; keep the HUD out of the shot. */
+body.is-in-dialogue .quickslot-hud {
+  display: none !important;
+}

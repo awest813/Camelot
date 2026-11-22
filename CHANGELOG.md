@@ -138,6 +138,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   with lit tops and shaded undersides, rosy dusks and moonlit night clouds.
   Water (sun, zenith and ambient colours) and the distant mountains (light
   and ambient) had the same bug and are fixed too.
+- **Dialogue camera, Bethesda style.** Starting a conversation no longer cuts
+  to a separate camera, which also dropped the colour grade, bloom and
+  ambient occlusion. Your own view now turns smoothly to the speaker's face
+  and zooms in until head and shoulders fill the frame, with the face above
+  the dialogue panel. The speaker turns to face you and stops walking. The
+  weapon, crosshair and quick-slot bar are hidden. When the conversation
+  ends, the zoom eases back out and you're left facing them.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

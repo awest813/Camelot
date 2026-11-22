@@ -80,6 +80,11 @@ export class ScheduleSystem {
   private _updateNPC(npc: NPC, deltaTime: number): void {
     // CombatSystem owns movement for any state other than IDLE/PATROL
     if (npc.isDead || npc.isAggressive) return;
+    // Hold still while talking to the player.
+    if (npc.isInDialogue) {
+      this._applyStopHorizontal(npc);
+      return;
+    }
 
     // Determine active schedule behavior (if any)
     const scheduledBehavior = this._getScheduledBehavior(npc);
