@@ -91,7 +91,7 @@ import { Kernel } from "./core/kernel";
 import { EditorSuite } from "./features/editor/editor-suite";
 import { VillageRaidFeature, RaidsKey, type RaidsService } from "./features/village-raids/raid-feature";
 import {
-  ActorsKey, AnimationKey, BuildingsKey, ClockKey, FastTravelKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey,
+  ActorsKey, AnimationKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey,
   QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey,
 } from "./features/services";
 import { VillagesFeature, VillagesKey, type VillagesService } from "./features/villages/villages-feature";
@@ -109,7 +109,8 @@ import { GraphicsSystem, persistGraphicsTier } from "./systems/graphics-system";
 import { QuickSlotSystem, isConsumableItem, type QuickSlotKey } from "./systems/quickslot-system";
 import { WaitSystem } from "./systems/wait-system";
 import { SkillProgressionSystem } from "./systems/skill-progression-system";
-import { FastTravelSystem } from "./systems/fast-travel-system";
+import type { FastTravelSystem } from "./systems/fast-travel-system";
+import { FastTravelFeature, TravelKey, TravelHostKey } from "./features/fast-travel/fast-travel-feature";
 import { LevelScalingSystem } from "./systems/level-scaling-system";
 import { FameSystem } from "./systems/fame-system";
 import { ActiveEffectsSystem } from "./systems/active-effects-system";
@@ -148,7 +149,7 @@ import { ContentBundleUI } from "./ui/content-bundle-ui";
 import { EditorHubUI } from "./ui/editor-hub-ui";
 import { EditorLayout } from "./ui/editor-layout";
 import { buildHelpOverlayLines } from "./ui/editor-help-overlay";
-import { FastTravelUI, type FastTravelOptionView } from "./ui/fast-travel-ui";
+import type { FastTravelUI } from "./ui/fast-travel-ui";
 import { SpellMakingUI } from "./ui/spell-making-ui";
 import type { GuardEncounterUI } from "./ui/guard-encounter-ui";
 import { ArrestFeature, ArrestKey, LawKey } from "./features/arrest/arrest-feature";
@@ -160,7 +161,7 @@ import { HorseSystem } from "./systems/horse-system";
 import { SwimmingSystem } from "./systems/swimming-system";
 import { DiseaseSystem } from "./systems/disease-system";
 import { SurvivalSystem } from "./systems/survival-system";
-import { TravelEventSystem, type TravelContext } from "./systems/travel-event-system";
+import type { TravelEventSystem } from "./systems/travel-event-system";
 import { AmbientEventSystem } from "./systems/ambient-event-system";
 import { LeveledListSystem, ALL_BUILT_IN_LEVELED_LISTS } from "./systems/leveled-list-system";
 import { EventManagerSystem } from "./systems/event-manager-system";
@@ -203,7 +204,6 @@ import { GraphicsSettingsUI, type CameraSensitivity } from "./ui/graphics-settin
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
 /** Pseudo fast-travel destination that triggers Mark & Recall teleportation. */
-const MARK_RECALL_TRAVEL_ID = "__recall";
 /** Squared distance beyond which NPC procedural animation updates are skipped. */
 const NPC_ANIMATION_FAR_DISTANCE_SQ = 100 * 100;
 /** NPCs below this height fell through the world (e.g. spawned before their chunk). */
@@ -292,7 +292,9 @@ export class Game {
   public audioSystem: AudioSystem;
   public navigationSystem: NavigationSystem;
   public frameworkRuntime: FrameworkRuntime;
-  public fastTravelUI: FastTravelUI;
+  /** Fast travel (built with the game: the editor suite reads `fastTravelSystem`). */
+  private readonly _fastTravel = new FastTravelFeature();
+  public get fastTravelUI(): FastTravelUI { return this._fastTravel.menu; }
   public spellMakingUI: SpellMakingUI;
   public get guardEncounterUI(): GuardEncounterUI { return this.kernel.services.get(ArrestKey).panel; }
   public levelUpUI: LevelUpUI;
@@ -423,7 +425,7 @@ export class Game {
 
   // v8 systems (Oblivion depth: skill progression, fast travel, level scaling)
   public skillProgressionSystem: SkillProgressionSystem;
-  public fastTravelSystem: FastTravelSystem;
+  public get fastTravelSystem(): FastTravelSystem { return this._fastTravel.places; }
   public levelScalingSystem: LevelScalingSystem;
 
   // v9 systems (Oblivion parity: fame/infamy, active effects, jail)
@@ -830,14 +832,6 @@ export class Game {
     // Editor tools (map editor, creators, bundles, asset browser, hub).
     this.editors = new EditorSuite(this);
 
-    // ── Fast Travel UI ────────────────────────────────────────────────────────
-    this.fastTravelUI = new FastTravelUI();
-    this.fastTravelUI.onClose = () => {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
-    };
 
 
     this.levelUpUI = new LevelUpUI();
@@ -1099,16 +1093,11 @@ export class Game {
       attributeSystem: this.attributeSystem,
     });
 
-    this.fastTravelSystem = new FastTravelSystem();
-    // Seed the starting village as a discovered location
-    this.fastTravelSystem.discoverLocation("start_village", "Starting Village", new Vector3(0, 2, 0));
     // Auto-discover locations when the player enters a new cell (portals use fade + tryTransition)
     this.cellManager.onCellChanged = (cellId, cellName) => {
       this._onCellEntered(cellId, cellName);
     };
     this.interactionSystem.onPortalTransition = (portalId) => this._beginPortalTransition(portalId);
-    this.saveSystem.setFastTravelSystem(this.fastTravelSystem);
-    this.fastTravelUI.onTravel = (locationId) => this._attemptFastTravel(locationId);
 
     this.levelScalingSystem = new LevelScalingSystem();
     // Scale the test NPC on spawn (guard if the npcs list is unexpectedly empty)
@@ -2663,14 +2652,7 @@ export class Game {
       this.spellMakingUI.open();
       this._suspendGameplayInput();
     });
-    adapter.onAction("toggleFastTravel", () => {
-      if (this.fastTravelUI.isVisible) {
-        this.fastTravelUI.close();
-        return;
-      }
-      if (this._isCombatInputBlocked()) return;
-      this._openFastTravelMenu();
-    });
+    adapter.onAction("toggleFastTravel", () => this.kernel.services.get(TravelKey).toggleMenu());
     adapter.onAction("markPosition", () => {
       if (this._isCombatInputBlocked()) return;
       const p = this.player.camera.position;
@@ -4208,152 +4190,6 @@ export class Game {
       }
   }
 
-  /**
-   * Build the fast-travel option list (with a Recall row when a mark exists)
-   * and open the destination picker.
-   */
-  private _openFastTravelMenu(): void {
-      const locs = this.fastTravelSystem.discoveredLocations;
-      const options: FastTravelOptionView[] = locs.map((loc) => ({
-          id: loc.id,
-          name: loc.name,
-          estimatedHours: this.fastTravelSystem.estimateTravelHours(this.player.camera.position, loc.id) ?? 1,
-      }));
-      if (this.markRecallSystem.hasMarked) {
-          options.push({
-              id: MARK_RECALL_TRAVEL_ID,
-              name: "✦ Recall to Mark",
-              estimatedHours: 0,
-              detail: "instant",
-          });
-      }
-      if (options.length === 0) {
-          this.ui.showNotification("No locations discovered yet.", 2000);
-          return;
-      }
-      this.fastTravelUI.open(options);
-      this._suspendGameplayInput();
-  }
-
-  private _attemptFastTravel(locationId: string): void {
-      if (locationId === MARK_RECALL_TRAVEL_ID) {
-          this._attemptRecall();
-          return;
-      }
-      const hours = this.fastTravelSystem.estimateTravelHours(this.player.camera.position, locationId);
-      if (hours === null) {
-          this.ui.showNotification("Unknown destination.", 2000);
-          return;
-      }
-
-      if (this._isPlayerInCombat()) {
-          this.ui.showNotification("Cannot fast travel while in combat.", 2200);
-          return;
-      }
-      if (this.stealthSystem.isCrouching) {
-          this.ui.showNotification("Cannot fast travel while sneaking.", 2200);
-          return;
-      }
-      if (this.player.isEncumbered) {
-          this.ui.showNotification("Cannot fast travel while overencumbered.", 2200);
-          return;
-      }
-
-      const loc = this.fastTravelSystem.getDiscoveredLocation(locationId);
-      if (!loc) {
-          this.ui.showNotification(`Location "${locationId}" has not been discovered.`, 2200);
-          return;
-      }
-
-      const cellDef = this.cellManager.getCellDefinition(locationId);
-      const targetIsInterior = cellDef?.type === "interior";
-      const needsFade = targetIsInterior || this.cellManager.isInterior;
-      const dest = new Vector3(loc.position.x, loc.position.y, loc.position.z);
-      const message = `Fast travelled to ${loc.name}.`;
-
-      const applyTimeAndClose = () => {
-          this.timeSystem.advanceHours(hours);
-          this.respawnSystem.update(this.timeSystem.elapsedGameTime);
-          this.merchantRestockSystem.update(this.timeSystem.elapsedGameTime, this.barterSystem);
-          this._updateDynamicWorldEventsOnHourChange();
-          this.ui.showNotification(
-              `${message} (${hours.toFixed(1)}h passed) — ${this.timeSystem.timeString}`,
-              3200,
-          );
-          this.fastTravelUI.close();
-          // Travel events: a chance of an encounter-flavor moment on arrival.
-          if (Math.random() < 0.35) {
-              const travelContext: TravelContext = {
-                  gameTimeHours: this.timeSystem.elapsedGameHours % 24,
-                  activeBiomeIds: [this.world.getBiome(
-                      Math.floor(dest.x / this.world.chunkSize),
-                      Math.floor(dest.z / this.world.chunkSize),
-                  )],
-                  weatherId: this.weatherSystem.state,
-                  playerLevel: this.playerLevelSystem.characterLevel,
-                  getFlag: (flag) => this.frameworkRuntime.getFlag(flag),
-                  setFlag: (flag, value) => this.frameworkRuntime.setFlag(flag, value),
-              };
-              const outcome = this.travelEventSystem.rollEvent(travelContext);
-              if (outcome?.notification) {
-                  this.ui.showNotification(`🌫 ${outcome.notification}`, 4000);
-              }
-          }
-          this.saveSystem.markDirty();
-      };
-
-      if (needsFade) {
-          this.ui.playScreenFadeSequence({
-              fadeOutMs: 400,
-              holdMs: 120,
-              fadeInMs: 450,
-              onBlack: () => {
-                  if (targetIsInterior) {
-                      this.cellManager.enterCellById(locationId, dest, true);
-                  } else {
-                      this.cellManager.enterCellById("exterior", dest, true);
-                  }
-              },
-              onComplete: () => {
-                  this.fastTravelSystem.discoverLocation(
-                      targetIsInterior ? locationId : (this.cellManager.currentCell?.id ?? "exterior"),
-                      targetIsInterior ? loc.name : (this.cellManager.currentCell?.name ?? "Exterior World"),
-                      this.player.camera.position.clone(),
-                  );
-                  applyTimeAndClose();
-              },
-          });
-      } else {
-          this.player.camera.position.copyFrom(dest);
-          applyTimeAndClose();
-      }
-  }
-
-  /**
-   * Recall to the marked position (via the travel menu's Recall row).
-   * Teleportation + notification happen in the markRecallSystem.onRecall
-   * callback; this only guards, closes the picker, and flags the autosave.
-   */
-  private _attemptRecall(): void {
-      if (this._isPlayerInCombat()) {
-          this.ui.showNotification("Cannot recall while in combat.", 2200);
-          this.fastTravelUI.close();
-          return;
-      }
-      if (this.stealthSystem.isCrouching) {
-          this.ui.showNotification("Cannot recall while sneaking.", 2200);
-          this.fastTravelUI.close();
-          return;
-      }
-      const result = this.markRecallSystem.recall();
-      this.fastTravelUI.close();
-      if (!result) {
-          this.ui.showNotification("No mark has been placed.", 2000);
-          return;
-      }
-      this.saveSystem.markDirty();
-  }
-
   private _getInventoryGold(): number {
       const goldEntry = this.inventorySystem.items.find((item) => item.id === GOLD_ITEM_ID);
       return goldEntry?.quantity ?? 0;
@@ -4989,10 +4825,38 @@ export class Game {
         biome: (cx, cz) => this.world.getBiome(cx, cz),
         pondAt: (cx, cz) => !!this.world.pondAt(cx, cz),
       });
-      k.services.provide(FastTravelKey, {
-        isDiscovered: (id) => this.fastTravelSystem.isDiscovered(id),
-        discover: (id, name, at) => this.fastTravelSystem.discoverLocation(id, name, at),
+      k.services.provide(TravelHostKey, {
+        position: () => this.player.camera.position,
+        teleport: (to) => { this.player.camera.position.copyFrom(to); },
+        inCombat: () => this._isPlayerInCombat(),
+        sneaking: () => this.stealthSystem.isCrouching,
+        encumbered: () => this.player.isEncumbered,
+        isInterior: (id) => this.cellManager.getCellDefinition(id)?.type === "interior",
+        indoors: () => this.cellManager.isInterior,
+        enterCell: (id, at) => { this.cellManager.enterCellById(id, at, true); },
+        fade: (onBlack, onDone) => this.ui.playScreenFadeSequence({
+          fadeOutMs: 400, holdMs: 120, fadeInMs: 450, onBlack, onComplete: onDone,
+        }),
+        passHours: (hours) => {
+          this.timeSystem.advanceHours(hours);
+          this.respawnSystem.update(this.timeSystem.elapsedGameTime);
+          this.merchantRestockSystem.update(this.timeSystem.elapsedGameTime, this.barterSystem);
+          this._updateDynamicWorldEventsOnHourChange();
+          return this.timeSystem.timeString;
+        },
+        arrivalEvent: (at) => this.travelEventSystem.rollEvent({
+          gameTimeHours: this.timeSystem.elapsedGameHours % 24,
+          activeBiomeIds: [this.world.getBiome(Math.floor(at.x / this.world.chunkSize), Math.floor(at.z / this.world.chunkSize))],
+          weatherId: this.weatherSystem.state,
+          playerLevel: this.playerLevelSystem.characterLevel,
+          getFlag: (flag) => this.frameworkRuntime.getFlag(flag),
+          setFlag: (flag, value) => this.frameworkRuntime.setFlag(flag, value),
+        })?.notification ?? null,
+        hasMark: () => this.markRecallSystem.hasMarked,
+        recall: () => !!this.markRecallSystem.recall(),
       });
+      k.install(this._fastTravel);
+      this.saveSystem.setFastTravelSystem(this._fastTravel.places);
       const record = (chunkKey: string) => this._chunkFantasyContent.get(chunkKey);
       k.services.provide(SiteBuilderKey, {
         get scene() { return game.scene; },

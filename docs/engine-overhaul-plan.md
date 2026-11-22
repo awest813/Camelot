@@ -382,6 +382,16 @@ state, scope and save codec.
       the fine, jail, persuasion and resisting (also Escape). New `law`
       service (crime, persuasion, jail time, infamy).
 
+  14. **Fast travel** (`src/features/fast-travel/`): known places, the travel
+      menu (Y) and Recall, travelling with fades and time passing, and the
+      arrival event (now on a seeded stream). The feature provides the
+      `fast-travel` service the villages use. Travelling out of an interior
+      no longer adds the open world as a destination.
+- `RngStreams.reseed` and `restoreFromSave` reset streams in place. A stream
+  a feature kept from install time used to go stale at the first new game or
+  load: it was no longer seeded from the world and was not saved. This
+  affected raids and loot drops.
+
 - Legacy keyboard path pruned (ahead of Phase 2). Legacy branches only run
   for chords the input adapter does not bind, or in the map editor. The ones
   that copied adapter actions (Escape, F1, F3, PrintScreen, the panels, the

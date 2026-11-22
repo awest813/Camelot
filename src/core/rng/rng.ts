@@ -79,10 +79,13 @@ export class RngStreams {
     return this._seed;
   }
 
-  /** Reseed (e.g. a new game): drops every stream. */
+  /**
+   * Reseed (e.g. a new game).  Streams already handed out restart from the
+   * new seed in place, so a feature that kept one keeps a live stream.
+   */
   public reseed(seed: string): void {
     this._seed = seed;
-    this._streams.clear();
+    for (const [id, r] of this._streams) r.setState(hashString(`${seed}|${id}`));
   }
 
   public stream(name: string, ...keys: Array<string | number>): Rng {
@@ -106,9 +109,12 @@ export class RngStreams {
     if (!state) return;
     this.reseed(state.seed);
     for (const [id, s] of Object.entries(state.streams ?? {})) {
-      const r = new Rng(0);
+      let r = this._streams.get(id);
+      if (!r) {
+        r = new Rng(0);
+        this._streams.set(id, r);
+      }
       r.setState(s);
-      this._streams.set(id, r);
     }
   }
 }

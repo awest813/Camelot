@@ -91,6 +91,23 @@ describe("Rng / RngStreams", () => {
     expect(t.seed).toBe("w");
     expect(t.stream("raids").next()).toBe(expected);
   });
+
+  it("a stream kept across a reseed or a load stays live (it is the saved one)", () => {
+    const s = new RngStreams("before");
+    const kept = s.stream("raids");
+    kept.next();
+    s.reseed("world");
+    expect(kept.next(), "restarts from the new seed").toBe(new RngStreams("world").stream("raids").next());
+    expect(s.stream("raids")).toBe(kept);
+
+    const other = new RngStreams("w");
+    other.stream("raids").next();
+    other.stream("raids").next();
+    const saved = other.getSaveState();
+    const expected = other.stream("raids").next();
+    s.restoreFromSave(saved);
+    expect(kept.next(), "continues from the save").toBe(expected);
+  });
 });
 
 describe("PhaseScheduler", () => {

@@ -273,6 +273,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Gameplay keys (crouch, combat stances, quest log, …) no longer act while the
   map editor is open.
 - Village General Goods keeps its bread, ale and stew after a restock.
+- Fast travel from an interior to the open world no longer adds an "Exterior
+  World" destination.
+- Village raids and travel loot follow the world seed after a new game or a
+  load, as intended.
 
 ### Changed
 - Plain B still opens Enchanting. B with Shift held now opens Smithing.
