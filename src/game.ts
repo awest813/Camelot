@@ -84,7 +84,7 @@ import { AlchemyUI } from "./ui/alchemy-ui";
 import { CraftingSystem, type CraftingStationId } from "./systems/crafting-system";
 import { CraftingUI } from "./ui/crafting-ui";
 import { ItemConditionSystem } from "./systems/item-condition-system";
-import { buildingFootprint, buildingLayout, toWorld, WALL_HEIGHT, type BuildingKind } from "./world/village-buildings";
+import { buildingFootprint, buildingWallColliders, buildingLayout, toWorld, WALL_HEIGHT, type BuildingKind } from "./world/village-buildings";
 import { hasVillage, planVillage, VILLAGE_DISCOVER_RADIUS, VILLAGE_CLEAR_RADIUS, type VillagePlan } from "./world/village-settlement";
 import { VillageJobBoard } from "./systems/village-jobs";
 import { JobBoardUI } from "./ui/job-board-ui";
@@ -392,6 +392,8 @@ export class Game {
   public readonly villageRaids = new VillageRaidSystem();
   /** Townsfolk hiding indoors from a raid (kept in until it's over). */
   private readonly _raidSheltered = new Set<NPC>();
+  /** NPCs spawned by the current raid (despawned if it's abandoned). */
+  private readonly _raiders = new Set<NPC>();
   private _raidCheckTimer = 0;
   /** Board the job window is showing (inn chunk id + place name). */
   private _activeJobBoard: { boardId: string; placeName: string } | null = null;
@@ -852,6 +854,7 @@ export class Game {
     this.saveSystem.setCombatSystem(this.combatSystem);
     this.questSystem        = new QuestSystem(this.ui);
     this.questSystem.onOpen = () => {
+      for (const job of this.villageJobs.getActive()) this._syncJobQuest(job.boardId);
       if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === "quests") {
         this._onboardingTutorial.advance();
       }
@@ -863,8 +866,12 @@ export class Game {
       this._syncInventoryGoldToFramework();
       // Saved equipment bypasses equip() — re-sync the weapon archetype.
       this._syncWeaponArchetype();
-      // Village jobs live in their own save slot; mirror them back into the log.
+      // Village jobs live in their own save slot: drop job entries the loaded
+      // state no longer has (taken after that save), then mirror it back in.
+      this._pruneStaleJobQuests();
       for (const job of this.villageJobs.getActive()) this._syncJobQuest(job.boardId);
+      // Raids aren't saved: send off any raiders and let the townsfolk out.
+      this._clearRaidAftermath();
       // Restored condition values change the wear penalty on the player.
       this.smithing?.trackEquippedGear();
       this.smithing?.refreshPenalties();
@@ -2530,18 +2537,7 @@ export class Game {
           root.dispose();
         }
 
-        for (const npc of record.npcs) {
-          this.scheduleSystem.removeNPC(npc);
-          this.combatSystem.removeNPC(npc);
-          this.stealthSystem.removeNPC(npc);
-          this.crimeSystem.removeNPC(npc);
-          this.spellSystem.removeNPC(npc);
-          this.projectileSystem.removeNPC(npc);
-          this.lodSystem.unregister(npc.mesh);
-          this._indoorNpcs.delete(npc);
-          this._raidSheltered.delete(npc);
-          npc.mesh.dispose();
-        }
+        for (const npc of record.npcs) this._releaseNpc(npc);
       };
     }
 
@@ -7548,27 +7544,36 @@ export class Game {
   ): void {
       if (this._chunkFantasyContent.get(chunkKey) !== chunkRecord) return;
       const { width, depth } = buildingFootprint(kind);
-      const box = MeshBuilder.CreateBox(`bldg_collider_${chunkKey}_${chunkRecord.roots.length}`, {
-        width: width - 0.2, depth: depth - 0.2, height: WALL_HEIGHT,
-      }, this.scene);
-      box.position.set(origin.x, WALL_HEIGHT / 2, origin.z);
-      box.rotation.y = origin.rot;
-      box.isVisible = false;
-      box.isPickable = false;
-      box.checkCollisions = false;
-      box.freezeWorldMatrix();
-      // Footprint (plus a body's width) for NPC wander / path checks.
+      // One static box per wall (the front split around the doorway), so the
+      // interior stays open to chasers, companions, projectiles and loot.
+      const walls = buildingWallColliders(kind);
       const fp = { x: origin.x, z: origin.z, cos: Math.cos(origin.rot), sin: Math.sin(origin.rot), hw: width / 2 + 0.5, hd: depth / 2 + 0.5 };
-      this._buildingFootprints.add(fp);
-      box.onDisposeObservable.addOnce(() => this._buildingFootprints.delete(fp));
-      try {
-        const agg = new PhysicsAggregate(box, PhysicsShapeType.BOX, { mass: 0 }, this.scene);
-        box.onDisposeObservable.addOnce(() => agg.dispose());
-      } catch (err) {
-        // No physics engine (e.g. headless tooling) — the box is harmless.
-        console.warn("[buildings] collider unavailable", err);
-      }
-      chunkRecord.roots.push(box);
+      walls.forEach((w, i) => {
+        const p = toWorld(w, origin);
+        const box = MeshBuilder.CreateBox(`bldg_wall_${chunkKey}_${chunkRecord.roots.length}_${i}`, {
+          width: w.width, depth: w.depth, height: WALL_HEIGHT,
+        }, this.scene);
+        box.position.set(p.x, WALL_HEIGHT / 2, p.z);
+        box.rotation.y = origin.rot;
+        box.isVisible = false;
+        box.isPickable = false;
+        box.checkCollisions = false;
+        box.freezeWorldMatrix();
+        try {
+          const agg = new PhysicsAggregate(box, PhysicsShapeType.BOX, { mass: 0 }, this.scene);
+          box.onDisposeObservable.addOnce(() => agg.dispose());
+        } catch (err) {
+          // No physics engine (e.g. headless tooling) — the box is harmless.
+          if (i === 0) console.warn("[buildings] collider unavailable", err);
+        }
+        // Footprint (plus a body's width) for NPC wander / path checks,
+        // registered with the first wall and dropped with it.
+        if (i === 0) {
+          this._buildingFootprints.add(fp);
+          box.onDisposeObservable.addOnce(() => this._buildingFootprints.delete(fp));
+        }
+        chunkRecord.roots.push(box);
+      });
   }
 
   /**
@@ -7730,8 +7735,13 @@ export class Game {
         this.questSystem.addQuest(quest, true);
       }
       const obj = quest.objectives[0];
-      obj.current = Math.min(job.progress, obj.required);
-      obj.completed = template.kind === "bounty" && obj.current >= obj.required;
+      // Supply runs count what's in the bag; bounties count kills.
+      const have = template.kind === "supply" ? this._jobContext().countItem(template.target) : job.progress;
+      obj.current = Math.min(have, obj.required);
+      // Never mark it complete: QuestSystem would then close the quest (and
+      // announce it) on the next kill/talk event, before the job is paid.
+      // The job board completes it on hand-in.
+      obj.completed = false;
   }
 
   /** The village plan for chunk (cx, cz), or null (cached; never on ponds). */
@@ -7934,6 +7944,21 @@ export class Game {
       }
   }
 
+  /** Unregister an NPC from every system and dispose it. */
+  private _releaseNpc(npc: NPC): void {
+      this.scheduleSystem.removeNPC(npc);
+      this.combatSystem.removeNPC(npc);
+      this.stealthSystem.removeNPC(npc);
+      this.crimeSystem.removeNPC(npc);
+      this.spellSystem.removeNPC(npc);
+      this.projectileSystem.removeNPC(npc);
+      this.lodSystem.unregister(npc.mesh);
+      this._indoorNpcs.delete(npc);
+      this._raidSheltered.delete(npc);
+      this._raiders.delete(npc);
+      npc.mesh.dispose();
+  }
+
   /** The loaded, discovered village the player is standing in, if any. */
   private _currentVillage(): { chunkKey: string; plan: VillagePlan } | null {
       const p = this.player.camera.position;
@@ -7982,6 +8007,7 @@ export class Game {
         const z = c.z + dir.z * back + side.z * lateral;
         const npc = this._spawnArchetypeNpc(archetype, record, x, z);
         if (!npc) continue;
+        this._raiders.add(npc);
         // March in along the road to the square (then the combat AI takes
         // over as soon as the player is in range).
         npc.scheduleBlocks = [];
@@ -8003,6 +8029,8 @@ export class Game {
       // Townsfolk hide; guards stay out.
       for (const npc of record.npcs) {
         if (npc.isDead || raiders.includes(npc) || this._indoorNpcs.has(npc)) continue;
+        // Don't vanish mid-conversation (or mid-trade).
+        if (npc.isInDialogue || npc.mesh.name === this._currentDialogueNpcName) continue;
         if (/^(Town Guard|Guard)_/.test(npc.mesh.name) || npc.factionId === "bandits") continue;
         this._sendIndoors(npc);
         this._raidSheltered.add(npc);
@@ -8023,11 +8051,12 @@ export class Game {
       const p = this.player.camera.position;
       if (plan && Math.hypot(p.x - plan.center.x, p.z - plan.center.z) < 80) return;
       this.villageRaids.abandon();
-      this._endRaidShelter();
+      this._clearRaidAftermath();
       this.ui.showNotification(`You left ${raid.villageName} to the raiders.`, 4000);
   }
 
   private _onRaidWon(outcome: { villageName: string; rewardGold: number; rewardXp: number }): void {
+      this._raiders.clear();
       this._endRaidShelter();
       this.fameSystem.addFame(10);
       this._grantDynamicWorldEventReward({
@@ -8041,6 +8070,39 @@ export class Game {
   /** Townsfolk come back out (unless it's their bedtime — the indoor loop decides). */
   private _endRaidShelter(): void {
       this._raidSheltered.clear();
+  }
+
+  /**
+   * A raid that ended without being beaten (abandoned, or a save loaded
+   * mid-raid): the raiders leave and the townsfolk come out.
+   */
+  private _clearRaidAftermath(): void {
+      for (const npc of this._raiders) {
+        if (npc.isDead || npc.mesh.isDisposed()) continue;
+        this._despawnNpc(npc);
+      }
+      this._raiders.clear();
+      this.villageRaids.abandon();
+      this._endRaidShelter();
+  }
+
+  /** Remove one NPC from the world and every system (and its chunk's list). */
+  private _despawnNpc(npc: NPC): void {
+      for (const record of this._chunkFantasyContent.values()) {
+        const i = record.npcs.indexOf(npc);
+        if (i >= 0) { record.npcs.splice(i, 1); break; }
+      }
+      this._releaseNpc(npc);
+  }
+
+  /** Drop quest-log entries for village jobs that are no longer active. */
+  private _pruneStaleJobQuests(): void {
+      const live = new Set(this.villageJobs.getActive().map((j) => this._jobQuestId(j.boardId)));
+      const quests = this.questSystem.getQuests();
+      for (let i = quests.length - 1; i >= 0; i--) {
+        const q = quests[i];
+        if (q.id.startsWith("job_") && !q.isCompleted && !live.has(q.id)) quests.splice(i, 1);
+      }
   }
 
   /** Bandit camp dressing around a camp origin (entrance on local +Z). */

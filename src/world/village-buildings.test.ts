@@ -42,3 +42,24 @@ describe("village building layouts", () => {
     expect(w.z).toBeCloseTo(20);
   });
 });
+
+describe("buildingWallColliders", () => {
+  it("walls every side but leaves the doorway open", async () => {
+    const { buildingWallColliders, buildingFootprint, DOOR_HALF } = await import("./village-buildings");
+    for (const kind of ["cottage", "house", "inn"] as const) {
+      const { width, depth } = buildingFootprint(kind);
+      const cols = buildingWallColliders(kind);
+      const front = cols.filter((c) => Math.abs(c.z - depth / 2) < 1e-6);
+      expect(front).toHaveLength(2);
+      // The two front pieces cover the front except a door-sized gap.
+      const covered = front.reduce((n, c) => n + c.width, 0);
+      expect(width - covered).toBeGreaterThan(DOOR_HALF * 2);
+      expect(width - covered).toBeLessThan(DOOR_HALF * 2 + 0.3);
+      // Back and sides span the full footprint.
+      expect(cols.some((c) => Math.abs(c.z + depth / 2) < 1e-6 && Math.abs(c.width - width) < 1e-6)).toBe(true);
+      expect(cols.filter((c) => Math.abs(Math.abs(c.x) - width / 2) < 1e-6 && Math.abs(c.depth - depth) < 1e-6)).toHaveLength(2);
+      // Nothing covers the middle of the floor.
+      expect(cols.some((c) => Math.abs(c.x) < c.width / 2 && Math.abs(c.z) < c.depth / 2)).toBe(false);
+    }
+  });
+});

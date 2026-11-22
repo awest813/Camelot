@@ -82,11 +82,12 @@ export class VillageRaidSystem {
   /** Start a raid with the given raiders (their NPC names). */
   public start(villageId: string, villageName: string, raiderNames: string[], elapsedHours: number): ActiveRaid {
     this._lastRaidAt.set(villageId, elapsedHours);
+    const remaining = new Set(raiderNames);
     this._active = {
       villageId,
       villageName,
-      remaining: new Set(raiderNames),
-      total: raiderNames.length,
+      remaining,
+      total: remaining.size,
       startedAt: elapsedHours,
     };
     return this._active;

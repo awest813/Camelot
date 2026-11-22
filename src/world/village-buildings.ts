@@ -32,7 +32,7 @@ export interface ModulePlacement {
 export const WALL_WIDTH = 2;
 export const WALL_HEIGHT = 3.12;
 /** Half the door panel width — offsets the hinge so the panel fills the opening. */
-const DOOR_HALF = 0.53;
+export const DOOR_HALF = 0.53;
 
 interface Spec {
   /** Footprint in wall segments (X × Z). */
@@ -121,6 +121,44 @@ export function buildingLayout(kind: BuildingKind): ModulePlacement[] {
   put(s.roof, 0, WALL_HEIGHT, 0, 0);
   put(s.gable, 0, WALL_HEIGHT, hd, 0);
   put(s.gable, 0, WALL_HEIGHT, -hd, Math.PI);
+  return out;
+}
+
+/** A static wall collider box, in building-local space (yaw 0; axis-aligned). */
+export interface WallCollider {
+  x: number;
+  z: number;
+  /** Extent along local X. */
+  width: number;
+  /** Extent along local Z. */
+  depth: number;
+}
+
+/** Wall thickness used for colliders. */
+export const WALL_COLLIDER_THICKNESS = 0.3;
+
+/**
+ * Colliders for a building's walls: back, both sides, and the front split
+ * around the doorway, so the interior stays open to anyone who walks in
+ * (chasers, companions, projectiles, dropped loot).
+ */
+export function buildingWallColliders(kind: BuildingKind): WallCollider[] {
+  const s = SPECS[kind];
+  const hw = (s.segsX * WALL_WIDTH) / 2;
+  const hd = (s.segsZ * WALL_WIDTH) / 2;
+  const t = WALL_COLLIDER_THICKNESS;
+  const out: WallCollider[] = [
+    { x: 0, z: -hd, width: hw * 2, depth: t },
+    { x: -hw, z: 0, width: t, depth: hd * 2 },
+    { x: hw, z: 0, width: t, depth: hd * 2 },
+  ];
+  // Front: everything but the door opening (centred on the door segment).
+  const doorIndex = Math.floor((s.segsX - 1) / 2);
+  const doorX = (doorIndex - (s.segsX - 1) / 2) * WALL_WIDTH;
+  const gapL = doorX - DOOR_HALF - 0.05;
+  const gapR = doorX + DOOR_HALF + 0.05;
+  if (gapL > -hw) out.push({ x: (-hw + gapL) / 2, z: hd, width: gapL + hw, depth: t });
+  if (gapR < hw) out.push({ x: (gapR + hw) / 2, z: hd, width: hw - gapR, depth: t });
   return out;
 }
 

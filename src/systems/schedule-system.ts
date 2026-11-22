@@ -80,8 +80,10 @@ export class ScheduleSystem {
   private _updateNPC(npc: NPC, deltaTime: number): void {
     // CombatSystem owns movement for any state other than IDLE/PATROL
     if (npc.isDead || npc.isAggressive) return;
-    // Hold still while talking to the player.
-    if (npc.isInDialogue) {
+    // Hold still while talking to the player, and while hidden indoors
+    // (asleep or sheltering): a hidden body has no collisions, so moving it
+    // would carry it through walls and terrain.
+    if (npc.isInDialogue || (typeof npc.mesh.isEnabled === "function" && !npc.mesh.isEnabled())) {
       this._applyStopHorizontal(npc);
       return;
     }
@@ -146,16 +148,16 @@ export class ScheduleSystem {
 
   // ── Schedule behavior helpers ──────────────────────────────────────────────
 
-  /**
-   * Returns the current scheduled behavior for the NPC based on
-   * `this.currentHour` and the NPC's schedule blocks.
-   * Returns null when no blocks are defined or `currentHour` is -1.
-   */
   /** The NPC's scheduled behaviour right now (null: no schedule / hour unset). */
   public behaviorOf(npc: NPC): ScheduleBehaviorType | null {
     return this._getScheduledBehavior(npc);
   }
 
+  /**
+   * Returns the current scheduled behavior for the NPC based on
+   * `this.currentHour` and the NPC's schedule blocks.
+   * Returns null when no blocks are defined or `currentHour` is -1.
+   */
   private _getScheduledBehavior(npc: NPC): ScheduleBehaviorType | null {
     if (this.currentHour < 0 || npc.scheduleBlocks.length === 0) return null;
 

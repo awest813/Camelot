@@ -145,6 +145,27 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   the dialogue panel. The speaker turns to face you and stops walking. The
   weapon, crosshair and quick-slot bar are hidden. When the conversation
   ends, the zoom eases back out and you're left facing them.
+- Audit fixes:
+  - Buildings are walled, not solid blocks. Their physics colliders used to
+    fill the whole footprint, so anyone following you through the door
+    (pursuers, companions, arrows, dropped loot) was stopped or pushed out.
+    The interior is now open behind the doorway.
+  - A finished bounty no longer announces "Quest Complete" before you're
+    paid. The next kill or conversation used to close the job's quest entry,
+    and an abandoned unpaid job then stayed in the log as completed.
+  - Supply jobs show how many of the goods you carry in the quest log
+    (it always said 0).
+  - Loading a save no longer leaves jobs from after that save in the quest
+    log.
+  - Raids: leaving a village (or loading a save) mid-raid now sends the
+    raiders away and lets the townsfolk out. They used to stay hidden for
+    good, and the bandits stayed in the square. A raid can no longer hide
+    the person you're talking to. A raid can't end early when two raiders
+    happen to share a name; NPC names are now always unique, which also
+    protects the animation registry.
+  - Hidden NPCs (asleep indoors or sheltering from a raid) no longer keep
+    walking with collisions off, which could leave them inside a wall or
+    under the ground when they came back out.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

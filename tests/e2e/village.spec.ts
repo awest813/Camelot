@@ -115,6 +115,10 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     } else {
       for (let i = 0; i < t.required; i++) g.villageJobs.onKill(`${t.target}_${i}`);
     }
+    // Any kill/pickup/talk event re-checks quest completion; a done-but-unpaid
+    // job must stay open until it's handed in.
+    g.questSystem.onKill("Nobody_1");
+    const openBeforeHandIn = !!quest && !quest.isCompleted && quest.isActive;
     g.saveSystem.save(true);
     const saved = JSON.parse(localStorage.getItem("camelot_save")!).villageJobs;
     const goldBefore = g._getInventoryGold();
@@ -122,7 +126,7 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     click("Hand in");
     click("Close");
     return {
-      opened: !!pending && opened, handInEnabledEarly, closed: !g.jobBoardUI.isVisible,
+      opened: !!pending && opened, handInEnabledEarly, closed: !g.jobBoardUI.isVisible, openBeforeHandIn,
       template: t.id, place: active.placeName, questName: quest?.name,
       savedActive: saved.active.length, paid: g._getInventoryGold() - goldBefore,
       reward: t.rewardGold, questDone: quest?.isCompleted, left: g.villageJobs.getActive().length,
@@ -131,6 +135,7 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   expect(job.opened, "the job window opens").toBe(true);
   expect(job.handInEnabledEarly, "can't hand in before the work is done").toBe(false);
   expect(job.closed).toBe(true);
+  expect(job.openBeforeHandIn, "a finished job isn't completed until it's paid").toBe(true);
   expect(job.place).toBe(v!.name);
   expect(job.questName).toContain(v!.name);
   expect(job.savedActive).toBe(1);
@@ -245,6 +250,56 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     const g = (window as any).__camelotGame;
     return g.scheduleSystem.npcs.filter((n: any) => /^Villager_/.test(n.mesh.name) && !n.mesh.isEnabled()).length;
   }), { timeout: 5_000, message: "townsfolk come back out" }).toBe(0);
+
+  // ── An abandoned raid: the raiders leave and the townsfolk come back out ──
+  const abandoned = await page.evaluate(async () => {
+    const g = (window as any).__camelotGame;
+    const key = [...g._loadedVillages.keys()][0];
+    const plan = g._loadedVillages.get(key);
+    const raiders = g._startRaid(key, plan);
+    const c = g.player.camera.position;
+    c.set(plan.center.x + 90, 3, plan.center.z);
+    await new Promise((r) => setTimeout(r, 1500));
+    const out = {
+      raiders: raiders.length,
+      active: !!g.villageRaids.active,
+      gone: raiders.every((r: any) => r.mesh.isDisposed()),
+      inSchedule: raiders.filter((r: any) => g.scheduleSystem.npcs.includes(r)).length,
+    };
+    c.set(plan.center.x + 2, 3, plan.center.z + 2);
+    return out;
+  });
+  expect(abandoned.raiders).toBeGreaterThan(0);
+  expect(abandoned, "leaving ends the raid and sends the raiders off").toEqual({ raiders: abandoned.raiders, active: false, gone: true, inSchedule: 0 });
+  await expect.poll(() => page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    return g.scheduleSystem.npcs.filter((n: any) => /^Villager_/.test(n.mesh.name) && !n.mesh.isEnabled() && g.scheduleSystem.behaviorOf(n) !== "sleep").length;
+  }), { timeout: 5_000, message: "townsfolk come back out after an abandoned raid" }).toBe(0);
+
+  // ── Buildings are walled, not solid: the doorway leads into an open interior ──
+  const interior = await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    const plan = [...g._loadedVillages.values()][0];
+    const b = plan.buildings.find((x: any) => x.role === "inn");
+    const s = Math.sin(b.rot), co = Math.cos(b.rot);
+    const at = (x: number, z: number) => ({ x: b.x + x * co + z * s, z: b.z - x * s + z * co });
+    const depth = b.kind === "inn" ? 8 : 6;
+    // Through the doorway from 2 m outside to the centre of the floor.
+    const from = at(0, depth / 2 + 2), to = at(0, 0);
+    const V = g.player.camera.position.constructor;
+    const ray = (a: { x: number; z: number }, b2: { x: number; z: number }) => {
+      const hit = g.scene.getPhysicsEngine().raycast(new V(a.x, 1.2, a.z), new V(b2.x, 1.2, b2.z));
+      return hit.hasHit && /^bldg_/.test(hit.body?.transformNode?.name ?? "");
+    };
+    const width = b.kind === "inn" ? 6 : 4;
+    return {
+      doorway: ray(from, to),
+      // Sanity check that the probe sees colliders at all: a side wall blocks.
+      sideWall: ray(at(width / 2 + 2, 0), to),
+    };
+  });
+  expect(interior, "the doorway leads into an open interior; the walls are solid")
+    .toEqual({ doorway: false, sideWall: true });
 
   // ── Bedtime: villagers walk to their doors and go inside; they're back by morning ──
   const villagerState = () => page.evaluate(() => {

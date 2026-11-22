@@ -16,6 +16,9 @@ import type { NpcScheduleSystem } from "./npc-schedule-system";
  * The spawned NPC is not added to any system automatically — the caller
  * is responsible for registering it with ScheduleSystem, CombatSystem, etc.
  */
+/** Session-wide NPC name serial (starts high so names don't look like counts). */
+let _npcSerial = 10000;
+
 export class NpcArchetypeSystem {
   private _archetypes: Map<string, NpcArchetypeDefinition> = new Map();
 
@@ -75,10 +78,10 @@ export class NpcArchetypeSystem {
     const scaledHealth = Math.round(def.baseHealth * (1 + (effectiveLevel - 1) * 0.15));
     const scaledXp     = Math.round((def.level ?? 1) * 25 * (1 + (effectiveLevel - 1) * 0.1));
 
-    // Use archetype name as the mesh name; append a unique suffix so multiple
-    // instances of the same archetype don't share the same name.
-    const suffix = Math.floor(Math.random() * 100000);
-    const npcName = `${def.name}_${suffix}`;
+    // Use archetype name as the mesh name with a per-session serial, so no
+    // two NPCs share a name (raids, bounties and the animation registry key
+    // on it; a random suffix could collide).
+    const npcName = `${def.name}_${++_npcSerial}`;
 
     const npc = new NPC(scene, position, npcName);
 
