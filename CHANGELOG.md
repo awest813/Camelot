@@ -266,6 +266,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - Crafting messages use names ("Steel Sword requires a Forge.",
   "2× Iron Ingot") instead of internal ids.
 
+### Fixed
+- Editor shortcuts that never fired now work: Ctrl+M (Scene Notes),
+  Ctrl+Shift+M (Mod Manifest; Shift+M used to mark a Recall point instead)
+  and T in the map editor (cycle the placement type).
+- Gameplay keys (crouch, combat stances, quest log, …) no longer act while the
+  map editor is open.
+
 ### Changed
 - Plain B still opens Enchanting. B with Shift held now opens Smithing.
 - Saves gain an optional `crafting` field. Save version stays at 29, and older

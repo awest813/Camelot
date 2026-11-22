@@ -192,8 +192,9 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   { key: "o", action: "stableOrSaddlebag", shift: true, caseInsensitive: true },
   { key: "o", action: "mountDismount", caseInsensitive: true },
   // Shift+M = Mark position for Recall (recall itself lives in the Y travel menu;
-  // binding must precede mute, which rejects Shift)
-  { key: "m", action: "markPosition", shift: true, caseInsensitive: true },
+  // binding must precede mute, which rejects Shift). ctrlOrMeta:false leaves
+  // Ctrl+Shift+M to the Mod Manifest editor.
+  { key: "m", action: "markPosition", shift: true, caseInsensitive: true, ctrlOrMeta: false },
 
   // ── Quick-slots (1-0) ───────────────────────────────────────────────────────
   { key: "1", action: "quickSlot1" },

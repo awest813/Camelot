@@ -378,6 +378,15 @@ state, scope and save codec.
       `smithing` during construction. Those hooks move once combat is a
       feature.
 
+- Legacy keyboard path pruned (ahead of Phase 2). Legacy branches only run
+  for chords the input adapter does not bind, or in the map editor. The ones
+  that copied adapter actions (Escape, F1, F3, PrintScreen, the panels, the
+  combat keys, the quick slots) are gone, about 370 lines. What remains are
+  the editor chords, Tab, and the F-key tools. This fixed three shortcuts
+  that never fired, because an earlier branch for the same key caught them:
+  Ctrl+M (Scene Notes), Ctrl+Shift+M (Mod Manifest), and T in the editor
+  (placement type). Gameplay keys no longer act inside the editor.
+
   Render counts after the extraction match the pre-extraction baseline
   (2,066 village meshes), so villages are built identically. The render
   budget check now also has floors, so a scene that failed to render can't

@@ -62,3 +62,46 @@ test("every editor tool opens without errors", async ({ page }) => {
   expect(result.assetsSeeded, "the asset browser opens seeded with base content").toBeGreaterThan(10);
   expect(errors).toEqual([]);
 });
+
+test("editor and tool chords reach their handlers", async ({ page }) => {
+  test.setTimeout(180_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => { if (!/pointer\s*lock/i.test(e.message)) errors.push(`${e.name}: ${e.message}`); });
+  await page.addInitScript(() => localStorage.clear());
+  await page.goto("/", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await completeCharacterCreation(page);
+  const canvas = page.locator("#renderCanvas");
+  const g = <T>(fn: string) => page.evaluate((src) => new Function("g", `return (${src})`)((window as any).__camelotGame), fn) as Promise<T>;
+
+  // Ctrl+Shift+M (global): the Mod Manifest editor, not Mark.
+  await canvas.click({ force: true });
+  await page.keyboard.press("Control+Shift+M");
+  expect(await g<boolean>("g.modManifestUI.isVisible"), "Ctrl+Shift+M opens the mod manifest").toBe(true);
+  expect(await g<boolean>("!!g.markRecallSystem.markedPosition"), "and does not mark").toBe(false);
+  await page.evaluate(() => (window as any).__camelotGame.modManifestUI.close());
+
+  // In gameplay, plain M still mutes.
+  await canvas.click({ force: true });
+  const muted = await g<boolean>("g.audioSystem.isMuted");
+  await page.keyboard.press("m");
+  expect(await g<boolean>("g.audioSystem.isMuted")).toBe(!muted);
+
+  // F2: the map editor. T cycles the placement type; Ctrl+M toggles Scene Notes.
+  await page.keyboard.press("F2");
+  expect(await g<boolean>("g.mapEditorSystem.isEnabled")).toBe(true);
+  const before = await g<string>("g.mapEditorSystem.currentPlacementType");
+  await page.keyboard.press("t");
+  expect(await g<string>("g.mapEditorSystem.currentPlacementType"), "T cycles the placement type").not.toBe(before);
+  const notes = await g<boolean>("g.editorLayout.getPanelState('notes')?.isVisible ?? false");
+  const mutedBefore = await g<boolean>("g.audioSystem.isMuted");
+  await page.keyboard.press("Control+m");
+  expect(await g<boolean>("g.editorLayout.getPanelState('notes')?.isVisible ?? false"), "Ctrl+M toggles Scene Notes").toBe(!notes);
+  expect(await g<boolean>("g.audioSystem.isMuted"), "Ctrl+M does not mute").toBe(mutedBefore);
+
+  // Gameplay keys do nothing in the editor.
+  await page.keyboard.press("j");
+  expect(await g<boolean>("g.questSystem.isLogOpen"), "J in the editor").toBe(false);
+  await page.keyboard.press("F2");
+  expect(await g<boolean>("g.mapEditorSystem.isEnabled")).toBe(false);
+  expect(errors).toEqual([]);
+});
