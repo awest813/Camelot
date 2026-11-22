@@ -1,6 +1,6 @@
 # Engine overhaul plan
 
-Status: proposal · Scope: the whole client runtime (`src/`), asset pipeline and
+Status: approved direction; decisions recorded below · Scope: the whole client runtime (`src/`), asset pipeline and
 test harness · Companion docs: [framework-architecture.md](framework-architecture.md),
 [rendering.md](rendering.md)
 
@@ -103,8 +103,12 @@ the feature itself. Recent audits are typical:
   sequence in `_updateGameplayStep`. The fixed-step loop
   (`fixed-step-loop.ts`) drives `sim`; `present` runs per rendered frame.
   Each phase is timed, so the profiler gets per-system cost for free.
-- **Entity store.** Use stable numeric ids, not mesh names. It's an ECS-lite
-  model, not an archetype ECS. Components are plain data
+- **Entity store: [bitECS](https://github.com/NateTheGreatt/bitECS) 0.4**
+  (decided). It uses stable numeric ids, not mesh names. Numeric component
+  data lives in bitECS's typed-array stores; Babylon objects (meshes,
+  physics bodies, rigs) and strings live in side tables keyed by entity id
+  behind small typed accessors, so systems never touch bitECS internals
+  directly. Components
   (`Transform`, `Body`, `Rig`, `Actor`, `Schedule`, `CombatState`,
   `Conversation`, `Indoors`, `Inventory`, `Faction`, `ChunkOwned`…) and
   systems query by component set. NPC state stops being a bag of booleans on
@@ -144,9 +148,10 @@ the feature itself. Recent audits are typical:
   described by layout specs (as `planVillage` already does) and built by one
   "site builder" that creates entities inside the chunk's scope. Nothing is
   placed by hand-written code in `game.ts`.
-- **Navigation.** Each streamed chunk gets a navmesh tile (Recast is already
-  a dependency, and becomes lazy-loaded), with building footprints carved
-  out. NPC movement becomes path plus steering (seek, arrive, separation,
+- **Navigation: Recast navmesh tiles** (decided). Each streamed chunk gets a
+  navmesh tile, built in a worker from the chunk's terrain and colliders,
+  with building walls carved out and doorways left open so NPCs can path
+  indoors. `recast-detour` is already a dependency; it becomes lazy-loaded. NPC movement becomes path plus steering (seek, arrive, separation,
   obstacle avoidance), as the Yuka evaluation recommended. This replaces the
   walkable-footprint and sidestep heuristics.
 - **NPC LOD tiers.** Near NPCs get full AI, animation and physics; mid-range
@@ -180,8 +185,15 @@ the feature itself. Recent audits are typical:
 - **Lighting.** Use a clustered light budget instead of the four-nearest
   heuristic in `FireFx`, with proper night lighting for every site type,
   not only villages.
-- **WebGPU first, WebGL2 fallback.** Ship only the shader language the
-  device uses, and load the other lazily.
+- **WebGPU by default, WebGL2 fallback** (decided). Babylon's built-in
+  shaders already ship in WGSL. The game's own shader code doesn't: the sky,
+  water and horizon `ShaderMaterial`s, and the terrain and wind material
+  plugins. Each gets a WGSL version alongside its GLSL, so no runtime
+  GLSL→WGSL transpiler is needed. Babylon would otherwise fetch one from a
+  CDN, which breaks offline and desktop builds. Startup feature-detects
+  WebGPU (`WebGPUEngine.IsSupportedAsync`), falls back to WebGL2, and keeps
+  a setting or URL flag to force either. Only the shader language in use is
+  loaded.
 - **Asset pipeline.** An offline step will cover:
   - glTF optimisation: meshopt compression, KTX2/Basis textures
   - LOD generation and an asset manifest with per-asset budgets (triangles,
@@ -193,8 +205,9 @@ the feature itself. Recent audits are typical:
 
 ### UI and input
 
-- **One UI toolkit for menus and panels:** DOM with a light component layer.
-  The choice between Preact and plain custom elements is an open decision.
+- **One UI toolkit for menus and panels: Preact + `@preact/signals`**
+  (decided). Panels are Preact components that read game state through
+  signals fed by kernel events.
   Babylon GUI is kept only for world-space UI such as nameplates and markers.
   Styling comes from one design-token sheet; it's already mostly
   `main.css`.
@@ -265,7 +278,8 @@ state, scope and save codec.
 ### Phase 2 — Input, modals and camera (2 weeks)
 
 - Input contexts plus a key-to-action map.
-- A modal stack that owns pointer lock and HUD visibility.
+- A modal stack (the first Preact code) that owns pointer lock and HUD
+  visibility. New panels from here on are Preact components.
 - A camera stack (gameplay, dialogue, cinematic and death modes).
 - Remove the hand-kept modal lists.
 
@@ -274,7 +288,8 @@ state, scope and save codec.
 
 ### Phase 3 — Entity model for actors (3–4 weeks)
 
-- Entity ids for NPCs and the player, with components replacing NPC booleans.
+- Add bitECS. Entity ids for NPCs and the player, with components
+  replacing NPC booleans.
 - Schedule, combat, stealth, crime and animation become component queries.
 - Ownership via `ChunkOwned` and scopes. Chunk unload is a scope dispose.
 - NPC LOD tiers.
@@ -305,7 +320,7 @@ one replay runs in CI.
 ### Phase 6 — World and navigation (3 weeks)
 
 - Data-driven site builder for all site types.
-- Navmesh tiles per chunk, plus steering.
+- Recast navmesh tiles per chunk (built in a worker), plus steering.
 - Off-screen schedule simulation.
 
 **Exit:** no placement code in `game.ts`. NPCs path around buildings using
@@ -316,9 +331,13 @@ the navmesh.
 - Render feature modules and the uniform block helper.
 - Thin-instanced vegetation, and a light budget across all sites.
 - Asset pipeline: meshopt, KTX2, LODs and a manifest. Lazy shader language.
+- WGSL versions of the five custom shader pieces, then make WebGPU the
+  default with feature detection and a WebGL2 fallback. This can start
+  early; it doesn't depend on the other phases.
 
 **Exit:** budgets are met on the census scenes, and model size is at most
-50% of today's.
+50% of today's. WebGPU is the default where supported, and nothing is fetched
+from a CDN at runtime.
 
 ### Phase 8 — UI consolidation (3 weeks; can run in parallel from Phase 2)
 
@@ -329,7 +348,18 @@ the navmesh.
 
 **Exit:** Babylon GUI is used only for world-space UI.
 
-**Total:** roughly 23–28 engineer-weeks sequentially, or about 16–18 weeks
+### Phase 9 — Editor app (3 weeks; after Phases 1 and 8)
+
+- Move the in-game editors into a separate app as a second Vite entry
+  (`editor.html`) that shares the kernel, framework and render features:
+  map editor, quest, dialogue, NPC, item, loot and spawn creators, asset
+  browser, bundle tools.
+- Remove editor code and the inspector from the game bundle.
+
+**Exit:** the game bundle has no editor code. The editor app opens a world,
+edits content bundles and can play-test through the shared kernel.
+
+**Total:** roughly 27–33 engineer-weeks sequentially, or about 18–20 weeks
 with the rendering and UI tracks in parallel.
 
 ## Success metrics
@@ -361,17 +391,14 @@ with the rendering and UI tracks in parallel.
   periodic manual pass on reference hardware records real frame times in
   `docs/rendering.md`.
 
-## Open decisions
+## Decisions
 
-1. **Entity model.** Use a hand-rolled ECS-lite (recommended: small, typed,
-   no dependency) or adopt `bitECS`.
-2. **UI layer.** Use Preact with signals (recommended: tiny, familiar) or
-   plain Web Components.
-3. **Renderer default.** WebGPU first with WebGL2 fallback (recommended), or
-   keep WebGL2 as the default until WebGPU support is broader on the target
-   hardware.
-4. **In-game editors.** Keep them inside the game bundle (lazy-loaded) or
-   split them into a separate editor app that shares the kernel. Splitting
-   is cleaner, but it is a larger move.
-5. **Navigation.** Use Recast navmesh tiles (recommended; already a
-   dependency) or a simpler grid-plus-steering for the open world.
+Recorded 2026-11-22.
+
+| Question | Decision | Notes |
+|---|---|---|
+| Entity model | **Library: bitECS 0.4** | MPL-2.0 (file-level copyleft; used unmodified, so only a notice in THIRD-PARTY-NOTICES). Non-numeric data goes in side tables. |
+| UI layer | **Preact** (+ `@preact/signals`) | Menus and panels only; Babylon GUI stays for world-space UI. |
+| Renderer default | **WebGPU**, WebGL2 fallback | Needs WGSL versions of 5 custom shader pieces first (Phase 7). |
+| In-game editors | **Separate editor app** | Phase 9: a second Vite entry sharing the kernel. |
+| Navigation | **Recast navmesh tiles** | Already a dependency; handles buildings, doorways and interiors, which grid-plus-steering can't; tile builds run in a worker. |
