@@ -1,0 +1,207 @@
+{
+  "tool": "tools/import-quaternius.mjs",
+  "license": "CC0 1.0 — models by Quaternius (quaternius.com)",
+  "textureSize": 1024,
+  "imported": [
+    {
+      "slot": "props/Barrel",
+      "source": "fantasy-props-megakit/Barrel"
+    },
+    {
+      "slot": "props/Crate",
+      "source": "fantasy-props-megakit/Crate_Wooden"
+    },
+    {
+      "slot": "props/Chest",
+      "source": "fantasy-props-megakit/Chest_Wood"
+    },
+    {
+      "slot": "props/Table",
+      "source": "fantasy-props-megakit/Table_Large"
+    },
+    {
+      "slot": "props/Chair",
+      "source": "fantasy-props-megakit/Chair_1"
+    },
+    {
+      "slot": "props/Bench",
+      "source": "fantasy-props-megakit/Bench"
+    },
+    {
+      "slot": "props/Shelf",
+      "source": "fantasy-props-megakit/Shelf_Simple"
+    },
+    {
+      "slot": "props/Bookshelf",
+      "source": "fantasy-props-megakit/Bookcase_2"
+    },
+    {
+      "slot": "props/Bed",
+      "source": "fantasy-props-megakit/Bed_Twin1"
+    },
+    {
+      "slot": "props/Anvil",
+      "source": "fantasy-props-megakit/Anvil"
+    },
+    {
+      "slot": "props/MarketStall",
+      "source": "fantasy-props-megakit/Stall_Empty"
+    },
+    {
+      "slot": "props/Lantern",
+      "source": "fantasy-props-megakit/CandleStick_Stand"
+    },
+    {
+      "slot": "props/Cauldron",
+      "source": "fantasy-props-megakit/Cauldron"
+    },
+    {
+      "slot": "props/Flag",
+      "source": "fantasy-props-megakit/Banner_1"
+    },
+    {
+      "slot": "props/BannerStand",
+      "source": "fantasy-props-megakit/Banner_2"
+    },
+    {
+      "slot": "props/Altar",
+      "source": "fantasy-props-megakit/BookStand"
+    },
+    {
+      "slot": "props/SignPost",
+      "source": "fantasy-props-megakit/WeaponStand"
+    },
+    {
+      "slot": "props/Forge",
+      "source": "medieval-village-megakit/Prop_Chimney"
+    },
+    {
+      "slot": "nature/OakTree",
+      "source": "stylized-nature-megakit/CommonTree_3"
+    },
+    {
+      "slot": "nature/PineTree",
+      "source": "stylized-nature-megakit/Pine_2"
+    },
+    {
+      "slot": "nature/WillowTree",
+      "source": "stylized-nature-megakit/TwistedTree_2"
+    },
+    {
+      "slot": "nature/DeadTree",
+      "source": "stylized-nature-megakit/DeadTree_3"
+    },
+    {
+      "slot": "nature/BushLarge",
+      "source": "stylized-nature-megakit/Bush_Common"
+    },
+    {
+      "slot": "nature/BushSmall",
+      "source": "stylized-nature-megakit/Plant_7"
+    },
+    {
+      "slot": "nature/Fern",
+      "source": "stylized-nature-megakit/Fern_1"
+    },
+    {
+      "slot": "nature/FlowerRed",
+      "source": "stylized-nature-megakit/Flower_3_Group"
+    },
+    {
+      "slot": "nature/FlowerBlue",
+      "source": "stylized-nature-megakit/Flower_4_Group"
+    },
+    {
+      "slot": "nature/GrassClump",
+      "source": "stylized-nature-megakit/Grass_Wispy_Tall"
+    },
+    {
+      "slot": "nature/RockLarge",
+      "source": "stylized-nature-megakit/Rock_Medium_1"
+    },
+    {
+      "slot": "nature/RockMedium",
+      "source": "stylized-nature-megakit/Rock_Medium_2"
+    },
+    {
+      "slot": "nature/RockSmall",
+      "source": "stylized-nature-megakit/Pebble_Round_3"
+    },
+    {
+      "slot": "nature/Mushroom",
+      "source": "stylized-nature-megakit/Mushroom_Laetiporus"
+    },
+    {
+      "slot": "characters/Archer",
+      "source": "modular-character-outfits-fantasy/Male_Ranger"
+    },
+    {
+      "slot": "characters/Rogue",
+      "source": "modular-character-outfits-fantasy/Female_Ranger"
+    },
+    {
+      "slot": "characters/VillagerMale",
+      "source": "modular-character-outfits-fantasy/Male_Peasant"
+    },
+    {
+      "slot": "characters/VillagerFemale",
+      "source": "modular-character-outfits-fantasy/Female_Peasant"
+    },
+    {
+      "slot": "characters/Innkeeper",
+      "source": "modular-character-outfits-fantasy/Male_Peasant"
+    },
+    {
+      "slot": "characters/Merchant",
+      "source": "modular-character-outfits-fantasy/Female_Peasant"
+    },
+    {
+      "slot": "characters/Mage",
+      "source": "modular-character-outfits-fantasy/Female_Ranger"
+    },
+    {
+      "slot": "characters/Barbarian",
+      "source": "characters-fantasy-races/Orc_Male"
+    },
+    {
+      "slot": "monsters/Goblin",
+      "source": "bestiary-dungeon-monsters-kit/Imp"
+    },
+    {
+      "slot": "monsters/Slime",
+      "source": "bestiary-dungeon-monsters-kit/Puglin"
+    },
+    {
+      "slot": "monsters/Orc",
+      "source": "characters-fantasy-races/Orc_Male"
+    },
+    {
+      "slot": "outfits/ChestLight",
+      "source": "modular-character-outfits-fantasy/Male_Ranger_Body"
+    },
+    {
+      "slot": "outfits/ChestRobe",
+      "source": "modular-character-outfits-fantasy/Female_Peasant_Body"
+    },
+    {
+      "slot": "outfits/LegsLight",
+      "source": "modular-character-outfits-fantasy/Male_Ranger_Legs"
+    },
+    {
+      "slot": "outfits/BootsLight",
+      "source": "modular-character-outfits-fantasy/Male_Ranger_Feet_Boots"
+    },
+    {
+      "slot": "outfits/HelmetLight",
+      "source": "modular-character-outfits-fantasy/Male_Ranger_Head_Hood"
+    },
+    {
+      "slot": "outfits/CloakShort",
+      "source": "modular-character-outfits-fantasy/Male_Ranger_Acc_Pauldron"
+    },
+    {
+      "slot": "outfits/Shield",
+      "source": "fantasy-props-megakit/Shield_Wooden"
+    }
+  ]
+}

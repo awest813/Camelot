@@ -18,6 +18,8 @@
     "test:e2e": "playwright test",
     "dev:e2e": "vite --config vite.e2e.config.ts",
     "assets:filler": "node tools/generate-filler-assets.mjs",
+    "assets:quaternius": "node tools/import-quaternius.mjs",
+    "assets:grade": "node tools/grade-kaykit-textures.mjs",
     "desktop": "desktop/node_modules/.bin/electron desktop/main.mjs",
     "desktop:dev": "CAMELOT_DEV_SERVER=http://127.0.0.1:8088 desktop/node_modules/.bin/electron desktop/main.mjs",
     "desktop:check": "node --check desktop/main.mjs && node --check desktop/preload.mjs && node --check desktop/steam.mjs && node --check desktop/paths.mjs",

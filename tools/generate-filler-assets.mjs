@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
+import { gradeColor } from "./grade-kaykit-textures.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -771,6 +772,8 @@ function makeGlb(pack, name) {
   const bin = Buffer.concat([positions, normals, indices]);
   const bounds = minMaxPositions(geometry.positions);
   const mat = getMaterial(pack, name);
+  // Same dark-fantasy grade as the imported Quaternius / KayKit textures.
+  mat.color = [...gradeColor(mat.color.slice(0, 3)), mat.color[3]];
 
   const positionOffset = 0;
   const normalOffset = positions.length;
@@ -825,11 +828,15 @@ function makeGlb(pack, name) {
 
 async function main() {
   const written = [];
+  // Slots filled by real Quaternius models (tools/import-quaternius.mjs) are never overwritten.
+  const slotMap = JSON.parse(await readFile(path.join(__dirname, "quaternius-slot-map.json"), "utf8"));
+  const imported = (pack, name) => Boolean(slotMap.slots?.[pack]?.[name]);
 
   for (const [pack, names] of Object.entries(packs)) {
     const dir = path.join(outRoot, pack);
     await mkdir(dir, { recursive: true });
     for (const name of names) {
+      if (imported(pack, name)) continue;
       const file = path.join(dir, `${name}.glb`);
       await writeFile(file, makeGlb(pack, name));
       written.push(path.relative(root, file).replaceAll("\\", "/"));
@@ -840,7 +847,7 @@ async function main() {
     path.join(outRoot, "filler-assets-manifest.json"),
     JSON.stringify({
       generator: "tools/generate-filler-assets.mjs",
-      note: "Polished low-poly stylized placeholder GLBs for Quaternius CC0 catalogue slots.",
+      note: "Procedural dark-graded stand-ins for catalogue slots that have no imported Quaternius model (see quaternius-import-manifest.json).",
       files: written,
     }, null, 2) + "\n",
   );

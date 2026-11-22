@@ -1,0 +1,299 @@
+{
+  "comment": "Catalogue slot -> real Quaternius (CC0) model. pack = folder name of the extracted Standard zip (fantasy-props-megakit, stylized-nature-megakit, modular-character-outfits-fantasy, characters-fantasy-races, bestiary-dungeon-monsters-kit); model = file base name. Slots not listed keep the procedural stand-in from tools/generate-filler-assets.mjs. Fantasy Races' free models are bare base bodies, so only the orcs are used (Orc monster, Barbarian). attach: skinned meshes spliced in from another model on the same rig (outfits ship headless, so heads come from Universal Base Characters with minY cutting the head off the body, plus rigged hair).",
+  "slots": {
+    "props": {
+      "Barrel": {
+        "pack": "fantasy-props-megakit",
+        "model": "Barrel"
+      },
+      "Crate": {
+        "pack": "fantasy-props-megakit",
+        "model": "Crate_Wooden"
+      },
+      "Chest": {
+        "pack": "fantasy-props-megakit",
+        "model": "Chest_Wood"
+      },
+      "Table": {
+        "pack": "fantasy-props-megakit",
+        "model": "Table_Large"
+      },
+      "Chair": {
+        "pack": "fantasy-props-megakit",
+        "model": "Chair_1"
+      },
+      "Bench": {
+        "pack": "fantasy-props-megakit",
+        "model": "Bench"
+      },
+      "Shelf": {
+        "pack": "fantasy-props-megakit",
+        "model": "Shelf_Simple"
+      },
+      "Bookshelf": {
+        "pack": "fantasy-props-megakit",
+        "model": "Bookcase_2"
+      },
+      "Bed": {
+        "pack": "fantasy-props-megakit",
+        "model": "Bed_Twin1"
+      },
+      "Anvil": {
+        "pack": "fantasy-props-megakit",
+        "model": "Anvil"
+      },
+      "MarketStall": {
+        "pack": "fantasy-props-megakit",
+        "model": "Stall_Empty"
+      },
+      "Lantern": {
+        "pack": "fantasy-props-megakit",
+        "model": "CandleStick_Stand"
+      },
+      "Cauldron": {
+        "pack": "fantasy-props-megakit",
+        "model": "Cauldron"
+      },
+      "Flag": {
+        "pack": "fantasy-props-megakit",
+        "model": "Banner_1"
+      },
+      "BannerStand": {
+        "pack": "fantasy-props-megakit",
+        "model": "Banner_2"
+      },
+      "Altar": {
+        "pack": "fantasy-props-megakit",
+        "model": "BookStand"
+      },
+      "SignPost": {
+        "pack": "fantasy-props-megakit",
+        "model": "WeaponStand"
+      },
+      "Forge": {
+        "pack": "medieval-village-megakit",
+        "model": "Prop_Chimney"
+      }
+    },
+    "nature": {
+      "OakTree": {
+        "pack": "stylized-nature-megakit",
+        "model": "CommonTree_3"
+      },
+      "PineTree": {
+        "pack": "stylized-nature-megakit",
+        "model": "Pine_2"
+      },
+      "WillowTree": {
+        "pack": "stylized-nature-megakit",
+        "model": "TwistedTree_2"
+      },
+      "DeadTree": {
+        "pack": "stylized-nature-megakit",
+        "model": "DeadTree_3"
+      },
+      "BushLarge": {
+        "pack": "stylized-nature-megakit",
+        "model": "Bush_Common"
+      },
+      "BushSmall": {
+        "pack": "stylized-nature-megakit",
+        "model": "Plant_7"
+      },
+      "Fern": {
+        "pack": "stylized-nature-megakit",
+        "model": "Fern_1"
+      },
+      "FlowerRed": {
+        "pack": "stylized-nature-megakit",
+        "model": "Flower_3_Group"
+      },
+      "FlowerBlue": {
+        "pack": "stylized-nature-megakit",
+        "model": "Flower_4_Group"
+      },
+      "GrassClump": {
+        "pack": "stylized-nature-megakit",
+        "model": "Grass_Wispy_Tall"
+      },
+      "RockLarge": {
+        "pack": "stylized-nature-megakit",
+        "model": "Rock_Medium_1"
+      },
+      "RockMedium": {
+        "pack": "stylized-nature-megakit",
+        "model": "Rock_Medium_2"
+      },
+      "RockSmall": {
+        "pack": "stylized-nature-megakit",
+        "model": "Pebble_Round_3"
+      },
+      "Mushroom": {
+        "pack": "stylized-nature-megakit",
+        "model": "Mushroom_Laetiporus"
+      }
+    },
+    "characters": {
+      "Archer": {
+        "pack": "modular-character-outfits-fantasy",
+        "model": "Male_Ranger",
+        "attach": [
+          {
+            "pack": "universal-base-characters",
+            "model": "Superhero_Male_FullBody",
+            "minY": 1.5
+          },
+          {
+            "pack": "universal-base-characters",
+            "model": "Hair_Beard",
+            "pathIncludes": "Rigged"
+          }
+        ]
+      },
+      "Rogue": {
+        "pack": "modular-character-outfits-fantasy",
+        "model": "Female_Ranger",
+        "attach": [
+          {
+            "pack": "universal-base-characters",
+            "model": "Superhero_Female_FullBody",
+            "minY": 1.42
+          }
+        ]
+      },
+      "VillagerMale": {
+        "pack": "modular-character-outfits-fantasy",
+        "model": "Male_Peasant",
+        "attach": [
+          {
+            "pack": "universal-base-characters",
+            "model": "Superhero_Male_FullBody",
+            "minY": 1.5
+          },
+          {
+            "pack": "universal-base-characters",
+            "model": "Hair_SimpleParted",
+            "pathIncludes": "Rigged"
+          },
+          {
+            "pack": "universal-base-characters",
+            "model": "Hair_Beard",
+            "pathIncludes": "Rigged"
+          }
+        ]
+      },
+      "VillagerFemale": {
+        "pack": "modular-character-outfits-fantasy",
+        "model": "Female_Peasant",
+        "attach": [
+          {
+            "pack": "universal-base-characters",
+            "model": "Superhero_Female_FullBody",
+            "minY": 1.42
+          },
+          {
+            "pack": "universal-base-characters",
+            "model": "Hair_Buns",
+            "pathIncludes": "Rigged"
+          }
+        ]
+      },
+      "Innkeeper": {
+        "pack": "modular-character-outfits-fantasy",
+        "model": "Male_Peasant",
+        "attach": [
+          {
+            "pack": "universal-base-characters",
+            "model": "Superhero_Male_FullBody",
+            "minY": 1.5
+          },
+          {
+            "pack": "universal-base-characters",
+            "model": "Hair_Buzzed",
+            "pathIncludes": "Rigged"
+          },
+          {
+            "pack": "universal-base-characters",
+            "model": "Hair_Beard",
+            "pathIncludes": "Rigged"
+          }
+        ]
+      },
+      "Merchant": {
+        "pack": "modular-character-outfits-fantasy",
+        "model": "Female_Peasant",
+        "attach": [
+          {
+            "pack": "universal-base-characters",
+            "model": "Superhero_Female_FullBody",
+            "minY": 1.42
+          },
+          {
+            "pack": "universal-base-characters",
+            "model": "Hair_Long",
+            "pathIncludes": "Rigged"
+          }
+        ]
+      },
+      "Mage": {
+        "pack": "modular-character-outfits-fantasy",
+        "model": "Female_Ranger",
+        "attach": [
+          {
+            "pack": "universal-base-characters",
+            "model": "Superhero_Female_FullBody",
+            "minY": 1.42
+          }
+        ]
+      },
+      "Barbarian": {
+        "pack": "characters-fantasy-races",
+        "model": "Orc_Male"
+      }
+    },
+    "monsters": {
+      "Goblin": {
+        "pack": "bestiary-dungeon-monsters-kit",
+        "model": "Imp"
+      },
+      "Slime": {
+        "pack": "bestiary-dungeon-monsters-kit",
+        "model": "Puglin"
+      },
+      "Orc": {
+        "pack": "characters-fantasy-races",
+        "model": "Orc_Male"
+      }
+    },
+    "outfits": {
+      "ChestLight": {
+        "pack": "modular-character-outfits-fantasy",
+        "model": "Male_Ranger_Body"
+      },
+      "ChestRobe": {
+        "pack": "modular-character-outfits-fantasy",
+        "model": "Female_Peasant_Body"
+      },
+      "LegsLight": {
+        "pack": "modular-character-outfits-fantasy",
+        "model": "Male_Ranger_Legs"
+      },
+      "BootsLight": {
+        "pack": "modular-character-outfits-fantasy",
+        "model": "Male_Ranger_Feet_Boots"
+      },
+      "HelmetLight": {
+        "pack": "modular-character-outfits-fantasy",
+        "model": "Male_Ranger_Head_Hood"
+      },
+      "CloakShort": {
+        "pack": "modular-character-outfits-fantasy",
+        "model": "Male_Ranger_Acc_Pauldron"
+      },
+      "Shield": {
+        "pack": "fantasy-props-megakit",
+        "model": "Shield_Wooden"
+      }
+    }
+  }
+}
