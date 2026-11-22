@@ -1,6 +1,6 @@
 /**
- * The starting area's hand-placed content: a chest, the Old Cave, three
- * enchanted weapons on the ground, and the first quests.
+ * The starting area's hand-placed content: a chest, the Old Cave, starter
+ * gear and three enchanted weapons on the ground, and the first quests.
  */
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
@@ -11,6 +11,7 @@ import type { Quest, QuestSystem } from "../systems/quest-system";
 import type { ContainerSystem } from "../systems/container-system";
 import type { CellManager } from "../world/cell-manager";
 import { setInstanceScale, type FantasyAssetLoader } from "../systems/fantasy-asset-loader";
+import { HEALTH_POTION_STATS } from "./starter-merchants";
 
 interface GroundWeapon {
   at: [number, number, number];
@@ -20,6 +21,14 @@ interface GroundWeapon {
   scale: number;
   lift: number;
 }
+
+/** Plain starter gear lying near the start. */
+export const STARTER_GROUND_ITEMS: ReadonlyArray<{ at: [number, number, number]; item: Item }> = [
+  { at: [5, 1, 5], item: { id: "sword_01", name: "Iron Sword", description: "A rusty iron sword.", stackable: false, quantity: 1, slot: "mainHand", stats: { damage: 10 } } },
+  { at: [7, 1, 5], item: { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 HP.", stackable: true, quantity: 1, stats: { ...HEALTH_POTION_STATS } } },
+  { at: [6, 1, 7], item: { id: "leather_chest_01", name: "Leather Chest", description: "Light armor. +15 Armor Rating.", stackable: false, quantity: 1, slot: "chest", stats: { armor: 15 } } },
+  { at: [8, 1, 7], item: { id: "iron_helm_01", name: "Iron Helm", description: "A sturdy iron helmet. +12 Armor Rating.", stackable: false, quantity: 1, slot: "head", stats: { armor: 12 } } },
+];
 
 export const STARTER_WEAPONS: readonly GroundWeapon[] = [
   { at: [3, 1, 3], item: { id: "rune_sword_01", name: "Runesword", description: "A blade etched with glowing runes. +22 Damage, +8 Magicka.", slot: "mainHand", stats: { damage: 22, magicka: 8 } }, model: "runeSword", scale: 0.6, lift: -0.2 },
@@ -107,6 +116,8 @@ export function seedStartingArea(d: StartingAreaDeps): void {
 
   // The Old Cave's entrance, with where the player comes back out.
   d.cells.buildSimpleInterior("cave_01", "Old Cave", "portal_cave_entrance", new Vector3(-8, 1, 8), new Vector3(-8, 2, 8));
+
+  for (const g of STARTER_GROUND_ITEMS) new Loot(d.scene, new Vector3(...g.at), { ...g.item, stats: { ...g.item.stats } });
 
   // Each weapon is an ordinary pickup, drawn by its model once that loads
   // (the pickup sphere shows if the model can't).

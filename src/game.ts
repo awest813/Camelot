@@ -1770,10 +1770,11 @@ export class Game {
                 const dropPos = npc.mesh.position.clone();
                 dropPos.y += 0.5;
                 for (const drop of drops) {
+                    const scatter = this.kernel.rng.stream("death-drops");
                     new Loot(this.scene, dropPos.add(new Vector3(
-                        (Math.random() - 0.5) * 1.2,
+                        (scatter.next() - 0.5) * 1.2,
                         0,
-                        (Math.random() - 0.5) * 1.2,
+                        (scatter.next() - 0.5) * 1.2,
                     )), {
                         id: drop.id,
                         name: drop.name,
@@ -1791,7 +1792,7 @@ export class Game {
         // Elites (dragons, bandit chiefs) drop tiered gear from the leveled
         // lists — the reward scales with the player's level.
         if (/^(DragonBoss|Bandit Chief)/.test(npc.mesh.name)) {
-            const listId = Math.random() < 0.6 ? "ll_weapon_melee" : "ll_armor_heavy";
+            const listId = this.kernel.rng.stream("elite-drops").chance(0.6) ? "ll_weapon_melee" : "ll_armor_heavy";
             const resolved = this.leveledListSystem.resolve(listId, this.player.level);
             const template = resolved.value ? LEVEL_ITEM_TEMPLATES[resolved.value] : undefined;
             if (template) {
@@ -1833,13 +1834,9 @@ export class Game {
         this.smithing.onPlayerStruck();
         // Small chance to contract a random disease on each hit (Oblivion-style).
         // ~5 % base chance per strike; resistance is factored inside contractDisease().
-        if (Math.random() < 0.05) {
-            const diseasePool = [
-                "rust_chancre", "swamp_rot", "witbane",
-                "collywobbles", "yellow_tick",
-            ];
-            const pick = diseasePool[Math.floor(Math.random() * diseasePool.length)];
-            this.diseaseSystem.contractDisease(pick);
+        const contagion = this.kernel.rng.stream("disease");
+        if (contagion.chance(0.05)) {
+            this.diseaseSystem.contractDisease(contagion.pick(["rust_chancre", "swamp_rot", "witbane", "collywobbles", "yellow_tick"]));
         }
     };
     this.combatSystem.onBlockSuccess = () => {
@@ -1876,46 +1873,6 @@ export class Game {
 
     // Quest XP and fame callbacks are wired in the v9 block above.
     // Note: player.onLevelUp is wired above in the v2 system wiring block
-
-    // Test Loot
-    new Loot(this.scene, new Vector3(5, 1, 5), {
-        id: "sword_01",
-        name: "Iron Sword",
-        description: "A rusty iron sword.",
-        stackable: false,
-        quantity: 1,
-        slot: "mainHand",
-        stats: { damage: 10 }
-    });
-
-    new Loot(this.scene, new Vector3(7, 1, 5), {
-        id: "potion_hp_01",
-        name: "Health Potion",
-        description: "Restores 50 HP.",
-        stackable: true,
-        quantity: 1,
-        stats: { ...HEALTH_POTION_STATS }
-    });
-
-    new Loot(this.scene, new Vector3(6, 1, 7), {
-        id: "leather_chest_01",
-        name: "Leather Chest",
-        description: "Light armor. +15 Armor Rating.",
-        stackable: false,
-        quantity: 1,
-        slot: "chest",
-        stats: { armor: 15 }
-    });
-
-    new Loot(this.scene, new Vector3(8, 1, 7), {
-        id: "iron_helm_01",
-        name: "Iron Helm",
-        description: "A sturdy iron helmet. +12 Armor Rating.",
-        stackable: false,
-        quantity: 1,
-        slot: "head",
-        stats: { armor: 12 }
-    });
 
     // Input handling for combat
     this.scene.onPointerObservable.add((pointerInfo) => {
