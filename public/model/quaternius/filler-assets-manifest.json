@@ -4,6 +4,7 @@
   "files": [
     "public/model/quaternius/props/Well.glb",
     "public/model/quaternius/props/Fountain.glb",
+    "public/model/quaternius/props/NoticeBoard.glb",
     "public/model/quaternius/nature/Stump.glb",
     "public/model/quaternius/nature/Log.glb",
     "public/model/quaternius/characters/Knight.glb",

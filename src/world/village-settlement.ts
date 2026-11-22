@@ -67,6 +67,8 @@ export interface VillagePlan {
   forge: { x: number; z: number; rot: number };
   /** Fast-travel arrival: on the entrance road, facing into the square. */
   arrival: { x: number; z: number };
+  /** Notice board inside the square by the entrance (faces the road). */
+  noticeBoard: { x: number; z: number; rot: number };
 }
 
 /** Qualifiers that make village names (far) less likely to repeat. */
@@ -126,6 +128,7 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
   let forge = { x: center.x, z: center.z, rot: 0 };
   const homes: Array<{ x: number; z: number }> = [];
   let arrival = { x: center.x, z: center.z };
+  let noticeBoard = { x: center.x, z: center.z, rot: 0 };
 
   roles.forEach((role, s) => {
     const a = slotAngle(s);
@@ -135,6 +138,9 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
       const side = { x: Math.cos(a), z: -Math.sin(a) }; // tangent
       const g = polar(a, gate);
       arrival = polar(a, PLAZA_RADIUS + 1.5);
+      // The board stands just inside the square, off to one side of the road,
+      // facing arrivals.
+      noticeBoard = { ...polar(a + 0.32, PLAZA_RADIUS - 2.2), rot: a };
       // Guards walk a beat: the gate, round the square and back.
       for (const sign of [1, -1]) {
         const post = { x: g.x + side.x * 2.5 * sign, z: g.z + side.z * 2.5 * sign };
@@ -220,5 +226,6 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
     residents,
     forge,
     arrival,
+    noticeBoard,
   };
 }

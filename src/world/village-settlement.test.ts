@@ -114,6 +114,15 @@ describe("village settlements", () => {
     }
   });
 
+  it("puts a notice board inside the square, clear of the well and the buildings", () => {
+    for (const [cx, cz] of villageChunks(40)) {
+      const v = planVillage(cx, cz, CHUNK);
+      const d = Math.hypot(v.noticeBoard.x - v.center.x, v.noticeBoard.z - v.center.z);
+      expect(d).toBeGreaterThan(2.5);          // not on the well
+      expect(d).toBeLessThan(PLAZA_RADIUS);    // inside the square
+    }
+  });
+
   it("village names rarely repeat", () => {
     const names = villageChunks(120).map(([cx, cz]) => planVillage(cx, cz, CHUNK).name);
     expect(new Set(names).size / names.length).toBeGreaterThan(0.85);

@@ -96,6 +96,9 @@ export class InteractionSystem {
                       sneakPrompt ?? `[E] Talk to ${metadata.npc.mesh.name}`);
               }
               this.ui.setCrosshairActive(true);
+          } else if (metadata.type === 'activator' && typeof metadata.onActivate === 'function') {
+              this.ui.setInteractionText(`[E] ${metadata.label ?? "Use"}`);
+              this.ui.setCrosshairActive(true);
           } else if (metadata.type === 'loot') {
               this.ui.setInteractionText(`[E] Take ${metadata.loot.item.name}`);
               this.ui.setCrosshairActive(true);
@@ -140,6 +143,9 @@ export class InteractionSystem {
               return;
           }
           this.dialogueSystem.startDialogue(metadata.npc);
+      } else if (metadata.type === 'activator' && typeof metadata.onActivate === 'function') {
+          // Generic world activator: { type: 'activator', label, onActivate }.
+          metadata.onActivate();
       } else if (metadata.type === 'loot') {
           const loot = metadata.loot;
           if (this.inventorySystem.addItem(loot.item)) {

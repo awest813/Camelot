@@ -98,6 +98,7 @@ export type FantasyAssetKey =
   | "qCauldron"       // Cauldron — alchemy / witch hut prop
   | "qFlag"           // Wall-mounted flag / banner — castle decoration
   | "qBannerStand"    // Freestanding banner — camp / garrison decoration
+  | "qNoticeBoard"    // Village notice board (generated) — job board in the square
   // ── Quaternius: Stylized Nature Mega Kit (CC0) ────────────────────────────
   | "qOakTree"        // Deciduous oak tree — temperate forest vegetation
   | "qPineTree"       // Conifer pine tree — boreal / mountain vegetation
@@ -288,6 +289,7 @@ const ASSET_URLS: Record<FantasyAssetKey, string> = {
   get qCauldron()    { return qProps()    + "Cauldron.glb"; },
   get qFlag()        { return qProps()    + "Flag.glb"; },
   get qBannerStand() { return qProps()    + "BannerStand.glb"; },
+  get qNoticeBoard() { return qProps()    + "NoticeBoard.glb"; },
   // ── Quaternius: Stylized Nature Mega Kit (CC0) ────────────────────────────
   get qOakTree()     { return qNature()   + "OakTree.glb"; },
   get qPineTree()    { return qNature()   + "PineTree.glb"; },

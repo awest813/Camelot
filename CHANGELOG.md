@@ -77,6 +77,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   the quest log under the village's name and track your kills. Supply runs pay
   when you hand the goods over; bounties pay when you come back. Each inn
   offers a new job once you finish one, and jobs are saved with your game.
+  Every village square also has a notice board (press E) that offers the
+  same job as the village inn.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

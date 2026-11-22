@@ -119,5 +119,24 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   expect(job.questDone).toBe(true);
   expect(job.left).toBe(0);
 
+
+  // ── The notice board in the square: press E to take the next job ──
+  await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    const p = g._villagePlans.get([...g._loadedVillages.keys()][0]);
+    const nb = p.noticeBoard; const c = g.player.camera;
+    c.position.set(nb.x + Math.sin(nb.rot) * 1.8, 1.6, nb.z + Math.cos(nb.rot) * 1.8);
+    c.setTarget(new c.position.constructor(nb.x, 1.45, nb.z));
+  });
+  await page.waitForTimeout(2500);
+  await page.screenshot({ path: "test-results/village-notice-board.png" });
+  const boardJob = await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    const before = g.villageJobs.getActive().length;
+    g.interactionSystem.interact();
+    return { before, after: g.villageJobs.getActive().length };
+  });
+  expect(boardJob, "pressing E at the notice board takes a job").toEqual({ before: 0, after: 1 });
+
   expect(pageErrors, `uncaught page errors:\n${pageErrors.join("\n")}`).toEqual([]);
 });

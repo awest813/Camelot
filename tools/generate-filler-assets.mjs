@@ -13,7 +13,7 @@ const packs = {
   props: [
     "Barrel", "Crate", "Chest", "Table", "Chair", "Bench", "Shelf", "Bookshelf", "Bed", "Anvil",
     "Forge", "Altar", "Well", "Fountain", "MarketStall", "SignPost", "Lantern", "Cauldron", "Flag",
-    "BannerStand",
+    "BannerStand", "NoticeBoard",
   ],
   nature: [
     "OakTree", "PineTree", "WillowTree", "DeadTree", "BushLarge", "BushSmall", "Fern", "FlowerRed",
@@ -51,6 +51,7 @@ function getMaterial(pack, name) {
     if (name === "Forge") return { color: [0.30, 0.28, 0.30, 1], metallic: 0.25, roughness: 0.78 };
     if (name === "Bed") return { color: [0.58, 0.22, 0.24, 1], metallic: 0.05, roughness: 0.70 };
     if (name === "Bookshelf") return { color: [0.45, 0.28, 0.16, 1], metallic: 0.04, roughness: 0.78 };
+    if (name === "NoticeBoard") return { color: [0.30, 0.22, 0.15, 1], metallic: 0.02, roughness: 0.9 };
     return { color: [0.52, 0.34, 0.18, 1], metallic: 0.05, roughness: 0.80 };
   }
 
@@ -682,6 +683,19 @@ function createGeometry(pack, name) {
       addBox(builder, [0, 0.82, -0.20], [1.2, 0.50, 0.06]); // backrest
       addBox(builder, [-0.52, 0.21, 0], [0.08, 0.42, 0.38]); // legs
       addBox(builder, [0.52, 0.21, 0], [0.08, 0.42, 0.38]);
+    } else if (name === "NoticeBoard") {
+      // Village notice board: two posts, a plank board under a little pitched
+      // roof, notices pinned at odd angles (board faces +Z).
+      addBox(builder, [-0.72, 1.0, 0], [0.12, 2.0, 0.12]);
+      addBox(builder, [0.72, 1.0, 0], [0.12, 2.0, 0.12]);
+      addBox(builder, [0, 1.45, 0], [1.5, 0.9, 0.06]);              // board
+      addBox(builder, [0, 1.92, 0], [1.6, 0.06, 0.12]);             // top rail
+      addBox(builder, [0, 0.98, 0], [1.6, 0.06, 0.12]);             // bottom rail
+      addTilted(builder, [0, 2.16, 0.12], [1.8, 0.05, 0.42], [0.55, 0, 0], "box");   // roof front
+      addTilted(builder, [0, 2.16, -0.12], [1.8, 0.05, 0.42], [-0.55, 0, 0], "box"); // roof back
+      for (const [x, y, rz] of [[-0.42, 1.55, 0.08], [0.05, 1.62, -0.05], [0.45, 1.5, 0.12], [-0.15, 1.25, -0.1], [0.35, 1.22, 0.04]]) {
+        addTilted(builder, [x, y, 0.045], [0.32, 0.38, 0.01], [0, 0, rz], "box");  // pinned notices
+      }
     } else if (name === "SignPost") {
       addCylinder(builder, [0, 0.95, 0], 0.08, 1.9, 6); // post
       addBox(builder, [0.26, 1.65, 0], [0.55, 0.18, 0.04]); // sign 1

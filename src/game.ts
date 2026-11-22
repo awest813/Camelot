@@ -11,7 +11,7 @@ import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
 import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
@@ -484,6 +484,8 @@ export class Game {
   private _pendingBarterMerchantId: string | null = null;
   /** Set by the smith's "use your forge" dialogue choice; opened once dialogue closes. */
   private _pendingSmithingOpen = false;
+  /** Shared parchment material for village notice boards. */
+  private _noticeMat: StandardMaterial | null = null;
 
   public isPaused: boolean = false;
 
@@ -7486,8 +7488,7 @@ export class Game {
   }
 
   /** "Any work going?" — take a job, report progress, or collect pay. */
-  private _askForWork(): void {
-      const board = this._jobBoardForCurrentSpeaker();
+  private _askForWork(board = this._jobBoardForCurrentSpeaker()): void {
       if (!board) return;
       const result = this.villageJobs.ask(board.boardId, board.placeName, {
         playerLevel: this.playerLevelSystem.characterLevel,
@@ -7581,6 +7582,7 @@ export class Game {
         this._placeSiteProp(chunkKey, chunkRecord, p.key, here, p.x, p.z, p.rot);
       }
       this._placeSmithy(chunkKey, chunkRecord, plan.forge.x, plan.forge.z, plan.forge.rot);
+      this._placeNoticeBoard(chunkKey, chunkRecord, plan);
       const at = (p: { x: number; z: number }) => new Vector3(p.x, 2, p.z);
       for (const r of plan.residents) {
         const npc = this._spawnArchetypeNpc(r.archetype, chunkRecord, r.x, r.z);
@@ -7591,6 +7593,56 @@ export class Game {
         if (r.patrol) npc.patrolPoints = r.patrol.map(at);
       }
       this._loadedVillages.set(chunkKey, plan);
+  }
+
+  /**
+   * The village notice board: the same job board as the village inn (one
+   * job per village), read with E.
+   */
+  private _placeNoticeBoard(
+      chunkKey: string,
+      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
+      plan: VillagePlan,
+  ): void {
+      const nb = plan.noticeBoard;
+      this._placeSiteProp(chunkKey, chunkRecord, "qNoticeBoard", { x: 0, z: 0, rot: 0 }, nb.x, nb.z, nb.rot);
+      if (this._chunkFantasyContent.get(chunkKey) !== chunkRecord) return;
+      const [cx, cz] = chunkKey.split(",").map(Number);
+      const board = { boardId: `inn_${cx}_${cz}`, placeName: plan.name };
+      // Invisible (visibility 0, still pickable) hit box over the board face.
+      const hit = MeshBuilder.CreateBox(`notice_board_${chunkKey}`, { width: 1.6, height: 1.2, depth: 0.4 }, this.scene);
+      hit.position.set(nb.x, 1.45, nb.z);
+      hit.rotation.y = nb.rot;
+      hit.visibility = 0;
+      hit.isPickable = true;
+      // Pinned notices: parchment quads (one shared material) on the board face.
+      this._noticeMat ??= (() => {
+        const m = new StandardMaterial("notice_parchment", this.scene);
+        m.diffuseColor = new Color3(0.86, 0.78, 0.60);
+        m.emissiveColor = new Color3(0.14, 0.12, 0.09); // readable in shade
+        m.specularColor = new Color3(0.02, 0.02, 0.02);
+        m.backFaceCulling = false;
+        m.freeze();
+        return m;
+      })();
+      const notices: Array<[number, number, number]> = [[-0.42, 1.55, 0.08], [0.05, 1.62, -0.05], [0.45, 1.5, 0.12], [-0.15, 1.24, -0.1], [0.36, 1.2, 0.04]];
+      notices.forEach(([lx, ly, tilt], i) => {
+        const q = MeshBuilder.CreatePlane(`notice_${chunkKey}_${i}`, { width: 0.3, height: 0.36, sideOrientation: Mesh.DOUBLESIDE }, this.scene);
+        // The board model is mirrored in X by the glTF handedness conversion.
+        const w = toWorld({ x: -lx, z: 0.07 }, { x: nb.x, z: nb.z, rot: nb.rot });
+        q.position.set(w.x, ly, w.z);
+        q.rotation.set(0, nb.rot, tilt);
+        q.material = this._noticeMat!;
+        q.isPickable = false;
+        q.freezeWorldMatrix();
+        chunkRecord.roots.push(q);
+      });
+      hit.metadata = {
+        type: "activator",
+        label: `Read the ${plan.name} notice board`,
+        onActivate: () => this._askForWork(board),
+      };
+      chunkRecord.roots.push(hit);
   }
 
   /** Walking into a village's square discovers it as a fast-travel destination. */
