@@ -164,6 +164,17 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
   expect(await page.evaluate(() => (window as any).__camelotGame.followerUI.isVisible), "follower panel closed").toBe(false);
   await page.locator("#renderCanvas").click({ force: true });
 
+  // N — the shouts panel; Shift+N with nothing equipped says so.
+  await page.keyboard.press("n");
+  expect(await page.evaluate(() => (window as any).__camelotGame.shoutUI.isVisible), "shouts panel open").toBe(true);
+  await page.keyboard.press("n");
+  await page.locator("#renderCanvas").click({ force: true });
+  expect(await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    g.shouts.use();
+    return g.shoutUI.isVisible === false && g.dragonShoutSystem === g.shouts.shouts;
+  }), "shout used without errors").toBe(true);
+
   // F5 — manual save.  Assert the full game-state graph serialised.
   await page.keyboard.press("F5");
   const saveRaw = await page.evaluate(() => localStorage.getItem("camelot_save"));

@@ -362,6 +362,13 @@ state, scope and save codec.
       follower panel (G). The map editor keeps G for its gizmo. New `purse`
       service (gold and spend), which the mounts feature now uses too.
 
+  11. **Shouts** (`src/features/shouts/`): dragon souls, Words of Power, the
+      shouts panel (N), using a shout (Shift+N), every shout's world effect
+      (cone targeting, knockback, dash, burn, freeze), and the Slow Time and
+      Elemental Fury timers, now a sim-phase system. The game keeps only a
+      small `shout-host` service: facing, targets, dash, damage with the
+      usual kill handling, attack speed and weather.
+
   Render counts after the extraction match the pre-extraction baseline
   (2,066 village meshes), so villages are built identically. The render
   budget check now also has floors, so a scene that failed to render can't
