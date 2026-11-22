@@ -6192,3 +6192,65 @@ body::before {
   margin: 0 0 6px;
 }
 
+
+/* ── Village job board (notice board / "Any work going?") ─────────────────── */
+.job-board__panel {
+  width: min(520px, 92vw);
+  max-height: min(80vh, 640px);
+  overflow: auto;
+}
+.job-board__status {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #b89a5a;
+  margin: 4px 0 2px;
+}
+.job-board__job-title {
+  font-family: Cinzel, serif;
+  color: #e6d3a3;
+  font-size: 20px;
+  margin: 0 0 8px;
+}
+.job-board__desc {
+  color: #d9d0c1;
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+.job-board__reward,
+.job-board__progress {
+  color: #cdbf9f;
+  font-size: 14px;
+  margin: 0 0 6px;
+}
+.job-board__bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.job-board__bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8a6b2e, #d4a017);
+}
+.job-board__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.job-board__btn {
+  font: inherit;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid rgba(212, 160, 23, 0.35);
+  background: rgba(30, 24, 14, 0.9);
+  color: #e6d3a3;
+  cursor: pointer;
+}
+.job-board__btn:hover:not(:disabled) { border-color: rgba(212, 160, 23, 0.8); }
+.job-board__btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.job-board__btn--primary { background: rgba(120, 88, 24, 0.9); }
+.job-board__btn--danger { border-color: rgba(170, 60, 50, 0.6); color: #e2b3a8; }

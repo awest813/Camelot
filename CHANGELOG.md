@@ -78,7 +78,11 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   when you hand the goods over; bounties pay when you come back. Each inn
   offers a new job once you finish one, and jobs are saved with your game.
   Every village square also has a notice board (press E) that offers the
-  same job as the village inn.
+  same job as the village inn. Both open a job window that shows the job,
+  the reward and your progress. From it you can accept, turn the job down
+  ("Not now" rolls a different one), hand it in once it's done, or abandon
+  it. Each job you take gets its own quest-log entry, so a second job at the
+  same inn no longer reuses the finished one's entry.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

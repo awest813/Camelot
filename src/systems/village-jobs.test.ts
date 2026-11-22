@@ -84,6 +84,39 @@ describe("VillageJobBoard", () => {
     expect(other.offerFor(id, 1)).toEqual(board.offerFor(id, 1));
   });
 
+  it("view / accept / handIn / decline drive the job board window", () => {
+    const id = boardOffering("supply_potions");
+    const offer = board.view(id, "Camcross", ctx({}));
+    expect(offer.job).toBeNull();
+    expect(offer.template.id).toBe("supply_potions");
+    expect(offer.description).toContain("Camcross");
+    board.accept(id, "Camcross", 1);
+    const bag = { potion_hp_01: 2 };
+    let v = board.view(id, "Camcross", ctx(bag));
+    expect(v.progress).toBe(2);
+    expect(v.canHandIn).toBe(false);
+    expect(board.handIn(id, ctx(bag))).toBeNull();
+    bag.potion_hp_01 = 3;
+    v = board.view(id, "Camcross", ctx(bag));
+    expect(v.canHandIn).toBe(true);
+    expect(board.handIn(id, ctx(bag))?.rewardGold).toBe(90);
+    expect(bag.potion_hp_01).toBe(0);
+  });
+
+  it("declining or abandoning moves the board on to a different job", () => {
+    const id = boardOffering("bounty_bandits");
+    board.accept(id, "X", 1);
+    board.decline(id);
+    expect(board.activeAt(id)).toBeUndefined();
+    // Over a few declines the offer must change at least once.
+    const seen = new Set<string>([board.offerFor(id, 1).id]);
+    for (let i = 0; i < 5; i++) { board.decline(id); seen.add(board.offerFor(id, 1).id); }
+    expect(seen.size).toBeGreaterThan(1);
+    const copy = new VillageJobBoard();
+    copy.restoreFromSave(board.getSaveState());
+    expect(copy.offerFor(id, 1)).toEqual(board.offerFor(id, 1));
+  });
+
   it("round-trips through its save state and drops unknown templates", () => {
     const id = boardOffering("bounty_dead");
     board.ask(id, "Ashford", ctx({}));

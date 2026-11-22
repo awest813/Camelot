@@ -87,6 +87,7 @@ import { ItemConditionSystem } from "./systems/item-condition-system";
 import { buildingFootprint, buildingLayout, toWorld, WALL_HEIGHT, type BuildingKind } from "./world/village-buildings";
 import { hasVillage, planVillage, VILLAGE_DISCOVER_RADIUS, type VillagePlan } from "./world/village-settlement";
 import { VillageJobBoard } from "./systems/village-jobs";
+import { JobBoardUI } from "./ui/job-board-ui";
 import { ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
 import { EnchantingSystem } from "./systems/enchanting-system";
 import { EnchantingUI } from "./ui/enchanting-ui";
@@ -384,6 +385,9 @@ export class Game {
   public craftingUI: CraftingUI;
   /** Radiant work offered by innkeepers ("Any work going?"). */
   public readonly villageJobs = new VillageJobBoard();
+  public readonly jobBoardUI = new JobBoardUI();
+  /** Board the job window is showing (inn chunk id + place name). */
+  private _activeJobBoard: { boardId: string; placeName: string } | null = null;
 
   // v5 systems (Oblivion parity: enchanting)
   public enchantingSystem: EnchantingSystem;
@@ -484,6 +488,8 @@ export class Game {
   private _pendingBarterMerchantId: string | null = null;
   /** Set by the smith's "use your forge" dialogue choice; opened once dialogue closes. */
   private _pendingSmithingOpen = false;
+  /** Set by the innkeeper's "Any work going?"; the job window opens after the dialogue. */
+  private _pendingJobBoard: { boardId: string; placeName: string } | null = null;
   /** Shared parchment material for village notice boards. */
   private _noticeMat: StandardMaterial | null = null;
 
@@ -1496,6 +1502,7 @@ export class Game {
     this.craftingUI.onClose = () => this._restoreGameplayInput();
     this.saveSystem.setCraftingSystem(this.craftingSystem);
     this.saveSystem.setVillageJobs(this.villageJobs);
+    this._initJobBoardUI();
     this.villageJobs.onProgress = (job, template) => {
       this._syncJobQuest(job.boardId);
       const left = template.required - job.progress;
@@ -3323,6 +3330,11 @@ export class Game {
         this._pendingSmithingOpen = false;
         this._openSmithingForge();
       }
+      if (this._pendingJobBoard) {
+        const board = this._pendingJobBoard;
+        this._pendingJobBoard = null;
+        this._askForWork(board);
+      }
       this._currentDialogueNpcName = null;
     };
 
@@ -4920,6 +4932,7 @@ export class Game {
       if (this.alchemyUI.isVisible) { this.alchemyUI.toggle(false); this._restoreGameplayInput(); return; }
       if (this.enchantingUI.isVisible) { this.enchantingUI.toggle(false); this._restoreGameplayInput(); return; }
       if (this.craftingUI.isVisible) { this.craftingUI.hide(); this._restoreGameplayInput(); return; }
+      if (this.jobBoardUI.isVisible) { this.jobBoardUI.hide(); this.jobBoardUI.onClose?.(); return; }
       if (this.spellMakingUI.isVisible) { this.spellMakingUI.close(); return; }
       if (this._barterUI.isVisible) { this._barterUI.onClose?.(); return; }
       if (this._containerUI.isVisible) { this._containerUI.onClose?.(); return; }
@@ -5110,6 +5123,7 @@ export class Game {
           if (this.alchemyUI.isVisible) { this.alchemyUI.toggle(false); }
           if (this.enchantingUI.isVisible) { this.enchantingUI.toggle(false); }
           if (this.craftingUI.isVisible) { this.craftingUI.hide(); }
+          if (this.jobBoardUI.isVisible) { this.jobBoardUI.hide(); this._activeJobBoard = null; }
           if (this.spellMakingUI.isVisible) { this.spellMakingUI.close(); }
           if (this.fastTravelUI.isVisible) { this.fastTravelUI.close(); }
           if (this.petUI.isVisible) { this.petUI.close(); }
@@ -6503,6 +6517,7 @@ export class Game {
           this.followerUI.isVisible ||
           this.pickpocketUI.isVisible ||
           this.craftingUI.isVisible ||
+          this.jobBoardUI.isVisible ||
           this.graphicsSettingsUI.isVisible ||
           !!this._creditsUI?.isVisible
       );
@@ -7092,7 +7107,8 @@ export class Game {
         return;
       }
       if (eventId === "jobs:ask") {
-        this._askForWork();
+        // Open once the dialogue has closed (it restores input on close).
+        this._pendingJobBoard = this._jobBoardForCurrentSpeaker();
         return;
       }
       if (eventId === "smithing:open") {
@@ -7487,36 +7503,88 @@ export class Game {
       return { boardId: `inn_${cx}_${cz}`, placeName: village?.name ?? "the inn" };
   }
 
-  /** "Any work going?" — take a job, report progress, or collect pay. */
+  /** The job context (player level, bag) for the village job board. */
+  private _jobContext() {
+      return {
+        playerLevel: this.playerLevelSystem.characterLevel,
+        countItem: (id: string) => this.inventorySystem.items.reduce((n, i) => (i.id === id ? n + i.quantity : n), 0),
+        removeItem: (id: string, amount: number) => this.inventorySystem.removeQuantity(id, amount),
+      };
+  }
+
+  /** "Any work going?" / the notice board: open the job board window. */
   private _askForWork(board = this._jobBoardForCurrentSpeaker()): void {
       if (!board) return;
-      const result = this.villageJobs.ask(board.boardId, board.placeName, {
-        playerLevel: this.playerLevelSystem.characterLevel,
-        countItem: (id) => this.inventorySystem.items.reduce((n, i) => (i.id === id ? n + i.quantity : n), 0),
-        removeItem: (id, amount) => this.inventorySystem.removeQuantity(id, amount),
-      });
-      switch (result.type) {
-        case "accepted":
-          this._syncJobQuest(board.boardId);
-          this.ui.showNotification(`New job — ${result.template.title}: ${result.text}`, 5000);
-          break;
-        case "progress":
-          this._syncJobQuest(board.boardId);
-          this.ui.showNotification(`${result.template.title}: ${result.text}`, 3200);
-          break;
-        case "completed": {
-          const quest = this.questSystem.getQuests().find((q) => q.id === `job_${board.boardId}`);
-          if (quest) {
-            quest.isCompleted = true;
-            quest.isActive = false;
-            for (const o of quest.objectives) { o.current = o.required; o.completed = true; }
-          }
-          this.fameSystem.addFame(5);
-          this._grantDynamicWorldEventReward({ gold: result.rewardGold, xp: result.rewardXp, label: `Job done: ${result.template.title}` });
-          break;
-        }
+      this._activeJobBoard = board;
+      const view = this.villageJobs.view(board.boardId, board.placeName, this._jobContext());
+      if (this.jobBoardUI.isVisible) {
+        this.jobBoardUI.render(board.placeName, view);
+        return;
       }
-      this.saveSystem.markDirty();
+      this.jobBoardUI.show(board.placeName, view);
+      this._suspendGameplayInput();
+  }
+
+  /** Wire the job board window's buttons. */
+  private _initJobBoardUI(): void {
+      const refresh = () => {
+        const b = this._activeJobBoard;
+        if (b && this.villageJobs.activeAt(b.boardId)) this._syncJobQuest(b.boardId);
+        if (b && this.jobBoardUI.isVisible) {
+          this.jobBoardUI.render(b.placeName, this.villageJobs.view(b.boardId, b.placeName, this._jobContext()));
+        }
+        this.saveSystem.markDirty();
+      };
+      this.jobBoardUI.onAccept = () => {
+        const b = this._activeJobBoard;
+        if (!b) return;
+        const job = this.villageJobs.accept(b.boardId, b.placeName, this.playerLevelSystem.characterLevel);
+        this._syncJobQuest(job.boardId);
+        const t = VillageJobBoard.template(job.templateId);
+        if (t) this.ui.showNotification(`New job: ${t.title}`, 2600);
+        refresh();
+      };
+      this.jobBoardUI.onHandIn = () => {
+        const b = this._activeJobBoard;
+        if (!b) return;
+        const questId = this._jobQuestId(b.boardId); // before handIn bumps the count
+        const done = this.villageJobs.handIn(b.boardId, this._jobContext());
+        if (!done) { refresh(); return; }
+        const quest = this.questSystem.getQuests().find((q) => q.id === questId);
+        if (quest) {
+          quest.isCompleted = true;
+          quest.isActive = false;
+          for (const o of quest.objectives) { o.current = o.required; o.completed = true; }
+        }
+        this.fameSystem.addFame(5);
+        this._grantDynamicWorldEventReward({ gold: done.rewardGold, xp: done.rewardXp, label: `Job done: ${done.template.title}` });
+        refresh();
+      };
+      this.jobBoardUI.onDecline = () => {
+        const b = this._activeJobBoard;
+        if (!b) return;
+        this._removeJobQuest(b.boardId);
+        this.villageJobs.decline(b.boardId);
+        refresh();
+      };
+      this.jobBoardUI.onClose = () => {
+        this._activeJobBoard = null;
+        this._restoreGameplayInput();
+      };
+  }
+
+  /** Quest-log id for a board's current job (one entry per job taken there). */
+  private _jobQuestId(boardId: string): string {
+      const n = this.villageJobs.completedAt(boardId);
+      return n === 0 ? `job_${boardId}` : `job_${boardId}_${n}`;
+  }
+
+  /** Drop an abandoned job's quest-log entry. */
+  private _removeJobQuest(boardId: string): void {
+      const quests = this.questSystem.getQuests();
+      const id = this._jobQuestId(boardId);
+      const i = quests.findIndex((q) => q.id === id && !q.isCompleted);
+      if (i >= 0) quests.splice(i, 1);
   }
 
   /** Mirror an active village job into the quest log (created on first sync). */
@@ -7525,7 +7593,7 @@ export class Game {
       if (!job) return;
       const template = VillageJobBoard.template(job.templateId);
       if (!template) return;
-      const id = `job_${boardId}`;
+      const id = this._jobQuestId(boardId);
       let quest = this.questSystem.getQuests().find((q) => q.id === id);
       if (!quest) {
         quest = {
@@ -7802,6 +7870,7 @@ export class Game {
           this.petUI.isVisible ||
           this.pickpocketUI.isVisible ||
           this.craftingUI.isVisible ||
+          this.jobBoardUI.isVisible ||
           this.characterSheetUI.isVisible ||
           this.graphicsSettingsUI.isVisible ||
           !!this._creditsUI?.isVisible ||

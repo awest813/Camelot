@@ -86,6 +86,20 @@ export type AskResult =
 export interface VillageJobsSaveState {
   active: ActiveJob[];
   completed: Record<string, number>;
+  /** Jobs turned down / abandoned per board (rolls the next offer). Optional for old saves. */
+  declined?: Record<string, number>;
+}
+
+/** What a board shows right now (for the job board window). */
+export interface BoardView {
+  template: JobTemplate;
+  /** The active job here, or null when this is a fresh offer. */
+  job: ActiveJob | null;
+  description: string;
+  /** Progress toward the requirement (kills, or items carried for supply runs). */
+  progress: number;
+  /** Whether "Hand in" would succeed now. */
+  canHandIn: boolean;
 }
 
 function hash(s: string): number {
@@ -97,6 +111,7 @@ function hash(s: string): number {
 export class VillageJobBoard {
   private readonly _active = new Map<string, ActiveJob>();
   private readonly _completed = new Map<string, number>();
+  private readonly _declined = new Map<string, number>();
 
   /** Fired when a bounty kill advances a job (for quest-log sync and toasts). */
   public onProgress: ((job: ActiveJob, template: JobTemplate) => void) | null = null;
@@ -113,7 +128,8 @@ export class VillageJobBoard {
   public offerFor(boardId: string, playerLevel: number): JobTemplate {
     const pool = JOB_TEMPLATES.filter((t) => (t.minLevel ?? 0) <= playerLevel);
     const n = this._completed.get(boardId) ?? 0;
-    return pool[hash(`${boardId}#${n}`) % pool.length];
+    const d = this._declined.get(boardId) ?? 0;
+    return pool[hash(`${boardId}#${n}${d ? `~${d}` : ""}`) % pool.length];
   }
 
   public getActive(): ActiveJob[] {
@@ -156,6 +172,56 @@ export class VillageJobBoard {
     };
   }
 
+  /** The board's current state: its active job, or the job it offers. */
+  public view(boardId: string, placeName: string, ctx: JobContext): BoardView {
+    const job = this._active.get(boardId) ?? null;
+    const template = job ? VillageJobBoard.template(job.templateId)! : this.offerFor(boardId, ctx.playerLevel);
+    const place = job?.placeName ?? placeName;
+    const progress = template.kind === "supply"
+      ? Math.min(ctx.countItem(template.target), template.required)
+      : job?.progress ?? 0;
+    return {
+      template,
+      job,
+      description: VillageJobBoard.describe(template, place),
+      progress,
+      canHandIn: !!job && progress >= template.required,
+    };
+  }
+
+  /** Take the board's offered job (no-op if one is already active there). */
+  public accept(boardId: string, placeName: string, playerLevel: number): ActiveJob {
+    const existing = this._active.get(boardId);
+    if (existing) return existing;
+    const template = this.offerFor(boardId, playerLevel);
+    const job: ActiveJob = { boardId, placeName, templateId: template.id, progress: 0 };
+    this._active.set(boardId, job);
+    return job;
+  }
+
+  /** Hand in the active job when its requirement is met (supply runs take the goods). */
+  public handIn(boardId: string, ctx: JobContext): Extract<AskResult, { type: "completed" }> | null {
+    const job = this._active.get(boardId);
+    if (!job) return null;
+    const template = VillageJobBoard.template(job.templateId)!;
+    if (template.kind === "supply") {
+      if (ctx.countItem(template.target) < template.required) return null;
+      if (!ctx.removeItem(template.target, template.required)) return null;
+    } else if (job.progress < template.required) {
+      return null;
+    }
+    return this._complete(job, template) as Extract<AskResult, { type: "completed" }>;
+  }
+
+  /**
+   * Turn down the offer or abandon the active job: the board moves on to a
+   * different job (no reward, no penalty).
+   */
+  public decline(boardId: string): void {
+    this._active.delete(boardId);
+    this._declined.set(boardId, (this._declined.get(boardId) ?? 0) + 1);
+  }
+
   /** Count a kill toward any bounty whose prefix matches the NPC's name. */
   public onKill(npcName: string): void {
     for (const job of this._active.values()) {
@@ -181,18 +247,23 @@ export class VillageJobBoard {
     return {
       active: this.getActive().map((j) => ({ ...j })),
       completed: Object.fromEntries(this._completed),
+      declined: Object.fromEntries(this._declined),
     };
   }
 
   public restoreFromSave(state: VillageJobsSaveState | undefined): void {
     this._active.clear();
     this._completed.clear();
+    this._declined.clear();
     if (!state) return;
     for (const j of state.active ?? []) {
       if (VillageJobBoard.template(j.templateId)) this._active.set(j.boardId, { ...j });
     }
     for (const [k, v] of Object.entries(state.completed ?? {})) {
       if (typeof v === "number") this._completed.set(k, v);
+    }
+    for (const [k, v] of Object.entries(state.declined ?? {})) {
+      if (typeof v === "number") this._declined.set(k, v);
     }
   }
 }
