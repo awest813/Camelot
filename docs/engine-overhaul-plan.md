@@ -1,0 +1,377 @@
+# Engine overhaul plan
+
+Status: proposal · Scope: the whole client runtime (`src/`), asset pipeline and
+test harness · Companion docs: [framework-architecture.md](framework-architecture.md),
+[rendering.md](rendering.md)
+
+## Why
+
+Camelot has grown into a large, feature-rich game on an architecture that was
+built for a demo. Features still land quickly, but each one now costs more,
+and a growing share of the bugs come from the architecture rather than from
+the feature itself. Recent audits are typical:
+
+| Bug (recent) | Root cause in the architecture |
+|---|---|
+| Sky rendered as one flat colour; water and mountains lost their light colours | No rendering abstraction for shader inputs; reference-holding `setColor3` misused in 3 places |
+| Distance culling for buildings/props hid nothing | LOD system toggles `isVisible` on whatever it's given; no notion of an "object" vs. its meshes |
+| Village job "completed" before payment; stale job entries after loading | Two quest systems (legacy `QuestSystem` + framework quest engine) mirrored by hand |
+| Raid townsfolk hidden forever after a load; raiders left behind | Transient state lives in ad-hoc `Set`s in `game.ts`; save/load has no lifecycle for it |
+| Raid ending early, animation clashes | NPC identity is the mesh name (random suffix); no entity ids |
+| Number keys fired quick slots mid-dialogue; pointer lock juggled per modal | No input contexts or modal stack: every feature handles keys and pointer lock itself |
+| Hidden NPCs walking through walls | NPC state is a bag of booleans (`isAggressive`, `isInDialogue`, hidden-ness) read by several systems with different assumptions |
+
+### Where things stand
+
+- **`src/game.ts`: 8,450 lines**, one `Game` class with ~330 members and ~78
+  systems as fields. It holds the wiring, the per-frame ordering (the
+  gameplay step alone is ~150 lines of hand-ordered calls), the content
+  placement for villages, camps and dungeons, and most of the cross-system
+  rules.
+- **`src/systems/`: 116 files, 43k lines.** The individual systems are mostly
+  well tested (5,900 unit tests). Their *composition* is only tested end to
+  end.
+- **Duplicated subsystems:**
+  - quests: `QuestSystem` + framework `QuestEngine`
+  - inventory: `InventorySystem` + framework inventory, with gold synced by hand
+  - schedules, three layers: `ScheduleSystem`, `DailyScheduleSystem`, `NpcScheduleSystem`
+  - NPC AI, three models: combat-system state machine, `npc-ai-state-machine`, `npc-behavior-tree`, plus `xstate` and `mistreevous` as dependencies
+  - chunk streaming: `WorldManager` + `ChunkManager`
+- **Communication:** systems talk through `onSomething = …` callback
+  properties assigned in `game.ts`. The `EventBus` exists, but it has 27
+  `emit` calls and **zero subscribers**.
+- **Randomness:** 79 unseeded `Math.random` calls. World generation is partly
+  seeded per chunk, but gameplay isn't reproducible, which makes bugs hard to
+  replay.
+- **UI:** two toolkits. There are 38 DOM-based UI modules and a Babylon GUI
+  HUD/dialogue layer, each with its own styling, focus and input handling.
+- **Bundle:** main chunk 1.45 MB, Babylon vendor 2.9 MB. Recast (556 KB) is
+  loaded eagerly. Both the GLSL and the WGSL shader sets ship. Models take
+  46 MB uncompressed.
+
+## Goals
+
+1. **Composable runtime.** Features are self-contained modules that register
+   with a kernel. `game.ts` becomes a bootstrap of a few hundred lines.
+2. **One source of truth per concern:** one quest engine, one inventory, one
+   schedule pipeline, one AI model, one streaming system.
+3. **Explicit lifecycles.** Every spawned thing has an owner (chunk, scene
+   scope, feature) and is released with it. Every piece of state is either
+   saved or declared transient, with defined load behaviour.
+4. **Determinism.** Seeded RNG streams per world, chunk and system, so a
+   seed plus an input log can replay a session.
+5. **Rendering as features**, each with quality tiers, budgets and a safe
+   shader-uniform API. Instancing by default, and a real asset pipeline.
+6. **One UI and input stack**, with input contexts and a modal stack that owns
+   pointer lock.
+7. **Measurable performance:** budgets for draw calls, frame time, boot time,
+   memory and bundle size, enforced in CI.
+
+### Non-goals
+
+- Changing engines (Babylon.js stays) or language (TypeScript stays).
+- Rewriting the framework core (`src/framework/*`). It is already pure and
+  tested; it becomes the single domain layer.
+- A big-bang rewrite. Every phase ships, and the game stays playable and
+  green throughout.
+
+## Target architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ App shell: boot, settings, menus, save slots (DOM UI)                │
+├──────────────────────────────────────────────────────────────────────┤
+│ Feature modules (plugins): villages · raids · jobs · smithing ·      │
+│   combat · stealth · crime · dialogue · travel · weather · editors … │
+│   each: components + systems + content + save codec + UI panels      │
+├──────────────────────────────────────────────────────────────────────┤
+│ Kernel                                                               │
+│   phases: input → sim (fixed) → ai → physics → anim → present → ui   │
+│   entity store (ids + components) · typed event bus · services       │
+│   scopes/ownership · RNG streams · save registry · input contexts    │
+├───────────────────────────────┬──────────────────────────────────────┤
+│ Domain (src/framework)        │ Platform adapters                    │
+│ quests, dialogue, inventory,  │ Babylon render/physics/audio,        │
+│ factions, content, mods, save │ storage (web/desktop), Steam         │
+└───────────────────────────────┴──────────────────────────────────────┘
+```
+
+### Kernel
+
+- **Phase scheduler.** Systems declare a phase and an order
+  (`{ phase: "sim", after: ["physics-sync"] }`) instead of the hand-written
+  sequence in `_updateGameplayStep`. The fixed-step loop
+  (`fixed-step-loop.ts`) drives `sim`; `present` runs per rendered frame.
+  Each phase is timed, so the profiler gets per-system cost for free.
+- **Entity store.** Use stable numeric ids, not mesh names. It's an ECS-lite
+  model, not an archetype ECS. Components are plain data
+  (`Transform`, `Body`, `Rig`, `Actor`, `Schedule`, `CombatState`,
+  `Conversation`, `Indoors`, `Inventory`, `Faction`, `ChunkOwned`…) and
+  systems query by component set. NPC state stops being a bag of booleans on
+  a class. "Hidden indoors" becomes an `Indoors` component that the
+  schedule, physics-sync and render systems all respect by construction.
+- **Typed event bus.** One `Events` map (`npc.killed`, `item.picked`,
+  `dialogue.started`, `hour.changed`, `chunk.unloaded`, …) replaces the
+  `onX` callback properties. It has synchronous dispatch, a deferred queue
+  for the end of a phase, and subscription handles that are released with
+  their scope.
+- **Scopes and ownership.** A `Scope` owns entities, meshes, observers,
+  timers and subscriptions. Chunk unload, cell exit, raid end and feature
+  shutdown each dispose a scope. This removes the "spawned thing outlives its
+  reason" class of bugs: raiders, candle lights, colliders, footprints.
+- **RNG streams.** `rng("world", seed)`, `rng("chunk", cx, cz)`,
+  `rng("loot")`, … Each stream is a seeded generator with a saved state where
+  it matters. Combined with an input recorder, this gives deterministic
+  replays for bug reports and tests.
+- **Services.** Use a small service registry (time, weather, player,
+  camera, audio, assets) rather than passing `Game` around. Systems ask for
+  what they use, which makes their dependencies visible and testable.
+
+### Domain consolidation
+
+| Concern | Keep | Retire |
+|---|---|---|
+| Quests | framework `QuestEngine` (graph, triggers, save) | legacy `QuestSystem` (becomes a view model for the quest log) |
+| Inventory | framework inventory + item registry | `InventorySystem` state (becomes a view model) |
+| Schedules | one `ScheduleSystem` driven by data (`npc-schedule-system` definitions) | `DailyScheduleSystem` interactivity hack and the duplicate hour logic |
+| NPC AI | one behaviour model: a behaviour tree selects goals and a steering layer moves the body | the overlapping state machines; fold the one `xstate` user and the one `mistreevous` user into it |
+| Streaming | `ChunkManager` (data) + a render adapter | `WorldManager`'s parallel lifecycle |
+| Jobs / raids / bounties | framework "radiant quest" templates | the bespoke mirroring in `game.ts` |
+
+### World and simulation
+
+- **Content placement becomes data.** Villages, camps, ruins and inns are
+  described by layout specs (as `planVillage` already does) and built by one
+  "site builder" that creates entities inside the chunk's scope. Nothing is
+  placed by hand-written code in `game.ts`.
+- **Navigation.** Each streamed chunk gets a navmesh tile (Recast is already
+  a dependency, and becomes lazy-loaded), with building footprints carved
+  out. NPC movement becomes path plus steering (seek, arrive, separation,
+  obstacle avoidance), as the Yuka evaluation recommended. This replaces the
+  walkable-footprint and sidestep heuristics.
+- **NPC LOD tiers.** Near NPCs get full AI, animation and physics; mid-range
+  NPCs get reduced-rate AI with no physics; far NPCs get a schedule
+  simulation only ("off-screen villagers keep their routines").
+
+### Persistence
+
+- **Save registry.** Each feature registers a codec
+  (`{ key, version, save(), load(data), migrate(from) }`) and declares its
+  transient state with an `onLoad` reset. This replaces the per-system
+  setters (`setVillageJobs`, `setVillageRaids`, …) and the optional fields
+  on one large save object.
+- **Save tests by construction.** A generic round-trip test runs every codec
+  against fixtures, and old save fixtures are kept to exercise the migrations.
+
+### Rendering
+
+- **Render features.** Sky, water, terrain, foliage, shadows, post,
+  characters and FX become modules with
+  `init(tier) / update(frame) / setTier(tier) / dispose()`. Each owns its
+  materials and passes its shader inputs through a typed uniform block helper
+  (the `UniformCache` pattern, generalised), so values can't be shared by
+  reference.
+- **Instancing by default.** Static props are already instanced. Next comes
+  vegetation and scatter as thin instances in per-chunk buffers, merged static
+  geometry per site, and GPU-friendly batching budgets per feature.
+- **Shadows.** Keep cascaded maps with per-cascade caster lists, add a caster
+  budget per cascade, and use static cached cascades when the sun barely
+  moves.
+- **Lighting.** Use a clustered light budget instead of the four-nearest
+  heuristic in `FireFx`, with proper night lighting for every site type,
+  not only villages.
+- **WebGPU first, WebGL2 fallback.** Ship only the shader language the
+  device uses, and load the other lazily.
+- **Asset pipeline.** An offline step will cover:
+  - glTF optimisation: meshopt compression, KTX2/Basis textures
+  - LOD generation and an asset manifest with per-asset budgets (triangles,
+    texture size, materials)
+  - provenance tracking (extending `import-quaternius.mjs`)
+
+  Target: cut the 46 MB of models by at least half, and stream assets per
+  region.
+
+### UI and input
+
+- **One UI toolkit for menus and panels:** DOM with a light component layer.
+  The choice between Preact and plain custom elements is an open decision.
+  Babylon GUI is kept only for world-space UI such as nameplates and markers.
+  Styling comes from one design-token sheet; it's already mostly
+  `main.css`.
+- **Input contexts.** Gameplay, dialogue, menu, map and editor each map
+  physical keys to actions. Only the top context receives input, so number
+  keys can't leak to quick slots during dialogue. Rebinding works everywhere.
+- **Modal stack.** One manager pushes and pops panels. It owns pointer lock,
+  pause, the crosshair and HUD visibility, and the focus trap, replacing the
+  hand-maintained lists in `game.ts` (pause cascade, close-all,
+  `_isCombatInputBlocked`, `setHtmlOverlayActive`).
+- **Camera director.** Gameplay, dialogue framing, cinematics and death cam
+  are camera modes on one camera stack. `DialogueCamera` is the first such
+  mode.
+
+### Tooling and quality
+
+- **Headless simulation harness.** Run the kernel with stub render and
+  physics adapters in Vitest. Feature behaviour (raids, jobs, schedules) can
+  then be tested without Playwright.
+- **Deterministic replays:** record the seed plus inputs, replay in CI, and
+  use the result as a regression test.
+- **Performance budgets in CI.** Extend `perf-census.spec.ts` to fail when a
+  scene exceeds its budgets. Proposed starting budgets:
+
+  | Scene | Draw calls | Active meshes |
+  |---|---|---|
+  | Village | ≤ 350 | ≤ 500 |
+  | Start area | ≤ 250 | — |
+
+  Also track boot-to-playable time and heap size.
+- **Architecture lint.** Dependency rules such as "framework imports no
+  Babylon", "features don't import each other, only kernel events and
+  services" and "no `Math.random` outside the RNG module", enforced with
+  dependency-cruiser and ESLint.
+- **Bundle budgets:** main chunk ≤ 900 KB, with Recast, the editors and the
+  inspector lazy-loaded.
+
+## Migration plan
+
+Each phase ends shippable, with all tests green and the game playable. Effort
+is in focused engineer-weeks, assuming the current test suite is kept as the
+safety net.
+
+### Phase 0 — Guardrails (1 week)
+
+- Turn on the perf census as a CI check, with today's numbers as the
+  baseline and budgets that ratchet down.
+- Add architecture lint rules, starting with warnings.
+- Add a headless harness skeleton and one feature test through it.
+- Build a save fixture corpus from current saves.
+
+**Exit:** CI reports perf, bundle size and lint, and save fixtures load.
+
+### Phase 1 — Kernel and features (3–4 weeks)
+
+- Kernel: phase scheduler, typed event bus, scopes, services, RNG streams.
+- Move the `_updateGameplayStep` ordering into phase registrations, with
+  behaviour unchanged.
+- Extract features out of `game.ts` one at a time, starting with the newest
+  and most self-contained: raids, jobs, notice boards, smithing stations,
+  villages, bandit camps, dragons, weather and atmosphere, then dialogue
+  hooks.
+- Replace `onX` callbacks with events as each feature moves.
+
+**Exit:** `game.ts` is under 2,500 lines, and the extracted features own their
+state, scope and save codec.
+
+### Phase 2 — Input, modals and camera (2 weeks)
+
+- Input contexts plus a key-to-action map.
+- A modal stack that owns pointer lock and HUD visibility.
+- A camera stack (gameplay, dialogue, cinematic and death modes).
+- Remove the hand-kept modal lists.
+
+**Exit:** no feature touches `requestPointerLock`, `exitPointerLock` or raw
+`keydown` directly.
+
+### Phase 3 — Entity model for actors (3–4 weeks)
+
+- Entity ids for NPCs and the player, with components replacing NPC booleans.
+- Schedule, combat, stealth, crime and animation become component queries.
+- Ownership via `ChunkOwned` and scopes. Chunk unload is a scope dispose.
+- NPC LOD tiers.
+
+**Exit:** no system reads `mesh.name` for identity, and NPC flags are
+components.
+
+### Phase 4 — Consolidation (3 weeks)
+
+- One quest engine, one inventory and one schedule pipeline.
+- Radiant job and raid templates in the framework.
+- Remove the duplicate modules and the unused `3d-tiles-renderer`
+  dependency. Once the single AI model replaces their only users, remove
+  `xstate` and `mistreevous` too.
+
+**Exit:** the domain table above is fully on its "Keep" column.
+
+### Phase 5 — Persistence (1–2 weeks)
+
+- A save registry and per-feature codecs, with migrations from the current
+  format.
+- Transient state declared per feature.
+- Replay recorder.
+
+**Exit:** a round-trip test over all codecs passes, old fixtures migrate, and
+one replay runs in CI.
+
+### Phase 6 — World and navigation (3 weeks)
+
+- Data-driven site builder for all site types.
+- Navmesh tiles per chunk, plus steering.
+- Off-screen schedule simulation.
+
+**Exit:** no placement code in `game.ts`. NPCs path around buildings using
+the navmesh.
+
+### Phase 7 — Rendering and assets (4 weeks; can run in parallel from Phase 2)
+
+- Render feature modules and the uniform block helper.
+- Thin-instanced vegetation, and a light budget across all sites.
+- Asset pipeline: meshopt, KTX2, LODs and a manifest. Lazy shader language.
+
+**Exit:** budgets are met on the census scenes, and model size is at most
+50% of today's.
+
+### Phase 8 — UI consolidation (3 weeks; can run in parallel from Phase 2)
+
+- Move the Babylon GUI panels (dialogue, inventory, pause, quest log, skill
+  tree) to the DOM component layer.
+- Design tokens and an accessibility pass covering focus, contrast and
+  scaling.
+
+**Exit:** Babylon GUI is used only for world-space UI.
+
+**Total:** roughly 23–28 engineer-weeks sequentially, or about 16–18 weeks
+with the rendering and UI tracks in parallel.
+
+## Success metrics
+
+| Metric | Today | Target |
+|---|---|---|
+| `game.ts` | 8,450 lines | ≤ 500 lines (bootstrap only) |
+| Duplicate subsystems | 5 concerns | 0 |
+| Systems wired by callback properties | most | 0 (events + services) |
+| Unseeded `Math.random` | 79 | 0 outside the RNG module |
+| Village draw calls / frame | ~290 | ≤ 250 |
+| Main JS chunk | 1.45 MB | ≤ 900 KB |
+| Model payload | 46 MB | ≤ 23 MB |
+| Feature logic testable headless | none | all features |
+| Save codecs with round-trip tests | 0 | all |
+
+## Risks
+
+- **Regression risk during extraction.** Mitigation: the existing 5,900 unit
+  tests, the Playwright scenarios, replays (from Phase 5), and moving one
+  feature per pull request.
+- **Save compatibility.** Mitigation: the fixture corpus, plus migrations
+  that are themselves tested and versioned.
+- **Scope creep** (a "while we're here" rewrite of features). Mitigation:
+  each phase has a behaviour-neutral exit, and gameplay changes go in
+  separate pull requests.
+- **Performance work without real-GPU numbers.** CI runs on software GL.
+  Mitigation: CI budgets track draw calls and CPU-side counts, and a
+  periodic manual pass on reference hardware records real frame times in
+  `docs/rendering.md`.
+
+## Open decisions
+
+1. **Entity model.** Use a hand-rolled ECS-lite (recommended: small, typed,
+   no dependency) or adopt `bitECS`.
+2. **UI layer.** Use Preact with signals (recommended: tiny, familiar) or
+   plain Web Components.
+3. **Renderer default.** WebGPU first with WebGL2 fallback (recommended), or
+   keep WebGL2 as the default until WebGPU support is broader on the target
+   hardware.
+4. **In-game editors.** Keep them inside the game bundle (lazy-loaded) or
+   split them into a separate editor app that shares the kernel. Splitting
+   is cleaner, but it is a larger move.
+5. **Navigation.** Use Recast navmesh tiles (recommended; already a
+   dependency) or a simpler grid-plus-steering for the open world.
