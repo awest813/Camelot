@@ -386,6 +386,12 @@ state, scope and save codec.
   that never fired, because an earlier branch for the same key caught them:
   Ctrl+M (Scene Notes), Ctrl+Shift+M (Mod Manifest), and T in the editor
   (placement type). Gameplay keys no longer act inside the editor.
+- Starting content moved out of `init()` into `src/content/`:
+  - `starter-merchants.ts`: one table for the merchants, their shops and
+    their restock stock. The restock copy had drifted, so the general store
+    lost its food after the first restock.
+  - `starting-area.ts`: the chest, the Old Cave, the ground weapons and the
+    first quests.
 
   Render counts after the extraction match the pre-extraction baseline
   (2,066 village meshes), so villages are built identically. The render

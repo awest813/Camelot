@@ -272,6 +272,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   and T in the map editor (cycle the placement type).
 - Gameplay keys (crouch, combat stances, quest log, …) no longer act while the
   map editor is open.
+- Village General Goods keeps its bread, ale and stew after a restock.
 
 ### Changed
 - Plain B still opens Enchanting. B with Shift held now opens Smithing.

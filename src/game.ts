@@ -69,7 +69,9 @@ import { CrimeSystem } from "./systems/crime-system";
 import { ContainerSystem } from "./systems/container-system";
 import { ProjectileSystem } from "./systems/projectile-system";
 import { BarterSystem } from "./systems/barter-system";
-import { ShopSystem, type ShopDef } from "./systems/shop-system";
+import { ShopSystem } from "./systems/shop-system";
+import { registerStarterMerchants, HEALTH_POTION_STATS } from "./content/starter-merchants";
+import { seedStartingArea } from "./content/starting-area";
 import { CellManager } from "./world/cell-manager";
 import { SpellSystem } from "./systems/spell-system";
 import { PersuasionSystem } from "./systems/persuasion-system";
@@ -98,7 +100,7 @@ import { IndoorsFeature } from "./features/indoors/indoors-feature";
 import { MountsFeature, MountsKey, MountHostKey, type MountsService } from "./features/mounts/mounts-feature";
 import { WorldEventsFeature, WorldEventsKey } from "./features/world-events/world-events-feature";
 import { VillageJobsFeature, JobsKey, type JobsService } from "./features/village-jobs/jobs-feature";
-import { smithingMaterialStack, type ForgeRegistry, type SmithingController } from "./systems/smithing-controller";
+import type { ForgeRegistry, SmithingController } from "./systems/smithing-controller";
 import type { EnchantingSystem } from "./systems/enchanting-system";
 import type { EnchantingUI } from "./ui/enchanting-ui";
 import { LodSystem } from "./systems/lod-system";
@@ -232,7 +234,6 @@ const LEVEL_ITEM_TEMPLATES: Readonly<Record<string, {
   daedric_cuirass: { name: "Daedric Cuirass", description: "Armor carved from raw Oblivion.", weight: 14, slot: "chest", stats: { armor: 36, value: 2000 } },
 };
 /** Merchant / restock health potions: `value` for barter pricing, `heal` for consumable use. */
-const HEALTH_POTION_STATS = { value: 25, heal: 50 } as const;
 /** Persisted local author identity for layer ownership workflows. */
 
 export class Game {
@@ -1239,60 +1240,6 @@ export class Game {
 
     // MerchantRestockSystem — restock the starter merchant every 72 game-hours
     this.merchantRestockSystem = new MerchantRestockSystem();
-    const merchantTemplate = [
-      { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 5, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
-      { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 3, weight: 1, stats: { value: 15 } },
-    ];
-    this.merchantRestockSystem.registerMerchant(
-      "merchant_01",
-      merchantTemplate,
-      500,
-      72,
-      this.timeSystem.elapsedGameTime,
-    );
-    this.merchantRestockSystem.registerMerchant(
-      "merchant_general_01",
-      [
-        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 8, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
-        { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 4, weight: 1, stats: { value: 15 } },
-      ],
-      450,
-      72,
-      this.timeSystem.elapsedGameTime,
-    );
-    this.merchantRestockSystem.registerMerchant(
-      "merchant_weapons_01",
-      [
-        { id: "iron_sword", name: "Iron Sword", description: "A basic iron sword.", stackable: false, quantity: 2, slot: "mainHand", weight: 3, stats: { damage: 10, value: 80 } },
-        { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 6, weight: 1, stats: { value: 15 } },
-        smithingMaterialStack("iron_ingot", 10),
-        smithingMaterialStack("steel_ingot", 4),
-        smithingMaterialStack("repair_hammer", 5),
-      ],
-      800,
-      72,
-      this.timeSystem.elapsedGameTime,
-    );
-    this.merchantRestockSystem.registerMerchant(
-      "merchant_armor_01",
-      [
-        { id: "leather_chest_01", name: "Leather Chest", description: "Light armor. +15 Armor Rating.", stackable: false, quantity: 1, slot: "chest", weight: 4, stats: { armor: 15, value: 55 } },
-        { id: "iron_helm_01", name: "Iron Helm", description: "A sturdy iron helmet. +12 Armor Rating.", stackable: false, quantity: 2, slot: "head", weight: 2.5, stats: { armor: 12, value: 45 } },
-        smithingMaterialStack("iron_ingot", 6),
-        smithingMaterialStack("leather_strips", 10),
-        smithingMaterialStack("repair_hammer", 5),
-      ],
-      650,
-      72,
-      this.timeSystem.elapsedGameTime,
-    );
-    this.merchantRestockSystem.registerMerchant(
-      "merchant_alchemist_01",
-      [{ id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 12, weight: 0.3, stats: { ...HEALTH_POTION_STATS } }],
-      520,
-      72,
-      this.timeSystem.elapsedGameTime,
-    );
     this.merchantRestockSystem.onRestock = (merchantId) => {
       const merchant = this.barterSystem.getMerchant(merchantId);
       const name = merchant?.name ?? merchantId;
@@ -1757,155 +1704,18 @@ export class Game {
     // A forge near the starting area so steel work is reachable from day one.
     this._placeSmithy(null, null, -4, -5);
 
-    // Spawn a test container chest
-    this.containerSystem.spawnContainer({
-      id: "chest_01",
-      name: "Old Chest",
-      position: new Vector3(5, 1, 5),
-      contents: [
-        { id: "gold_coins", name: "Gold Coins", description: "A handful of gold coins.", stackable: true, quantity: 50, weight: 0.1, stats: { value: 1 } },
-        { id: "iron_sword", name: "Iron Sword", description: "A basic iron sword.", stackable: false, quantity: 1, slot: "mainHand", weight: 3, stats: { damage: 10, value: 80 } },
-      ],
+    // The starting area: a chest, the Old Cave, weapons on the ground, the first quests.
+    seedStartingArea({
+      scene: this.scene,
+      assets: this.fantasyAssets,
+      quests: this.questSystem,
+      containers: this.containerSystem,
+      cells: this.cellManager,
+      castShadow: (root) => this.shadowGenerator?.addShadowCaster(root, true),
     });
 
-    // Spawn a test cave entrance portal near the starting area
-    this.cellManager.buildSimpleInterior(
-      "cave_01",
-      "Old Cave",
-      "portal_cave_entrance",
-      new Vector3(-8, 1, 8),
-      new Vector3(-8, 2, 8),  // return position after exiting
-    );
-
-    // Register merchants (dialogue `barter:open` uses payload.merchantId)
-    this.barterSystem.registerMerchant({
-      id: "merchant_01",
-      name: "Trader Elan",
-      factionId: "town",
-      inventory: [
-        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 5, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
-        { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 3, weight: 1, stats: { value: 15 } },
-      ],
-      gold: 500,
-      priceMultiplier: 1.1,
-      isOpen: true,
-      openHour: 8,
-      closeHour: 20,
-    });
-    this.barterSystem.registerMerchant({
-      id: "merchant_general_01",
-      name: "Village General Goods",
-      factionId: "merchants_guild",
-      inventory: [
-        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 8, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
-        { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 4, weight: 1, stats: { value: 15 } },
-        { id: "bread", name: "Loaf of Bread", description: "Hearty bread. Restores hunger.", stackable: true, quantity: 6, weight: 0.2, stats: { value: 5, nutrition: 30 } },
-        { id: "ale", name: "Mug of Ale", description: "Watered-down but filling.", stackable: true, quantity: 6, weight: 0.4, stats: { value: 4, nutrition: 15 } },
-        { id: "stew", name: "Bowl of Stew", description: "Hot and hearty. Restores a lot of hunger.", stackable: true, quantity: 4, weight: 0.5, stats: { value: 8, nutrition: 50 } },
-      ],
-      gold: 450,
-      priceMultiplier: 1.05,
-      isOpen: true,
-      openHour: 7,
-      closeHour: 21,
-    });
-    this.barterSystem.registerMerchant({
-      id: "merchant_weapons_01",
-      name: "Roadside Arms",
-      factionId: "merchants_guild",
-      inventory: [
-        { id: "iron_sword", name: "Iron Sword", description: "A basic iron sword.", stackable: false, quantity: 2, slot: "mainHand", weight: 3, stats: { damage: 10, value: 80 } },
-        { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 6, weight: 1, stats: { value: 15 } },
-        smithingMaterialStack("iron_ingot", 10),
-        smithingMaterialStack("steel_ingot", 4),
-        smithingMaterialStack("repair_hammer", 5),
-      ],
-      gold: 800,
-      priceMultiplier: 1.15,
-      isOpen: true,
-      openHour: 8,
-      closeHour: 19,
-    });
-    this.barterSystem.registerMerchant({
-      id: "merchant_armor_01",
-      name: "Shield & Hauberk",
-      factionId: "merchants_guild",
-      inventory: [
-        { id: "leather_chest_01", name: "Leather Chest", description: "Light armor. +15 Armor Rating.", stackable: false, quantity: 1, slot: "chest", weight: 4, stats: { armor: 15, value: 55 } },
-        { id: "iron_helm_01", name: "Iron Helm", description: "A sturdy iron helmet. +12 Armor Rating.", stackable: false, quantity: 2, slot: "head", weight: 2.5, stats: { armor: 12, value: 45 } },
-        smithingMaterialStack("iron_ingot", 6),
-        smithingMaterialStack("leather_strips", 10),
-        smithingMaterialStack("repair_hammer", 5),
-      ],
-      gold: 650,
-      priceMultiplier: 1.12,
-      isOpen: true,
-      openHour: 8,
-      closeHour: 19,
-    });
-    this.barterSystem.registerMerchant({
-      id: "merchant_alchemist_01",
-      name: "Stillwater Reagents",
-      factionId: "mages_college",
-      inventory: [
-        { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 12, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
-      ],
-      gold: 520,
-      priceMultiplier: 1.2,
-      isOpen: true,
-      openHour: 9,
-      closeHour: 18,
-    });
-
-    const starterShops: ShopDef[] = [
-      {
-        id: "shop_trader_elan",
-        name: "Trader Elan's Stall",
-        type: "general",
-        merchantId: "merchant_01",
-        factionId: "town",
-        openHour: 8,
-        closeHour: 20,
-        description: "Roadside trader with potions and arrows.",
-      },
-      {
-        id: "shop_village_general",
-        name: "Village General Goods",
-        type: "general",
-        merchantId: "merchant_general_01",
-        factionId: "merchants_guild",
-        openHour: 7,
-        closeHour: 21,
-      },
-      {
-        id: "shop_roadside_arms",
-        name: "Roadside Arms",
-        type: "weapons",
-        merchantId: "merchant_weapons_01",
-        factionId: "merchants_guild",
-        openHour: 8,
-        closeHour: 19,
-      },
-      {
-        id: "shop_shield_hauberk",
-        name: "Shield & Hauberk",
-        type: "armor",
-        merchantId: "merchant_armor_01",
-        factionId: "merchants_guild",
-        openHour: 8,
-        closeHour: 19,
-      },
-      {
-        id: "shop_stillwater_reagents",
-        name: "Stillwater Reagents",
-        type: "alchemist",
-        merchantId: "merchant_alchemist_01",
-        factionId: "mages_college",
-        openHour: 9,
-        closeHour: 18,
-      },
-    ];
-    this.shopSystem.registerAll(starterShops);
+    // The starting region's merchants (dialogue `barter:open` uses payload.merchantId).
+    registerStarterMerchants(this.barterSystem, this.merchantRestockSystem, this.shopSystem, this.timeSystem.elapsedGameTime);
 
     this._barterUI.onBuy = (itemId, instanceId) => {
       const mid = this.barterSystem.activeMerchantId;
@@ -2136,107 +1946,6 @@ export class Game {
         slot: "head",
         stats: { armor: 12 }
     });
-
-    // ── Fantasy weapon loot (with CDN 3D model overlays) ─────────────────
-    // Each weapon is a standard Loot sphere for physics/pickup, with a
-    // BabylonJS Assets CDN model parented to it as the visual representation.
-    const _placeWeaponLoot = (
-      lootPos: Vector3,
-      item: { id: string; name: string; description: string; slot: string; stats: Record<string, number> },
-      assetKey: "runeSword" | "frostAxe" | "moltenDagger",
-      modelScale: number,
-      modelOffsetY: number,
-    ) => {
-      const loot = new Loot(this.scene, lootPos, { ...item, stackable: false, quantity: 1 });
-      // Dim the sphere so the CDN model is the main visual
-      (loot.mesh.material as any).alpha = 0.0;
-      this.fantasyAssets.getInstance(assetKey, (root) => {
-        if (!root) {
-          // Fallback: restore sphere visibility
-          (loot.mesh.material as any).alpha = 1.0;
-          return;
-        }
-        root.parent   = loot.mesh;
-        root.position = new Vector3(0, modelOffsetY, 0);
-        setInstanceScale(root, modelScale);
-        this.shadowGenerator?.addShadowCaster(root, true);
-      });
-      return loot;
-    };
-
-    _placeWeaponLoot(
-      new Vector3(3, 1, 3),
-      { id: "rune_sword_01", name: "Runesword", description: "A blade etched with glowing runes. +22 Damage, +8 Magicka.", slot: "mainHand", stats: { damage: 22, magicka: 8 } },
-      "runeSword", 0.6, -0.2,
-    );
-
-    _placeWeaponLoot(
-      new Vector3(9, 1, 4),
-      { id: "frost_axe_01", name: "Frost Axe", description: "A frost-enchanted axe. +18 Damage, +12 frost resist.", slot: "mainHand", stats: { damage: 18, frostResist: 12 } },
-      "frostAxe", 0.55, -0.15,
-    );
-
-    _placeWeaponLoot(
-      new Vector3(5, 1, 10),
-      { id: "molten_dagger_01", name: "Molten Dagger", description: "Forged in volcanic glass. +14 Damage, 5 fire DoT.", slot: "mainHand", stats: { damage: 14, fireDot: 5 } },
-      "moltenDagger", 0.5, -0.1,
-    );
-
-    // Test Quests
-    this.questSystem.addQuest({
-        id: "quest_kill_guard",
-        name: "Eliminate the Guard",
-        description: "A rogue guard threatens the village. Defeat him.",
-        isCompleted: false,
-        isActive: true,
-        reward: "100 XP",
-        xpReward: 100,
-        objectives: [{
-            id: "obj_kill_guard",
-            type: "kill",
-            description: "Defeat the Guard",
-            targetId: "Guard",
-            required: 1,
-            current: 0,
-            completed: false
-        }]
-    }, true);
-    this.questSystem.addQuest({
-        id: "quest_collect_potions",
-        name: "Stock the Medicine Chest",
-        description: "The village healer needs supplies.",
-        isCompleted: false,
-        isActive: true,
-        reward: "50 XP",
-        xpReward: 50,
-        objectives: [{
-            id: "obj_collect_potions",
-            type: "fetch",
-            description: "Collect Health Potions",
-            targetId: "potion_hp_01",
-            required: 1,
-            current: 0,
-            completed: false
-        }]
-    }, true);
-    this.questSystem.addQuest({
-        id: "quest_speak_guard",
-        name: "Parley with the Guard",
-        description: "Try talking to the Guard before resorting to violence.",
-        isCompleted: false,
-        isActive: true,
-        reward: "25 XP",
-        xpReward: 25,
-        objectives: [{
-            id: "obj_talk_guard",
-            type: "talk",
-            description: "Speak with the Guard",
-            targetId: "Guard",
-            required: 1,
-            current: 0,
-            completed: false
-        }]
-    }, true);
 
     // Input handling for combat
     this.scene.onPointerObservable.add((pointerInfo) => {
