@@ -190,6 +190,39 @@ describe('CombatSystem', () => {
         expect(mockPlayer.notifyResourceSpent).toHaveBeenCalledWith('stamina');
     });
 
+    it('townsfolk (not hostile on sight) ignore the player walking up', () => {
+        mockNpcs[0].hostileOnSight = false;
+        mockNpcs[0].aiState = "PATROL";
+        combatSystem.updateNPCAI(0.1);
+        combatSystem.updateNPCAI(0.1);
+        expect(mockNpcs[0].aiState).toBe("PATROL");
+        expect(mockNpcs[0].isAggressive).toBe(false);
+    });
+
+    it('hostile-on-sight NPCs still aggro on proximity', () => {
+        mockNpcs[0].aiState = "PATROL";
+        combatSystem.updateNPCAI(0.1);
+        expect(mockNpcs[0].aiState).toBe("ALERT");
+        expect(mockNpcs[0].isAggressive).toBe(true);
+    });
+
+    it('a struck townsperson fights back, then calms down once home', () => {
+        mockNpcs[0].hostileOnSight = false;
+        mockScene.pickWithRay.mockReturnValue({ pickedMesh: mockNpcs[0].mesh, pickedPoint: new Vector3(0, 0, 1) });
+        combatSystem.meleeAttack();
+        expect(mockNpcs[0].aiState).toBe("CHASE");
+        expect(mockNpcs[0].provoked).toBe(true);
+
+        // It gives up and walks home: back at spawn with the player far away.
+        mockPlayer.camera.position = new Vector3(500, 0, 500);
+        mockNpcs[0].aiState = "RETURN";
+        mockNpcs[0].patrolPoints = [];
+        mockNpcs[0].mesh.position = mockNpcs[0].spawnPosition.clone();
+        combatSystem.updateNPCAI(0.1);
+        expect(["IDLE", "PATROL"]).toContain(mockNpcs[0].aiState);
+        expect(mockNpcs[0].provoked).toBe(false);
+    });
+
     it('magicAttack should fail if magicka is too low', () => {
         mockPlayer.magicka = 10;
         const ok = combatSystem.magicAttack();

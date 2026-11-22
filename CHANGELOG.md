@@ -65,6 +65,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
     pipeline is off, so the grade is applied by the materials instead.
 
 ### Fixed
+- Townsfolk no longer attack the player on sight. Innkeepers, shopkeepers,
+  villagers and trainers used to draw weapons as soon as you walked within
+  about 12 paces, and the stealth system turned them hostile as soon as it
+  registered that they had fully seen you. That made talking and trading
+  with them impossible.
+  - Only monsters, bandits and the undead are hostile on sight now.
+  - A townsperson you hit fights back, then calms down after walking home.
+  - One brawl no longer sets the whole guild on you; the guards and the crime
+    system answer it instead.
 - Inns, cottages, pirate forts and their people (innkeepers, shopkeepers,
   trainers, bandits, dragons) were missing from default builds. The setting
   that keeps the remote Babylon.js models off was also stopping every one of

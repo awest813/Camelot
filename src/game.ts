@@ -7152,6 +7152,7 @@ export class Game {
 
   private _engageGuardCombat(guard: NPC): void {
       guard.isAggressive = true;
+      guard.provoked = true;
       guard.aiState = AIState.CHASE;
       guard.lastKnownPlayerPos = this.player.camera.position.clone();
       this.ui.showNotification(`${guard.mesh.name} attacks!`, 2500);

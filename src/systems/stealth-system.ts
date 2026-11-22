@@ -228,7 +228,10 @@ export class StealthSystem {
           this.onPartialDetection?.(npc, this._player.camera.position.clone());
         }
 
-        if (!wasFullyDetected && next >= 100) {
+        // Being seen only turns hostile-on-sight NPCs (or provoked ones);
+        // a villager noticing you keeps its detection level (witness, pickpocket)
+        // but does not draw a weapon.
+        if (!wasFullyDetected && next >= 100 && (npc.hostileOnSight !== false || npc.provoked)) {
           npc.aiState = AIState.ALERT;
           npc.isAggressive = true;
           this.onDetected?.(npc);

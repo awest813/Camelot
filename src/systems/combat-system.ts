@@ -1433,7 +1433,7 @@ export class CombatSystem {
         if (npc.patrolPoints.length > 0) {
           npc.aiState = AIState.PATROL; // quiet upgrade, no colour/flag change
         }
-        if (distSq <= aggroRangeSq) {
+        if (distSq <= aggroRangeSq && this._aggroesOnProximity(npc)) {
           this._transitionTo(npc, AIState.ALERT);
         }
         break;
@@ -1441,7 +1441,7 @@ export class CombatSystem {
       // ── PATROL ────────────────────────────────────────────────────────────
       case AIState.PATROL:
         // ScheduleSystem owns movement in this state.
-        if (distSq <= aggroRangeSq) {
+        if (distSq <= aggroRangeSq && this._aggroesOnProximity(npc)) {
           this._transitionTo(npc, AIState.ALERT);
         }
         break;
@@ -1464,7 +1464,7 @@ export class CombatSystem {
       // ── INVESTIGATE ───────────────────────────────────────────────────────
       case AIState.INVESTIGATE:
         // Re-aggro if the player returns while we're searching.
-        if (distSq <= aggroRangeSq) {
+        if (distSq <= aggroRangeSq && this._aggroesOnProximity(npc)) {
           this._transitionTo(npc, AIState.ALERT);
           break;
         }
@@ -1547,7 +1547,7 @@ export class CombatSystem {
       // ── RETURN ────────────────────────────────────────────────────────────
       case AIState.RETURN:
         // Re-aggro if player wanders close again
-        if (distSq <= aggroRangeSq) {
+        if (distSq <= aggroRangeSq && this._aggroesOnProximity(npc)) {
           this._transitionTo(npc, AIState.ALERT);
           break;
         }
@@ -1601,7 +1601,18 @@ export class CombatSystem {
     npc.setStateColor(COLOR_INVESTIGATE);
   }
 
+  /** Hostile-on-sight NPCs, or friendly ones the player has provoked. */
+  private _aggroesOnProximity(npc: NPC): boolean {
+    return npc.hostileOnSight !== false || npc.provoked === true;
+  }
+
   private _transitionTo(npc: NPC, newState: AIState): void {
+    // Anyone who starts chasing / attacking has been provoked (hit, a resisted
+    // guard, a pack call); townsfolk calm down once they are home again.
+    if (newState === AIState.CHASE || newState === AIState.ATTACK) npc.provoked = true;
+    if ((newState === AIState.IDLE || newState === AIState.PATROL) && npc.aiState === AIState.RETURN) {
+      npc.provoked = false;
+    }
     npc.aiState = newState;
 
     // Keep legacy flag in sync for ScheduleSystem / DialogueSystem
@@ -1702,6 +1713,9 @@ export class CombatSystem {
    * allies join in — the player can't pull a camp one at a time.
    */
   private _broadcastAggro(source: NPC): void {
+    // Camps and packs fight together; townsfolk don't mob the player over one
+    // brawl (guards answer that through the crime system).
+    if (source.hostileOnSight === false) return;
     const faction = source.factionId;
     if (!faction) return;
 

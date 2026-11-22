@@ -123,6 +123,19 @@ export class NPC {
    * false → IDLE  | PATROL
    */
   public isAggressive: boolean = false;
+  /**
+   * Whether this NPC turns on the player just for coming close (or for being
+   * spotted by it).  Monsters, bandits and the restless dead are hostile on
+   * sight; townsfolk, traders and trainers (archetype `isHostile: false`) are
+   * not — they only fight once {@link provoked}.  Defaults to true so ad-hoc
+   * enemy spawns keep their behaviour.
+   */
+  public hostileOnSight: boolean = true;
+  /**
+   * Set when the player attacks this NPC (or a guard is resisted).  A provoked
+   * NPC fights like a hostile one until it gives up and walks home.
+   */
+  public provoked: boolean = false;
 
   /** World position where this NPC was initially spawned; used for RETURN state. */
   public spawnPosition: Vector3;

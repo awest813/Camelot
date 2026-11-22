@@ -93,7 +93,8 @@ export class NpcArchetypeSystem {
     // Loot table
     npc.lootTableId = def.lootTableId ?? null;
 
-    // Hostility
+    // Hostility: only hostile archetypes attack on sight; townsfolk wait to be provoked.
+    npc.hostileOnSight = !!def.isHostile;
     if (def.isHostile) {
       npc.isAggressive = true;
     }

@@ -92,6 +92,16 @@ describe("StealthSystem", () => {
     expect(mockNpc.isAggressive).toBe(true);
   });
 
+  it("a townsperson noticing the player keeps detection but does not turn hostile", () => {
+    const onDetected = vi.fn();
+    stealthSystem.onDetected = onDetected;
+    (mockNpc as unknown as { hostileOnSight: boolean }).hostileOnSight = false;
+    for (let i = 0; i < 60; i++) stealthSystem.update(1.0);
+    expect(stealthSystem.getDetectionLevel(mockNpc)).toBe(100);
+    expect(onDetected).not.toHaveBeenCalled();
+    expect(mockNpc.isAggressive).toBe(false);
+  });
+
   it("does not fire onDetected twice for the same detection event", () => {
     const onDetected = vi.fn();
     stealthSystem.onDetected = onDetected;
