@@ -5703,9 +5703,9 @@ export class Game {
       chunkRecord: { npcs: NPC[] },
       x: number,
       z: number,
-  ): boolean {
+  ): NPC | null {
       const npc = this.npcArchetypeSystem.spawnNpc(archetypeId, this.scene, new Vector3(x, 2, z));
-      if (!npc) return false;
+      if (!npc) return null;
       this.scheduleSystem.addNPC(npc);
       const cx = Math.floor(x / this.world.chunkSize);
       const cz = Math.floor(z / this.world.chunkSize);
@@ -5714,7 +5714,7 @@ export class Game {
       this._registerPickpocketInventory(npc);
       this.lodSystem.register(npc.mesh, 120);
       chunkRecord.npcs.push(npc);
-      return true;
+      return npc;
   }
 
   /** Map the equipped main-hand item to a combat weapon archetype (default: sword). */
@@ -7480,8 +7480,14 @@ export class Game {
         this._placeSiteProp(chunkKey, chunkRecord, p.key, here, p.x, p.z, p.rot);
       }
       this._placeSmithy(chunkKey, chunkRecord, plan.forge.x, plan.forge.z, plan.forge.rot);
+      const at = (p: { x: number; z: number }) => new Vector3(p.x, 2, p.z);
       for (const r of plan.residents) {
-        this._spawnArchetypeNpc(r.archetype, chunkRecord, r.x, r.z);
+        const npc = this._spawnArchetypeNpc(r.archetype, chunkRecord, r.x, r.z);
+        if (!npc) continue;
+        // Daily routine anchors (ScheduleSystem: work / wander / sleep / patrol).
+        if (r.work) npc.workPosition = at(r.work);
+        if (r.home) npc.homePosition = at(r.home);
+        if (r.patrol) npc.patrolPoints = r.patrol.map(at);
       }
       this._loadedVillages.set(chunkKey, plan);
   }

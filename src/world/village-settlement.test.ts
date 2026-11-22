@@ -95,6 +95,25 @@ describe("village settlements", () => {
     }
   });
 
+  it("gives residents daily routines: villagers work the square, guards walk a beat", () => {
+    for (const [cx, cz] of villageChunks(20)) {
+      const v = planVillage(cx, cz, CHUNK);
+      const dist = (p: { x: number; z: number }) => Math.hypot(p.x - v.center.x, p.z - v.center.z);
+      const villagers = v.residents.filter((r) => r.archetype === "archetype_villager");
+      for (const r of villagers) {
+        expect(r.work, "villagers have a work spot").toBeDefined();
+        expect(r.home, "villagers have a home").toBeDefined();
+        expect(dist(r.work!)).toBeLessThan(PLAZA_RADIUS);        // out on the square by day
+        expect(dist(r.home!)).toBeGreaterThan(PLAZA_RADIUS - 2); // by a door at night (1.4 m in front of it)
+      }
+      const guards = v.residents.filter((r) => r.archetype === "archetype_guard");
+      for (const g of guards) {
+        expect(g.patrol!.length).toBeGreaterThanOrEqual(3);
+        for (const p of g.patrol!) expect(dist(p)).toBeLessThan(VILLAGE_CLEAR_RADIUS);
+      }
+    }
+  });
+
   it("village names rarely repeat", () => {
     const names = villageChunks(120).map(([cx, cz]) => planVillage(cx, cz, CHUNK).name);
     expect(new Set(names).size / names.length).toBeGreaterThan(0.85);

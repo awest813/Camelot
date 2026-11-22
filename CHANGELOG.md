@@ -16,6 +16,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   - residents: an innkeeper, a barkeep, the village smith (Armorer trainer), a
     shopkeeper, a traveling merchant, and villagers.
 
+  Villagers keep a daily routine: out on the square by day, a stroll in the
+  evening, and back to their own door at night. Gate guards walk a beat from
+  the gate round the square.
   Walking into the square shows "Discovered: <name>" and adds the village to
   the fast-travel menu. Villages are always the same in the same place, and
   their ground is kept clear of trees, rocks and ruins.

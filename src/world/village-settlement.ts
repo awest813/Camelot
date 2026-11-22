@@ -42,6 +42,19 @@ export interface VillageBuilding {
   rot: number;
 }
 
+/** A villager to spawn, with optional daily-routine anchors. */
+export interface VillageResident {
+  archetype: string;
+  x: number;
+  z: number;
+  /** Where the schedule's "work" block sends them (defaults to the spawn point). */
+  work?: { x: number; z: number };
+  /** Where they sleep / wander from (defaults to the spawn point). */
+  home?: { x: number; z: number };
+  /** Patrol loop (guards). */
+  patrol?: Array<{ x: number; z: number }>;
+}
+
 export interface VillagePlan {
   id: string;
   name: string;
@@ -49,7 +62,7 @@ export interface VillagePlan {
   clearRadius: number;
   buildings: VillageBuilding[];
   props: Array<{ key: FantasyAssetKey; x: number; z: number; rot: number }>;
-  residents: Array<{ archetype: string; x: number; z: number }>;
+  residents: VillageResident[];
   /** Outdoor forge beside the smithy (a crafting station); `rot` is the smithy's yaw. */
   forge: { x: number; z: number; rot: number };
   /** Fast-travel arrival: on the entrance road, facing into the square. */
@@ -111,6 +124,7 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
   const props: VillagePlan["props"] = [];
   const residents: VillagePlan["residents"] = [];
   let forge = { x: center.x, z: center.z, rot: 0 };
+  const homes: Array<{ x: number; z: number }> = [];
   let arrival = { x: center.x, z: center.z };
 
   roles.forEach((role, s) => {
@@ -121,8 +135,15 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
       const side = { x: Math.cos(a), z: -Math.sin(a) }; // tangent
       const g = polar(a, gate);
       arrival = polar(a, PLAZA_RADIUS + 1.5);
-      residents.push({ archetype: "archetype_guard", x: g.x + side.x * 2.5, z: g.z + side.z * 2.5 });
-      residents.push({ archetype: "archetype_guard", x: g.x - side.x * 2.5, z: g.z - side.z * 2.5 });
+      // Guards walk a beat: the gate, round the square and back.
+      for (const sign of [1, -1]) {
+        const post = { x: g.x + side.x * 2.5 * sign, z: g.z + side.z * 2.5 * sign };
+        residents.push({
+          archetype: "archetype_guard",
+          ...post,
+          patrol: [post, polar(a + sign * 1.4, PLAZA_RADIUS - 1.5), polar(a + sign * 2.6, PLAZA_RADIUS - 1.5), post],
+        });
+      }
       props.push({ key: "qBannerStand", x: g.x + side.x * 4, z: g.z + side.z * 4, rot: a + Math.PI });
       props.push({ key: "qBannerStand", x: g.x - side.x * 4, z: g.z - side.z * 4, rot: a + Math.PI });
       return;
@@ -159,7 +180,10 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
         break;
       }
       case "home": {
-        residents.push({ archetype: "archetype_villager", ...front(1.4) });
+        // Home by the door at night, out on the square by day.
+        const door = front(1.4);
+        homes.push(door);
+        residents.push({ archetype: "archetype_villager", ...door, home: door, work: polar(rng() * Math.PI * 2, 3 + rng() * 3) });
         const bar = front(-1.9, 0.6);
         props.push({ key: rng() < 0.5 ? "qBarrel" : "qCrate", ...bar, rot: rng() * Math.PI });
         break;
@@ -180,8 +204,11 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
   props.push({ key: "qMarketStall", ...traveling, rot: start + Math.PI * 0.8 + Math.PI });
   residents.push({ archetype: "archetype_merchant", ...polar(start + Math.PI * 0.8, 4.4) });
   // A couple more villagers milling about the square.
-  residents.push({ archetype: "archetype_villager", ...polar(start + 2.2, 3) });
-  residents.push({ archetype: "archetype_villager", ...polar(start + 4.1, 3.5) });
+  // A couple more villagers who spend the day on the square and go home at night.
+  for (const [k, [a, r]] of ([[start + 2.2, 3], [start + 4.1, 3.5]] as const).entries()) {
+    const spot = polar(a, r);
+    residents.push({ archetype: "archetype_villager", ...spot, work: spot, home: homes[k % Math.max(1, homes.length)] ?? spot });
+  }
 
   return {
     id: `village_${cx}_${cz}`,
