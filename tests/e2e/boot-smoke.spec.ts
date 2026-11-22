@@ -157,6 +157,13 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
   await page.keyboard.press("p");
   await page.locator("#renderCanvas").click({ force: true });
 
+  // G — the follower panel opens and closes.
+  await page.keyboard.press("g");
+  expect(await page.evaluate(() => (window as any).__camelotGame.followerUI.isVisible), "follower panel open").toBe(true);
+  await page.keyboard.press("g");
+  expect(await page.evaluate(() => (window as any).__camelotGame.followerUI.isVisible), "follower panel closed").toBe(false);
+  await page.locator("#renderCanvas").click({ force: true });
+
   // F5 — manual save.  Assert the full game-state graph serialised.
   await page.keyboard.press("F5");
   const saveRaw = await page.evaluate(() => localStorage.getItem("camelot_save"));

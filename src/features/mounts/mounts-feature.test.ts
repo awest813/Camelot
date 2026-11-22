@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Kernel } from "../../core/kernel";
-import { FeedbackKey, ModalKey } from "../services";
+import { FeedbackKey, ModalKey, PurseKey } from "../services";
 import { MountsFeature, MountsKey, MountHostKey } from "./mounts-feature";
 import type { Item } from "../../systems/inventory-system";
 
@@ -14,12 +14,14 @@ function setup(opts: { gold?: number } = {}) {
   const modal = { suspendGameplay: vi.fn(), restoreGameplay: vi.fn() };
   k.services.provide(FeedbackKey, { notify: (t) => { notes.push(t); }, grant: vi.fn(), addFame: vi.fn(), markDirty: vi.fn() });
   k.services.provide(ModalKey, modal);
+  k.services.provide(PurseKey, {
+    gold: () => gold,
+    spend: (n) => { if (gold < n) return false; gold -= n; return true; },
+  });
   k.services.provide(MountHostKey, {
     canAct: () => canAct,
     setMoveSpeedMultiplier: (m) => { speed = m; },
     unlockAchievement: vi.fn(),
-    gold: () => gold,
-    spendGold: (n) => { if (gold < n) return false; gold -= n; return true; },
     give: (item) => { given.push(item); },
   });
   const feature = new MountsFeature();

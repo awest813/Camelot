@@ -166,6 +166,13 @@ export interface AnimationService {
   release(meshName: string): void;
 }
 
+/** The player's gold. */
+export interface PurseService {
+  gold(): number;
+  /** Take `amount` gold; false (and nothing taken) when there isn't enough. */
+  spend(amount: number): boolean;
+}
+
 /** Whether gameplay input may act now (not paused, talking, or in a menu). */
 export interface GameplayService {
   canAct(): boolean;
@@ -189,6 +196,7 @@ export const InventoryKey = createServiceKey<InventoryService>("inventory");
 export const QuestLogKey = createServiceKey<QuestLogService>("quest-log");
 export const WorldStateKey = createServiceKey<WorldStateService>("world-state");
 export const AnimationKey = createServiceKey<AnimationService>("animation");
+export const PurseKey = createServiceKey<PurseService>("purse");
 export const GameplayKey = createServiceKey<GameplayService>("gameplay");
 export const LootKey = createServiceKey<LootService>("loot");
 export const ModalKey = createServiceKey<ModalService>("modal");

@@ -6,7 +6,7 @@
  * (Shift+O) — serves both the input adapter and the legacy keyboard path,
  * which used to carry two full copies of this logic.
  *
- * Inputs:   services feedback, modal, mount-host.
+ * Inputs:   services feedback, modal, purse, mount-host.
  * Outputs:  the `mounts` service.
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
@@ -17,7 +17,7 @@ import { HorseSystem } from "../../systems/horse-system";
 import { StableUI } from "../../ui/stable-ui";
 import { SaddlebagUI } from "../../ui/saddlebag-ui";
 import type { Item } from "../../systems/inventory-system";
-import { FeedbackKey, ModalKey } from "../services";
+import { FeedbackKey, ModalKey, PurseKey } from "../services";
 
 /** What riding needs from the game. */
 export interface MountHostService {
@@ -25,8 +25,6 @@ export interface MountHostService {
   canAct(): boolean;
   setMoveSpeedMultiplier(multiplier: number): void;
   unlockAchievement(id: string): void;
-  gold(): number;
-  spendGold(amount: number): boolean;
   give(item: Item): void;
 }
 
@@ -68,6 +66,7 @@ export class MountsFeature implements Feature {
     const host = () => s.get(MountHostKey);
     const feedback = () => s.get(FeedbackKey);
     const modal = () => s.get(ModalKey);
+    const purse = () => s.get(PurseKey);
 
     this.horses.onMount = (horse, speed) => {
       host().setMoveSpeedMultiplier(speed);
@@ -89,15 +88,15 @@ export class MountsFeature implements Feature {
     this.stable.onClose = () => modal().restoreGameplay();
     this.stable.onPurchase = (horseId) => {
       if (!this.horses.getStableNPC(STABLE_MASTER)) return;
-      const price = this.horses.purchaseHorse(STABLE_MASTER, horseId, host().gold());
+      const price = this.horses.purchaseHorse(STABLE_MASTER, horseId, purse().gold());
       if (price === -2) {
         this.stable.showStatus("You already own this horse.", true);
       } else if (price < 0) {
         this.stable.showStatus("Unable to complete the purchase.", true);
       } else {
-        host().spendGold(price);
+        purse().spend(price);
         this.stable.markOwned(horseId);
-        this.stable.setPlayerGold(host().gold());
+        this.stable.setPlayerGold(purse().gold());
         this.stable.showStatus(`You purchased a horse for ${price}g.`);
       }
     };
@@ -152,7 +151,7 @@ export class MountsFeature implements Feature {
             saddlebagCapacity: h.saddlebagCapacity, price: stable.prices[id] ?? 0, isOwned: h.isOwned,
           };
         });
-        this.stable.open(STABLE_MASTER, offers, host().gold());
+        this.stable.open(STABLE_MASTER, offers, purse().gold());
         modal().suspendGameplay();
       },
     });

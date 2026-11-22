@@ -89,7 +89,7 @@ import { Kernel } from "./core/kernel";
 import { EditorSuite } from "./features/editor/editor-suite";
 import { VillageRaidFeature, RaidsKey, type RaidsService } from "./features/village-raids/raid-feature";
 import {
-  ActorsKey, AnimationKey, BuildingsKey, ClockKey, FastTravelKey, FeedbackKey, GameplayKey, InventoryKey, LootKey, ModalKey, PlayerKey,
+  ActorsKey, AnimationKey, BuildingsKey, ClockKey, FastTravelKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, LootKey, ModalKey, PlayerKey,
   QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey,
 } from "./features/services";
 import { VillagesFeature, VillagesKey, type VillagesService } from "./features/villages/villages-feature";
@@ -183,9 +183,10 @@ import { ScreenshotSystem } from "./systems/screenshot-system";
 import { UIAnimator } from "./ui/ui-animator";
 import { MarkRecallSystem } from "./systems/mark-recall-system";
 import { TrainerSystem } from "./systems/trainer-system";
-import { FollowerSystem } from "./systems/follower-system";
+import type { FollowerSystem } from "./systems/follower-system";
 
-import { FollowerUI } from "./ui/follower-ui";
+import type { FollowerUI } from "./ui/follower-ui";
+import { FollowersFeature, FollowersKey, type FollowersService } from "./features/followers/followers-feature";
 import { ActiveEffectHUD } from "./ui/active-effect-hud";
 import { QuickSlotHUD } from "./ui/quickslot-hud";
 import { PerkSystem } from "./systems/perk-system";
@@ -469,8 +470,9 @@ export class Game {
   public trainerSystem: TrainerSystem;
 
   // v26 systems
-  public followerSystem: FollowerSystem;
-  public followerUI: FollowerUI;
+  public get followers(): FollowersService { return this.kernel.services.get(FollowersKey); }
+  public get followerSystem(): FollowerSystem { return this.followers.followers; }
+  public get followerUI(): FollowerUI { return this.followers.panel; }
 
   // v27 systems
   public perkSystem!: PerkSystem;
@@ -1725,27 +1727,6 @@ export class Game {
       this.player.camera.attachControl(this.canvas, true);
     };
 
-    // ── v26: Follower System ──────────────────────────────────────────────
-    this.followerSystem = new FollowerSystem();
-    this.followerSystem.onFollowerRecruited = (_templateId, name) => {
-      this.ui.showNotification(`${name} has joined you.`, 3000);
-    };
-    this.followerSystem.onFollowerDismissed = (_templateId, name, homeLocation) => {
-      this.ui.showNotification(`${name} has returned to ${homeLocation}.`, 3000);
-    };
-    this.followerSystem.onFollowerDied = (_templateId, name) => {
-      this.ui.showNotification(`${name} has fallen in battle and cannot be rehired!`, 4000);
-    };
-    this.followerSystem.onCommandIssued = (command) => {
-      this.ui.showNotification(`Follower command: ${command}`, 1500);
-    };
-    this.followerSystem.onFollowerDamaged = (_amount, remaining) => {
-      if (remaining <= 0) {
-        this.ui.showNotification("Your follower needs help!", 2000);
-      }
-    };
-    this.saveSystem.setFollowerSystem(this.followerSystem);
-
     // ── v27: Perk System ──────────────────────────────────────────────────
     this.perkSystem = new PerkSystem(this.player, this.skillProgressionSystem);
     this.perkSystem.onPerkUnlocked = (_id, name) => {
@@ -1776,33 +1757,6 @@ export class Game {
         // which would flag the suspicious NPC as hostile.
         this.combatSystem.paintNpcInvestigating(npc);
       }
-    };
-
-    // ── v26: Follower UI ──────────────────────────────────────────────────
-    this.followerUI = new FollowerUI();
-    this.followerUI.onRecruit = (templateId) => {
-      const playerGold = this._getInventoryGold();
-      const follower = this.followerSystem.recruitFollower(templateId, playerGold);
-      if (follower) {
-        const tmpl = this.followerSystem.getFollowerTemplate(templateId);
-        if (tmpl && tmpl.hireCost > 0) {
-          this._consumeInventoryGold(tmpl.hireCost);
-        }
-        this._refreshFollowerUI();
-      }
-    };
-    this.followerUI.onDismiss = () => {
-      this.followerSystem.dismissFollower();
-      this._refreshFollowerUI();
-    };
-    this.followerUI.onCommand = (command) => {
-      this.followerSystem.commandFollower(command);
-      this._refreshFollowerUI();
-    };
-    this.followerUI.onClose = () => {
-      this.interactionSystem.isBlocked = false;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
     };
 
     // ── Active Effects HUD ──────────────────────────────────────────────────
@@ -3583,24 +3537,7 @@ export class Game {
         this._refreshEditorToolbar();
         return;
       }
-      if (this.followerUI.isVisible) {
-        this.followerUI.close();
-        this._restoreGameplayInput();
-        return;
-      }
-      if (this._isCombatInputBlocked()) return;
-      const activeFollower = this.followerSystem.getActiveFollower();
-      const deceasedIds: string[] = [];
-      for (const templateId of this.followerSystem.registeredTemplateIds) {
-        if (this.followerSystem.isFollowerDeceased(templateId)) {
-          deceasedIds.push(templateId);
-        }
-      }
-      const templates = this.followerSystem.registeredTemplateIds.map(id =>
-        this.followerSystem.getFollowerTemplate(id)
-      ).filter((t): t is NonNullable<typeof t> => t !== undefined);
-      this.followerUI.open(templates, activeFollower, deceasedIds, this._getInventoryGold());
-      this._suspendGameplayInput();
+      this.followers.togglePanel();
     });
     adapter.onAction("toggleShoutMenu", () => {
       if (this.shoutUI.isVisible) {
@@ -5865,27 +5802,6 @@ export class Game {
       return this.inventorySystem.removeItem(GOLD_ITEM_ID, amount);
   }
 
-  private _refreshFollowerUI(): void {
-      const activeFollower = this.followerSystem.getActiveFollower();
-      const deceasedIds: string[] = [];
-      for (const templateId of this.followerSystem.registeredTemplateIds) {
-          if (this.followerSystem.isFollowerDeceased(templateId)) {
-              deceasedIds.push(templateId);
-          }
-      }
-      const templates = this.followerSystem.registeredTemplateIds.map(id =>
-          this.followerSystem.getFollowerTemplate(id)
-      ).filter((t): t is NonNullable<typeof t> => t !== undefined);
-
-      this.followerUI.refresh(
-          templates,
-          activeFollower,
-          deceasedIds,
-          this._getInventoryGold()
-      );
-      this.followerUI.updateHUD(activeFollower);
-  }
-
   private _refreshGuardEncounterView(statusMessage?: string, isError: boolean = false): void {
       const challenge = this._activeGuardChallenge;
       if (!challenge) return;
@@ -6414,9 +6330,16 @@ export class Game {
         release: (name) => this.animationSystem.unregisterMesh(name),
       });
       k.services.provide(GameplayKey, { canAct: () => !this._isCombatInputBlocked() });
+      k.services.provide(PurseKey, {
+        gold: () => this._getInventoryGold(),
+        spend: (amount) => this._consumeInventoryGold(amount),
+      });
       const pets = new PetsFeature(this.scene);
       k.install(pets);
       this.saveSystem.setPetSystem(pets.pets);
+      const followers = new FollowersFeature();
+      k.install(followers);
+      this.saveSystem.setFollowerSystem(followers.followers);
       // A starter wolf companion for new games.
       pets.pets.grantPet("pet_wolf");
 
@@ -6424,8 +6347,6 @@ export class Game {
         canAct: () => !this.isPaused && !this.dialogueSystem.isInDialogue,
         setMoveSpeedMultiplier: (m) => { (this.player as unknown as { moveSpeedMultiplier?: number }).moveSpeedMultiplier = m; },
         unlockAchievement: (id) => { this._achievements?.unlock(id as never); },
-        gold: () => this._getInventoryGold(),
-        spendGold: (amount) => this._consumeInventoryGold(amount),
         give: (item) => { this.inventorySystem.addItem(item); },
       });
       const mounts = new MountsFeature();
