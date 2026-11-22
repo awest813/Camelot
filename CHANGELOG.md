@@ -100,6 +100,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   indoors can't witness crimes.
 - Inns stay open all night: the barkeeper works the night shift (16:00–08:00)
   while the innkeeper has the day, and the barkeeper will rent you a room too.
+- Villages are guarded at night: one of the two gate guards keeps the night
+  watch (patrols 18:00–08:00) and sleeps at the inn by day.
 - Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
   are stone with timber gables. Both are built from Quaternius Medieval
   Village pieces, with arched windows, shutters and plank doors. They replace

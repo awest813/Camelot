@@ -53,6 +53,8 @@ export interface VillageResident {
   home?: { x: number; z: number };
   /** Patrol loop (guards). */
   patrol?: Array<{ x: number; z: number }>;
+  /** Guard on the night watch (patrols at night, sleeps at the inn by day). */
+  nightWatch?: boolean;
 }
 
 export interface VillagePlan {
@@ -129,6 +131,7 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
   const homes: Array<{ x: number; z: number }> = [];
   let arrival = { x: center.x, z: center.z };
   let noticeBoard = { x: center.x, z: center.z, rot: 0 };
+  let innDoor: { x: number; z: number } | null = null;
 
   roles.forEach((role, s) => {
     const a = slotAngle(s);
@@ -148,6 +151,7 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
           archetype: "archetype_guard",
           ...post,
           patrol: [post, polar(a + sign * 1.4, PLAZA_RADIUS - 1.5), polar(a + sign * 2.6, PLAZA_RADIUS - 1.5), post],
+          ...(sign === -1 ? { nightWatch: true } : {}),
         });
       }
       props.push({ key: "qBannerStand", x: g.x + side.x * 4, z: g.z + side.z * 4, rot: a + Math.PI });
@@ -166,6 +170,7 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
     switch (role) {
       case "inn": {
         const a1 = front(1.6), a2 = front(-1.6);
+        innDoor = front(0, 1.2);
         residents.push({ archetype: "archetype_innkeeper", ...a1 });
         residents.push({ archetype: "archetype_barkeeper", ...a2 });
         const b = front(-2.8, 0.8);
@@ -215,6 +220,9 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
     const spot = polar(a, r);
     residents.push({ archetype: "archetype_villager", ...spot, work: spot, home: homes[k % Math.max(1, homes.length)] ?? spot });
   }
+
+  // The night watchman sleeps at the inn by day.
+  for (const r of residents) if (r.nightWatch && innDoor) r.home = innDoor;
 
   return {
     id: `village_${cx}_${cz}`,

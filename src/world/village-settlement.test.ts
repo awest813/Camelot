@@ -107,6 +107,10 @@ describe("village settlements", () => {
         expect(dist(r.home!)).toBeGreaterThan(PLAZA_RADIUS - 2); // by a door at night (1.4 m in front of it)
       }
       const guards = v.residents.filter((r) => r.archetype === "archetype_guard");
+      expect(guards.filter((g) => g.nightWatch), "one guard keeps the night watch").toHaveLength(1);
+      const inn = v.buildings.find((b) => b.role === "inn")!;
+      const watch = guards.find((g) => g.nightWatch)!;
+      expect(Math.hypot(watch.home!.x - inn.x, watch.home!.z - inn.z), "and sleeps at the inn").toBeLessThan(8);
       for (const g of guards) {
         expect(g.patrol!.length).toBeGreaterThanOrEqual(3);
         for (const p of g.patrol!) expect(dist(p)).toBeLessThan(VILLAGE_CLEAR_RADIUS);

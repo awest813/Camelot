@@ -187,6 +187,13 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     return { found: !!b, visible: !!b?.mesh.isEnabled(), talks: !!b?.mesh.metadata };
   });
   expect(barkeep, "the barkeeper is up and serving at 23:00").toEqual({ found: true, visible: true, talks: true });
+  const onWatch = await page.evaluate(() => {
+    const g = (window as any).__camelotGame; const c = g.player.camera.position;
+    return g.scheduleSystem.npcs.filter((n: any) => /^Town Guard_|^Guard_/.test(n.mesh.name)
+      && Math.hypot(n.mesh.position.x - c.x, n.mesh.position.z - c.z) < 40
+      && n.mesh.isEnabled() && g.scheduleSystem.behaviorOf(n) === "patrol").length;
+  });
+  expect(onWatch, "a guard keeps the night watch").toBe(1);
   await page.evaluate(() => {
     const g = (window as any).__camelotGame;
     g.timeSystem.advanceHours((9 - g.timeSystem.hour + 24) % 24);

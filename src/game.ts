@@ -7731,14 +7731,18 @@ export class Game {
         if (r.work) npc.workPosition = at(r.work);
         if (r.home) npc.homePosition = at(r.home);
         if (r.patrol) npc.patrolPoints = r.patrol.map(at);
+        // Night watch: patrols 18:00–08:00 (overlapping the day guard's
+        // 06:00–22:00), sleeps by day.
+        if (r.nightWatch) {
+          npc.scheduleBlocks = [
+            { startHour: 18, endHour: 8, behavior: "patrol" },
+            { startHour: 8, endHour: 18, behavior: "sleep" },
+          ];
+        }
       }
       this._loadedVillages.set(chunkKey, plan);
   }
 
-  /**
-   * The village notice board: the same job board as the village inn (one
-   * job per village), read with E.
-   */
   /** The well on a village square: stone curb, winch and roof, with a collider. */
   private _placeVillageWell(
       chunkKey: string,
@@ -7772,6 +7776,10 @@ export class Game {
       chunkRecord.roots.push(col);
   }
 
+  /**
+   * The village notice board: the same job board as the village inn (one
+   * job per village), read with E.
+   */
   private _placeNoticeBoard(
       chunkKey: string,
       chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
