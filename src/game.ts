@@ -14,8 +14,6 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
-import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
-import { PhysicsShapeType } from "@babylonjs/core/Physics";
 import { AtmosphereController } from "./rendering/sky-dome";
 import { createTerrainMaterial } from "./rendering/terrain-material";
 import { HorizonMountains } from "./rendering/horizon";
@@ -86,7 +84,6 @@ import type { CraftingSystem } from "./systems/crafting-system";
 import type { CraftingUI } from "./ui/crafting-ui";
 import type { ItemConditionSystem } from "./systems/item-condition-system";
 import { CraftingFeature, CraftingKey, type CraftingService } from "./features/crafting/crafting-feature";
-import { buildingFootprint, buildingWallColliders, buildingLayout, toWorld, WALL_HEIGHT, type BuildingKind } from "./world/village-buildings";
 import { Kernel } from "./core/kernel";
 import { EditorSuite } from "./features/editor/editor-suite";
 import { VillageRaidFeature, RaidsKey, type RaidsService } from "./features/village-raids/raid-feature";
@@ -104,6 +101,7 @@ import type { ForgeRegistry, SmithingController } from "./systems/smithing-contr
 import type { EnchantingSystem } from "./systems/enchanting-system";
 import type { EnchantingUI } from "./ui/enchanting-ui";
 import { LodSystem } from "./systems/lod-system";
+import { ChunkContent } from "./world/chunk-content";
 import { WeatherSystem } from "./systems/weather-system";
 import { GraphicsSystem, persistGraphicsTier } from "./systems/graphics-system";
 import { QuickSlotSystem, isConsumableItem, type QuickSlotKey } from "./systems/quickslot-system";
@@ -505,36 +503,12 @@ export class Game {
   private _pendingBarterMerchantId: string | null = null;
   /** Set by the smith's "use your forge" dialogue choice; opened once dialogue closes. */
   /** Shared parchment material for village notice boards. */
-  private _candleMat: StandardMaterial | null = null;
   private _hudInDialogue = false;
   private _windowGlass: Array<{ emissiveColor?: Color3 }> = [];
   private _windowGlassScan = -1;
   private _windowGlow = -1;
-  /** Footprints of loaded buildings (centre, yaw, half sizes incl. margin) — NPCs keep out. */
-  private readonly _buildingFootprints = new Set<{ x: number; z: number; cos: number; sin: number; hw: number; hd: number }>();
 
-  /** Whether (x, z) is within `margin` m of a loaded building. */
-  private _nearBuilding(x: number, z: number, margin: number): boolean {
-      for (const f of this._buildingFootprints) {
-        const dx = x - f.x, dz = z - f.z;
-        const lx = dx * f.cos - dz * f.sin;
-        const lz = dx * f.sin + dz * f.cos;
-        if (Math.abs(lx) < f.hw + margin && Math.abs(lz) < f.hd + margin) return true;
-      }
-      return false;
-  }
 
-  /** Whether (x, z) is open ground, i.e. not inside a loaded building. */
-  private _isWalkable(x: number, z: number): boolean {
-      for (const f of this._buildingFootprints) {
-        const dx = x - f.x, dz = z - f.z;
-        if (Math.abs(dx) > f.hw + f.hd || Math.abs(dz) > f.hw + f.hd) continue; // cheap reject
-        const lx = dx * f.cos - dz * f.sin;
-        const lz = dx * f.sin + dz * f.cos;
-        if (Math.abs(lx) < f.hw && Math.abs(lz) < f.hd) return false;
-      }
-      return true;
-  }
 
   public isPaused: boolean = false;
 
@@ -552,8 +526,8 @@ export class Game {
   private _lastNavChunkZ: number = NaN;
   private _lastRegionId: string | null = null;
 
-  /** CDN props and chunk-scoped NPCs spawned per chunk key ("cx,cz") — disposed on chunk unload. */
-  private readonly _chunkFantasyContent = new Map<string, { roots: AbstractMesh[]; npcs: NPC[] }>();
+  /** What each loaded chunk holds (props, buildings, its NPCs); goes with the chunk. */
+  private _chunks!: ChunkContent;
 
   /** Last integer in-game minute rendered to the clock HUD. */
   private _lastClockMinutes: number = Number.NaN;
@@ -662,38 +636,7 @@ export class Game {
     this._helpOverlayEl.textContent = buildHelpOverlayLines(this.mapEditorSystem.isEnabled).join("\n");
   }
 
-  /**
-   * Register a CDN prop spawned on the terrain for distance culling (root uses world-space position).
-   * Parented loot overlays skip this — their world origin is not on the root transform.
-   */
-  private _registerFantasyChunkLod(
-    root: AbstractMesh,
-    tier: "structure" | "scene" | "prop" | "boss",
-  ): void {
-    const dist = tier === "boss" ? 210 : tier === "scene" ? 185 : tier === "structure" ? 145 : 88;
-    this.lodSystem.registerHierarchy(root, dist);
-  }
 
-  /**
-   * Track a chunk-scoped CDN prop so the chunk unload handler can dispose it.
-   * If the chunk already unloaded while the asset was loading (record identity
-   * mismatch — also covers unload → re-mount windows), the root is discarded
-   * immediately instead of leaking into the scene.
-   */
-  private _trackChunkProp(
-    chunkKey: string,
-    record: { roots: AbstractMesh[]; npcs: NPC[] },
-    root: AbstractMesh,
-    tier: "structure" | "scene" | "prop" | "boss",
-  ): void {
-    if (this._chunkFantasyContent.get(chunkKey) !== record) {
-      root.dispose();
-      return;
-    }
-    record.roots.push(root);
-    this.shadowGenerator?.addShadowCaster(root, true);
-    this._registerFantasyChunkLod(root, tier);
-  }
 
 
 
@@ -736,7 +679,7 @@ export class Game {
     this._initFoliage();
     this.navigationSystem = new NavigationSystem(this.scene);
     this.scheduleSystem = new ScheduleSystem();
-    this.scheduleSystem.walkable = (x, z) => this._isWalkable(x, z);
+    this.scheduleSystem.walkable = (x, z) => this._chunks.isWalkable(x, z);
 
     // ── v2 Oblivion-lite systems ──────────────────────────────────────────────
     this.attributeSystem = new AttributeSystem();
@@ -1489,12 +1432,20 @@ export class Game {
     this.fantasyAssets = new FantasyAssetLoader(this.scene, { allowRemote: remotePropsEnabled });
     {
       if (remotePropsEnabled) this.fantasyAssets.preloadRemoteCdnAssets();
+      this._chunks = new ChunkContent({
+        scene: this.scene,
+        assets: this.fantasyAssets,
+        lod: this.lodSystem,
+        shadows: () => this.shadowGenerator,
+        fireFx: () => this._fireFx,
+        forges: () => this.forges,
+        releaseNpc: (npc) => this._releaseNpc(npc),
+      });
 
       // ── Chunk content (placement rules: world-sites feature) ──────────────
       this.world.onChunkLoaded = (cx, cz, biome) => {
         const chunkKey = `${cx},${cz}`;
-        const chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] } = { roots: [], npcs: [] };
-        this._chunkFantasyContent.set(chunkKey, chunkRecord);
+        this._chunks.open(chunkKey);
         // What goes where lives in the world-sites feature (villages, camps,
         // inns, homesteads, the dragon, wild nature).
         this.worldSites.populate(chunkKey, cx, cz, biome);
@@ -1504,19 +1455,8 @@ export class Game {
       // revisiting an area never accumulates duplicate props or entities.
       this.world.onChunkUnloaded = (cx, cz) => {
         const key = `${cx},${cz}`;
-        const record = this._chunkFantasyContent.get(key);
         this.eventBus.emit("chunk:unloaded", { chunkKey: key });
-        if (!record) return;
-        this._chunkFantasyContent.delete(key);
-
-        for (const root of record.roots) {
-          this.lodSystem.unregister(root);
-          this.shadowGenerator?.removeShadowCaster(root, true);
-          // Materials/textures belong to the shared asset template — preserve them.
-          root.dispose();
-        }
-
-        for (const npc of record.npcs) this._releaseNpc(npc);
+        this._chunks.close(key);
       };
     }
 
@@ -1672,7 +1612,7 @@ export class Game {
 
     // Spell cast events forwarded to event bus
     // A forge near the starting area so steel work is reachable from day one.
-    this._placeSmithy(null, null, -4, -5);
+    this._chunks.placeSmithy(null, null, -4, -5);
 
     // The starting area: a chest, the Old Cave, weapons on the ground, the first quests.
     seedStartingArea({
@@ -4535,135 +4475,10 @@ export class Game {
     });
   }
 
-  /**
-   * Place one local (Quaternius) prop, chunk-scoped.  Offsets are relative to
-   * a site origin rotated by `siteRot`, so dressing follows the site layout.
-   */
-  private _placeSiteProp(
-      chunkKey: string,
-      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
-      key: FantasyAssetKey,
-      origin: { x: number; z: number; rot: number },
-      dx: number,
-      dz: number,
-      rotY = 0,
-      tier: "structure" | "prop" = "prop",
-  ): void {
-      const { x, z } = toWorld({ x: dx, z: dz }, origin);
-      this.fantasyAssets.getInstance(key, (root) => {
-        if (!root) return;
-        root.position.set(x, 0, z);
-        setInstanceYaw(root, origin.rot + rotY);
-        this._trackChunkProp(chunkKey, chunkRecord, root, tier);
-      });
-  }
-
-  /**
-   * Assemble a village building from Medieval Village modules (see
-   * world/village-buildings.ts).  Its meshes don't take picks, so talking to
-   * or looting through a doorway still works; walls collide.
-   */
-  private _placeBuilding(
-      chunkKey: string,
-      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
-      kind: BuildingKind,
-      origin: { x: number; z: number; rot: number },
-  ): void {
-      this._addBuildingCollider(chunkKey, chunkRecord, kind, origin);
-      for (const part of buildingLayout(kind)) {
-        const { x, z } = toWorld(part, origin);
-        this.fantasyAssets.getInstance(part.key, (root) => {
-          if (!root) return;
-          root.position.set(x, part.y, z);
-          setInstanceYaw(root, origin.rot + part.rotY);
-          // Walls stop the player (and block NPC sight lines for stealth /
-          // crime witnesses); the doorway stays open, roofs and panels don't collide.
-          const solid = part.key.startsWith("vWall") || part.key.startsWith("vCorner");
-          root.isPickable = false;
-          for (const m of root.getChildMeshes(false)) {
-            m.isPickable = false;
-            m.checkCollisions = solid;
-          }
-          this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
-        });
-      }
-  }
-
-  /**
-   * Invisible static box over a building's footprint so NPC bodies (and
-   * physics projectiles) can't walk or fly through it.  The player collides
-   * with the real walls (camera collisions) and can still use the doorway.
-   */
-  private _addBuildingCollider(
-      chunkKey: string,
-      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
-      kind: BuildingKind,
-      origin: { x: number; z: number; rot: number },
-  ): void {
-      if (this._chunkFantasyContent.get(chunkKey) !== chunkRecord) return;
-      const { width, depth } = buildingFootprint(kind);
-      // One static box per wall (the front split around the doorway), so the
-      // interior stays open to chasers, companions, projectiles and loot.
-      const walls = buildingWallColliders(kind);
-      const fp = { x: origin.x, z: origin.z, cos: Math.cos(origin.rot), sin: Math.sin(origin.rot), hw: width / 2 + 0.5, hd: depth / 2 + 0.5 };
-      walls.forEach((w, i) => {
-        const p = toWorld(w, origin);
-        const box = MeshBuilder.CreateBox(`bldg_wall_${chunkKey}_${chunkRecord.roots.length}_${i}`, {
-          width: w.width, depth: w.depth, height: WALL_HEIGHT,
-        }, this.scene);
-        box.position.set(p.x, WALL_HEIGHT / 2, p.z);
-        box.rotation.y = origin.rot;
-        box.isVisible = false;
-        box.isPickable = false;
-        box.checkCollisions = false;
-        box.freezeWorldMatrix();
-        try {
-          const agg = new PhysicsAggregate(box, PhysicsShapeType.BOX, { mass: 0 }, this.scene);
-          box.onDisposeObservable.addOnce(() => agg.dispose());
-        } catch (err) {
-          // No physics engine (e.g. headless tooling) — the box is harmless.
-          if (i === 0) console.warn("[buildings] collider unavailable", err);
-        }
-        // Footprint (plus a body's width) for NPC wander / path checks,
-        // registered with the first wall and dropped with it.
-        if (i === 0) {
-          this._buildingFootprints.add(fp);
-          box.onDisposeObservable.addOnce(() => this._buildingFootprints.delete(fp));
-        }
-        chunkRecord.roots.push(box);
-      });
-  }
 
 
-  /**
-   * A night-only flame: a small glowing core plus a warm point light
-   * (FireFx manages flicker, particles and which few lights are on).
-   * The caller owns the returned mesh; disposing it removes the light.
-   */
-  private _nightFlame(name: string, x: number, y: number, z: number): Mesh | null {
-      if (!this._fireFx) return null;
-      this._candleMat ??= (() => {
-        const m = new StandardMaterial("candle_flame", this.scene);
-        m.emissiveColor = new Color3(1.0, 0.62, 0.22);
-        m.diffuseColor = new Color3(0, 0, 0);
-        m.disableLighting = true;
-        m.freeze();
-        return m;
-      })();
-      const flame = MeshBuilder.CreateSphere(name, { diameter: 0.14, segments: 6 }, this.scene);
-      flame.position.set(x, y, z);
-      flame.material = this._candleMat;
-      flame.isPickable = false;
-      flame.freezeWorldMatrix();
-      const light = new PointLight(`${name}_light`, new Vector3(x, y + 0.1, z), this.scene);
-      light.diffuse = new Color3(1.0, 0.6, 0.22);
-      light.specular = new Color3(0.4, 0.25, 0.08);
-      light.intensity = 1.1;
-      light.range = 9;
-      flame.onDisposeObservable.addOnce(() => light.dispose());
-      this._fireFx.attach({ flame, light, kind: "torch", nightOnly: true });
-      return flame;
-  }
+
+
 
   /**
    * Windows glow warm after dark: the Medieval Village window-glass material
@@ -4689,7 +4504,7 @@ export class Game {
    * Quaternius dragon body parented to its capsule.  Owned by the chunk.
    */
   private _spawnDragon(chunkKey: string, x: number, z: number, yaw: number): void {
-        const chunkRecord = this._chunkFantasyContent.get(chunkKey);
+        const chunkRecord = this._chunks.record(chunkKey);
         if (!chunkRecord) return;
         const [cx, cz] = chunkKey.split(",").map(Number);
         // Register the boss NPC first so the AI/combat system tracks it
@@ -4715,7 +4530,7 @@ export class Game {
         // was static and never followed the NPC).
         this.fantasyAssets.getInstance("qDragonSmall", (root) => {
           if (!root) return;
-          if (dragonNpc.isDead || dragonNpc.mesh.isDisposed() || this._chunkFantasyContent.get(chunkKey) !== chunkRecord) {
+          if (dragonNpc.isDead || dragonNpc.mesh.isDisposed() || this._chunks.record(chunkKey) !== chunkRecord) {
             root.dispose();
             return;
           }
@@ -4726,7 +4541,7 @@ export class Game {
           for (const m of root.getChildMeshes(false)) m.isPickable = false;
           this._dragonVisuals.set(dragonNpc, { root, yaw, last: dragonNpc.mesh.position.clone(), t: 0 });
           dragonNpc.mesh.onDisposeObservable.addOnce(() => this._dragonVisuals.delete(dragonNpc));
-          this._trackChunkProp(chunkKey, chunkRecord, root, "boss");
+          this._chunks.track(chunkKey, chunkRecord, root, "boss");
         });
   }
 
@@ -4767,9 +4582,9 @@ export class Game {
         markDirty: () => this.saveSystem.markDirty(),
       });
       k.services.provide(ActorsKey, {
-        residents: (chunkKey) => this._chunkFantasyContent.get(chunkKey)?.npcs ?? [],
+        residents: (chunkKey) => this._chunks.record(chunkKey)?.npcs ?? [],
         spawnArchetype: (chunkKey, archetype, x, z) => {
-          const record = this._chunkFantasyContent.get(chunkKey);
+          const record = this._chunks.record(chunkKey);
           return record ? this._spawnArchetypeNpc(archetype, record, x, z) : null;
         },
         despawn: (npc) => this._despawnNpc(npc),
@@ -4814,25 +4629,25 @@ export class Game {
       });
       k.install(this._fastTravel);
       this.saveSystem.setFastTravelSystem(this._fastTravel.places);
-      const record = (chunkKey: string) => this._chunkFantasyContent.get(chunkKey);
+      const record = (chunkKey: string) => this._chunks.record(chunkKey);
       k.services.provide(SiteBuilderKey, {
         get scene() { return game.scene; },
         isLive: (chunkKey) => !!record(chunkKey),
         placeBuilding: (chunkKey, kind, origin) => {
           const r = record(chunkKey);
-          if (r) this._placeBuilding(chunkKey, r, kind, origin);
+          if (r) this._chunks.placeBuilding(chunkKey, r, kind, origin);
         },
         placeProp: (chunkKey, key, x, z, rot) => {
           const r = record(chunkKey);
-          if (r) this._placeSiteProp(chunkKey, r, key, { x: 0, z: 0, rot: 0 }, x, z, rot);
+          if (r) this._chunks.placeProp(chunkKey, r, key, { x: 0, z: 0, rot: 0 }, x, z, rot);
         },
         placeSmithy: (chunkKey, x, z, rot) => {
           const r = record(chunkKey);
-          if (r) this._placeSmithy(chunkKey, r, x, z, rot);
+          if (r) this._chunks.placeSmithy(chunkKey, r, x, z, rot);
         },
         ownStructure: (chunkKey, mesh) => {
           const r = record(chunkKey);
-          if (r) this._trackChunkProp(chunkKey, r, mesh, "structure");
+          if (r) this._chunks.track(chunkKey, r, mesh, "structure");
           else mesh.dispose();
         },
         own: (chunkKey, mesh) => {
@@ -4841,10 +4656,9 @@ export class Game {
           else mesh.dispose();
         },
         addKeepOut: (fp) => {
-          this._buildingFootprints.add(fp);
-          return () => { this._buildingFootprints.delete(fp); };
+          return this._chunks.addKeepOut(fp);
         },
-        nightFlame: (name, x, y, z) => this._nightFlame(name, x, y, z),
+        nightFlame: (name, x, y, z) => this._chunks.nightFlame(name, x, y, z),
         placeAsset: (chunkKey, key, at) => {
           if (!record(chunkKey)) return;
           this.fantasyAssets.getInstance(key, (root) => {
@@ -4854,7 +4668,7 @@ export class Game {
             root.position.set(at.x, at.y ?? 0, at.z);
             setInstanceYaw(root, at.yaw);
             if (at.scale !== undefined) setInstanceScale(root, at.scale);
-            this._trackChunkProp(chunkKey, r, root, at.tier ?? "prop");
+            this._chunks.track(chunkKey, r, root, at.tier ?? "prop");
           });
         },
         spawnDragon: (chunkKey, x, z, yaw) => this._spawnDragon(chunkKey, x, z, yaw),
@@ -4871,7 +4685,7 @@ export class Game {
         behaviorOf: (npc) => this.scheduleSystem.behaviorOf(npc),
       });
       k.services.provide(BuildingsKey, {
-        nearBuilding: (x, z, margin) => this._nearBuilding(x, z, margin),
+        nearBuilding: (x, z, margin) => this._chunks.nearBuilding(x, z, margin),
       });
       k.services.provide(ModalKey, {
         suspendGameplay: () => this._suspendGameplayInput(),
@@ -5010,48 +4824,12 @@ export class Game {
 
   /** Remove one NPC from the world and every system (and its chunk's list). */
   private _despawnNpc(npc: NPC): void {
-      for (const record of this._chunkFantasyContent.values()) {
-        const i = record.npcs.indexOf(npc);
-        if (i >= 0) { record.npcs.splice(i, 1); break; }
-      }
+      this._chunks.forget(npc);
       this._releaseNpc(npc);
   }
 
 
 
-  /**
-   * Place a forge + anvil at (x, z) and register the forge as a usable station.
-   * With a chunk key/record the props and the station are chunk-scoped;
-   * without (the starting forge) they are permanent.
-   */
-  private _placeSmithy(
-      chunkKey: string | null,
-      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] } | null,
-      x: number,
-      z: number,
-      yaw = 0,
-  ): void {
-      this.forges.add(`forge_${x.toFixed(1)}_${z.toFixed(1)}`, x, z, chunkKey);
-      // The anvil sits beside the forge in the forge's own frame, so it stays
-      // clear of whatever wall the forge backs onto.
-      const anvil = toWorld({ x: 1.5, z: 1 }, { x, z, rot: yaw });
-      const props: Array<["qForge" | "qAnvil", number, number]> = [
-        ["qForge", x, z],
-        ["qAnvil", anvil.x, anvil.z],
-      ];
-      for (const [key, px, pz] of props) {
-        this.fantasyAssets.getInstance(key, (root) => {
-          if (!root) return;
-          root.position.set(px, 0, pz);
-          setInstanceYaw(root, yaw);
-          if (chunkKey && chunkRecord) {
-            this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
-          } else {
-            this.shadowGenerator?.addShadowCaster(root, true);
-          }
-        });
-      }
-  }
 
   private _isCombatInputBlocked(): boolean {
       return (

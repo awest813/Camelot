@@ -391,6 +391,11 @@ state, scope and save codec.
   a feature kept from install time used to go stale at the first new game or
   load: it was no longer seeded from the world and was not saved. This
   affected raids and loot drops.
+- Chunk content (`src/world/chunk-content.ts`): what each loaded chunk holds
+  (props, village buildings with wall colliders and keep-out footprints,
+  smithies, night flames, its NPCs), and disposing it on unload. It
+  implements most of the `site-builder` service. The village still builds
+  exactly 2,066 meshes.
 
 - Legacy keyboard path pruned (ahead of Phase 2). Legacy branches only run
   for chords the input adapter does not bind, or in the map editor. The ones
