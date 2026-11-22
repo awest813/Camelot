@@ -84,6 +84,7 @@ import { AlchemyUI } from "./ui/alchemy-ui";
 import { CraftingSystem, type CraftingStationId } from "./systems/crafting-system";
 import { CraftingUI } from "./ui/crafting-ui";
 import { ItemConditionSystem } from "./systems/item-condition-system";
+import { buildingLayout, toWorld, type BuildingKind } from "./world/village-buildings";
 import { ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
 import { EnchantingSystem } from "./systems/enchanting-system";
 import { EnchantingUI } from "./ui/enchanting-ui";
@@ -153,7 +154,7 @@ import { AmbientEventSystem } from "./systems/ambient-event-system";
 import { LeveledListSystem, ALL_BUILT_IN_LEVELED_LISTS } from "./systems/leveled-list-system";
 import { EventManagerSystem } from "./systems/event-manager-system";
 import { AnimationSystem } from "./systems/animation-system";
-import { FantasyAssetLoader, type FantasyAssetKey } from "./systems/fantasy-asset-loader";
+import { FantasyAssetLoader, setInstanceYaw, type FantasyAssetKey } from "./systems/fantasy-asset-loader";
 import { PetSystem } from "./systems/pet-system";
 import type { Pet } from "./systems/pet-system";
 import { PetUI } from "./ui/pet-ui";
@@ -2122,7 +2123,7 @@ export class Game {
           if (!root) return;
           const s = 0.8 + _chunkRand(cx, cz, 3) * 0.6;
           root.position.set(ox, 0, oz);
-          root.rotation.y = _chunkRand(cx, cz, 4) * Math.PI * 2;
+          setInstanceYaw(root, _chunkRand(cx, cz, 4) * Math.PI * 2);
           root.scaling.setAll(s);
           this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
         });
@@ -2132,13 +2133,8 @@ export class Game {
       if (biome === "plains" && _chunkRand(cx, cz, 5) < 0.083) {
         const cx2 = worldX + (_chunkRand(cx, cz, 6) - 0.5) * this.world.chunkSize * 0.5;
         const cz2 = worldZ + (_chunkRand(cx, cz, 7) - 0.5) * this.world.chunkSize * 0.5;
-        this.fantasyAssets.getInstance("cottage", (root) => {
-          if (!root) return;
-          root.position.set(cx2, 0, cz2);
-          root.rotation.y = _chunkRand(cx, cz, 8) * Math.PI * 2;
-          root.scaling.setAll(1.0);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
-        });
+        // Plaster-and-timber cottage from Medieval Village modules.
+        this._placeBuilding(chunkKey, chunkRecord, "cottage", { x: cx2, z: cz2 - 5, rot: 0 });
         // Homestead: a villager and a visiting instructor rotating per chunk.
         this._spawnArchetypeNpc("archetype_villager", chunkRecord, cx2 + 2, cz2 + 2);
         const cottageTrainer = [
@@ -2190,7 +2186,7 @@ export class Game {
             return;
           }
           root.position.set(dx, 0, dz);
-          root.rotation.y = _chunkRand(cx, cz, 12) * Math.PI * 2;
+          setInstanceYaw(root, _chunkRand(cx, cz, 12) * Math.PI * 2);
           root.scaling.setAll(2.5);
           this._trackChunkProp(chunkKey, chunkRecord, root, "boss");
         });
@@ -2200,13 +2196,9 @@ export class Game {
       if (biome === "forest" && _chunkRand(cx, cz, 13) < 0.067) {
         const ix = worldX + (_chunkRand(cx, cz, 14) - 0.5) * this.world.chunkSize * 0.5;
         const iz = worldZ + (_chunkRand(cx, cz, 15) - 0.5) * this.world.chunkSize * 0.5;
-        this.fantasyAssets.getInstance("inn", (root) => {
-          if (!root) return;
-          root.position.set(ix, 0, iz);
-          root.rotation.y = _chunkRand(cx, cz, 16) * Math.PI * 2;
-          root.scaling.setAll(1.0);
-          this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
-        });
+        // Brick inn assembled from Medieval Village modules, set back so its
+        // door faces the yard where the staff and dressing stand.
+        this._placeBuilding(chunkKey, chunkRecord, "inn", { x: ix, z: iz - 8, rot: 0 });
         this._dressSite(chunkKey, chunkRecord, "inn", { x: ix, z: iz, rot: 0 }, {
           merchant: ((cx + cz) % 5 + 5) % 5 === 4,
         });
@@ -2238,7 +2230,7 @@ export class Game {
         this.fantasyAssets.getInstance("hauntedHouse", (root) => {
           if (!root) return;
           root.position.set(hx, 0, hz);
-          root.rotation.y = _chunkRand(cx, cz, 20) * Math.PI * 2;
+          setInstanceYaw(root, _chunkRand(cx, cz, 20) * Math.PI * 2);
           root.scaling.setAll(1.2);
           this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
         });
@@ -2251,7 +2243,7 @@ export class Game {
         this.fantasyAssets.getInstance("graveYardScene", (root) => {
           if (!root) return;
           root.position.set(gx, 0, gz);
-          root.rotation.y = _chunkRand(cx, cz, 24) * Math.PI * 2;
+          setInstanceYaw(root, _chunkRand(cx, cz, 24) * Math.PI * 2);
           root.scaling.setAll(1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "scene");
         });
@@ -2265,7 +2257,7 @@ export class Game {
         this.fantasyAssets.getInstance("pirateFort", (root) => {
           if (!root) return;
           root.position.set(fx, 0, fz);
-          root.rotation.y = fortRot;
+          setInstanceYaw(root, fortRot);
           root.scaling.setAll(1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
         });
@@ -2275,7 +2267,7 @@ export class Game {
         this.fantasyAssets.getInstance("cannon", (root) => {
           if (!root) return;
           root.position.set(cannonX, 0, cannonZ);
-          root.rotation.y = fortRot + Math.PI * 0.35;
+          setInstanceYaw(root, fortRot + Math.PI * 0.35);
           root.scaling.setAll(1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
@@ -2295,7 +2287,7 @@ export class Game {
         this.fantasyAssets.getInstance("snowField", (root) => {
           if (!root) return;
           root.position.set(sx, 0, sz);
-          root.rotation.y = _chunkRand(cx, cz, 48) * Math.PI * 2;
+          setInstanceYaw(root, _chunkRand(cx, cz, 48) * Math.PI * 2);
           const s = 0.85 + _chunkRand(cx, cz, 49) * 0.35;
           root.scaling.setAll(s);
           this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
@@ -2309,7 +2301,7 @@ export class Game {
         this.fantasyAssets.getInstance("rabbit", (root) => {
           if (!root) return;
           root.position.set(rx, 0, rz);
-          root.rotation.y = _chunkRand(cx, cz, 53) * Math.PI * 2;
+          setInstanceYaw(root, _chunkRand(cx, cz, 53) * Math.PI * 2);
           root.scaling.setAll(0.9 + _chunkRand(cx, cz, 54) * 0.25);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
@@ -2321,7 +2313,7 @@ export class Game {
         this.fantasyAssets.getInstance("pumpkinCarved", (root) => {
           if (!root) return;
           root.position.set(px, 0, pz);
-          root.rotation.y = _chunkRand(cx, cz, 58) * Math.PI * 2;
+          setInstanceYaw(root, _chunkRand(cx, cz, 58) * Math.PI * 2);
           root.scaling.setAll(1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
@@ -2333,7 +2325,7 @@ export class Game {
         this.fantasyAssets.getInstance("d20Animated", (root) => {
           if (!root) return;
           root.position.set(dx, 0.15, dz);
-          root.rotation.y = _chunkRand(cx, cz, 62) * Math.PI * 2;
+          setInstanceYaw(root, _chunkRand(cx, cz, 62) * Math.PI * 2);
           root.scaling.setAll(1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
@@ -2345,7 +2337,7 @@ export class Game {
         this.fantasyAssets.getInstance("sheenChair", (root) => {
           if (!root) return;
           root.position.set(cx3, 0, cz3);
-          root.rotation.y = _chunkRand(cx, cz, 66) * Math.PI * 2;
+          setInstanceYaw(root, _chunkRand(cx, cz, 66) * Math.PI * 2);
           root.scaling.setAll(1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
@@ -2357,7 +2349,7 @@ export class Game {
         this.fantasyAssets.getInstance("alien", (root) => {
           if (!root) return;
           root.position.set(ax, 0.2, az);
-          root.rotation.y = _chunkRand(cx, cz, 70) * Math.PI * 2;
+          setInstanceYaw(root, _chunkRand(cx, cz, 70) * Math.PI * 2);
           root.scaling.setAll(1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
@@ -2370,7 +2362,7 @@ export class Game {
         this.fantasyAssets.getInstance("skull", (root) => {
           if (!root) return;
           root.position.set(kx, 0, kz);
-          root.rotation.y = _chunkRand(cx, cz, 74) * Math.PI * 2;
+          setInstanceYaw(root, _chunkRand(cx, cz, 74) * Math.PI * 2);
           root.scaling.setAll(0.55 + _chunkRand(cx, cz, 75) * 0.5);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
@@ -2383,7 +2375,7 @@ export class Game {
         this.fantasyAssets.getInstance("underwaterScene", (root) => {
           if (!root) return;
           root.position.set(ux, -0.5, uz);
-          root.rotation.y = _chunkRand(cx, cz, 79) * Math.PI * 2;
+          setInstanceYaw(root, _chunkRand(cx, cz, 79) * Math.PI * 2);
           root.scaling.setAll(1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "scene");
         });
@@ -2394,7 +2386,7 @@ export class Game {
         this.fantasyAssets.getInstance("octopusCustomRig", (root) => {
           if (!root) return;
           root.position.set(opx, 0.4, opz);
-          root.rotation.y = _chunkRand(cx, cz, 83) * Math.PI * 2;
+          setInstanceYaw(root, _chunkRand(cx, cz, 83) * Math.PI * 2);
           root.scaling.setAll(1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
@@ -2405,7 +2397,7 @@ export class Game {
         this.fantasyAssets.getInstance("babylonBuoy", (root) => {
           if (!root) return;
           root.position.set(bx, 0, bz);
-          root.rotation.y = _chunkRand(cx, cz, 87) * Math.PI * 2;
+          setInstanceYaw(root, _chunkRand(cx, cz, 87) * Math.PI * 2);
           root.scaling.setAll(1.0);
           this._trackChunkProp(chunkKey, chunkRecord, root, "prop");
         });
@@ -7310,15 +7302,43 @@ export class Game {
       rotY = 0,
       tier: "structure" | "prop" = "prop",
   ): void {
-      const c = Math.cos(origin.rot), s = Math.sin(origin.rot);
-      const x = origin.x + dx * c - dz * s;
-      const z = origin.z + dx * s + dz * c;
+      const { x, z } = toWorld({ x: dx, z: dz }, origin);
       this.fantasyAssets.getInstance(key, (root) => {
         if (!root) return;
         root.position.set(x, 0, z);
-        root.rotation.y = origin.rot + rotY;
+        setInstanceYaw(root, origin.rot + rotY);
         this._trackChunkProp(chunkKey, chunkRecord, root, tier);
       });
+  }
+
+  /**
+   * Assemble a village building from Medieval Village modules (see
+   * world/village-buildings.ts).  Its meshes don't take picks, so talking to
+   * or looting through a doorway still works; walls collide.
+   */
+  private _placeBuilding(
+      chunkKey: string,
+      chunkRecord: { roots: AbstractMesh[]; npcs: NPC[] },
+      kind: BuildingKind,
+      origin: { x: number; z: number; rot: number },
+  ): void {
+      for (const part of buildingLayout(kind)) {
+        const { x, z } = toWorld(part, origin);
+        this.fantasyAssets.getInstance(part.key, (root) => {
+          if (!root) return;
+          root.position.set(x, part.y, z);
+          setInstanceYaw(root, origin.rot + part.rotY);
+          // Walls stop the player (and block NPC sight lines for stealth /
+          // crime witnesses); the doorway stays open, roofs and panels don't collide.
+          const solid = part.key.startsWith("vWall") || part.key.startsWith("vCorner");
+          root.isPickable = false;
+          for (const m of root.getChildMeshes(false)) {
+            m.isPickable = false;
+            m.checkCollisions = solid;
+          }
+          this._trackChunkProp(chunkKey, chunkRecord, root, "structure");
+        });
+      }
   }
 
   /**
@@ -7378,7 +7398,7 @@ export class Game {
         this.fantasyAssets.getInstance(key, (root) => {
           if (!root) return;
           root.position.set(x, 0, z);
-          root.rotation.y = rand(70 + i) * Math.PI * 2;
+          setInstanceYaw(root, rand(70 + i) * Math.PI * 2);
           const tree = key === "qDeadTree" || key === "qWillowTree" || key === "qPineTree";
           this._trackChunkProp(chunkKey, chunkRecord, root, tree ? "structure" : "prop");
         });

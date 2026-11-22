@@ -294,6 +294,88 @@
         "pack": "fantasy-props-megakit",
         "model": "Shield_Wooden"
       }
+    },
+    "village": {
+      "WallPlaster": {
+        "pack": "medieval-village-megakit",
+        "model": "Wall_Plaster_Straight"
+      },
+      "WallPlasterDoor": {
+        "pack": "medieval-village-megakit",
+        "model": "Wall_Plaster_Door_Round"
+      },
+      "WallPlasterWindow": {
+        "pack": "medieval-village-megakit",
+        "model": "Wall_Plaster_Window_Wide_Round"
+      },
+      "WallTimber": {
+        "pack": "medieval-village-megakit",
+        "model": "Wall_Plaster_WoodGrid"
+      },
+      "WallBrick": {
+        "pack": "medieval-village-megakit",
+        "model": "Wall_UnevenBrick_Straight"
+      },
+      "WallBrickDoor": {
+        "pack": "medieval-village-megakit",
+        "model": "Wall_UnevenBrick_Door_Round"
+      },
+      "WallBrickWindow": {
+        "pack": "medieval-village-megakit",
+        "model": "Wall_UnevenBrick_Window_Wide_Round"
+      },
+      "CornerWood": {
+        "pack": "medieval-village-megakit",
+        "model": "Corner_Exterior_Wood"
+      },
+      "CornerBrick": {
+        "pack": "medieval-village-megakit",
+        "model": "Corner_Exterior_Brick"
+      },
+      "FloorWood": {
+        "pack": "medieval-village-megakit",
+        "model": "Floor_WoodDark"
+      },
+      "Roof4x4": {
+        "pack": "medieval-village-megakit",
+        "model": "Roof_RoundTiles_4x4"
+      },
+      "Roof6x8": {
+        "pack": "medieval-village-megakit",
+        "model": "Roof_RoundTiles_6x8"
+      },
+      "Gable4": {
+        "pack": "medieval-village-megakit",
+        "model": "Roof_Front_Brick4"
+      },
+      "Gable6": {
+        "pack": "medieval-village-megakit",
+        "model": "Roof_Front_Brick6"
+      },
+      "Door": {
+        "pack": "medieval-village-megakit",
+        "model": "Door_1_Round"
+      },
+      "Window": {
+        "pack": "medieval-village-megakit",
+        "model": "Window_Wide_Round1"
+      },
+      "Shutters": {
+        "pack": "medieval-village-megakit",
+        "model": "WindowShutters_Wide_Round_Open"
+      },
+      "Chimney": {
+        "pack": "medieval-village-megakit",
+        "model": "Prop_Chimney2"
+      },
+      "Fence": {
+        "pack": "medieval-village-megakit",
+        "model": "Prop_WoodenFence_Single"
+      },
+      "Wagon": {
+        "pack": "medieval-village-megakit",
+        "model": "Prop_Wagon"
+      }
     }
   }
 }

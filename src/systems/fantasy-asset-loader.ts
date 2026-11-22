@@ -164,7 +164,29 @@ export type FantasyAssetKey =
   | "qAnimCast"       // Spellcast animation clip — magic gesture
   | "qAnimBlock"      // Block animation clip — shield raise
   | "qAnimPickup"     // Pickup animation clip — bend and grab
-  | "qAnimSit";       // Sit animation clip — chair / bench idle
+  | "qAnimSit"        // Sit animation clip — chair / bench idle
+  // Quaternius Medieval Village MegaKit modules (2 m grid) — assembled into
+  // cottages and inns by src/world/village-buildings.ts.
+  | "vWallPlaster"
+  | "vWallPlasterDoor"
+  | "vWallPlasterWindow"
+  | "vWallTimber"
+  | "vWallBrick"
+  | "vWallBrickDoor"
+  | "vWallBrickWindow"
+  | "vCornerWood"
+  | "vCornerBrick"
+  | "vFloorWood"
+  | "vRoof4x4"
+  | "vRoof6x8"
+  | "vGable4"
+  | "vGable6"
+  | "vDoor"
+  | "vWindow"
+  | "vShutters"
+  | "vChimney"
+  | "vFence"
+  | "vWagon";
 
 const CDN      = "https://assets.babylonjs.com/meshes/";
 const CDN_DEMO = CDN + "Demos/weaponsDemo/meshes/";
@@ -191,6 +213,7 @@ export function getQuaterniusBasePath(): string {
 
 // Helpers for Quaternius sub-paths
 const qProps    = () => QUATERNIUS_BASE + "props/";
+const qVillage  = () => QUATERNIUS_BASE + "village/";
 /** KayKit (CC0) characters, dark-graded — used where no mature Quaternius model exists. */
 const kaykit    = () => `${import.meta.env.BASE_URL ?? "/"}model/kaykit/`;
 const qNature   = () => QUATERNIUS_BASE + "nature/";
@@ -331,6 +354,27 @@ const ASSET_URLS: Record<FantasyAssetKey, string> = {
   get qAnimBlock()       { return qAnims()    + "Block.glb"; },
   get qAnimPickup()      { return qAnims()    + "Pickup.glb"; },
   get qAnimSit()         { return qAnims()    + "Sit.glb"; },
+  // ── Quaternius: Medieval Village MegaKit modules (CC0) ───────────────────
+  get vWallPlaster() { return qVillage() + "WallPlaster.glb"; },
+  get vWallPlasterDoor() { return qVillage() + "WallPlasterDoor.glb"; },
+  get vWallPlasterWindow() { return qVillage() + "WallPlasterWindow.glb"; },
+  get vWallTimber() { return qVillage() + "WallTimber.glb"; },
+  get vWallBrick() { return qVillage() + "WallBrick.glb"; },
+  get vWallBrickDoor() { return qVillage() + "WallBrickDoor.glb"; },
+  get vWallBrickWindow() { return qVillage() + "WallBrickWindow.glb"; },
+  get vCornerWood() { return qVillage() + "CornerWood.glb"; },
+  get vCornerBrick() { return qVillage() + "CornerBrick.glb"; },
+  get vFloorWood() { return qVillage() + "FloorWood.glb"; },
+  get vRoof4x4() { return qVillage() + "Roof4x4.glb"; },
+  get vRoof6x8() { return qVillage() + "Roof6x8.glb"; },
+  get vGable4() { return qVillage() + "Gable4.glb"; },
+  get vGable6() { return qVillage() + "Gable6.glb"; },
+  get vDoor() { return qVillage() + "Door.glb"; },
+  get vWindow() { return qVillage() + "Window.glb"; },
+  get vShutters() { return qVillage() + "Shutters.glb"; },
+  get vChimney() { return qVillage() + "Chimney.glb"; },
+  get vFence() { return qVillage() + "Fence.glb"; },
+  get vWagon() { return qVillage() + "Wagon.glb"; },
 };
 
 /**
@@ -341,6 +385,21 @@ const ASSET_URLS: Record<FantasyAssetKey, string> = {
 export function isRemoteAssetKey(key: FantasyAssetKey): boolean {
   const url = ASSET_URLS[key];
   return typeof url === "string" && /^https?:\/\//i.test(url);
+}
+
+/**
+ * Turn a fantasy-asset instance to `yaw` radians about +Y.  Imported glTF
+ * roots carry a rotationQuaternion (the handedness conversion), which makes
+ * Babylon ignore `rotation.y` — so compose the yaw with that base rotation.
+ */
+export function setInstanceYaw(root: AbstractMesh, yaw: number): void {
+  if (!root.rotationQuaternion) {
+    root.rotation.y = yaw;
+    return;
+  }
+  const meta = (root.metadata ??= {}) as { __baseQuat?: Quaternion };
+  meta.__baseQuat ??= root.rotationQuaternion.clone();
+  root.rotationQuaternion = Quaternion.RotationAxis(Vector3.Up(), yaw).multiply(meta.__baseQuat);
 }
 
 export function getRemoteCdnAssetKeys(): FantasyAssetKey[] {
@@ -544,7 +603,9 @@ export class FantasyAssetLoader {
         // Store as hidden template — instances will be cloned from this
         root.setEnabled(false);
         root.name = `__fantasy_template_${key}`;
-        root.scaling = new Vector3(scale, scale, scale);
+        // Multiply, don't replace: the glTF root carries the right→left-handed
+        // conversion (scaling z = −1); overwriting it mirrored every model.
+        root.scaling.scaleInPlace(scale);
 
         entry.rootMesh = root;
         entry.allMeshes = result.meshes;

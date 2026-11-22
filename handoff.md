@@ -51,6 +51,12 @@ bone name in `character-models.ts`); undead stay KayKit. KayKit textures dark-gr
 per chunk (`_scatterGrimNature`). Loader fixes: folder/file split so external textures resolve; merge
 groups keyed by vertex attributes. `public/model` is now ~44 MB.
 
+Sixth follow-up — **assembled buildings**: `src/world/village-buildings.ts` (pure layout, tested) builds
+4×4 plaster cottages and 6×8 brick inns from 20 Medieval Village modules (`village/` slot folder, `v*` keys);
+`game._placeBuilding` replaces the CDN inn/cottage meshes (set back 5–8 m so doors face the yard), walls
+`checkCollisions` (verified: player stops ~1 m from the wall), meshes unpickable. Loader fixes: keep the glTF
+root's handedness scaling (models were mirrored) and `setInstanceYaw` (rotation.y was ignored on glTF roots).
+
 Known limits: The saddlebag takes out the *first* copy of an item
 id (it is consistent, so nothing is lost, but the player can't choose which of two identical swords to take).
 Barter is instance-aware and prices worn gear down (third follow-up).

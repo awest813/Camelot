@@ -52,6 +52,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   fungus are scattered by biome. The smith's forge is a stone-and-brick hearth
   from the Medieval Village kit.
 - KayKit textures are colour-graded darker and less saturated to match.
+- Real buildings: cottages are half-timbered plaster with tiled roofs, and inns
+  are stone with timber gables. Both are built from Quaternius Medieval
+  Village pieces, with arched windows, shutters and plank doors. They replace
+  the online-only cottage and inn models, so towns have buildings in offline
+  and Steam builds too. Walls block the player, and NPCs can't see through
+  them when deciding whether you've been spotted or witnessed committing a
+  crime.
 - The whole world now shares one dark-fantasy colour grade (with
   `src/rendering/dark-grade.ts` as the single source):
   - Every texture the game generates (ground, bark, foliage, stone, plaster)
@@ -65,6 +72,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
     pipeline is off, so the grade is applied by the materials instead.
 
 ### Fixed
+- Imported models were drawn mirrored, and turning them had no effect: the
+  loader discarded part of the model's orientation data and ignored its
+  stored rotation. Placed props, scattered trees and rocks, and buildings now
+  face the way they are meant to.
 - Townsfolk no longer attack the player on sight. Innkeepers, shopkeepers,
   villagers and trainers used to draw weapons as soon as you walked within
   about 12 paces, and the stealth system turned them hostile as soon as it

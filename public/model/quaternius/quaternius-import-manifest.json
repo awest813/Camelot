@@ -202,6 +202,86 @@
     {
       "slot": "outfits/Shield",
       "source": "fantasy-props-megakit/Shield_Wooden"
+    },
+    {
+      "slot": "village/WallPlaster",
+      "source": "medieval-village-megakit/Wall_Plaster_Straight"
+    },
+    {
+      "slot": "village/WallPlasterDoor",
+      "source": "medieval-village-megakit/Wall_Plaster_Door_Round"
+    },
+    {
+      "slot": "village/WallPlasterWindow",
+      "source": "medieval-village-megakit/Wall_Plaster_Window_Wide_Round"
+    },
+    {
+      "slot": "village/WallTimber",
+      "source": "medieval-village-megakit/Wall_Plaster_WoodGrid"
+    },
+    {
+      "slot": "village/WallBrick",
+      "source": "medieval-village-megakit/Wall_UnevenBrick_Straight"
+    },
+    {
+      "slot": "village/WallBrickDoor",
+      "source": "medieval-village-megakit/Wall_UnevenBrick_Door_Round"
+    },
+    {
+      "slot": "village/WallBrickWindow",
+      "source": "medieval-village-megakit/Wall_UnevenBrick_Window_Wide_Round"
+    },
+    {
+      "slot": "village/CornerWood",
+      "source": "medieval-village-megakit/Corner_Exterior_Wood"
+    },
+    {
+      "slot": "village/CornerBrick",
+      "source": "medieval-village-megakit/Corner_Exterior_Brick"
+    },
+    {
+      "slot": "village/FloorWood",
+      "source": "medieval-village-megakit/Floor_WoodDark"
+    },
+    {
+      "slot": "village/Roof4x4",
+      "source": "medieval-village-megakit/Roof_RoundTiles_4x4"
+    },
+    {
+      "slot": "village/Roof6x8",
+      "source": "medieval-village-megakit/Roof_RoundTiles_6x8"
+    },
+    {
+      "slot": "village/Gable4",
+      "source": "medieval-village-megakit/Roof_Front_Brick4"
+    },
+    {
+      "slot": "village/Gable6",
+      "source": "medieval-village-megakit/Roof_Front_Brick6"
+    },
+    {
+      "slot": "village/Door",
+      "source": "medieval-village-megakit/Door_1_Round"
+    },
+    {
+      "slot": "village/Window",
+      "source": "medieval-village-megakit/Window_Wide_Round1"
+    },
+    {
+      "slot": "village/Shutters",
+      "source": "medieval-village-megakit/WindowShutters_Wide_Round_Open"
+    },
+    {
+      "slot": "village/Chimney",
+      "source": "medieval-village-megakit/Prop_Chimney2"
+    },
+    {
+      "slot": "village/Fence",
+      "source": "medieval-village-megakit/Prop_WoodenFence_Single"
+    },
+    {
+      "slot": "village/Wagon",
+      "source": "medieval-village-megakit/Prop_Wagon"
     }
   ]
 }
