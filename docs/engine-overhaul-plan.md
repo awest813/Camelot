@@ -369,6 +369,15 @@ state, scope and save codec.
       small `shout-host` service: facing, targets, dash, damage with the
       usual kill handling, attack speed and weather.
 
+  12. **Crafting** (`src/features/crafting/`): alchemy (L), enchanting (B),
+      smithing (Shift+B), the world's forges and the starter kit. The smith's
+      "use the forge" now arrives through `dialogue:action` and
+      `dialogue:closed`; forges leave with `chunk:unloaded`. New `skills`
+      service (level, XP scaled by class). The game still builds the feature
+      early, because gear-wear hooks in combat, barter and the inventory read
+      `smithing` during construction. Those hooks move once combat is a
+      feature.
+
   Render counts after the extraction match the pre-extraction baseline
   (2,066 village meshes), so villages are built identically. The render
   budget check now also has floors, so a scene that failed to render can't

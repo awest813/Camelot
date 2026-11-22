@@ -1,0 +1,126 @@
+import { describe, it, expect, vi } from "vitest";
+
+// The workbench and altar panels draw with Babylon GUI; stand them in.
+vi.mock("../../ui/alchemy-ui", () => ({
+  AlchemyUI: class {
+    isVisible = false;
+    onCraft: unknown = null; onDrink: unknown = null; onClosed: unknown = null;
+    toggle(v: boolean) { this.isVisible = v; }
+    refresh() {}
+  },
+}));
+vi.mock("../../ui/enchanting-ui", () => ({
+  EnchantingUI: class {
+    isVisible = false;
+    onEnchant: unknown = null; onClosed: unknown = null;
+    toggle(v: boolean) { this.isVisible = v; }
+    refresh() {}
+  },
+}));
+
+import { Kernel } from "../../core/kernel";
+import { FeedbackKey, GameplayKey, ModalKey, PlayerKey, SkillsKey } from "../services";
+import { CraftingFeature, CraftingKey, type CraftingDeps } from "./crafting-feature";
+import type { Item } from "../../systems/inventory-system";
+
+function setup() {
+  const k = new Kernel();
+  const notes: string[] = [];
+  const xp: Array<[string, number]> = [];
+  let canAct = true;
+  let at = { x: 0, z: 0 };
+  const items: Item[] = [];
+  const deps = {
+    player: { carryWeight: 0, gearDamagePenalty: 0, gearArmorPenalty: 0, maxCarryWeight: 300, health: 50, maxHealth: 100 },
+    ui: { showNotification: vi.fn(), uiTexture: {} },
+    inventory: {
+      items,
+      get totalWeight() { return items.reduce((n, i) => n + (i.weight ?? 0) * i.quantity, 0); },
+      addItem: (i: Item) => { items.push(i); return true; },
+      removeQuantity: () => true,
+      removeItem: () => true,
+    },
+    equipment: { getEquipped: () => new Map(), isEquipped: () => false },
+  } as unknown as CraftingDeps;
+  const modal = { suspendGameplay: vi.fn(), restoreGameplay: vi.fn() };
+  k.services.provide(FeedbackKey, { notify: (t) => { notes.push(t); }, grant: vi.fn(), addFame: vi.fn(), markDirty: vi.fn() });
+  k.services.provide(ModalKey, modal);
+  k.services.provide(GameplayKey, { canAct: () => canAct });
+  k.services.provide(PlayerKey, { position: () => at, level: () => 1 });
+  k.services.provide(SkillsKey, { level: () => 20, gainXP: (id, n) => { xp.push([id, n]); } });
+  const feature = new CraftingFeature(deps);
+  k.install(feature);
+  return {
+    k, feature, notes, xp, modal, items, c: k.services.get(CraftingKey),
+    block: () => { canAct = false; }, moveTo: (x: number, z: number) => { at = { x, z }; },
+  };
+}
+
+describe("CraftingFeature (headless, through the kernel)", () => {
+  it("starts the player with a forge kit, ingredients and soul gems", () => {
+    const t = setup();
+    expect(t.items.map((i) => i.id)).toEqual(["iron_ingot", "leather_strips", "repair_hammer"]);
+    expect(t.c.alchemy.getIngredientCount("aloe_vera_leaves")).toBe(5);
+    expect(t.c.enchanting.getSaveState().soulGems).toBeDefined();
+    t.k.uninstall("crafting");
+  });
+
+  it("Shift+B away from a forge is field smithing; by one, the forge", () => {
+    const t = setup();
+    t.c.toggleSmithing();
+    expect(t.c.forgePanel.isVisible).toBe(true);
+    expect(t.notes.at(-1)).toMatch(/No forge nearby/);
+    t.c.toggleSmithing();
+    expect(t.c.forgePanel.isVisible).toBe(false);
+    expect(t.modal.restoreGameplay).toHaveBeenCalled();
+
+    t.c.forges.add("forge_a", 10, 10, "0,0");
+    t.moveTo(10.5, 10);
+    const before = t.notes.length;
+    t.c.toggleSmithing();
+    expect(t.notes.length, "no field-smithing warning at a forge").toBe(before);
+    t.c.toggleSmithing();
+
+    // Leaving the area takes its forges with it.
+    t.k.events.emit("chunk:unloaded", { chunkKey: "0,0" });
+    expect(t.c.forges.size).toBe(0);
+    t.k.uninstall("crafting");
+  });
+
+  it("a smith's \"use the forge\" opens it after the conversation", () => {
+    const t = setup();
+    t.k.events.emit("dialogue:action", { eventId: "smithing:open", npcName: "Smith" });
+    expect(t.c.forgePanel.isVisible).toBe(false);
+    t.k.events.emit("dialogue:closed", {});
+    expect(t.c.forgePanel.isVisible).toBe(true);
+    // Only once.
+    t.c.forgePanel.hide();
+    t.k.events.emit("dialogue:closed", {});
+    expect(t.c.forgePanel.isVisible).toBe(false);
+    t.k.uninstall("crafting");
+  });
+
+  it("L and B toggle their panels; blocked gameplay opens nothing", () => {
+    const t = setup();
+    t.c.toggleAlchemy();
+    expect(t.c.alchemyPanel.isVisible).toBe(true);
+    t.c.toggleAlchemy();
+    expect(t.c.alchemyPanel.isVisible).toBe(false);
+    t.c.toggleEnchanting();
+    expect(t.c.enchantingPanel.isVisible).toBe(true);
+    t.c.toggleEnchanting();
+    t.block();
+    t.c.toggleAlchemy();
+    t.c.toggleEnchanting();
+    t.c.toggleSmithing();
+    expect([t.c.alchemyPanel.isVisible, t.c.enchantingPanel.isVisible, t.c.forgePanel.isVisible]).toEqual([false, false, false]);
+    t.k.uninstall("crafting");
+  });
+
+  it("brewing a potion trains Alchemy through the skills service", () => {
+    const t = setup();
+    t.c.alchemy.onPotionCrafted!({} as never);
+    expect(t.xp).toEqual([["alchemy", 15]]);
+    t.k.uninstall("crafting");
+  });
+});

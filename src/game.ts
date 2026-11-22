@@ -78,17 +78,18 @@ import { LootTableSystem, STARTER_LOOT_TABLES } from "./systems/loot-table-syste
 import { NpcArchetypeSystem } from "./systems/npc-archetype-system";
 import { NpcScheduleSystem, SCHED_GUARD } from "./systems/npc-schedule-system";
 import { FixedStepLoop } from "./systems/fixed-step-loop";
-import { AlchemySystem } from "./systems/alchemy-system";
-import { AlchemyUI } from "./ui/alchemy-ui";
-import { CraftingSystem, type CraftingStationId } from "./systems/crafting-system";
-import { CraftingUI } from "./ui/crafting-ui";
-import { ItemConditionSystem } from "./systems/item-condition-system";
+import type { AlchemySystem } from "./systems/alchemy-system";
+import type { AlchemyUI } from "./ui/alchemy-ui";
+import type { CraftingSystem } from "./systems/crafting-system";
+import type { CraftingUI } from "./ui/crafting-ui";
+import type { ItemConditionSystem } from "./systems/item-condition-system";
+import { CraftingFeature, CraftingKey, type CraftingService } from "./features/crafting/crafting-feature";
 import { buildingFootprint, buildingWallColliders, buildingLayout, toWorld, WALL_HEIGHT, type BuildingKind } from "./world/village-buildings";
 import { Kernel } from "./core/kernel";
 import { EditorSuite } from "./features/editor/editor-suite";
 import { VillageRaidFeature, RaidsKey, type RaidsService } from "./features/village-raids/raid-feature";
 import {
-  ActorsKey, AnimationKey, BuildingsKey, ClockKey, FastTravelKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, LootKey, ModalKey, PlayerKey,
+  ActorsKey, AnimationKey, BuildingsKey, ClockKey, FastTravelKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey,
   QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey,
 } from "./features/services";
 import { VillagesFeature, VillagesKey, type VillagesService } from "./features/villages/villages-feature";
@@ -97,9 +98,9 @@ import { IndoorsFeature } from "./features/indoors/indoors-feature";
 import { MountsFeature, MountsKey, MountHostKey, type MountsService } from "./features/mounts/mounts-feature";
 import { WorldEventsFeature, WorldEventsKey } from "./features/world-events/world-events-feature";
 import { VillageJobsFeature, JobsKey, type JobsService } from "./features/village-jobs/jobs-feature";
-import { ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack } from "./systems/smithing-controller";
-import { EnchantingSystem } from "./systems/enchanting-system";
-import { EnchantingUI } from "./ui/enchanting-ui";
+import { smithingMaterialStack, type ForgeRegistry, type SmithingController } from "./systems/smithing-controller";
+import type { EnchantingSystem } from "./systems/enchanting-system";
+import type { EnchantingUI } from "./ui/enchanting-ui";
 import { LodSystem } from "./systems/lod-system";
 import { WeatherSystem } from "./systems/weather-system";
 import { GraphicsSystem, persistGraphicsTier } from "./systems/graphics-system";
@@ -324,16 +325,18 @@ export class Game {
   public npcScheduleSystem: NpcScheduleSystem;
 
   // v4 systems (Oblivion-lite: alchemy)
-  public alchemySystem: AlchemySystem;
-  public alchemyUI: AlchemyUI;
+  /** Alchemy, enchanting and smithing (built early: see CraftingFeature). */
+  private _crafting!: CraftingFeature;
+  public get alchemySystem(): AlchemySystem { return this._crafting.alchemy; }
+  public get alchemyUI(): AlchemyUI { return this._crafting.alchemyPanel; }
 
   // Smithing + gear wear (CraftingSystem / ItemConditionSystem, glued by SmithingController)
-  public craftingSystem: CraftingSystem;
-  public itemConditionSystem: ItemConditionSystem;
-  public smithing: SmithingController;
+  public get craftingSystem(): CraftingSystem { return this._crafting.recipes; }
+  public get itemConditionSystem(): ItemConditionSystem { return this._crafting.conditions; }
+  public get smithing(): SmithingController { return this._crafting.smithing; }
   /** World forges (smithies, armorer inns, the starting forge) — steel work needs one in reach. */
-  public readonly forges = new ForgeRegistry();
-  public craftingUI: CraftingUI;
+  public get forges(): ForgeRegistry { return this._crafting.forges; }
+  public get craftingUI(): CraftingUI { return this._crafting.forgePanel; }
   /** Radiant work offered by innkeepers ("Any work going?"). */
   /** In-game editor tools (moves to the separate editor app in Phase 9). */
   public editors!: EditorSuite;
@@ -397,13 +400,14 @@ export class Game {
   }
 
   /** The village jobs feature's service (job window, rules). */
+  public get crafting(): CraftingService { return this.kernel.services.get(CraftingKey); }
   public get jobs(): JobsService {
     return this.kernel.services.get(JobsKey);
   }
 
   // v5 systems (Oblivion parity: enchanting)
-  public enchantingSystem: EnchantingSystem;
-  public enchantingUI: EnchantingUI;
+  public get enchantingSystem(): EnchantingSystem { return this._crafting.enchanting; }
+  public get enchantingUI(): EnchantingUI { return this._crafting.enchantingPanel; }
 
   // v4 browser optimisation: LOD culling
   public lodSystem: LodSystem;
@@ -496,7 +500,6 @@ export class Game {
   /** When set, open barter after dialogue teardown (pointer lock restored first). */
   private _pendingBarterMerchantId: string | null = null;
   /** Set by the smith's "use your forge" dialogue choice; opened once dialogue closes. */
-  private _pendingSmithingOpen = false;
   /** Shared parchment material for village notice boards. */
   private _candleMat: StandardMaterial | null = null;
   private _hudInDialogue = false;
@@ -962,72 +965,16 @@ export class Game {
     this.saveSystem.setSpellSystem(this.spellSystem);
     this.saveSystem.setPersuasionSystem(this.persuasionSystem);
 
-    // ── v4 system wiring (Alchemy) ────────────────────────────────────────────
-    this.alchemySystem = new AlchemySystem(this.player, this.ui);
-
-    // Seed the player with a starter set of ingredients
-    this.alchemySystem.addIngredient("aloe_vera_leaves", 5);
-    this.alchemySystem.addIngredient("cairn_bolete_cap", 4);
-    this.alchemySystem.addIngredient("fennel_seeds", 4);
-    this.alchemySystem.addIngredient("dragon_tongue", 3);
-    this.alchemySystem.addIngredient("bergamot_seeds", 3);
-
-    this.alchemyUI = new AlchemyUI(this.ui.uiTexture, this.alchemySystem);
-    this.alchemyUI.onCraft = (ingredientIds) => {
-      this.alchemySystem.craftPotion(ingredientIds);
-      this.alchemyUI.refresh();
-    };
-    this.alchemyUI.onDrink = (potionId) => {
-      this.alchemySystem.drinkPotion(potionId);
-      this.saveSystem.markDirty();
-    };
-
-    this.saveSystem.setAlchemySystem(this.alchemySystem);
-
-    // ── v5 system wiring (Enchanting) ─────────────────────────────────────────
-    this.enchantingSystem = new EnchantingSystem(
-      this.player,
-      this.inventorySystem,
-      this.equipmentSystem,
-      this.ui,
-    );
-
-    // Seed the player with a starter set of soul gems
-    this.enchantingSystem.addSoulGem("petty", 3);
-    this.enchantingSystem.addSoulGem("lesser", 2);
-    this.enchantingSystem.addSoulGem("common", 1);
-
-    this.enchantingUI = new EnchantingUI(this.ui.uiTexture, this.enchantingSystem);
-    this.enchantingUI.onEnchant = (itemId, effectId, gemType) => {
-      this.enchantingSystem.enchantItem(itemId, effectId, gemType);
-      this.enchantingUI.refresh();
-      this.saveSystem.markDirty();
-    };
-
-    this.saveSystem.setEnchantingSystem(this.enchantingSystem);
-
-    // ── Smithing + gear wear ──────────────────────────────────────────────────
+    // ── Crafting: alchemy, enchanting, smithing + gear wear ─────────────────
     // Shift+B opens the forge.  Gear wears in combat; Repair Hammers mend it.
-    this.craftingSystem = new CraftingSystem();
-    this.itemConditionSystem = new ItemConditionSystem();
-    this.smithing = new SmithingController(this.craftingSystem, this.itemConditionSystem, {
+    this._crafting = new CraftingFeature({
+      player: this.player,
+      ui: this.ui,
       inventory: this.inventorySystem,
       equipment: this.equipmentSystem,
-      player: this.player,
-      getArmorerSkill: () => this.skillProgressionSystem?.getSkill("armorer")?.level ?? 0,
-      gainArmorerXp: (amount) => {
-        this.skillProgressionSystem?.gainXP("armorer", amount * (this.classSystem?.xpMultiplierFor("armorer") ?? 1));
-      },
-      notify: (message, durationMs) => this.ui.showNotification(message, durationMs),
     });
-    this.craftingUI = new CraftingUI({ title: "Smithing Forge" });
-    this.craftingUI.materialLabel = (id) => SMITHING_MATERIAL_ITEMS[id]?.name ?? id;
-    this.craftingUI.onCraft = (recipeId) => {
-      const outcome = this.smithing.craft(recipeId, this._currentCraftingStation());
-      if (outcome.success) this.saveSystem.markDirty();
-      this._refreshCraftingUI();
-    };
-    this.craftingUI.onClose = () => this._restoreGameplayInput();
+    this.saveSystem.setAlchemySystem(this.alchemySystem);
+    this.saveSystem.setEnchantingSystem(this.enchantingSystem);
     this.saveSystem.setCraftingSystem(this.craftingSystem);
     this._installFeatures();
     // Forget condition for gear that left the world (dropped, or wiped by a shop restock).
@@ -1052,13 +999,6 @@ export class Game {
       return c === null ? "" : `\nCondition: ${Math.round(c)}%`;
     };
     this.saveSystem.setItemConditionSystem(this.itemConditionSystem);
-    // Starter kit so the forge is usable before the first merchant visit.
-    this.inventorySystem.items.push(
-      smithingMaterialStack("iron_ingot", 3),
-      smithingMaterialStack("leather_strips", 2),
-      smithingMaterialStack("repair_hammer", 2),
-    );
-    this.player.carryWeight = this.inventorySystem.totalWeight;
 
     // ── v6 system wiring (Weather + QuickSlots) ────────────────────────────────
     // WeatherSystem: Markov-chain atmospheric weather with fog/light integration.
@@ -1124,9 +1064,6 @@ export class Game {
     this.ui.onWaitDialogClosed = () => this._restoreGameplayInput();
     // Attribute panel ✕ button closes without going through a game toggle.
     this.ui.onAttributePanelClosed = () => this._restoreGameplayInput();
-    // Alchemy/enchanting ✕ buttons likewise.
-    this.alchemyUI.onClosed = () => this._restoreGameplayInput();
-    this.enchantingUI.onClosed = () => this._restoreGameplayInput();
 
     // ── v8 system wiring (Oblivion depth: skill progression, fast travel, level scaling) ──
     this.skillProgressionSystem = new SkillProgressionSystem();
@@ -1212,9 +1149,6 @@ export class Game {
     };
 
     // Wire skill XP into spell cast and potion craft callbacks
-    this.alchemySystem.onPotionCrafted = (_potion) => {
-      this.skillProgressionSystem.gainXP("alchemy", 15 * this.classSystem.xpMultiplierFor("alchemy"));
-    };
     this.spellSystem.onSpellCast = (spell, result) => {
       // Spell school XP
       if (result.damage && result.damage > 0) {
@@ -1637,7 +1571,6 @@ export class Game {
       this.world.onChunkUnloaded = (cx, cz) => {
         const key = `${cx},${cz}`;
         const record = this._chunkFantasyContent.get(key);
-        this.forges.removeGroup(key);
         this.eventBus.emit("chunk:unloaded", { chunkKey: key });
         if (!record) return;
         this._chunkFantasyContent.delete(key);
@@ -2156,10 +2089,6 @@ export class Game {
       this.barterSystem.playerGold = this._getInventoryGold();
       this._syncInventoryGoldToFramework();
       this._flushPendingBarter();
-      if (this._pendingSmithingOpen) {
-        this._pendingSmithingOpen = false;
-        this._openSmithingForge();
-      }
       // Features waiting on the conversation (e.g. the job window) act now.
       this.eventBus.emit("dialogue:closed", {});
       this._currentDialogueNpcName = null;
@@ -3038,34 +2967,10 @@ export class Game {
                 }
             } else if (kbInfo.event.key === "l" || kbInfo.event.key === "L") {
                 // Toggle Alchemy workbench
-                if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
-                    const open = !this.alchemyUI.isVisible;
-                    this.alchemyUI.toggle(open);
-                    if (open) {
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
-                    } else {
-                        this.interactionSystem.isBlocked = false;
-                        this.canvas.requestPointerLock();
-                        this.player.camera.attachControl(this.canvas, true);
-                    }
-                }
+                this.crafting.toggleAlchemy();
             } else if (kbInfo.event.key === "b" || kbInfo.event.key === "B") {
                 // Toggle Enchanting altar (B = enchanting Bench)
-                if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
-                    const open = !this.enchantingUI.isVisible;
-                    this.enchantingUI.toggle(open);
-                    if (open) {
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
-                    } else {
-                        this.interactionSystem.isBlocked = false;
-                        this.canvas.requestPointerLock();
-                        this.player.camera.attachControl(this.canvas, true);
-                    }
-                }
+                this.crafting.toggleEnchanting();
             } else if (kbInfo.event.key === "x" || kbInfo.event.key === "X") {
                 if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
                     if (this.spellMakingUI.isVisible) {
@@ -3422,35 +3327,9 @@ export class Game {
       this.ui.refreshAttributePanel(this.attributeSystem);
       this._suspendGameplayInput();
     });
-    adapter.onAction("toggleAlchemy", () => {
-      if (this.alchemyUI.isVisible) {
-        this.alchemyUI.toggle(false);
-        this._restoreGameplayInput();
-        return;
-      }
-      if (this._isCombatInputBlocked()) return;
-      this.alchemyUI.toggle(true);
-      this._suspendGameplayInput();
-    });
-    adapter.onAction("toggleEnchanting", () => {
-      if (this.enchantingUI.isVisible) {
-        this.enchantingUI.toggle(false);
-        this._restoreGameplayInput();
-        return;
-      }
-      if (this._isCombatInputBlocked()) return;
-      this.enchantingUI.toggle(true);
-      this._suspendGameplayInput();
-    });
-    adapter.onAction("toggleSmithing", () => {
-      if (this.craftingUI.isVisible) {
-        this.craftingUI.hide();
-        this._restoreGameplayInput();
-        return;
-      }
-      if (this._isCombatInputBlocked()) return;
-      this._openSmithingForge();
-    });
+    adapter.onAction("toggleAlchemy", () => this.crafting.toggleAlchemy());
+    adapter.onAction("toggleEnchanting", () => this.crafting.toggleEnchanting());
+    adapter.onAction("toggleSmithing", () => this.crafting.toggleSmithing());
     adapter.onAction("toggleSpellMaking", () => {
       if (this.spellMakingUI.isVisible) {
         this.spellMakingUI.close();
@@ -5441,10 +5320,8 @@ export class Game {
         }
         return;
       }
-      if (eventId === "smithing:open") {
-        this._pendingSmithingOpen = true;
-        return;
-      }
+      // "smithing:open" is the crafting feature's (it opens the forge after the talk).
+      if (eventId === "smithing:open") return;
       if (eventId === "barter:open") {
         const merchantId = typeof payload?.merchantId === "string" ? payload.merchantId : "merchant_01";
         if (this._barterUI.isVisible) {
@@ -6042,6 +5919,11 @@ export class Game {
         release: (name) => this.animationSystem.unregisterMesh(name),
       });
       k.services.provide(GameplayKey, { canAct: () => !this._isCombatInputBlocked() });
+      k.services.provide(SkillsKey, {
+        level: (id) => this.skillProgressionSystem?.getSkill(id)?.level ?? 0,
+        gainXP: (id, base) => this.skillProgressionSystem?.gainXP(id, base * (this.classSystem?.xpMultiplierFor(id) ?? 1)),
+      });
+      k.install(this._crafting);
       k.services.provide(PurseKey, {
         gold: () => this._getInventoryGold(),
         spend: (amount) => this._consumeInventoryGold(amount),
@@ -6157,34 +6039,6 @@ export class Game {
           }
         });
       }
-  }
-
-  /** "forge" when the player stands within reach of one, else undefined (field smithing). */
-  private _currentCraftingStation(): CraftingStationId | undefined {
-      const p = this.player.camera.position;
-      return this.forges.stationAt(p.x, p.z);
-  }
-
-  /** Open the smithing forge panel and hand input to it. */
-  private _openSmithingForge(): void {
-      if (this.craftingUI.isVisible) return;
-      this.craftingUI.show();
-      this._refreshCraftingUI();
-      this._suspendGameplayInput();
-      if (!this._currentCraftingStation()) {
-        this.ui.showNotification("No forge nearby: field smithing only. Steel work needs a forge.", 3000);
-      }
-  }
-
-  /** Re-render the smithing panel from live inventory + Armorer skill. */
-  private _refreshCraftingUI(): void {
-      if (!this.craftingUI.isVisible) return;
-      this.craftingUI.update(
-          this.craftingSystem,
-          this.smithing.getMaterials(),
-          this.skillProgressionSystem.getSkill("armorer")?.level ?? 0,
-          this._currentCraftingStation(),
-      );
   }
 
   private _isCombatInputBlocked(): boolean {

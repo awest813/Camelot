@@ -8,6 +8,7 @@
  */
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { NPC } from "../entities/npc";
+import type { ProgressionSkillId } from "../systems/skill-progression-system";
 import type { Quest } from "../systems/quest-system";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
@@ -166,6 +167,13 @@ export interface AnimationService {
   release(meshName: string): void;
 }
 
+/** The player's skills. */
+export interface SkillsService {
+  level(skill: ProgressionSkillId): number;
+  /** Award XP, scaled by the player's class. */
+  gainXP(skill: ProgressionSkillId, base: number): void;
+}
+
 /** The player's gold. */
 export interface PurseService {
   gold(): number;
@@ -196,6 +204,7 @@ export const InventoryKey = createServiceKey<InventoryService>("inventory");
 export const QuestLogKey = createServiceKey<QuestLogService>("quest-log");
 export const WorldStateKey = createServiceKey<WorldStateService>("world-state");
 export const AnimationKey = createServiceKey<AnimationService>("animation");
+export const SkillsKey = createServiceKey<SkillsService>("skills");
 export const PurseKey = createServiceKey<PurseService>("purse");
 export const GameplayKey = createServiceKey<GameplayService>("gameplay");
 export const LootKey = createServiceKey<LootService>("loot");
