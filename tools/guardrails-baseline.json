@@ -1,8 +1,8 @@
 {
   "counts": {
-    "game-ts-lines": 5469,
+    "game-ts-lines": 5317,
     "unseeded-random": 57,
-    "callback-properties": 109,
+    "callback-properties": 107,
     "babylon-gui-files": 12
   }
 }

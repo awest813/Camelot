@@ -378,6 +378,10 @@ state, scope and save codec.
       `smithing` during construction. Those hooks move once combat is a
       feature.
 
+  13. **Arrest** (`src/features/arrest/`): a guard's challenge, with paying
+      the fine, jail, persuasion and resisting (also Escape). New `law`
+      service (crime, persuasion, jail time, infamy).
+
 - Legacy keyboard path pruned (ahead of Phase 2). Legacy branches only run
   for chords the input adapter does not bind, or in the map editor. The ones
   that copied adapter actions (Escape, F1, F3, PrintScreen, the panels, the

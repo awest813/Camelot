@@ -175,6 +175,27 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
     return g.shoutUI.isVisible === false && g.dragonShoutSystem === g.shouts.shouts;
   }), "shout used without errors").toBe(true);
 
+  // A guard stops the player for a bounty; Escape resists arrest.
+  const arrest = await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    const guard = g.scheduleSystem.npcs.find((n: any) => !n.isDead);
+    if (!guard) return { skipped: true };
+    g.crimeSystem.setBounty("town", 40);
+    g.crimeSystem.onGuardChallenge(guard, "town", 40);
+    return { skipped: false, open: g.guardEncounterUI.isVisible as boolean };
+  });
+  expect(arrest.skipped, "an NPC to play the guard").toBe(false);
+  {
+    expect(arrest.open, "the arrest panel opens").toBe(true);
+    await page.keyboard.press("Escape");
+    expect(await page.evaluate(() => {
+      const g = (window as any).__camelotGame;
+      return { open: g.guardEncounterUI.isVisible, bounty: g.crimeSystem.getBounty("town") };
+    })).toEqual({ open: false, bounty: 50 });
+    await page.evaluate(() => (window as any).__camelotGame.crimeSystem.clearBounty("town"));
+    await page.locator("#renderCanvas").click({ force: true });
+  }
+
   // F5 — manual save.  Assert the full game-state graph serialised.
   await page.keyboard.press("F5");
   const saveRaw = await page.evaluate(() => localStorage.getItem("camelot_save"));
