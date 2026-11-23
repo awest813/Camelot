@@ -244,10 +244,6 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
     const travel = g.kernel.services.get({ name: "travel" });
     const host = g.kernel.services.get({ name: "travel-host" });
     host.inCombat = () => false;
-    // Rooms are built near the world origin, by the boot-time Guard: send the
-    // NPCs away so a fight can't knock the player out through the exit.
-    g.kernel.services.get({ name: "death-host" }).calmAttackers();
-    for (const n of g.scheduleSystem.npcs) n.mesh.position.x += 500;
     const said: string[] = [];
     const orig = g.ui.showNotification.bind(g.ui);
     g.ui.showNotification = (t: string, ms?: number) => { said.push(t); return orig(t, ms); };
@@ -302,6 +298,19 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
     return { level: g.playerLevelSystem.characterLevel, open: g.levelUpUI.isVisible, blocked: g.interactionSystem.isBlocked };
   })).toEqual({ level: before + 1, open: false, blocked: false });
   await page.locator("#renderCanvas").click({ force: true });
+
+  // Combat input: a left click swings, Q casts.
+  await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    const calls: string[] = ((window as any).__combatCalls = []);
+    const c = g.combatSystem, sp = g.spellSystem;
+    const melee = c.meleeAttack.bind(c), cast = sp.castSpell.bind(sp);
+    c.meleeAttack = () => { calls.push("melee"); return melee(); };
+    sp.castSpell = () => { calls.push("cast"); return cast(); };
+  });
+  await page.locator("#renderCanvas").click({ force: true });
+  await page.keyboard.press("q");
+  expect(await page.evaluate(() => (window as any).__combatCalls)).toEqual(expect.arrayContaining(["melee", "cast"]));
 
   // A guard stops the player for a bounty; Escape resists arrest.
   const arrest = await page.evaluate(() => {

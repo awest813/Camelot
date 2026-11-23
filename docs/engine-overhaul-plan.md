@@ -431,6 +431,9 @@ state, scope and save codec.
       and the second copy, the one shown, had no confirm handler. Confirming
       a level-up did nothing, and Escape is blocked there, so the player
       was stuck.
+- `src/game/combat-controls.ts`: what each combat input does (swing or draw
+  a bow, power attack, dodge, block, cast or charge a staff, cycle spells,
+  loose an arrow, racial power), bound to the input adapter in one place.
 - `src/world/dragon-lair.ts` (the tundra dragon boss and its body) and
   `src/game/weapon-archetype.ts` (which archetype a weapon fights as).
 - `src/game/player-pack.ts`: gold (one coin stack, mirrored into the

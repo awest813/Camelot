@@ -195,6 +195,7 @@ import { ModalRegistry } from "./ui/modal-registry";
 import { PlayerPack } from "./game/player-pack";
 import { QuestBridge } from "./game/quest-bridge";
 import { NpcRoster } from "./game/npc-roster";
+import { CombatControls } from "./game/combat-controls";
 import { weaponArchetypeOf } from "./game/weapon-archetype";
 import { QuickSlotHUD } from "./ui/quickslot-hud";
 import { PerkSystem } from "./systems/perk-system";
@@ -534,6 +535,21 @@ export class Game {
     addXp: (xp) => this.player.addExperience(xp),
     notify: (text, ms) => this.ui.showNotification(text, ms),
     markDirty: () => this.saveSystem.markDirty(),
+  });
+  /** What the combat keys and mouse do. */
+  private readonly _combatControls = new CombatControls({
+    combat: () => this.combatSystem,
+    projectiles: () => this.projectileSystem,
+    stealth: () => this.stealthSystem,
+    spells: () => this.spellSystem,
+    races: () => this.raceSystem,
+    effects: () => this.activeEffectsSystem,
+    gameTime: () => this.timeSystem.gameTime,
+    blocked: () => this._isCombatInputBlocked(),
+    free: () => !this.isPaused && !this.dialogueSystem.isInDialogue,
+    swing: (power) => { this._viewModel?.swing(power); this.audioSystem.playMeleeAttack(); },
+    twang: () => this.audioSystem.playMeleeAttack(),
+    notify: (text, ms) => this.ui.showNotification(text, ms),
   });
   /** Panels that take over the screen (Escape, pause, input blocking). */
   private readonly _modals = new ModalRegistry();
@@ -1433,11 +1449,8 @@ export class Game {
             }
         } else if (pointerInfo.type === PointerEventTypes.POINTERUP) {
             this._inputAdapter.handlePointerEvent(pointerInfo.event.button, "up");
-            // Release bow on left mouse up when arrow is drawn
-            if (pointerInfo.event.button === 0 && this.projectileSystem.isDrawing) {
-                const fired = this.projectileSystem.releaseArrow();
-                if (fired) this.audioSystem.playMeleeAttack();
-            }
+            // Left mouse up looses a drawn arrow.
+            if (pointerInfo.event.button === 0) this._combatControls.releaseBow();
         }
     });
 
@@ -1490,23 +1503,8 @@ export class Game {
         } else if (kbInfo.type === KeyboardEventTypes.KEYUP) {
             // A bow drawn (or staff charged) before entering the editor is
             // released here, where the editor sends key-ups.
-            if (kbInfo.event.key === "r" || kbInfo.event.key === "R") {
-                if (this.projectileSystem.isDrawing) {
-                    const fired = this.projectileSystem.releaseArrow();
-                    if (fired) {
-                        this.audioSystem.playMeleeAttack(); // reuse existing SFX placeholder
-                    }
-                }
-            }
-            // Release staff charge when Q is released
-            if (kbInfo.event.key === "q" || kbInfo.event.key === "Q") {
-                if (this.combatSystem.isChargingStaff) {
-                    const fired = this.combatSystem.releaseStaffCharge();
-                    if (fired) {
-                        this.skillProgressionSystem.gainXP("destruction", 8 * this.classSystem.xpMultiplierFor("destruction"));
-                    }
-                }
-            }
+            if (kbInfo.event.key === "r" || kbInfo.event.key === "R") this._combatControls.releaseBow();
+            if (kbInfo.event.key === "q" || kbInfo.event.key === "Q") this._combatControls.castUp();
         }
     });
 
@@ -1617,97 +1615,7 @@ export class Game {
     const adapter = this._inputAdapter;
 
     // Combat
-    adapter.onAction("meleeAttack", () => {
-      if (!this._isCombatInputBlocked()) {
-        if (this.combatSystem.activeWeaponArchetype === "bow") {
-          const drawing = this.projectileSystem.beginDraw();
-          if (drawing) this.stealthSystem.pushNoise(0.4);
-        } else {
-          const attacked = this.combatSystem.meleeAttack();
-          // Weapon-skill XP is awarded inside CombatSystem on hit (correct skill for blade/blunt).
-          if (attacked) {
-            this._viewModel?.swing(false);
-            this.audioSystem.playMeleeAttack();
-          }
-        }
-      }
-    });
-    adapter.onAction("powerAttack", () => {
-      if (!this._isCombatInputBlocked()) {
-        const powered = this.combatSystem.powerAttack();
-        if (powered) {
-            this._viewModel?.swing(true);
-          this.audioSystem.playMeleeAttack();
-        }
-      }
-    });
-    adapter.onAction("dodgeRoll", () => {
-      if (!this._isCombatInputBlocked()) {
-        this.combatSystem.tryDodgeRoll();
-      }
-    });
-    adapter.onAction("block", () => {
-      if (!this._isCombatInputBlocked()) this.combatSystem.beginBlock();
-    });
-    adapter.onAction("blockRelease", () => {
-      this.combatSystem.endBlock();
-    });
-    adapter.onAction("castSpell", () => {
-      if (this._isCombatInputBlocked()) return;
-
-      // KEYUP = release staff charge
-      if (!this._inputAdapter.isActive("castSpell")) {
-        if (this.combatSystem.isChargingStaff) {
-          const fired = this.combatSystem.releaseStaffCharge();
-          // Destruction XP is awarded inside CombatSystem on a successful hit.
-          void fired;
-        }
-        return;
-      }
-
-      // KEYDOWN = cast or begin charge
-      if (this.combatSystem.activeWeaponArchetype === "staff") {
-        this.combatSystem.beginStaffCharge();
-      } else {
-        this.spellSystem.castSpell();
-      }
-    });
-    adapter.onAction("cycleSpell", () => {
-      if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
-        const spells = this.spellSystem.knownSpells;
-        if (spells.length > 0) {
-          const current = this.spellSystem.equippedSpell;
-          const idx = current ? spells.findIndex(s => s.id === current.id) : -1;
-          const next = spells[(idx + 1) % spells.length];
-          this.spellSystem.equipSpell(next.id);
-        }
-      }
-    });
-    adapter.onAction("drawBow", () => {
-      if (!this._isCombatInputBlocked()) {
-        const drawing = this.projectileSystem.beginDraw();
-        if (drawing) this.stealthSystem.pushNoise(0.4);
-      }
-    });
-    adapter.onAction("releaseBow", () => {
-      if (this.projectileSystem.isDrawing) {
-        const fired = this.projectileSystem.releaseArrow();
-        if (fired) this.audioSystem.playMeleeAttack();
-      }
-    });
-    adapter.onAction("racialPower", () => {
-      if (!this._isCombatInputBlocked()) {
-        const race = this.raceSystem.chosenRace;
-        if (!race?.power) {
-          this.ui.showNotification("No racial power available.", 2000);
-        } else if (!this.raceSystem.canActivatePower(this.timeSystem.gameTime)) {
-          const mins = Math.ceil(this.raceSystem.powerCooldownRemaining(this.timeSystem.gameTime));
-          this.ui.showNotification(`${race.power.name} is recharging (${mins} game-minutes remaining).`, 2500);
-        } else {
-          this.raceSystem.activatePower(this.timeSystem.gameTime, this.activeEffectsSystem);
-        }
-      }
-    });
+    this._combatControls.bind(adapter);
 
     // Movement
     adapter.onAction("toggleCrouch", () => {
@@ -1921,14 +1829,6 @@ export class Game {
       }
     });
 
-    adapter.onAction("readyWeapon", () => {
-      if (this._isCombatInputBlocked()) return;
-      if (this.combatSystem.activeWeaponArchetype === "bow" && this.projectileSystem.isDrawing) {
-        const fired = this.projectileSystem.releaseArrow();
-        if (fired) this.audioSystem.playMeleeAttack();
-      }
-      this.ui.showNotification("Weapon ready — switch with archetype keys (1-6)", 2000);
-    });
 
     adapter.onAction("favoritesMenu", () => {
       if (!this.isPaused && !this.dialogueSystem.isInDialogue) {

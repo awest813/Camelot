@@ -439,14 +439,18 @@ export class UIManager {
     this._transitionFadeObserver = this.scene.onBeforeRenderObservable.add(() => {
       elapsed += this.scene.getEngine().getDeltaTime();
 
+      // Fire at full black even when a slow frame steps past the whole hold
+      // (at ~9 fps one frame is longer than it), or the move never happens.
+      if (!blackFired && elapsed > fadeOutMs) {
+        blackFired = true;
+        overlay.alpha = 1;
+        options.onBlack?.();
+      }
+
       if (elapsed <= fadeOutMs) {
         overlay.alpha = Math.min(1, elapsed / fadeOutMs);
       } else if (elapsed <= fadeOutMs + holdMs) {
         overlay.alpha = 1;
-        if (!blackFired) {
-          blackFired = true;
-          options.onBlack?.();
-        }
       } else if (elapsed <= total) {
         const t = (elapsed - fadeOutMs - holdMs) / fadeInMs;
         overlay.alpha = Math.max(0, 1 - t);
