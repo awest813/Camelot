@@ -801,8 +801,8 @@ one replay runs in CI.
     re-derives it).
   - `declareStateless(ctx, why)`: nothing of its own to keep, with the
     reason (saved by the save system's own parts, derived from the world
-    seed, or a player preference outside the save). The other thirteen
-    do.
+    seed, or a player preference outside the save). The other twelve
+    do. (Raids and jobs both save and declare transient state.)
 
   Raids and jobs used to listen for `save:loaded` directly. After
   installing features, the game reports any that declared nothing as a
