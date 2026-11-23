@@ -637,8 +637,18 @@ components.
 - Still scans: combat, spells, projectiles and the crime system's guard
   search walk their own NPC lists. Those loops are proximity searches,
   where a tag query alone does not help, and their unit tests build the
-  lists directly. They move to a spatial index over actors in Phase 5,
+  lists directly. They move to a spatial index over actors in Phase 6,
   with the navmesh tiles.
+
+**Exit check (met):**
+- No system reads `mesh.name` for identity; the `npc-identity`
+  guardrail enforces this.
+- NPC flags are actor components: dead, in dialogue, aggressive, hostile
+  on sight, provoked, telegraphing, staggered, unblockable, hit-react,
+  guard, engaged, LOD tier and chunk-owned.
+- The codec registry (part of Phase 5) is in place, with ten features on
+  it. Phase 5 moves the remaining built-in state onto codecs and adds
+  migrations.
 
 ### Phase 4 — Consolidation (3 weeks)
 
