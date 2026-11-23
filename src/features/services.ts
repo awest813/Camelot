@@ -141,9 +141,14 @@ export interface InventoryService {
 
 /** The quest log (legacy QuestSystem list until Phase 4 unifies quests). */
 export interface QuestLogService {
-  /** The live, mutable list of quests. */
-  quests(): Quest[];
+  /** The quests in the log (read them; change them through the methods). */
+  quests(): readonly Quest[];
   add(quest: Quest): void;
+  /** Set a managed quest's objective progress. */
+  setProgress(questId: string, objectiveId: string, current: number): void;
+  /** Complete a quest quietly (its owner paid out). */
+  finish(questId: string): boolean;
+  remove(questId: string): boolean;
 }
 
 /** Full-screen windows: pause gameplay input while one is open. */

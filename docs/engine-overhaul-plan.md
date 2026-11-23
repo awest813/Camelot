@@ -713,6 +713,17 @@ components.
   Merging needs one rule for this first. A likely one: the event carries
   both ids, and a node says which it wants. Then the legacy kill, pickup
   and talk calls in `game.ts` go, and the bridge feeds the one engine.
+- The quest log has an API; features no longer change quest objects
+  directly. The quest-log service has `setProgress`, `finish` and
+  `remove`, and `quests()` is read-only. A `managed` quest belongs to a
+  feature: kill, pickup and talk events don't move it, and only `finish`
+  completes it (quietly, because the owner pays).
+  - Village jobs use this. They used to write objective counts directly,
+    mark the quest complete, and splice quests out of the log's array.
+  - Jobs had a "never mark the objective complete" workaround, so a
+    stray kill event couldn't close the job before it was paid. A
+    managed quest can't be closed that way, so the workaround is gone.
+  - This was the prerequisite for making the log a view over one engine.
 
 ### Phase 5 — Persistence (1–2 weeks)
 

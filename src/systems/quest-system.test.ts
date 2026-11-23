@@ -263,4 +263,31 @@ describe('QuestSystem', () => {
         expect(qs.getFailedQuests()).toHaveLength(0);
         expect(qs.getActiveQuests()).toHaveLength(1);
     });
+
+    // ── managed quests (owned by a feature, e.g. a village job) ──────────────
+
+    it('a managed quest ignores kill events; its owner sets progress and finishes it', () => {
+        const onComplete = vi.fn();
+        qs.onQuestComplete = onComplete;
+        qs.addQuest(makeQuest({
+            id: 'job', managed: true, xpReward: 50,
+            objectives: [{ id: 'o', type: 'kill', description: '', targetId: 'Wolf', required: 2, current: 0, completed: false }],
+        }), true);
+        qs.onKill('Wolf');
+        expect(qs.getQuests()[0].objectives[0].current, 'events do not drive it').toBe(0);
+        qs.setProgress('job', 'o', 5);
+        expect(qs.getQuests()[0].objectives[0]).toMatchObject({ current: 2, completed: true });
+        expect(qs.getQuests()[0].isCompleted, 'only finish completes it').toBe(false);
+        expect(qs.finish('job')).toBe(true);
+        expect(qs.getCompletedQuests()).toHaveLength(1);
+        expect(onComplete, 'its owner pays, not the log').not.toHaveBeenCalled();
+        expect(qs.finish('job'), 'once').toBe(false);
+    });
+
+    it('remove takes a quest out of the log', () => {
+        qs.addQuest(makeQuest({ id: 'a' }), true);
+        expect(qs.remove('a')).toBe(true);
+        expect(qs.getQuests()).toHaveLength(0);
+        expect(qs.remove('a')).toBe(false);
+    });
 });

@@ -27,6 +27,12 @@ export interface Quest {
   isFailed?: boolean;
   reward?: string;
   xpReward?: number;
+  /**
+   * Driven by its owner (e.g. a village job): objective progress comes from
+   * `setProgress`, and only `finish` completes it — kill / pickup / talk
+   * events never touch it.
+   */
+  managed?: boolean;
 }
 
 export interface QuestSaveState {
@@ -96,6 +102,38 @@ export class QuestSystem {
     return true;
   }
 
+  /** Set a managed quest's objective progress (clamped to what it needs). */
+  public setProgress(questId: string, objectiveId: string, current: number): void {
+    const obj = this._quests.find(q => q.id === questId)?.objectives.find(o => o.id === objectiveId);
+    if (!obj) return;
+    obj.current = Math.max(0, Math.min(obj.required, current));
+    obj.completed = obj.current >= obj.required;
+    this._syncUI();
+  }
+
+  /**
+   * Complete a quest quietly, its owner having already paid out (no toast, no
+   * XP).  Its objectives show as done.
+   */
+  public finish(questId: string): boolean {
+    const quest = this._quests.find(q => q.id === questId);
+    if (!quest || quest.isCompleted || quest.isFailed) return false;
+    quest.isCompleted = true;
+    quest.isActive = false;
+    for (const o of quest.objectives) { o.current = o.required; o.completed = true; }
+    this._syncUI();
+    return true;
+  }
+
+  /** Take a quest out of the log (an abandoned job). */
+  public remove(questId: string): boolean {
+    const i = this._quests.findIndex(q => q.id === questId);
+    if (i < 0) return false;
+    this._quests.splice(i, 1);
+    this._syncUI();
+    return true;
+  }
+
   /** Called by CombatSystem when an NPC is killed. */
   public onKill(npcName: string): void {
     this._updateObjective("kill", npcName);
@@ -142,7 +180,7 @@ export class QuestSystem {
   private _updateObjective(type: ObjectiveType, targetId: string): void {
     let anyUpdated = false;
     for (const quest of this._quests) {
-      if (!quest.isActive || quest.isCompleted || quest.isFailed) continue;
+      if (!quest.isActive || quest.isCompleted || quest.isFailed || quest.managed) continue;
       for (const obj of quest.objectives) {
         if (obj.completed || obj.type !== type || obj.targetId !== targetId) continue;
         obj.current = Math.min(obj.required, obj.current + 1);

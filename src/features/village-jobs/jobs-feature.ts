@@ -153,12 +153,7 @@ export class VillageJobsFeature implements Feature {
       const questId = this._questId(b.boardId); // before handIn bumps the count
       const done = this.rules.handIn(b.boardId, this._context());
       if (!done) { refresh(); return; }
-      const quest = deps.questLog.quests().find((q) => q.id === questId);
-      if (quest) {
-        quest.isCompleted = true;
-        quest.isActive = false;
-        for (const o of quest.objectives) { o.current = o.required; o.completed = true; }
-      }
+      deps.questLog.finish(questId);
       deps.feedback.addFame(5);
       deps.feedback.grant({ gold: done.rewardGold, xp: done.rewardXp, label: `Job done: ${done.template.title}` });
       refresh();
@@ -206,6 +201,7 @@ export class VillageJobsFeature implements Feature {
     let quest = deps.questLog.quests().find((q) => q.id === id);
     if (!quest) {
       quest = {
+        managed: true,
         id,
         name: `${template.title} (${job.placeName})`,
         description: VillageJobBoard.describe(template, job.placeName),
@@ -214,7 +210,6 @@ export class VillageJobsFeature implements Feature {
         reward: `${template.rewardGold} gold`,
         objectives: [{
           id: `${id}_obj`,
-          // Never matched by QuestSystem's own kill/pickup hooks — the job board drives it.
           type: template.kind === "bounty" ? "kill" : "fetch",
           targetId: `__job__${template.target}`,
           description: template.kind === "bounty"
@@ -227,32 +222,25 @@ export class VillageJobsFeature implements Feature {
       } as Quest;
       deps.questLog.add(quest);
     }
-    const obj = quest.objectives[0];
-    // Supply runs count what's in the bag; bounties count kills.
+    // Supply runs count what's in the bag; bounties count kills.  The quest
+    // is managed, so only the hand-in completes it.
     const have = template.kind === "supply" ? deps.inventory.count(template.target) : job.progress;
-    obj.current = Math.min(have, obj.required);
-    // Never mark it complete: QuestSystem would then close the quest (and
-    // announce it) on the next kill/talk event, before the job is paid.
-    obj.completed = false;
+    deps.questLog.setProgress(id, quest.objectives[0].id, have);
   }
 
   /** Drop an abandoned job's quest-log entry. */
   private _removeQuest(boardId: string): void {
-    const quests = this._deps?.questLog.quests();
-    if (!quests) return;
+    const log = this._deps?.questLog;
     const id = this._questId(boardId);
-    const i = quests.findIndex((q) => q.id === id && !q.isCompleted);
-    if (i >= 0) quests.splice(i, 1);
+    if (log?.quests().some((q) => q.id === id && !q.isCompleted)) log.remove(id);
   }
 
   /** Drop quest-log entries for jobs that are no longer active. */
   private _pruneStale(): void {
-    const quests = this._deps?.questLog.quests();
-    if (!quests) return;
+    const log = this._deps?.questLog;
+    if (!log) return;
     const live = new Set(this.rules.getActive().map((j) => this._questId(j.boardId)));
-    for (let i = quests.length - 1; i >= 0; i--) {
-      const q = quests[i];
-      if (q.id.startsWith("job_") && !q.isCompleted && !live.has(q.id)) quests.splice(i, 1);
-    }
+    const stale = log.quests().filter((q) => q.id.startsWith("job_") && !q.isCompleted && !live.has(q.id));
+    for (const q of stale) log.remove(q.id);
   }
 }

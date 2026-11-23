@@ -3,7 +3,7 @@ import { Kernel } from "../../core/kernel";
 import { FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, VillagesKey } from "../services";
 import { VillageJobsFeature, JobsKey } from "./jobs-feature";
 import { VillageJobBoard } from "../../systems/village-jobs";
-import type { Quest } from "../../systems/quest-system";
+import { QuestSystem } from "../../systems/quest-system";
 
 /** A board id whose first offer is the given template. */
 function boardOffering(templateId: string): string {
@@ -15,7 +15,8 @@ function boardOffering(templateId: string): string {
 function setup(boardId: string) {
   const k = new Kernel();
   const bag: Record<string, number> = {};
-  const quests: Quest[] = [];
+  const log = new QuestSystem({ showNotification: vi.fn(), toggleQuestLog: vi.fn(), updateQuestLog: vi.fn() } as never);
+
   const grants: Array<{ gold?: number; label: string }> = [];
   const modal = { suspendGameplay: vi.fn(), restoreGameplay: vi.fn() };
   k.services.provide(PlayerKey, { position: () => ({ x: 0, z: 0 }), level: () => 3 });
@@ -24,7 +25,10 @@ function setup(boardId: string) {
     count: (id) => bag[id] ?? 0,
     remove: (id, n) => { if ((bag[id] ?? 0) < n) return false; bag[id] -= n; return true; },
   });
-  k.services.provide(QuestLogKey, { quests: () => quests, add: (q) => { quests.push(q); } });
+  k.services.provide(QuestLogKey, {
+    quests: () => log.getQuests(), add: (q) => log.addQuest(q, true),
+    setProgress: (id, o, n) => log.setProgress(id, o, n), finish: (id) => log.finish(id), remove: (id) => log.remove(id),
+  });
   k.services.provide(ModalKey, modal);
   k.services.provide(VillagesKey, {
     currentVillage: () => null, loadedVillage: () => null, planFor: () => null, clearingAt: () => null,
@@ -39,7 +43,7 @@ function setup(boardId: string) {
     if (!btn) throw new Error(`no "${label}" button`);
     btn.click();
   };
-  return { k, jobs, bag, quests, grants, modal, click, feature };
+  return { k, jobs, bag, get quests() { return log.getQuests(); }, log, grants, modal, click, feature };
 }
 
 describe("VillageJobsFeature (headless, through the kernel)", () => {

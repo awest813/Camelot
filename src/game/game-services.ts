@@ -402,6 +402,9 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
       k.services.provide(QuestLogKey, {
         quests: () => game.questSystem.getQuests(),
         add: (quest) => game.questSystem.addQuest(quest, true),
+        setProgress: (id, objective, current) => game.questSystem.setProgress(id, objective, current),
+        finish: (id) => game.questSystem.finish(id),
+        remove: (id) => game.questSystem.remove(id),
       });
       k.services.provide(ScheduleKey, {
         behaviorOf: (npc) => game.scheduleSystem.behaviorOf(npc),
