@@ -62,7 +62,7 @@ export interface GameEvents {
   /** A world chunk unloaded (its content and NPCs are gone). */
   "chunk:unloaded": { chunkKey: string };
   /** A dialogue choice fired a host action (e.g. "jobs:ask"), with the speaker. */
-  "dialogue:action": { eventId: string; npcName: string | null };
+  "dialogue:action": { eventId: string; npcName: string | null; payload?: Record<string, unknown> };
   /** A conversation ended and the dialogue UI is gone. */
   "dialogue:closed": Record<string, never>;
   /** The quest log was opened. */

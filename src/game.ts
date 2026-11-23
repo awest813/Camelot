@@ -173,8 +173,9 @@ import { BundleMergeUI } from "./ui/bundle-merge-ui";
 import { WorkspaceDraftSystem } from "./systems/workspace-draft-system";
 import { ModManifestSystem } from "./systems/mod-manifest-system";
 import { ModManifestUI } from "./ui/mod-manifest-ui";
-import { BarterUI } from "./ui/barter-ui";
-import { ContainerUI } from "./ui/container-ui";
+import type { BarterUI } from "./ui/barter-ui";
+import type { ContainerUI } from "./ui/container-ui";
+import { TradeFeature, TradeHostKey } from "./features/trade/trade-feature";
 import type { Item } from "./systems/inventory-system";
 import { ScreenshotSystem } from "./systems/screenshot-system";
 import { UIAnimator } from "./ui/ui-animator";
@@ -475,10 +476,10 @@ export class Game {
   /** Captures the WebGL canvas as a PNG/JPEG and triggers a browser download. */
   public readonly screenshotSystem = new ScreenshotSystem();
 
-  private readonly _barterUI = new BarterUI();
-  private readonly _containerUI = new ContainerUI();
+  private readonly _trade = new TradeFeature();
+  private get _barterUI(): BarterUI { return this._trade.barterPanel; }
+  private get _containerUI(): ContainerUI { return this._trade.containerPanel; }
   /** When set, open barter after dialogue teardown (pointer lock restored first). */
-  private _pendingBarterMerchantId: string | null = null;
   /** Set by the smith's "use your forge" dialogue choice; opened once dialogue closes. */
   /** Shared parchment material for village notice boards. */
   private _hudInDialogue = false;
@@ -1580,53 +1581,6 @@ export class Game {
     // The starting region's merchants (dialogue `barter:open` uses payload.merchantId).
     registerStarterMerchants(this.barterSystem, this.merchantRestockSystem, this.shopSystem, this.timeSystem.elapsedGameTime);
 
-    this._barterUI.onBuy = (itemId, instanceId) => {
-      const mid = this.barterSystem.activeMerchantId;
-      if (!mid) return;
-      this.barterSystem.buyItem(mid, itemId, instanceId);
-      this._barterUI.update(this.barterSystem, this.inventorySystem.items);
-      this.saveSystem.markDirty();
-    };
-    this._barterUI.onSell = (itemId, instanceId) => {
-      const mid = this.barterSystem.activeMerchantId;
-      if (!mid) return;
-      this.barterSystem.sellItem(mid, itemId, instanceId);
-      this._barterUI.update(this.barterSystem, this.inventorySystem.items);
-      this.saveSystem.markDirty();
-    };
-    this._barterUI.onClose = () => {
-      this._barterUI.hide();
-      this.barterSystem.closeBarter();
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
-    };
-
-    // ── Container loot ────────────────────────────────────────────────────
-    this.containerSystem.onContainerOpen = () => {
-      this._containerUI.show();
-      this._containerUI.update(this.containerSystem);
-      this._suspendGameplayInput();
-    };
-    this._containerUI.onTakeItem = (itemId) => {
-      const active = this.containerSystem.activeContainer;
-      if (!active) return;
-      if (this.containerSystem.takeItem(active.id, itemId)) {
-        this.saveSystem.markDirty();
-      }
-      this._containerUI.update(this.containerSystem);
-      if (this.containerSystem.activeContainer?.contents.length === 0) {
-        this._closeContainerUI();
-      }
-    };
-    this._containerUI.onTakeAll = () => {
-      const active = this.containerSystem.activeContainer;
-      if (active) this.containerSystem.takeAll(active.id);
-      this.saveSystem.markDirty();
-      this._closeContainerUI();
-    };
-    this._containerUI.onClose = () => this._closeContainerUI();
     this.interactionSystem.containerSystem = this.containerSystem;
 
     // Prevent browser context menu from capturing right-click combat input.
@@ -1758,7 +1712,6 @@ export class Game {
     this.dialogueSystem.onDialogueClosed = () => {
       this.barterSystem.playerGold = this._getInventoryGold();
       this._syncInventoryGoldToFramework();
-      this._flushPendingBarter();
       // Features waiting on the conversation (e.g. the job window) act now.
       this.eventBus.emit("dialogue:closed", {});
       this._currentDialogueNpcName = null;
@@ -3838,12 +3791,6 @@ export class Game {
       });
   }
 
-  /** Hide the container panel, clear the active container, restore input. */
-  private _closeContainerUI(): void {
-      this._containerUI.hide();
-      this.containerSystem.closeContainer();
-      this._restoreGameplayInput();
-  }
 
   /** Grant quest reward items (same pipeline as dialogue give-item effects). */
   private _grantFrameworkItem(itemId: string, quantity: number): void {
@@ -3854,7 +3801,7 @@ export class Game {
 
   private _handleDialogueHostEvent(eventId: string, payload?: Record<string, unknown>): void {
       // Features react to dialogue actions through the bus (e.g. "jobs:ask").
-      this.eventBus.emit("dialogue:action", { eventId, npcName: this._currentDialogueNpcName });
+      this.eventBus.emit("dialogue:action", { eventId, npcName: this._currentDialogueNpcName, payload });
       if (eventId === "trainer:train") {
         const trainerId = typeof payload?.trainerId === "string" ? payload.trainerId : "";
         if (!trainerId) return;
@@ -3886,20 +3833,8 @@ export class Game {
       }
       // "smithing:open" is the crafting feature's (it opens the forge after the talk).
       if (eventId === "smithing:open") return;
-      if (eventId === "barter:open") {
-        const merchantId = typeof payload?.merchantId === "string" ? payload.merchantId : "merchant_01";
-        if (this._barterUI.isVisible) {
-          this._barterUI.hide();
-          this.barterSystem.closeBarter();
-          this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-          if (!this.mapEditorSystem.isEnabled && !this.isPaused) {
-            this.canvas.requestPointerLock();
-            this.player.camera.attachControl(this.canvas, true);
-          }
-        }
-        this._pendingBarterMerchantId = merchantId;
-        return;
-      }
+      // "barter:open" is the trade feature's (it opens the shop after the talk).
+      if (eventId === "barter:open") return;
       if (eventId === "rest:inn") {
         const hoursRaw = payload?.hours;
         const hours = typeof hoursRaw === "number" && Number.isFinite(hoursRaw)
@@ -3915,38 +3850,6 @@ export class Game {
       }
   }
 
-  private _flushPendingBarter(): void {
-      const merchantId = this._pendingBarterMerchantId;
-      this._pendingBarterMerchantId = null;
-      if (!merchantId) return;
-
-      const hour = this.timeSystem.hour;
-      const shop = this.shopSystem.getShopByMerchantId(merchantId);
-      if (shop && !this.shopSystem.isOpen(shop.id, hour)) {
-        this.ui.showNotification(`${shop.name} is closed right now.`, 2600);
-        return;
-      }
-      if (!this.barterSystem.openBarter(merchantId, hour)) {
-        return;
-      }
-
-      // Reputation pricing: fame-based disposition shifts the price factor,
-      // and the merchant's persuasion disposition refines it further
-      // (allied/friendly merchants give real discounts; hostile ones gouge).
-      const fameFactor = 1 - (this.fameSystem.dispositionModifier / 20) * 0.15;
-      const persuasionFactor = this._currentDialogueNpcName
-        ? this.persuasionSystem.getMerchantPriceMultiplier(this._currentDialogueNpcName)
-        : 1.0;
-      this.barterSystem.sessionBuyPriceFactor =
-        Math.min(1.5, Math.max(0.7, fameFactor * persuasionFactor));
-
-      this.barterSystem.playerGold = this._getInventoryGold();
-      this._barterUI.show();
-      this._barterUI.update(this.barterSystem, this.inventorySystem.items);
-      this.interactionSystem.isBlocked = true;
-      document.exitPointerLock();
-      this.player.camera.detachControl();
-  }
 
   private _consumeInventoryGold(amount: number): boolean {
       if (amount <= 0) return true;
@@ -4157,6 +4060,18 @@ export class Game {
         receive: (itemId) => this._grantPickpocketItem(itemId),
       });
       k.install(this._thief);
+      k.services.provide(TradeHostKey, {
+        get barter() { return game.barterSystem; },
+        get shops() { return game.shopSystem; },
+        get containers() { return game.containerSystem; },
+        items: () => this.inventorySystem.items,
+        hour: () => this.timeSystem.hour,
+        reputationFactor: (npcName) => {
+          const fame = 1 - (this.fameSystem.dispositionModifier / 20) * 0.15;
+          return fame * (npcName ? this.persuasionSystem.getMerchantPriceMultiplier(npcName) : 1.0);
+        },
+      });
+      k.install(this._trade);
       k.events.on("pickpocket:opened", () => this._advanceOnboardingStep("sneak"));
       this.saveSystem.setFastTravelSystem(this._fastTravel.places);
       const record = (chunkKey: string) => this._chunks.record(chunkKey);

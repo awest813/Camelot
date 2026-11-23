@@ -396,6 +396,11 @@ state, scope and save codec.
       picker, the roll (now on a seeded stream) and getting caught. New
       `thief-host` service (crouching, noticed, report the theft, receive
       the item); opening it emits `pickpocket:opened`.
+
+  17. **Trade** (`src/features/trade/`): barter (opened by `barter:open`
+      once the talk ends, priced by reputation) and containers.
+      `dialogue:action` now carries the action's payload, so the merchant
+      id travels with it.
 - `game.update()` runs the `ui` phase each frame. The pet, follower and
   shout HUD chips are `ui` systems of their features.
 - World environment (`src/rendering/world-environment.ts`): the lights and
