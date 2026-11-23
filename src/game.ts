@@ -26,7 +26,6 @@ import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { BabylonInputAdapter, type InputAction } from "./adapters/babylon/babylon-input-adapter";
 import { GamepadInputSystem } from "./systems/gamepad-input-system";
 import { InventorySystem } from "./systems/inventory-system";
-import type { WeaponArchetype } from "./systems/combat-shared";
 import { applyDamageWithResistance } from "./systems/combat-shared";
 import { EquipmentSystem } from "./systems/equipment-system";
 import { SaveSystem } from "./systems/save-system";
@@ -94,6 +93,7 @@ import { LodSystem } from "./systems/lod-system";
 import { WorldEnvironment } from "./rendering/world-environment";
 import { ChunkContent } from "./world/chunk-content";
 import { dressInterior } from "./world/interior-dressing";
+import { spawnDragon } from "./world/dragon-lair";
 import { WeatherSystem } from "./systems/weather-system";
 import { GraphicsSystem, persistGraphicsTier } from "./systems/graphics-system";
 import { QuickSlotSystem, isConsumableItem, type QuickSlotKey } from "./systems/quickslot-system";
@@ -109,7 +109,8 @@ import { LevelScalingSystem } from "./systems/level-scaling-system";
 import { FameSystem } from "./systems/fame-system";
 import { ActiveEffectsSystem } from "./systems/active-effects-system";
 import { JailSystem } from "./systems/jail-system";
-import { SpellMakingSystem } from "./systems/spell-making-system";
+import type { SpellMakingSystem } from "./systems/spell-making-system";
+import { SpellMakingFeature, SpellMakingKey } from "./features/spell-making/spell-making-feature";
 import { RespawnSystem } from "./systems/respawn-system";
 import { MerchantRestockSystem } from "./systems/merchant-restock-system";
 import { BirthsignSystem } from "./systems/birthsign-system";
@@ -144,7 +145,7 @@ import { EditorHubUI } from "./ui/editor-hub-ui";
 import { EditorLayout } from "./ui/editor-layout";
 import { buildHelpOverlayLines } from "./ui/editor-help-overlay";
 import type { FastTravelUI } from "./ui/fast-travel-ui";
-import { SpellMakingUI } from "./ui/spell-making-ui";
+import type { SpellMakingUI } from "./ui/spell-making-ui";
 import type { GuardEncounterUI } from "./ui/guard-encounter-ui";
 import { ArrestFeature, ArrestKey, LawKey } from "./features/arrest/arrest-feature";
 import { LevelUpUI } from "./ui/level-up-ui";
@@ -192,6 +193,7 @@ import { ModalRegistry } from "./ui/modal-registry";
 import { PlayerPack } from "./game/player-pack";
 import { QuestBridge } from "./game/quest-bridge";
 import { NpcRoster } from "./game/npc-roster";
+import { weaponArchetypeOf } from "./game/weapon-archetype";
 import { QuickSlotHUD } from "./ui/quickslot-hud";
 import { PerkSystem } from "./systems/perk-system";
 import { DynamicWorldEventSystem } from "./systems/dynamic-world-event-system";
@@ -249,7 +251,7 @@ export class Game {
   /** Fast travel (built with the game: the editor suite reads `fastTravelSystem`). */
   private readonly _fastTravel = new FastTravelFeature();
   public get fastTravelUI(): FastTravelUI { return this._fastTravel.menu; }
-  public spellMakingUI: SpellMakingUI;
+  public get spellMakingUI(): SpellMakingUI { return this._spellMaking.panel; }
   public get guardEncounterUI(): GuardEncounterUI { return this.kernel.services.get(ArrestKey).panel; }
   public levelUpUI: LevelUpUI;
   /** Tab-open HTML overlay — identity, attributes, skills, reputation. */
@@ -390,7 +392,8 @@ export class Game {
   public jailSystem: JailSystem;
 
   // v10 systems (Oblivion depth: spell making, respawn, merchant restock)
-  public spellMakingSystem: SpellMakingSystem;
+  private _spellMaking!: SpellMakingFeature;
+  public get spellMakingSystem(): SpellMakingSystem { return this._spellMaking.altar; }
   public respawnSystem: RespawnSystem;
   public merchantRestockSystem: MerchantRestockSystem;
 
@@ -1040,51 +1043,11 @@ export class Game {
     this.saveSystem.setJailSystem(this.jailSystem);
 
     // ── v10 system wiring (Oblivion depth: spell making, respawn, merchant restock) ──
-    this.spellMakingSystem = new SpellMakingSystem(this.spellSystem);
-    this.spellMakingSystem.onSpellForged = (spell, goldCost) => {
-      this.ui.showNotification(`Spell forged: "${spell.name}" (${goldCost}g)`, 3000);
-      this.skillProgressionSystem.gainXP("destruction", 20 * this.classSystem.xpMultiplierFor("destruction"));
-      this.saveSystem.markDirty();
-    };
     this.saveSystem.setSpellMakingSystem(this.spellMakingSystem);
-
-    this.spellMakingUI = new SpellMakingUI((components) => this.spellMakingSystem.computeCost(components));
     this.spellMakingUI.setAnimator(this.uiAnimator);
 
     this.levelUpUI = new LevelUpUI();
     this.levelUpUI.setAnimator(this.uiAnimator);
-
-    this.spellMakingUI.onForge = ({ name, components }) => {
-      this.barterSystem.playerGold = this._pack.gold();
-      const result = this.spellMakingSystem.forgeSpell(name, components, this.barterSystem);
-      if (result.ok) {
-        if (result.goldCost && result.goldCost > 0) {
-          this._pack.spendGold(result.goldCost);
-        }
-        this.barterSystem.playerGold = this._pack.gold();
-        this.spellMakingUI.showStatus(
-          `Forged "${result.spell!.name}" for ${result.goldCost} gold. Press Z to cycle spells.`,
-        );
-      } else {
-        const reasonMsg: Record<string, string> = {
-          insufficient_gold: "Not enough gold to forge this spell.",
-          duplicate_name: "A custom spell with that name already exists.",
-          no_components: "Add at least one spell component.",
-          too_many_components: "You can only combine up to two components.",
-          invalid_name: "Enter a valid spell name.",
-        };
-        this.spellMakingUI.showStatus(
-          reasonMsg[result.reason ?? ""] ?? `Cannot forge spell (${result.reason ?? "unknown"}).`,
-          true,
-        );
-      }
-    };
-    this.spellMakingUI.onClose = () => {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      if (this.mapEditorSystem.isEnabled || this.isPaused) return;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
-    };
 
     // RespawnSystem — register the test cave as a respawnable zone (72 game-hours)
     this.respawnSystem = new RespawnSystem();
@@ -1990,15 +1953,7 @@ export class Game {
     adapter.onAction("toggleAlchemy", () => this.crafting.toggleAlchemy());
     adapter.onAction("toggleEnchanting", () => this.crafting.toggleEnchanting());
     adapter.onAction("toggleSmithing", () => this.crafting.toggleSmithing());
-    adapter.onAction("toggleSpellMaking", () => {
-      if (this.spellMakingUI.isVisible) {
-        this.spellMakingUI.close();
-        return;
-      }
-      if (this._isCombatInputBlocked()) return;
-      this.spellMakingUI.open();
-      this._suspendGameplayInput();
-    });
+    adapter.onAction("toggleSpellMaking", () => this.kernel.services.get(SpellMakingKey).toggle());
     adapter.onAction("toggleFastTravel", () => this.kernel.services.get(TravelKey).toggleMenu());
     adapter.onAction("markPosition", () => {
       if (this._isCombatInputBlocked()) return;
@@ -2435,22 +2390,11 @@ export class Game {
   /** Map the equipped main-hand item to a combat weapon archetype (default: sword). */
   private _syncWeaponArchetype(): void {
       const weapon = this.equipmentSystem.getEquipped().get("mainHand");
-      const archetype = this._weaponArchetypeForItem(weapon);
+      const archetype = weaponArchetypeOf(weapon);
       this.combatSystem.setWeaponArchetype(archetype);
       this._viewModel?.setWeapon(archetype);
   }
 
-  private _weaponArchetypeForItem(item: Item | undefined): WeaponArchetype {
-      if (!item) return "sword";
-      const hay = `${item.id} ${item.name}`.toLowerCase();
-      if (hay.includes("bow")) return "bow";
-      if (hay.includes("staff")) return "staff";
-      if (hay.includes("dagger")) return "dagger";
-      if (hay.includes("greatsword") || hay.includes("great_") || hay.includes("two-handed") || hay.includes("two_handed")) return "greatsword";
-      if (hay.includes("mace") || hay.includes("hammer")) return "mace";
-      if (hay.includes("axe")) return "axe";
-      return "sword";
-  }
 
 
 
@@ -2780,48 +2724,6 @@ export class Game {
     });
   }
 
-  /**
-   * The tundra dragon boss: an NPC the combat AI tracks, with the
-   * Quaternius dragon body parented to its capsule.  Owned by the chunk.
-   */
-  private _spawnDragon(chunkKey: string, x: number, z: number, yaw: number): void {
-        const chunkRecord = this._chunks.record(chunkKey);
-        if (!chunkRecord) return;
-        const [cx, cz] = chunkKey.split(",").map(Number);
-        // Register the boss NPC first so the AI/combat system tracks it
-        const dragonNpc = new NPC(this.scene, new Vector3(x, 2, z), `DragonBoss_${cx}_${cz}`);
-        dragonNpc.maxHealth    = 500;
-        dragonNpc.health       = 500;
-        dragonNpc.attackDamage = 40;
-        dragonNpc.aggroRange   = 25;
-        dragonNpc.xpReward     = 500;
-        dragonNpc.armorRating  = 60;
-        dragonNpc.lootTableId  = "boss_loot";
-        // Hide the default capsule — the CDN model provides the visual
-        dragonNpc.mesh.isVisible = false;
-        this._roster.add(dragonNpc, { regional: true, cull: false, pockets: false });
-        chunkRecord.npcs.push(dragonNpc);
-        // NOTE: the capsule stays unregistered in LodSystem — visibility toggling
-        // would reveal it; the CDN model root is LOD-tracked via _trackChunkProp.
-
-        // Local dark-fantasy dragon body, parented to the capsule so it moves,
-        // turns and fights with the boss (works offline; the old CDN model
-        // was static and never followed the NPC).
-        this.fantasyAssets.getInstance("qDragonSmall", (root) => {
-          if (!root) return;
-          if (dragonNpc.isDead || dragonNpc.mesh.isDisposed() || this._chunks.record(chunkKey) !== chunkRecord) {
-            root.dispose();
-            return;
-          }
-          root.parent = dragonNpc.mesh;
-          root.position.set(0, -1, 0); // capsule origin sits 1 unit above its feet
-          setInstanceScale(root, 2.5);
-          setInstanceYaw(root, yaw);
-          for (const m of root.getChildMeshes(false)) m.isPickable = false;
-          this._npcVisuals.addDragon(dragonNpc, root, yaw);
-          this._chunks.track(chunkKey, chunkRecord, root, "boss");
-        });
-  }
 
   /** Unregister an NPC from every system and dispose it. */
   private _releaseNpc(npc: NPC): void {
@@ -3035,7 +2937,7 @@ export class Game {
             this._chunks.track(chunkKey, r, root, at.tier ?? "prop");
           });
         },
-        spawnDragon: (chunkKey, x, z, yaw) => this._spawnDragon(chunkKey, x, z, yaw),
+        spawnDragon: (chunkKey, x, z, yaw) => spawnDragon({ scene: this.scene, chunks: this._chunks, roster: this._roster, assets: this.fantasyAssets, visuals: this._npcVisuals }, chunkKey, x, z, yaw),
       });
       k.services.provide(InventoryKey, {
         count: (id) => this.inventorySystem.items.reduce((n, i) => (i.id === id ? n + i.quantity : n), 0),
@@ -3105,6 +3007,8 @@ export class Game {
         gainXP: (id, base) => this.skillProgressionSystem?.gainXP(id, base * (this.classSystem?.xpMultiplierFor(id) ?? 1)),
       });
       k.install(this._crafting);
+      this._spellMaking = new SpellMakingFeature(this.spellSystem);
+      k.install(this._spellMaking);
       k.services.provide(LawKey, {
         get crime() { return game.crimeSystem; },
         get persuasion() { return game.persuasionSystem; },

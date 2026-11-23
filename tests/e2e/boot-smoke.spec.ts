@@ -239,9 +239,17 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
     const travel = g.kernel.services.get({ name: "travel" });
     const host = g.kernel.services.get({ name: "travel-host" });
     host.inCombat = () => false;
+    const said: string[] = [];
+    const orig = g.ui.showNotification.bind(g.ui);
+    g.ui.showNotification = (t: string, ms?: number) => { said.push(t); return orig(t, ms); };
     g.fastTravelSystem.discoverLocation("cave_01", "Old Cave", { x: -8, y: 2, z: 8 });
+    // The trip fades out and in; wait for it (slow under load).
+    const until = async (ok: () => boolean) => {
+      for (let t = 0; t < 80 && !ok(); t++) await new Promise((r) => setTimeout(r, 100));
+    };
     travel.travel("cave_01");
-    await new Promise((r) => setTimeout(r, 1500));
+    await until(() => g.cellManager.currentCell?.type === "interior" && !g.fastTravelUI.isVisible);
+    await new Promise((r) => setTimeout(r, 200));
     const inside = {
       cell: g.cellManager.currentCell?.type,
       outdoorsShown: g.world.visible,
@@ -249,10 +257,11 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
       dressed: !!g.scene.materials.find((m: any) => m.name === "intWall_cave_01")?.metadata?.dressed,
     };
     travel.travel("start_village");
-    await new Promise((r) => setTimeout(r, 1500));
-    return { inside, back: g.cellManager.currentCell?.type, outdoorsShown: g.world.visible };
+    await until(() => g.cellManager.currentCell?.type === "exterior" && g.world.visible);
+    g.ui.showNotification = orig;
+    return { inside, back: g.cellManager.currentCell?.type, outdoorsShown: g.world.visible, said };
   });
-  expect(cave).toEqual({ inside: { cell: "interior", outdoorsShown: false, torch: true, dressed: true }, back: "exterior", outdoorsShown: true });
+  expect({ ...cave, said: undefined }, cave.said.join(" | ")).toEqual({ inside: { cell: "interior", outdoorsShown: false, torch: true, dressed: true }, back: "exterior", outdoorsShown: true, said: undefined });
 
   // A guard stops the player for a bounty; Escape resists arrest.
   const arrest = await page.evaluate(() => {

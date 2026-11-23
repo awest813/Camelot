@@ -413,6 +413,11 @@ state, scope and save codec.
 
   21. **Survival** (`src/features/survival/`): hunger, fatigue and cold,
       their warnings and costs, as a sim-phase system.
+
+  22. **Spell making** (`src/features/spell-making/`): the altar (X) and
+      forging spells for gold.
+- `src/world/dragon-lair.ts` (the tundra dragon boss and its body) and
+  `src/game/weapon-archetype.ts` (which archetype a weapon fights as).
 - `src/game/player-pack.ts`: gold (one coin stack, mirrored into the
   framework inventory) and items, with the framework-to-game id mapping.
   It replaces four hand-built gold stacks and the dialogue count, consume
