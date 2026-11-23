@@ -492,13 +492,10 @@ export class Game {
   /** True while the character-creation wizard is up (Escape must not pause beneath it). */
   private _inCharacterCreation: boolean = false;
 
-  /** Gold and items, kept in step with the framework inventory. */
+  /** Gold and items: the one player inventory (dialogue and quests use it too). */
   private readonly _pack = new PlayerPack(
     () => this.inventorySystem,
-    () => ({
-      inventory: this.frameworkRuntime.inventoryEngine,
-      item: (id) => this.frameworkRuntime.contentRegistry.getItemDefinition(id) ?? undefined,
-    }),
+    (id) => this.frameworkRuntime.contentRegistry.getItemDefinition(id) ?? undefined,
   );
   /** Bringing NPCs into the world and taking them out, the same way every time. */
   private readonly _roster = new NpcRoster({
@@ -717,7 +714,6 @@ export class Game {
     this.saveSystem.onAfterLoad = () => {
       this._cleanupCollectedLoot();
       this._hydrateCellAfterLoad();
-      this._pack.syncGoldToFramework();
       // Saved equipment bypasses equip() — re-sync the weapon archetype.
       this._syncWeaponArchetype();
       // Features reset their transient state (e.g. a raid in progress).
@@ -782,7 +778,6 @@ export class Game {
     this.shopSystem      = new ShopSystem();
     this.barterSystem.onTransaction = () => {
       this._pack.setGold(this.barterSystem.playerGold);
-      this._pack.syncGoldToFramework();
     };
     this.frameworkRuntime.setDialogueHostHooks({
       onDialogueHostEvent: (eventId, payload) => this._handleDialogueHostEvent(eventId, payload),
@@ -1392,8 +1387,6 @@ export class Game {
     this.interactionSystem.onLootPickup = (id) => {
         this._quests.apply("pickup", id);
         this.saveSystem.markDirty();
-        const frameworkItemId = this._pack.frameworkIdOf(id);
-        if (frameworkItemId) this.frameworkRuntime.inventoryEngine.addItem(frameworkItemId, 1);
         this._tips.did("interact");
     };
     this.dialogueSystem.onTalkStart  = (name)  => {
@@ -1404,7 +1397,6 @@ export class Game {
     };
     this.dialogueSystem.onDialogueClosed = () => {
       this.barterSystem.playerGold = this._pack.gold();
-      this._pack.syncGoldToFramework();
       // Features waiting on the conversation (e.g. the job window) act now.
       this.eventBus.emit("dialogue:closed", {});
       this._currentDialogueNpcName = null;

@@ -19,24 +19,17 @@ function setup() {
       return true;
     },
   };
-  const fw = new Map<string, number>();
-  const pack = new PlayerPack(() => inv, () => ({
-    inventory: {
-      getItemCount: (id) => fw.get(id) ?? 0,
-      addItem: (id, n) => fw.set(id, (fw.get(id) ?? 0) + n),
-      removeItem: (id, n) => fw.set(id, (fw.get(id) ?? 0) - n),
-    },
-    item: (id) => (id === "health_potion" ? { name: "Health Potion", description: "", stackable: true } : undefined),
-  }));
-  return { pack, items, fw };
+  const pack = new PlayerPack(() => inv,
+    (id) => (id === "health_potion" ? { name: "Health Potion", description: "", stackable: true } : undefined));
+  return { pack, items };
 }
 
 describe("PlayerPack", () => {
-  it("gold: add (mirrored to the framework), spend, can't overspend, set", () => {
+  it("gold: add, spend, can't overspend, set; dialogue counts it as an item", () => {
     const t = setup();
     t.pack.addGold(50);
     expect(t.pack.gold()).toBe(50);
-    expect(t.fw.get(GOLD_ITEM_ID)).toBe(50);
+    expect(t.pack.count(GOLD_ITEM_ID)).toBe(50);
     expect(t.pack.spendGold(80)).toBe(false);
     expect(t.pack.spendGold(20)).toBe(true);
     t.pack.setGold(100);
@@ -45,14 +38,13 @@ describe("PlayerPack", () => {
     expect(t.pack.gold()).toBe(10);
   });
 
-  it("framework items map to the game's ids both ways", () => {
+  it("framework item ids map to the game's", () => {
     const t = setup();
     expect(t.pack.give("health_potion", 2)).toBe(true);
     expect(t.items[0]).toMatchObject({ id: "potion_hp_01", quantity: 2 });
     expect(t.pack.count("health_potion")).toBe(2);
     expect(t.pack.consume("health_potion", 1)).toBe(true);
     expect(t.pack.count("health_potion")).toBe(1);
-    expect(t.pack.frameworkIdOf("potion_hp_01")).toBe("health_potion");
     expect(t.pack.give("unknown_thing", 1)).toBe(false);
   });
 

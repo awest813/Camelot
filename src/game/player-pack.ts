@@ -1,8 +1,10 @@
 /**
  * The player's pack as the rest of the game sees it: gold (one stack of
- * coins) and items, kept in step with the framework's inventory (which
- * dialogue conditions and quests read), and the mapping between framework
- * item ids and the game's own.
+ * coins) and items, and the mapping between framework item ids and the
+ * game's own.  The game's inventory is the only player inventory: framework
+ * dialogue conditions, item costs and rewards read and write it through
+ * this (the runtime's dialogue host hooks).  It used to be mirrored into the
+ * framework's own inventory engine, which nothing read.
  *
  * Moved out of game.ts (engine overhaul, Phase 1).
  */
@@ -15,12 +17,6 @@ export const GOLD_ITEM_ID = "gold_coins";
 const FRAMEWORK_TO_GAME: Readonly<Record<string, string>> = {
   health_potion: "potion_hp_01",
   iron_sword: "sword_01",
-};
-/** Game items the framework inventory tracks (dialogue conditions, quests). */
-const GAME_TO_FRAMEWORK: Readonly<Record<string, string>> = {
-  potion_hp_01: "health_potion",
-  sword_01: "iron_sword",
-  guard_token: "guard_token",
 };
 
 /** A stack of `quantity` gold coins. */
@@ -37,18 +33,13 @@ export interface PackInventory {
   removeItem(itemId: string, amount?: number): boolean;
 }
 
-export interface FrameworkInventory {
-  getItemCount(id: string): number;
-  addItem(id: string, quantity: number): unknown;
-  removeItem(id: string, quantity: number): unknown;
-}
-
 export interface FrameworkItemDef { name: string; description: string; stackable: boolean; slot?: Item["slot"] }
 
 export class PlayerPack {
   constructor(
     private readonly _inv: () => PackInventory,
-    private readonly _fw: () => { inventory: FrameworkInventory; item(id: string): FrameworkItemDef | undefined },
+    /** A framework item's definition (for items dialogue or quests give). */
+    private readonly _itemDef: (id: string) => FrameworkItemDef | undefined,
   ) {}
 
   public gold(): number {
@@ -65,7 +56,6 @@ export class PlayerPack {
   public addGold(amount: number): void {
     if (amount <= 0) return;
     this._inv().addItem(goldCoins(amount));
-    this.syncGoldToFramework();
   }
 
   /** Make the gold stack equal `target` (barter keeps its own running total). */
@@ -74,20 +64,6 @@ export class PlayerPack {
     const have = this.gold();
     if (have > want) this._inv().removeItem(GOLD_ITEM_ID, have - want);
     else if (want > have) this._inv().addItem(goldCoins(want - have));
-  }
-
-  /** Mirror the gold stack into the framework inventory (dialogue conditions read it). */
-  public syncGoldToFramework(): void {
-    const qty = this.gold();
-    const fw = this._fw().inventory;
-    const cur = fw.getItemCount(GOLD_ITEM_ID);
-    if (cur > qty) fw.removeItem(GOLD_ITEM_ID, cur - qty);
-    else if (cur < qty) fw.addItem(GOLD_ITEM_ID, qty - cur);
-  }
-
-  /** The framework id of a game item it tracks, else null. */
-  public frameworkIdOf(gameItemId: string): string | null {
-    return GAME_TO_FRAMEWORK[gameItemId] ?? null;
   }
 
   /** How many of a framework item the player carries. */
@@ -105,7 +81,7 @@ export class PlayerPack {
 
   /** Give a framework item (from dialogue or a quest); unknown ids are ignored. */
   public give(frameworkId: string, quantity: number): boolean {
-    const def = this._fw().item(frameworkId);
+    const def = this._itemDef(frameworkId);
     if (!def) return false;
     const id = FRAMEWORK_TO_GAME[frameworkId] ?? frameworkId;
     const inv = this._inv();

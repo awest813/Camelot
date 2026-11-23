@@ -726,6 +726,18 @@ components.
     owns carries its status and progress into the engine; the framework
     snapshot, restored after it, wins when it has the quest. The v29
     fixture loads with its original expectations.
+- One inventory: the game's `InventorySystem`. The domain table had
+  this the other way round, keeping the framework inventory as the
+  source. That doesn't work: the framework engine stores only id and
+  quantity, and game items carry stats, enchantments and instance ids.
+  - Framework dialogue already reads and writes the player's real pack
+    through the runtime's host hooks (`PlayerPack`: count, consume,
+    give).
+  - The rest was a mirror that nothing read: gold copied into the
+    framework inventory after every change, and some pickups added to it.
+    The mirror and its id table are removed.
+  - The framework keeps its own inventory engine as the default for hosts
+    that don't supply hooks.
 - The quest log has an API; features no longer change quest objects
   directly. The quest-log service has `setProgress`, `finish` and
   `remove`, and `quests()` is read-only. A `managed` quest belongs to a
