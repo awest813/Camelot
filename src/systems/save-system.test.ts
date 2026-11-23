@@ -130,6 +130,29 @@ describe('SaveSystem', () => {
         expect(JSON.parse(localStorageMock['camelot_save']).pets, 'gone once unregistered').toBeUndefined();
     });
 
+    it('round-trips every built-in part through its codec, in load order', () => {
+        const special = new Set(['setStorage', 'setQuestSystem', 'setSkillTreeSystem', 'setFrameworkRuntime', 'setAttributeSystem', 'setAutosaveInterval']);
+        const setters = Object.getOwnPropertyNames(SaveSystem.prototype).filter((n) => n.startsWith('set') && !special.has(n));
+        expect(setters.length, 'every system setter').toBeGreaterThanOrEqual(36);
+        const restored: Array<{ setter: string; data: unknown }> = [];
+        for (const setter of setters) {
+            const value = { from: setter };
+            const stub = {
+                getSaveState: () => value, getSnapshot: () => value,
+                restoreFromSave: (d: unknown) => restored.push({ setter, data: d }),
+                restoreSnapshot: (d: unknown) => restored.push({ setter, data: d }),
+            };
+            (saveSystem as any)[setter](stub);
+        }
+        saveSystem.save();
+        expect(saveSystem.load()).toBe(true);
+        expect(restored.map((r) => r.setter).sort()).toEqual([...setters].sort());
+        for (const r of restored) expect(r.data, r.setter).toEqual({ from: r.setter });
+        // Time restores before the daily schedule re-derives who is asleep.
+        const order = restored.map((r) => r.setter);
+        expect(order.indexOf('setTimeSystem')).toBeLessThan(order.indexOf('setDailyScheduleSystem'));
+    });
+
     it('should show a save notification', () => {
         saveSystem.save();
         expect(mockUI.showNotification).toHaveBeenCalledWith('Game Saved!', 2500);

@@ -703,6 +703,16 @@ components.
   `onChunkUnloaded` hooks feed the chunk scopes. Removed the second,
   unused adapter pair (`world/babylon-world-chunk-adapter.ts` and
   `-source.ts`).
+- Quests, not yet merged. Legacy quests could register into the
+  framework's graph engine as one node per objective, but the two sides
+  match targets differently:
+  - legacy objectives match the exact NPC key (`Bandit_12`, a specific
+    bounty);
+  - framework events carry the quest-bridge id (`Bandit`).
+
+  Merging needs one rule for this first. A likely one: the event carries
+  both ids, and a node says which it wants. Then the legacy kill, pickup
+  and talk calls in `game.ts` go, and the bridge feeds the one engine.
 
 ### Phase 5 — Persistence (1–2 weeks)
 
@@ -713,6 +723,25 @@ components.
 
 **Exit:** a round-trip test over all codecs passes, old fixtures migrate, and
 one replay runs in CI.
+
+**Progress:**
+
+- The save registry is in place (started in Phase 3, see there). The save
+  system's own 36 parts are codecs now: time, crime, containers, … combat
+  effects. Each setter registers its codec. A part's `order` keeps the
+  load sequence it always had (10–360), and feature codecs default to
+  1000, after all of them.
+  - The 36 save lines and 36 load lines are gone; `save-system.ts` lost
+    about 170 lines.
+  - Special handling stays inline: the player, inventory, equipment,
+    quests, skills, the framework snapshot, and attributes (which re-sync
+    the player's maxima).
+  - A part that throws on load is logged and skipped; it used to abort
+    the whole load.
+- Round-trip test: every setter gets a stub, the game is saved and
+  loaded, and each stub must get back exactly its own data, with time
+  restored before the daily schedule. The save-fixture e2e still loads
+  the checked-in fixtures.
 
 ### Phase 6 — World and navigation (3 weeks)
 

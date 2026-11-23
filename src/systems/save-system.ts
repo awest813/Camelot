@@ -156,9 +156,18 @@ interface ParsedSaveData {
  */
 export interface SaveCodec {
   readonly key: string;
+  /**
+   * When it loads relative to the others (lower first).  The save system's
+   * own parts use 10–360, in the order they have always loaded; features
+   * default to {@link FEATURE_CODEC_ORDER}, after all of them.
+   */
+  readonly order?: number;
   save(): unknown;
   load(data: unknown): void;
 }
+
+/** Default load order for feature codecs: after every built-in part. */
+export const FEATURE_CODEC_ORDER = 1000;
 
 interface EquipmentEntry {
   slot: string;
@@ -391,111 +400,108 @@ export class SaveSystem {
   // ── v5 system injection ───────────────────────────────────────────────────
 
   public setAttributeSystem(s: AttributeSystem): void { this._attributes = s; }
-  public setTimeSystem(s: TimeSystem): void            { this._timeSystem = s; }
-  public setCrimeSystem(s: CrimeSystem): void          { this._crimeSystem = s; }
-  public setContainerSystem(s: ContainerSystem): void  { this._containerSystem = s; }
-  public setBarterSystem(s: BarterSystem): void        { this._barterSystem = s; }
-  public setCellManager(s: CellManager): void          { this._cellManager = s; }
+  public setTimeSystem(s: TimeSystem): void            { this._timeSystem = s; this._own("time", 10, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
+  public setCrimeSystem(s: CrimeSystem): void          { this._crimeSystem = s; this._own("crime", 20, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
+  public setContainerSystem(s: ContainerSystem): void  { this._containerSystem = s; this._own("containers", 30, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
+  public setBarterSystem(s: BarterSystem): void        { this._barterSystem = s; this._own("barter", 40, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
+  public setCellManager(s: CellManager): void          { this._cellManager = s; this._own("cell", 50, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v6 system injection ───────────────────────────────────────────────────
 
-  public setSpellSystem(s: SpellSystem): void          { this._spellSystem = s; }
-  public setPersuasionSystem(s: PersuasionSystem): void { this._persuasionSystem = s; }
+  public setSpellSystem(s: SpellSystem): void          { this._spellSystem = s; this._own("spells", 60, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
+  public setPersuasionSystem(s: PersuasionSystem): void { this._persuasionSystem = s; this._own("persuasion", 70, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v7 system injection ───────────────────────────────────────────────────
 
-  public setAlchemySystem(s: AlchemySystem): void      { this._alchemySystem = s; }
+  public setAlchemySystem(s: AlchemySystem): void      { this._alchemySystem = s; this._own("alchemy", 80, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v8 system injection ───────────────────────────────────────────────────
 
-  public setEnchantingSystem(s: EnchantingSystem): void { this._enchantingSystem = s; }
+  public setEnchantingSystem(s: EnchantingSystem): void { this._enchantingSystem = s; this._own("enchanting", 90, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v9 system injection ───────────────────────────────────────────────────
 
-  public setWeatherSystem(s: WeatherSystem): void       { this._weatherSystem = s; }
-  public setQuickSlotSystem(s: QuickSlotSystem): void   { this._quickSlotSystem = s; }
+  public setWeatherSystem(s: WeatherSystem): void       { this._weatherSystem = s; this._own("weather", 100, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
+  public setQuickSlotSystem(s: QuickSlotSystem): void   { this._quickSlotSystem = s; this._own("quickSlots", 110, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v10 system injection ──────────────────────────────────────────────────
 
-  public setWaitSystem(s: WaitSystem): void              { this._waitSystem = s; }
+  public setWaitSystem(s: WaitSystem): void              { this._waitSystem = s; this._own("wait", 120, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v11 system injection ──────────────────────────────────────────────────
 
-  public setSkillProgressionSystem(s: SkillProgressionSystem): void { this._skillProgressionSystem = s; }
-  public setFastTravelSystem(s: FastTravelSystem): void              { this._fastTravelSystem = s; }
+  public setSkillProgressionSystem(s: SkillProgressionSystem): void { this._skillProgressionSystem = s; this._own("skillProgression", 130, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
+  public setFastTravelSystem(s: FastTravelSystem): void              { this._fastTravelSystem = s; this._own("fastTravel", 140, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v12 system injection ──────────────────────────────────────────────────
 
-  public setFameSystem(s: FameSystem): void                { this._fameSystem = s; }
-  public setActiveEffectsSystem(s: ActiveEffectsSystem): void { this._activeEffectsSystem = s; }
-  public setJailSystem(s: JailSystem): void                { this._jailSystem = s; }
+  public setFameSystem(s: FameSystem): void                { this._fameSystem = s; this._own("fame", 150, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
+  public setActiveEffectsSystem(s: ActiveEffectsSystem): void { this._activeEffectsSystem = s; this._own("activeEffects", 160, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
+  public setJailSystem(s: JailSystem): void                { this._jailSystem = s; this._own("jail", 170, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v13 system injection ──────────────────────────────────────────────────
 
-  public setRespawnSystem(s: RespawnSystem): void               { this._respawnSystem = s; }
-  public setMerchantRestockSystem(s: MerchantRestockSystem): void { this._merchantRestockSystem = s; }
+  public setRespawnSystem(s: RespawnSystem): void               { this._respawnSystem = s; this._own("respawn", 180, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
+  public setMerchantRestockSystem(s: MerchantRestockSystem): void { this._merchantRestockSystem = s; this._own("merchantRestock", 190, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v14 system injection ──────────────────────────────────────────────────
 
-  public setBirthsignSystem(s: BirthsignSystem): void           { this._birthsignSystem = s; }
-  public setClassSystem(s: ClassSystem): void                   { this._classSystem = s; }
+  public setBirthsignSystem(s: BirthsignSystem): void           { this._birthsignSystem = s; this._own("birthsign", 200, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
+  public setClassSystem(s: ClassSystem): void                   { this._classSystem = s; this._own("characterClass", 210, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v15 system injection ──────────────────────────────────────────────────
 
-  public setRaceSystem(s: RaceSystem): void                     { this._raceSystem = s; }
+  public setRaceSystem(s: RaceSystem): void                     { this._raceSystem = s; this._own("race", 220, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v17 system injection ──────────────────────────────────────────────────
 
-  public setPlayerLevelSystem(s: PlayerLevelSystem): void       { this._playerLevelSystem = s; }
+  public setPlayerLevelSystem(s: PlayerLevelSystem): void       { this._playerLevelSystem = s; this._own("playerLevel", 230, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v18 system injection ──────────────────────────────────────────────────
 
-  public setDailyScheduleSystem(s: DailyScheduleSystem): void  { this._dailyScheduleSystem = s; }
+  public setDailyScheduleSystem(s: DailyScheduleSystem): void  { this._dailyScheduleSystem = s; this._own("dailySchedule", 240, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v19 system injection ──────────────────────────────────────────────────
 
-
   // ── v20 system injection ──────────────────────────────────────────────────
 
-  public setSwimmingSystem(s: SwimmingSystem): void            { this._swimmingSystem = s; }
+  public setSwimmingSystem(s: SwimmingSystem): void            { this._swimmingSystem = s; this._own("swimming", 250, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v21 system injection ──────────────────────────────────────────────────
 
-  public setDiseaseSystem(s: DiseaseSystem): void              { this._diseaseSystem = s; }
+  public setDiseaseSystem(s: DiseaseSystem): void              { this._diseaseSystem = s; this._own("disease", 260, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v22 system injection ──────────────────────────────────────────────────
 
-  public setEventManagerSystem(s: EventManagerSystem): void   { this._eventManagerSystem = s; }
+  public setEventManagerSystem(s: EventManagerSystem): void   { this._eventManagerSystem = s; this._own("eventManager", 270, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v23 system injection ──────────────────────────────────────────────────
 
-
   // ── v24 system injection ──────────────────────────────────────────────────
 
-  public setMarkRecallSystem(s: MarkRecallSystem): void       { this._markRecallSystem = s; }
-  public setTrainerSystem(s: TrainerSystem): void             { this._trainerSystem = s; }
+  public setMarkRecallSystem(s: MarkRecallSystem): void       { this._markRecallSystem = s; this._own("markRecall", 280, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
+  public setTrainerSystem(s: TrainerSystem): void             { this._trainerSystem = s; this._own("trainer", 290, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v25 system injection ──────────────────────────────────────────────────
 
-  public setItemConditionSystem(s: ItemConditionSystem): void { this._itemConditionSystem = s; }
+  public setItemConditionSystem(s: ItemConditionSystem): void { this._itemConditionSystem = s; this._own("itemCondition", 300, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v26 system injection ──────────────────────────────────────────────────
 
-
   // ── v27 system injection ──────────────────────────────────────────────────
 
-  public setPerkSystem(s: PerkSystem): void               { this._perkSystem = s; }
+  public setPerkSystem(s: PerkSystem): void               { this._perkSystem = s; this._own("perks", 310, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   // ── v28 system injection ──────────────────────────────────────────────────
 
-  public setDynamicWorldEventSystem(s: DynamicWorldEventSystem): void { this._dynamicWorldEventSystem = s; }
-  public setTravelEventSystem(s: TravelEventSystem): void { this._travelEventSystem = s; }
-  public setAmbientEventSystem(s: AmbientEventSystem): void { this._ambientEventSystem = s; }
+  public setDynamicWorldEventSystem(s: DynamicWorldEventSystem): void { this._dynamicWorldEventSystem = s; this._own("dynamicWorldEvents", 320, () => s.getSnapshot(), (d) => s.restoreSnapshot(d as any)); }
+  public setTravelEventSystem(s: TravelEventSystem): void { this._travelEventSystem = s; this._own("travelEvents", 330, () => s.getSnapshot(), (d) => s.restoreSnapshot(d as any)); }
+  public setAmbientEventSystem(s: AmbientEventSystem): void { this._ambientEventSystem = s; this._own("ambientEvents", 340, () => s.getSnapshot(), (d) => s.restoreSnapshot(d as any)); }
 
   // ── v29 system injection ──────────────────────────────────────────────────
 
-  public setStealthSystem(s: StealthSystem): void           { this._stealthSystem = s; }
-  public setCombatSystem(s: CombatSystem): void             { this._combatSystem = s; }
+  public setStealthSystem(s: StealthSystem): void           { this._stealthSystem = s; this._own("stealth", 350, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
+  public setCombatSystem(s: CombatSystem): void             { this._combatSystem = s; this._own("combatEffects", 360, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
   /**
    * Serialize the full game state to localStorage.
@@ -510,6 +516,24 @@ export class SaveSystem {
     if (this._codecs.has(codec.key)) throw new Error(`[SaveSystem] save key "${codec.key}" is already owned`);
     this._codecs.set(codec.key, codec);
     return () => { if (this._codecs.get(codec.key) === codec) this._codecs.delete(codec.key); };
+  }
+
+  /**
+   * A built-in part of the save: a system attached by one of the setters.
+   * Attaching again replaces it.  Missing in the save (an older one) means
+   * the system keeps its current state, as it always has.
+   */
+  private _own(key: string, order: number, save: () => unknown, load: (data: unknown) => void): void {
+    this._codecs.delete(key);
+    this._codecs.set(key, { key, order, save, load: (data) => { if (data) load(data); } });
+  }
+
+  /** Codecs in load order (stable for equal orders). */
+  private _codecsInOrder(): SaveCodec[] {
+    return [...this._codecs.values()]
+      .map((codec, i) => ({ codec, i }))
+      .sort((a, b) => (a.codec.order ?? FEATURE_CODEC_ORDER) - (b.codec.order ?? FEATURE_CODEC_ORDER) || a.i - b.i)
+      .map(({ codec }) => codec);
   }
 
   public save(silent = false): void {
@@ -562,45 +586,9 @@ export class SaveSystem {
     if (this._frameworkRuntime) {
       data.framework = this._frameworkSaveEngine.serialize(this._frameworkRuntime.getSaveSnapshot(), "default");
     }
-    if (this._attributes)       data.attributes  = this._attributes.getSaveState();
-    if (this._timeSystem)       data.time        = this._timeSystem.getSaveState();
-    if (this._crimeSystem)      data.crime       = this._crimeSystem.getSaveState();
-    if (this._containerSystem)  data.containers  = this._containerSystem.getSaveState();
-    if (this._barterSystem)     data.barter      = this._barterSystem.getSaveState();
-    if (this._cellManager)      data.cell        = this._cellManager.getSaveState();
-    if (this._spellSystem)      data.spells      = this._spellSystem.getSaveState();
-    if (this._persuasionSystem) data.persuasion  = this._persuasionSystem.getSaveState();
-    if (this._alchemySystem)    data.alchemy     = this._alchemySystem.getSaveState();
-    if (this._enchantingSystem) data.enchanting  = this._enchantingSystem.getSaveState();
-    if (this._weatherSystem)    data.weather     = this._weatherSystem.getSaveState();
-    if (this._quickSlotSystem)  data.quickSlots  = this._quickSlotSystem.getSaveState();
-    if (this._waitSystem)       data.wait        = this._waitSystem.getSaveState();
-    if (this._skillProgressionSystem) data.skillProgression = this._skillProgressionSystem.getSaveState();
-    if (this._fastTravelSystem)       data.fastTravel       = this._fastTravelSystem.getSaveState();
-    if (this._fameSystem)             data.fame             = this._fameSystem.getSaveState();
-    if (this._activeEffectsSystem)    data.activeEffects    = this._activeEffectsSystem.getSaveState();
-    if (this._jailSystem)             data.jail             = this._jailSystem.getSaveState();
-    if (this._respawnSystem)          data.respawn          = this._respawnSystem.getSaveState();
-    if (this._merchantRestockSystem)  data.merchantRestock  = this._merchantRestockSystem.getSaveState();
-    if (this._birthsignSystem)        data.birthsign        = this._birthsignSystem.getSaveState();
-    if (this._classSystem)            data.characterClass   = this._classSystem.getSaveState();
-    if (this._raceSystem)             data.race             = this._raceSystem.getSaveState();
-    if (this._playerLevelSystem)      data.playerLevel      = this._playerLevelSystem.getSaveState();
-    if (this._dailyScheduleSystem)    data.dailySchedule    = this._dailyScheduleSystem.getSaveState();
-    if (this._swimmingSystem)         data.swimming         = this._swimmingSystem.getSaveState();
-    if (this._diseaseSystem)          data.disease          = this._diseaseSystem.getSaveState();
-    if (this._eventManagerSystem)     data.eventManager     = this._eventManagerSystem.getSaveState();
-    if (this._markRecallSystem)       data.markRecall       = this._markRecallSystem.getSaveState();
-    if (this._trainerSystem)          data.trainer          = this._trainerSystem.getSaveState();
-    if (this._itemConditionSystem)    data.itemCondition    = this._itemConditionSystem.getSaveState();
-    if (this._perkSystem)             data.perks            = this._perkSystem.getSaveState();
-    if (this._dynamicWorldEventSystem) data.dynamicWorldEvents = this._dynamicWorldEventSystem.getSnapshot();
-    if (this._travelEventSystem) data.travelEvents = this._travelEventSystem.getSnapshot();
-    if (this._ambientEventSystem) data.ambientEvents = this._ambientEventSystem.getSnapshot();
-    if (this._stealthSystem) data.stealth = this._stealthSystem.getSaveState();
-    if (this._combatSystem) data.combatEffects = this._combatSystem.getSaveState();
+    if (this._attributes) data.attributes = this._attributes.getSaveState();
     const record = data as unknown as Record<string, unknown>;
-    for (const codec of this._codecs.values()) {
+    for (const codec of this._codecsInOrder()) {
       const value = codec.save();
       if (value !== undefined) record[codec.key] = value;
     }
@@ -754,102 +742,11 @@ export class SaveSystem {
       this._player.magicka = Math.min(this._player.magicka, this._player.maxMagicka);
       this._player.stamina = Math.min(this._player.stamina, this._player.maxStamina);
     }
-    if (this._timeSystem && data.time)         this._timeSystem.restoreFromSave(data.time as any);
-    if (this._crimeSystem && data.crime)       this._crimeSystem.restoreFromSave(data.crime as any);
-    if (this._containerSystem && data.containers) this._containerSystem.restoreFromSave(data.containers as any);
-    if (this._barterSystem && data.barter)     this._barterSystem.restoreFromSave(data.barter as any);
-    if (this._cellManager && data.cell)        this._cellManager.restoreFromSave(data.cell as any);
 
-    // v6 systems
-    if (this._spellSystem && data.spells)           this._spellSystem.restoreFromSave(data.spells as any);
-    if (this._persuasionSystem && data.persuasion)  this._persuasionSystem.restoreFromSave(data.persuasion as any);
-
-    // v7 systems
-    if (this._alchemySystem && data.alchemy)        this._alchemySystem.restoreFromSave(data.alchemy as any);
-
-    // v8 systems
-    if (this._enchantingSystem && data.enchanting)  this._enchantingSystem.restoreFromSave(data.enchanting as any);
-
-    // v9 systems
-    if (this._weatherSystem && data.weather)       this._weatherSystem.restoreFromSave(data.weather as any);
-    if (this._quickSlotSystem && data.quickSlots)  this._quickSlotSystem.restoreFromSave(data.quickSlots as any);
-    // v10 systems
-    if (this._waitSystem && data.wait)             this._waitSystem.restoreFromSave(data.wait as any);
-    // v11 systems
-    if (this._skillProgressionSystem && data.skillProgression)
-      this._skillProgressionSystem.restoreFromSave(data.skillProgression as any);
-    if (this._fastTravelSystem && data.fastTravel)
-      this._fastTravelSystem.restoreFromSave(data.fastTravel as any);
-    // v12 systems
-    if (this._fameSystem && data.fame)
-      this._fameSystem.restoreFromSave(data.fame as any);
-    if (this._activeEffectsSystem && data.activeEffects)
-      this._activeEffectsSystem.restoreFromSave(data.activeEffects as any);
-    if (this._jailSystem && data.jail)
-      this._jailSystem.restoreFromSave(data.jail as any);
-    // v13 systems
-    if (this._respawnSystem && data.respawn)
-      this._respawnSystem.restoreFromSave(data.respawn as any);
-    if (this._merchantRestockSystem && data.merchantRestock)
-      this._merchantRestockSystem.restoreFromSave(data.merchantRestock as any);
-    // v14 systems
-    if (this._birthsignSystem && data.birthsign)
-      this._birthsignSystem.restoreFromSave(data.birthsign as any);
-    if (this._classSystem && data.characterClass)
-      this._classSystem.restoreFromSave(data.characterClass as any);
-    // v15 systems
-    if (this._raceSystem && data.race)
-      this._raceSystem.restoreFromSave(data.race as any);
-
-    // v17 systems
-    if (this._playerLevelSystem && data.playerLevel)
-      this._playerLevelSystem.restoreFromSave(data.playerLevel as any);
-
-    // v18 systems
-    if (this._dailyScheduleSystem && data.dailySchedule)
-      this._dailyScheduleSystem.restoreFromSave(data.dailySchedule as any);
-
-    // v20 systems
-    if (this._swimmingSystem && data.swimming)
-      this._swimmingSystem.restoreFromSave(data.swimming as any);
-
-    // v21 systems
-    if (this._diseaseSystem && data.disease)
-      this._diseaseSystem.restoreFromSave(data.disease as any);
-
-    // v22 systems
-    if (this._eventManagerSystem && data.eventManager)
-      this._eventManagerSystem.restoreFromSave(data.eventManager as any);
-
-    // v24 systems
-    if (this._markRecallSystem && data.markRecall)
-      this._markRecallSystem.restoreFromSave(data.markRecall as any);
-    if (this._trainerSystem && data.trainer)
-      this._trainerSystem.restoreFromSave(data.trainer as any);
-
-    // v25 systems
-    if (this._itemConditionSystem && data.itemCondition)
-      this._itemConditionSystem.restoreFromSave(data.itemCondition as any);
-
-    // v27 systems
-    if (this._perkSystem && data.perks)
-      this._perkSystem.restoreFromSave(data.perks as any);
-
-    // v28 systems
-    if (this._dynamicWorldEventSystem && data.dynamicWorldEvents)
-      this._dynamicWorldEventSystem.restoreSnapshot(data.dynamicWorldEvents as any);
-    if (this._travelEventSystem && data.travelEvents)
-      this._travelEventSystem.restoreSnapshot(data.travelEvents as any);
-    if (this._ambientEventSystem && data.ambientEvents)
-      this._ambientEventSystem.restoreSnapshot(data.ambientEvents as any);
-    // v29 systems
-    if (this._stealthSystem && data.stealth)
-      this._stealthSystem.restoreFromSave(data.stealth as any);
-    if (this._combatSystem && data.combatEffects)
-      this._combatSystem.restoreFromSave(data.combatEffects as any);
-    // Feature-owned parts, read from the raw save (the validator above only
-    // knows the built-in fields).
-    for (const codec of this._codecs.values()) {
+    // Every registered part, in load order: the save system's own systems
+    // (10–360) then features.  Read from the raw save; the validator above
+    // only knows the core fields.
+    for (const codec of this._codecsInOrder()) {
       try {
         codec.load((parsed as Record<string, unknown>)[codec.key]);
       } catch (error) {
