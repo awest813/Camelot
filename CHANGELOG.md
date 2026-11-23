@@ -279,6 +279,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   load, as intended.
 - Dying and then pausing no longer revives you in the background; the
   four-second wait runs on the game clock.
+- Closing a creator tool with Escape inside the map editor no longer grabs the
+  mouse back from the editor.
 
 ### Changed
 - Plain B still opens Enchanting. B with Shift held now opens Smithing.

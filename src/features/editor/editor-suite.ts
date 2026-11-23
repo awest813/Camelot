@@ -54,7 +54,20 @@ import type { Item } from "../../systems/inventory-system";
 import type { Game } from "../../game";
 
 /** What the editors use from the game. */
-export type EditorHost = Pick<Game, "canvas" | "cellManager" | "fastTravelSystem" | "interactionSystem" | "isPaused" | "lootTableSystem" | "player" | "scene" | "ui" | "world">;
+export type EditorHost = Pick<Game, "canvas" | "cellManager" | "fastTravelSystem" | "frameworkRuntime" | "interactionSystem" | "isPaused" | "lootTableSystem" | "player" | "scene" | "ui" | "world">;
+
+/** Game input hand-off and notifications the editors need. */
+export interface EditorHooks {
+  /** Give input to a panel (release the pointer, stop the camera). */
+  suspendGameplay(): void;
+  /** Give input back to play. */
+  restoreGameplay(): void;
+  /** The map editor turned on or off (e.g. refresh the help overlay). */
+  modeChanged(): void;
+}
+
+/** A tool window that opens and closes. */
+interface ToolWindow { readonly isVisible: boolean; open(): void; close(): void }
 
 const MAP_EDITOR_AUTHOR_STORAGE_KEY = "camelot_map_editor_author";
 
@@ -110,7 +123,7 @@ export class EditorSuite {
   public editorHubUI!: EditorHubUI;
   public editorLayout!: EditorLayout;
 
-  constructor(private readonly host: EditorHost) {
+  constructor(private readonly host: EditorHost, private readonly hooks: EditorHooks) {
     this.mapEditorSystem = new MapEditorSystem(this.host.scene);
     this.mapEditorSystem.currentAuthor = this.loadAuthor();
 
@@ -742,5 +755,203 @@ export class EditorSuite {
   public persistAuthor(author: string): void {
     if (typeof localStorage === "undefined") return;
     localStorage.setItem(MAP_EDITOR_AUTHOR_STORAGE_KEY, author);
+  }
+
+  // ── Keyboard ─────────────────────────────────────────────────────────────
+
+  /** F2: the map editor on or off. */
+  public toggleMapEditor(): void {
+    if (this.mapEditorSystem.isEnabled) { this.exitMapEditor(); return; }
+    this.mapEditorSystem.toggle();
+    this.host.interactionSystem.isBlocked = true;
+    document.exitPointerLock();
+    this.host.player.camera.detachControl();
+    this.mapEditorToolbar.show();
+    this.editorLayout.setVisible("hierarchy", true);
+    this.editorLayout.setVisible("palette", true);
+    this.editorLayout.setVisible("layers", true);
+    this.refreshToolbar();
+    this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+    this.host.ui.showNotification("Map editor mode enabled", 1800);
+    this.hooks.modeChanged();
+  }
+
+  /** Leave the map editor (F2 or Escape), hiding its panels. */
+  public exitMapEditor(): void {
+    if (!this.mapEditorSystem.isEnabled) return;
+    this.mapEditorSystem.toggle();
+    this.mapEditorToolbar.hide();
+    for (const panel of ["hierarchy", "palette", "validation", "layers", "notes", "properties"] as const) {
+      this.editorLayout.setVisible(panel, false);
+    }
+    this.editorLayout.clearSelection();
+    this.hooks.restoreGameplay();
+    this.host.ui.showNotification("Map editor mode disabled", 1800);
+    this.hooks.modeChanged();
+  }
+
+  /** Open a tool window (taking input) or close it. */
+  private _toggleTool(tool: ToolWindow): void {
+    if (tool.isVisible) { tool.close(); return; }
+    tool.open();
+    this.hooks.suspendGameplay();
+  }
+
+  /** The hierarchy, toolbar and layers after the map changed. */
+  private _refreshAfterEdit(): void {
+    this.refreshToolbar();
+    this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+    this.refreshLayerPanel();
+  }
+
+  /**
+   * Editor and creator-tool chords.  The game sends keys the input adapter
+   * did not take (all of them while the map editor is on).  Returns true
+   * when the key was the editors'.
+   */
+  public handleKey(ev: { key: string; shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }): boolean {
+    const ed = this.mapEditorSystem;
+    const ui = this.host.ui;
+    const ctrl = ev.ctrlKey || ev.metaKey;
+    const key = ev.key;
+    const k = key.toLowerCase();
+    const onlyInEditor = (fn: () => void): boolean => { if (ed.isEnabled) fn(); return true; };
+
+    // Tools reachable from anywhere (mostly Shift + F-key).
+    if (ev.shiftKey) {
+      const tool: Record<string, ToolWindow | undefined> = {
+        F4: this.worldBuilderUI, F5: this.bundleMergeUI, F6: this.assetBrowserUI, F8: this.lootTableCreatorUI,
+        F9: this.factionCreatorUI, F10: this.npcCreatorUI, F11: this.spawnCreatorUI, F12: this.itemCreatorUI,
+      };
+      if (tool[key]) { this._toggleTool(tool[key]!); return true; }
+      if (key === "F7") {
+        if (!this.contentBundleUI.isVisible) this.contentBundleSystem.attachMap(ed);
+        this._toggleTool(this.contentBundleUI);
+        return true;
+      }
+      if (ctrl && k === "w") { this._toggleTool(this.worldBuilderUI); return true; }
+      // Ctrl+Shift+M: the key is "M" because Shift is held.
+      if (ctrl && key === "M") { this._toggleTool(this.modManifestUI); return true; }
+    }
+    switch (key) {
+      case "F2": this.toggleMapEditor(); return true;
+      case "F10": this._toggleTool(this.questCreatorUI); return true;
+      case "F12": this._toggleTool(this.dialogueCreatorUI); return true;
+      case "F11":
+        if (this.editorHubUI.toggle()) this.hooks.suspendGameplay();
+        else this.hooks.restoreGameplay();
+        return true;
+      case "F4": return onlyInEditor(() => { ed.exportToFile(); ui.showNotification("Map exported to file", 2000); });
+      case "F6": return onlyInEditor(() => this._importMap());
+      case "F7": return onlyInEditor(() => {
+        if (this.editorLayout.getPanelState("validation")?.isVisible) { this.editorLayout.setVisible("validation", false); return; }
+        const validation = ed.validateMap(0.5, { knownLootTableIds: this.host.lootTableSystem.getTableIds() });
+        this.mapEditorValidationPanel.show(validation);
+        this.editorLayout.setVisible("validation", true);
+        if (!validation.isValid) console.warn("[MapEditorValidation]", validation.issues);
+      });
+      case "F8": {
+        // Quest graph validation (plain F8 in play is the favourites menu).
+        const reports = frameworkBaseContent.quests.map((q) => this.host.frameworkRuntime.questEngine.validateGraph(q.id));
+        const issues = reports.reduce((n, r) => n + r.issues.length, 0);
+        ui.showNotification(
+          issues === 0
+            ? `Quest graph validation passed (${reports.length} graphs).`
+            : `Quest graph validation: ${reports.filter((r) => !r.valid).length} invalid graph(s), ${issues} issue(s).`,
+          3200,
+        );
+        if (issues > 0) console.warn("[QuestGraphValidation]", reports);
+        return true;
+      }
+    }
+    if (ctrl) {
+      if (k === "m" && !ev.shiftKey) return onlyInEditor(() => {
+        this.editorLayout.setVisible("notes", !(this.editorLayout.getPanelState("notes")?.isVisible ?? false));
+      });
+      if (k === "z" && !ev.shiftKey) return onlyInEditor(() => {
+        const undone = ed.undo();
+        ui.showNotification(undone ? "Undo" : "Nothing to undo", 1000);
+        if (undone) this._refreshAfterEdit();
+      });
+      if (k === "y" || (k === "z" && ev.shiftKey)) return onlyInEditor(() => {
+        const redone = ed.redo();
+        ui.showNotification(redone ? "Redo" : "Nothing to redo", 1000);
+        if (redone) this._refreshAfterEdit();
+      });
+      return false;
+    }
+    if (!ed.isEnabled) return false;
+    switch (k) {
+      case "f": {
+        if (ev.shiftKey) {
+          const all = ed.listEntitySummaries();
+          if (all.length === 0) { ui.showNotification("No entities to frame", 1000); return true; }
+          const c = all.reduce((a, e) => ({ x: a.x + e.position.x, y: a.y + e.position.y, z: a.z + e.position.z }), { x: 0, y: 0, z: 0 });
+          this.host.player.camera.target.set(c.x / all.length, c.y / all.length, c.z / all.length);
+          ui.showNotification(`Framed ${all.length} entities`, 1000);
+        } else {
+          const id = ed.selectedEntityId;
+          if (!id) { ui.showNotification("No entity selected to frame", 1000); return true; }
+          const pos = ed.getEntityPosition(id);
+          if (pos) {
+            this.host.player.camera.target.set(pos.x, pos.y, pos.z);
+            ui.showNotification("Framed selected entity", 1000);
+          }
+        }
+        return true;
+      }
+      case "l": {
+        const shown = this.editorLayout.getPanelState("layers")?.isVisible ?? false;
+        this.editorLayout.setVisible("layers", !shown);
+        if (!shown) ui.showNotification("Layers panel opened", 1000);
+        return true;
+      }
+      case "t": ui.showNotification(`Place type: ${ed.cyclePlacementType()}`, 1400); this.refreshToolbar(); return true;
+      case "p": ui.showNotification(`New patrol group: ${ed.startNewPatrolGroup()}`, 1600); this.refreshToolbar(); return true;
+      case "h": ui.showNotification(`Terrain tool: ${ed.cycleTerrainTool()}`, 1600); this.refreshToolbar(); return true;
+      case "[": ui.showNotification(`Terrain sculpt step: ${ed.adjustTerrainSculptStep(-0.1).toFixed(1)}`, 1200); return true;
+      case "]": ui.showNotification(`Terrain sculpt step: ${ed.adjustTerrainSculptStep(0.1).toFixed(1)}`, 1200); return true;
+      case "n": {
+        const cam = this.host.player.camera;
+        const at = cam.position.add(this.host.player.getForwardDirection(8).scale(4));
+        at.y = Math.max(1, at.y);
+        ed.placeEntity(at);
+        ui.showNotification(`Placed: ${ed.currentPlacementType}`, 1200);
+        this._refreshAfterEdit();
+        return true;
+      }
+      case "d": {
+        const id = ed.selectedEntityId;
+        if (!id) { ui.showNotification("No entity selected to duplicate", 1400); return true; }
+        if (ed.duplicateEntity(id)) {
+          ui.showNotification("Entity duplicated", 1200);
+          this._refreshAfterEdit();
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** F6 in the editor: pick a map JSON to import. */
+  private _importMap(): void {
+    if (typeof document === "undefined") return;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.style.display = "none";
+    input.addEventListener("change", async () => {
+      const file = input.files?.[0];
+      input.remove();
+      if (!file) return;
+      const ok = await this.mapEditorSystem.importFromFile(file);
+      this.host.ui.showNotification(ok ? "Map imported successfully" : "Map import failed: invalid file", 2500);
+      if (ok) {
+        this.refreshToolbar();
+        this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
+      }
+    });
+    document.body.appendChild(input);
+    input.click();
   }
 }

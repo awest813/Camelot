@@ -98,10 +98,33 @@ test("editor and tool chords reach their handlers", async ({ page }) => {
   expect(await g<boolean>("g.editorLayout.getPanelState('notes')?.isVisible ?? false"), "Ctrl+M toggles Scene Notes").toBe(!notes);
   expect(await g<boolean>("g.audioSystem.isMuted"), "Ctrl+M does not mute").toBe(mutedBefore);
 
+  // N places an entity at the crosshair; Ctrl+Z takes it back; Ctrl+Y redoes it.
+  const count0 = await g<number>("g.mapEditorSystem.entityCount");
+  await page.keyboard.press("n");
+  expect(await g<number>("g.mapEditorSystem.entityCount"), "N places").toBe(count0 + 1);
+  await page.keyboard.press("Control+z");
+  expect(await g<number>("g.mapEditorSystem.entityCount"), "Ctrl+Z undoes").toBe(count0);
+  await page.keyboard.press("Control+y");
+  expect(await g<number>("g.mapEditorSystem.entityCount"), "Ctrl+Y redoes").toBe(count0 + 1);
+
   // Gameplay keys do nothing in the editor.
   await page.keyboard.press("j");
   expect(await g<boolean>("g.questSystem.isLogOpen"), "J in the editor").toBe(false);
   await page.keyboard.press("F2");
   expect(await g<boolean>("g.mapEditorSystem.isEnabled")).toBe(false);
+
+  // Shift+F12: the Item Creator, from play; the same chord closes it.
+  await canvas.click({ force: true });
+  await page.keyboard.press("Shift+F12");
+  expect(await g<boolean>("g.itemCreatorUI.isVisible"), "Shift+F12 opens the item creator").toBe(true);
+  await page.evaluate(() => (window as any).__camelotGame.itemCreatorUI.close());
+
+  // Tab: the character sheet (the closed tool left focus on its panel).
+  await canvas.click({ force: true });
+  await canvas.focus();
+  await page.keyboard.press("Tab");
+  expect(await g<boolean>("g.characterSheetUI.isVisible"), "Tab opens the character sheet").toBe(true);
+  await page.keyboard.press("Tab");
+  expect(await g<boolean>("g.characterSheetUI.isVisible")).toBe(false);
   expect(errors).toEqual([]);
 });

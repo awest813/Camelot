@@ -484,8 +484,6 @@ export class Game {
   /** Set by the smith's "use your forge" dialogue choice; opened once dialogue closes. */
   /** Shared parchment material for village notice boards. */
 
-
-
   public isPaused: boolean = false;
 
   private readonly _gameplayLoop = new FixedStepLoop({
@@ -504,7 +502,6 @@ export class Game {
 
   /** What each loaded chunk holds (props, buildings, its NPCs); goes with the chunk. */
   private _chunks!: ChunkContent;
-
 
   /** Debounce for witnessed-assault crime reports (one per 3s per combat burst). */
   private _lastAssaultCrimeMs: number = Number.NEGATIVE_INFINITY;
@@ -525,10 +522,8 @@ export class Game {
   // Last LOD culled count for the debug overlay (updated from lodSystem.update())
   private _lastLodCulled: number = 0;
 
-
   /** Frame counter for throttling non-critical subsystem updates. */
   private _systemTickCounter: number = 0;
-
 
   private _helpOverlayEl: HTMLDivElement | null = null;
   private _helpOverlayVisible: boolean = false;
@@ -567,7 +562,6 @@ export class Game {
     this.init();
   }
 
-
   private _toggleHelpOverlay(): void {
     if (!this._helpOverlayEl) {
       const panel = document.createElement("div");
@@ -592,12 +586,6 @@ export class Game {
     if (!this._helpOverlayVisible || !this._helpOverlayEl) return;
     this._helpOverlayEl.textContent = buildHelpOverlayLines(this.mapEditorSystem.isEnabled).join("\n");
   }
-
-
-
-
-
-
 
   private _refreshEditorToolbar(): void { return this.editors.refreshToolbar(); }
 
@@ -736,9 +724,11 @@ export class Game {
     };
     this._loadFrameworkMods();
     // Editor tools (map editor, creators, bundles, asset browser, hub).
-    this.editors = new EditorSuite(this);
-
-
+    this.editors = new EditorSuite(this, {
+      suspendGameplay: () => this._suspendGameplayInput(),
+      restoreGameplay: () => this._restoreGameplayInput(),
+      modeChanged: () => this._refreshHelpOverlayIfVisible(),
+    });
 
     this.levelUpUI = new LevelUpUI();
     this.levelUpUI.onConfirm = (primary, sec1, sec2) => {
@@ -1484,7 +1474,6 @@ export class Game {
     this.guardEncounterUI.setAnimator(uiAnimator);
     this.saddlebagUI.setAnimator(uiAnimator);
 
-
     this._runCharacterCreation().catch((error: unknown) => {
       console.error("Character creation failed; applying defaults", error);
       this._applyDefaultCharacterCreation();
@@ -1755,382 +1744,25 @@ export class Game {
                 const tabEv = kbInfo.event as KeyboardEvent;
                 if (tabEv.repeat) return;
                 tabEv.preventDefault();
+                // Tab: the character sheet (open over play only).
                 if (this.characterSheetUI.isVisible) {
                     this.characterSheetUI.hide();
                     this.ui.setCharacterSheetOpen(false);
-                    if (!this.mapEditorSystem.isEnabled && !this.isPaused) {
-                        this.interactionSystem.isBlocked = false;
-                        this.canvas.requestPointerLock();
-                        this.player.camera.attachControl(this.canvas, true);
-                    }
+                    this._restoreGameplayInput();
                     return;
                 }
-                if (
-                    this.isPaused ||
-                    this.dialogueSystem.isInDialogue ||
-                    this.mapEditorSystem.isEnabled ||
-                    this.levelUpUI.isVisible ||
-                    this.inventorySystem.isOpen ||
-                    this.questSystem.isLogOpen ||
-                    this.skillTreeSystem.isOpen ||
-                    this.ui.isAttributePanelOpen ||
-                    this.guardEncounterUI.isVisible ||
-                    this.spellMakingUI.isVisible ||
-                    this._barterUI.isVisible ||
-                    this._containerUI.isVisible ||
-                    this.fastTravelUI.isVisible ||
-                    this.stableUI.isVisible ||
-                    this.saddlebagUI.isVisible ||
-                    this.petUI.isVisible ||
-                    this.followerUI.isVisible ||
-                    this.shoutUI.isVisible ||
-                    this.pickpocketUI.isVisible ||
-                    this.interactionSystem.isBlocked
-                ) {
-                    return;
-                }
+                if (this._isCombatInputBlocked()) return;
                 this._refreshCharacterSheet();
                 this.characterSheetUI.show();
                 this.ui.setCharacterSheetOpen(true);
-                this.interactionSystem.isBlocked = true;
-                document.exitPointerLock();
-                this.player.camera.detachControl();
-            } else if (kbInfo.event.key === "F2") {
-                const isEnabled = this.mapEditorSystem.toggle();
-                this.interactionSystem.isBlocked = isEnabled;
-                if (isEnabled) {
-                    document.exitPointerLock();
-                    this.player.camera.detachControl();
-                    this.mapEditorToolbar.show();
-                    this.editorLayout.setVisible("hierarchy", true);
-                    this.editorLayout.setVisible("palette", true);
-                    this.editorLayout.setVisible("layers", true);
-                    this._refreshEditorToolbar();
-                    this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-                } else {
-                    this.canvas.requestPointerLock();
-                    this.player.camera.attachControl(this.canvas, true);
-                    this.mapEditorToolbar.hide();
-                    this.editorLayout.setVisible("hierarchy", false);
-                    this.editorLayout.setVisible("palette", false);
-                    this.editorLayout.setVisible("validation", false);
-                    this.editorLayout.setVisible("layers", false);
-                    this.editorLayout.setVisible("notes", false);
-                    this.editorLayout.setVisible("properties", false);
-                    this.editorLayout.clearSelection();
-                }
-                this.ui.showNotification(isEnabled ? "Map editor mode enabled" : "Map editor mode disabled", 1800);
-                this._refreshHelpOverlayIfVisible();
-            } else if (kbInfo.event.key === "f" || kbInfo.event.key === "F") {
-                if (!this.mapEditorSystem.isEnabled) return;
-                if (kbInfo.event.shiftKey) {
-                    // Shift+F: Frame All
-                    const summaries = this.mapEditorSystem.listEntitySummaries();
-                    if (summaries.length === 0) { this.ui.showNotification("No entities to frame", 1000); return; }
-                    let cx = 0, cy = 0, cz = 0;
-                    for (const s of summaries) { cx += s.position.x; cy += s.position.y; cz += s.position.z; }
-                    cx /= summaries.length; cy /= summaries.length; cz /= summaries.length;
-                    this.player.camera.target.set(cx, cy, cz);
-                    this.ui.showNotification(`Framed ${summaries.length} entities`, 1000);
-                } else {
-                    // F: Frame Selected
-                    const selId = this.mapEditorSystem.selectedEntityId;
-                    if (!selId) { this.ui.showNotification("No entity selected to frame", 1000); return; }
-                    const pos = this.mapEditorSystem.getEntityPosition(selId);
-                    if (pos) {
-                        this.player.camera.target.set(pos.x, pos.y, pos.z);
-                        this.ui.showNotification("Framed selected entity", 1000);
-                    }
-                }
-            } else if (kbInfo.event.key === "l" || kbInfo.event.key === "L") {
-                if (!this.mapEditorSystem.isEnabled) return;
-                const layerVisible = this.editorLayout.getPanelState("layers")?.isVisible ?? false;
-                if (layerVisible) {
-                    this.editorLayout.setVisible("layers", false);
-                } else {
-                    this.editorLayout.setVisible("layers", true);
-                    this.ui.showNotification("Layers panel opened", 1000);
-                }
-            } else if ((kbInfo.event.key === "M") && (kbInfo.event.ctrlKey || kbInfo.event.metaKey) && kbInfo.event.shiftKey) {
-                // Ctrl+Shift+M — key is "M" (uppercase) because Shift is held; shiftKey guard
-                // disambiguates from plain Ctrl+M (Scene Notes) which produces lowercase "m".
-                // → Mod Manifest Editor (global)
-                if (this.modManifestUI.isVisible) {
-                    this.modManifestUI.close();
-                } else {
-                    this.interactionSystem.isBlocked = true;
-                    document.exitPointerLock();
-                    this.player.camera.detachControl();
-                    this.modManifestUI.open();
-                }
-            } else if ((kbInfo.event.key === "m") && (kbInfo.event.ctrlKey || kbInfo.event.metaKey) && !kbInfo.event.shiftKey) {
-                // Ctrl+M (lowercase "m", no Shift) → Scene Notes (editor mode only)
-                if (!this.mapEditorSystem.isEnabled) return;
-                const notesVisible = this.editorLayout.getPanelState("notes")?.isVisible ?? false;
-                this.editorLayout.setVisible("notes", !notesVisible);
-            } else if (kbInfo.event.key === "t" || kbInfo.event.key === "T") {
-                if (!this.mapEditorSystem.isEnabled) return;
-                const ptype = this.mapEditorSystem.cyclePlacementType();
-                this.ui.showNotification(`Place type: ${ptype}`, 1400);
-                this._refreshEditorToolbar();
-            } else if (kbInfo.event.key === "p" || kbInfo.event.key === "P") {
-                if (!this.mapEditorSystem.isEnabled) return;
-                const groupId = this.mapEditorSystem.startNewPatrolGroup();
-                this.ui.showNotification(`New patrol group: ${groupId}`, 1600);
-                this._refreshEditorToolbar();
-            } else if (kbInfo.event.key === "h" || kbInfo.event.key === "H") {
-                if (!this.mapEditorSystem.isEnabled) return;
-                const terrainTool = this.mapEditorSystem.cycleTerrainTool();
-                this.ui.showNotification(`Terrain tool: ${terrainTool}`, 1600);
-                this._refreshEditorToolbar();
-            } else if (kbInfo.event.key === "[") {
-                if (!this.mapEditorSystem.isEnabled) return;
-                const step = this.mapEditorSystem.adjustTerrainSculptStep(-0.1);
-                this.ui.showNotification(`Terrain sculpt step: ${step.toFixed(1)}`, 1200);
-            } else if (kbInfo.event.key === "]") {
-                if (!this.mapEditorSystem.isEnabled) return;
-                const step = this.mapEditorSystem.adjustTerrainSculptStep(0.1);
-                this.ui.showNotification(`Terrain sculpt step: ${step.toFixed(1)}`, 1200);
-            } else if (kbInfo.event.key === "F4") {
-                if (kbInfo.event.shiftKey) {
-                    // Shift+F4 → World Builder
-                    if (this.worldBuilderUI.isVisible) {
-                        this.worldBuilderUI.close();
-                    } else {
-                        this.worldBuilderUI.open();
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
-                    }
-                } else {
-                    if (!this.mapEditorSystem.isEnabled) return;
-                    this.mapEditorSystem.exportToFile();
-                    this.ui.showNotification("Map exported to file", 2000);
-                }
-            } else if (
-                (kbInfo.event.key === "w" || kbInfo.event.key === "W") &&
-                (kbInfo.event.ctrlKey || kbInfo.event.metaKey) &&
-                kbInfo.event.shiftKey
-            ) {
-                // Ctrl+Shift+W → World Builder
-                if (this.worldBuilderUI.isVisible) {
-                    this.worldBuilderUI.close();
-                } else {
-                    this.worldBuilderUI.open();
-                    this.interactionSystem.isBlocked = true;
-                    document.exitPointerLock();
-                    this.player.camera.detachControl();
-                }
-            } else if (kbInfo.event.key === "z" && (kbInfo.event.ctrlKey || kbInfo.event.metaKey) && !kbInfo.event.shiftKey) {
-                if (!this.mapEditorSystem.isEnabled) return;
-                const undone = this.mapEditorSystem.undo();
-                this.ui.showNotification(undone ? "Undo" : "Nothing to undo", 1000);
-                if (undone) {
-                    this._refreshEditorToolbar();
-                    this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-                    this._refreshLayerPanel();
-                }
-            } else if (
-                (kbInfo.event.key === "y" && (kbInfo.event.ctrlKey || kbInfo.event.metaKey)) ||
-                (kbInfo.event.key === "z" && (kbInfo.event.ctrlKey || kbInfo.event.metaKey) && kbInfo.event.shiftKey)
-            ) {
-                if (!this.mapEditorSystem.isEnabled) return;
-                const redone = this.mapEditorSystem.redo();
-                this.ui.showNotification(redone ? "Redo" : "Nothing to redo", 1000);
-                if (redone) {
-                    this._refreshEditorToolbar();
-                    this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-                    this._refreshLayerPanel();
-                }
-            } else if (kbInfo.event.key === "F6") {
-                if (kbInfo.event.shiftKey) {
-                    // Shift+F6 → Asset Browser
-                    if (this.assetBrowserUI.isVisible) {
-                        this.assetBrowserUI.close();
-                    } else {
-                        this.assetBrowserUI.open();
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
-                    }
-                } else {
-                    if (!this.mapEditorSystem.isEnabled) return;
-                    this._triggerMapImport();
-                }
-            } else if (kbInfo.event.key === "F7") {
-                if (kbInfo.event.shiftKey) {
-                    // Shift+F7 → Content Bundle Dashboard
-                    if (this.contentBundleUI.isVisible) {
-                        this.contentBundleUI.close();
-                    } else {
-                        this.contentBundleSystem.attachMap(this.mapEditorSystem);
-                        this.contentBundleUI.open();
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
-                    }
-                } else {
-                    // F7 → Map validation panel (editor mode only)
-                    if (!this.mapEditorSystem.isEnabled) return;
-                    const validationVisible = this.editorLayout.getPanelState("validation")?.isVisible ?? false;
-                    if (validationVisible) {
-                        this.editorLayout.setVisible("validation", false);
-                    } else {
-                        const validation = this.mapEditorSystem.validateMap(0.5, {
-                          knownLootTableIds: this.lootTableSystem.getTableIds(),
-                        });
-                        this.mapEditorValidationPanel.show(validation);
-                        this.editorLayout.setVisible("validation", true);
-                        if (!validation.isValid) {
-                          console.warn("[MapEditorValidation]", validation.issues);
-                        }
-                    }
-                }
-            } else if (kbInfo.event.key === "F8") {
-                if (kbInfo.event.shiftKey) {
-                    // Shift+F8 → Loot Table Creator
-                    if (this.lootTableCreatorUI.isVisible) {
-                        this.lootTableCreatorUI.close();
-                    } else {
-                        this.lootTableCreatorUI.open();
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
-                    }
-                } else {
-                    // F8 → Framework quest graph validation
-                    const reports = frameworkBaseContent.quests.map((quest) => {
-                      return this.frameworkRuntime.questEngine.validateGraph(quest.id);
-                    });
-                    const totalIssues = reports.reduce((sum, report) => sum + report.issues.length, 0);
-                    const invalidGraphs = reports.filter((report) => !report.valid).length;
-                    this.ui.showNotification(
-                      totalIssues === 0
-                        ? `Quest graph validation passed (${reports.length} graphs).`
-                        : `Quest graph validation: ${invalidGraphs} invalid graph(s), ${totalIssues} issue(s).`,
-                      3200,
-                    );
-                    if (totalIssues > 0) {
-                      console.warn("[QuestGraphValidation]", reports);
-                    }
-                }
-            } else if (kbInfo.event.key === "F10") {
-                if (kbInfo.event.shiftKey) {
-                    // Shift+F10 → NPC Creator
-                    if (this.npcCreatorUI.isVisible) {
-                        this.npcCreatorUI.close();
-                    } else {
-                        this.npcCreatorUI.open();
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
-                    }
-                } else {
-                    // F10 → Quest Creator
-                    if (this.questCreatorUI.isVisible) {
-                        this.questCreatorUI.close();
-                    } else {
-                        this.questCreatorUI.open();
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
-                    }
-                }
-            } else if (kbInfo.event.key === "F11") {
-                if (kbInfo.event.shiftKey) {
-                    // Shift+F11 → Spawn Creator
-                    if (this.spawnCreatorUI.isVisible) {
-                        this.spawnCreatorUI.close();
-                    } else {
-                        this.spawnCreatorUI.open();
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
-                    }
-                } else {
-                    // F11 → Editor Hub
-                    const isNowOpen = this.editorHubUI.toggle();
-                    if (isNowOpen) {
-                      this._suspendGameplayInput();
-                    } else {
-                      this._restoreGameplayInput();
-                    }
-                }
-            } else if (kbInfo.event.key === "F12") {
-                if (kbInfo.event.shiftKey) {
-                    // Shift+F12 → Item Creator
-                    if (this.itemCreatorUI.isVisible) {
-                        this.itemCreatorUI.close();
-                    } else {
-                        this.itemCreatorUI.open();
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
-                    }
-                } else {
-                    // F12 → Dialogue Creator
-                    if (this.dialogueCreatorUI.isVisible) {
-                        this.dialogueCreatorUI.close();
-                    } else {
-                        this.dialogueCreatorUI.open();
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
-                    }
-                }
-            } else if (kbInfo.event.key === "n" || kbInfo.event.key === "N") {
-                if (!this.mapEditorSystem.isEnabled) return;
-                const placeAt = this.player.camera.position.add(this.player.getForwardDirection(8).scale(4));
-                placeAt.y = Math.max(1, placeAt.y);
-                this.mapEditorSystem.placeEntity(placeAt);
-                const ptype = this.mapEditorSystem.currentPlacementType;
-                this.ui.showNotification(`Placed: ${ptype}`, 1200);
-                this._refreshEditorToolbar();
-                this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-                this._refreshLayerPanel();
-            } else if (kbInfo.event.key === "d" || kbInfo.event.key === "D") {
-                if (!this.mapEditorSystem.isEnabled) return;
-                const selId = this.mapEditorSystem.selectedEntityId;
-                if (!selId) {
-                    this.ui.showNotification("No entity selected to duplicate", 1400);
-                    return;
-                }
-                const newMesh = this.mapEditorSystem.duplicateEntity(selId);
-                if (newMesh) {
-                    this.ui.showNotification("Entity duplicated", 1200);
-                    this._refreshEditorToolbar();
-                    this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-                    this._refreshLayerPanel();
-                }
-            } else if (kbInfo.event.key === "F5") {
-                if (kbInfo.event.shiftKey) {
-                    // Shift+F5 → Bundle Merge Assistant
-                    if (this.bundleMergeUI.isVisible) {
-                        this.bundleMergeUI.close();
-                    } else {
-                        this.bundleMergeUI.open();
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
-                    }
-                } else {
-                    if (!this.isPaused) this.saveSystem.save();
-                }
-            } else if (kbInfo.event.key === "F9") {
-                if (kbInfo.event.shiftKey) {
-                    // Shift+F9 → Faction Creator
-                    if (this.factionCreatorUI.isVisible) {
-                        this.factionCreatorUI.close();
-                    } else {
-                        this.factionCreatorUI.open();
-                        this.interactionSystem.isBlocked = true;
-                        document.exitPointerLock();
-                        this.player.camera.detachControl();
-                    }
-                } else {
-                    // F9 → Load game
-                    if (!this.isPaused) this.saveSystem.load();
-                }
+                this._suspendGameplayInput();
+            } else if (kbInfo.event.key === "F5" && !kbInfo.event.shiftKey) {
+                if (!this.isPaused) this.saveSystem.save();
+            } else if (kbInfo.event.key === "F9" && !kbInfo.event.shiftKey) {
+                if (!this.isPaused) this.saveSystem.load();
+            } else {
+                // Map editor and creator-tool chords.
+                this.editors.handleKey(kbInfo.event);
             }
         } else if (kbInfo.type === KeyboardEventTypes.KEYUP) {
             // A bow drawn (or staff charged) before entering the editor is
@@ -2513,23 +2145,7 @@ export class Game {
       if (this.dialogueSystem.isInDialogue) return;
       if (this.levelUpUI.isVisible) return;
       if (this.guardEncounterUI.isVisible) { this.kernel.services.get(ArrestKey).resist(); return; }
-      if (this.mapEditorSystem.isEnabled) {
-        this.mapEditorSystem.toggle();
-        this.interactionSystem.isBlocked = false;
-        this.canvas.requestPointerLock();
-        this.player.camera.attachControl(this.canvas, true);
-        this.mapEditorToolbar.hide();
-        this.editorLayout.setVisible("hierarchy", false);
-        this.editorLayout.setVisible("palette", false);
-        this.editorLayout.setVisible("validation", false);
-        this.editorLayout.setVisible("layers", false);
-        this.editorLayout.setVisible("notes", false);
-        this.editorLayout.setVisible("properties", false);
-        this.editorLayout.clearSelection();
-        this.ui.showNotification("Map editor mode disabled", 1800);
-        this._refreshHelpOverlayIfVisible();
-        return;
-      }
+      if (this.mapEditorSystem.isEnabled) { this.editors.exitMapEditor(); return; }
       if (this.characterSheetUI.isVisible) { this.characterSheetUI.hide(); this.ui.setCharacterSheetOpen(false); this._restoreGameplayInput(); return; }
       // Closing the inventory must clear isBlocked like the I-key path does.
       if (this.inventorySystem.isOpen) { this.inventorySystem.toggleInventory(); this._restoreGameplayInput(); return; }
@@ -2551,17 +2167,12 @@ export class Game {
       if (this.saddlebagUI.isVisible) { this.saddlebagUI.close(); return; }
       if (this._creditsUI?.isVisible) { this._creditsUI.hide(); this._creditsUI.onClose?.(); return; }
       if (this.graphicsSettingsUI.isVisible) { this.graphicsSettingsUI.hide(); this.graphicsSettingsUI.onClose?.(); return; }
-      if (this.questCreatorUI.isVisible) { this.questCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.dialogueCreatorUI.isVisible) { this.dialogueCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.npcCreatorUI.isVisible) { this.npcCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.itemCreatorUI.isVisible) { this.itemCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.factionCreatorUI.isVisible) { this.factionCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.lootTableCreatorUI.isVisible) { this.lootTableCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.spawnCreatorUI.isVisible) { this.spawnCreatorUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.contentBundleUI.isVisible) { this.contentBundleUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.assetBrowserUI.isVisible) { this.assetBrowserUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.bundleMergeUI.isVisible) { this.bundleMergeUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
-      if (this.modManifestUI.isVisible) { this.modManifestUI.close(); this.canvas.requestPointerLock(); this.player.camera.attachControl(this.canvas, true); return; }
+      // Creator tools (their own close clears the interaction block).
+      for (const tool of [this.questCreatorUI, this.dialogueCreatorUI, this.npcCreatorUI, this.itemCreatorUI,
+        this.factionCreatorUI, this.lootTableCreatorUI, this.spawnCreatorUI, this.contentBundleUI,
+        this.assetBrowserUI, this.bundleMergeUI, this.modManifestUI]) {
+        if (tool.isVisible) { tool.close(); this._restoreGameplayInput(); return; }
+      }
       if (this.editorHubUI.isVisible) { this.editorHubUI.close(); this._restoreGameplayInput(); return; }
       if (this.ui.isWaitDialogOpen) { this.ui.toggleWaitDialog(false); this._restoreGameplayInput(); return; }
       this.togglePause();
@@ -2583,33 +2194,7 @@ export class Game {
     adapter.onAction("helpOverlay", () => {
       this._toggleHelpOverlay();
     });
-    adapter.onAction("toggleMapEditor", () => {
-      const isEnabled = this.mapEditorSystem.toggle();
-      this.interactionSystem.isBlocked = isEnabled;
-      if (isEnabled) {
-        document.exitPointerLock();
-        this.player.camera.detachControl();
-        this.mapEditorToolbar.show();
-        this.editorLayout.setVisible("hierarchy", true);
-        this.editorLayout.setVisible("palette", true);
-        this.editorLayout.setVisible("layers", true);
-        this._refreshEditorToolbar();
-        this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-      } else {
-        this.canvas.requestPointerLock();
-        this.player.camera.attachControl(this.canvas, true);
-        this.mapEditorToolbar.hide();
-        this.editorLayout.setVisible("hierarchy", false);
-        this.editorLayout.setVisible("palette", false);
-        this.editorLayout.setVisible("validation", false);
-        this.editorLayout.setVisible("layers", false);
-        this.editorLayout.setVisible("notes", false);
-        this.editorLayout.setVisible("properties", false);
-        this.editorLayout.clearSelection();
-      }
-      this.ui.showNotification(isEnabled ? "Map editor mode enabled" : "Map editor mode disabled", 1800);
-      this._refreshHelpOverlayIfVisible();
-    });
+    adapter.onAction("toggleMapEditor", () => this.editors.toggleMapEditor());
 
     // ── Skyrim/Oblivion-style action handlers ─────────────────────────────
     adapter.onAction("jump", () => {
@@ -2850,12 +2435,6 @@ export class Game {
     this._achievements?.unlock("ACH_TAKE_UP_THE_SWORD");
   }
 
-
-
-
-
-
-
   /**
    * Attach a persistent gear button (⚙) to the DOM that opens the graphics
    * settings dialog.  The button is always visible so players can adjust
@@ -2881,9 +2460,6 @@ export class Game {
     document.body.appendChild(btn);
   }
 
-
-
-
   /**
    * Put an NPC that fell through the world back at its spawn point.  Bodies
    * spawned before their ground chunk existed (e.g. the boot-time test guard)
@@ -2898,10 +2474,6 @@ export class Game {
     body.disablePreStep = false;
     this.scene.onAfterPhysicsObservable.addOnce(() => { body.disablePreStep = true; });
   }
-
-
-
-
 
   /** Remove world loot objects whose item IDs are now in inventory or equipment (called after load). */
   private _cleanupCollectedLoot(): void {
@@ -3034,8 +2606,6 @@ export class Game {
       if (itemId === "guard_token") return "guard_token";
       return null;
   }
-
-
 
   /**
    * Fail quests that needed the killed NPC alive: framework quests with an
@@ -3425,7 +2995,6 @@ export class Game {
       this.eventBus.emit("time:hour", { hour: this.timeSystem.hour, elapsedHours: this.timeSystem.elapsedGameHours });
   }
 
-
   private _grantDynamicWorldEventReward(reward: DynamicEventReward): void {
       const xp = Math.max(0, Math.floor(reward.xp ?? 0));
       const gold = Math.max(0, Math.floor(reward.gold ?? 0));
@@ -3530,12 +3099,6 @@ export class Game {
       this.inventorySystem.addItem(item);
   }
 
-
-
-
-
-
-
   /** Move a successfully lifted item into the player inventory. */
   private _grantPickpocketItem(itemId: string): void {
       if (itemId === COIN_PURSE) {
@@ -3572,7 +3135,6 @@ export class Game {
           stats: { value: 10 },
       });
   }
-
 
   /** Grant quest reward items (same pipeline as dialogue give-item effects). */
   private _grantFrameworkItem(itemId: string, quantity: number): void {
@@ -3632,7 +3194,6 @@ export class Game {
       }
   }
 
-
   private _consumeInventoryGold(amount: number): boolean {
       if (amount <= 0) return true;
       const available = this._getInventoryGold();
@@ -3666,12 +3227,6 @@ export class Game {
       gearCondition:   this.smithing.getEquippedConditionSummary(),
     });
   }
-
-
-
-
-
-
 
   /**
    * The tundra dragon boss: an NPC the combat AI tracks, with the
@@ -4062,9 +3617,6 @@ export class Game {
       this._releaseNpc(npc);
   }
 
-
-
-
   private _isCombatInputBlocked(): boolean {
       return (
           this.isPaused ||
@@ -4125,25 +3677,4 @@ export class Game {
     return false;
   }
 
-  /** Opens a hidden file-input to let the user choose a map JSON to import. */
-  private _triggerMapImport(): void {
-      if (typeof document === "undefined") return;
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = ".json,application/json";
-      input.style.display = "none";
-      input.addEventListener("change", async () => {
-          const file = input.files?.[0];
-          document.body.removeChild(input);
-          if (!file) return;
-          const ok = await this.mapEditorSystem.importFromFile(file);
-          this.ui.showNotification(ok ? "Map imported successfully" : "Map import failed: invalid file", 2500);
-          if (ok) {
-              this._refreshEditorToolbar();
-              this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-          }
-      });
-      document.body.appendChild(input);
-      input.click();
-  }
 }

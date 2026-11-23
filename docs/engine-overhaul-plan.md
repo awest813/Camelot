@@ -418,6 +418,11 @@ state, scope and save codec.
   sneak and combat readouts, crosshair-under-menus, effect and quick-slot
   bars, and the debug overlay, written only on change. It reads a
   `HudSources` view, which the Phase 3 UI can read too.
+- Editor keys moved into `EditorSuite.handleKey`. The game sends it the
+  chords the input adapter does not take: F2, the map-editor keys, Ctrl+Z/Y,
+  Ctrl+M, and the Shift+F-key creator tools. One `toggleMapEditor` /
+  `exitMapEditor` replaces three copies (adapter F2, legacy F2, Escape).
+  The legacy keyboard path is now Tab, plain F5/F9 and the editor hand-off.
 - `RngStreams.reseed` and `restoreFromSave` reset streams in place. A stream
   a feature kept from install time used to go stale at the first new game or
   load: it was no longer seeded from the world and was not saved. This
