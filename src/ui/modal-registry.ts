@@ -32,6 +32,23 @@ export class ModalRegistry {
     return this._modals.filter((m) => m.isOpen()).map((m) => m.id);
   }
 
+  /** Whether the panel `id` is open. */
+  public isOpen(id: string): boolean {
+    return this._get(id).isOpen();
+  }
+
+  /** Close the panel `id` (if open) by its own close path. */
+  public close(id: string): void {
+    const m = this._get(id);
+    if (m.isOpen()) m.close();
+  }
+
+  private _get(id: string): Modal {
+    const m = this._modals.find((x) => x.id === id);
+    if (!m) throw new Error(`no modal '${id}'`);
+    return m;
+  }
+
   /** Escape: close the first open panel; false when none was open. */
   public closeTop(): boolean {
     const top = this._modals.find((m) => m.isOpen());

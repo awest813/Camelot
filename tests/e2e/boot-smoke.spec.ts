@@ -312,6 +312,20 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
   await page.keyboard.press("q");
   expect(await page.evaluate(() => (window as any).__combatCalls)).toEqual(expect.arrayContaining(["melee", "cast"]));
 
+  // Each panel key opens its panel and closes it again.
+  for (const [key, open] of [
+    ["i", "g.inventorySystem.isOpen"], ["j", "g.questSystem.isLogOpen"], ["k", "g.skillTreeSystem.isOpen"],
+    ["u", "g.ui.isAttributePanelOpen"], ["t", "g.ui.isWaitDialogOpen"],
+  ] as const) {
+    const isOpen = () => page.evaluate((src) => new Function("g", `return ${src}`)((window as any).__camelotGame), open) as Promise<boolean>;
+    await page.locator("#renderCanvas").focus();
+    await page.keyboard.press(key);
+    expect(await isOpen(), `${key} opens`).toBe(true);
+    await page.keyboard.press(key);
+    expect(await isOpen(), `${key} closes`).toBe(false);
+  }
+  await page.locator("#renderCanvas").click({ force: true });
+
   // A guard stops the player for a bounty; Escape resists arrest.
   const arrest = await page.evaluate(() => {
     const g = (window as any).__camelotGame;

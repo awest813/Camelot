@@ -1611,6 +1611,14 @@ export class Game {
     this._inputAdapter.handleKeyEvent(ev.key, "down", modifiers);
   }
 
+  /** A jump: 10 stamina for a 3 m hop (only with gravity on, i.e. not flying in the editor). */
+  private _hop(): void {
+      if (!this.player.camera.applyGravity || this.player.stamina < 10) return;
+      this.player.stamina = Math.max(0, this.player.stamina - 10);
+      this.player.notifyResourceSpent("stamina");
+      this.player.camera.position.y += 3;
+  }
+
   private _wireInputAdapter(): void {
     const adapter = this._inputAdapter;
 
@@ -1628,47 +1636,13 @@ export class Game {
 
     // UI panels — every toggle closes its own menu first, and only opens when
     // no other modal owns the screen (prevents stacked menus).
-    adapter.onAction("toggleInventory", () => {
-      if (this.inventorySystem.isOpen) {
-        this.inventorySystem.toggleInventory();
-        this._restoreGameplayInput();
-        return;
-      }
-      if (this._isCombatInputBlocked()) return;
-      this.inventorySystem.toggleInventory();
-      this._suspendGameplayInput();
-    });
-    adapter.onAction("toggleQuestLog", () => {
-      if (this.questSystem.isLogOpen) {
-        this.questSystem.toggleQuestLog();
-        this._restoreGameplayInput();
-        return;
-      }
-      if (this._isCombatInputBlocked()) return;
-      this.questSystem.toggleQuestLog();
-      this._suspendGameplayInput();
-    });
-    adapter.onAction("toggleSkillTree", () => {
-      if (this.skillTreeSystem.isOpen) {
-        this.skillTreeSystem.toggle();
-        this._restoreGameplayInput();
-        return;
-      }
-      if (this._isCombatInputBlocked()) return;
-      this.skillTreeSystem.toggle();
-      this._suspendGameplayInput();
-    });
-    adapter.onAction("toggleAttributePanel", () => {
-      if (this.ui.isAttributePanelOpen) {
-        this.ui.toggleAttributePanel(false);
-        this._restoreGameplayInput();
-        return;
-      }
-      if (this._isCombatInputBlocked()) return;
+    adapter.onAction("toggleInventory", () => this._togglePanel("inventory", () => this.inventorySystem.toggleInventory()));
+    adapter.onAction("toggleQuestLog", () => this._togglePanel("quest-log", () => this.questSystem.toggleQuestLog()));
+    adapter.onAction("toggleSkillTree", () => this._togglePanel("skill-tree", () => this.skillTreeSystem.toggle()));
+    adapter.onAction("toggleAttributePanel", () => this._togglePanel("attributes", () => {
       this.ui.toggleAttributePanel(true);
       this.ui.refreshAttributePanel(this.attributeSystem);
-      this._suspendGameplayInput();
-    });
+    }));
     adapter.onAction("toggleAlchemy", () => this.crafting.toggleAlchemy());
     adapter.onAction("toggleEnchanting", () => this.crafting.toggleEnchanting());
     adapter.onAction("toggleSmithing", () => this.crafting.toggleSmithing());
@@ -1694,16 +1668,7 @@ export class Game {
     });
     adapter.onAction("toggleShoutMenu", () => this.shouts.togglePanel());
     adapter.onAction("useShout", () => this.shouts.use());
-    adapter.onAction("toggleWaitDialog", () => {
-      if (this.ui.isWaitDialogOpen) {
-        this.ui.toggleWaitDialog(false);
-        this._restoreGameplayInput();
-        return;
-      }
-      if (this._isCombatInputBlocked()) return;
-      this.ui.toggleWaitDialog(true);
-      this._suspendGameplayInput();
-    });
+    adapter.onAction("toggleWaitDialog", () => this._togglePanel("wait", () => this.ui.toggleWaitDialog(true)));
     adapter.onAction("mountDismount", () => this.mounts.toggleMount());
     adapter.onAction("stableOrSaddlebag", () => this.mounts.toggleStableOrSaddlebag());
     adapter.onAction("showFameStatus", () => {
@@ -1732,18 +1697,13 @@ export class Game {
       });
     }
 
-    // Combat archetypes
-    const archetypeMap: Record<string, () => void> = {
-      archetype1: () => { if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMeleeArchetype("duelist"); },
-      archetype2: () => { if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMeleeArchetype("soldier"); },
-      archetype3: () => { if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMeleeArchetype("bruiser"); },
-      archetype4: () => { if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMagicArchetype("spark"); },
-      archetype5: () => { if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMagicArchetype("bolt"); },
-      archetype6: () => { if (!this.isPaused && !this.dialogueSystem.isInDialogue) this.combatSystem.setMagicArchetype("surge"); },
-    };
-    for (const [action, fn] of Object.entries(archetypeMap)) {
-      adapter.onAction(action as any, fn);
-    }
+    // Combat stances (Shift + 1–6): three melee, three magic.
+    const stances = [["melee", "duelist"], ["melee", "soldier"], ["melee", "bruiser"], ["magic", "spark"], ["magic", "bolt"], ["magic", "surge"]] as const;
+    stances.forEach(([kind, stance], i) => adapter.onAction(`archetype${i + 1}` as never, () => {
+      if (this.isPaused || this.dialogueSystem.isInDialogue) return;
+      if (kind === "melee") this.combatSystem.setMeleeArchetype(stance as never);
+      else this.combatSystem.setMagicArchetype(stance as never);
+    }));
 
     // System
     adapter.onAction("pause", () => {
@@ -1781,12 +1741,7 @@ export class Game {
       // Space also advances the onboarding tutorial when active
       if (this._tips.space()) return;
 
-      if (this._isCombatInputBlocked() || !this.player.camera.applyGravity) return;
-      if (this.player.stamina >= 10) {
-        this.player.stamina = Math.max(0, this.player.stamina - 10);
-        this.player.notifyResourceSpent("stamina");
-        this.player.camera.position.y += 3;
-      }
+      if (!this._isCombatInputBlocked()) this._hop();
     });
 
     adapter.onAction("sprint", () => {
@@ -1819,14 +1774,8 @@ export class Game {
       if (this._isCombatInputBlocked()) return;
 
       // Skyrim-style: if nothing is within interact range, jump instead
-      const interactHit = this._raycastInteract();
-      if (interactHit) {
-        this.interactionSystem.interact();
-      } else if (this.player.camera.applyGravity && this.player.stamina >= 10) {
-        this.player.stamina = Math.max(0, this.player.stamina - 10);
-        this.player.notifyResourceSpent("stamina");
-        this.player.camera.position.y += 3;
-      }
+      if (this._raycastInteract()) this.interactionSystem.interact();
+      else this._hop();
     });
 
 
@@ -2774,6 +2723,17 @@ export class Game {
   private _despawnNpc(npc: NPC): void {
       this._chunks.forget(npc);
       this._releaseNpc(npc);
+  }
+
+  /**
+   * A panel's key: close it if it is open, else open it over play (never on
+   * top of another menu) and take input.
+   */
+  private _togglePanel(id: string, open: () => void): void {
+      if (this._modals.isOpen(id)) { this._modals.close(id); return; }
+      if (this._isCombatInputBlocked()) return;
+      open();
+      this._suspendGameplayInput();
   }
 
   /** Every panel that takes over the screen, in Escape order. */

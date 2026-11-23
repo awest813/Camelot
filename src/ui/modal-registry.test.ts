@@ -27,4 +27,15 @@ describe("ModalRegistry", () => {
     expect(r.anyOpen()).toBe(false);
     expect(() => r.add(panel("a"))).toThrow(/already registered/);
   });
+
+  it("closes a panel by id, and only when it is open", () => {
+    const r = new ModalRegistry();
+    const a = panel("a", true), b = panel("b");
+    r.add(a, b);
+    expect(r.isOpen("a")).toBe(true);
+    r.close("a");
+    r.close("b");
+    expect([a.closed, b.closed]).toEqual([1, 0]);
+    expect(() => r.isOpen("nope")).toThrow(/no modal/);
+  });
 });
