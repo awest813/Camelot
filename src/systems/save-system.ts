@@ -33,20 +33,14 @@ import type { ClassSystem } from "./class-system";
 import type { RaceSystem } from "./race-system";
 import type { PlayerLevelSystem } from "./player-level-system";
 import type { DailyScheduleSystem } from "./daily-schedule-system";
-import type { HorseSystem } from "./horse-system";
 import type { SwimmingSystem } from "./swimming-system";
 import type { DiseaseSystem } from "./disease-system";
 import type { EventManagerSystem } from "./event-manager-system";
-import type { PetSystem } from "./pet-system";
 import type { MarkRecallSystem } from "./mark-recall-system";
 import type { TrainerSystem } from "./trainer-system";
 import type { PickpocketSystem } from "./pickpocket-system";
 import type { ItemConditionSystem } from "./item-condition-system";
 import type { CraftingSystem } from "./crafting-system";
-import type { VillageJobBoard } from "./village-jobs";
-import type { VillageRaidSystem } from "./village-raids";
-import type { DragonShoutSystem } from "./dragon-shout-system";
-import type { FollowerSystem } from "./follower-system";
 import type { PerkSystem } from "./perk-system";
 import type { SurvivalSystem } from "./survival-system";
 import type { DynamicWorldEventSystem } from "./dynamic-world-event-system";
@@ -158,6 +152,18 @@ interface ParsedSaveData {
   combatEffects?: unknown;
 }
 
+/**
+ * One piece of the save, owned by whoever registers it (usually a feature).
+ * `save` returns the value to store under `key`, or undefined for nothing.
+ * `load` gets what is stored under `key`, or undefined when the save has
+ * none (an older save): it should reset to a fresh state then.
+ */
+export interface SaveCodec {
+  readonly key: string;
+  save(): unknown;
+  load(data: unknown): void;
+}
+
 interface EquipmentEntry {
   slot: string;
   item: Item;
@@ -255,6 +261,8 @@ export class SaveSystem {
   private _skills: SkillTreeSystem | null = null;
   private _frameworkRuntime: FrameworkRuntime | null = null;
   private _frameworkSaveEngine = new FrameworkSaveEngine();
+  /** Feature-owned parts of the save, by key, in registration order. */
+  private readonly _codecs = new Map<string, SaveCodec>();
   private _ui: UIManager;
 
   // v5 optional systems
@@ -310,7 +318,6 @@ export class SaveSystem {
   private _dailyScheduleSystem: DailyScheduleSystem | null = null;
 
   // v19 optional systems
-  private _horseSystem: HorseSystem | null = null;
 
   // v20 optional systems
   private _swimmingSystem: SwimmingSystem | null = null;
@@ -320,7 +327,6 @@ export class SaveSystem {
   // ── v22 optional systems ──────────────────────────────────────────────────
   private _eventManagerSystem: EventManagerSystem | null = null;
   // ── v23 optional systems ──────────────────────────────────────────────────
-  private _petSystem: PetSystem | null = null;
   // ── v24 optional systems ──────────────────────────────────────────────────
   private _markRecallSystem: MarkRecallSystem | null = null;
   private _trainerSystem: TrainerSystem | null = null;
@@ -328,11 +334,7 @@ export class SaveSystem {
   private _pickpocketSystem: PickpocketSystem | null = null;
   private _itemConditionSystem: ItemConditionSystem | null = null;
   private _craftingSystem: CraftingSystem | null = null;
-  private _villageJobs: VillageJobBoard | null = null;
-  private _villageRaids: VillageRaidSystem | null = null;
   // ── v26 optional systems ──────────────────────────────────────────────────
-  private _dragonShoutSystem: DragonShoutSystem | null = null;
-  private _followerSystem: FollowerSystem | null = null;
   // ── v27 optional systems ──────────────────────────────────────────────────
   private _perkSystem: PerkSystem | null = null;
   // ── v28 optional systems ──────────────────────────────────────────────────
@@ -461,7 +463,6 @@ export class SaveSystem {
 
   // ── v19 system injection ──────────────────────────────────────────────────
 
-  public setHorseSystem(s: HorseSystem): void                  { this._horseSystem = s; }
 
   // ── v20 system injection ──────────────────────────────────────────────────
 
@@ -477,7 +478,6 @@ export class SaveSystem {
 
   // ── v23 system injection ──────────────────────────────────────────────────
 
-  public setPetSystem(s: PetSystem): void                     { this._petSystem = s; }
 
   // ── v24 system injection ──────────────────────────────────────────────────
 
@@ -489,13 +489,9 @@ export class SaveSystem {
   public setPickpocketSystem(s: PickpocketSystem): void       { this._pickpocketSystem = s; }
   public setItemConditionSystem(s: ItemConditionSystem): void { this._itemConditionSystem = s; }
   public setCraftingSystem(s: CraftingSystem): void           { this._craftingSystem = s; }
-  public setVillageJobs(s: VillageJobBoard): void             { this._villageJobs = s; }
-  public setVillageRaids(s: VillageRaidSystem): void           { this._villageRaids = s; }
 
   // ── v26 system injection ──────────────────────────────────────────────────
 
-  public setDragonShoutSystem(s: DragonShoutSystem): void { this._dragonShoutSystem = s; }
-  public setFollowerSystem(s: FollowerSystem): void       { this._followerSystem = s; }
 
   // ── v27 system injection ──────────────────────────────────────────────────
 
@@ -517,6 +513,17 @@ export class SaveSystem {
    * Serialize the full game state to localStorage.
    * @param silent suppress the "Game Saved!" notification (used by autosave)
    */
+  /**
+   * Own a part of the save.  It is written under `codec.key` on every save
+   * and read back after the built-in state on every load.  Returns the
+   * unregister function.
+   */
+  public registerCodec(codec: SaveCodec): () => void {
+    if (this._codecs.has(codec.key)) throw new Error(`[SaveSystem] save key "${codec.key}" is already owned`);
+    this._codecs.set(codec.key, codec);
+    return () => { if (this._codecs.get(codec.key) === codec) this._codecs.delete(codec.key); };
+  }
+
   public save(silent = false): void {
     this.onBeforeSave?.();
     const equipmentEntries: EquipmentEntry[] = [];
@@ -593,20 +600,14 @@ export class SaveSystem {
     if (this._raceSystem)             data.race             = this._raceSystem.getSaveState();
     if (this._playerLevelSystem)      data.playerLevel      = this._playerLevelSystem.getSaveState();
     if (this._dailyScheduleSystem)    data.dailySchedule    = this._dailyScheduleSystem.getSaveState();
-    if (this._horseSystem)            data.horse            = this._horseSystem.getSaveState();
     if (this._swimmingSystem)         data.swimming         = this._swimmingSystem.getSaveState();
     if (this._diseaseSystem)          data.disease          = this._diseaseSystem.getSaveState();
     if (this._eventManagerSystem)     data.eventManager     = this._eventManagerSystem.getSaveState();
-    if (this._petSystem)              data.pets             = this._petSystem.getSaveState();
     if (this._markRecallSystem)       data.markRecall       = this._markRecallSystem.getSaveState();
     if (this._trainerSystem)          data.trainer          = this._trainerSystem.getSaveState();
     if (this._pickpocketSystem)       data.pickpocket       = this._pickpocketSystem.getSaveState();
     if (this._itemConditionSystem)    data.itemCondition    = this._itemConditionSystem.getSaveState();
     if (this._craftingSystem)         data.crafting         = this._craftingSystem.getSystemState();
-    if (this._villageJobs)            data.villageJobs      = this._villageJobs.getSaveState();
-    if (this._villageRaids)           data.villageRaids     = this._villageRaids.getSaveState();
-    if (this._dragonShoutSystem)      data.dragonShouts     = this._dragonShoutSystem.getSaveState();
-    if (this._followerSystem)         data.follower         = this._followerSystem.getSaveState();
     if (this._perkSystem)             data.perks            = this._perkSystem.getSaveState();
     if (this._survivalSystem)         data.survival         = this._survivalSystem.getSaveState();
     if (this._dynamicWorldEventSystem) data.dynamicWorldEvents = this._dynamicWorldEventSystem.getSnapshot();
@@ -614,6 +615,11 @@ export class SaveSystem {
     if (this._ambientEventSystem) data.ambientEvents = this._ambientEventSystem.getSnapshot();
     if (this._stealthSystem) data.stealth = this._stealthSystem.getSaveState();
     if (this._combatSystem) data.combatEffects = this._combatSystem.getSaveState();
+    const record = data as unknown as Record<string, unknown>;
+    for (const codec of this._codecs.values()) {
+      const value = codec.save();
+      if (value !== undefined) record[codec.key] = value;
+    }
 
     this._storage().setItem(SAVE_KEY, JSON.stringify(data));
     if (!silent) this._ui.showNotification("Game Saved!", 2500);
@@ -821,10 +827,6 @@ export class SaveSystem {
     if (this._dailyScheduleSystem && data.dailySchedule)
       this._dailyScheduleSystem.restoreFromSave(data.dailySchedule as any);
 
-    // v19 systems
-    if (this._horseSystem && data.horse)
-      this._horseSystem.restoreFromSave(data.horse as any);
-
     // v20 systems
     if (this._swimmingSystem && data.swimming)
       this._swimmingSystem.restoreFromSave(data.swimming as any);
@@ -837,10 +839,6 @@ export class SaveSystem {
     if (this._eventManagerSystem && data.eventManager)
       this._eventManagerSystem.restoreFromSave(data.eventManager as any);
 
-    // v23 systems
-    if (this._petSystem && data.pets)
-      this._petSystem.restoreFromSave(data.pets as any);
-
     // v24 systems
     if (this._markRecallSystem && data.markRecall)
       this._markRecallSystem.restoreFromSave(data.markRecall as any);
@@ -852,19 +850,11 @@ export class SaveSystem {
       this._pickpocketSystem.restoreFromSave(data.pickpocket as any);
     if (this._itemConditionSystem && data.itemCondition)
       this._itemConditionSystem.restoreFromSave(data.itemCondition as any);
-    if (this._villageJobs) this._villageJobs.restoreFromSave(data.villageJobs as any);
-    if (this._villageRaids) this._villageRaids.restoreFromSave(data.villageRaids as any);
     if (this._craftingSystem && data.crafting) {
       const c = data.crafting as any;
       if (Array.isArray(c.recipeSnapshots) && Array.isArray(c.discoveredRecipeIds))
         this._craftingSystem.restoreSystemState(c);
     }
-
-    // v26 systems
-    if (this._dragonShoutSystem && data.dragonShouts)
-      this._dragonShoutSystem.restoreFromSave(data.dragonShouts as any);
-    if (this._followerSystem && data.follower)
-      this._followerSystem.restoreFromSave(data.follower as any);
 
     // v27 systems
     if (this._perkSystem && data.perks)
@@ -884,6 +874,15 @@ export class SaveSystem {
       this._stealthSystem.restoreFromSave(data.stealth as any);
     if (this._combatSystem && data.combatEffects)
       this._combatSystem.restoreFromSave(data.combatEffects as any);
+    // Feature-owned parts, read from the raw save (the validator above only
+    // knows the built-in fields).
+    for (const codec of this._codecs.values()) {
+      try {
+        codec.load((parsed as Record<string, unknown>)[codec.key]);
+      } catch (error) {
+        console.error(`[SaveSystem] "${codec.key}" save data was invalid:`, error);
+      }
+    }
 
     // Restore player name (v15+; keep default "Hero" for older saves)
     if (typeof data.player.name === "string" && data.player.name.trim()) {

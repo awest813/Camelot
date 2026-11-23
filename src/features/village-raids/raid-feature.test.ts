@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { Kernel } from "../../core/kernel";
-import { ActorsKey, ClockKey, FeedbackKey, PlayerKey, VillagesKey } from "../services";
+import { ActorsKey, ClockKey, FeedbackKey, PlayerKey, SavesKey, VillagesKey } from "../services";
+import type { SaveCodec } from "../../systems/save-system";
 import { VillageRaidFeature, RaidsKey, RAID_LEAVE_DISTANCE } from "./raid-feature";
 import { IndoorsKey } from "../indoors/indoors-feature";
 import { planVillage, hasVillage } from "../../world/village-settlement";
@@ -63,10 +64,12 @@ function setup(opts: { level?: number } = {}) {
     hold: (npc, holder) => { indoors.add(npc); (holds.get(npc) ?? holds.set(npc, new Set()).get(npc)!).add(holder); },
     releaseHolds: (holder) => { for (const h of holds.values()) h.delete(holder); },
   });
+  const codecs = new Map<string, SaveCodec>();
+  k.services.provide(SavesKey, { register: (c) => { codecs.set(c.key, c); return () => codecs.delete(c.key); } });
   const feature = new VillageRaidFeature();
   k.install(feature);
   return {
-    k, feature, plan, chunkKey, pos, townsfolk, indoors, holds, despawned, notes, grants,
+    k, feature, plan, codecs, chunkKey, pos, townsfolk, indoors, holds, despawned, notes, grants,
     raids: k.services.get(RaidsKey),
     talkTo: (npc: NPC | null) => { talkingTo = npc; },
   };
@@ -124,6 +127,17 @@ describe("VillageRaidFeature (headless, through the kernel)", () => {
     expect(u.despawned.length).toBeGreaterThan(0);
     expect(u.k.services.tryGet(RaidsKey)).toBeUndefined();
     expect(u.k.phases.has("village-raids.watch")).toBe(false);
+  });
+
+  it("owns its part of the save while installed", () => {
+    const t = setup();
+    const codec = t.codecs.get("villageRaids")!;
+    expect(codec).toBeDefined();
+    const saved = JSON.parse(JSON.stringify(codec.save() ?? null));
+    expect(() => codec.load(saved)).not.toThrow();
+    expect(() => codec.load(undefined), "an older save without raids").not.toThrow();
+    t.k.uninstall("village-raids");
+    expect(t.codecs.has("villageRaids")).toBe(false);
   });
 
   it("released NPCs are forgotten", () => {

@@ -107,6 +107,38 @@ describe('SaveSystem', () => {
         expect(data.crafting.recipeSnapshots).toEqual([{ id: 'r1', craftCount: 2 }]);
     });
 
+    it('feature codecs own their part of the save: written, read back, and absent saves reset', () => {
+        let pets = ['wolf'];
+        const loads: unknown[] = [];
+        const unregister = saveSystem.registerCodec({
+            key: 'pets', save: () => ({ owned: pets }), load: (d) => { loads.push(d); pets = (d as { owned: string[] } | undefined)?.owned ?? []; },
+        });
+        expect(() => saveSystem.registerCodec({ key: 'pets', save: () => 1, load: () => {} }), 'one owner per key').toThrow();
+        saveSystem.save();
+        expect(JSON.parse(localStorageMock['camelot_save']).pets).toEqual({ owned: ['wolf'] });
+        pets = [];
+        expect(saveSystem.load()).toBe(true);
+        expect(pets).toEqual(['wolf']);
+
+        // An older save without the key: the codec gets undefined and resets.
+        const raw = JSON.parse(localStorageMock['camelot_save']);
+        delete raw.pets;
+        localStorageMock['camelot_save'] = JSON.stringify(raw);
+        saveSystem.load();
+        expect(loads.at(-1)).toBeUndefined();
+        expect(pets).toEqual([]);
+
+        // A codec that throws doesn't stop the load.
+        const bad = saveSystem.registerCodec({ key: 'bad', save: () => undefined, load: () => { throw new Error('boom'); } });
+        const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+        expect(saveSystem.load()).toBe(true);
+        err.mockRestore();
+        bad();
+        unregister();
+        saveSystem.save();
+        expect(JSON.parse(localStorageMock['camelot_save']).pets, 'gone once unregistered').toBeUndefined();
+    });
+
     it('should show a save notification', () => {
         saveSystem.save();
         expect(mockUI.showNotification).toHaveBeenCalledWith('Game Saved!', 2500);

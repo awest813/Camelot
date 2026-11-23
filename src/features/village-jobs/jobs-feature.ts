@@ -15,11 +15,7 @@ import { createServiceKey } from "../../core/kernel";
 import { VillageJobBoard, type JobContext } from "../../systems/village-jobs";
 import { JobBoardUI } from "../../ui/job-board-ui";
 import type { Quest } from "../../systems/quest-system";
-import {
-  FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, VillagesKey,
-  type FeedbackService, type InventoryService, type ModalService, type PlayerService,
-  type QuestLogService, type VillagesService,
-} from "../services";
+import { FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, VillagesKey, type FeedbackService, type InventoryService, type ModalService, type PlayerService, type QuestLogService, type VillagesService, ownSave } from "../services";
 
 export interface JobBoardRef {
   boardId: string;
@@ -63,6 +59,7 @@ export class VillageJobsFeature implements Feature {
   }
 
   public install(ctx: FeatureContext): void {
+    ownSave(ctx, { key: "villageJobs", save: () => this.rules.getSaveState(), load: (data) => this.rules.restoreFromSave(data as never) });
     const s = ctx.kernel.services;
     const deps: JobDeps = {
       get player() { return s.get(PlayerKey); },

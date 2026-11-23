@@ -11,7 +11,7 @@ import { applyDamageWithResistance } from "../systems/combat-shared";
 import { getDesktopBridge } from "../platform/desktop-bridge";
 import { Loot } from "../entities/loot";
 import { VillageRaidFeature } from "../features/village-raids/raid-feature";
-import { ActorsKey, AnimationKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey, QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
+import { ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey, QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
 import { VillagesFeature } from "../features/villages/villages-feature";
 import { WorldSitesFeature } from "../features/world-sites/world-sites-feature";
 import { IndoorsFeature } from "../features/indoors/indoors-feature";
@@ -81,6 +81,8 @@ export interface GameInternals {
  */
 export function installGameFeatures(game: Game, gi: GameInternals): void {
       const k = game.kernel;
+      // First, so features can own their part of the save as they install.
+      k.services.provide(SavesKey, { register: (codec) => game.saveSystem.registerCodec(codec) });
       k.services.provide(ClockKey, {
         hour: () => game.timeSystem.hour,
         elapsedHours: () => game.timeSystem.elapsedGameHours,
@@ -476,7 +478,6 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
       });
       const pets = new PetsFeature(game.scene);
       k.install(pets);
-      game.saveSystem.setPetSystem(pets.pets);
       k.services.provide(ShoutHostKey, {
         gameTime: () => game.timeSystem.gameTime,
         stance: () => {
@@ -512,10 +513,8 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
       });
       const shouts = new ShoutsFeature();
       k.install(shouts);
-      game.saveSystem.setDragonShoutSystem(shouts.shouts);
       const followers = new FollowersFeature();
       k.install(followers);
-      game.saveSystem.setFollowerSystem(followers.followers);
       // A starter wolf companion for new games.
       pets.pets.grantPet("pet_wolf");
 
@@ -527,7 +526,6 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
       });
       const mounts = new MountsFeature();
       k.install(mounts);
-      game.saveSystem.setHorseSystem(mounts.horses);
 
       k.install(new IndoorsFeature());
       k.install(new VillagesFeature());
@@ -535,9 +533,7 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
 
       const raids = new VillageRaidFeature();
       k.install(raids);
-      game.saveSystem.setVillageRaids(raids.rules);
 
       const jobs = new VillageJobsFeature();
       k.install(jobs);
-      game.saveSystem.setVillageJobs(jobs.rules);
   }

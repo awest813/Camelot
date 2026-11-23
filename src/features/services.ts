@@ -16,7 +16,8 @@ import type { BiomeType } from "../world/world-manager";
 import type { BuildingKind } from "../world/village-buildings";
 import type { VillagePlan } from "../world/village-settlement";
 import type { FantasyAssetKey } from "../systems/fantasy-asset-loader";
-import { createServiceKey } from "../core/kernel";
+import { createServiceKey, type FeatureContext } from "../core/kernel";
+import type { SaveCodec } from "../systems/save-system";
 
 export interface GameClockService {
   /** Hour of day, 0–23 (fractional). */
@@ -211,3 +212,19 @@ export const LootKey = createServiceKey<LootService>("loot");
 export const ModalKey = createServiceKey<ModalService>("modal");
 export const ScheduleKey = createServiceKey<ScheduleQueryService>("schedules");
 export const BuildingsKey = createServiceKey<BuildingsService>("buildings");
+
+/** The save file: features own their part of it. */
+export interface SavesService {
+  /** Own a part of the save; returns the unregister function. */
+  register(codec: SaveCodec): () => void;
+}
+export const SavesKey = createServiceKey<SavesService>("saves");
+
+/**
+ * Own a part of the save for as long as the feature is installed.  Without
+ * a save service (headless tests) it does nothing.
+ */
+export function ownSave(ctx: FeatureContext, codec: SaveCodec): void {
+  const saves = ctx.kernel.services.tryGet(SavesKey);
+  if (saves) ctx.scope.add(saves.register(codec));
+}

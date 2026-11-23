@@ -17,7 +17,7 @@ import { HorseSystem } from "../../systems/horse-system";
 import { StableUI } from "../../ui/stable-ui";
 import { SaddlebagUI } from "../../ui/saddlebag-ui";
 import type { Item } from "../../systems/inventory-system";
-import { FeedbackKey, ModalKey, PurseKey } from "../services";
+import { FeedbackKey, ModalKey, PurseKey, ownSave } from "../services";
 
 /** What riding needs from the game. */
 export interface MountHostService {
@@ -62,6 +62,7 @@ export class MountsFeature implements Feature {
   }
 
   public install(ctx: FeatureContext): void {
+    ownSave(ctx, { key: "horse", save: () => this.horses.getSaveState(), load: (data) => { if (data) this.horses.restoreFromSave(data as never); } });
     const s = ctx.kernel.services;
     const host = () => s.get(MountHostKey);
     const feedback = () => s.get(FeedbackKey);

@@ -16,7 +16,7 @@ import { DragonShoutSystem, type ShoutTierEffect } from "../../systems/dragon-sh
 import { ShoutUI, type ShoutView } from "../../ui/shout-ui";
 import type { ActiveEffect } from "../../systems/active-effects-system";
 import type { DamageType, NPC } from "../../entities/npc";
-import { FeedbackKey, GameplayKey, ModalKey } from "../services";
+import { FeedbackKey, GameplayKey, ModalKey, ownSave } from "../services";
 
 /** What a shout does to the world, through the game. */
 export interface ShoutHostService {
@@ -68,6 +68,7 @@ export class ShoutsFeature implements Feature {
   private _s: ServiceRegistry | null = null;
 
   public install(ctx: FeatureContext): void {
+    ownSave(ctx, { key: "dragonShouts", save: () => this.shouts.getSaveState(), load: (data) => { if (data) this.shouts.restoreFromSave(data as never); } });
     const s = ctx.kernel.services;
     this._s = s;
     const feedback = () => s.get(FeedbackKey);

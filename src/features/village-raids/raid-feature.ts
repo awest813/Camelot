@@ -21,10 +21,7 @@ import { IndoorsKey, type IndoorsService } from "../indoors/indoors-feature";
 
 /** Hold name used to keep sheltering townsfolk inside. */
 const SHELTER_HOLD = "raid";
-import {
-  ActorsKey, ClockKey, FeedbackKey, PlayerKey, VillagesKey,
-  type ActorsService, type FeedbackService, type GameClockService, type PlayerService, type VillagesService,
-} from "../services";
+import { ActorsKey, ClockKey, FeedbackKey, PlayerKey, VillagesKey, type ActorsService, type FeedbackService, type GameClockService, type PlayerService, type VillagesService, ownSave } from "../services";
 
 /** Service accessors, resolved at call time (the game provides them). */
 interface RaidDeps {
@@ -59,6 +56,7 @@ export class VillageRaidFeature implements Feature {
   private _deps: RaidDeps | null = null;
 
   public install(ctx: FeatureContext): void {
+    ownSave(ctx, { key: "villageRaids", save: () => this.rules.getSaveState(), load: (data) => this.rules.restoreFromSave(data as never) });
     const s = ctx.kernel.services;
     const deps: RaidDeps = {
       get villages() { return s.get(VillagesKey); },

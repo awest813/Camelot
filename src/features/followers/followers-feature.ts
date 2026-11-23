@@ -11,7 +11,7 @@ import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { FollowerSystem } from "../../systems/follower-system";
 import { FollowerUI } from "../../ui/follower-ui";
-import { FeedbackKey, GameplayKey, ModalKey, PurseKey } from "../services";
+import { FeedbackKey, GameplayKey, ModalKey, PurseKey, ownSave } from "../services";
 
 export interface FollowersService {
   readonly followers: FollowerSystem;
@@ -28,6 +28,7 @@ export class FollowersFeature implements Feature {
   public readonly panel = new FollowerUI();
 
   public install(ctx: FeatureContext): void {
+    ownSave(ctx, { key: "follower", save: () => this.followers.getSaveState(), load: (data) => { if (data) this.followers.restoreFromSave(data as never); } });
     const s = ctx.kernel.services;
     const notify = (text: string, ms: number) => s.get(FeedbackKey).notify(text, ms);
     const f = this.followers;

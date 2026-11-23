@@ -24,7 +24,7 @@ import { createServiceKey } from "../../core/kernel";
 import { PetSystem, type Pet } from "../../systems/pet-system";
 import { PetUI } from "../../ui/pet-ui";
 import { AIState, type NPC } from "../../entities/npc";
-import { ActorsKey, AnimationKey, FeedbackKey, GameplayKey, ModalKey, PlayerKey } from "../services";
+import { ActorsKey, AnimationKey, FeedbackKey, GameplayKey, ModalKey, PlayerKey, ownSave } from "../services";
 
 /** Seconds between a companion's attacks. */
 const ATTACK_COOLDOWN = 2.0;
@@ -52,6 +52,7 @@ export class PetsFeature implements Feature {
   constructor(private readonly _scene: Scene) {}
 
   public install(ctx: FeatureContext): void {
+    ownSave(ctx, { key: "pets", save: () => this.pets.getSaveState(), load: (data) => { if (data) this.pets.restoreFromSave(data as never); } });
     const s = ctx.kernel.services;
     this._services = s;
     const events = ctx.kernel.events;
