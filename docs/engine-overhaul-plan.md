@@ -393,6 +393,10 @@ state, scope and save codec.
       doesn't expire under the pause menu.
 - `game.update()` runs the `ui` phase each frame. The pet, follower and
   shout HUD chips are `ui` systems of their features.
+- World environment (`src/rendering/world-environment.ts`): the lights and
+  sun shadows, sky dome, horizon, post-processing, water, grass, fire and
+  weather particles, window glow, and the per-frame blend from clock and
+  weather. Render counts are unchanged.
 - `RngStreams.reseed` and `restoreFromSave` reset streams in place. A stream
   a feature kept from install time used to go stale at the first new game or
   load: it was no longer seeded from the world and was not saved. This

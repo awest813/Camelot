@@ -1,29 +1,22 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
-import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
-import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import type { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
-import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
+import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
-import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
+import type { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
 
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
-import { AtmosphereController } from "./rendering/sky-dome";
+import type { AtmosphereController } from "./rendering/sky-dome";
 import { createTerrainMaterial } from "./rendering/terrain-material";
-import { HorizonMountains } from "./rendering/horizon";
 import { WeaponViewModel } from "./rendering/viewmodel";
-import { FireFx, WeatherFx } from "./rendering/particles-fx";
-import { WaterRenderer } from "./rendering/water";
 import { AdaptiveResolution } from "./rendering/adaptive-resolution";
-import { createFoliageMaterials, GrassField, WindState } from "./rendering/foliage";
 import { CharacterModelLibrary, modelForNpcName, type CharacterRig } from "./rendering/character-models";
-import { createPostFx, createSunShadows, type PostFxHandle } from "./rendering/render-pipeline";
 import { Player } from "./entities/player";
 import { UIManager } from "./ui/ui-manager";
 import { WorldManager } from "./world/world-manager";
@@ -101,6 +94,7 @@ import type { ForgeRegistry, SmithingController } from "./systems/smithing-contr
 import type { EnchantingSystem } from "./systems/enchanting-system";
 import type { EnchantingUI } from "./ui/enchanting-ui";
 import { LodSystem } from "./systems/lod-system";
+import { WorldEnvironment } from "./rendering/world-environment";
 import { ChunkContent } from "./world/chunk-content";
 import { WeatherSystem } from "./systems/weather-system";
 import { GraphicsSystem, persistGraphicsTier } from "./systems/graphics-system";
@@ -244,41 +238,28 @@ export class Game {
   public ui: UIManager;
   public world: WorldManager;
 
+  /** Light, sky, post-processing, water, grass, particles and their per-frame blend. */
+  private _env!: WorldEnvironment;
   /** Shadow generator driven by the directional sun light. */
-  public shadowGenerator: ShadowGenerator | null = null;
-  /** Directional sun — its position is offset from the player each frame to keep the shadow frustum centred. */
-  private _sunLight: DirectionalLight | null = null;
+  public get shadowGenerator(): ShadowGenerator | null { return this._env?.shadows ?? null; }
   /** Rendering configuration preset (lighting, sky, post-processing, fog). */
   public readonly graphics: GraphicsSystem = GraphicsSystem.fromSavedOrAutoDetect();
-  /** Procedural sky-dome mesh (skybox).  Null before _initPostProcessing() runs. */
-  public skyDome: Mesh | null = null;
-  /** Time-of-day sky, sun/moon light and fog driver.  Null before _initPostProcessing() runs. */
-  public atmosphere: AtmosphereController | null = null;
+  /** Procedural sky-dome mesh (skybox).  Null before the sky is set up. */
+  public get skyDome(): Mesh | null { return this._env?.sky ?? null; }
+  /** Time-of-day sky, sun/moon light and fog driver.  Null before the sky is set up. */
+  public get atmosphere(): AtmosphereController | null { return this._env?.atmosphere ?? null; }
   /** Dynamic render scale defending the tier's target FPS. */
   private _adaptiveRes: AdaptiveResolution | null = null;
-  /** Pond water surfaces. */
-  private _water: WaterRenderer | null = null;
-  /** Torch / campfire particles + flicker + nearest-light management. */
-  private _fireFx: FireFx | null = null;
-  /** Rain, snow, lightning, dust motes, fireflies. */
-  private _weatherFx: WeatherFx | null = null;
-  private _precipitation = 0;
   /** First-person weapon (CC0 KayKit weapons). */
   private _viewModel: WeaponViewModel | null = null;
-  /** Distant mountain rings on the horizon. */
-  private _horizon: HorizonMountains | null = null;
-  /** Instanced, wind-blown grass around the player (null when the tier disables it). */
-  private _grass: GrassField | null = null;
   /** Rigged NPC models (CC0 KayKit characters). */
   private _characterModels: CharacterModelLibrary | null = null;
   private readonly _npcRigs: Map<NPC, CharacterRig> = new Map();
   /** Village plans by chunk key (null = no village there); deterministic, cached. */
   /** Dragon bosses' bodies (generated dark-fantasy dragon parented to the capsule). */
   private readonly _dragonVisuals = new Map<NPC, { root: AbstractMesh; yaw: number; last: Vector3; t: number }>();
-  /** SSAO / god rays / lens flare / HDR pipeline handle. */
-  private _postFx: PostFxHandle | null = null;
   /** DefaultRenderingPipeline (bloom, FXAA, sharpen, tone-mapping, vignette). */
-  public renderingPipeline: DefaultRenderingPipeline | null = null;
+  public get renderingPipeline(): DefaultRenderingPipeline | null { return this._env?.pipeline ?? null; }
   public scheduleSystem: ScheduleSystem;
   public combatSystem: CombatSystem;
   public dialogueSystem: DialogueSystem;
@@ -505,9 +486,6 @@ export class Game {
   /** Set by the smith's "use your forge" dialogue choice; opened once dialogue closes. */
   /** Shared parchment material for village notice boards. */
   private _hudInDialogue = false;
-  private _windowGlass: Array<{ emissiveColor?: Color3 }> = [];
-  private _windowGlassScan = -1;
-  private _windowGlow = -1;
 
 
 
@@ -655,10 +633,17 @@ export class Game {
     // All picking is explicit (raycasts, editor clicks); skip Babylon's
     // automatic pick on every pointer move.
     this.scene.skipPointerMovePicking = true;
-    this._setLight();
+    this._env = new WorldEnvironment({
+      scene: this.scene,
+      graphics: this.graphics,
+      dayFraction: () => this.timeSystem?.normalizedTime ?? null,
+      weather: () => this.weatherSystem ?? null,
+      playerPosition: () => this.player?.camera.position ?? null,
+    });
+    this._env.initLights();
     this.player = new Player(this.scene, this.canvas);
     // Post-processing and skybox require the camera, so initialise after Player.
-    this._initPostProcessing();
+    this._env.initSky(this.player.camera);
     this._initCharacterModels();
     this._viewModel = new WeaponViewModel(
       this.scene, this.player.camera, `${import.meta.env.BASE_URL ?? "/"}model/kaykit/weapons/`,
@@ -669,7 +654,7 @@ export class Game {
     // Village settlements keep their footprint clear of trees, rocks and ruins.
     // (Called once chunks stream in, after the villages feature is installed.)
     this.world.clearingAt = (cx, cz) => this.villages.clearingAt(cx, cz);
-    this._initFoliage();
+    this._env.initFoliage(this.world);
     this.navigationSystem = new NavigationSystem(this.scene);
     this.scheduleSystem = new ScheduleSystem();
     this.scheduleSystem.walkable = (x, z) => this._chunks.isWalkable(x, z);
@@ -1430,7 +1415,7 @@ export class Game {
         assets: this.fantasyAssets,
         lod: this.lodSystem,
         shadows: () => this.shadowGenerator,
-        fireFx: () => this._fireFx,
+        fireFx: () => this._env.fireFx,
         forges: () => this.forges,
         releaseNpc: (npc) => this._releaseNpc(npc),
       });
@@ -3101,71 +3086,7 @@ export class Game {
     document.body.appendChild(btn);
   }
 
-  private _setLight(): void {
-    // The sky dome covers the entire background, so the clear colour is used
-    // only for pixels not covered by any geometry.  Keep a deep sky-blue fallback
-    // for the very first frame before the skybox is initialised.
-    this.scene.clearColor = new Color4(0.28, 0.46, 0.74, 1.0);
 
-    // Ambient hemisphere light — rich warm sunlit sky above, deep earthy tones below
-    const hLight = new HemisphericLight("hLight", new Vector3(0, 1, 0), this.scene);
-    hLight.intensity   = this.graphics.lighting.ambientBase;
-    hLight.diffuse     = new Color3(0.92, 0.88, 0.72);
-    hLight.groundColor = new Color3(0.18, 0.14, 0.08);
-    hLight.specular    = new Color3(0.08, 0.07, 0.05);
-
-    // Directional sun light — warm golden angle with deep shadow contrast
-    const sun = new DirectionalLight("sun", new Vector3(-1.0, -2.5, -0.6).normalize(), this.scene);
-    sun.intensity = this.graphics.lighting.sunBase;
-    sun.diffuse   = new Color3(1.0, 0.92, 0.72);
-    sun.specular  = new Color3(0.55, 0.48, 0.30);
-    // Position the light far away so the shadow frustum covers the visible world.
-    // update() keeps it offset from the player so the frustum stays centred.
-    sun.position  = new Vector3(80, 120, 50);
-    this._sunLight = sun;
-
-    // Shadows are driven by the active graphics quality tier: cascaded PCF
-    // shadows on medium+, a single soft map on low.
-    this.shadowGenerator = createSunShadows(this.scene, sun, this.graphics);
-
-    // Atmospheric distance fog — initial values match WeatherSystem's "clear"
-    // state so the first frame is consistent before WeatherSystem takes over.
-    this.scene.fogMode    = Scene.FOGMODE_EXP2;
-    this.scene.fogDensity = this.graphics.fog.density;
-    this.scene.fogColor   = new Color3(
-      this.graphics.fog.color.r,
-      this.graphics.fog.color.g,
-      this.graphics.fog.color.b,
-    );
-  }
-
-  /** Leaf-card trees, wind sway and the grass field. */
-  private _initFoliage(): void {
-    this._water = new WaterRenderer(this.scene);
-    this.world.water = this._water;
-    const foliage = createFoliageMaterials(this.scene, this.world.textureManager, this.graphics.effects.wind);
-    this.world.foliage = foliage;
-    const density = this.graphics.effects.grassDensity;
-    if (density > 0) {
-      this._grass = new GrassField(
-        this.scene, foliage.grass, density, this.world.chunkSize,
-        (cx, cz) => this.world.getBiome(cx, cz),
-        (x, z) => this.world.isInPond(x, z, 0.5),
-      );
-    }
-    const particleScale = Math.min(1.5, this.graphics.performance.maxParticles / 512);
-    this._fireFx = new FireFx(this.scene, particleScale);
-    this.world.structures.onFire = (info) => this._fireFx?.attach(info);
-    this.world.structures.mergeStatic = true;
-    this._weatherFx = new WeatherFx(this.scene, this.graphics.effects.ambientParticles ? particleScale : particleScale * 0.5);
-
-    this.world.onVisibilityChanged = (visible) => {
-      this._grass?.setVisible(visible);
-      this._horizon?.setVisible(visible);
-      this.atmosphere?.mesh.setEnabled(visible);
-      if (this._postFx) this._postFx.outdoors = visible;
-    };
-  }
 
   /**
    * Give every NPC a rigged, animated body.  The physics capsule keeps doing
@@ -3259,120 +3180,7 @@ export class Game {
     }
   }
 
-  /**
-   * Drive sun/moon direction, light colours, sky and fog from the clock and
-   * weather, and keep the shadow frustum centred on the player.
-   */
-  private _updateAtmosphere(dt: number): void {
-    const atmo = this.atmosphere;
-    if (!atmo) return;
-    const weather = this.weatherSystem?.visuals;
-    if (weather) {
-      // Light loss from the weather doubles as a smooth cloudiness signal.
-      atmo.cloudiness = 0.15 + 0.85 * Math.min(1, Math.max(0, (1 - weather.sunScale) / 0.8));
-      atmo.weatherFog = atmo.weatherFog ?? new Color3();
-      atmo.weatherFog.set(weather.fogColor.r, weather.fogColor.g, weather.fogColor.b);
-      atmo.weatherFogWeight = Math.min(0.85, Math.max(0, (weather.fogDensity - 0.006) / 0.02));
-    }
-    const hour = (this.timeSystem?.normalizedTime ?? 8 / 24) * 24;
-    const state = atmo.update(hour, dt, {
-      sun: this._sunLight,
-      ambient: this.scene.getLightByName("hLight") as HemisphericLight | null,
-      sunBase: this.graphics.lighting.sunBase,
-      ambientBase: this.graphics.lighting.ambientBase,
-      sunWeatherScale: weather?.sunScale,
-      ambientWeatherScale: weather?.ambientScale,
-    });
-    // Weather particles + lightning.
-    let flash = 0;
-    if (this._weatherFx && this.player) {
-      const ws = this.weatherSystem?.state ?? "clear";
-      const target = ws === "storm" ? 1 : ws === "rain" ? 0.55 : 0;
-      this._precipitation += (target - this._precipitation) * Math.min(1, dt * 0.25);
-      const p = this.player.camera.position;
-      const biome = this.world?.getBiome(Math.floor(p.x / this.world.chunkSize), Math.floor(p.z / this.world.chunkSize));
-      this._weatherFx.update(dt, p, {
-        precipitation: this._precipitation,
-        snow: biome === "tundra",
-        storm: ws === "storm",
-        daylight: Math.max(0, Math.min(1, (state.ambientIntensity - 0.42) / 0.58)),
-        outdoors: this.world?.visible ?? true,
-        windX: WindState.dirX * WindState.strength * 3,
-        windZ: WindState.dirZ * WindState.strength * 3,
-      });
-      flash = this._weatherFx.flashLight;
-      if (flash > 0) {
-        const amb = this.scene.getLightByName("hLight") as HemisphericLight | null;
-        if (amb) {
-          amb.intensity += flash * 1.4;
-          amb.diffuse.set(0.75, 0.82, 1.0);
-        }
-      }
-    }
-    const daylight = Math.max(0, Math.min(1, (state.ambientIntensity - 0.42) / 0.58));
-    if (this._fireFx && this.player) {
-      this._fireFx.night = daylight < 0.3;
-      this._fireFx.update(dt, this.player.camera.position);
-    }
-    this._updateWindowGlow(daylight);
-    this._water?.update(dt, state, { x: WindState.dirX * WindState.strength, z: WindState.dirZ * WindState.strength });
 
-    if (this.renderingPipeline) {
-      this.renderingPipeline.imageProcessing.exposure = this.graphics.postProcess.exposure * state.exposure * (1 + flash * 0.8);
-      // Night raises exposure, which also amplifies sharpening halos and
-      // grain into crawling speckle on dark surfaces: ease both off after dark.
-      const rp = this.renderingPipeline;
-      if (rp.sharpenEnabled) rp.sharpen.edgeAmount = this.graphics.postProcess.sharpenEdgeAmount * (0.4 + 0.6 * daylight);
-      if (rp.grainEnabled) rp.grain.intensity = 4 * (0.5 + 0.5 * daylight);
-    }
-
-    // Interiors: no daylight pouring in, and fog is dark rather than sky-blue.
-    if (this.world && !this.world.visible) {
-      if (this._sunLight) this._sunLight.intensity *= 0.12;
-      const amb = this.scene.getLightByName("hLight") as HemisphericLight | null;
-      if (amb) amb.intensity *= 0.7;
-      this.scene.fogColor.set(0.02, 0.02, 0.025);
-    }
-    this._postFx?.update(state, atmo.cloudiness);
-    if (this._horizon && this.player) this._horizon.update(this.player.camera.position, state, this.scene.fogColor, atmo.cloudiness);
-    // Wind picks up with the weather.
-    WindState.time += dt;
-    WindState.strength += ((0.22 + atmo.cloudiness * 0.75) - WindState.strength) * Math.min(1, dt * 0.5);
-    if (this._grass && this.world?.visible && this.player) {
-      this._grass.update(this.player.camera.position.x, this.player.camera.position.z);
-      this._grass.pump(2);
-    }
-    // Keep the shadow frustum centred on the player, placed up-light.
-    const sun = this._sunLight;
-    if (sun && this.player) {
-      const p = this.player.camera.position;
-      sun.position.set(
-        p.x - state.lightDir[0] * 150,
-        p.y - state.lightDir[1] * 150,
-        p.z - state.lightDir[2] * 150,
-      );
-    }
-  }
-
-  /**
-   * Initialise post-processing effects and the procedural sky dome.
-   * Must be called after `Player` is created so its camera is available.
-   */
-  private _initPostProcessing(): void {
-    // ── Procedural sky dome + time-of-day atmosphere ─────────────────────────
-    // A custom sky shader (gradient, sun/moon, clouds, stars) whose horizon
-    // colour is also the scene fog colour, so distant terrain melts into it.
-    this.atmosphere = new AtmosphereController(this.scene);
-    this.skyDome = this.atmosphere.mesh;
-    this._horizon = new HorizonMountains(this.scene);
-    this._updateAtmosphere(0);
-
-    // ── Post-processing stack ────────────────────────────────────────────────
-    // HDR pipeline (bloom, AA, grade, grain…), SSAO, god rays and lens flare,
-    // each gated by the quality tier.  Skipped on WebGPU (driver issues).
-    this._postFx = createPostFx(this.scene, this.player.camera, this.graphics, this.skyDome);
-    this.renderingPipeline = this._postFx.pipeline;
-  }
 
   /** Remove world loot objects whose item IDs are now in inventory or equipment (called after load). */
   private _cleanupCollectedLoot(): void {
@@ -3744,7 +3552,7 @@ export class Game {
 
       // After the gameplay step: WeatherSystem writes raw light/fog values on
       // its ticks, and the atmosphere composes the final ones on top.
-      this._updateAtmosphere(frameDelta);
+      this._env.update(frameDelta);
 
       // Conversation framing (turn to the speaker, zoom in / back out), and
       // ending it if the speaker is gone or the player was moved away.
@@ -3953,7 +3761,7 @@ export class Game {
           light.intensity = 1.1;
           light.range = 10;
           flame.onDisposeObservable.addOnce(() => light.dispose());
-          this._fireFx?.attach({ flame, light, kind: "torch" });
+          this._env.fireFx?.attach({ flame, light, kind: "torch" });
       }
       anchor.onDisposeObservable.addOnce(() => torchMat.dispose());
   }
@@ -4378,24 +4186,6 @@ export class Game {
 
 
 
-  /**
-   * Windows glow warm after dark: the Medieval Village window-glass material
-   * (shared by every building) gets an emissive tint scaled by darkness.
-   */
-  private _updateWindowGlow(daylight: number): void {
-      const glow = Math.max(0, Math.min(1, 1 - daylight * 2.2));
-      if (Math.abs(glow - this._windowGlow) < 0.02 && this.scene.materials.length === this._windowGlassScan) return;
-      if (this.scene.materials.length !== this._windowGlassScan) {
-        this._windowGlassScan = this.scene.materials.length;
-        this._windowGlass = this.scene.materials.filter((m) => /WindowGlass/i.test(m.name)) as Array<{ emissiveColor?: Color3 }>;
-      }
-      this._windowGlow = glow;
-      for (const m of this._windowGlass) {
-        if (!m.emissiveColor) continue;
-        // A uniform, so no markDirty() / shader rebuild is needed.
-        m.emissiveColor.set(1.0 * glow, 0.58 * glow, 0.22 * glow);
-      }
-  }
 
   /**
    * The tundra dragon boss: an NPC the combat AI tracks, with the
