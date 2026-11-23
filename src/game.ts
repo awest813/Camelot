@@ -103,6 +103,7 @@ import type { FastTravelSystem } from "./systems/fast-travel-system";
 import { FastTravelFeature, TravelKey, TravelHostKey } from "./features/fast-travel/fast-travel-feature";
 import { DeathFeature, DeathHostKey } from "./features/death/death-feature";
 import { SpoilsFeature, SpoilsHostKey } from "./features/spoils/spoils-feature";
+import { CharacterFeature, CharacterHostKey, CharacterKey } from "./features/character/character-feature";
 import { DialogueServicesFeature, DialogueHostKey } from "./features/dialogue-services/dialogue-services-feature";
 import { SurvivalFeature, SurvivalHostKey } from "./features/survival/survival-feature";
 import { LevelScalingSystem } from "./systems/level-scaling-system";
@@ -113,9 +114,9 @@ import type { SpellMakingSystem } from "./systems/spell-making-system";
 import { SpellMakingFeature, SpellMakingKey } from "./features/spell-making/spell-making-feature";
 import { RespawnSystem } from "./systems/respawn-system";
 import { MerchantRestockSystem } from "./systems/merchant-restock-system";
-import { BirthsignSystem } from "./systems/birthsign-system";
-import { ClassSystem } from "./systems/class-system";
-import { RaceSystem } from "./systems/race-system";
+import type { BirthsignSystem } from "./systems/birthsign-system";
+import type { ClassSystem } from "./systems/class-system";
+import type { RaceSystem } from "./systems/race-system";
 import { PlayerLevelSystem } from "./systems/player-level-system";
 import { CharacterCreationUI } from "./ui/character-creation-ui";
 import { CharacterSheetUI } from "./ui/character-sheet-ui";
@@ -398,9 +399,11 @@ export class Game {
   public merchantRestockSystem: MerchantRestockSystem;
 
   // v11 systems (Oblivion depth: character creation — birthsign and class)
-  public birthsignSystem: BirthsignSystem;
-  public classSystem: ClassSystem;
-  public raceSystem: RaceSystem;
+  /** Race, birthsign, class and the creation wizard. */
+  private readonly _character = new CharacterFeature();
+  public get birthsignSystem(): BirthsignSystem { return this._character.birthsigns; }
+  public get classSystem(): ClassSystem { return this._character.classes; }
+  public get raceSystem(): RaceSystem { return this._character.races; }
 
   // v12 systems (Oblivion depth: character progression — skill-based level-up)
   public playerLevelSystem: PlayerLevelSystem;
@@ -1068,63 +1071,9 @@ export class Game {
     };
     this.saveSystem.setMerchantRestockSystem(this.merchantRestockSystem);
 
-    // ── v11 systems (Oblivion depth: character creation) ────────────────────
-    this.raceSystem = new RaceSystem();
-    this.raceSystem.onRaceChosen = (race) => {
-      this.ui.showNotification(
-        `Race chosen: ${race.name} (${race.heritage})${race.power ? ` — Power: ${race.power.name}` : ""}`,
-        3000,
-      );
-      // Sync derived stats after race attribute bonuses have been applied
-      this.player.maxHealth      = this.attributeSystem.maxHealth;
-      this.player.maxMagicka     = this.attributeSystem.maxMagicka;
-      this.player.maxStamina     = this.attributeSystem.maxStamina;
-      this.player.maxCarryWeight = this.attributeSystem.carryWeight;
-      // Sync water breathing ability (Argonian racial trait)
-      this.swimSystem.hasWaterBreathing = race.waterBreathing ?? false;
-      // Sync disease immunity (Argonian racial trait — 100 % resistance)
-      this.diseaseSystem.diseaseResistanceChance = race.id === "argonian" ? 1.0 : 0;
-      this.saveSystem.markDirty();
-    };
+    // Race, birthsign and class: the character feature.
     this.saveSystem.setRaceSystem(this.raceSystem);
-    this.raceSystem.onPowerActivated = (power) => {
-      this.ui.showNotification(`${power.name}: ${power.description}`, 3000);
-      this.saveSystem.markDirty();
-    };
-
-    this.birthsignSystem = new BirthsignSystem();
-    this.birthsignSystem.onBirthsignChosen = (birthsign) => {
-      this.ui.showNotification(
-        `Birthsign chosen: ${birthsign.name}${birthsign.power ? ` — Power: ${birthsign.power.name}` : ""}`,
-        3000,
-      );
-      // Apply any max-stat bonuses from the birthsign
-      const bonuses = this.birthsignSystem.getStatBonuses();
-      this.player.maxHealth  += bonuses.maxHealth;
-      this.player.maxMagicka += bonuses.maxMagicka;
-      this.player.maxStamina += bonuses.maxStamina;
-      this.player.maxCarryWeight += bonuses.carryWeight;
-      this.saveSystem.markDirty();
-    };
-    this.birthsignSystem.onPowerActivated = (power) => {
-      this.ui.showNotification(`${power.name}: ${power.description}`, 3000);
-      this.saveSystem.markDirty();
-    };
     this.saveSystem.setBirthsignSystem(this.birthsignSystem);
-
-    this.classSystem = new ClassSystem();
-    this.classSystem.onClassChosen = (cls) => {
-      this.ui.showNotification(
-        `Class chosen: ${cls.name} (${cls.specialization}) — Major skills: ${cls.majorSkills.join(", ")}`,
-        4000,
-      );
-      // Sync derived stats now that attributes may have changed
-      this.player.maxHealth      = this.attributeSystem.maxHealth;
-      this.player.maxMagicka     = this.attributeSystem.maxMagicka;
-      this.player.maxStamina     = this.attributeSystem.maxStamina;
-      this.player.maxCarryWeight = this.attributeSystem.carryWeight;
-      this.saveSystem.markDirty();
-    };
     this.saveSystem.setClassSystem(this.classSystem);
 
     // ── v12 system wiring (Oblivion depth: skill-based character progression) ──
@@ -1423,14 +1372,7 @@ export class Game {
     this.guardEncounterUI.setAnimator(uiAnimator);
     this.saddlebagUI.setAnimator(uiAnimator);
 
-    this._runCharacterCreation().catch((error: unknown) => {
-      console.error("Character creation failed; applying defaults", error);
-      this._applyDefaultCharacterCreation();
-      this.interactionSystem.isBlocked = false;
-      this.isPaused = false;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
-    });
+    void this.kernel.services.get(CharacterKey).create();
     this.questSystem.onQuestComplete = (xp: number, questId?: string) => {
       this.eventBus.emit("quest:completed", { questId: questId ?? "legacy", xpReward: xp });
       this.player.addExperience(xp);
@@ -2157,101 +2099,7 @@ export class Game {
       }
   }
 
-  private async _runCharacterCreation(): Promise<void> {
-    this._inCharacterCreation = true;
-    this.isPaused = true;
-    this.interactionSystem.isBlocked = true;
-    this.ui.toggleCrosshair(false);
-    document.exitPointerLock();
-    this.player.camera.detachControl();
 
-    const creator = new CharacterCreationUI();
-    creator.setAnimator(this.uiAnimator);
-    const selection = await creator.open();
-
-    // Apply player name
-    this.player.name = selection.name;
-
-    const raceApplied = this.raceSystem.chooseRace(
-      selection.raceId,
-      this.attributeSystem,
-      this.skillProgressionSystem,
-    );
-    const birthsignApplied = this.birthsignSystem.chooseBirthsign(
-      selection.birthsignId,
-      this.attributeSystem,
-      this.skillProgressionSystem,
-    );
-    const classApplied = this.classSystem.chooseClass(
-      selection.classId,
-      this.attributeSystem,
-      this.skillProgressionSystem,
-    );
-
-    if (!raceApplied || !birthsignApplied || !classApplied) {
-      this._applyDefaultCharacterCreation();
-    }
-
-    // Refresh current health/magicka/stamina to match max values after race/birthsign/class bonuses
-    this.player.health   = this.attributeSystem.maxHealth;
-    this.player.magicka  = this.attributeSystem.maxMagicka;
-    this.player.stamina  = this.attributeSystem.maxStamina;
-    // Add birthsign flat bonuses on top (Mage/Apprentice/Atronach magicka, Steed carry, etc.)
-    const signBonuses = this.birthsignSystem.getStatBonuses();
-    this.player.health   += signBonuses.maxHealth;
-    this.player.magicka  += signBonuses.maxMagicka;
-    this.player.stamina  += signBonuses.maxStamina;
-
-    if (selection.worldSeed) {
-      this.world.setSeed(selection.worldSeed);
-      // Feature randomness (raids, …) derives from the world seed too.
-      this.kernel.rng.reseed(selection.worldSeed.seedString);
-    }
-
-    persistSkipOnboardingTips(selection.skipGameplayTips);
-    this._tips.start();
-    this._inCharacterCreation = false;
-    this._achievements?.unlock("ACH_TAKE_UP_THE_SWORD");
-
-    this.ui.showNotification(`Welcome, ${this.player.name}! Character creation complete.`, 2800);
-    this.interactionSystem.isBlocked = false;
-    this.isPaused = false;
-    this.ui.toggleCrosshair(true);
-    this.canvas.requestPointerLock();
-    this.player.camera.attachControl(this.canvas, true);
-
-    // ── Workspace draft restore ───────────────────────────────────────────────
-    if (this.workspaceDraftSystem.hasDraft()) {
-      const result = this.workspaceDraftSystem.restore();
-      if (result.restoredCount > 0) {
-        const ts = result.savedAt ? new Date(result.savedAt).toLocaleTimeString() : "unknown";
-        this.ui.showNotification(
-          `Workspace draft restored (${result.restoredSystems.join(", ")}) — saved at ${ts}`,
-          4000,
-        );
-      }
-    }
-  }
-
-  private _applyDefaultCharacterCreation(): void {
-    this.raceSystem.chooseRace(
-      "nord",
-      this.attributeSystem,
-      this.skillProgressionSystem,
-    );
-    this.birthsignSystem.chooseBirthsign(
-      "warrior",
-      this.attributeSystem,
-      this.skillProgressionSystem,
-    );
-    this.classSystem.chooseClass(
-      "warrior",
-      this.attributeSystem,
-      this.skillProgressionSystem,
-    );
-    this._tips.start();
-    this._achievements?.unlock("ACH_TAKE_UP_THE_SWORD");
-  }
 
   /**
    * Attach a persistent gear button (⚙) to the DOM that opens the graphics
@@ -2864,6 +2712,72 @@ export class Game {
         drop: (at, item) => { new Loot(this.scene, at, item); },
       });
       k.install(new SpoilsFeature());
+      const syncMax = () => {
+        this.player.maxHealth = this.attributeSystem.maxHealth;
+        this.player.maxMagicka = this.attributeSystem.maxMagicka;
+        this.player.maxStamina = this.attributeSystem.maxStamina;
+        this.player.maxCarryWeight = this.attributeSystem.carryWeight;
+      };
+      k.services.provide(CharacterHostKey, {
+        get attributes() { return game.attributeSystem; },
+        get skills() { return game.skillProgressionSystem; },
+        syncMaxStats: syncMax,
+        addMaxStats: (b) => {
+          this.player.maxHealth += b.maxHealth;
+          this.player.maxMagicka += b.maxMagicka;
+          this.player.maxStamina += b.maxStamina;
+          this.player.maxCarryWeight += b.carryWeight;
+        },
+        setRacialTraits: (t) => {
+          this.swimSystem.hasWaterBreathing = t.waterBreathing;
+          this.diseaseSystem.diseaseResistanceChance = t.diseaseImmune ? 1.0 : 0;
+        },
+        beginCreation: () => {
+          this._inCharacterCreation = true;
+          this.isPaused = true;
+          this.interactionSystem.isBlocked = true;
+          this.ui.toggleCrosshair(false);
+          document.exitPointerLock();
+          this.player.camera.detachControl();
+        },
+        endCreation: () => {
+          this._inCharacterCreation = false;
+          this.interactionSystem.isBlocked = false;
+          this.isPaused = false;
+          this.ui.toggleCrosshair(true);
+          this.canvas.requestPointerLock();
+          this.player.camera.attachControl(this.canvas, true);
+        },
+        ask: () => {
+          const creator = new CharacterCreationUI();
+          creator.setAnimator(this.uiAnimator);
+          return creator.open();
+        },
+        becomeHero: (name, bonus) => {
+          this.player.name = name;
+          this.player.health = this.attributeSystem.maxHealth + bonus.maxHealth;
+          this.player.magicka = this.attributeSystem.maxMagicka + bonus.maxMagicka;
+          this.player.stamina = this.attributeSystem.maxStamina + bonus.maxStamina;
+        },
+        seedWorld: (seed) => {
+          this.world.setSeed(seed);
+          // Feature randomness (raids, …) derives from the world seed too.
+          this.kernel.rng.reseed(seed.seedString);
+        },
+        welcome: (skipTips) => {
+          if (skipTips !== null) persistSkipOnboardingTips(skipTips);
+          this._tips.start();
+          this._achievements?.unlock("ACH_TAKE_UP_THE_SWORD");
+          if (this.workspaceDraftSystem.hasDraft()) {
+            const result = this.workspaceDraftSystem.restore();
+            if (result.restoredCount > 0) {
+              const ts = result.savedAt ? new Date(result.savedAt).toLocaleTimeString() : "unknown";
+              this.ui.showNotification(`Workspace draft restored (${result.restoredSystems.join(", ")}) — saved at ${ts}`, 4000);
+            }
+          }
+        },
+      });
+      k.install(this._character);
       k.services.provide(DialogueHostKey, {
         get trainers() { return game.trainerSystem; },
         skillName: (id) => this.skillProgressionSystem.getSkill(id as never)?.name ?? id,

@@ -416,6 +416,10 @@ state, scope and save codec.
 
   22. **Spell making** (`src/features/spell-making/`): the altar (X) and
       forging spells for gold.
+
+  23. **Character** (`src/features/character/`): race, birthsign and class
+      with their bonuses and racial traits, and the creation wizard (with
+      a Nord warrior fallback if the wizard fails).
 - `src/world/dragon-lair.ts` (the tundra dragon boss and its body) and
   `src/game/weapon-archetype.ts` (which archetype a weapon fights as).
 - `src/game/player-pack.ts`: gold (one coin stack, mirrored into the
