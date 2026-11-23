@@ -32,7 +32,7 @@ import { SaveSystem } from "./systems/save-system";
 import { AchievementSystem } from "./platform/achievement-system";
 import { getDesktopBridge } from "./platform/desktop-bridge";
 import { desktopMirroredSaveStore } from "./platform/save-store";
-import { CreditsUI } from "./ui/credits-ui";
+import type { CreditsUI } from "./ui/credits-ui";
 import { QuestSystem } from "./systems/quest-system";
 import { InteractionSystem } from "./systems/interaction-system";
 import { SkillTreeSystem } from "./systems/skill-tree-system";
@@ -95,7 +95,7 @@ import { ChunkContent } from "./world/chunk-content";
 import { dressInterior } from "./world/interior-dressing";
 import { spawnDragon } from "./world/dragon-lair";
 import { WeatherSystem } from "./systems/weather-system";
-import { GraphicsSystem, persistGraphicsTier } from "./systems/graphics-system";
+import { GraphicsSystem } from "./systems/graphics-system";
 import { QuickSlotSystem, isConsumableItem, type QuickSlotKey } from "./systems/quickslot-system";
 import { WaitSystem } from "./systems/wait-system";
 import { SkillProgressionSystem } from "./systems/skill-progression-system";
@@ -202,7 +202,8 @@ import type { DynamicEventReward } from "./systems/dynamic-world-event-system";
 import type { DragonShoutSystem } from "./systems/dragon-shout-system";
 import type { ShoutUI } from "./ui/shout-ui";
 import { ShoutsFeature, ShoutsKey, ShoutHostKey, type ShoutsService } from "./features/shouts/shouts-feature";
-import { GraphicsSettingsUI, type CameraSensitivity } from "./ui/graphics-settings-ui";
+import type { GraphicsSettingsUI } from "./ui/graphics-settings-ui";
+import { SettingsFeature, SettingsHostKey, SettingsKey } from "./features/settings/settings-feature";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -260,7 +261,8 @@ export class Game {
   public get stableUI(): StableUI { return this.mounts.stable; }
   public get saddlebagUI(): SaddlebagUI { return this.mounts.saddlebag; }
   public uiAnimator: UIAnimator = new UIAnimator();
-  public graphicsSettingsUI: GraphicsSettingsUI;
+  private readonly _settings = new SettingsFeature();
+  public get graphicsSettingsUI(): GraphicsSettingsUI { return this._settings.dialog; }
 
   // v2 systems (Oblivion-lite)
   public attributeSystem: AttributeSystem;
@@ -493,9 +495,7 @@ export class Game {
   /** True once the Bandit Bounty framework quest has been activated by a bandit kill. */
   private _banditQuestStarted: boolean = false;
   /** Active difficulty setting (scales NPC→player damage). */
-  private _difficulty: "easy" | "normal" | "hard" = "normal";
   /** Active camera look sensitivity setting. */
-  private _cameraSensitivity: CameraSensitivity = "standard";
   /** Mesh name of the NPC the player is currently talking to (persuasion pricing). */
   private _currentDialogueNpcName: string | null = null;
   /** True while the character-creation wizard is up (Escape must not pause beneath it). */
@@ -555,7 +555,7 @@ export class Game {
   private readonly _gamepadInput = new GamepadInputSystem(this._inputAdapter);
   /** Launch achievements. Forwarded to Steamworks when the desktop shell is up. */
   private _achievements: AchievementSystem | null = null;
-  private _creditsUI: CreditsUI | null = null;
+  private get _creditsUI(): CreditsUI { return this._settings.credits; }
   /** Tracks whether the current key event was consumed by the input adapter. */
   private _keyConsumedByAdapter: boolean = false;
   /**
@@ -1126,55 +1126,6 @@ export class Game {
       }
     };
 
-    // ── Graphics Settings UI ──────────────────────────────────────────────────
-    this.graphicsSettingsUI = new GraphicsSettingsUI();
-    this.graphicsSettingsUI.onTierSelect = (tier) => {
-      persistGraphicsTier(tier);
-      this.lodSystem?.setQuality(tier);
-      location.reload();
-    };
-    // Difficulty applies immediately — it only scales NPC→player damage.
-    this.graphicsSettingsUI.onDifficultySelect = (difficulty) => {
-      this._difficulty = difficulty;
-      this.combatSystem.difficultyMultiplier =
-        difficulty === "easy" ? 0.6 : difficulty === "hard" ? 1.5 : 1.0;
-      this.ui.showNotification(`Difficulty: ${difficulty[0].toUpperCase()}${difficulty.slice(1)}`, 2400);
-    };
-    this.graphicsSettingsUI.onAudioMuteToggle = (isMuted) => {
-      if (this.audioSystem.isMuted !== isMuted) {
-        this.audioSystem.toggleMute();
-      }
-      this.ui.showNotification(isMuted ? "Audio muted" : "Audio unmuted", 1500);
-    };
-    this.graphicsSettingsUI.onVolumeChange = (volume) => {
-      this.audioSystem.setMasterVolume(volume);
-      this.ui.showNotification(`Master volume: ${Math.round(volume * 100)}%`, 1500);
-    };
-    this.graphicsSettingsUI.onCameraSensitivityChange = (sens) => {
-      this._cameraSensitivity = sens;
-      const sensMap: Record<CameraSensitivity, number> = {
-        low: 1200,
-        standard: 800,
-        high: 500,
-      };
-      if (this.player?.camera) {
-        this.player.camera.angularSensibility = sensMap[sens];
-      }
-      this.ui.showNotification(`Look Sensitivity: ${sens[0].toUpperCase()}${sens.slice(1)}`, 1500);
-    };
-    this.graphicsSettingsUI.onClose = () => {
-      this.interactionSystem.isBlocked = false;
-      if (!this.isPaused) {
-        this.canvas.requestPointerLock();
-        this.player.camera.attachControl(this.canvas, true);
-      }
-    };
-    if (getDesktopBridge()) {
-      this.graphicsSettingsUI.onToggleFullscreen = () => {
-        void getDesktopBridge()?.toggleFullscreen();
-      };
-    }
-    this._wireGraphicsSettingsButton();
 
     // ── v18 DailyScheduleSystem ───────────────────────────────────────────────
     // Connects TimeSystem → ScheduleSystem so NPC daily behaviours are driven
@@ -1634,25 +1585,8 @@ export class Game {
       this.saveSystem.exportToFile();
     });
     this.ui.importButton.onPointerUpObservable.add(() => this._openSaveImportPicker());
-    this.ui.settingsButton?.onPointerUpObservable.add(() => {
-      this.graphicsSettingsUI.show(
-        this.graphics.tier,
-        this._difficulty,
-        this.audioSystem.isMuted,
-        this.audioSystem.masterVolume,
-        this._cameraSensitivity,
-      );
-    });
-    this._creditsUI = new CreditsUI();
-    this._creditsUI.onClose = () => {
-      if (this.isPaused) return;
-      this.interactionSystem.isBlocked = false;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
-    };
-    this.ui.creditsButton.onPointerUpObservable.add(() => {
-      this._creditsUI?.show();
-    });
+    this.ui.settingsButton?.onPointerUpObservable.add(() => this.kernel.services.get(SettingsKey).open());
+    this.ui.creditsButton.onPointerUpObservable.add(() => this.kernel.services.get(SettingsKey).openCredits());
     const desktop = getDesktopBridge();
     if (desktop) {
       this.ui.setQuitButtonLabel("Quit to Desktop");
@@ -2101,30 +2035,6 @@ export class Game {
 
 
 
-  /**
-   * Attach a persistent gear button (⚙) to the DOM that opens the graphics
-   * settings dialog.  The button is always visible so players can adjust
-   * quality without a keyboard shortcut.
-   */
-  private _wireGraphicsSettingsButton(): void {
-    if (typeof document === "undefined") return;
-    const btn = document.createElement("button");
-    btn.className = "graphics-settings-btn";
-    btn.setAttribute("aria-label", "Open graphics settings");
-    btn.textContent = "⚙";
-    btn.addEventListener("click", () => {
-      if (this._inCharacterCreation || this.graphicsSettingsUI.isVisible || this._creditsUI?.isVisible || this._isCombatInputBlocked()) return;
-      this.graphicsSettingsUI.show(
-        this.graphics.tier,
-        this._difficulty,
-        this.audioSystem.isMuted,
-        this.audioSystem.masterVolume,
-        this._cameraSensitivity,
-      );
-      this._suspendGameplayInput();
-    });
-    document.body.appendChild(btn);
-  }
 
   /**
    * Put an NPC that fell through the world back at its spawn point.  Bodies
@@ -2778,6 +2688,16 @@ export class Game {
         },
       });
       k.install(this._character);
+      k.services.provide(SettingsHostKey, {
+        tier: () => this.graphics.tier,
+        applyTier: (tier) => { this.lodSystem?.setQuality(tier); location.reload(); },
+        setDamageTaken: (m) => { this.combatSystem.difficultyMultiplier = m; },
+        get audio() { return game.audioSystem; },
+        setLookSensibility: (v) => { if (this.player?.camera) this.player.camera.angularSensibility = v; },
+        toggleFullscreen: getDesktopBridge() ? () => { void getDesktopBridge()?.toggleFullscreen(); } : null,
+        paused: () => this.isPaused,
+      });
+      k.install(this._settings);
       k.services.provide(DialogueHostKey, {
         get trainers() { return game.trainerSystem; },
         skillName: (id) => this.skillProgressionSystem.getSkill(id as never)?.name ?? id,

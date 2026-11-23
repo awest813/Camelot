@@ -186,7 +186,12 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
   const travel = await page.evaluate(() => {
     const g = (window as any).__camelotGame;
     const before = g.timeSystem.elapsedGameTime;
+    // Not a combat test: a stray swing may have provoked someone nearby.
+    const host = g.kernel.services.get({ name: "travel-host" });
+    const inCombat = host.inCombat;
+    host.inCombat = () => false;
     g.fastTravelUI.onTravel("start_village");
+    host.inCombat = inCombat;
     return {
       why: { combat: g._isPlayerInCombat(), crouch: g.stealthSystem.isCrouching, enc: g.player.isEncumbered },
       open: g.fastTravelUI.isVisible,
@@ -262,6 +267,17 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
     return { inside, back: g.cellManager.currentCell?.type, outdoorsShown: g.world.visible, said };
   });
   expect({ ...cave, said: undefined }, cave.said.join(" | ")).toEqual({ inside: { cell: "interior", outdoorsShown: false, torch: true, dressed: true }, back: "exterior", outdoorsShown: true, said: undefined });
+
+  // The gear button opens the settings; Escape closes them, play resumes.
+  // (The canvas holds the pointer lock, so click the button itself.)
+  await page.evaluate(() => (document.querySelector(".graphics-settings-btn") as HTMLButtonElement).click());
+  expect(await page.evaluate(() => (window as any).__camelotGame.graphicsSettingsUI.isVisible), "settings open").toBe(true);
+  await page.keyboard.press("Escape");
+  expect(await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    return { open: g.graphicsSettingsUI.isVisible, paused: g.isPaused };
+  })).toEqual({ open: false, paused: false });
+  await page.locator("#renderCanvas").click({ force: true });
 
   // A guard stops the player for a bounty; Escape resists arrest.
   const arrest = await page.evaluate(() => {

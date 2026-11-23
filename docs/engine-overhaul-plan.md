@@ -420,6 +420,10 @@ state, scope and save codec.
   23. **Character** (`src/features/character/`): race, birthsign and class
       with their bonuses and racial traits, and the creation wizard (with
       a Nord warrior fallback if the wizard fails).
+
+  24. **Settings** (`src/features/settings/`): the settings dialog
+      (graphics tier, difficulty, audio, look sensitivity, fullscreen), the
+      gear button, and the credits.
 - `src/world/dragon-lair.ts` (the tundra dragon boss and its body) and
   `src/game/weapon-archetype.ts` (which archetype a weapon fights as).
 - `src/game/player-pack.ts`: gold (one coin stack, mirrored into the
