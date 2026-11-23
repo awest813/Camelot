@@ -104,6 +104,7 @@ import { SkillProgressionSystem } from "./systems/skill-progression-system";
 import type { FastTravelSystem } from "./systems/fast-travel-system";
 import { FastTravelFeature, TravelKey, TravelHostKey } from "./features/fast-travel/fast-travel-feature";
 import { DeathFeature, DeathHostKey } from "./features/death/death-feature";
+import { SpoilsFeature, SpoilsHostKey } from "./features/spoils/spoils-feature";
 import { LevelScalingSystem } from "./systems/level-scaling-system";
 import { FameSystem } from "./systems/fame-system";
 import { ActiveEffectsSystem } from "./systems/active-effects-system";
@@ -208,27 +209,6 @@ const FRAMEWORK_ITEM_TO_GAME: Readonly<Record<string, string>> = {
   health_potion: "potion_hp_01",
   iron_sword: "sword_01",
 };
-/**
- * Item templates for leveled-list drops (LeveledListSystem values).
- * Stats scale with tier so boss loot stays relevant to the player's level.
- */
-const LEVEL_ITEM_TEMPLATES: Readonly<Record<string, {
-  name: string; description: string; weight: number; slot: string; stats: Record<string, number>;
-}>> = {
-  iron_sword:      { name: "Iron Sword",      description: "A dependable blade.",            weight: 3.5, slot: "mainHand", stats: { damage: 10, value: 80 } },
-  steel_sword:     { name: "Steel Sword",     description: "Forged with superior steel.",    weight: 4.0, slot: "mainHand", stats: { damage: 16, value: 220 } },
-  silver_sword:    { name: "Silver Sword",    description: "Blessed silver etched with runes.", weight: 4.0, slot: "mainHand", stats: { damage: 22, value: 500 } },
-  daedric_sword:   { name: "Daedric Sword",   description: "A blade of blackened obsidian.", weight: 5.0, slot: "mainHand", stats: { damage: 30, value: 1500 } },
-  iron_bow:        { name: "Iron Bow",        description: "A sturdy shortbow.",             weight: 2.5, slot: "mainHand", stats: { damage: 8, value: 100 } },
-  steel_bow:       { name: "Steel Bow",       description: "A recurve bow with steel limbs.", weight: 3.0, slot: "mainHand", stats: { damage: 13, value: 280 } },
-  elven_bow:       { name: "Elven Bow",       description: "A lightweight bow of moon-metal.", weight: 2.0, slot: "mainHand", stats: { damage: 18, value: 700 } },
-  iron_cuirass:    { name: "Iron Cuirass",    description: "Heavy plated protection.",       weight: 8.0, slot: "chest", stats: { armor: 12, value: 120 } },
-  steel_cuirass:   { name: "Steel Cuirass",   description: "Well-tempered steel plate.",     weight: 10,  slot: "chest", stats: { armor: 18, value: 300 } },
-  orcish_cuirass:  { name: "Orcish Cuirass",  description: "Brutal, functional craftsmanship.", weight: 12, slot: "chest", stats: { armor: 26, value: 800 } },
-  daedric_cuirass: { name: "Daedric Cuirass", description: "Armor carved from raw Oblivion.", weight: 14, slot: "chest", stats: { armor: 36, value: 2000 } },
-};
-/** Merchant / restock health potions: `value` for barter pricing, `heal` for consumable use. */
-/** Persisted local author identity for layer ownership workflows. */
 
 export class Game {
   public scene: Scene;
@@ -1564,7 +1544,8 @@ export class Game {
     // Wire quest event callbacks
     this.combatSystem.onNPCDeath = (name, xp, npc) => {
         const npcName = /dragon/i.test(npc.mesh.name) ? npc.mesh.name : name;
-        this.eventBus.emit("player:kill", { npcId: npc.mesh.name, npcName, xp });
+        const p = npc.mesh.position;
+        this.eventBus.emit("player:kill", { npcId: npc.mesh.name, npcName, xp, at: { x: p.x, y: p.y, z: p.z }, lootTableId: npc.lootTableId ?? undefined });
         // Bandit Bounty: activate on the first bandit kill so that kill counts.
         if (!this._banditQuestStarted && this._toFrameworkTargetId(name) === "Bandit") {
             this._banditQuestStarted = true;
@@ -1584,61 +1565,6 @@ export class Game {
         this.ui.showNotification(`+${xp} XP`, 2000);
         this.audioSystem.playNPCDeath();
 
-        // Drop loot from the NPC's loot table
-        if (npc.lootTableId) {
-            const lootContext = { playerLevel: this.player.level };
-            const drops = this.lootTableSystem.rollTable(npc.lootTableId, undefined, lootContext).items;
-            if (drops.length > 0) {
-                const dropPos = npc.mesh.position.clone();
-                dropPos.y += 0.5;
-                for (const drop of drops) {
-                    const scatter = this.kernel.rng.stream("death-drops");
-                    new Loot(this.scene, dropPos.add(new Vector3(
-                        (scatter.next() - 0.5) * 1.2,
-                        0,
-                        (scatter.next() - 0.5) * 1.2,
-                    )), {
-                        id: drop.id,
-                        name: drop.name,
-                        description: drop.description ?? "",
-                        stackable: drop.stackable ?? false,
-                        quantity: drop.quantity ?? 1,
-                        weight: drop.weight,
-                        stats: drop.stats,
-                        slot: drop.slot as any,
-                    });
-                }
-            }
-        }
-
-        // Elites (dragons, bandit chiefs) drop tiered gear from the leveled
-        // lists — the reward scales with the player's level.
-        if (/^(DragonBoss|Bandit Chief)/.test(npc.mesh.name)) {
-            const listId = this.kernel.rng.stream("elite-drops").chance(0.6) ? "ll_weapon_melee" : "ll_armor_heavy";
-            const resolved = this.leveledListSystem.resolve(listId, this.player.level);
-            const template = resolved.value ? LEVEL_ITEM_TEMPLATES[resolved.value] : undefined;
-            if (template) {
-                const eliteDropPos = npc.mesh.position.clone();
-                eliteDropPos.y += 0.6;
-                new Loot(this.scene, eliteDropPos, {
-                    id: resolved.value!,
-                    name: template.name,
-                    description: template.description,
-                    stackable: false,
-                    quantity: 1,
-                    weight: template.weight,
-                    slot: template.slot as any,
-                    stats: { ...template.stats },
-                });
-                this.ui.showNotification(`The elite drops ${template.name}!`, 2600);
-            }
-        }
-
-        // Slaying a dragon absorbs its soul and echoes a new Word of Power
-        // into the player's mind (unlock it in the shouts panel [N]).
-        if (/^DragonBoss/.test(npc.mesh.name)) {
-            this.shouts.absorbDragonSoul();
-        }
     };
     this.projectileSystem.onNPCDeath = this.combatSystem.onNPCDeath;
     this.combatSystem.onNpcDamaged = (npc) => {
@@ -3343,6 +3269,16 @@ export class Game {
         },
       });
       k.install(this._trade);
+      k.services.provide(SpoilsHostKey, {
+        level: () => this.player.level,
+        roll: (tableId, level) => this.lootTableSystem.rollTable(tableId, undefined, { playerLevel: level }).items.map((d) => ({
+          id: d.id, name: d.name, description: d.description ?? "", stackable: d.stackable ?? false,
+          quantity: d.quantity ?? 1, weight: d.weight, stats: d.stats, slot: d.slot as Item["slot"],
+        })),
+        resolveLeveled: (listId, level) => this.leveledListSystem.resolve(listId, level).value ?? null,
+        drop: (at, item) => { new Loot(this.scene, at, item); },
+      });
+      k.install(new SpoilsFeature());
       k.services.provide(OnboardingHostKey, {
         // Space must never skip a tip while a menu, dialog or the editor is open.
         screenFree: () => !this._isCombatInputBlocked()

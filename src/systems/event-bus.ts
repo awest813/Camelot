@@ -8,8 +8,8 @@ import type { NPC } from "../entities/npc";
  * Add new entries here as systems evolve.
  */
 export interface GameEvents {
-  /** An NPC was killed by the player. */
-  "player:kill": { npcId: string; npcName: string; xp: number };
+  /** The player killed an NPC (where it fell, and its loot table if any). */
+  "player:kill": { npcId: string; npcName: string; xp: number; at?: { x: number; y: number; z: number }; lootTableId?: string };
   /** An item was picked up (from loot, container, etc.). */
   "player:pickup": { itemId: string; quantity: number };
   /** The player gained a level. */

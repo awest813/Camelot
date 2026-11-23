@@ -402,6 +402,11 @@ state, scope and save codec.
       `dialogue:action` now carries the action's payload, so the merchant
       id travels with it.
 
+  19. **Spoils** (`src/features/spoils/`): a kill's loot-table drops and the
+      elites' leveled gear (table in `src/content/leveled-gear.ts`).
+      `player:kill` now carries where the NPC fell and its loot table. The
+      shouts feature takes a dragon's soul from the same event.
+
   18. **Onboarding** (`src/features/onboarding/`): the five first-run tips
       as data. Each advances when the player does what it teaches (the game
       calls `did(step)`, or `questlog:opened` / `pickpocket:opened` arrive),

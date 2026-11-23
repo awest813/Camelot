@@ -219,6 +219,19 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
   expect(await page.evaluate(() => (window as any).__camelotGame.pickpocketUI.isVisible)).toBe(false);
   await page.locator("#renderCanvas").click({ force: true });
 
+  // A kill with a loot table leaves pickups where the NPC fell.
+  expect(await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    const loot = () => g.scene.meshes.filter((m: any) => m.metadata?.type === "loot").length;
+    const victim = g.scheduleSystem.npcs.find((n: any) => !n.isDead);
+    const before = loot();
+    const table = victim.lootTableId;
+    victim.lootTableId = "boss_loot";
+    g.combatSystem.onNPCDeath(victim.mesh.name, 1, victim);
+    victim.lootTableId = table;
+    return loot() > before;
+  }), "the kill dropped loot").toBe(true);
+
   // A guard stops the player for a bounty; Escape resists arrest.
   const arrest = await page.evaluate(() => {
     const g = (window as any).__camelotGame;

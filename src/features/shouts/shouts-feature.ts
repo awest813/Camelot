@@ -3,8 +3,8 @@
  * shouts panel (N), using the equipped shout (Shift+N), each shout's effect
  * on the world, and the timed buffs (Slow Time, Elemental Fury).
  *
- * Inputs:   services feedback, modal, gameplay, shout-host; a sim-phase
- *           system ticks the buffs.
+ * Inputs:   services feedback, modal, gameplay, shout-host; event
+ *           `player:kill` (dragons); a sim-phase system ticks the buffs.
  * Outputs:  the `shouts` service.
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
@@ -147,6 +147,11 @@ export class ShoutsFeature implements Feature {
           cooldownSeconds: sh.cooldownRemaining(id, host().gameTime()),
         });
       },
+    });
+
+    // Slaying a dragon absorbs its soul and teaches the next Word of Power.
+    ctx.on("player:kill", ({ npcId }) => {
+      if (/^DragonBoss/.test(npcId)) s.get(ShoutsKey).absorbDragonSoul();
     });
 
     ctx.system({ id: "shouts.buffs", phase: "sim", update: (dt) => this._tickBuffs(dt) });
