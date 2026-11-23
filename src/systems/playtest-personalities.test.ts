@@ -34,7 +34,8 @@ import { CrimeSystem } from "./crime-system";
 import { AlchemySystem, type IngredientDefinition } from "./alchemy-system";
 import { SpellSystem } from "./spell-system";
 import { SpellMakingSystem, MIN_SPELL_COST, MAX_SPELL_COST, type SpellComponent } from "./spell-making-system";
-import { QuestSystem, type Quest } from "./quest-system";
+import { QuestSystem } from "./quest-system";
+import { QuestGraphEngine } from "../framework/quests/quest-graph-engine";
 import { StealthSystem } from "./stealth-system";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
@@ -367,38 +368,26 @@ describe("Personality Playtest: The Average", () => {
   });
 
   it("accepts a standard bounty quest, completes objectives, and earns honest fame", () => {
-    const bountyQuest: Quest = {
-      id: "wolf_cull",
-      name: "Wolf Pack Culling",
-      description: "Eliminate 2 wolves prowling the trade road.",
-      isActive: true,
-      isCompleted: false,
+    // Quests run on the one quest engine; the log shows them.
+    const engine = new QuestGraphEngine([{
+      id: "wolf_cull", name: "Wolf Pack Culling", description: "Eliminate 2 wolves prowling the trade road.",
       xpReward: 150,
-      objectives: [
-        {
-          id: "kill_wolves",
-          type: "kill",
-          description: "Slay 2 wolves",
-          targetId: "wolf",
-          required: 2,
-          current: 0,
-          completed: false,
-        },
-      ],
-    };
-
-    env.quests.addQuest(bountyQuest);
+      nodes: [{ id: "kill_wolves", description: "Slay 2 wolves", triggerType: "kill", targetId: "wolf", requiredCount: 2 }],
+    }]);
+    env.quests.setFramework(() => engine);
+    engine.activateQuest("wolf_cull");
     expect(env.quests.getQuests().length).toBe(1);
+    const log = () => env.quests.getQuests()[0];
 
     // Slays 1st wolf
-    env.quests.onKill("wolf");
-    expect(bountyQuest.objectives[0].current).toBe(1);
-    expect(bountyQuest.isCompleted).toBe(false);
+    engine.applyEvent({ type: "kill", targetId: "wolf" });
+    expect(log().objectives[0].current).toBe(1);
+    expect(log().isCompleted).toBe(false);
 
     // Slays 2nd wolf -> Quest completes
-    env.quests.onKill("wolf");
-    expect(bountyQuest.objectives[0].completed).toBe(true);
-    expect(bountyQuest.isCompleted).toBe(true);
+    engine.applyEvent({ type: "kill", targetId: "wolf" });
+    expect(log().objectives[0].completed).toBe(true);
+    expect(log().isCompleted).toBe(true);
 
     // Earns fame for civic service
     env.fame.addFame(5);

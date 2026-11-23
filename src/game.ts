@@ -56,7 +56,7 @@ import { ProjectileSystem } from "./systems/projectile-system";
 import { BarterSystem } from "./systems/barter-system";
 import { ShopSystem } from "./systems/shop-system";
 import { registerStarterMerchants } from "./content/starter-merchants";
-import { seedStartingArea } from "./content/starting-area";
+import { seedStartingArea, STARTER_QUESTS } from "./content/starting-area";
 import { CellManager } from "./world/cell-manager";
 import { SpellSystem } from "./systems/spell-system";
 import { PersuasionSystem } from "./systems/persuasion-system";
@@ -517,10 +517,11 @@ export class Game {
   /** Quest events in, framework quest rewards and failures out. */
   private readonly _quests = new QuestBridge({
     framework: () => this.frameworkRuntime,
-    legacy: () => this.questSystem,
+    refreshLog: () => this.questSystem.refresh(),
     events: () => this.eventBus,
     pack: this._pack,
     addXp: (xp) => this.player.addExperience(xp),
+    addFame: (amount) => this.fameSystem.addFame(amount),
     notify: (text, ms) => this.ui.showNotification(text, ms),
     markDirty: () => this.saveSystem.markDirty(),
   });
@@ -743,12 +744,15 @@ export class Game {
     this.ui.onSkillPurchase = (treeIdx, skillIdx) => this.skillTreeSystem.purchaseSkill(treeIdx, skillIdx);
     this.saveSystem.setSkillTreeSystem(this.skillTreeSystem);
     this.audioSystem        = new AudioSystem();
-    this.frameworkRuntime   = new FrameworkRuntime(frameworkBaseContent, {
+    // The base content plus the starter quests (one quest engine for all).
+    this.frameworkRuntime   = new FrameworkRuntime({ ...frameworkBaseContent, quests: [...frameworkBaseContent.quests, ...STARTER_QUESTS] }, {
       inventoryCapacity: this.inventorySystem.maxCapacity,
       fetchImpl: (url: string) => fetch(url),
       skillLevelProvider: (skillId: string) => this.skillTreeSystem.getSkillRank(skillId),
     });
     this.frameworkRuntime.questEngine.activateQuest("quest_guard_resolution");
+    for (const q of STARTER_QUESTS) this.frameworkRuntime.questEngine.activateQuest(q.id);
+    this.questSystem.setFramework(() => this.frameworkRuntime?.questEngine ?? null);
     this.saveSystem.setFrameworkRuntime(this.frameworkRuntime);
     this.dialogueSystem.dialogueSessionProvider = (targetNpc) => {
       this._currentDialogueNpcName = targetNpc.key;
@@ -1279,18 +1283,6 @@ export class Game {
     this.saddlebagUI.setAnimator(uiAnimator);
 
     void this.kernel.services.get(CharacterKey).create();
-    this.questSystem.onQuestComplete = (xp: number, questId?: string) => {
-      this.eventBus.emit("quest:completed", { questId: questId ?? "legacy", xpReward: xp });
-      this.player.addExperience(xp);
-      this.fameSystem.addFame(10);
-      this.saveSystem.markDirty();
-      this.ui.showNotification(
-        `+${xp} XP  |  Fame: ${this.fameSystem.fame} (${this.fameSystem.fameLabel})`, 3000
-      );
-    };
-    this.questSystem.onQuestFailed = () => {
-      this.saveSystem.markDirty();
-    };
 
     this.ui.onAttributeSpend = (name) => {
       const spent = this.attributeSystem.spendPoint(name);
@@ -1341,7 +1333,6 @@ export class Game {
     seedStartingArea({
       scene: this.scene,
       assets: this.fantasyAssets,
-      quests: this.questSystem,
       containers: this.containerSystem,
       cells: this.cellManager,
       castShadow: (root) => this.shadowGenerator?.addShadowCaster(root, true),
@@ -1369,7 +1360,6 @@ export class Game {
             this.frameworkRuntime.questEngine.activateQuest("quest_bandit_bounty");
             this.ui.showNotification("📜 New quest: Bandit Bounty — bring proof to collect.", 3500);
         }
-        this.questSystem.onKill(name);
         this._quests.apply("kill", this._quests.targetId(name));
         // Killing someone a quest needed alive fails the dependent quests.
         this._quests.failForDead(name);
@@ -1400,7 +1390,6 @@ export class Game {
         this.skillProgressionSystem.gainXP("block", 5 * this.classSystem.xpMultiplierFor("block"));
     };
     this.interactionSystem.onLootPickup = (id) => {
-        this.questSystem.onPickup(id);
         this._quests.apply("pickup", id);
         this.saveSystem.markDirty();
         const frameworkItemId = this._pack.frameworkIdOf(id);
@@ -1408,7 +1397,6 @@ export class Game {
         this._tips.did("interact");
     };
     this.dialogueSystem.onTalkStart  = (name)  => {
-        this.questSystem.onTalk(name);
         this._quests.apply("talk", this._quests.targetId(name));
         // Speechcraft XP each time dialogue is initiated
         this.skillProgressionSystem.gainXP("speechcraft", 8 * this.classSystem.xpMultiplierFor("speechcraft"));

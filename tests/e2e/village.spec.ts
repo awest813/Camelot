@@ -114,9 +114,9 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     } else {
       for (let i = 0; i < t.required; i++) g.jobs.rules.onKill(`${t.target}_${i}`);
     }
-    // Any kill/pickup/talk event re-checks quest completion; a done-but-unpaid
-    // job must stay open until it's handed in.
-    g.questSystem.onKill("Nobody_1");
+    // Quest events go to the quest engine; a done-but-unpaid job (an entry
+    // the job board owns) must stay open until it's handed in.
+    g._quests.apply("kill", "Nobody");
     const openBeforeHandIn = !!quest && !quest.isCompleted && quest.isActive;
     g.saveSystem.save(true);
     const saved = JSON.parse(localStorage.getItem("camelot_save")!).villageJobs;

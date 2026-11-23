@@ -703,16 +703,29 @@ components.
   `onChunkUnloaded` hooks feed the chunk scopes. Removed the second,
   unused adapter pair (`world/babylon-world-chunk-adapter.ts` and
   `-source.ts`).
-- Quests, not yet merged. Legacy quests could register into the
-  framework's graph engine as one node per objective, but the two sides
-  match targets differently:
-  - legacy objectives match the exact NPC key (`Bandit_12`, a specific
-    bounty);
-  - framework events carry the quest-bridge id (`Bandit`).
-
-  Merging needs one rule for this first. A likely one: the event carries
-  both ids, and a node says which it wants. Then the legacy kill, pickup
-  and talk calls in `game.ts` go, and the bridge feeds the one engine.
+- One quest engine: the framework's graph engine. The target-id clash
+  noted earlier didn't matter in practice: the only legacy quests driven
+  by game events were the three starter quests, and their targets
+  (`Guard`, `potion_hp_01`) already equal the bridge ids.
+  - The starter quests are framework definitions
+    (`content/starting-area.ts`), added to the content the game's runtime
+    is built from and activated at start.
+  - The quest log (`QuestSystem`) is a view. It shows the framework
+    quests that have started, with their reached nodes as objectives,
+    then the entries features own (village jobs). Framework quests used to
+    be invisible in the log. Game events go only to the engine, through
+    the bridge.
+  - `QuestSystem` no longer has `onKill`, `onPickup` or `onTalk`,
+    objective matching, completion checks or `onQuestComplete`, and
+    `game.ts` no longer calls them.
+  - The bridge pays every completed quest the same way: "Quest Complete:
+    Name!", XP, +10 fame (which only legacy quests used to give), gold and
+    items. It redraws the log when a quest moves. Its "fail the quests
+    that needed this NPC alive" no longer has a legacy branch.
+  - Old saves migrate. A legacy save entry for a quest the engine now
+    owns carries its status and progress into the engine; the framework
+    snapshot, restored after it, wins when it has the quest. The v29
+    fixture loads with its original expectations.
 - The quest log has an API; features no longer change quest objects
   directly. The quest-log service has `setProgress`, `finish` and
   `remove`, and `quests()` is read-only. A `managed` quest belongs to a

@@ -1,13 +1,14 @@
 /**
  * The starting area's hand-placed content: a chest, the Old Cave, starter
- * gear and three enchanted weapons on the ground, and the first quests.
+ * gear and three enchanted weapons on the ground, and the first quests
+ * (framework quests, added to the content the game's runtime is built from).
  */
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Loot } from "../entities/loot";
 import type { Item } from "../systems/inventory-system";
-import type { Quest, QuestSystem } from "../systems/quest-system";
+import type { QuestDefinition } from "../framework/quests/quest-types";
 import type { ContainerSystem } from "../systems/container-system";
 import type { CellManager } from "../world/cell-manager";
 import { setInstanceScale, type FantasyAssetLoader } from "../systems/fantasy-asset-loader";
@@ -36,67 +37,38 @@ export const STARTER_WEAPONS: readonly GroundWeapon[] = [
   { at: [5, 1, 10], item: { id: "molten_dagger_01", name: "Molten Dagger", description: "Forged in volcanic glass. +14 Damage, 5 fire DoT.", slot: "mainHand", stats: { damage: 14, fireDot: 5 } }, model: "moltenDagger", scale: 0.5, lift: -0.1 },
 ];
 
-export const STARTER_QUESTS: readonly Quest[] = [
+/**
+ * The three quests every new game starts with, as framework quests (the
+ * one quest engine).  Node ids are the old quest-log objective ids, so
+ * progress in saves from before the merge carries over.
+ */
+export const STARTER_QUESTS: readonly QuestDefinition[] = [
   {
     id: "quest_kill_guard",
     name: "Eliminate the Guard",
     description: "A rogue guard threatens the village. Defeat him.",
-    isCompleted: false,
-    isActive: true,
-    reward: "100 XP",
     xpReward: 100,
-    objectives: [{
-      id: "obj_kill_guard",
-      type: "kill",
-      description: "Defeat the Guard",
-      targetId: "Guard",
-      required: 1,
-      current: 0,
-      completed: false
-    }],
+    nodes: [{ id: "obj_kill_guard", description: "Defeat the Guard", triggerType: "kill", targetId: "Guard", requiredCount: 1 }],
   },
   {
     id: "quest_collect_potions",
     name: "Stock the Medicine Chest",
     description: "The village healer needs supplies.",
-    isCompleted: false,
-    isActive: true,
-    reward: "50 XP",
     xpReward: 50,
-    objectives: [{
-      id: "obj_collect_potions",
-      type: "fetch",
-      description: "Collect Health Potions",
-      targetId: "potion_hp_01",
-      required: 1,
-      current: 0,
-      completed: false
-    }],
+    nodes: [{ id: "obj_collect_potions", description: "Collect Health Potions", triggerType: "pickup", targetId: "potion_hp_01", requiredCount: 1 }],
   },
   {
     id: "quest_speak_guard",
     name: "Parley with the Guard",
     description: "Try talking to the Guard before resorting to violence.",
-    isCompleted: false,
-    isActive: true,
-    reward: "25 XP",
     xpReward: 25,
-    objectives: [{
-      id: "obj_talk_guard",
-      type: "talk",
-      description: "Speak with the Guard",
-      targetId: "Guard",
-      required: 1,
-      current: 0,
-      completed: false
-    }],
+    nodes: [{ id: "obj_talk_guard", description: "Speak with the Guard", triggerType: "talk", targetId: "Guard", requiredCount: 1 }],
   },
 ];
 
 export interface StartingAreaDeps {
   scene: Scene;
   assets: FantasyAssetLoader;
-  quests: QuestSystem;
   containers: ContainerSystem;
   cells: CellManager;
   /** Register a model as a shadow caster, when shadows are on. */
@@ -137,5 +109,4 @@ export function seedStartingArea(d: StartingAreaDeps): void {
     });
   }
 
-  for (const q of STARTER_QUESTS) d.quests.addQuest(structuredClone(q), true);
 }

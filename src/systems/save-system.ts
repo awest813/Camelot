@@ -544,7 +544,7 @@ export class SaveSystem {
     }
 
     const questSaveStates: QuestSaveState[] = this._quests
-      ? this._quests.getQuests().map(q => ({
+      ? this._quests.getOwnQuests().map(q => ({
           id: q.id,
           isCompleted: q.isCompleted,
           isActive: q.isActive,
