@@ -9,6 +9,8 @@
         "noEmit": true,
         "baseUrl": "./",
         "useDefineForClassFields": true, // enable latest ECMA runtime behavior with older ECMA/JavaScript versions (delete this line if target: "ESNext" or "ES2022"+)
+        "jsx": "react-jsx", // Preact components (UI from Phase 2 on)
+        "jsxImportSource": "preact",
         "module": "ESNext", // use the latest ECMA/JavaScript syntax for our import statements and such
         "moduleResolution": "node", // ensures we are using CommonJS for our npm packages
         "noResolve": false, // disable TypeScript from automatically detecting/adding files based on import statements and etc (it's less helpful than you think)

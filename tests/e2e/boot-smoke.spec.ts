@@ -336,6 +336,14 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
   }
   await page.locator("#renderCanvas").click({ force: true });
 
+  // The credits (the first Preact panel) open, and Escape closes them.
+  await page.evaluate(() => (window as any).__camelotGame.kernel.services.get({ name: "settings" }).openCredits());
+  await expect(page.locator("#credits-title")).toHaveText("Credits");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#credits-title")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__camelotGame.isPaused), "Escape closed the credits, not paused").toBe(false);
+  await page.locator("#renderCanvas").click({ force: true });
+
   // A guard stops the player for a bounty; Escape resists arrest.
   const arrest = await page.evaluate(() => {
     const g = (window as any).__camelotGame;

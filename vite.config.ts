@@ -51,10 +51,13 @@ export default ({ mode }: { mode: string }) => {
         "@": pathResolve("src"),
       },
       // https://github.com/vitejs/vite/issues/178#issuecomment-630138450
-      extensions: [".js", ".ts", ".json"],
+      extensions: [".js", ".ts", ".tsx", ".json"],
     },
     // https://vitejs.cn/config/#esbuild
     esbuild: {
+      // Preact components: the automatic JSX runtime from preact.
+      jsx: "automatic",
+      jsxImportSource: "preact",
       // pure: env.VITE_DROP_CONSOLE ? ["console.log", "debugger"] : [],
       pure: mode === "production" ? ["console.log"] : [],
       //  drop: ["console", "debugger"],

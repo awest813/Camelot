@@ -13,8 +13,10 @@ export default defineConfig({
     alias: {
       "@": resolve(__dirname, "src"),
     },
-    extensions: [".js", ".ts", ".json"],
+    extensions: [".js", ".ts", ".tsx", ".json"],
   },
+  // Preact components: the automatic JSX runtime from preact.
+  esbuild: { jsx: "automatic", jsxImportSource: "preact" },
   test: {
     environment: "jsdom",
     setupFiles: ["./tests/setup-jsdom-storage.ts"],

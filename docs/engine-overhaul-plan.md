@@ -558,7 +558,14 @@ setters instead of owning a save codec. That moves to the entity store
 by guardrail). No feature listens to raw `keydown`. The remaining
 `keydown` listeners are panels' own keyboard handling inside their dialogs,
 and app-level shortcuts in `app.ts`. They are ported with the panels to
-Preact in Phase 8. The Preact modal stack itself is still to do.
+Preact in Phase 8.
+- Preact is in (`preact` 10, automatic JSX runtime in the TypeScript, Vite,
+  Vitest and e2e configs). `src/ui/preact/modal-dialog.tsx` is the shared
+  modal: backdrop, header with ✕, focus trap, and ✕ / backdrop / Escape all
+  close. The credits panel is the first panel ported, with its old API
+  kept. Together with the modal registry and PlayFocus, this is the modal
+  stack: the registry knows what is open, PlayFocus owns the pointer, and
+  new panels are Preact components on ModalDialog.
 
 ### Phase 3 — Entity model for actors (3–4 weeks)
 
