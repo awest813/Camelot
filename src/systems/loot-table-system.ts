@@ -1,4 +1,5 @@
 import type { Item } from "./inventory-system";
+import { unseededRandom } from "../core/rng/rng";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -133,6 +134,13 @@ function xorshift(state: { seed: number }): number {
  *   (useful in tests and for reproducible dungeon loot).
  */
 export class LootTableSystem {
+  /**
+   * Where this system's random rolls come from.  The game gives it a named
+   * stream of the kernel's seeded RNG, so a seed replays a session; tests
+   * and standalone use fall back to an unseeded source.
+   */
+  public random: () => number = unseededRandom;
+
   private _tables: Map<string, LootTable> = new Map();
 
   // ── Registration ──────────────────────────────────────────────────────────
@@ -166,7 +174,7 @@ export class LootTableSystem {
     const table = this._tables.get(tableId);
     if (!table) return { tableId, items: [] };
 
-    const rng = { seed: seed !== undefined ? (seed | 0) || 1 : Math.floor(Math.random() * 0x7fffffff) + 1 };
+    const rng = { seed: seed !== undefined ? (seed | 0) || 1 : Math.floor(this.random() * 0x7fffffff) + 1 };
 
     const items: Item[] = [];
 

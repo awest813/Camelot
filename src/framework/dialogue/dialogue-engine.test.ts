@@ -333,6 +333,19 @@ describe("DialogueEngine", () => {
 
   // ── random_chance condition ─────────────────────────────────────────────────
 
+  it("random_chance rolls from the host's random source when it gives one", () => {
+    const def = {
+      id: "coin", startNodeId: "start",
+      nodes: [{ id: "start", speaker: "Gambler", text: "Heads?", choices: [
+        { id: "win", text: "Win.", conditions: [{ type: "random_chance" as const, chance: 0.5 }], endsDialogue: true },
+      ] }],
+    };
+    const low = new DialogueEngine([def]).createSession("coin", { ...makeContext(), random: () => 0.1 });
+    const high = new DialogueEngine([def]).createSession("coin", { ...makeContext(), random: () => 0.9 });
+    expect(low.getCurrentNode()?.choices.find(c => c.id === "win")?.isAvailable).toBe(true);
+    expect(high.getCurrentNode()?.choices.find(c => c.id === "win")?.isAvailable).toBe(false);
+  });
+
   it("random_chance: always blocks when chance is 0", () => {
     const engine = new DialogueEngine([
       {

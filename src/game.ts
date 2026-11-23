@@ -183,7 +183,7 @@ import { NpcRoster } from "./game/npc-roster";
 import { CombatControls } from "./game/combat-controls";
 import { PlayFocus } from "./input/play-focus";
 import { CameraDirector, DeathCamera } from "./rendering/camera-director";
-import { installGameFeatures } from "./game/game-services";
+import { seedGameRandomness, installGameFeatures } from "./game/game-services";
 import { weaponArchetypeOf } from "./game/weapon-archetype";
 import { QuickSlotHUD } from "./ui/quickslot-hud";
 import { PerkSystem } from "./systems/perk-system";
@@ -745,6 +745,8 @@ export class Game {
       inventoryCapacity: this.inventorySystem.maxCapacity,
       fetchImpl: (url: string) => fetch(url),
       skillLevelProvider: (skillId: string) => this.skillTreeSystem.getSkillRank(skillId),
+      // Dialogue chance rolls come from a seeded stream (the kernel is built later).
+      random: () => this.kernel.rng.stream("dialogue").next(),
     });
     this.frameworkRuntime.questEngine.activateQuest("quest_guard_resolution");
     for (const q of STARTER_QUESTS) this.frameworkRuntime.questEngine.activateQuest(q.id);
@@ -1404,6 +1406,9 @@ export class Game {
 
     // Quest XP and fame callbacks are wired in the v9 block above.
     // Note: player.onLevelUp is wired above in the v2 system wiring block
+
+    // Gameplay rolls draw from the kernel's seeded streams (replays).
+    seedGameRandomness(this);
 
     // Input handling for combat
     this.scene.onPointerObservable.add((pointerInfo) => {

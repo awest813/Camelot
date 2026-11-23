@@ -24,6 +24,8 @@ export interface FrameworkRuntimeOptions {
    * dialogue choices gated by skill level are correctly enabled/disabled.
    */
   skillLevelProvider?: (skillId: string) => number;
+  /** Source of dialogue `random_chance` rolls (a seeded stream); unseeded when absent. */
+  random?: () => number;
   /**
    * When set, dialogue `emit_event` effects invoke this after quest-event translation
    * so the host can handle non-quest ids (`barter:open`, `rest:inn`, …).
@@ -52,6 +54,7 @@ export class FrameworkRuntime {
   private _factionEngine: FactionEngine;
   private _modLoader: ModLoader | null = null;
   private _skillLevelProvider: ((skillId: string) => number) | undefined;
+  private _random: (() => number) | undefined;
   private _onDialogueHostEvent?: (eventId: string, payload?: Record<string, unknown>) => void;
   private _onDialogueConsumeItem?: (itemId: string, quantity: number) => boolean;
   private _onDialogueGiveItem?: (itemId: string, quantity: number) => void;
@@ -60,6 +63,7 @@ export class FrameworkRuntime {
   constructor(baseContent: RpgContentBundle, options: FrameworkRuntimeOptions = {}) {
     this.contentRegistry.loadBase(baseContent);
     this._skillLevelProvider = options.skillLevelProvider;
+    this._random = options.random;
     this._onDialogueHostEvent = options.onDialogueHostEvent;
     this._onDialogueConsumeItem = options.onDialogueConsumeItem;
     this._onDialogueGiveItem = options.onDialogueGiveItem;
@@ -134,6 +138,7 @@ export class FrameworkRuntime {
       getInventoryCount: (itemId) =>
         this._dialogueInventoryCount?.(itemId) ?? this._inventoryEngine.getItemCount(itemId),
       getSkillLevel: this._skillLevelProvider,
+      random: this._random,
       emitEvent: (eventId, payload) => {
         this._onDialogueHostEvent?.(eventId, payload);
         const event = this._translateDialogueEvent(eventId, payload);

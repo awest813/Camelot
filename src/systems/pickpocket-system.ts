@@ -1,3 +1,4 @@
+import { unseededRandom } from "../core/rng/rng";
 /**
  * PickpocketSystem — Oblivion/Morrowind-style pickpocketing for Camelot.
  *
@@ -120,6 +121,13 @@ export interface PickpocketSaveState {
  * ```
  */
 export class PickpocketSystem {
+  /**
+   * Where this system's random rolls come from.  The game gives it a named
+   * stream of the kernel's seeded RNG, so a seed replays a session; tests
+   * and standalone use fall back to an unseeded source.
+   */
+  public random: () => number = unseededRandom;
+
   private _inventories: Map<string, PickpocketableItem[]> = new Map();
   private _totalAttempts  = 0;
   private _totalSuccesses = 0;
@@ -306,7 +314,7 @@ export class PickpocketSystem {
     npcAwareness: number,
     isCrouching: boolean,
     isDetected: boolean,
-    rng: () => number = () => Math.random() * 100,
+    rng: () => number = () => this.random() * 100,
   ): PickpocketResult {
     const eligibility = this.canAttempt(npcId, isCrouching, isDetected, itemId, sneakLevel, npcAwareness);
 

@@ -51,6 +51,8 @@ export interface DialogueDefinition {
 }
 
 export interface DialogueContext {
+  /** Source of `random_chance` rolls (the host's seeded RNG); unseeded when absent. */
+  random?: () => number;
   getFlag(flag: string): boolean;
   setFlag(flag: string, value: boolean): void;
   getFactionReputation(factionId: string): number;

@@ -818,10 +818,20 @@ one replay runs in CI.
     raider down. It sends the log through JSON, replays it, and requires
     the same state: rewards, notifications, despawns and raid history.
     The same inputs under another seed must diverge.
-  - Not covered yet: the whole game. That needs the remaining 51
-    unseeded `Math.random` calls on kernel streams (the `unseeded-random`
-    ratchet tracks them), and the frame loop and input adapter driving
-    the kernel. Then the recorder can sit on the input adapter.
+  - Not covered yet: the whole game. Gameplay randomness is now seeded
+    (next item). What remains is the frame loop and input adapter
+    driving the kernel, so the recorder can sit on the input adapter.
+- Gameplay randomness is seeded. Nine systems take a
+  `random: () => number` (default `unseededRandom`, for tests and
+  standalone use): combat, projectiles, schedules, weather, leveled lists,
+  pickpocketing, persuasion, loot tables and alchemy.
+  `seedGameRandomness(game)` gives each one its own kernel stream, which
+  resets in place on a reseed or a load. Framework dialogue's
+  `random_chance` takes a host `random` too, and the game passes its
+  "dialogue" stream. The `unseeded-random` ratchet went from 51 to 19.
+  None of the 19 is gameplay: seed creation itself, editor tools,
+  character-name suggestions, and cosmetic jitter (stone tilt, flame
+  phase, portal shimmer, audio noise).
 
 **Exit check:**
 - Round-trip over all codecs: met (see above).

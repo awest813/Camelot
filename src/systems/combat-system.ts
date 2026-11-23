@@ -188,6 +188,7 @@ import {
   type WeaponArchetype,
   type WeaponProfile,
 } from "./combat-shared";
+import { unseededRandom } from "../core/rng/rng";
 
 export {
   applyDamageWithResistance,
@@ -298,6 +299,13 @@ const COLOR_FLEE        = new Color3(0.6, 0.0, 0.8);   // purple — panicked fl
 const MAX_CONCURRENT_ATTACKERS = 2;
 
 export class CombatSystem {
+  /**
+   * Where this system's random rolls come from.  The game gives it a named
+   * stream of the kernel's seeded RNG, so a seed replays a session; tests
+   * and standalone use fall back to an unseeded source.
+   */
+  public random: () => number = unseededRandom;
+
   public scene: Scene;
   public player: Player;
   public npcs: NPC[];
@@ -789,7 +797,7 @@ export class CombatSystem {
     // Only active when skill and attribute systems are wired up (backward-compatible).
     // Riposte swings never miss — the perfect-block reward must not be lost to RNG.
     const hitChance = this._hitChance();
-    if (!isRiposte && hitChance < 1.0 && Math.random() >= hitChance) {
+    if (!isRiposte && hitChance < 1.0 && this.random() >= hitChance) {
       this._ui.showNotification("Miss!", 600);
       this._resetCombo();
       return true;
@@ -829,12 +837,12 @@ export class CombatSystem {
 
     for (const npc of hitNpcs) {
       // NPC dodge chance
-      if (Math.random() < npc.dodgeChance) {
+      if (this.random() < npc.dodgeChance) {
         this._ui.showNotification(`${npc.displayName} dodges!`, 800);
         this._ui.showHitFlash("rgba(200, 200, 200, 0.15)");
         if (npc.physicsAggregate?.body) {
           const side = this.player.camera.getDirection(Vector3.Right());
-          const dodgeDir = Math.random() > 0.5 ? 1 : -1;
+          const dodgeDir = this.random() > 0.5 ? 1 : -1;
           npc.physicsAggregate.body.applyImpulse(side.scale(12 * dodgeDir), npc.mesh.position);
         }
         continue;
@@ -845,7 +853,7 @@ export class CombatSystem {
       // Critical hit: combine base player critChance with weapon's bonus.
       const baseCritChance = (this.player as unknown as { critChance?: number }).critChance ?? 0;
       const effectiveCritChance = baseCritChance + weaponProfile.critChanceBonus;
-      const isCrit = effectiveCritChance > 0 && Math.random() < effectiveCritChance;
+      const isCrit = effectiveCritChance > 0 && this.random() < effectiveCritChance;
       const critMultiplier = isCrit ? CRIT_DAMAGE_MULTIPLIER : 1.0;
 
       // Sneak-attack multiplier: shared base with bows; perks can raise it further.
@@ -886,7 +894,7 @@ export class CombatSystem {
       if (!npc.isDead && !npc.isStaggered) {
         const finisherStagger = isFinisher;
         const rolledStagger =
-          weaponProfile.staggerChance > 0 && Math.random() < weaponProfile.staggerChance;
+          weaponProfile.staggerChance > 0 && this.random() < weaponProfile.staggerChance;
         if (finisherStagger || rolledStagger) {
           npc.isStaggered = true;
           npc.staggerTimer = finisherStagger
@@ -1034,7 +1042,7 @@ export class CombatSystem {
       if (npc && !npc.isDead) {
         const baseCritChance = (this.player as unknown as { critChance?: number }).critChance ?? 0;
         const effectiveCritChance = baseCritChance + weaponProfile.critChanceBonus;
-        const isCrit = effectiveCritChance > 0 && Math.random() < effectiveCritChance;
+        const isCrit = effectiveCritChance > 0 && this.random() < effectiveCritChance;
         const critMultiplier = isCrit ? CRIT_DAMAGE_MULTIPLIER : 1.0;
         const sneakMult = resolveSneakAttackMultiplier(
           this._stealthSystem?.canSneakAttack(npc) === true,
@@ -1879,7 +1887,7 @@ export class CombatSystem {
     npc.setStateColor(COLOR_TELEGRAPH);
     // Elites occasionally commit to an unblockable heavy blow.
     npc.isAttackUnblockable =
-      /^(DragonBoss|Bandit Chief)/.test(npc.key) && Math.random() < UNBLOCKABLE_CHANCE;
+      /^(DragonBoss|Bandit Chief)/.test(npc.key) && this.random() < UNBLOCKABLE_CHANCE;
     // Alert the player with a timed warning matching the windup window.
     const windupMs = Math.round(npc.attackTelegraphTimer * 1000);
     const attackVerb = npc.npcAttackArchetype === "ranged"
@@ -1971,7 +1979,7 @@ export class CombatSystem {
 
       // Block counter: chance to stagger the attacker (Oblivion-style shield bash feel).
       // Perfect block ALWAYS staggers.
-      if (isPerfect || Math.random() < BLOCK_COUNTER_STAGGER_CHANCE) {
+      if (isPerfect || this.random() < BLOCK_COUNTER_STAGGER_CHANCE) {
         npc.isStaggered = true;
         npc.staggerTimer = isPerfect ? BLOCK_COUNTER_STAGGER_DURATION * 2.2 : BLOCK_COUNTER_STAGGER_DURATION;
         npc.isAttackTelegraphing = false;
@@ -2058,9 +2066,9 @@ export class CombatSystem {
     dir.normalize();
     // Ranged shots scatter more than guided magic bolts.
     const spread = npc.npcAttackArchetype === "magic" ? 0.03 : 0.05;
-    dir.x += (Math.random() - 0.5) * spread;
-    dir.y += (Math.random() - 0.5) * spread;
-    dir.z += (Math.random() - 0.5) * spread;
+    dir.x += (this.random() - 0.5) * spread;
+    dir.y += (this.random() - 0.5) * spread;
+    dir.z += (this.random() - 0.5) * spread;
     dir.normalize();
     this._projectileSystem.fireNpcArrow(origin, dir, damage, {
       sourceName: npc.key,
@@ -2083,8 +2091,8 @@ export class CombatSystem {
 
     npc.strafeTimer = Math.max(0, npc.strafeTimer - deltaTime);
     if (npc.strafeTimer <= 0) {
-      npc.strafeTimer = 0.3 + Math.random() * 0.55;
-      const roll = Math.random();
+      npc.strafeTimer = 0.3 + this.random() * 0.55;
+      const roll = this.random();
       if (roll < 0.38) {
         npc.strafeDirection = -1;
       } else if (roll < 0.76) {

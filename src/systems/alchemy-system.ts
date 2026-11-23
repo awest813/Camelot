@@ -1,5 +1,6 @@
 import type { Player } from "../entities/player";
 import type { UIManager } from "../ui/ui-manager";
+import { unseededRandom } from "../core/rng/rng";
 
 // ── Alchemy effect types ──────────────────────────────────────────────────────
 
@@ -254,6 +255,13 @@ export const DEFAULT_INGREDIENTS: IngredientDefinition[] = [
  *  - Every successful craft increases the skill.
  */
 export class AlchemySystem {
+  /**
+   * Where this system's random rolls come from.  The game gives it a named
+   * stream of the kernel's seeded RNG, so a seed replays a session; tests
+   * and standalone use fall back to an unseeded source.
+   */
+  public random: () => number = unseededRandom;
+
   private _player: Player;
   private _ui: UIManager;
 
@@ -484,7 +492,7 @@ export class AlchemySystem {
     const potionValue = Math.round(baseValue * skillMult);
 
     const potion: AlchemyPotion = {
-      id: `potion_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      id: `potion_${Date.now()}_${Math.floor(this.random() * 1000)}`,
       name: potionName,
       effects: potionEffects,
       value: potionValue,

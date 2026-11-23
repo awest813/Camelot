@@ -2,6 +2,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import type { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { unseededRandom } from "../core/rng/rng";
 
 // ── Weather state types ───────────────────────────────────────────────────────
 
@@ -82,6 +83,13 @@ export interface WeatherSaveState {
  * and works fully headlessly when scene/lights are omitted (useful for tests).
  */
 export class WeatherSystem {
+  /**
+   * Where this system's random rolls come from.  The game gives it a named
+   * stream of the kernel's seeded RNG, so a seed replays a session; tests
+   * and standalone use fall back to an unseeded source.
+   */
+  public random: () => number = unseededRandom;
+
   // ── Config ────────────────────────────────────────────────────────────────
   /** Minimum real-time seconds before weather can change. */
   public minWeatherDuration: number = 120;
@@ -328,7 +336,7 @@ export class WeatherSystem {
     let total = 0;
     for (const w of Object.values(options)) total += w;
 
-    let rand = Math.random() * total;
+    let rand = this.random() * total;
     for (const [stateKey, weight] of Object.entries(options)) {
       rand -= weight;
       if (rand <= 0) return stateKey as WeatherState;
@@ -337,7 +345,7 @@ export class WeatherSystem {
   }
 
   private _randomDuration(): number {
-    return this.minWeatherDuration + Math.random() * (this.maxWeatherDuration - this.minWeatherDuration);
+    return this.minWeatherDuration + this.random() * (this.maxWeatherDuration - this.minWeatherDuration);
   }
 }
 

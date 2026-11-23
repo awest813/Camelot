@@ -2,6 +2,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { NPC, AIState, ScheduleBehaviorType, type ScheduleBlock } from "../entities/npc";
 import { actors } from "../entities/actors";
 import type { LodTier } from "../core/ecs/actors";
+import { unseededRandom } from "../core/rng/rng";
 
 /** How far a "wander" destination is picked from the NPC's home position. */
 const WANDER_RADIUS = 8;
@@ -59,6 +60,13 @@ interface StuckTracker {
 }
 
 export class ScheduleSystem {
+  /**
+   * Where this system's random rolls come from.  The game gives it a named
+   * stream of the kernel's seeded RNG, so a seed replays a session; tests
+   * and standalone use fall back to an unseeded source.
+   */
+  public random: () => number = unseededRandom;
+
   public npcs: NPC[] = [];
 
   /**
@@ -379,8 +387,8 @@ export class ScheduleSystem {
    */
   private _pickRandomWanderPoint(origin: Vector3, from?: Vector3): Vector3 {
     for (let attempt = 0; attempt < 8; attempt++) {
-      const angle = Math.random() * Math.PI * 2;
-      const radius = Math.random() * WANDER_RADIUS;
+      const angle = this.random() * Math.PI * 2;
+      const radius = this.random() * WANDER_RADIUS;
       const x = origin.x + Math.cos(angle) * radius;
       const z = origin.z + Math.sin(angle) * radius;
       if (!this.walkable || this._clearLine(from ?? origin, x, z)) return new Vector3(x, origin.y, z);
@@ -405,13 +413,13 @@ export class ScheduleSystem {
   private _getPatrolWaitSeconds(npc: NPC): number {
     const min = Math.max(0, Math.min(npc.patrolWaitMin, npc.patrolWaitMax));
     const max = Math.max(min, Math.max(npc.patrolWaitMin, npc.patrolWaitMax));
-    return min + (max - min) * Math.random();
+    return min + (max - min) * this.random();
   }
 
   private _setPatrolIdleHeading(npc: NPC): void {
     npc.patrolPoints[npc.currentPatrolIndex].subtractToRef(npc.mesh.position, this._toTarget);
     const baseAngle = Math.atan2(this._toTarget.x, this._toTarget.z);
-    const randomOffset = (Math.random() * 2 - 1) * npc.patrolLookAroundAngle;
+    const randomOffset = (this.random() * 2 - 1) * npc.patrolLookAroundAngle;
     const heading = baseAngle + randomOffset;
 
     let headingVec = this._patrolPauseHeading.get(npc);

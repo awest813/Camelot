@@ -1,3 +1,4 @@
+import { unseededRandom } from "../core/rng/rng";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface LeveledEntry {
@@ -110,6 +111,13 @@ const MAX_DEPTH = 16;
  * ```
  */
 export class LeveledListSystem {
+  /**
+   * Where this system's random rolls come from.  The game gives it a named
+   * stream of the kernel's seeded RNG, so a seed replays a session; tests
+   * and standalone use fall back to an unseeded source.
+   */
+  public random: () => number = unseededRandom;
+
   private _lists: Map<string, LeveledList> = new Map();
 
   // ── Registry ──────────────────────────────────────────────────────────────
@@ -147,7 +155,7 @@ export class LeveledListSystem {
     const rng = {
       seed: seed !== undefined
         ? wangHash(seed)
-        : Math.floor(Math.random() * 0x7fffffff) + 1,
+        : Math.floor(this.random() * 0x7fffffff) + 1,
     };
     return this._resolveInner(listId, playerLevel, rng, 0);
   }
@@ -173,7 +181,7 @@ export class LeveledListSystem {
       const rng = {
         seed: currentSeed !== undefined
           ? currentSeed
-          : Math.floor(Math.random() * 0x7fffffff) + 1,
+          : Math.floor(this.random() * 0x7fffffff) + 1,
       };
       results.push(this._resolveInner(listId, playerLevel, rng, 0));
       if (currentSeed !== undefined) {

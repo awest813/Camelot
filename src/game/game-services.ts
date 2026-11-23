@@ -81,6 +81,27 @@ export interface GameInternals {
  * Provide the services features use and install the features.  Services
  * resolve lazily, so systems created later in the game's constructor are fine.
  */
+/**
+ * Give each gameplay system its own named stream of the kernel's seeded
+ * RNG, so a seed (plus inputs) replays a session.  Streams reset in place
+ * when the world is reseeded or a save is loaded, so wiring once is enough.
+ */
+export function seedGameRandomness(game: Game): void {
+  const wire = (system: { random: () => number }, stream: string): void => {
+    const rng = game.kernel.rng.stream(stream);
+    system.random = () => rng.next();
+  };
+  wire(game.combatSystem, "combat");
+  wire(game.projectileSystem, "projectiles");
+  wire(game.scheduleSystem, "schedules");
+  wire(game.weatherSystem, "weather");
+  wire(game.leveledListSystem, "leveled-lists");
+  wire(game.pickpocketSystem, "pickpocket-rolls");
+  wire(game.persuasionSystem, "persuasion");
+  wire(game.lootTableSystem, "loot-tables");
+  wire(game.alchemySystem, "alchemy");
+}
+
 export function installGameFeatures(game: Game, gi: GameInternals): void {
       const k = game.kernel;
       // First, so features can own their part of the save as they install.

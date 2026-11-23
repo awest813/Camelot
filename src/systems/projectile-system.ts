@@ -13,6 +13,7 @@ import { applyDamageWithResistance, resolveSneakAttackMultiplier, WEAPON_PROFILE
 import type { SkillProgressionSystem } from "./skill-progression-system";
 import type { AttributeSystem } from "./attribute-system";
 import { ObjectPool } from "./object-pool";
+import { unseededRandom } from "../core/rng/rng";
 
 const ARROW_SPEED          = 40;
 const BASE_ARROW_DAMAGE    = 15;
@@ -153,6 +154,13 @@ const MAGIC_BOLT_COLORS: Record<string, string> = {
  *   Releases below BOW_MIN_DRAW are silently cancelled.
  */
 export class ProjectileSystem {
+  /**
+   * Where this system's random rolls come from.  The game gives it a named
+   * stream of the kernel's seeded RNG, so a seed replays a session; tests
+   * and standalone use fall back to an unseeded source.
+   */
+  public random: () => number = unseededRandom;
+
   private _scene: Scene;
   private _player: Player;
   private _npcs: NPC[];
@@ -254,7 +262,7 @@ export class ProjectileSystem {
 
   private _createArrowMesh(): PooledArrow {
     const mesh = MeshBuilder.CreateCylinder(
-      `arrow_pooled_${Date.now()}_${Math.random()}`,
+      `arrow_pooled_${Date.now()}_${this.random()}`,
       { diameter: 0.05, height: 0.6, tessellation: 4 },
       this._scene,
     );
@@ -508,8 +516,8 @@ export class ProjectileSystem {
 
     const spread = Math.max(0, (100 - marksLevel) / 1000);
     const direction = new Vector3(
-      forward.x + (Math.random() - 0.5) * spread,
-      forward.y + (Math.random() - 0.5) * spread,
+      forward.x + (this.random() - 0.5) * spread,
+      forward.y + (this.random() - 0.5) * spread,
       forward.z,
     ).normalize();
 
@@ -597,7 +605,7 @@ export class ProjectileSystem {
         if (Vector3.Distance(arrow.mesh.position, npc.mesh.position) < ARROW_HIT_RADIUS) {
           // Evasion: aware, sprinting, or distant targets may sidestep the
           // shot entirely — a clean miss, shown as a grey zero.
-          if (Math.random() < this._npcEvasionChance(npc, arrow.mesh.position)) {
+          if (this.random() < this._npcEvasionChance(npc, arrow.mesh.position)) {
             const missPos = npc.mesh.position.addToRef(ProjectileSystem._DMG_OFFSET_Y2, this._hitPos);
             this._ui.showDamageNumber(missPos, 0, this._scene, DMG_COLOR_ARROW_MISS);
             hit = true;
@@ -622,7 +630,7 @@ export class ProjectileSystem {
           const baseCrit =
             (this._player as unknown as { critChance?: number }).critChance ?? 0;
           const effectiveCritChance = baseCrit + bowProf.critChanceBonus;
-          const isCrit = effectiveCritChance > 0 && Math.random() < effectiveCritChance;
+          const isCrit = effectiveCritChance > 0 && this.random() < effectiveCritChance;
           if (isCrit) {
             raw = Math.round(raw * ARROW_CRIT_DAMAGE_MULTIPLIER);
           }
@@ -637,7 +645,7 @@ export class ProjectileSystem {
           // Shield block: carriers (starting equipment with a shield) turn
           // some arrows for half damage.
           let blocked = false;
-          if (this._npcHasShield(npc) && Math.random() < NPC_SHIELD_BLOCK_CHANCE) {
+          if (this._npcHasShield(npc) && this.random() < NPC_SHIELD_BLOCK_CHANCE) {
             blocked = true;
             finalDamage = Math.max(1, Math.round(finalDamage / 2));
           }

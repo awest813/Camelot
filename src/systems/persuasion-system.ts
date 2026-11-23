@@ -1,3 +1,4 @@
+import { unseededRandom } from "../core/rng/rng";
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type PersuasionOutcome = "success" | "failure" | "critical_success" | "critical_failure";
@@ -62,6 +63,13 @@ const ACTION_DELTA_MULTIPLIER = 0.4;
 // ── PersuasionSystem ──────────────────────────────────────────────────────────
 
 export class PersuasionSystem {
+  /**
+   * Where this system's random rolls come from.  The game gives it a named
+   * stream of the kernel's seeded RNG, so a seed replays a session; tests
+   * and standalone use fall back to an unseeded source.
+   */
+  public random: () => number = unseededRandom;
+
   private _dispositions: Map<string, number> = new Map();
   /** Default starting disposition for any NPC not explicitly set. */
   public defaultDisposition: number = DISPOSITION_NEUTRAL;
@@ -221,7 +229,7 @@ export class PersuasionSystem {
     randomRoll?: number,
     deltaTransform?: (delta: number) => number,
   ): PersuasionAttemptResult {
-    const roll = randomRoll !== undefined ? randomRoll : Math.random();
+    const roll = randomRoll !== undefined ? randomRoll : this.random();
 
     let outcome: PersuasionOutcome;
     let delta: number;
