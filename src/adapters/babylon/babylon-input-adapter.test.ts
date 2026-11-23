@@ -413,3 +413,37 @@ describe("BabylonInputAdapter", () => {
     }
   });
 });
+
+describe("BabylonInputAdapter — contexts", () => {
+  it("in the map editor only the bindings marked for it are live", async () => {
+    const { BabylonInputAdapter } = await import("./babylon-input-adapter");
+    const a = new BabylonInputAdapter();
+    expect(a.handleKeyEvent("i", "down")).toBe("toggleInventory");
+    a.setContext("editor");
+    expect(a.handleKeyEvent("i", "down"), "gameplay keys go to the editor's chords").toBeNull();
+    expect(a.handleKeyEvent("t", "down")).toBeNull();
+    expect(a.handleKeyEvent("Escape", "down")).toBe("pause");
+    expect(a.handleKeyEvent("F2", "down")).toBe("toggleMapEditor");
+    expect(a.handleKeyEvent("F5", "down")).toBe("save");
+    expect(a.handleKeyEvent("F5", "down", { shift: true }), "Shift+F5 is a creator tool").toBeNull();
+    // Letting go of a bow or staff still works in the editor.
+    expect(a.handleKeyEvent("r", "up")).toBe("releaseBow");
+    a.setContext("play");
+    expect(a.handleKeyEvent("i", "down")).toBe("toggleInventory");
+  });
+
+  it("switching context drops held actions; Tab ignores auto-repeat", async () => {
+    const { BabylonInputAdapter } = await import("./babylon-input-adapter");
+    const a = new BabylonInputAdapter();
+    let sheets = 0;
+    a.onAction("toggleCharacterSheet", () => { sheets++; });
+    a.handleKeyEvent("Shift", "down");
+    expect(a.isActive("sprint")).toBe(true);
+    a.setContext("editor");
+    expect(a.isActive("sprint")).toBe(false);
+    a.setContext("play");
+    a.handleKeyEvent("Tab", "down");
+    expect(a.handleKeyEvent("Tab", "down", { repeat: true }), "a repeat is still Tab's").toBe("toggleCharacterSheet");
+    expect(sheets).toBe(1);
+  });
+});

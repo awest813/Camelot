@@ -565,17 +565,6 @@ export class Game {
   /** Launch achievements. Forwarded to Steamworks when the desktop shell is up. */
   private _achievements: AchievementSystem | null = null;
   private get _creditsUI(): CreditsUI { return this._settings.credits; }
-  /** Tracks whether the current key event was consumed by the input adapter. */
-  private _keyConsumedByAdapter: boolean = false;
-  /**
-   * Adapter keys that stay live while the map editor owns the keyboard.
-   * Every editor chord (T/G/P/H/L, F4–F12, Shift+F*, Ctrl+M/Z/Y, [/]) is
-   * handled by the legacy key branches, so while the editor is enabled the
-   * gameplay adapter only sees keys with no editor meaning.
-   */
-  private static readonly _EDITOR_ADAPTER_KEYS: ReadonlySet<string> = new Set([
-    "Escape", "F1", "F3", "PrintScreen", "m", "M",
-  ]);
 
   /** Short post-creation tips; advances on Space or when the hinted action occurs. */
   /** First-run tips (the onboarding feature). */
@@ -757,7 +746,11 @@ export class Game {
     this.editors = new EditorSuite(this, {
       suspendGameplay: () => this._suspendGameplayInput(),
       restoreGameplay: () => this._restoreGameplayInput(),
-      editorMode: (on) => { if (on) this._focus.take("editor"); else this._focus.give("editor"); },
+      editorMode: (on) => {
+        // The editor holds input, and its own chords replace the play bindings.
+        if (on) this._focus.take("editor"); else this._focus.give("editor");
+        this._inputAdapter.setContext(on ? "editor" : "play");
+      },
       modeChanged: () => this._refreshHelpOverlayIfVisible(),
     });
 
@@ -1446,51 +1439,18 @@ export class Game {
       window.addEventListener("keydown", (ev) => this._forwardDialogToggleKey(ev));
     }
 
-    // Input handling for pause
+    // Keys: the input adapter's bindings for the live context (play or the
+    // map editor) first; whatever they don't take is the editors' (map editor
+    // chords, Shift+F-key creator tools).
     this.scene.onKeyboardObservable.add((kbInfo) => {
-        this._keyConsumedByAdapter = false;
-
-        // Forward key events through the input adapter for decoupled action dispatch
-        if (kbInfo.type === KeyboardEventTypes.KEYDOWN || kbInfo.type === KeyboardEventTypes.KEYUP) {
-            const phase = kbInfo.type === KeyboardEventTypes.KEYDOWN ? "down" : "up";
-            if (this.mapEditorSystem.isEnabled && !Game._EDITOR_ADAPTER_KEYS.has(kbInfo.event.key)) {
-                // Editor mode: let the legacy editor branches see every chord;
-                // clear stuck held-actions (sprint, bow draw, …) as we skip.
-                this._inputAdapter.reset();
-            } else {
-                const handled = this._inputAdapter.handleKeyEvent(
-                    kbInfo.event.key,
-                    phase,
-                    { shift: kbInfo.event.shiftKey, ctrlOrMeta: kbInfo.event.ctrlKey || kbInfo.event.metaKey },
-                );
-                if (handled !== null) {
-                    this._keyConsumedByAdapter = true;
-                    kbInfo.event.preventDefault();
-                    return;
-                }
-            }
-        }
-
-        if (kbInfo.type === KeyboardEventTypes.KEYDOWN) {
-            if (kbInfo.event.key === "Tab") {
-                const tabEv = kbInfo.event as KeyboardEvent;
-                if (tabEv.repeat) return;
-                tabEv.preventDefault();
-                this.kernel.services.get(ProgressionKey).toggleSheet();
-            } else if (kbInfo.event.key === "F5" && !kbInfo.event.shiftKey) {
-                if (!this.isPaused) this.saveSystem.save();
-            } else if (kbInfo.event.key === "F9" && !kbInfo.event.shiftKey) {
-                if (!this.isPaused) this.saveSystem.load();
-            } else {
-                // Map editor and creator-tool chords.
-                this.editors.handleKey(kbInfo.event);
-            }
-        } else if (kbInfo.type === KeyboardEventTypes.KEYUP) {
-            // A bow drawn (or staff charged) before entering the editor is
-            // released here, where the editor sends key-ups.
-            if (kbInfo.event.key === "r" || kbInfo.event.key === "R") this._combatControls.releaseBow();
-            if (kbInfo.event.key === "q" || kbInfo.event.key === "Q") this._combatControls.castUp();
-        }
+        const ev = kbInfo.event as KeyboardEvent;
+        const down = kbInfo.type === KeyboardEventTypes.KEYDOWN;
+        if (!down && kbInfo.type !== KeyboardEventTypes.KEYUP) return;
+        const handled = this._inputAdapter.handleKeyEvent(ev.key, down ? "down" : "up", {
+          shift: ev.shiftKey, ctrlOrMeta: ev.ctrlKey || ev.metaKey, repeat: ev.repeat,
+        });
+        if (handled !== null) { ev.preventDefault(); return; }
+        if (down) this.editors.handleKey(ev);
     });
 
     // Wire up Pause Menu buttons
@@ -1720,6 +1680,7 @@ export class Game {
       this._toggleHelpOverlay();
     });
     adapter.onAction("toggleMapEditor", () => this.editors.toggleMapEditor());
+    adapter.onAction("toggleCharacterSheet", () => this.kernel.services.get(ProgressionKey).toggleSheet());
 
     // ── Skyrim/Oblivion-style action handlers ─────────────────────────────
     adapter.onAction("jump", () => {

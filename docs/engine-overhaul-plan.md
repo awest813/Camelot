@@ -539,6 +539,13 @@ setters instead of owning a save codec. That moves to the entity store
 - The editor's three copies of "turn the map editor on" are one.
 - Guardrail `pointer-lock-owner`: pointer lock only in the focus wiring
   (plus the dialogue / inventory fallbacks for running without a game).
+- Input contexts on the key-to-action map: each binding lists the contexts
+  it is live in (play, or the map editor). Escape, F1–F3, F5/F9, mute,
+  PrintScreen and the bow / staff releases are live in both. Every key the
+  bindings don't take goes to the editors' chords. This retires
+  `_EDITOR_ADAPTER_KEYS` and the legacy keyboard branches (Tab is now the
+  `toggleCharacterSheet` binding, ignoring auto-repeat). The game's
+  keyboard observable is a dozen lines.
 
 ### Phase 3 — Entity model for actors (3–4 weeks)
 

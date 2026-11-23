@@ -112,10 +112,11 @@ export class CombatControls {
     on("dodgeRoll", () => { if (!this._d.blocked()) c().tryDodgeRoll(); });
     on("block", () => { if (!this._d.blocked()) c().beginBlock(); });
     on("blockRelease", () => c().endBlock());
-    // The same action fires on key down and key up.
+    // The same action fires on key down and key up.  Letting go always
+    // releases a charged staff (even after entering the editor mid-charge).
     on("castSpell", () => {
-      if (this._d.blocked()) return;
-      if (adapter.isActive("castSpell" as never)) this.castDown(); else this.castUp();
+      if (!adapter.isActive("castSpell" as never)) { this.castUp(); return; }
+      this.castDown();
     });
     on("cycleSpell", () => this.cycleSpell());
     on("drawBow", () => this.drawBow());

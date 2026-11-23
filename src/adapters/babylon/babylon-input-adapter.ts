@@ -106,7 +106,15 @@ export type InputAction =
   | "helpOverlay"
   | "advanceTutorial"
   // Editor (high-level — editor-specific keys are left to the map editor)
-  | "toggleMapEditor";
+  | "toggleMapEditor"
+  | "toggleCharacterSheet";
+
+/**
+ * Which bindings are live.  In play every binding applies; in the map editor
+ * only the ones marked for it (Escape, F-keys, mute…), and every other key
+ * goes to the editor's own chords.
+ */
+export type InputContext = "play" | "editor";
 
 /**
  * Binding entry: maps a keyboard key (or mouse button) to a named action.
@@ -117,6 +125,10 @@ export type InputAction =
 export interface InputBinding {
   /** The `KeyboardEvent.key` value (e.g. `"i"`, `"Escape"`, `"F5"`). */
   key: string;
+  /** Contexts the binding is live in.  Defaults to `["play"]`. */
+  contexts?: readonly InputContext[];
+  /** Ignore auto-repeat while the key is held (one press, one toggle). */
+  ignoreRepeat?: boolean;
   /** Action to dispatch. */
   action: InputAction;
   /** Fire on key-down or key-up.  Defaults to `"down"`. */
@@ -135,6 +147,10 @@ export type ActionCallback = (action: InputAction) => void;
 
 // ── Default bindings ──────────────────────────────────────────────────────────
 
+/** Live in play and in the map editor. */
+const BOTH: readonly InputContext[] = ["play", "editor"];
+const PLAY_ONLY: readonly InputContext[] = ["play"];
+
 export const DEFAULT_BINDINGS: readonly InputBinding[] = [
 
   // ── Movement ────────────────────────────────────────────────────────────────
@@ -151,10 +167,10 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   { key: "e", action: "powerAttack", shift: true, caseInsensitive: true },
   // Q = Cast spell (KEYUP releases staff charge)
   { key: "q", action: "castSpell", caseInsensitive: true },
-  { key: "q", action: "castSpell", phase: "up", caseInsensitive: true },
+  { key: "q", action: "castSpell", phase: "up", caseInsensitive: true, contexts: BOTH },
   // R = Draw/release bow
   { key: "r", action: "drawBow", caseInsensitive: true },
-  { key: "r", action: "releaseBow", phase: "up", caseInsensitive: true },
+  { key: "r", action: "releaseBow", phase: "up", caseInsensitive: true, contexts: BOTH },
   // Z = Cycle equipped spell (shift:false so Ctrl+Z falls through to editor undo)
   { key: "z", action: "cycleSpell", caseInsensitive: true, ctrlOrMeta: false },
   // F = Dodge roll (i-frame dash; shift:false so editor Shift+F = Frame All)
@@ -173,7 +189,7 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   { key: "n", action: "toggleShoutMenu", shift: false, caseInsensitive: true },
 
   // ── UI panels ───────────────────────────────────────────────────────────────
-  // Tab = Character sheet (stays in legacy handler)
+  { key: "Tab", action: "toggleCharacterSheet", ignoreRepeat: true },
   { key: "i", action: "toggleInventory", caseInsensitive: true },
   { key: "j", action: "toggleQuestLog", caseInsensitive: true },
   { key: "k", action: "toggleSkillTree", caseInsensitive: true },
@@ -217,19 +233,19 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   { key: "^", action: "archetype6" },
 
   // ── System ──────────────────────────────────────────────────────────────────
-  { key: "Escape", action: "pause" },
-  { key: "F1", action: "helpOverlay" },
-  { key: "F2", action: "toggleMapEditor" },
-  { key: "F3", action: "toggleDebugOverlay" },
+  { key: "Escape", action: "pause", contexts: BOTH },
+  { key: "F1", action: "helpOverlay", contexts: BOTH },
+  { key: "F2", action: "toggleMapEditor", contexts: BOTH },
+  { key: "F3", action: "toggleDebugOverlay", contexts: BOTH },
   // F4 = POV toggle (shift:false so editor Shift+F4 stays free; plain F4 in the
   // editor is handled by the editor's own F4-export branch via game.ts)
   { key: "F4", action: "togglePOV", shift: false },
-  { key: "F5", action: "save", shift: false },   // shift:false → Shift+F5 = Bundle Merge Assistant
-  { key: "F9", action: "load", shift: false },   // shift:false → Shift+F9 = Faction Creator (never load a save!)
+  { key: "F5", action: "save", shift: false, contexts: BOTH },   // shift:false → Shift+F5 = Bundle Merge Assistant
+  { key: "F9", action: "load", shift: false, contexts: BOTH },   // shift:false → Shift+F9 = Faction Creator (never load a save!)
   // M = Mute (shift:false so Shift+M = Mark; ctrlOrMeta:false so Ctrl+M = Scene
   // Notes, Ctrl+Shift+M = Mod Manifest)
-  { key: "m", action: "toggleMute", caseInsensitive: true, ctrlOrMeta: false, shift: false },
-  { key: "PrintScreen", action: "screenshot", caseInsensitive: true },
+  { key: "m", action: "toggleMute", caseInsensitive: true, ctrlOrMeta: false, shift: false, contexts: BOTH },
+  { key: "PrintScreen", action: "screenshot", caseInsensitive: true, contexts: BOTH },
 ];
 
 // ── System ─────────────────────────────────────────────────────────────────────
@@ -240,6 +256,8 @@ export class BabylonInputAdapter {
 
   /** Registered action listeners. */
   private _listeners = new Map<InputAction, Set<ActionCallback>>();
+
+  private _context: InputContext = "play";
 
   /** Tracks which actions are currently "active" (key held). */
   private _activeActions = new Set<InputAction>();
@@ -321,10 +339,12 @@ export class BabylonInputAdapter {
   handleKeyEvent(
     key: string,
     phase: "down" | "up",
-    modifiers: { shift?: boolean; ctrlOrMeta?: boolean } = {},
+    modifiers: { shift?: boolean; ctrlOrMeta?: boolean; repeat?: boolean } = {},
   ): InputAction | null {
     const binding = this._matchBinding(key, phase, modifiers);
     if (!binding) return null;
+    // A held toggle key auto-repeats; it still belongs to its action.
+    if (binding.ignoreRepeat && modifiers.repeat) return binding.action;
 
     // Track active state
     if (phase === "down") {
@@ -355,6 +375,7 @@ export class BabylonInputAdapter {
     modifiers: { shift?: boolean; ctrlOrMeta?: boolean },
   ): InputBinding | null {
     for (const binding of this._bindings) {
+      if (!(binding.contexts ?? PLAY_ONLY).includes(this._context)) continue;
       const bindingPhase = binding.phase ?? "down";
       if (bindingPhase !== phase) continue;
 
@@ -407,6 +428,18 @@ export class BabylonInputAdapter {
       return "blockRelease";
     }
     return null;
+  }
+
+  /** The live context (see InputContext). */
+  get context(): InputContext {
+    return this._context;
+  }
+
+  /** Switch context; held actions are dropped so nothing sticks across it. */
+  setContext(context: InputContext): void {
+    if (context === this._context) return;
+    this._context = context;
+    this.reset();
   }
 
   /** Reset all active actions (call when focus is lost or game pauses). */
