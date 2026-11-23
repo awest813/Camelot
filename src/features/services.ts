@@ -68,10 +68,12 @@ export interface ActorsService {
   despawn(npc: NPC): void;
   /** Whether the player is talking or trading with this NPC. */
   isTalkingTo(npc: NPC): boolean;
-  /** Look an NPC up by mesh name (until entity ids, Phase 3). */
+  /** Look an NPC up by its key (its spawn name). */
   byName(name: string): NPC | undefined;
   /** Every live NPC the simulation tracks. */
   all(): readonly NPC[];
+  /** Living NPCs that are hostile right now (the `Aggressive` actor tag). */
+  hostiles(): readonly NPC[];
 }
 
 /** Static facts about the streamed world. */

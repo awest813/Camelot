@@ -1,6 +1,6 @@
 import { Scene } from "@babylonjs/core/scene";
 import { actors } from "./actors";
-import { Aggressive, Dead, Guard, HitReact, HostileOnSight, InDialogue, Provoked, Staggered, Telegraphing, Unblockable, type ActorId } from "../core/ecs/actors";
+import { Aggressive, Dead, Engaged, Guard, HitReact, HostileOnSight, InDialogue, Provoked, Staggered, Telegraphing, Unblockable, type ActorId } from "../core/ecs/actors";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
@@ -40,6 +40,11 @@ export enum AIState {
   /** NPC is running away from the player (triggered when health drops below fleesBelowHealthPct). */
   FLEE        = "FLEE",
 }
+
+/** The AI states that count as fighting (the `Engaged` actor tag). */
+export const ENGAGED_STATES: ReadonlySet<AIState> = new Set([
+  AIState.ALERT, AIState.INVESTIGATE, AIState.CHASE, AIState.ATTACK,
+]);
 
 /**
  * Damage categories used for resistance and weakness calculations.
@@ -117,8 +122,17 @@ export class NPC {
 
   // ─── AI State Machine ───────────────────────────────────────────────────────
 
-  /** Current AI state. Managed by CombatSystem. */
-  public aiState: AIState = AIState.IDLE;
+  /**
+   * Current AI state. Managed by CombatSystem.  The fighting states (alert,
+   * investigate, chase, attack) also tag the actor `Engaged`, so "who is
+   * fighting" is a query.
+   */
+  public get aiState(): AIState { return this._aiState; }
+  public set aiState(state: AIState) {
+    this._aiState = state;
+    actors.set(this.actorId, Engaged, ENGAGED_STATES.has(state));
+  }
+  private _aiState: AIState = AIState.IDLE;
 
   /**
    * Legacy backward-compatible flag. Kept in sync with aiState so that

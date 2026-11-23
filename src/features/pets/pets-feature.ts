@@ -23,7 +23,7 @@ import type { Feature, FeatureContext, ServiceRegistry } from "../../core/kernel
 import { createServiceKey } from "../../core/kernel";
 import { PetSystem, type Pet } from "../../systems/pet-system";
 import { PetUI } from "../../ui/pet-ui";
-import { AIState, type NPC } from "../../entities/npc";
+import type { NPC } from "../../entities/npc";
 import { ActorsKey, AnimationKey, FeedbackKey, GameplayKey, ModalKey, PlayerKey, ownSave } from "../services";
 
 /** Seconds between a companion's attacks. */
@@ -225,9 +225,7 @@ export class PetsFeature implements Feature {
     if (this._attackTimer > 0) return;
     let target: NPC | null = null;
     let best = pet.attackRange * pet.attackRange;
-    for (const npc of services.get(ActorsKey).all()) {
-      if (npc.isDead) continue;
-      if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK && !npc.isAggressive) continue;
+    for (const npc of services.get(ActorsKey).hostiles()) {
       const ex = npc.mesh.position.x - petPos.x, ez = npc.mesh.position.z - petPos.z;
       const d = ex * ex + ez * ez;
       if (d < best) { best = d; target = npc; }

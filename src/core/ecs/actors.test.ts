@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ActorStore, Aggressive, Dead, InDialogue } from "./actors";
+import { ActorStore, Aggressive, Dead, InDialogue, LodFar } from "./actors";
 
 describe("ActorStore", () => {
   it("gives each body an id, tags it, and finds actors by tags", () => {
@@ -51,5 +51,28 @@ describe("ActorStore", () => {
       for (const id of live) { s.set(id, Aggressive, true); expect(s.has(id, Dead)).toBe(true); }
     }
     expect(new Set(s.query(Dead, Aggressive))).toEqual(new Set(live));
+  });
+
+  it("bodies() filters with and without tags", () => {
+    const s = new ActorStore<string>();
+    const fighter = s.spawn("fighter"), corpse = s.spawn("corpse"), calm = s.spawn("calm");
+    s.set(fighter, Aggressive, true);
+    s.set(corpse, Aggressive, true);
+    s.set(corpse, Dead, true);
+    expect(s.bodies([Aggressive])).toEqual(expect.arrayContaining(["fighter", "corpse"]));
+    expect(s.bodies([Aggressive], [Dead])).toEqual(["fighter"]);
+    expect(s.bodies([Dead], [Aggressive])).toEqual([]);
+    expect(s.exists(calm)).toBe(true);
+  });
+
+  it("LOD tiers: one at a time, untiered counts as near", () => {
+    const s = new ActorStore<string>();
+    const a = s.spawn("a");
+    expect(s.tier(a)).toBe("near");
+    s.setTier(a, "far");
+    expect(s.tier(a)).toBe("far");
+    s.setTier(a, "mid");
+    expect(s.tier(a)).toBe("mid");
+    expect(s.has(a, LodFar)).toBe(false);
   });
 });

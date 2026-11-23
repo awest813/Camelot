@@ -627,6 +627,18 @@ components.
   followers, mounts, raids, jobs, crafting, survival, spell making and
   pickpocket. Their setters and save/load lines are gone from the save
   system. Save keys are unchanged, so existing saves load.
+- AI state is queryable. Setting `npc.aiState` tags the actor `Engaged` in
+  the fighting states (alert, investigate, chase, attack).
+  `ActorStore.bodies(with, without)` returns bodies with bitECS `Not`
+  terms. "Is the player in combat" (fast travel, waiting, the HUD) is one
+  query, living `Engaged`, instead of a scan of every NPC. The `actors`
+  service has `hostiles()` (living `Aggressive`), and the companion picks
+  its target from it.
+- Still scans: combat, spells, projectiles and the crime system's guard
+  search walk their own NPC lists. Those loops are proximity searches,
+  where a tag query alone does not help, and their unit tests build the
+  lists directly. They move to a spatial index over actors in Phase 5,
+  with the navmesh tiles.
 
 ### Phase 4 — Consolidation (3 weeks)
 

@@ -54,7 +54,7 @@ function setup() {
     },
     despawn: vi.fn(), isTalkingTo: () => false,
     byName: (n) => spawned.find((s) => s.mesh.name === n),
-    all: () => spawned,
+    all: () => spawned, hostiles: () => [],
   });
   k.services.provide(SiteBuilderKey, {
     scene,

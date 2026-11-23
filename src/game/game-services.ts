@@ -11,6 +11,8 @@ import { applyDamageWithResistance } from "../systems/combat-shared";
 import { getDesktopBridge } from "../platform/desktop-bridge";
 import { Loot } from "../entities/loot";
 import { VillageRaidFeature } from "../features/village-raids/raid-feature";
+import { actors } from "../entities/actors";
+import { Aggressive, Dead } from "../core/ecs/actors";
 import { ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey, QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
 import { VillagesFeature } from "../features/villages/villages-feature";
 import { WorldSitesFeature } from "../features/world-sites/world-sites-feature";
@@ -107,6 +109,7 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
         isTalkingTo: (npc) => npc.isInDialogue || npc.key === gi.currentDialogueNpcName,
         byName: (name) => game.scheduleSystem.npcs.find((n) => n.key === name),
         all: () => game.scheduleSystem.npcs,
+        hostiles: () => actors.bodies([Aggressive], [Dead]),
       });
       k.services.provide(WorldInfoKey, {
         get chunkSize() { return game.world.chunkSize; },

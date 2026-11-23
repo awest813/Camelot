@@ -10,7 +10,7 @@
  *
  * Engine overhaul, Phase 3.  bitECS 0.4 (MPL-2.0, used unmodified).
  */
-import { addComponent, addEntity, createWorld, hasComponent, query, removeComponent, removeEntity } from "bitecs";
+import { Not, addComponent, addEntity, createWorld, hasComponent, query, removeComponent, removeEntity } from "bitecs";
 
 /**
  * An actor's id in the store.  Ids are never reused, so a stale id names
@@ -35,6 +35,8 @@ export const Unblockable = {};
 /** Took damage this frame (the hit-react animation plays). */
 export const HitReact = {};
 export const Guard = {};
+/** In a fighting state: alert, investigating, chasing or attacking. */
+export const Engaged = {};
 /** Belongs to a loaded chunk, and leaves the world when it unloads. */
 export const ChunkOwned = {};
 
@@ -116,6 +118,18 @@ export class ActorStore<Body = unknown> {
     for (const eid of query(this._world, tags)) {
       const id = this._ids.get(eid);
       if (id !== undefined) out.push(id);
+    }
+    return out;
+  }
+
+  /** The bodies of every actor with all of `tags` and none of `without`. */
+  public bodies(tags: readonly ActorTag[], without: readonly ActorTag[] = []): Body[] {
+    const out: Body[] = [];
+    const terms = [...tags, ...without.map((t) => Not(t))];
+    for (const eid of query(this._world, terms)) {
+      const id = this._ids.get(eid);
+      const body = id === undefined ? undefined : this._bodies.get(id);
+      if (body !== undefined) out.push(body);
     }
     return out;
   }

@@ -13,6 +13,7 @@ import { AdaptiveResolution } from "./rendering/adaptive-resolution";
 import { NpcVisuals } from "./rendering/npc-visuals";
 import { NpcTierSystem } from "./systems/npc-tier-system";
 import { actors } from "./entities/actors";
+import { Dead, Engaged } from "./core/ecs/actors";
 import { Player } from "./entities/player";
 import { UIManager } from "./ui/ui-manager";
 import { WorldManager } from "./world/world-manager";
@@ -2068,13 +2069,8 @@ export class Game {
   }
 
   private _isPlayerInCombat(): boolean {
-      return this.scheduleSystem.npcs.some((npc) =>
-          !npc.isDead &&
-          (npc.aiState === AIState.ALERT ||
-           npc.aiState === AIState.INVESTIGATE ||
-           npc.aiState === AIState.CHASE ||
-           npc.aiState === AIState.ATTACK)
-      );
+      // Anyone alive in a fighting state (the Engaged tag).
+      return actors.bodies([Engaged], [Dead]).length > 0;
   }
 
   private _onCellEntered(cellId: string, cellName: string): void {

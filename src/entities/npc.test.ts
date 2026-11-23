@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { NPC } from './npc';
+import { AIState, NPC } from './npc';
+import { actors } from './actors';
+import { Engaged } from '../core/ecs/actors';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
 import { PhysicsMotionType } from '@babylonjs/core/Physics';
@@ -161,6 +163,15 @@ describe('NPC', () => {
 
         beforeEach(() => {
             npc = new NPC(mockScene, new Vector3(0, 0, 0), 'test_npc');
+        });
+
+        it('fighting AI states tag the actor Engaged', () => {
+            expect(actors.has(npc.actorId, Engaged)).toBe(false);
+            npc.aiState = AIState.CHASE;
+            expect(actors.has(npc.actorId, Engaged)).toBe(true);
+            expect(actors.bodies([Engaged])).toContain(npc);
+            npc.aiState = AIState.RETURN;
+            expect(actors.has(npc.actorId, Engaged)).toBe(false);
         });
 
         it('should take damage and not die if health is > 0', () => {

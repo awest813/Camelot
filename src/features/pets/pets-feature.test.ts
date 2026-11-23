@@ -33,6 +33,7 @@ function setup() {
   k.services.provide(ActorsKey, {
     residents: () => [], spawnArchetype: () => null, despawn: vi.fn(), isTalkingTo: () => false,
     byName: () => undefined, all: () => npcs,
+    hostiles: () => npcs.filter((n) => !n.isDead && (n.isAggressive || n.aiState === AIState.CHASE || n.aiState === AIState.ATTACK)),
   });
   const feature = new PetsFeature(scene);
   k.install(feature);
