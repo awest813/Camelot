@@ -391,6 +391,11 @@ state, scope and save codec.
   15. **Death** (`src/features/death/`): falling at 0 health and waking at
       the nearest known place. The wait now runs on the game clock, so it
       doesn't expire under the pause menu.
+
+  16. **Pickpocket** (`src/features/pickpocket/`): what NPCs carry, the
+      picker, the roll (now on a seeded stream) and getting caught. New
+      `thief-host` service (crouching, noticed, report the theft, receive
+      the item); opening it emits `pickpocket:opened`.
 - `game.update()` runs the `ui` phase each frame. The pet, follower and
   shout HUD chips are `ui` systems of their features.
 - World environment (`src/rendering/world-environment.ts`): the lights and

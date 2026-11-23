@@ -163,9 +163,9 @@ import { FantasyAssetLoader, setInstanceScale, setInstanceYaw, type FantasyAsset
 import type { PetSystem } from "./systems/pet-system";
 import type { PetUI } from "./ui/pet-ui";
 import { PetsFeature, PetsKey, type PetsService } from "./features/pets/pets-feature";
-import { PickpocketSystem } from "./systems/pickpocket-system";
-import type { PickpocketableItem } from "./systems/pickpocket-system";
-import { PickpocketUI } from "./ui/pickpocket-ui";
+import type { PickpocketSystem } from "./systems/pickpocket-system";
+import type { PickpocketUI } from "./ui/pickpocket-ui";
+import { PickpocketFeature, PickpocketKey, ThiefHostKey, COIN_PURSE } from "./features/pickpocket/pickpocket-feature";
 import { AssetBrowserSystem } from "./systems/asset-browser-system";
 import { AssetBrowserUI } from "./ui/asset-browser-ui";
 import { BundleMergeSystem } from "./systems/bundle-merge-system";
@@ -284,8 +284,10 @@ export class Game {
   public timeSystem: TimeSystem;
   public stealthSystem: StealthSystem;
   public crimeSystem: CrimeSystem;
-  public pickpocketSystem: PickpocketSystem;
-  public pickpocketUI: PickpocketUI;
+  /** Pickpocketing (built with the game: NPCs register what they carry first). */
+  private readonly _thief = new PickpocketFeature((id) => this.frameworkRuntime?.contentRegistry.getItemDefinition(id)?.name);
+  public get pickpocketSystem(): PickpocketSystem { return this._thief.system; }
+  public get pickpocketUI(): PickpocketUI { return this._thief.panel; }
   public containerSystem: ContainerSystem;
   public projectileSystem: ProjectileSystem;
   public barterSystem: BarterSystem;
@@ -515,8 +517,6 @@ export class Game {
   private _cameraSensitivity: CameraSensitivity = "standard";
   /** Mesh name of the NPC the player is currently talking to (persuasion pricing). */
   private _currentDialogueNpcName: string | null = null;
-  /** Mesh name of the NPC currently shown in the pickpocket picker (null when closed). */
-  private _pickpocketTargetId: string | null = null;
   /** True while the character-creation wizard is up (Escape must not pause beneath it). */
   private _inCharacterCreation: boolean = false;
 
@@ -792,39 +792,14 @@ export class Game {
     this.saveSystem.setStealthSystem(this.stealthSystem);
 
     // ── Pickpocket wiring (sneak-thief loop) ────────────────────────────────
-    this.pickpocketSystem = new PickpocketSystem();
     this.saveSystem.setPickpocketSystem(this.pickpocketSystem);
-    this.pickpocketUI = new PickpocketUI();
-    this.pickpocketSystem.onPickpocketSuccess = (npcId, itemId, xp) => {
-      this._grantPickpocketItem(npcId, itemId);
-      const mult = this.classSystem.xpMultiplierFor("sneak");
-      this.skillProgressionSystem.gainXP("sneak", xp * mult);
-      this.ui.showNotification(`Lifted ${this._pickpocketItemLabel(itemId)}!`, 2200);
-      this.saveSystem.markDirty();
-      this._refreshPickpocketUI(npcId);
-    };
-    this.pickpocketSystem.onPickpocketFailed = (_npcId, _itemId, caught) => {
-      if (!caught) this.ui.showNotification("Your fingers slip — unnoticed. Try again.", 2200);
-    };
-    this.pickpocketSystem.onCaught = (npcId) => {
-      const npc = this.scheduleSystem.npcs.find(n => n.mesh.name === npcId);
-      this.crimeSystem.commitCrime("theft", npc?.factionId ?? "village_guard", this.timeSystem.elapsedGameTime);
-      this.ui.showNotification("Caught pickpocketing!", 2600);
-      if (this.pickpocketUI.isVisible) {
-        this._pickpocketTargetId = null;
-        this.pickpocketUI.hide();
-        this._restoreGameplayInput();
-      }
-    };
-    this.pickpocketUI.onStealItem = (itemId) => this._attemptPickpocketSteal(itemId);
-    this.pickpocketUI.onClose = () => this._restoreGameplayInput();
     this.interactionSystem.stealthSystem = this.stealthSystem;
     this.interactionSystem.pickpocketSystem = this.pickpocketSystem;
     this.interactionSystem.sneakLevelProvider = () =>
       this.skillProgressionSystem.getSkill("sneak")?.level ?? 0;
-    this.interactionSystem.onPickpocketNpc = (npc) => this._openPickpocketUI(npc);
+    this.interactionSystem.onPickpocketNpc = (npc) => this.kernel.services.get(PickpocketKey).open(npc);
     // Seed the starting cast (structure/archetype spawns register on arrival).
-    for (const npc of this.scheduleSystem.npcs) this._registerPickpocketInventory(npc);
+    for (const npc of this.scheduleSystem.npcs) this._thief.registerNpc(npc);
 
     // ── v3 system wiring ──────────────────────────────────────────────────────
     this.eventBus        = new GameEventBus();
@@ -1030,7 +1005,7 @@ export class Game {
       this.scheduleSystem.addNPC(npc);
       this.levelScalingSystem.scaleNPC(npc, this.player.level);
       this.lodSystem.register(npc.mesh, 120);
-      this._registerPickpocketInventory(npc);
+      this._thief.registerNpc(npc);
     };
 
     this.world.structures.onNPCRemove = (npc) => {
@@ -2639,7 +2614,7 @@ export class Game {
       if (this.fastTravelUI.isVisible) { this.fastTravelUI.close(); return; }
       if (this.petUI.isVisible) { this.petUI.close(); this._restoreGameplayInput(); return; }
       if (this.followerUI.isVisible) { this.followerUI.close(); this._restoreGameplayInput(); return; }
-      if (this.pickpocketUI.isVisible) { this._pickpocketTargetId = null; this.pickpocketUI.hide(); this._restoreGameplayInput(); return; }
+      if (this.pickpocketUI.isVisible) { this.kernel.services.get(PickpocketKey).close(); return; }
       if (this.stableUI.isVisible) { this.stableUI.close(); return; }
       if (this.saddlebagUI.isVisible) { this.saddlebagUI.close(); return; }
       if (this._creditsUI?.isVisible) { this._creditsUI.hide(); this._creditsUI.onClose?.(); return; }
@@ -2829,7 +2804,7 @@ export class Game {
           if (this.petUI.isVisible) { this.petUI.close(); }
           if (this.followerUI.isVisible) { this.followerUI.close(); }
           if (this.shoutUI.isVisible) { this.shoutUI.close(); }
-          if (this.pickpocketUI.isVisible) { this._pickpocketTargetId = null; this.pickpocketUI.hide(); }
+          if (this.pickpocketUI.isVisible) { this.pickpocketUI.hide(); }
           if (this.stableUI.isVisible) { this.stableUI.close(); }
           if (this.saddlebagUI.isVisible) { this.saddlebagUI.close(); }
           if (this.ui.isAttributePanelOpen) { this.ui.toggleAttributePanel(false); }
@@ -3207,7 +3182,7 @@ export class Game {
       const cz = Math.floor(z / this.world.chunkSize);
       const reg = this.world.getRegionAt(cx, cz);
       this.levelScalingSystem?.scaleNPC(npc, this.player.level, reg?.dangerLevel);
-      this._registerPickpocketInventory(npc);
+      this._thief.registerNpc(npc);
       this.lodSystem.register(npc.mesh, 120);
       chunkRecord.npcs.push(npc);
       return npc;
@@ -3820,98 +3795,15 @@ export class Game {
       this.inventorySystem.addItem(item);
   }
 
-  /**
-   * Register an NPC's liftable inventory: authored starting equipment plus a
-   * coin purse for non-hostiles (settlers carry coin — without this, nobody
-   * in the demo has anything worth stealing).
-   */
-  private _registerPickpocketInventory(npc: NPC): void {
-      const items: PickpocketableItem[] = [];
-      for (const id of npc.startingEquipmentIds) {
-          const def = this.frameworkRuntime.contentRegistry.getItemDefinition(id);
-          items.push({ id, name: def?.name ?? this._humanizeItemId(id), weight: 0.5, value: 10 });
-      }
-      if (!npc.isAggressive) {
-          items.push({ id: "coin_purse", name: "Coin Purse", weight: 0.1, value: 12 });
-      }
-      this.pickpocketSystem.registerNpcInventory(npc.mesh.name, items);
-  }
 
-  /** Open the pickpocket picker for a mark (called from the E interaction). */
-  private _openPickpocketUI(npc: NPC): void {
-      const npcId = npc.mesh.name;
-      const items = this.pickpocketSystem.getNpcInventory(npcId);
-      if (!items || items.length === 0) {
-          this.ui.showNotification("Nothing worth taking.", 1800);
-          return;
-      }
-      this._pickpocketTargetId = npcId;
-      this.pickpocketUI.show(npcId);
-      this._refreshPickpocketUI(npcId);
-      this._suspendGameplayInput();
-      this._advanceOnboardingStep("sneak");
-  }
 
-  /** Re-render the picker with live chances; auto-close when cleaned out. */
-  private _refreshPickpocketUI(npcId: string): void {
-      if (!this.pickpocketUI.isVisible) return;
-      const items = this.pickpocketSystem.getNpcInventory(npcId) ?? [];
-      const sneak = this.skillProgressionSystem.getSkill("sneak")?.level ?? 0;
-      this.pickpocketUI.update(items.map(i => ({
-          id: i.id,
-          name: i.name,
-          chance: this.pickpocketSystem.getSuccessChance(npcId, i.id, sneak, 30) ?? 0,
-      })));
-      if (items.length === 0) {
-          this._pickpocketTargetId = null;
-          this.pickpocketUI.hide();
-          this._restoreGameplayInput();
-      }
-  }
 
-  /** Resolve one steal click: live eligibility check, then the dice roll. */
-  private _attemptPickpocketSteal(itemId: string): void {
-      const npcId = this._pickpocketTargetId;
-      if (!npcId) return;
-      const npc = this.scheduleSystem.npcs.find(n => n.mesh.name === npcId);
-      const sneak = this.skillProgressionSystem.getSkill("sneak")?.level ?? 0;
-      const detected = npc ? this.stealthSystem.getDetectionLevel(npc) >= 30 : true;
-      const result = this.pickpocketSystem.attempt(
-          npcId, itemId, sneak, 30, this.stealthSystem.isCrouching, detected);
-      if (!result.success && result.reason !== "failed_roll") {
-          // Eligibility lapsed mid-panel (stood up, spotted, emptied).
-          const msg: Record<string, string> = {
-              unknown_npc: "There's nothing to steal there.",
-              not_crouching: "You must stay crouched to pickpocket.",
-              already_detected: "You've been spotted — too late to lift anything.",
-              empty_inventory: "Nothing worth taking.",
-              unknown_item: "That item is already gone.",
-          };
-          this.ui.showNotification(msg[result.reason] ?? "Can't steal that.", 2200);
-          if (result.reason === "empty_inventory" || result.reason === "unknown_npc") {
-              this._pickpocketTargetId = null;
-              this.pickpocketUI.hide();
-              this._restoreGameplayInput();
-          }
-      }
-      // Rolled success/failure feedback + picker refresh arrive via the
-      // onPickpocketSuccess / onPickpocketFailed / onCaught callbacks above.
-  }
 
-  /** Display name for a stolen item (framework def, else humanized id). */
-  private _pickpocketItemLabel(itemId: string): string {
-      if (itemId === "coin_purse") return "Coin Purse";
-      return this.frameworkRuntime.contentRegistry.getItemDefinition(itemId)?.name
-          ?? this._humanizeItemId(itemId);
-  }
 
-  private _humanizeItemId(itemId: string): string {
-      return itemId.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-  }
 
   /** Move a successfully lifted item into the player inventory. */
-  private _grantPickpocketItem(_npcId: string, itemId: string): void {
-      if (itemId === "coin_purse") {
+  private _grantPickpocketItem(itemId: string): void {
+      if (itemId === COIN_PURSE) {
           this.inventorySystem.addItem({
               id: GOLD_ITEM_ID,
               name: "Gold Coins",
@@ -3937,7 +3829,7 @@ export class Game {
       }
       this.inventorySystem.addItem({
           id: gameId,
-          name: this._humanizeItemId(itemId),
+          name: this._thief.label(itemId),
           description: "Lifted.",
           stackable: false,
           quantity: 1,
@@ -4252,6 +4144,20 @@ export class Game {
         },
       });
       k.install(new DeathFeature());
+      k.services.provide(ThiefHostKey, {
+        crouching: () => this.stealthSystem.isCrouching,
+        noticed: (npcId) => {
+          const npc = this.scheduleSystem.npcs.find((n) => n.mesh.name === npcId);
+          return npc ? this.stealthSystem.getDetectionLevel(npc) >= 30 : true;
+        },
+        reportTheft: (npcId) => {
+          const npc = this.scheduleSystem.npcs.find((n) => n.mesh.name === npcId);
+          this.crimeSystem.commitCrime("theft", npc?.factionId ?? "village_guard", this.timeSystem.elapsedGameTime);
+        },
+        receive: (itemId) => this._grantPickpocketItem(itemId),
+      });
+      k.install(this._thief);
+      k.events.on("pickpocket:opened", () => this._advanceOnboardingStep("sneak"));
       this.saveSystem.setFastTravelSystem(this._fastTravel.places);
       const record = (chunkKey: string) => this._chunks.record(chunkKey);
       k.services.provide(SiteBuilderKey, {

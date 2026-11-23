@@ -201,6 +201,18 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
     { timeout: 45_000, message: "the player wakes (game-clock seconds run slow under load)" },
   ).toBeGreaterThan(0);
 
+  // Pickpocket picker on a peaceful NPC (they carry a coin purse); Escape closes it.
+  expect(await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    const mark = g.scheduleSystem.npcs.find((n: any) => !n.isDead && !n.isAggressive && g.pickpocketSystem.getNpcInventory(n.mesh.name)?.length);
+    if (!mark) return "no mark";
+    g.interactionSystem.onPickpocketNpc(mark);
+    return g.pickpocketUI.isVisible ? "open" : "closed";
+  })).toBe("open");
+  await page.keyboard.press("Escape");
+  expect(await page.evaluate(() => (window as any).__camelotGame.pickpocketUI.isVisible)).toBe(false);
+  await page.locator("#renderCanvas").click({ force: true });
+
   // A guard stops the player for a bounty; Escape resists arrest.
   const arrest = await page.evaluate(() => {
     const g = (window as any).__camelotGame;

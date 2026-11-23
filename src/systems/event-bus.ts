@@ -36,6 +36,7 @@ export interface GameEvents {
   "spell:heal": { spellId: string; amount: number };
   /** The stealth system detected the player. */
   "stealth:detected": { npcName: string };
+  "pickpocket:opened": { npcName: string };
   /** The player's inventory changed. */
   "inventory:changed": { item: Item; delta: number };
   /** A loot drop was generated (e.g. from a loot table roll). */
