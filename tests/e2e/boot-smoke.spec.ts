@@ -167,7 +167,12 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
   // N — the shouts panel; Shift+N with nothing equipped says so.
   await page.keyboard.press("n");
   expect(await page.evaluate(() => (window as any).__camelotGame.shoutUI.isVisible), "shouts panel open").toBe(true);
-  await page.keyboard.press("n");
+  // Escape closes it (it used to pause the game underneath instead).
+  await page.keyboard.press("Escape");
+  expect(await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    return { open: g.shoutUI.isVisible, paused: g.isPaused };
+  })).toEqual({ open: false, paused: false });
   await page.locator("#renderCanvas").click({ force: true });
   expect(await page.evaluate(() => {
     const g = (window as any).__camelotGame;
@@ -183,12 +188,13 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
     const before = g.timeSystem.elapsedGameTime;
     g.fastTravelUI.onTravel("start_village");
     return {
+      why: { combat: g._isPlayerInCombat(), crouch: g.stealthSystem.isCrouching, enc: g.player.isEncumbered },
       open: g.fastTravelUI.isVisible,
       timePassed: g.timeSystem.elapsedGameTime >= before,
       places: g.fastTravelSystem.discoveredLocations.map((l: { id: string }) => l.id),
     };
   });
-  expect(travel.open).toBe(false);
+  expect(travel.open, JSON.stringify(travel)).toBe(false);
   expect(travel.timePassed).toBe(true);
   expect(travel.places).toContain("start_village");
   expect(travel.places).not.toContain("exterior");

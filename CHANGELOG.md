@@ -281,6 +281,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   four-second wait runs on the game clock.
 - Closing a creator tool with Escape inside the map editor no longer grabs the
   mouse back from the editor.
+- Escape closes the shouts panel and the World Builder, instead of pausing the
+  game underneath them.
 
 ### Changed
 - Plain B still opens Enchanting. B with Shift held now opens Smithing.

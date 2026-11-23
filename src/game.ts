@@ -187,6 +187,7 @@ import type { FollowerUI } from "./ui/follower-ui";
 import { FollowersFeature, FollowersKey, type FollowersService } from "./features/followers/followers-feature";
 import { ActiveEffectHUD } from "./ui/active-effect-hud";
 import { HudPresenter, type HudSources } from "./ui/hud-presenter";
+import { ModalRegistry } from "./ui/modal-registry";
 import { QuickSlotHUD } from "./ui/quickslot-hud";
 import { PerkSystem } from "./systems/perk-system";
 import { DynamicWorldEventSystem } from "./systems/dynamic-world-event-system";
@@ -516,6 +517,8 @@ export class Game {
   /** True while the character-creation wizard is up (Escape must not pause beneath it). */
   private _inCharacterCreation: boolean = false;
 
+  /** Panels that take over the screen (Escape, pause, input blocking). */
+  private readonly _modals = new ModalRegistry();
   /** Bars, clock, compass, readouts and the debug overlay. */
   private readonly _hud = new HudPresenter(() => this._hudSources());
 
@@ -1827,6 +1830,7 @@ export class Game {
     }
 
     // Wire decoupled input adapter after all systems are initialized
+    this._registerModals();
     this._wireInputAdapter();
     this._gamepadInput.connect();
 
@@ -2146,35 +2150,8 @@ export class Game {
       if (this.levelUpUI.isVisible) return;
       if (this.guardEncounterUI.isVisible) { this.kernel.services.get(ArrestKey).resist(); return; }
       if (this.mapEditorSystem.isEnabled) { this.editors.exitMapEditor(); return; }
-      if (this.characterSheetUI.isVisible) { this.characterSheetUI.hide(); this.ui.setCharacterSheetOpen(false); this._restoreGameplayInput(); return; }
-      // Closing the inventory must clear isBlocked like the I-key path does.
-      if (this.inventorySystem.isOpen) { this.inventorySystem.toggleInventory(); this._restoreGameplayInput(); return; }
-      if (this.questSystem.isLogOpen) { this.questSystem.toggleQuestLog(); this._restoreGameplayInput(); return; }
-      if (this.skillTreeSystem.isOpen) { this.skillTreeSystem.toggle(); this._restoreGameplayInput(); return; }
-      if (this.ui.isAttributePanelOpen) { this.ui.toggleAttributePanel(false); this._restoreGameplayInput(); return; }
-      if (this.alchemyUI.isVisible) { this.alchemyUI.toggle(false); this._restoreGameplayInput(); return; }
-      if (this.enchantingUI.isVisible) { this.enchantingUI.toggle(false); this._restoreGameplayInput(); return; }
-      if (this.craftingUI.isVisible) { this.craftingUI.hide(); this._restoreGameplayInput(); return; }
-      if (this.jobs.window.isVisible) { this.jobs.window.hide(); this.jobs.window.onClose?.(); return; }
-      if (this.spellMakingUI.isVisible) { this.spellMakingUI.close(); return; }
-      if (this._barterUI.isVisible) { this._barterUI.onClose?.(); return; }
-      if (this._containerUI.isVisible) { this._containerUI.onClose?.(); return; }
-      if (this.fastTravelUI.isVisible) { this.fastTravelUI.close(); return; }
-      if (this.petUI.isVisible) { this.petUI.close(); this._restoreGameplayInput(); return; }
-      if (this.followerUI.isVisible) { this.followerUI.close(); this._restoreGameplayInput(); return; }
-      if (this.pickpocketUI.isVisible) { this.kernel.services.get(PickpocketKey).close(); return; }
-      if (this.stableUI.isVisible) { this.stableUI.close(); return; }
-      if (this.saddlebagUI.isVisible) { this.saddlebagUI.close(); return; }
-      if (this._creditsUI?.isVisible) { this._creditsUI.hide(); this._creditsUI.onClose?.(); return; }
-      if (this.graphicsSettingsUI.isVisible) { this.graphicsSettingsUI.hide(); this.graphicsSettingsUI.onClose?.(); return; }
-      // Creator tools (their own close clears the interaction block).
-      for (const tool of [this.questCreatorUI, this.dialogueCreatorUI, this.npcCreatorUI, this.itemCreatorUI,
-        this.factionCreatorUI, this.lootTableCreatorUI, this.spawnCreatorUI, this.contentBundleUI,
-        this.assetBrowserUI, this.bundleMergeUI, this.modManifestUI]) {
-        if (tool.isVisible) { tool.close(); this._restoreGameplayInput(); return; }
-      }
-      if (this.editorHubUI.isVisible) { this.editorHubUI.close(); this._restoreGameplayInput(); return; }
-      if (this.ui.isWaitDialogOpen) { this.ui.toggleWaitDialog(false); this._restoreGameplayInput(); return; }
+      // Otherwise close the top panel, or pause.
+      if (this._modals.closeTop()) return;
       this.togglePause();
     });
     adapter.onAction("save", () => { if (!this.isPaused) this.saveSystem.save(); });
@@ -2283,51 +2260,8 @@ export class Game {
 
       if (this.isPaused) {
           this._gameplayLoop.reset();
-          if (this.mapEditorSystem.isEnabled) {
-              this.mapEditorSystem.toggle();
-              this.mapEditorToolbar.hide();
-              this.editorLayout.setVisible("hierarchy", false);
-              this.editorLayout.setVisible("palette", false);
-              this.editorLayout.setVisible("validation", false);
-              this.editorLayout.setVisible("layers", false);
-              this.editorLayout.setVisible("notes", false);
-              this.editorLayout.setVisible("properties", false);
-              this.editorLayout.clearSelection();
-              this._refreshHelpOverlayIfVisible();
-          }
-          // Close any open overlays
-          if (this.inventorySystem.isOpen) {
-              this.inventorySystem.isOpen = false;
-              this.ui.toggleInventory(false);
-          }
-          if (this.questSystem.isLogOpen) {
-              this.questSystem.isLogOpen = false;
-              this.ui.toggleQuestLog(false);
-          }
-          if (this.skillTreeSystem.isOpen) {
-              this.skillTreeSystem.isOpen = false;
-              this.ui.toggleSkillTree(false);
-          }
-          if (this.characterSheetUI.isVisible) {
-              this.characterSheetUI.hide();
-              this.ui.setCharacterSheetOpen(false);
-          }
-          if (this.alchemyUI.isVisible) { this.alchemyUI.toggle(false); }
-          if (this.enchantingUI.isVisible) { this.enchantingUI.toggle(false); }
-          if (this.craftingUI.isVisible) { this.craftingUI.hide(); }
-          if (this.jobs.window.isVisible) this.jobs.window.hide();
-          if (this.spellMakingUI.isVisible) { this.spellMakingUI.close(); }
-          if (this.fastTravelUI.isVisible) { this.fastTravelUI.close(); }
-          if (this.petUI.isVisible) { this.petUI.close(); }
-          if (this.followerUI.isVisible) { this.followerUI.close(); }
-          if (this.shoutUI.isVisible) { this.shoutUI.close(); }
-          if (this.pickpocketUI.isVisible) { this.pickpocketUI.hide(); }
-          if (this.stableUI.isVisible) { this.stableUI.close(); }
-          if (this.saddlebagUI.isVisible) { this.saddlebagUI.close(); }
-          if (this.ui.isAttributePanelOpen) { this.ui.toggleAttributePanel(false); }
-          if (this.ui.isWaitDialogOpen) { this.ui.toggleWaitDialog(false); }
-          if (this._barterUI.isVisible) { this._barterUI.onClose?.(); }
-          if (this._containerUI.isVisible) { this._containerUI.onClose?.(); }
+          this.editors.exitMapEditor({ quiet: true });
+          this._modals.closeAll();
           this.interactionSystem.isBlocked = true;
           this.ui.setInteractionText("");
           document.exitPointerLock();
@@ -3617,32 +3551,57 @@ export class Game {
       this._releaseNpc(npc);
   }
 
+  /** Every panel that takes over the screen, in Escape order. */
+  private _registerModals(): void {
+      const restore = () => this._restoreGameplayInput();
+      const tool = (id: string, ui: { isVisible: boolean; close(): void }) =>
+        ({ id, isOpen: () => ui.isVisible, close: () => { ui.close(); restore(); } });
+      this._modals.add(
+        { id: "character-sheet", isOpen: () => this.characterSheetUI.isVisible,
+          close: () => { this.characterSheetUI.hide(); this.ui.setCharacterSheetOpen(false); restore(); } },
+        { id: "inventory", isOpen: () => this.inventorySystem.isOpen, close: () => { this.inventorySystem.toggleInventory(); restore(); } },
+        { id: "quest-log", isOpen: () => this.questSystem.isLogOpen, close: () => { this.questSystem.toggleQuestLog(); restore(); } },
+        { id: "skill-tree", isOpen: () => this.skillTreeSystem.isOpen, close: () => { this.skillTreeSystem.toggle(); restore(); } },
+        { id: "attributes", isOpen: () => this.ui.isAttributePanelOpen, close: () => { this.ui.toggleAttributePanel(false); restore(); } },
+        { id: "alchemy", isOpen: () => this.alchemyUI.isVisible, close: () => this.crafting.toggleAlchemy() },
+        { id: "enchanting", isOpen: () => this.enchantingUI.isVisible, close: () => this.crafting.toggleEnchanting() },
+        { id: "forge", isOpen: () => this.craftingUI.isVisible, close: () => this.crafting.toggleSmithing() },
+        { id: "jobs", isOpen: () => this.jobs.window.isVisible, close: () => { this.jobs.window.hide(); this.jobs.window.onClose?.(); } },
+        { id: "spell-making", isOpen: () => this.spellMakingUI.isVisible, close: () => this.spellMakingUI.close() },
+        { id: "barter", isOpen: () => this._barterUI.isVisible, close: () => this._trade.barterPanel.onClose?.() },
+        { id: "container", isOpen: () => this._containerUI.isVisible, close: () => this._trade.containerPanel.onClose?.() },
+        { id: "fast-travel", isOpen: () => this.fastTravelUI.isVisible, close: () => this.fastTravelUI.close() },
+        { id: "pets", isOpen: () => this.petUI.isVisible, close: () => this.pets.togglePanel() },
+        { id: "followers", isOpen: () => this.followerUI.isVisible, close: () => this.followers.togglePanel() },
+        { id: "shouts", isOpen: () => this.shoutUI.isVisible, close: () => this.shouts.togglePanel() },
+        { id: "pickpocket", isOpen: () => this.pickpocketUI.isVisible, close: () => this.kernel.services.get(PickpocketKey).close() },
+        { id: "stable", isOpen: () => this.stableUI.isVisible, close: () => this.stableUI.close() },
+        { id: "saddlebag", isOpen: () => this.saddlebagUI.isVisible, close: () => this.saddlebagUI.close() },
+        { id: "credits", isOpen: () => !!this._creditsUI?.isVisible, close: () => { this._creditsUI!.hide(); this._creditsUI!.onClose?.(); } },
+        { id: "graphics", isOpen: () => this.graphicsSettingsUI.isVisible, close: () => { this.graphicsSettingsUI.hide(); this.graphicsSettingsUI.onClose?.(); } },
+        tool("quest-creator", this.questCreatorUI), tool("dialogue-creator", this.dialogueCreatorUI),
+        tool("npc-creator", this.npcCreatorUI), tool("item-creator", this.itemCreatorUI),
+        tool("faction-creator", this.factionCreatorUI), tool("loot-table-creator", this.lootTableCreatorUI),
+        tool("spawn-creator", this.spawnCreatorUI), tool("world-builder", this.worldBuilderUI),
+        tool("content-bundle", this.contentBundleUI), tool("asset-browser", this.assetBrowserUI),
+        tool("bundle-merge", this.bundleMergeUI), tool("mod-manifest", this.modManifestUI),
+        tool("editor-hub", this.editorHubUI),
+        { id: "wait", isOpen: () => this.ui.isWaitDialogOpen, close: () => { this.ui.toggleWaitDialog(false); restore(); } },
+      );
+  }
+
   private _isCombatInputBlocked(): boolean {
       return (
           this.isPaused ||
           this.mapEditorSystem.isEnabled ||
-          this.inventorySystem.isOpen ||
-          this.questSystem.isLogOpen ||
-          this.skillTreeSystem.isOpen ||
           this.levelUpUI.isVisible ||
           this.guardEncounterUI.isVisible ||
-          this.spellMakingUI.isVisible ||
-          this._barterUI.isVisible ||
-          this._containerUI.isVisible ||
-          this.fastTravelUI.isVisible ||
-          this.stableUI.isVisible ||
-          this.saddlebagUI.isVisible ||
-          this.petUI.isVisible ||
-          this.pickpocketUI.isVisible ||
-          this.craftingUI.isVisible ||
-          this.jobs.window.isVisible ||
-          this.characterSheetUI.isVisible ||
-          this.graphicsSettingsUI.isVisible ||
-          !!this._creditsUI?.isVisible ||
           this.dialogueSystem.isInDialogue ||
+          this._modals.anyOpen() ||
           this.interactionSystem.isBlocked
       );
   }
+
 
   /**
    * Suspend player input while a modal menu is open: block interaction,

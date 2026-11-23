@@ -423,6 +423,11 @@ state, scope and save codec.
   Ctrl+M, and the Shift+F-key creator tools. One `toggleMapEditor` /
   `exitMapEditor` replaces three copies (adapter F2, legacy F2, Escape).
   The legacy keyboard path is now Tab, plain F5/F9 and the editor hand-off.
+- Modal registry (`src/ui/modal-registry.ts`, ahead of Phase 2): every
+  panel that takes over the screen, in Escape order. Escape closes the top
+  one, pausing closes them all, and "any open?" blocks play. It replaces
+  three hand-kept lists. Escape had missed the shouts panel and the World
+  Builder, so it paused the game under them.
 - `RngStreams.reseed` and `restoreFromSave` reset streams in place. A stream
   a feature kept from install time used to go stale at the first new game or
   load: it was no longer seeded from the world and was not saved. This

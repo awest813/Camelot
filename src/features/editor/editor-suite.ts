@@ -776,8 +776,8 @@ export class EditorSuite {
     this.hooks.modeChanged();
   }
 
-  /** Leave the map editor (F2 or Escape), hiding its panels. */
-  public exitMapEditor(): void {
+  /** Leave the map editor (F2, Escape, or quietly on pause), hiding its panels. */
+  public exitMapEditor(opts: { quiet?: boolean } = {}): void {
     if (!this.mapEditorSystem.isEnabled) return;
     this.mapEditorSystem.toggle();
     this.mapEditorToolbar.hide();
@@ -786,7 +786,7 @@ export class EditorSuite {
     }
     this.editorLayout.clearSelection();
     this.hooks.restoreGameplay();
-    this.host.ui.showNotification("Map editor mode disabled", 1800);
+    if (!opts.quiet) this.host.ui.showNotification("Map editor mode disabled", 1800);
     this.hooks.modeChanged();
   }
 
