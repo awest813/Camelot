@@ -387,6 +387,12 @@ state, scope and save codec.
       arrival event (now on a seeded stream). The feature provides the
       `fast-travel` service the villages use. Travelling out of an interior
       no longer adds the open world as a destination.
+
+  15. **Death** (`src/features/death/`): falling at 0 health and waking at
+      the nearest known place. The wait now runs on the game clock, so it
+      doesn't expire under the pause menu.
+- `game.update()` runs the `ui` phase each frame. The pet, follower and
+  shout HUD chips are `ui` systems of their features.
 - `RngStreams.reseed` and `restoreFromSave` reset streams in place. A stream
   a feature kept from install time used to go stale at the first new game or
   load: it was no longer seeded from the world and was not saved. This

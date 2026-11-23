@@ -194,6 +194,13 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
   expect(travel.places).not.toContain("exterior");
   await page.locator("#renderCanvas").click({ force: true });
 
+  // Death: fall at 0 health, wake a few seconds later at half health.
+  await page.evaluate(() => { (window as any).__camelotGame.player.health = 0; });
+  await expect.poll(
+    () => page.evaluate(() => (window as any).__camelotGame.player.health),
+    { timeout: 45_000, message: "the player wakes (game-clock seconds run slow under load)" },
+  ).toBeGreaterThan(0);
+
   // A guard stops the player for a bounty; Escape resists arrest.
   const arrest = await page.evaluate(() => {
     const g = (window as any).__camelotGame;

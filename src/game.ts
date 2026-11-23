@@ -109,6 +109,7 @@ import { WaitSystem } from "./systems/wait-system";
 import { SkillProgressionSystem } from "./systems/skill-progression-system";
 import type { FastTravelSystem } from "./systems/fast-travel-system";
 import { FastTravelFeature, TravelKey, TravelHostKey } from "./features/fast-travel/fast-travel-feature";
+import { DeathFeature, DeathHostKey } from "./features/death/death-feature";
 import { LevelScalingSystem } from "./systems/level-scaling-system";
 import { FameSystem } from "./systems/fame-system";
 import { ActiveEffectsSystem } from "./systems/active-effects-system";
@@ -564,15 +565,7 @@ export class Game {
   /** Frame counter for throttling non-critical subsystem updates. */
   private _systemTickCounter: number = 0;
 
-  // Death feedback: true while health is at 0 so the notification fires once per "death"
-  private _playerAtZeroHP: boolean = false;
 
-  // Cache for pet HUD dirty-checking
-  private _lastPetHealth: number = -1;
-  private _lastPetId: string | null = null;
-  // Cache for follower HUD dirty-checking
-  private _lastFollowerHealth: number = -1;
-  private _lastFollowerId: string | null = null;
   private _helpOverlayEl: HTMLDivElement | null = null;
   private _helpOverlayVisible: boolean = false;
   public activeEffectHUD: ActiveEffectHUD;
@@ -3771,78 +3764,6 @@ export class Game {
       if (this.player.health !== this._lastHealth) {
           this._lastHealth = this.player.health;
           this.ui.updateHealth(this.player.health, this.player.maxHealth);
-
-           if (this.player.health <= 0 && !this._playerAtZeroHP) {
-               this._playerAtZeroHP = true;
-               this.eventBus.emit("player:died", {});
-               this.ui.showHitFlash("rgba(180, 0, 0, 0.55)");
-               this.ui.showNotification("You have fallen...", 4000);
-               // Death has consequences: after 4 seconds you wake at the
-               // nearest discovered location, lighter by 10% of your gold.
-               // (Health regen is suppressed at 0 HP, so this timer is the
-               // only path back above zero.)
-               setTimeout(() => {
-                 if (this.player.health > 0) return;
-                 this.player.health = Math.round(this.player.maxHealth * 0.5);
-                 this._playerAtZeroHP = false;
-
-                 // Tear down any screen state owned at the moment of death so
-                 // the player does not wake up inside a stale modal/conversation.
-                 if (this.dialogueSystem.isInDialogue) this.dialogueSystem.endDialogue();
-                 if (this.inventorySystem.isOpen) this.inventorySystem.toggleInventory();
-                 if (this._containerUI.isVisible) this._containerUI.onClose?.();
-                 if (this._barterUI.isVisible) this._barterUI.onClose?.();
-
-                 // Death purges active status effects (burn/freeze DoTs etc.).
-                 for (const effect of this.activeEffectsSystem.activeEffects) {
-                   this.activeEffectsSystem.removeEffect(effect.id);
-                 }
-
-                 // Disengage every living attacker so the revive point is not
-                 // a combat zone (and fast travel is not immediately blocked).
-                 for (const npc of this.scheduleSystem.npcs) {
-                   if (npc.isDead) continue;
-                   if (
-                     npc.aiState === AIState.ALERT ||
-                     npc.aiState === AIState.INVESTIGATE ||
-                     npc.aiState === AIState.CHASE ||
-                     npc.aiState === AIState.ATTACK
-                   ) {
-                     npc.aiState = npc.patrolPoints.length > 0 ? AIState.RETURN : AIState.IDLE;
-                     npc.isAggressive = false;
-                   }
-                 }
-                 this._restoreGameplayInput();
-
-                 const pos = this.player.camera.position;
-                 let nearest: { name: string; position: { x: number; y: number; z: number } } | null = null;
-                 let nearestDistSq = Number.POSITIVE_INFINITY;
-                 for (const loc of this.fastTravelSystem.discoveredLocations) {
-                   const dx = loc.position.x - pos.x;
-                   const dy = loc.position.y - pos.y;
-                   const dz = loc.position.z - pos.z;
-                   const dSq = dx * dx + dy * dy + dz * dz;
-                   if (dSq < nearestDistSq) {
-                     nearestDistSq = dSq;
-                     nearest = loc;
-                   }
-                 }
-                 if (nearest) {
-                   pos.set(nearest.position.x, nearest.position.y, nearest.position.z);
-                 }
-                 const lost = Math.floor(this._getInventoryGold() * 0.1);
-                 if (lost > 0) this._consumeInventoryGold(lost);
-                 this.ui.showNotification(
-                   nearest
-                     ? `You awaken at ${nearest.name}.${lost > 0 ? ` (${lost} gold lost)` : ""}`
-                     : "You feel the will to continue...",
-                   4000,
-                 );
-                 this.saveSystem.markDirty();
-               }, 4000);
-           } else if (this.player.health > 0 && this._playerAtZeroHP) {
-              this._playerAtZeroHP = false;
-          }
       }
       if (this.player.magicka !== this._lastMagicka) {
           this._lastMagicka = this.player.magicka;
@@ -3866,31 +3787,8 @@ export class Game {
           this.ui.updateStats(this.player, this.playerLevelSystem.characterLevel);
       }
 
-      // Pet HUD — update when active pet or health changes
-      {
-        const ap = this.petSystem?.activePet ?? null;
-        const apId = ap?.id ?? null;
-        if (apId !== this._lastPetId || (ap && ap.health !== this._lastPetHealth)) {
-          this._lastPetId     = apId;
-          this._lastPetHealth = ap?.health ?? -1;
-          this.petUI?.updateHUD(ap);
-        }
-      }
-
-      // Follower HUD — update when active follower or health changes
-      {
-        const af = this.followerSystem?.getActiveFollower() ?? null;
-        const afId = af?.templateId ?? null;
-        if (afId !== this._lastFollowerId || (af && af.health !== this._lastFollowerHealth)) {
-          this._lastFollowerId     = afId;
-          this._lastFollowerHealth = af?.health ?? -1;
-          this.followerUI?.updateHUD(af);
-        }
-      }
-
-      // Shout HUD chip — equipped shout name, word pips, cooldown countdown.
-      // updateHUD() skips DOM writes when nothing changed.
-      this.shouts.updateHud();
+      // Features' HUD pieces (companion, follower, shout chips).
+      this.kernel.phases.run("ui", frameDelta);
 
       // Update clock display only when the displayed in-game minute changes —
       // the timeString getter allocates, so don't build it every frame.
@@ -4628,6 +4526,34 @@ export class Game {
         recall: () => !!this.markRecallSystem.recall(),
       });
       k.install(this._fastTravel);
+      k.services.provide(DeathHostKey, {
+        health: () => this.player.health,
+        maxHealth: () => this.player.maxHealth,
+        setHealth: (v) => { this.player.health = v; },
+        position: () => this.player.camera.position,
+        flash: () => this.ui.showHitFlash("rgba(180, 0, 0, 0.55)"),
+        closeScreens: () => {
+          if (this.dialogueSystem.isInDialogue) this.dialogueSystem.endDialogue();
+          if (this.inventorySystem.isOpen) this.inventorySystem.toggleInventory();
+          if (this._containerUI.isVisible) this._containerUI.onClose?.();
+          if (this._barterUI.isVisible) this._barterUI.onClose?.();
+          this._restoreGameplayInput();
+        },
+        purgeEffects: () => {
+          for (const effect of this.activeEffectsSystem.activeEffects) this.activeEffectsSystem.removeEffect(effect.id);
+        },
+        calmAttackers: () => {
+          // So the waking place is not a fight (and fast travel isn't blocked).
+          for (const npc of this.scheduleSystem.npcs) {
+            if (npc.isDead) continue;
+            if (npc.aiState === AIState.ALERT || npc.aiState === AIState.INVESTIGATE || npc.aiState === AIState.CHASE || npc.aiState === AIState.ATTACK) {
+              npc.aiState = npc.patrolPoints.length > 0 ? AIState.RETURN : AIState.IDLE;
+              npc.isAggressive = false;
+            }
+          }
+        },
+      });
+      k.install(new DeathFeature());
       this.saveSystem.setFastTravelSystem(this._fastTravel.places);
       const record = (chunkKey: string) => this._chunks.record(chunkKey);
       k.services.provide(SiteBuilderKey, {

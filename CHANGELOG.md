@@ -277,6 +277,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   World" destination.
 - Village raids and travel loot follow the world seed after a new game or a
   load, as intended.
+- Dying and then pausing no longer revives you in the background; the
+  four-second wait runs on the game clock.
 
 ### Changed
 - Plain B still opens Enchanting. B with Shift held now opens Smithing.

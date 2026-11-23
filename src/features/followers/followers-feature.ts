@@ -74,6 +74,19 @@ export class FollowersFeature implements Feature {
       },
     });
 
+    // The follower HUD chip, redrawn when the follower or their health changes.
+    let hudId: string | null | undefined, hudHealth = -1;
+    ctx.system({
+      id: "followers.hud", phase: "ui", update: () => {
+        const active = f.getActiveFollower();
+        const id = active?.templateId ?? null;
+        if (id === hudId && (!active || active.health === hudHealth)) return;
+        hudId = id;
+        hudHealth = active?.health ?? -1;
+        this.panel.updateHUD(active);
+      },
+    });
+
     ctx.scope.add(() => {
       f.onFollowerRecruited = null;
       f.onFollowerDismissed = null;

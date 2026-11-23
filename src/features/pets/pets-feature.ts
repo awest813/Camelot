@@ -122,6 +122,18 @@ export class PetsFeature implements Feature {
     });
 
     ctx.system({ id: "pets.ai", phase: "sim", update: (dt) => this._updateAI(dt) });
+    // The companion HUD chip, redrawn when the companion or its health changes.
+    let hudId: string | null | undefined, hudHealth = -1;
+    ctx.system({
+      id: "pets.hud", phase: "ui", update: () => {
+        const pet = this.pets.activePet;
+        const id = pet?.id ?? null;
+        if (id === hudId && (!pet || pet.health === hudHealth)) return;
+        hudId = id;
+        hudHealth = pet?.health ?? -1;
+        this.panel.updateHUD(pet);
+      },
+    });
 
     ctx.scope.add(() => {
       this._despawn();

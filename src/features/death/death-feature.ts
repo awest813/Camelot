@@ -1,0 +1,100 @@
+/**
+ * Death as a kernel feature.  At 0 health the player falls; four seconds
+ * later they wake at the nearest discovered place, at half health and 10%
+ * lighter in gold, with menus closed, effects purged and attackers calmed.
+ *
+ * The wait runs on the game clock, so it doesn't run out under the pause
+ * menu.  Healing above 0 before then cancels it.
+ *
+ * Inputs:   services death-host, purse, feedback, fast-travel places.
+ * Outputs:  the `player:died` event.
+ *
+ * Extracted from game.ts (engine overhaul, Phase 1).
+ */
+import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import type { Feature, FeatureContext } from "../../core/kernel";
+import { createServiceKey } from "../../core/kernel";
+import { FeedbackKey, PurseKey } from "../services";
+import { TravelKey } from "../fast-travel/fast-travel-feature";
+
+/** Seconds between falling and waking. */
+export const REVIVE_DELAY = 4;
+/** Share of gold lost on waking. */
+const GOLD_LOST = 0.1;
+
+export interface DeathHostService {
+  health(): number;
+  maxHealth(): number;
+  setHealth(value: number): void;
+  position(): Vector3;
+  /** A red flash for the fall. */
+  flash(): void;
+  /** End the conversation and close the menus open when the player fell. */
+  closeScreens(): void;
+  /** Remove every active effect (burns, freezes, buffs). */
+  purgeEffects(): void;
+  /** Living attackers stand down. */
+  calmAttackers(): void;
+}
+
+export const DeathHostKey = createServiceKey<DeathHostService>("death-host");
+
+export class DeathFeature implements Feature {
+  public readonly id = "death";
+
+  public install(ctx: FeatureContext): void {
+    const s = ctx.kernel.services;
+    let down = false;
+    let wake = 0;
+
+    ctx.system({
+      id: "death.watch", phase: "sim", update: (dt) => {
+        const host = s.get(DeathHostKey);
+        const alive = host.health() > 0;
+        if (!down) {
+          if (alive) return;
+          down = true;
+          wake = REVIVE_DELAY;
+          ctx.kernel.events.emit("player:died", {});
+          host.flash();
+          s.get(FeedbackKey).notify("You have fallen...", 4000);
+          return;
+        }
+        if (alive) { down = false; return; } // healed in time
+        wake -= dt;
+        if (wake > 0) return;
+        down = false;
+        this._wake(ctx);
+      },
+    });
+  }
+
+  private _wake(ctx: FeatureContext): void {
+    const s = ctx.kernel.services;
+    const host = s.get(DeathHostKey);
+    const feedback = s.get(FeedbackKey);
+    host.setHealth(Math.round(host.maxHealth() * 0.5));
+    host.closeScreens();
+    host.purgeEffects();
+    host.calmAttackers();
+
+    const pos = host.position();
+    let nearest: { name: string; position: { x: number; y: number; z: number } } | null = null;
+    let best = Number.POSITIVE_INFINITY;
+    for (const loc of s.get(TravelKey).places.discoveredLocations) {
+      const dx = loc.position.x - pos.x, dy = loc.position.y - pos.y, dz = loc.position.z - pos.z;
+      const d = dx * dx + dy * dy + dz * dz;
+      if (d < best) { best = d; nearest = loc; }
+    }
+    if (nearest) pos.set(nearest.position.x, nearest.position.y, nearest.position.z);
+
+    const purse = s.get(PurseKey);
+    const lost = Math.floor(purse.gold() * GOLD_LOST);
+    if (lost > 0) purse.spend(lost);
+    feedback.notify(
+      nearest ? `You awaken at ${nearest.name}.${lost > 0 ? ` (${lost} gold lost)` : ""}` : "You feel the will to continue...",
+      4000,
+    );
+    feedback.markDirty();
+  }
+}

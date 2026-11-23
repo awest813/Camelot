@@ -150,6 +150,8 @@ export class ShoutsFeature implements Feature {
     });
 
     ctx.system({ id: "shouts.buffs", phase: "sim", update: (dt) => this._tickBuffs(dt) });
+    // The HUD chip (name, word pips, cooldown); updateHUD skips unchanged writes.
+    ctx.system({ id: "shouts.hud", phase: "ui", update: () => s.get(ShoutsKey).updateHud() });
 
     ctx.scope.add(() => {
       sh.onShoutUsed = null;
