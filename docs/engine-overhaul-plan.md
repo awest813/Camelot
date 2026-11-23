@@ -688,8 +688,7 @@ components.
     `recent-projects-system`, `standalone-editor-shell`;
   - other: `journal-system` and `journal-ui`, `camera-scripting-system`,
     `event-script-system`, `equipment-visual-system`,
-    `quaternius-asset-manifest`, and the
-    `world/babylon-world-chunk-*` adapters.
+    `quaternius-asset-manifest`.
 - Schedules:
   - Block matching lives in one place, `scheduledBehaviorAt(blocks, hour)`
     in `schedule-system.ts`. The daily schedule system had its own copy.
@@ -698,6 +697,12 @@ components.
     it. The interaction prompt now says "X is asleep" and won't start a
     conversation. The daily schedule system also forgets sleepers that
     have left the world; before, it kept them forever.
+- Streaming is one lifecycle. `ChunkManager` decides what loads,
+  unloads, and when (preload, concurrency, mount budget). `WorldManager`
+  is its source and render adapter, and the `onChunkLoaded` /
+  `onChunkUnloaded` hooks feed the chunk scopes. Removed the second,
+  unused adapter pair (`world/babylon-world-chunk-adapter.ts` and
+  `-source.ts`).
 
 ### Phase 5 — Persistence (1–2 weeks)
 
