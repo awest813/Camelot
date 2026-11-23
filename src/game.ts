@@ -186,6 +186,7 @@ import type { FollowerSystem } from "./systems/follower-system";
 import type { FollowerUI } from "./ui/follower-ui";
 import { FollowersFeature, FollowersKey, type FollowersService } from "./features/followers/followers-feature";
 import { ActiveEffectHUD } from "./ui/active-effect-hud";
+import { HudPresenter, type HudSources } from "./ui/hud-presenter";
 import { QuickSlotHUD } from "./ui/quickslot-hud";
 import { PerkSystem } from "./systems/perk-system";
 import { DynamicWorldEventSystem } from "./systems/dynamic-world-event-system";
@@ -482,7 +483,6 @@ export class Game {
   /** When set, open barter after dialogue teardown (pointer lock restored first). */
   /** Set by the smith's "use your forge" dialogue choice; opened once dialogue closes. */
   /** Shared parchment material for village notice boards. */
-  private _hudInDialogue = false;
 
 
 
@@ -505,8 +505,6 @@ export class Game {
   /** What each loaded chunk holds (props, buildings, its NPCs); goes with the chunk. */
   private _chunks!: ChunkContent;
 
-  /** Last integer in-game minute rendered to the clock HUD. */
-  private _lastClockMinutes: number = Number.NaN;
 
   /** Debounce for witnessed-assault crime reports (one per 3s per combat burst). */
   private _lastAssaultCrimeMs: number = Number.NEGATIVE_INFINITY;
@@ -521,19 +519,12 @@ export class Game {
   /** True while the character-creation wizard is up (Escape must not pause beneath it). */
   private _inCharacterCreation: boolean = false;
 
-  // Cached stat values to avoid redundant UI bar updates every frame
-  private _lastHealth: number = -1;
-  private _lastMagicka: number = -1;
-  private _lastStamina: number = -1;
-  private _lastExperience: number = -1;
-  private _lastLevel: number = -1;
-  private _lastCharacterLevel: number = -1;
+  /** Bars, clock, compass, readouts and the debug overlay. */
+  private readonly _hud = new HudPresenter(() => this._hudSources());
 
   // Last LOD culled count for the debug overlay (updated from lodSystem.update())
   private _lastLodCulled: number = 0;
 
-  /** Throttles expensive scene queries in the debug HUD (see `update()`). */
-  private _debugOverlayFrameSkip: number = 0;
 
   /** Frame counter for throttling non-critical subsystem updates. */
   private _systemTickCounter: number = 0;
@@ -3281,125 +3272,40 @@ export class Game {
         });
       }
 
-      // Only update UI bars when values have actually changed
-      if (this.player.health !== this._lastHealth) {
-          this._lastHealth = this.player.health;
-          this.ui.updateHealth(this.player.health, this.player.maxHealth);
-      }
-      if (this.player.magicka !== this._lastMagicka) {
-          this._lastMagicka = this.player.magicka;
-          this.ui.updateMagicka(this.player.magicka, this.player.maxMagicka);
-      }
-      if (this.player.stamina !== this._lastStamina) {
-          this._lastStamina = this.player.stamina;
-          this.ui.updateStamina(this.player.stamina, this.player.maxStamina);
-      }
-
-      if (this.player.experience !== this._lastExperience || this.player.level !== this._lastLevel || this.playerLevelSystem.characterLevel !== this._lastCharacterLevel) {
-          this._lastExperience = this.player.experience;
-          this._lastLevel = this.player.level;
-          this._lastCharacterLevel = this.playerLevelSystem.characterLevel;
-          this.ui.updateXP(this.player.experience, this.player.experienceToNextLevel, this.player.level, this.playerLevelSystem.characterLevel);
-      }
-
-      // Refresh the stats panel every frame while inventory is open so live values
-      // (health regen, damage taken, equipment changes) are always current.
-      if (this.inventorySystem.isOpen) {
-          this.ui.updateStats(this.player, this.playerLevelSystem.characterLevel);
-      }
-
-      // Features' HUD pieces (companion, follower, shout chips).
+      // Features' HUD pieces (companion, follower, shout chips), then the bars and readouts.
       this.kernel.phases.run("ui", frameDelta);
+      this._hud.update();
+  }
 
-      // Update clock display only when the displayed in-game minute changes —
-      // the timeString getter allocates, so don't build it every frame.
-      const clockMinutes = Math.floor(this.timeSystem.gameTime);
-      if (clockMinutes !== this._lastClockMinutes) {
-          this._lastClockMinutes = clockMinutes;
-          this.ui.updateClock(this.timeSystem.timeString);
-      }
-
-      // Update compass heading from camera yaw
-      this.ui.updateCompass(this.player.camera.rotation.y);
-
-      // Update stealth HUD when crouching
-      if (this.stealthSystem.isCrouching) {
-          this.ui.updateStealthHUD(this.stealthSystem.stealthLabel);
-      } else {
-          this.ui.updateStealthHUD(null);
-      }
-
-      // Combat-state readout: combo chain, finisher, and riposte window.
-      {
-          const combat = this.combatSystem;
-          let combatLabel: string | null = null;
-          if (combat.isDodging) combatLabel = "Dodging!";
-          else if (combat.finisherReady && combat.activeWeaponArchetype !== "bow") combatLabel = "⚔ FINISHER READY";
-          else if (combat.riposteReady) combatLabel = "Riposte ready!";
-          else if (combat.comboStack > 1) combatLabel = `Combo ×${combat.comboStack}`;
-          this.ui.updateCombatState(combatLabel);
-      }
-
-      // Hide the crosshair while any HTML modal overlay owns the screen
-      // (barter, level-up, guard challenge, travel, stable, settings, …).
-      // Conversations hide the crosshair and the quick-slot bar (Bethesda-style).
-      const talking = this.dialogueSystem.isInDialogue;
-      if (talking !== this._hudInDialogue) {
-        this._hudInDialogue = talking;
-        document.body.classList.toggle("is-in-dialogue", talking);
-      }
-      this.ui.setHtmlOverlayActive(
-          talking ||
-          this._barterUI.isVisible ||
-          this._containerUI.isVisible ||
-          this.levelUpUI.isVisible ||
-          this.guardEncounterUI.isVisible ||
-          this.spellMakingUI.isVisible ||
-          this.fastTravelUI.isVisible ||
-          this.stableUI.isVisible ||
-          this.saddlebagUI.isVisible ||
-          this.petUI.isVisible ||
-          this.followerUI.isVisible ||
-          this.pickpocketUI.isVisible ||
-          this.craftingUI.isVisible ||
-          this.jobs.window.isVisible ||
-          this.graphicsSettingsUI.isVisible ||
-          !!this._creditsUI?.isVisible
-      );
-
-      // Update active effects HUD (30 Hz, same as activeEffectsSystem)
-      if (this._systemTickCounter % 2 === 0) {
-        this.activeEffectHUD.update(this.activeEffectsSystem.activeEffects);
-        this.quickSlotHUD.update(this.quickSlotSystem);
-      }
-
-      if (!this.ui.isDebugVisible) {
-          // Primed so the first visible frame fills the overlay (otherwise it
-          // sat empty for 12 frames — seconds at low frame rates).
-          this._debugOverlayFrameSkip = 11;
-      } else if (++this._debugOverlayFrameSkip >= 12) {
-          this._debugOverlayFrameSkip = 0;
-          const eng = this.engine;
-          const drawCounter = (eng as { _drawCalls?: { current: number } })._drawCalls;
-          this.ui.updateDebugOverlay({
-              fps:           eng.getFps(),
-              drawCalls:     drawCounter?.current ?? 0,
-              activeMeshes:  this.scene.getActiveMeshes().length,
-              totalVertices: this.scene.getTotalVertices(),
-              playerPos: {
-                  x: this.player.camera.position.x,
-                  y: this.player.camera.position.y,
-                  z: this.player.camera.position.z,
-              },
-              carryWeight:    this.player.carryWeight,
-              maxCarryWeight: this.player.maxCarryWeight,
-              currentCell:    this.cellManager.currentCell?.name ?? "exterior",
-              gameTime:       this.timeSystem.timeString,
-              stealthLabel:   this.stealthSystem.stealthLabel,
-              lodCulled:      this._lastLodCulled,
-              weather:        this.weatherSystem.label,
-          });
-      }
+  private _hudSourcesCache: HudSources | null = null;
+  private _hudSources(): HudSources {
+      // eslint-disable-next-line @typescript-eslint/no-this-alias -- getters below
+      const game = this;
+      return this._hudSourcesCache ??= {
+        get engine() { return game.engine; },
+        get scene() { return game.scene; },
+        get ui() { return game.ui; },
+        get player() { return game.player; },
+        get time() { return game.timeSystem; },
+        get stealth() { return game.stealthSystem; },
+        get combat() { return game.combatSystem; },
+        get effects() { return game.activeEffectsSystem; },
+        get effectsHud() { return game.activeEffectHUD; },
+        get quickSlots() { return game.quickSlotSystem; },
+        get quickSlotsHud() { return game.quickSlotHUD; },
+        characterLevel: () => this.playerLevelSystem.characterLevel,
+        inventoryOpen: () => this.inventorySystem.isOpen,
+        talking: () => this.dialogueSystem.isInDialogue,
+        overlayOpen: () =>
+          this._barterUI.isVisible || this._containerUI.isVisible || this.levelUpUI.isVisible ||
+          this.guardEncounterUI.isVisible || this.spellMakingUI.isVisible || this.fastTravelUI.isVisible ||
+          this.stableUI.isVisible || this.saddlebagUI.isVisible || this.petUI.isVisible ||
+          this.followerUI.isVisible || this.pickpocketUI.isVisible || this.craftingUI.isVisible ||
+          this.jobs.window.isVisible || this.graphicsSettingsUI.isVisible || !!this._creditsUI?.isVisible,
+        cellName: () => this.cellManager.currentCell?.name ?? "exterior",
+        weatherLabel: () => this.weatherSystem.label,
+        lodCulled: () => this._lastLodCulled,
+      };
   }
 
   private _isPlayerInCombat(): boolean {

@@ -414,6 +414,10 @@ state, scope and save codec.
   weather. Render counts are unchanged.
 - NPC visuals (`src/rendering/npc-visuals.ts`): rigged character models,
   dragon bodies, and routing AI state to animation with a distance LOD.
+- HUD presenter (`src/ui/hud-presenter.ts`): the bars, clock, compass,
+  sneak and combat readouts, crosshair-under-menus, effect and quick-slot
+  bars, and the debug overlay, written only on change. It reads a
+  `HudSources` view, which the Phase 3 UI can read too.
 - `RngStreams.reseed` and `restoreFromSave` reset streams in place. A stream
   a feature kept from install time used to go stale at the first new game or
   load: it was no longer seeded from the world and was not saved. This
