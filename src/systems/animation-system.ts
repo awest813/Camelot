@@ -71,35 +71,45 @@ const VALID_CLIPS = new Set<string>([
   "victory", "spawn", "telegraph", "stagger", "hit", "death",
 ]);
 
+/**
+ * Which mesh an animation belongs to.  Meshes are told apart by their
+ * unique id, not their name (two NPCs can share a name); a bare name or a
+ * mesh without an id (test doubles) falls back to the name.
+ */
+export type AnimTarget = string | { readonly uniqueId?: number; readonly name: string };
+type AnimKey = number | string;
+const keyOf = (t: AnimTarget): AnimKey => (typeof t === "string" ? t : t.uniqueId ?? t.name);
+
 export class AnimationSystem {
   private readonly _scene: Scene;
-  /** Tracks the currently playing clip name per mesh (keyed by mesh.name). */
-  private readonly _active: Map<string, AnimationClip> = new Map();
+  /** The clip each mesh is playing (keyed by the mesh's unique id). */
+  private readonly _active: Map<AnimKey, AnimationClip> = new Map();
 
   /**
-   * Rigged models (keyed by capsule mesh name).  When a mesh has one, clips
+   * Rigged models (keyed by the capsule mesh).  When a mesh has one, clips
    * play as skeletal animation groups instead of the capsule scale tweens —
    * which would otherwise squash the parented model.
    */
-  private readonly _skeletal: Map<string, SkeletalAnimator> = new Map();
+  private readonly _skeletal: Map<AnimKey, SkeletalAnimator> = new Map();
 
   constructor(scene: Scene) {
     this._scene = scene;
   }
 
   /** Route this mesh's clips to a skeletal animator (see character-models.ts). */
-  public registerSkeletal(meshName: string, animator: SkeletalAnimator): void {
-    this._skeletal.set(meshName, animator);
-    const current = this._active.get(meshName);
+  public registerSkeletal(target: AnimTarget, animator: SkeletalAnimator): void {
+    const key = keyOf(target);
+    this._skeletal.set(key, animator);
+    const current = this._active.get(key);
     if (current) animator.play(current);
   }
 
-  public unregisterSkeletal(meshName: string): void {
-    this._skeletal.delete(meshName);
+  public unregisterSkeletal(target: AnimTarget): void {
+    this._skeletal.delete(keyOf(target));
   }
 
-  public hasSkeletal(meshName: string): boolean {
-    return this._skeletal.has(meshName);
+  public hasSkeletal(target: AnimTarget): boolean {
+    return this._skeletal.has(keyOf(target));
   }
 
   /**
@@ -107,12 +117,12 @@ export class AnimationSystem {
    * clips clear their tracking entry on completion, mirroring the tween path.
    */
   private _playSkeletal(mesh: Mesh, clip: AnimationClip, onComplete?: () => void): boolean {
-    const animator = this._skeletal.get(mesh.name);
+    const animator = this._skeletal.get(keyOf(mesh));
     if (!animator) return false;
     const looping = clip === "idle" || clip === "walk" || clip === "run" || clip === "alert"
       || clip === "investigate" || clip === "return" || clip === "victory";
     animator.play(clip, looping || clip === "death" ? undefined : () => {
-      if (this._active.get(mesh.name) === clip) this._active.delete(mesh.name);
+      if (this._active.get(keyOf(mesh)) === clip) this._active.delete(keyOf(mesh));
       onComplete?.();
     });
     return true;
@@ -125,10 +135,10 @@ export class AnimationSystem {
    * No-op if the mesh is already idling or dead.
    */
   public playIdle(mesh: Mesh): void {
-    const current = this._active.get(mesh.name);
+    const current = this._active.get(keyOf(mesh));
     if (current === "idle" || current === "death") return;
     this._stopAll(mesh);
-    this._active.set(mesh.name, "idle");
+    this._active.set(keyOf(mesh), "idle");
     if (this._playSkeletal(mesh, "idle")) return;
 
     // Gentle Y-scale swell: 1.0 → 1.015 → 1.0 → 0.985 → 1.0  (3-second cycle)
@@ -155,10 +165,10 @@ export class AnimationSystem {
    * No-op if the mesh is already walking or dead.
    */
   public playWalk(mesh: Mesh): void {
-    const current = this._active.get(mesh.name);
+    const current = this._active.get(keyOf(mesh));
     if (current === "walk" || current === "death") return;
     this._stopAll(mesh);
-    this._active.set(mesh.name, "walk");
+    this._active.set(keyOf(mesh), "walk");
     if (this._playSkeletal(mesh, "walk")) return;
 
     const anim = new Animation(
@@ -184,10 +194,10 @@ export class AnimationSystem {
    * No-op if the mesh is already running or dead.
    */
   public playRun(mesh: Mesh): void {
-    const current = this._active.get(mesh.name);
+    const current = this._active.get(keyOf(mesh));
     if (current === "run" || current === "death") return;
     this._stopAll(mesh);
-    this._active.set(mesh.name, "run");
+    this._active.set(keyOf(mesh), "run");
     if (this._playSkeletal(mesh, "run")) return;
 
     const anim = new Animation(
@@ -212,10 +222,10 @@ export class AnimationSystem {
    * Tense alert loop — slower, slightly larger breathing than idle.
    */
   public playAlert(mesh: Mesh): void {
-    const current = this._active.get(mesh.name);
+    const current = this._active.get(keyOf(mesh));
     if (current === "alert" || current === "death") return;
     this._stopAll(mesh);
-    this._active.set(mesh.name, "alert");
+    this._active.set(keyOf(mesh), "alert");
     if (this._playSkeletal(mesh, "alert")) return;
 
     const anim = new Animation(
@@ -240,10 +250,10 @@ export class AnimationSystem {
    * Cautious investigate bob — gentler and longer period than walk.
    */
   public playInvestigate(mesh: Mesh): void {
-    const current = this._active.get(mesh.name);
+    const current = this._active.get(keyOf(mesh));
     if (current === "investigate" || current === "death") return;
     this._stopAll(mesh);
-    this._active.set(mesh.name, "investigate");
+    this._active.set(keyOf(mesh), "investigate");
     if (this._playSkeletal(mesh, "investigate")) return;
 
     const anim = new Animation(
@@ -268,10 +278,10 @@ export class AnimationSystem {
    * Subdued return-home bob — shallow breathing while disengaging.
    */
   public playReturn(mesh: Mesh): void {
-    const current = this._active.get(mesh.name);
+    const current = this._active.get(keyOf(mesh));
     if (current === "return" || current === "death") return;
     this._stopAll(mesh);
-    this._active.set(mesh.name, "return");
+    this._active.set(keyOf(mesh), "return");
     if (this._playSkeletal(mesh, "return")) return;
 
     const anim = new Animation(
@@ -297,10 +307,10 @@ export class AnimationSystem {
    * No-op if the mesh is already celebrating or dead.
    */
   public playVictory(mesh: Mesh): void {
-    const current = this._active.get(mesh.name);
+    const current = this._active.get(keyOf(mesh));
     if (current === "victory" || current === "death") return;
     this._stopAll(mesh);
-    this._active.set(mesh.name, "victory");
+    this._active.set(keyOf(mesh), "victory");
     if (this._playSkeletal(mesh, "victory")) return;
 
     const anim = new Animation(
@@ -329,9 +339,9 @@ export class AnimationSystem {
    * natural size.  Ignored on dead meshes.  Calls `onComplete` when done.
    */
   public playSpawn(mesh: Mesh, onComplete?: () => void): void {
-    if (this._active.get(mesh.name) === "death") return;
+    if (this._active.get(keyOf(mesh)) === "death") return;
     this._stopAll(mesh);
-    this._active.set(mesh.name, "spawn");
+    this._active.set(keyOf(mesh), "spawn");
     if (this._playSkeletal(mesh, "spawn", onComplete)) return;
 
     const scaleY = _makeAnimation(`${mesh.name}_spawn_sy`, "scaling.y", FPS, [
@@ -356,8 +366,8 @@ export class AnimationSystem {
     mesh.animations = [scaleY, scaleX, scaleZ];
     this._scene.beginAnimation(mesh, 0, 16, false, 1.0, () => {
       mesh.scaling.set(1, 1, 1);
-      if (this._active.get(mesh.name) === "spawn") {
-        this._active.delete(mesh.name);
+      if (this._active.get(keyOf(mesh)) === "spawn") {
+        this._active.delete(keyOf(mesh));
       }
       onComplete?.();
     });
@@ -368,9 +378,9 @@ export class AnimationSystem {
    * Ignored on dead meshes.  Calls `onComplete` when the animation resolves.
    */
   public playAttackTelegraph(mesh: Mesh, onComplete?: () => void): void {
-    if (this._active.get(mesh.name) === "death") return;
+    if (this._active.get(keyOf(mesh)) === "death") return;
     this._stopAll(mesh);
-    this._active.set(mesh.name, "telegraph");
+    this._active.set(keyOf(mesh), "telegraph");
     if (this._playSkeletal(mesh, "telegraph", onComplete)) return;
 
     const scaleX = _makeAnimation(`${mesh.name}_tele_sx`, "scaling.x", FPS, [
@@ -395,8 +405,8 @@ export class AnimationSystem {
     mesh.animations = [scaleX, scaleZ, scaleY];
     this._scene.beginAnimation(mesh, 0, 30, false, 1.0, () => {
       mesh.scaling.set(1, 1, 1);
-      if (this._active.get(mesh.name) === "telegraph") {
-        this._active.delete(mesh.name);
+      if (this._active.get(keyOf(mesh)) === "telegraph") {
+        this._active.delete(keyOf(mesh));
       }
       onComplete?.();
     });
@@ -407,9 +417,9 @@ export class AnimationSystem {
    * Ignored on dead meshes.
    */
   public playStagger(mesh: Mesh): void {
-    if (this._active.get(mesh.name) === "death") return;
+    if (this._active.get(keyOf(mesh)) === "death") return;
     this._stopAll(mesh);
-    this._active.set(mesh.name, "stagger");
+    this._active.set(keyOf(mesh), "stagger");
     if (this._playSkeletal(mesh, "stagger")) return;
 
     const scaleX = _makeAnimation(`${mesh.name}_stag_sx`, "scaling.x", FPS, [
@@ -432,8 +442,8 @@ export class AnimationSystem {
     mesh.animations = [scaleX, scaleY];
     this._scene.beginAnimation(mesh, 0, 20, false, 1.0, () => {
       mesh.scaling.set(1, 1, 1);
-      if (this._active.get(mesh.name) === "stagger") {
-        this._active.delete(mesh.name);
+      if (this._active.get(keyOf(mesh)) === "stagger") {
+        this._active.delete(keyOf(mesh));
       }
     });
   }
@@ -442,9 +452,9 @@ export class AnimationSystem {
    * Quick flinch when the NPC takes damage (lighter than stagger).
    */
   public playHitReact(mesh: Mesh): void {
-    if (this._active.get(mesh.name) === "death") return;
+    if (this._active.get(keyOf(mesh)) === "death") return;
     this._stopAll(mesh);
-    this._active.set(mesh.name, "hit");
+    this._active.set(keyOf(mesh), "hit");
     if (this._playSkeletal(mesh, "hit")) return;
 
     const scaleX = _makeAnimation(`${mesh.name}_hit_sx`, "scaling.x", FPS, [
@@ -463,8 +473,8 @@ export class AnimationSystem {
     mesh.animations = [scaleX, scaleY];
     this._scene.beginAnimation(mesh, 0, 12, false, 1.0, () => {
       mesh.scaling.set(1, 1, 1);
-      if (this._active.get(mesh.name) === "hit") {
-        this._active.delete(mesh.name);
+      if (this._active.get(keyOf(mesh)) === "hit") {
+        this._active.delete(keyOf(mesh));
       }
     });
   }
@@ -482,9 +492,9 @@ export class AnimationSystem {
    * before invoking `playDeath` so the `rotation.z` keyframes take effect.
    */
   public playDeath(mesh: Mesh): void {
-    if (this._active.get(mesh.name) === "death") return;
+    if (this._active.get(keyOf(mesh)) === "death") return;
     this._stopAll(mesh);
-    this._active.set(mesh.name, "death");
+    this._active.set(keyOf(mesh), "death");
     if (this._playSkeletal(mesh, "death")) return;
 
     const rotZ = _makeAnimation(`${mesh.name}_death_rz`, "rotation.z", FPS, [
@@ -527,27 +537,27 @@ export class AnimationSystem {
     isDead: boolean,
   ): void {
     if (isDead) {
-      if (!this.isDeadClip(mesh.name)) {
+      if (!this.isDeadClip(mesh)) {
         this.playDeath(mesh);
       }
       return;
     }
 
     if (isSprinting) {
-      if (this._active.get(mesh.name) !== "run") {
+      if (this._active.get(keyOf(mesh)) !== "run") {
         this.playRun(mesh);
       }
       return;
     }
 
     if (isMoving) {
-      if (this._active.get(mesh.name) !== "walk") {
+      if (this._active.get(keyOf(mesh)) !== "walk") {
         this.playWalk(mesh);
       }
       return;
     }
 
-    if (this._active.get(mesh.name) !== "idle") {
+    if (this._active.get(keyOf(mesh)) !== "idle") {
       this.playIdle(mesh);
     }
   }
@@ -565,8 +575,8 @@ export class AnimationSystem {
    */
   public getSnapshot(): Record<string, AnimationClip> {
     const snap: Record<string, AnimationClip> = {};
-    this._active.forEach((clip, name) => {
-      snap[name] = clip;
+    this._active.forEach((clip, key) => {
+      snap[String(key)] = clip;
     });
     return snap;
   }
@@ -579,7 +589,8 @@ export class AnimationSystem {
     this._active.clear();
     for (const [name, clip] of Object.entries(snapshot)) {
       if (VALID_CLIPS.has(clip)) {
-        this._active.set(name, clip as AnimationClip);
+        // Mesh ids come back from the snapshot as strings.
+        this._active.set(/^\d+$/.test(name) ? Number(name) : name, clip as AnimationClip);
       }
     }
   }
@@ -591,30 +602,30 @@ export class AnimationSystem {
    * No-op on dead meshes (preserves death pose).
    */
   public stopAnimation(mesh: Mesh): void {
-    if (this._active.get(mesh.name) === "death") return;
+    if (this._active.get(keyOf(mesh)) === "death") return;
     this._stopAll(mesh);
-    this._active.delete(mesh.name);
+    this._active.delete(keyOf(mesh));
   }
 
   /** True if this mesh is permanently in the death-topple pose. */
-  public isDeadClip(meshName: string): boolean {
-    return this._active.get(meshName) === "death";
+  public isDeadClip(target: AnimTarget): boolean {
+    return this._active.get(keyOf(target)) === "death";
   }
 
   /**
    * Returns the currently playing clip name for a mesh, or `undefined` if no
    * clip is active.  Useful for UI feedback and diagnostic logging.
    */
-  public getActiveClip(meshName: string): AnimationClip | undefined {
-    return this._active.get(meshName);
+  public getActiveClip(target: AnimTarget): AnimationClip | undefined {
+    return this._active.get(keyOf(target));
   }
 
   /**
    * Clean up internal tracking when an NPC or pet mesh is removed from the scene.
    * Call this before disposing the mesh.
    */
-  public unregisterMesh(meshName: string): void {
-    this._active.delete(meshName);
+  public unregisterMesh(target: AnimTarget): void {
+    this._active.delete(keyOf(target));
   }
 
   /**
@@ -639,14 +650,14 @@ export class AnimationSystem {
     justTakenDamage: boolean = false,
   ): void {
     if (isDead) {
-      if (!this.isDeadClip(mesh.name)) {
+      if (!this.isDeadClip(mesh)) {
         this.playDeath(mesh);
       }
       return;
     }
 
     if (isStaggered) {
-      if (this._active.get(mesh.name) !== "stagger") {
+      if (this._active.get(keyOf(mesh)) !== "stagger") {
         this.playStagger(mesh);
       }
       return;
@@ -657,12 +668,12 @@ export class AnimationSystem {
       return;
     }
 
-    if (this._active.get(mesh.name) === "hit") {
+    if (this._active.get(keyOf(mesh)) === "hit") {
       return;
     }
 
     if (isAttackTelegraph) {
-      if (this._active.get(mesh.name) !== "telegraph") {
+      if (this._active.get(keyOf(mesh)) !== "telegraph") {
         this.playAttackTelegraph(mesh);
       }
       return;
@@ -701,7 +712,7 @@ export class AnimationSystem {
   private _stopAll(mesh: Mesh): void {
     this._scene.stopAnimation(mesh);
     // Only reset scale when not preserving a death pose
-    if (this._active.get(mesh.name) !== "death") {
+    if (this._active.get(keyOf(mesh)) !== "death") {
       mesh.scaling.set(1, 1, 1);
     }
     mesh.animations = [];

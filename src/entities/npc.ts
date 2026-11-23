@@ -366,8 +366,17 @@ export class NPC {
 
   /** This NPC's id in the actor store (its flags are components there). */
   public readonly actorId: ActorId = actors.spawn(this);
+  /**
+   * Who this NPC is, stable across saves (its spawn name, e.g.
+   * "Villager_3_4_-2"): quests, schedules, pickpocket stock and features
+   * key on it.  Runtime lookups can use `actorId` instead.
+   */
+  public readonly key: string;
+  /** The name shown to the player. */
+  public get displayName(): string { return this.key; }
 
   constructor(scene: Scene, position: Vector3, name: string) {
+    this.key = name;
     this.scene = scene;
     this.spawnPosition = position.clone();
     this.hostileOnSight = true;

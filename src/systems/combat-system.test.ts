@@ -99,6 +99,7 @@ describe('CombatSystem', () => {
         };
 
         const mockNpc = {
+            key: 'npc1', displayName: 'npc1',
             mesh: {
                 name: 'npc1',
                 position: new Vector3(0, 0, 2),
@@ -470,6 +471,7 @@ describe('CombatSystem', () => {
         const npcA = mockNpcs[0];
         const npcB = {
             ...mockNpcs[0],
+            key: 'npc2', displayName: 'npc2',
             mesh: {
                 name: 'npc2',
                 position: new Vector3(0, 0, 1.7),
@@ -2216,6 +2218,7 @@ describe('CombatSystem', () => {
         mockNpcs[0].mesh.position = new Vector3(0, 0, 2);
 
         const ally: any = {
+            key: 'Ally', displayName: 'Ally',
             mesh: {
                 name: 'Ally',
                 position: new Vector3(1, 0, 2),

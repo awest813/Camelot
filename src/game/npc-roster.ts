@@ -49,8 +49,8 @@ export class NpcRoster {
     this._d.schedule().removeNPC(npc);
     for (const t of this._d.trackers()) t.removeNPC(npc);
     this._d.lod().unregister(npc.mesh);
-    this._d.pockets().forget(npc.mesh.name);
-    this._d.events().emit("npc:released", { npcName: npc.mesh.name });
+    this._d.pockets().forget(npc.key);
+    this._d.events().emit("npc:released", { npcName: npc.key });
     if (opts.dispose ?? true) npc.mesh.dispose();
   }
 }

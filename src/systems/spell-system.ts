@@ -513,7 +513,7 @@ export class SpellSystem {
             this.onHostileHit?.(npc, finalDmg);
             this._applySpellDoT(spell, npc);
             if (hitNpcName === undefined) {
-              hitNpcName = npc.mesh.name;
+              hitNpcName = npc.key;
               reportedDamage = finalDmg;
             }
           }
@@ -525,7 +525,7 @@ export class SpellSystem {
           target.takeDamage(finalDmg);
           this.onHostileHit?.(target, finalDmg);
           this._applySpellDoT(spell, target);
-          hitNpcName = target.mesh.name;
+          hitNpcName = target.key;
           reportedDamage = finalDmg;
         }
       }
@@ -540,7 +540,7 @@ export class SpellSystem {
         const scaledHeal = spell.heal * healingMultiplier;
         const actual = Math.min(scaledHeal, target.maxHealth - target.health);
         target.health = Math.min(target.maxHealth, target.health + scaledHeal);
-        return { success: true, heal: Math.round(actual), hitNpc: target.mesh.name };
+        return { success: true, heal: Math.round(actual), hitNpc: target.key };
       }
       return { success: true, heal: 0 };
     }

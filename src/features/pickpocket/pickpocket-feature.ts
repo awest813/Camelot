@@ -73,7 +73,7 @@ export class PickpocketFeature implements Feature {
     const items: PickpocketableItem[] = npc.startingEquipmentIds.map((id) => ({ id, name: this.label(id), weight: 0.5, value: 10 }));
     // Settlers carry coin; without it nobody has anything worth stealing.
     if (!npc.isAggressive) items.push({ id: COIN_PURSE, name: "Coin Purse", weight: 0.1, value: 12 });
-    this.system.registerNpcInventory(npc.mesh.name, items);
+    this.system.registerNpcInventory(npc.key, items);
   }
 
   public install(ctx: FeatureContext): void {
@@ -107,7 +107,7 @@ export class PickpocketFeature implements Feature {
       registerNpc: (npc) => this.registerNpc(npc),
       close: () => { if (this.panel.isVisible) this._close(); },
       open: (npc) => {
-        const npcId = npc.mesh.name;
+        const npcId = npc.key;
         const items = sys.getNpcInventory(npcId);
         if (!items || items.length === 0) {
           feedback().notify("Nothing worth taking.", 1800);

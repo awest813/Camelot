@@ -164,7 +164,7 @@ export interface AnimationService {
   run(mesh: Mesh): void;
   death(mesh: Mesh): void;
   /** Stop animating a mesh (before disposing it). */
-  release(meshName: string): void;
+  release(mesh: Mesh): void;
 }
 
 /** The player's skills. */

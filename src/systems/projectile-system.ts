@@ -672,7 +672,7 @@ export class ProjectileSystem {
 
           if (isSneakAttack) {
             this._ui.showNotification(
-              `Sneak shot! ${npc.mesh.name} — ${finalDamage}`,
+              `Sneak shot! ${npc.displayName} — ${finalDamage}`,
               1600,
             );
           } else if (isCrit) {
@@ -682,9 +682,9 @@ export class ProjectileSystem {
           npc.isAggressive = true;
 
           if (npc.isDead) {
-            this._ui.showNotification(`${npc.mesh.name} defeated!`);
+            this._ui.showNotification(`${npc.displayName} defeated!`);
             if (this.onNPCDeath) {
-              this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
+              this.onNPCDeath(npc.key, npc.xpReward, npc);
             }
           }
 

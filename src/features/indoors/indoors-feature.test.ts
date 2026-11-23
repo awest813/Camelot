@@ -10,6 +10,7 @@ function fakeNpc(name: string, x = 0) {
   let gravity = 1;
   const shape = { filterMembershipMask: 5, filterCollideMask: 7 };
   const npc = {
+    key: name, displayName: name,
     mesh: {
       name, position: new Vector3(x, 1, 0),
       setEnabled: (v: boolean) => { enabled = v; }, isEnabled: () => enabled, isDisposed: () => false,

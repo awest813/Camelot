@@ -11,7 +11,7 @@ function setup(opts: { crouching?: boolean; noticed?: boolean; sneak?: number } 
   const reported: string[] = [];
   const modal = { suspendGameplay: vi.fn(), restoreGameplay: vi.fn() };
   const f = new PickpocketFeature((id) => (id === "iron_dagger" ? "Iron Dagger" : undefined));
-  const mark = { mesh: { name: "Farmer Tom" }, startingEquipmentIds: ["iron_dagger"], isAggressive: false } as unknown as NPC;
+  const mark = { key: "Farmer Tom", displayName: "Farmer Tom", mesh: { name: "Farmer Tom" }, startingEquipmentIds: ["iron_dagger"], isAggressive: false } as unknown as NPC;
   f.registerNpc(mark); // before install, as the game does
   k.services.provide(ThiefHostKey, {
     crouching: () => opts.crouching ?? true,

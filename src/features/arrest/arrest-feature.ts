@@ -99,11 +99,11 @@ export class ArrestFeature implements Feature {
     const c = this._challenge, s = this._s;
     if (!c || !s) return;
     this.panel.open({
-      guardName: c.guard.mesh.name,
+      guardName: c.guard.key,
       factionId: c.factionId,
       bounty: c.bounty,
       playerGold: s.get(PurseKey).gold(),
-      canPersuade: s.get(LawKey).persuasion.canAttemptPersuasion(c.guard.mesh.name, this._speech()),
+      canPersuade: s.get(LawKey).persuasion.canAttemptPersuasion(c.guard.key, this._speech()),
     });
     if (status) this.panel.showStatus(status, isError);
   }
@@ -121,7 +121,7 @@ export class ArrestFeature implements Feature {
     guard.provoked = true;
     guard.aiState = AIState.CHASE;
     guard.lastKnownPlayerPos = new Vector3(p.x, p.y ?? 0, p.z);
-    s.get(FeedbackKey).notify(`${guard.mesh.name} attacks!`, 2500);
+    s.get(FeedbackKey).notify(`${guard.displayName} attacks!`, 2500);
   }
 
   private _resolve(action: GuardEncounterAction, ctx: FeatureContext): void {
@@ -131,7 +131,7 @@ export class ArrestFeature implements Feature {
     const feedback = s.get(FeedbackKey);
     const skills = s.get(SkillsKey);
     const speechXp = (n: number) => skills.gainXP("speechcraft", n);
-    const name = c.guard.mesh.name;
+    const name = c.guard.key;
 
     switch (action) {
       case "pay_fine": {

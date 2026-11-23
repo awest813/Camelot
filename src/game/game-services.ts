@@ -102,8 +102,8 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
           return record ? gi.spawnArchetypeNpc(archetype, record, x, z) : null;
         },
         despawn: (npc) => gi.despawnNpc(npc),
-        isTalkingTo: (npc) => npc.isInDialogue || npc.mesh.name === gi.currentDialogueNpcName,
-        byName: (name) => game.scheduleSystem.npcs.find((n) => n.mesh.name === name),
+        isTalkingTo: (npc) => npc.isInDialogue || npc.key === gi.currentDialogueNpcName,
+        byName: (name) => game.scheduleSystem.npcs.find((n) => n.key === name),
         all: () => game.scheduleSystem.npcs,
       });
       k.services.provide(WorldInfoKey, {
@@ -176,11 +176,11 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
       k.services.provide(ThiefHostKey, {
         crouching: () => game.stealthSystem.isCrouching,
         noticed: (npcId) => {
-          const npc = game.scheduleSystem.npcs.find((n) => n.mesh.name === npcId);
+          const npc = game.scheduleSystem.npcs.find((n) => n.key === npcId);
           return npc ? game.stealthSystem.getDetectionLevel(npc) >= 30 : true;
         },
         reportTheft: (npcId) => {
-          const npc = game.scheduleSystem.npcs.find((n) => n.mesh.name === npcId);
+          const npc = game.scheduleSystem.npcs.find((n) => n.key === npcId);
           game.crimeSystem.commitCrime("theft", npc?.factionId ?? "village_guard", game.timeSystem.elapsedGameTime);
         },
         receive: (itemId) => gi.grantPickpocketItem(itemId),
@@ -450,7 +450,7 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
         walk: (m) => game.animationSystem.playWalk(m),
         run: (m) => game.animationSystem.playRun(m),
         death: (m) => game.animationSystem.playDeath(m),
-        release: (name) => game.animationSystem.unregisterMesh(name),
+        release: (mesh) => game.animationSystem.unregisterMesh(mesh),
       });
       k.services.provide(GameplayKey, { canAct: () => !gi.isCombatInputBlocked() });
       k.services.provide(SkillsKey, {
@@ -503,8 +503,8 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
           npc.takeDamage(damage);
           game.combatSystem.notifyHostileHit(npc, damage);
           if (npc.isDead) {
-            game.ui.showNotification(`${npc.mesh.name} defeated!`);
-            game.combatSystem.onNPCDeath?.(npc.mesh.name, npc.xpReward, npc);
+            game.ui.showNotification(`${npc.displayName} defeated!`);
+            game.combatSystem.onNPCDeath?.(npc.key, npc.xpReward, npc);
           }
         },
         setAttackSpeedMultiplier: (m) => { game.combatSystem.externalAttackSpeedMultiplier = m; },

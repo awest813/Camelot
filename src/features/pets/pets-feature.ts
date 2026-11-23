@@ -81,7 +81,7 @@ export class PetsFeature implements Feature {
         body?.body.setMotionType(PhysicsMotionType.STATIC);
         anim().death(mesh);
         setTimeout(() => {
-          anim().release(mesh.name);
+          anim().release(mesh);
           body?.dispose();
           mesh.dispose();
         }, 3000);
@@ -179,7 +179,7 @@ export class PetsFeature implements Feature {
 
   private _despawn(): void {
     if (!this._mesh) return;
-    this._services?.tryGet(AnimationKey)?.release(this._mesh.name);
+    this._services?.tryGet(AnimationKey)?.release(this._mesh);
     this._body?.dispose();
     this._mesh.dispose();
     this._mesh = null;

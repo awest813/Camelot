@@ -24,9 +24,9 @@ import type { TimeSystem } from "./time-system";
  * );
  *
  * this.dailyScheduleSystem.onNPCSleep = (npc) =>
- *   this.ui.showNotification(`${npc.mesh.name} has gone to sleep.`, 2000);
+ *   this.ui.showNotification(`${npc.displayName} has gone to sleep.`, 2000);
  * this.dailyScheduleSystem.onNPCWake = (npc) =>
- *   this.ui.showNotification(`${npc.mesh.name} has woken up.`, 2000);
+ *   this.ui.showNotification(`${npc.displayName} has woken up.`, 2000);
  * ```
  */
 
@@ -79,7 +79,7 @@ export class DailyScheduleSystem {
    */
   public isSleeping(npcMeshName: string): boolean {
     for (const [npc] of this._sleepingNpcs) {
-      if (npc.mesh.name === npcMeshName) return true;
+      if (npc.key === npcMeshName) return true;
     }
     return false;
   }
@@ -103,7 +103,7 @@ export class DailyScheduleSystem {
   public getSaveState(): DailyScheduleSaveState {
     const sleepingNpcNames: string[] = [];
     for (const [npc] of this._sleepingNpcs) {
-      sleepingNpcNames.push(npc.mesh.name);
+      sleepingNpcNames.push(npc.key);
     }
     return { sleepingNpcNames };
   }

@@ -66,7 +66,7 @@ export class IndoorsFeature implements Feature {
     });
 
     ctx.on("npc:released", ({ npcName }) => {
-      for (const npc of this._inside.keys()) if (npc.mesh.name === npcName) this._inside.delete(npc);
+      for (const npc of this._inside.keys()) if (npc.key === npcName) this._inside.delete(npc);
     });
 
     // Out again once nothing holds them and their schedule no longer says

@@ -36,7 +36,7 @@ function makeNPC(z = 5, alive = true, overrides: Record<string, unknown> = {}) {
     isDead: !alive,
     // Place NPCs along the +Z axis so they are within the camera's default
     // forward-facing targeting cone (camera at origin facing +Z).
-    mesh: { name: "Bandit", position: new Vector3(0, 0, z) },
+    key: "Bandit", displayName: "Bandit", mesh: { name: "Bandit", position: new Vector3(0, 0, z) },
     health: 100,
     maxHealth: 100,
     takeDamage: vi.fn(),
@@ -199,7 +199,7 @@ describe("SpellSystem", () => {
     const targetNpc = makeNPC(5, true, {
       health: 40,
       maxHealth: 100,
-      mesh: { name: "Villager", position: new Vector3(0, 0, 5) },
+      key: "Villager", displayName: "Villager", mesh: { name: "Villager", position: new Vector3(0, 0, 5) },
     });
     sys.npcs = [targetNpc];
     sys.learnSpell("heal_other");

@@ -747,8 +747,8 @@ export class Game {
     this.frameworkRuntime.questEngine.activateQuest("quest_guard_resolution");
     this.saveSystem.setFrameworkRuntime(this.frameworkRuntime);
     this.dialogueSystem.dialogueSessionProvider = (targetNpc) => {
-      this._currentDialogueNpcName = targetNpc.mesh.name;
-      return this._createFrameworkDialogueSession(targetNpc.mesh.name);
+      this._currentDialogueNpcName = targetNpc.key;
+      return this._createFrameworkDialogueSession(targetNpc.key);
     };
     this._loadFrameworkMods();
     // Editor tools (map editor, creators, bundles, asset browser, hub).
@@ -823,7 +823,7 @@ export class Game {
     this.npcArchetypeSystem.registerAll(frameworkBaseContent.npcArchetypes);
 
     // Demo guard: day/night schedule (patrol vs sleep) driven by TimeSystem → DailyScheduleSystem.
-    const demoGuard = this.scheduleSystem.npcs.find((n) => n.mesh.name === "Guard");
+    const demoGuard = this.scheduleSystem.npcs.find((n) => n.key === "Guard");
     if (demoGuard) {
       this.npcScheduleSystem.applySchedule(demoGuard, SCHED_GUARD);
     }
@@ -1329,8 +1329,8 @@ export class Game {
 
     // Stealth detection notification
     this.stealthSystem.onDetected = (detectedBy) => {
-      this.ui.showNotification(`${detectedBy.mesh.name} spotted you!`, 2000);
-      this.eventBus.emit("stealth:detected", { npcName: detectedBy.mesh.name });
+      this.ui.showNotification(`${detectedBy.displayName} spotted you!`, 2000);
+      this.eventBus.emit("stealth:detected", { npcName: detectedBy.key });
     };
 
     // Spell cast events forwarded to event bus
@@ -1357,10 +1357,10 @@ export class Game {
 
     // Wire quest event callbacks
     this.combatSystem.onNPCDeath = (name, xp, npc) => {
-        const npcName = /dragon/i.test(npc.mesh.name) ? npc.mesh.name : name;
+        const npcName = /dragon/i.test(npc.key) ? npc.key : name;
         const p = npc.mesh.position;
         this.eventBus.emit("player:kill", {
-          npcId: npc.mesh.name, npcName, xp, at: { x: p.x, y: p.y, z: p.z }, lootTableId: npc.lootTableId ?? undefined,
+          npcId: npc.key, npcName, xp, at: { x: p.x, y: p.y, z: p.z }, lootTableId: npc.lootTableId ?? undefined,
           civilian: this._isSettlementNpc(npc), factionId: npc.factionId ?? "village_guard",
         });
         // Bandit Bounty: activate on the first bandit kill so that kill counts.
@@ -1382,7 +1382,7 @@ export class Game {
     // Striking a peaceful settler is an assault (the arrest feature books it).
     this.combatSystem.onNpcDamaged = (npc) => {
         if (npc.isDead || !this._isSettlementNpc(npc)) return;
-        this.eventBus.emit("player:assault", { npcId: npc.mesh.name, factionId: npc.factionId ?? "village_guard" });
+        this.eventBus.emit("player:assault", { npcId: npc.key, factionId: npc.factionId ?? "village_guard" });
     };
     this.combatSystem.onWeaponHit = (powerAttack) => this.smithing.onWeaponHit(powerAttack);
     this.combatSystem.onPlayerHit = () => {
@@ -1851,7 +1851,7 @@ export class Game {
   private _isSettlementNpc(npc: NPC): boolean {
       // Natural hostiles are never "settlement" victims, whatever their state.
       if (npc.factionId === "bandits") return false;
-      if (/^(RuinGuard|TowerGuard|DragonBoss)/.test(npc.mesh.name)) return false;
+      if (/^(RuinGuard|TowerGuard|DragonBoss)/.test(npc.key)) return false;
       // Actively fighting NPCs are combat kills; suspicion (ALERT after
       // spotting a sneaking player) does NOT make a civilian kill lawful.
       if (

@@ -16,8 +16,9 @@ function firstPlan() {
 let serial = 0;
 function fakeNpc(name: string): NPC {
   let disposed = false;
+  const id = `${name}_${++serial}`;
   return {
-    mesh: { name: `${name}_${++serial}`, isDisposed: () => disposed, dispose: () => { disposed = true; } },
+    key: id, displayName: id, mesh: { name: id, isDisposed: () => disposed, dispose: () => { disposed = true; } },
     isDead: false, isInDialogue: false, factionId: null,
     scheduleBlocks: [], patrolPoints: [], currentPatrolIndex: 0, waitTime: 0,
   } as unknown as NPC;

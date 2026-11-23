@@ -115,7 +115,7 @@ export class CrimeSystem {
         type,
         factionId,
         value,
-        witnessName: w.mesh.name ?? "Unknown",
+        witnessName: w.key ?? "Unknown",
         timestamp: gameTime,
       });
     }

@@ -896,3 +896,19 @@ describe("AnimationSystem", () => {
     });
   });
 });
+
+describe("AnimationSystem — meshes are told apart by id, not name", () => {
+  it("two NPCs with the same name keep their own clips", () => {
+    const scene = { beginAnimation: vi.fn(), stopAnimation: vi.fn() } as any;
+    const sys = new AnimationSystem(scene);
+    const a = { ...makeMesh("Guard"), uniqueId: 101 };
+    const b = { ...makeMesh("Guard"), uniqueId: 102 };
+    sys.playDeath(a);
+    sys.playWalk(b);
+    expect(sys.isDeadClip(a)).toBe(true);
+    expect(sys.isDeadClip(b), "the other Guard is not dead").toBe(false);
+    expect(sys.getActiveClip(b)).toBe("walk");
+    sys.unregisterMesh(a);
+    expect(sys.getActiveClip(b)).toBe("walk");
+  });
+});

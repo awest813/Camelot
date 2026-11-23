@@ -9,6 +9,9 @@
  *                             layer stays engine-free).
  *   - pointer-lock-owner      only the play-focus owner locks or unlocks the pointer
  *                             (Phase 2); standalone fallbacks are allowlisted.
+ *   - npc-identity            no `.mesh.name` for identity (Phase 3): NPCs have `key`
+ *                             (stable, saved), `actorId` (runtime) and `displayName`.
+ *                             The map editor's own entities are allowlisted.
  *
  *  Ratchets (error when a count goes UP from tools/guardrails-baseline.json;
  *  a note when it goes down, so the baseline can be tightened with --update):
@@ -42,6 +45,9 @@ const SLACK = { "game-ts-lines": 40 };
  * dialogue / inventory systems' fallbacks for when they run without a game.
  */
 const POINTER_LOCK_ALLOWLIST = ["src/game.ts", "src/systems/dialogue-system.ts", "src/systems/inventory-system.ts"];
+
+/** Files whose `.mesh.name` reads are not NPC identity (the editor's own entities). */
+const MESH_NAME_ALLOWLIST = ["src/systems/map-editor-system.ts"];
 
 /** Files allowed to call Math.random (the future RNG module lives here). */
 const RANDOM_ALLOWLIST = [/^src\/core\/rng\//];
@@ -79,6 +85,9 @@ export function measure() {
     }
     if (/\b(requestPointerLock|exitPointerLock)\s*\(/.test(code) && !POINTER_LOCK_ALLOWLIST.includes(f.path)) {
       violations.push({ rule: "pointer-lock-owner", file: f.path });
+    }
+    if (/\.mesh\.name\b/.test(code) && !MESH_NAME_ALLOWLIST.includes(f.path)) {
+      violations.push({ rule: "npc-identity", file: f.path });
     }
     if (!RANDOM_ALLOWLIST.some((re) => re.test(f.path))) {
       const n = (code.match(/Math\.random\s*\(/g) ?? []).length;

@@ -732,8 +732,8 @@ export class CombatSystem {
         this._ui.showNotification(label, 1000);
 
         if (npc.isDead) {
-          this._ui.showNotification(`${npc.mesh.name} defeated!`);
-          if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
+          this._ui.showNotification(`${npc.displayName} defeated!`);
+          if (this.onNPCDeath) this.onNPCDeath(npc.key, npc.xpReward, npc);
         } else if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
           this._transitionTo(npc, AIState.CHASE);
         }
@@ -830,7 +830,7 @@ export class CombatSystem {
     for (const npc of hitNpcs) {
       // NPC dodge chance
       if (Math.random() < npc.dodgeChance) {
-        this._ui.showNotification(`${npc.mesh.name} dodges!`, 800);
+        this._ui.showNotification(`${npc.displayName} dodges!`, 800);
         this._ui.showHitFlash("rgba(200, 200, 200, 0.15)");
         if (npc.physicsAggregate?.body) {
           const side = this.player.camera.getDirection(Vector3.Right());
@@ -942,9 +942,9 @@ export class CombatSystem {
       }
 
       if (npc.isDead) {
-        this._ui.showNotification(`${npc.mesh.name} defeated!`);
+        this._ui.showNotification(`${npc.displayName} defeated!`);
         this._grantAdrenaline();
-        if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
+        if (this.onNPCDeath) this.onNPCDeath(npc.key, npc.xpReward, npc);
       } else {
         // A direct hit skips the ALERT window — immediately give chase.
         // Don't re-transition if already chasing/attacking (would reset path).
@@ -1146,9 +1146,9 @@ export class CombatSystem {
         }
 
         if (npc.isDead) {
-          this._ui.showNotification(`${npc.mesh.name} defeated!`);
+          this._ui.showNotification(`${npc.displayName} defeated!`);
           this._grantAdrenaline();
-          if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
+          if (this.onNPCDeath) this.onNPCDeath(npc.key, npc.xpReward, npc);
         } else if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
           this._transitionTo(npc, AIState.CHASE);
         }
@@ -1234,8 +1234,8 @@ export class CombatSystem {
           this._ui.showHitFlash("rgba(100, 180, 255, 0.3)");
 
           if (npc.isDead) {
-            this._ui.showNotification(`${npc.mesh.name} defeated!`);
-            if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
+            this._ui.showNotification(`${npc.displayName} defeated!`);
+            if (this.onNPCDeath) this.onNPCDeath(npc.key, npc.xpReward, npc);
           } else if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
             this._transitionTo(npc, AIState.CHASE);
           }
@@ -1330,7 +1330,7 @@ export class CombatSystem {
       // 1. Tick DoTs
       npc.tickStatusEffects(deltaTime);
       if (npc.isDead) {
-        if (this.onNPCDeath) this.onNPCDeath(npc.mesh.name, npc.xpReward, npc);
+        if (this.onNPCDeath) this.onNPCDeath(npc.key, npc.xpReward, npc);
         continue;
       }
 
@@ -1580,7 +1580,7 @@ export class CombatSystem {
       const maxHp: number = (npc as unknown as { maxHealth?: number }).maxHealth ?? 100;
       if (npc.health / maxHp < fleePct) {
         this._transitionTo(npc, AIState.FLEE);
-        this._ui.showNotification(`${npc.mesh.name} flees!`, 1500);
+        this._ui.showNotification(`${npc.displayName} flees!`, 1500);
       }
     }
   }
@@ -1879,7 +1879,7 @@ export class CombatSystem {
     npc.setStateColor(COLOR_TELEGRAPH);
     // Elites occasionally commit to an unblockable heavy blow.
     npc.isAttackUnblockable =
-      /^(DragonBoss|Bandit Chief)/.test(npc.mesh.name) && Math.random() < UNBLOCKABLE_CHANCE;
+      /^(DragonBoss|Bandit Chief)/.test(npc.key) && Math.random() < UNBLOCKABLE_CHANCE;
     // Alert the player with a timed warning matching the windup window.
     const windupMs = Math.round(npc.attackTelegraphTimer * 1000);
     const attackVerb = npc.npcAttackArchetype === "ranged"
@@ -1888,7 +1888,7 @@ export class CombatSystem {
         ? `casts ${npc.npcMagicDamageType}!`
         : "attacks!";
     this._ui.showNotification(
-      npc.isAttackUnblockable ? `⚠ ${npc.mesh.name} — UNBLOCKABLE!` : `⚠ ${npc.mesh.name} ${attackVerb}`,
+      npc.isAttackUnblockable ? `⚠ ${npc.displayName} — UNBLOCKABLE!` : `⚠ ${npc.displayName} ${attackVerb}`,
       windupMs,
     );
   }
@@ -1905,7 +1905,7 @@ export class CombatSystem {
 
     // Dodge-roll i-frames beat everything but cost the swing.
     if (this._dodgeIframeTimer > 0) {
-      this._ui.showNotification(`You dodge ${npc.mesh.name}'s strike!`, 1200);
+      this._ui.showNotification(`You dodge ${npc.displayName}'s strike!`, 1200);
       return;
     }
 
@@ -1924,7 +1924,7 @@ export class CombatSystem {
       ? distSq > npc.attackRange * npc.attackRange
       : distSq > strikeRange * strikeRange;
     if (outOfReach) {
-      this._ui.showNotification(`You dodge ${npc.mesh.name}'s strike!`, 1200);
+      this._ui.showNotification(`You dodge ${npc.displayName}'s strike!`, 1200);
       return;
     }
 
@@ -1989,7 +1989,7 @@ export class CombatSystem {
       this._ui.showHitFlash("rgba(200, 0, 0, 0.4)");
       this._ui.shakeCamera(0.4);
       this._ui.applyHitStop(60);
-      this._ui.showNotification(`${npc.mesh.name} attacks you for ${dmg} damage!`, 2000);
+      this._ui.showNotification(`${npc.displayName} attacks you for ${dmg} damage!`, 2000);
 
       // Apply NPC status effect to the player (burn, freeze, shock, etc.).
       if (npc.attackStatusEffect) {
@@ -2063,7 +2063,7 @@ export class CombatSystem {
     dir.z += (Math.random() - 0.5) * spread;
     dir.normalize();
     this._projectileSystem.fireNpcArrow(origin, dir, damage, {
-      sourceName: npc.mesh.name,
+      sourceName: npc.key,
       magicType: npc.npcAttackArchetype === "magic" ? npc.npcMagicDamageType : null,
       owner: npc,
       statusEffect: npc.attackStatusEffect,

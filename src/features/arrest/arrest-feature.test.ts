@@ -43,7 +43,7 @@ function setup(opts: { gold?: number; bounty?: number; outcome?: Outcome; speech
   const committed: number[] = [];
   k.events.on("crime:committed", ({ bounty }) => committed.push(bounty));
   k.install(new ArrestFeature());
-  const guard = { mesh: { name: "Guard Captain" }, isAggressive: false, provoked: false, aiState: AIState.IDLE, lastKnownPlayerPos: null } as unknown as NPC;
+  const guard = { key: "Guard Captain", displayName: "Guard Captain", mesh: { name: "Guard Captain" }, isAggressive: false, provoked: false, aiState: AIState.IDLE, lastKnownPlayerPos: null } as unknown as NPC;
   const stop = () => crime.onGuardChallenge!(guard, "town", bounties.get("town")!);
   return { k, notes, xp, modal, jail, guard, stop, committed, crime, panel: k.services.get(ArrestKey).panel,
     gold: () => gold, bounty: () => bounties.get("town")!, persuasion };

@@ -28,6 +28,7 @@ function makeNPC(
     patrolLookAroundAngle: Math.PI / 5,
     moveSpeed: 2,
     physicsAggregate: null,
+    key: name, displayName: name,
     mesh: {
       name,
       position: new Vector3(0, 0, 0),

@@ -15,7 +15,7 @@ function setup() {
   const roster = new NpcRoster({
     schedule: () => schedule, trackers: () => [combat, stealth], lod: () => lod, scale, pockets: () => pockets, events: () => events,
   });
-  const npc = { mesh: { name: "Guard_1", dispose: vi.fn() } } as unknown as NPC;
+  const npc = { key: "Guard_1", displayName: "Guard_1", mesh: { name: "Guard_1", dispose: vi.fn() } } as unknown as NPC;
   return { roster, npc, schedule, combat, stealth, lod, pockets, scale, released };
 }
 

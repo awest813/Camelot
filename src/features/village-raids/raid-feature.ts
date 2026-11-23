@@ -110,7 +110,7 @@ export class VillageRaidFeature implements Feature {
 
     ctx.on("npc:released", ({ npcName }) => {
       for (const set of [this._raiders, this._sheltered]) {
-        for (const npc of set) if (npc.mesh.name === npcName) set.delete(npc);
+        for (const npc of set) if (npc.key === npcName) set.delete(npc);
       }
     });
 
@@ -175,11 +175,11 @@ export class VillageRaidFeature implements Feature {
       raiders.push(npc);
     }
     if (raiders.length === 0) return raiders;
-    this.rules.start(plan.id, plan.name, raiders.map((r) => r.mesh.name), services.clock.elapsedHours());
+    this.rules.start(plan.id, plan.name, raiders.map((r) => r.key), services.clock.elapsedHours());
     // Townsfolk hide; guards stay out; nobody vanishes mid-conversation.
     for (const npc of world.residents(chunkKey)) {
       if (npc.isDead || raiders.includes(npc) || world.isTalkingTo(npc)) continue;
-      if (/^(Town Guard|Guard)_/.test(npc.mesh.name) || npc.factionId === "bandits") continue;
+      if (/^(Town Guard|Guard)_/.test(npc.key) || npc.factionId === "bandits") continue;
       // (Already asleep inside? The hold keeps them in for the raid too.)
       services.indoors.hold(npc, SHELTER_HOLD);
       this._sheltered.add(npc);

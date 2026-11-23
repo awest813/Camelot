@@ -89,11 +89,11 @@ export class InteractionSystem {
           const metadata = hit.pickedMesh.metadata;
           if (metadata.type === 'npc') {
               if (metadata.npc.isAggressive) {
-                  this.ui.setInteractionText(`${metadata.npc.mesh.name} is hostile`);
+                  this.ui.setInteractionText(`${metadata.npc.displayName} is hostile`);
               } else {
                   const sneakPrompt = this._pickpocketPromptFor(metadata.npc);
                   this.ui.setInteractionText(
-                      sneakPrompt ?? `[E] Talk to ${metadata.npc.mesh.name}`);
+                      sneakPrompt ?? `[E] Talk to ${metadata.npc.displayName}`);
               }
               this.ui.setCrosshairActive(true);
           } else if (metadata.type === 'activator' && typeof metadata.onActivate === 'function') {
@@ -135,7 +135,7 @@ export class InteractionSystem {
 
       if (metadata.type === 'npc') {
           if (metadata.npc.isAggressive) {
-              this.ui.showNotification(`${metadata.npc.mesh.name} is hostile!`, 1500);
+              this.ui.showNotification(`${metadata.npc.displayName} is hostile!`, 1500);
               return;
           }
           if (this._pickpocketPromptFor(metadata.npc) && this.onPickpocketNpc) {
@@ -176,7 +176,7 @@ export class InteractionSystem {
     if (!this.stealthSystem || !this.pickpocketSystem) return null;
     if (npc.isDead) return null;
     if (!this.stealthSystem.canSneakAttack(npc)) return null;
-    const npcId = npc.mesh.name;
+    const npcId = npc.key;
     const sneakLevel = this.sneakLevelProvider?.() ?? 0;
     const check = this.pickpocketSystem.canAttempt(npcId, true, false, "", sneakLevel);
     if (!check.canAttempt || check.successChance == null) return null;

@@ -43,16 +43,16 @@ export class NpcVisuals {
     const library = new CharacterModelLibrary(this._d.scene, this._d.modelBase, this._d.shadows);
     library.preload();
     NPC.onCreated = (npc) => {
-      const id = modelForNpcName(npc.mesh.name);
+      const id = modelForNpcName(npc.key);
       if (!id) return;
       void library.attach(npc.mesh, id).then((rig) => {
         if (!rig) return;
         this._rigs.set(npc, rig);
         npc.mesh.onDisposeObservable.addOnce(() => {
           this._rigs.delete(npc);
-          this._d.animation()?.unregisterSkeletal(npc.mesh.name);
+          this._d.animation()?.unregisterSkeletal(npc.mesh);
         });
-        this._d.animation()?.registerSkeletal(npc.mesh.name, rig);
+        this._d.animation()?.registerSkeletal(npc.mesh, rig);
       });
     };
   }

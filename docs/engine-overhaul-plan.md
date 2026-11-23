@@ -591,6 +591,15 @@ components.
   provoked, telegraphing, staggered, hit-react, guard, unblockable) are tag
   components behind the same `npc.isDead` / … accessors, so no caller
   changed.
+- NPC identity no longer comes from the mesh. NPCs have `key` (who they
+  are, stable across saves: their spawn name), `actorId` (runtime) and
+  `displayName` (what the player sees). About 60 `mesh.name` reads across
+  combat, spells, projectiles, schedules, dialogue, crime, interaction,
+  the roster and features now use `key` or `displayName`. The animation
+  system keys its state by the mesh's unique id, not its name. Two NPCs
+  with the same name (the boot-time "Guard" and others) used to share and
+  overwrite each other's animation state. Guardrail `npc-identity` keeps
+  `.mesh.name` out of identity.
 
 ### Phase 4 — Consolidation (3 weeks)
 

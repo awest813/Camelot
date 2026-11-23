@@ -180,7 +180,7 @@ export class DialogueSystem {
     this._activeNpc = npc;
     npc.isInDialogue = true;
     this._activeSession = null;
-    if (this.onTalkStart) this.onTalkStart(npc.mesh.name);
+    if (this.onTalkStart) this.onTalkStart(npc.key);
 
     // Frame the speaker with the player's own camera (no cut, so the post
     // pipeline and fog stay as they are): turn to the face and zoom in.
@@ -219,7 +219,7 @@ export class DialogueSystem {
       if (import.meta.env.DEV) {
         console.warn(
           "[DialogueSystem] Framework session returned no current node; ending dialogue.",
-          { npc: npc.mesh.name },
+          { npc: npc.key },
         );
       }
       this.endDialogue();
@@ -227,7 +227,7 @@ export class DialogueSystem {
     }
 
     // Fallback dialogue with generic rumors when no framework session exists.
-    const name = displayNameOf(npc.mesh.name);
+    const name = displayNameOf(npc.key);
     const farewell = (text: string) => ({ text, callback: () => this.endDialogue(), enabled: true });
     const rumours = () => this._render(name, "Aye, there's talk of strange lights near the old ruins to the north. Folk say it's best not to linger after dark.", [
       { text: "Sounds dangerous.", enabled: true, callback: () => this._render(name, "That it is. But fortune favors the bold, they say. Safe travels.", [farewell("Farewell.")]) },

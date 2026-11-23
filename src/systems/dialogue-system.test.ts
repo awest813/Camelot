@@ -105,6 +105,7 @@ vi.mock("../ui/ui-manager", () => ({
 
 function makeNpc(name = "Guard") {
   return {
+    key: name, displayName: name,
     mesh: {
       name,
       position: { x: 0, y: 0, z: 0, clone() { return this; }, add() { return this; } },

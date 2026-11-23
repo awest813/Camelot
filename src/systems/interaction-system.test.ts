@@ -46,7 +46,7 @@ describe("InteractionSystem", () => {
   });
 
   it("starts dialogue with non-hostile NPCs", () => {
-    const npc = { isAggressive: false, mesh: { name: "Guard" } };
+    const npc = { isAggressive: false, key: "Guard", displayName: "Guard", mesh: { name: "Guard" } };
     player.raycastForward.mockReturnValue({
       pickedMesh: { metadata: { type: "npc", npc } },
     });
@@ -58,7 +58,7 @@ describe("InteractionSystem", () => {
   });
 
   it("blocks dialogue with hostile NPCs", () => {
-    const npc = { isAggressive: true, mesh: { name: "Bandit" } };
+    const npc = { isAggressive: true, key: "Bandit", displayName: "Bandit", mesh: { name: "Bandit" } };
     player.raycastForward.mockReturnValue({
       pickedMesh: { metadata: { type: "npc", npc } },
     });
@@ -70,7 +70,7 @@ describe("InteractionSystem", () => {
   });
 
   it("shows hostile prompt when aiming at an aggressive NPC", () => {
-    const npc = { isAggressive: true, mesh: { name: "Bandit" } };
+    const npc = { isAggressive: true, key: "Bandit", displayName: "Bandit", mesh: { name: "Bandit" } };
     player.raycastForward.mockReturnValue({
       pickedMesh: { metadata: { type: "npc", npc } },
     });
@@ -135,7 +135,7 @@ describe("InteractionSystem", () => {
   });
 
   it("ignores interact entirely while isBlocked (modal owns the screen)", () => {
-    const npc = { isAggressive: false, mesh: { name: "Guard" } };
+    const npc = { isAggressive: false, key: "Guard", displayName: "Guard", mesh: { name: "Guard" } };
     player.raycastForward.mockReturnValue({
       pickedMesh: { metadata: { type: "npc", npc } },
     });
