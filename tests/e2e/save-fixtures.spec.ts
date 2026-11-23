@@ -51,7 +51,7 @@ function installSummary(): void {
     return {
       playerName: g.player.name as string,
       level: g.playerLevelSystem.characterLevel as number,
-      gold: g._getInventoryGold() as number,
+      gold: g._pack.gold() as number,
       items: g.inventorySystem.items.map((i: any) => `${i.id}×${i.quantity}`).sort() as string[],
       hour: Math.floor(g.timeSystem.hour) as number,
       activeJobs: g.jobs.rules.getActive().map((j: any) => `${j.boardId}:${j.templateId}:${j.progress}`).sort() as string[],

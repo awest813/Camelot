@@ -120,14 +120,14 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     const openBeforeHandIn = !!quest && !quest.isCompleted && quest.isActive;
     g.saveSystem.save(true);
     const saved = JSON.parse(localStorage.getItem("camelot_save")!).villageJobs;
-    const goldBefore = g._getInventoryGold();
+    const goldBefore = g._pack.gold();
     g.jobs.open({ boardId: active.boardId, placeName: active.placeName }); // re-render with the goods in hand
     click("Hand in");
     click("Close");
     return {
       opened, handInEnabledEarly, closed: !g.jobs.window.isVisible, openBeforeHandIn,
       template: t.id, place: active.placeName, questName: quest?.name,
-      savedActive: saved.active.length, paid: g._getInventoryGold() - goldBefore,
+      savedActive: saved.active.length, paid: g._pack.gold() - goldBefore,
       reward: t.rewardGold, questDone: quest?.isCompleted, left: g.jobs.rules.getActive().length,
     };
   });
@@ -236,12 +236,12 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   }), { timeout: 30_000, message: "raiders advance on the square" }).toBeLessThan(raid.startDist - 5);
   const raidEnd = await page.evaluate(() => {
     const g = (window as any).__camelotGame;
-    const gold = g._getInventoryGold();
+    const gold = g._pack.gold();
     for (const r of (window as any).__raiders) {
       r.takeDamage(1e6);
       g.combatSystem.onNPCDeath(r.mesh.name, r.xpReward, r);
     }
-    return { paid: g._getInventoryGold() - gold, active: !!g.raids.rules.active };
+    return { paid: g._pack.gold() - gold, active: !!g.raids.rules.active };
   });
   expect(raidEnd.active).toBe(false);
   expect(raidEnd.paid, "beating the raid pays").toBe(35 * raid.raiders);

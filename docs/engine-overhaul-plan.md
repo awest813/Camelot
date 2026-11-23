@@ -407,6 +407,16 @@ state, scope and save codec.
       `player:kill` now carries where the NPC fell and its loot table. The
       shouts feature takes a dragon's soul from the same event.
 
+  20. **Dialogue services** (`src/features/dialogue-services/`): a
+      trainer's lesson and a night at the inn, from `dialogue:action`. The
+      game's dialogue host now just emits the action.
+- `src/game/player-pack.ts`: gold (one coin stack, mirrored into the
+  framework inventory) and items, with the framework-to-game id mapping.
+  It replaces four hand-built gold stacks and the dialogue count, consume
+  and give helpers.
+- `src/game/quest-bridge.ts`: quest events into the framework, its
+  rewards out, and failing quests whose NPC was killed.
+
   18. **Onboarding** (`src/features/onboarding/`): the five first-run tips
       as data. Each advances when the player does what it teaches (the game
       calls `did(step)`, or `questlog:opened` / `pickpocket:opened` arrive),

@@ -61,7 +61,7 @@ import { ContainerSystem } from "./systems/container-system";
 import { ProjectileSystem } from "./systems/projectile-system";
 import { BarterSystem } from "./systems/barter-system";
 import { ShopSystem } from "./systems/shop-system";
-import { registerStarterMerchants, HEALTH_POTION_STATS } from "./content/starter-merchants";
+import { registerStarterMerchants } from "./content/starter-merchants";
 import { seedStartingArea } from "./content/starting-area";
 import { CellManager } from "./world/cell-manager";
 import { SpellSystem } from "./systems/spell-system";
@@ -105,6 +105,7 @@ import type { FastTravelSystem } from "./systems/fast-travel-system";
 import { FastTravelFeature, TravelKey, TravelHostKey } from "./features/fast-travel/fast-travel-feature";
 import { DeathFeature, DeathHostKey } from "./features/death/death-feature";
 import { SpoilsFeature, SpoilsHostKey } from "./features/spoils/spoils-feature";
+import { DialogueServicesFeature, DialogueHostKey } from "./features/dialogue-services/dialogue-services-feature";
 import { LevelScalingSystem } from "./systems/level-scaling-system";
 import { FameSystem } from "./systems/fame-system";
 import { ActiveEffectsSystem } from "./systems/active-effects-system";
@@ -189,6 +190,8 @@ import { FollowersFeature, FollowersKey, type FollowersService } from "./feature
 import { ActiveEffectHUD } from "./ui/active-effect-hud";
 import { HudPresenter, type HudSources } from "./ui/hud-presenter";
 import { ModalRegistry } from "./ui/modal-registry";
+import { PlayerPack } from "./game/player-pack";
+import { QuestBridge } from "./game/quest-bridge";
 import { QuickSlotHUD } from "./ui/quickslot-hud";
 import { PerkSystem } from "./systems/perk-system";
 import { DynamicWorldEventSystem } from "./systems/dynamic-world-event-system";
@@ -203,12 +206,6 @@ const SNEAK_XP_PER_SECOND = 2;
 /** NPCs below this height fell through the world (e.g. spawned before their chunk). */
 const NPC_FALL_RECOVERY_Y = -30;
 /** Inventory item ID used for player gold (bounty payment check). */
-const GOLD_ITEM_ID = "gold_coins";
-/** Map framework bundle item ids to Babylon inventory ids when they differ. */
-const FRAMEWORK_ITEM_TO_GAME: Readonly<Record<string, string>> = {
-  health_potion: "potion_hp_01",
-  iron_sword: "sword_01",
-};
 
 export class Game {
   public scene: Scene;
@@ -497,6 +494,24 @@ export class Game {
   /** True while the character-creation wizard is up (Escape must not pause beneath it). */
   private _inCharacterCreation: boolean = false;
 
+  /** Gold and items, kept in step with the framework inventory. */
+  private readonly _pack = new PlayerPack(
+    () => this.inventorySystem,
+    () => ({
+      inventory: this.frameworkRuntime.inventoryEngine,
+      item: (id) => this.frameworkRuntime.contentRegistry.getItemDefinition(id) ?? undefined,
+    }),
+  );
+  /** Quest events in, framework quest rewards and failures out. */
+  private readonly _quests = new QuestBridge({
+    framework: () => this.frameworkRuntime,
+    legacy: () => this.questSystem,
+    events: () => this.eventBus,
+    pack: this._pack,
+    addXp: (xp) => this.player.addExperience(xp),
+    notify: (text, ms) => this.ui.showNotification(text, ms),
+    markDirty: () => this.saveSystem.markDirty(),
+  });
   /** Panels that take over the screen (Escape, pause, input blocking). */
   private readonly _modals = new ModalRegistry();
   /** Bars, clock, compass, readouts and the debug overlay. */
@@ -674,7 +689,7 @@ export class Game {
     this.saveSystem.onAfterLoad = () => {
       this._cleanupCollectedLoot();
       this._hydrateCellAfterLoad();
-      this._syncInventoryGoldToFramework();
+      this._pack.syncGoldToFramework();
       // Saved equipment bypasses equip() — re-sync the weapon archetype.
       this._syncWeaponArchetype();
       // Features reset their transient state (e.g. a raid in progress).
@@ -730,14 +745,14 @@ export class Game {
     this.barterSystem    = new BarterSystem(this.inventorySystem, this.ui);
     this.shopSystem      = new ShopSystem();
     this.barterSystem.onTransaction = () => {
-      this._mirrorBarterGoldToInventory();
-      this._syncInventoryGoldToFramework();
+      this._pack.setGold(this.barterSystem.playerGold);
+      this._pack.syncGoldToFramework();
     };
     this.frameworkRuntime.setDialogueHostHooks({
       onDialogueHostEvent: (eventId, payload) => this._handleDialogueHostEvent(eventId, payload),
-      onDialogueConsumeItem: (itemId, quantity) => this._dialogueConsumeInventoryItem(itemId, quantity),
-      onDialogueGiveItem: (itemId, quantity) => this._giveDialogueItemToPlayer(itemId, quantity),
-      dialogueInventoryCount: (itemId) => this._dialogueInventoryCountForFramework(itemId),
+      onDialogueConsumeItem: (itemId, quantity) => this._pack.consume(itemId, quantity),
+      onDialogueGiveItem: (itemId, quantity) => this._pack.give(itemId, quantity),
+      dialogueInventoryCount: (itemId) => this._pack.count(itemId),
     });
 
     // Register v2 systems with save
@@ -1039,13 +1054,13 @@ export class Game {
     this.levelUpUI.setAnimator(this.uiAnimator);
 
     this.spellMakingUI.onForge = ({ name, components }) => {
-      this.barterSystem.playerGold = this._getInventoryGold();
+      this.barterSystem.playerGold = this._pack.gold();
       const result = this.spellMakingSystem.forgeSpell(name, components, this.barterSystem);
       if (result.ok) {
         if (result.goldCost && result.goldCost > 0) {
-          this._consumeInventoryGold(result.goldCost);
+          this._pack.spendGold(result.goldCost);
         }
-        this.barterSystem.playerGold = this._getInventoryGold();
+        this.barterSystem.playerGold = this._pack.gold();
         this.spellMakingUI.showStatus(
           `Forged "${result.spell!.name}" for ${result.goldCost} gold. Press Z to cycle spells.`,
         );
@@ -1388,7 +1403,7 @@ export class Game {
       // Gold sufficiency is pre-validated by TrainerSystem.train() via canTrain();
       // this callback only fires on a successful, already-approved session.
       this.skillProgressionSystem.setSkillLevel(skillId, newLevel);
-      this._consumeInventoryGold(goldSpent);
+      this._pack.spendGold(goldSpent);
       this.ui.showNotification(`${skillId} raised to ${newLevel}!  (−${goldSpent}g)`, 3000);
       this.saveSystem.markDirty();
     };
@@ -1547,7 +1562,7 @@ export class Game {
         const p = npc.mesh.position;
         this.eventBus.emit("player:kill", { npcId: npc.mesh.name, npcName, xp, at: { x: p.x, y: p.y, z: p.z }, lootTableId: npc.lootTableId ?? undefined });
         // Bandit Bounty: activate on the first bandit kill so that kill counts.
-        if (!this._banditQuestStarted && this._toFrameworkTargetId(name) === "Bandit") {
+        if (!this._banditQuestStarted && this._quests.targetId(name) === "Bandit") {
             this._banditQuestStarted = true;
             this.frameworkRuntime.questEngine.activateQuest("quest_bandit_bounty");
             this.ui.showNotification("📜 New quest: Bandit Bounty — bring proof to collect.", 3500);
@@ -1558,9 +1573,9 @@ export class Game {
             this.crimeSystem.commitCrime("murder", npc.factionId ?? "village_guard", this.timeSystem.elapsedGameTime);
         }
         this.questSystem.onKill(name);
-        this._applyFrameworkQuestEvent("kill", this._toFrameworkTargetId(name));
+        this._quests.apply("kill", this._quests.targetId(name));
         // Killing someone a quest needed alive fails the dependent quests.
-        this._failQuestsForDeadTarget(name, this._toFrameworkTargetId(name));
+        this._quests.failForDead(name);
         this.player.addExperience(xp);
         this.ui.showNotification(`+${xp} XP`, 2000);
         this.audioSystem.playNPCDeath();
@@ -1593,22 +1608,22 @@ export class Game {
     };
     this.interactionSystem.onLootPickup = (id) => {
         this.questSystem.onPickup(id);
-        this._applyFrameworkQuestEvent("pickup", id);
+        this._quests.apply("pickup", id);
         this.saveSystem.markDirty();
-        const frameworkItemId = this._toFrameworkInventoryItemId(id);
+        const frameworkItemId = this._pack.frameworkIdOf(id);
         if (frameworkItemId) this.frameworkRuntime.inventoryEngine.addItem(frameworkItemId, 1);
         this._tips.did("interact");
     };
     this.dialogueSystem.onTalkStart  = (name)  => {
         this.questSystem.onTalk(name);
-        this._applyFrameworkQuestEvent("talk", this._toFrameworkTargetId(name));
+        this._quests.apply("talk", this._quests.targetId(name));
         // Speechcraft XP each time dialogue is initiated
         this.skillProgressionSystem.gainXP("speechcraft", 8 * this.classSystem.xpMultiplierFor("speechcraft"));
         this._tips.did("interact");
     };
     this.dialogueSystem.onDialogueClosed = () => {
-      this.barterSystem.playerGold = this._getInventoryGold();
-      this._syncInventoryGoldToFramework();
+      this.barterSystem.playerGold = this._pack.gold();
+      this._pack.syncGoldToFramework();
       // Features waiting on the conversation (e.g. the job window) act now.
       this.eventBus.emit("dialogue:closed", {});
       this._currentDialogueNpcName = null;
@@ -2391,11 +2406,6 @@ export class Game {
       }
   }
 
-  private _toFrameworkTargetId(entityName: string): string {
-      if (entityName.startsWith("RuinGuard")) return "RuinGuard";
-      if (entityName.startsWith("TowerGuard")) return "TowerGuard";
-      return entityName.split("_")[0];
-  }
 
   /**
    * True when the victim is a non-hostile settlement NPC (villager, merchant,
@@ -2460,77 +2470,8 @@ export class Game {
       return "sword";
   }
 
-  private _toFrameworkInventoryItemId(itemId: string): string | null {
-      if (itemId === "potion_hp_01") return "health_potion";
-      if (itemId === "sword_01") return "iron_sword";
-      if (itemId === "guard_token") return "guard_token";
-      return null;
-  }
 
-  /**
-   * Fail quests that needed the killed NPC alive: framework quests with an
-   * incomplete "talk" node targeting them, and legacy quests with a matching
-   * incomplete talk objective. (E.g. killing the Guard fails "Parley with
-   * the Guard" and "The Guard's Plea" while "Eliminate the Guard" completes.)
-   */
-  private _failQuestsForDeadTarget(npcName: string, frameworkTargetId: string): void {
-      for (const questId of this.frameworkRuntime.questEngine.getActiveQuestIds()) {
-          const definition = this.frameworkRuntime.questEngine.getQuestDefinition(questId);
-          const state = this.frameworkRuntime.questEngine.getQuestState(questId);
-          if (!definition || !state) continue;
-          const neededAlive = definition.nodes.some(n =>
-              n.triggerType === "talk" && n.targetId === frameworkTargetId &&
-              !state.nodes[n.id]?.completed);
-          if (neededAlive && this.frameworkRuntime.questEngine.failQuest(questId)) {
-              this.ui.showNotification(`Quest failed: ${definition.name} — ${npcName} is dead.`, 4000);
-          }
-      }
-      for (const quest of this.questSystem.getActiveQuests()) {
-          const neededAlive = quest.objectives.some(o =>
-              !o.completed && o.type === "talk" && o.targetId === npcName);
-          if (neededAlive) this.questSystem.failQuest(quest.id);
-      }
-  }
 
-  private _applyFrameworkQuestEvent(
-      type: "kill" | "pickup" | "talk" | "custom",
-      targetId: string,
-      amount: number = 1
-  ): void {
-      const updates = this.frameworkRuntime.applyQuestEvent({ type, targetId, amount });
-      for (const update of updates) {
-          if (!update.questCompleted) continue;
-          this.eventBus.emit("quest:completed", { questId: update.questId, xpReward: update.xpReward });
-          this.ui.showNotification(`Framework quest complete: ${update.questId}`, 2800);
-          if (update.xpReward > 0) {
-              this.player.addExperience(update.xpReward);
-              this.ui.showNotification(`+${update.xpReward} XP`, 2000);
-          }
-          // Quest rewards: gold and items declared on the quest definition.
-          const definition = this.frameworkRuntime.questEngine.getQuestDefinition(update.questId);
-          const gold = Math.max(0, Math.floor(definition?.rewardGold ?? 0));
-          if (gold > 0) {
-              this.inventorySystem.addItem({
-                  id: GOLD_ITEM_ID,
-                  name: "Gold Coins",
-                  description: "Currency for trade and fines.",
-                  stackable: true,
-                  quantity: gold,
-                  weight: 0.1,
-                  stats: { value: 1 },
-              });
-              this._syncInventoryGoldToFramework();
-              this.ui.showNotification(`Quest reward: +${gold} gold`, 2400);
-          }
-          for (const reward of definition?.rewardItems ?? []) {
-              const quantity = Math.max(1, Math.floor(reward.quantity ?? 1));
-              this._grantFrameworkItem(reward.itemId, quantity);
-          }
-          if (gold > 0 || (definition?.rewardItems?.length ?? 0) > 0) {
-              this.saveSystem.markDirty();
-          }
-      }
-  }
 
   private _updateGameplayStep(deltaTime: number): void {
       this.player.update(deltaTime);
@@ -2842,10 +2783,6 @@ export class Game {
       }
   }
 
-  private _getInventoryGold(): number {
-      const goldEntry = this.inventorySystem.items.find((item) => item.id === GOLD_ITEM_ID);
-      return goldEntry?.quantity ?? 0;
-  }
 
   /** Once per in-game hour: features (world events, raids, …) react to `time:hour`. */
   private _updateDynamicWorldEventsOnHourChange(): void {
@@ -2865,16 +2802,7 @@ export class Game {
       }
 
       if (gold > 0) {
-        this.inventorySystem.addItem({
-          id: GOLD_ITEM_ID,
-          name: "Gold Coins",
-          description: "Currency for trade and fines.",
-          stackable: true,
-          quantity: gold,
-          weight: 0.1,
-          stats: { value: 1 },
-        });
-        this._syncInventoryGoldToFramework();
+        this._pack.addGold(gold);
         this.ui.showNotification(`+${gold} gold`, 1800);
       }
 
@@ -2887,179 +2815,31 @@ export class Game {
       }
   }
 
-  /** Sync framework engine gold count from the live inventory (for dialogue conditions). */
-  private _syncInventoryGoldToFramework(): void {
-      const qty = this._getInventoryGold();
-      const eng = this.frameworkRuntime.inventoryEngine;
-      const cur = eng.getItemCount("gold_coins");
-      if (cur === qty) return;
-      if (cur > qty) {
-        eng.removeItem("gold_coins", cur - qty);
-      } else {
-        eng.addItem("gold_coins", qty - cur);
-      }
-  }
 
-  /** Keep the gold stack aligned with BarterSystem's running total after trades. */
-  private _mirrorBarterGoldToInventory(): void {
-      const target = Math.max(0, Math.floor(this.barterSystem.playerGold));
-      const current = this._getInventoryGold();
-      if (current === target) return;
-      if (current > target) {
-        this.inventorySystem.removeItem(GOLD_ITEM_ID, current - target);
-      } else {
-        this.inventorySystem.addItem({
-          id: GOLD_ITEM_ID,
-          name: "Gold Coins",
-          description: "Currency for trade and fines.",
-          stackable: true,
-          quantity: target - current,
-          weight: 0.1,
-          stats: { value: 1 },
-        });
-      }
-  }
 
-  private _dialogueInventoryCountForFramework(itemId: string): number {
-      if (itemId === "gold_coins") return this._getInventoryGold();
-      const gameId = FRAMEWORK_ITEM_TO_GAME[itemId] ?? itemId;
-      return this.inventorySystem.items.find((i) => i.id === gameId)?.quantity ?? 0;
-  }
 
-  private _dialogueConsumeInventoryItem(itemId: string, quantity: number): boolean {
-      if (itemId === "gold_coins") {
-        return this._consumeInventoryGold(quantity);
-      }
-      const gameId = FRAMEWORK_ITEM_TO_GAME[itemId] ?? itemId;
-      return this.inventorySystem.removeItem(gameId, quantity);
-  }
 
-  private _giveDialogueItemToPlayer(itemId: string, quantity: number): void {
-      const def = this.frameworkRuntime.contentRegistry.getItemDefinition(itemId);
-      if (!def) return;
-      const gameId = FRAMEWORK_ITEM_TO_GAME[itemId] ?? itemId;
-      const existing = this.inventorySystem.items.find((i) => i.id === gameId);
-      if (existing) {
-        this.inventorySystem.addItem({ ...existing, quantity });
-        return;
-      }
-      const item: Item = {
-        id: gameId,
-        name: def.name,
-        description: def.description,
-        stackable: def.stackable,
-        quantity,
-        weight: 0.3,
-        stats:
-          itemId === "health_potion"
-            ? { ...HEALTH_POTION_STATS }
-            : { value: 10 },
-      };
-      if (def.slot) item.slot = def.slot;
-      this.inventorySystem.addItem(item);
-  }
 
   /** Move a successfully lifted item into the player inventory. */
   private _grantPickpocketItem(itemId: string): void {
       if (itemId === COIN_PURSE) {
-          this.inventorySystem.addItem({
-              id: GOLD_ITEM_ID,
-              name: "Gold Coins",
-              description: "Currency for trade and fines.",
-              stackable: true,
-              quantity: 8,
-              weight: 0.1,
-              stats: { value: 1 },
-          });
-          this._syncInventoryGoldToFramework();
+          this._pack.addGold(8);
           this.ui.showNotification("Coin purse: +8 gold", 2200);
           return;
       }
-      const gameId = FRAMEWORK_ITEM_TO_GAME[itemId] ?? itemId;
-      const existing = this.inventorySystem.items.find((i) => i.id === gameId);
-      if (existing) {
-          this.inventorySystem.addItem({ ...existing, quantity: 1 });
-          return;
-      }
-      if (this.frameworkRuntime.contentRegistry.getItemDefinition(itemId)) {
-          this._giveDialogueItemToPlayer(itemId, 1);
-          return;
-      }
-      this.inventorySystem.addItem({
-          id: gameId,
-          name: this._thief.label(itemId),
-          description: "Lifted.",
-          stackable: false,
-          quantity: 1,
-          weight: 0.5,
-          stats: { value: 10 },
-      });
+      this._pack.receive(itemId, () => ({
+          id: itemId, name: this._thief.label(itemId), description: "Lifted.",
+          stackable: false, quantity: 1, weight: 0.5, stats: { value: 10 },
+      }));
   }
 
-  /** Grant quest reward items (same pipeline as dialogue give-item effects). */
-  private _grantFrameworkItem(itemId: string, quantity: number): void {
-      const def = this.frameworkRuntime.contentRegistry.getItemDefinition(itemId);
-      this._giveDialogueItemToPlayer(itemId, quantity);
-      if (def) this.ui.showNotification(`Quest reward: ${def.name} ×${quantity}`, 2400);
-  }
 
   private _handleDialogueHostEvent(eventId: string, payload?: Record<string, unknown>): void {
-      // Features react to dialogue actions through the bus (e.g. "jobs:ask").
+      // Features act on dialogue actions ("jobs:ask", "barter:open",
+      // "smithing:open", "trainer:train", "rest:inn", …).
       this.eventBus.emit("dialogue:action", { eventId, npcName: this._currentDialogueNpcName, payload });
-      if (eventId === "trainer:train") {
-        const trainerId = typeof payload?.trainerId === "string" ? payload.trainerId : "";
-        if (!trainerId) return;
-        const def = this.trainerSystem.getTrainer(trainerId);
-        if (!def) {
-          this.ui.showNotification("That trainer is not available.", 2000);
-          return;
-        }
-        const skillState = this.skillProgressionSystem.getSkill(def.skillId);
-        const currentLevel = skillState?.level ?? 0;
-        const skillName = skillState?.name ?? def.skillId;
-        const gold = this._getInventoryGold();
-        const result = this.trainerSystem.train(trainerId, currentLevel, gold);
-        if (!result.success) {
-          const cost = this.trainerSystem.getCost(trainerId, currentLevel);
-          const reasonMsg: Record<string, string> = {
-            unknown_trainer: "That trainer is not available.",
-            skill_at_cap: `Your ${skillName} is as high as I can train you.`,
-            session_limit_reached:
-              "You've trained enough for now. Gain a character level, then return.",
-            insufficient_gold: `You need ${cost ?? 0} gold for the next lesson.`,
-          };
-          this.ui.showNotification(
-            reasonMsg[result.reason] ?? `Cannot train (${result.reason}).`,
-            3200,
-          );
-        }
-        return;
-      }
-      // "smithing:open" is the crafting feature's (it opens the forge after the talk).
-      if (eventId === "smithing:open") return;
-      // "barter:open" is the trade feature's (it opens the shop after the talk).
-      if (eventId === "barter:open") return;
-      if (eventId === "rest:inn") {
-        const hoursRaw = payload?.hours;
-        const hours = typeof hoursRaw === "number" && Number.isFinite(hoursRaw)
-          ? Math.round(hoursRaw)
-          : 8;
-        const result = this.waitSystem.rest(hours, this.timeSystem, this.player);
-        if (result.ok) {
-          this.survivalSystem.rest(hours * 22);
-          this.ui.showNotification(`You slept soundly. ${result.message}`, 3200);
-          this.skillProgressionSystem.gainXP("speechcraft", 6 * this.classSystem.xpMultiplierFor("speechcraft"));
-          this.saveSystem.markDirty();
-        }
-      }
   }
 
-  private _consumeInventoryGold(amount: number): boolean {
-      if (amount <= 0) return true;
-      const available = this._getInventoryGold();
-      if (available < amount) return false;
-      return this.inventorySystem.removeItem(GOLD_ITEM_ID, amount);
-  }
 
   /** Push latest progression snapshot into the Character Sheet DOM overlay. */
   private _refreshCharacterSheet(): void {
@@ -3279,6 +3059,17 @@ export class Game {
         drop: (at, item) => { new Loot(this.scene, at, item); },
       });
       k.install(new SpoilsFeature());
+      k.services.provide(DialogueHostKey, {
+        get trainers() { return game.trainerSystem; },
+        skillName: (id) => this.skillProgressionSystem.getSkill(id as never)?.name ?? id,
+        restAtInn: (hours) => {
+          const result = this.waitSystem.rest(hours, this.timeSystem, this.player);
+          if (!result.ok) return null;
+          this.survivalSystem.rest(hours * 22);
+          return result.message;
+        },
+      });
+      k.install(new DialogueServicesFeature());
       k.services.provide(OnboardingHostKey, {
         // Space must never skip a tip while a menu, dialog or the editor is open.
         screenFree: () => !this._isCombatInputBlocked()
@@ -3410,8 +3201,8 @@ export class Game {
       });
       k.install(new ArrestFeature());
       k.services.provide(PurseKey, {
-        gold: () => this._getInventoryGold(),
-        spend: (amount) => this._consumeInventoryGold(amount),
+        gold: () => this._pack.gold(),
+        spend: (amount) => this._pack.spendGold(amount),
       });
       const pets = new PetsFeature(this.scene);
       k.install(pets);
