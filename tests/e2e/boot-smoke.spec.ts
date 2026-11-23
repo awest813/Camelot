@@ -244,6 +244,10 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
     const travel = g.kernel.services.get({ name: "travel" });
     const host = g.kernel.services.get({ name: "travel-host" });
     host.inCombat = () => false;
+    // Rooms are built near the world origin, by the boot-time Guard: send the
+    // NPCs away so a fight can't knock the player out through the exit.
+    g.kernel.services.get({ name: "death-host" }).calmAttackers();
+    for (const n of g.scheduleSystem.npcs) n.mesh.position.x += 500;
     const said: string[] = [];
     const orig = g.ui.showNotification.bind(g.ui);
     g.ui.showNotification = (t: string, ms?: number) => { said.push(t); return orig(t, ms); };
@@ -254,7 +258,7 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
       for (let t = 0; t < 300 && !ok(); t++) await new Promise((r) => setTimeout(r, 100));
     };
     travel.travel("cave_01");
-    await until(() => g.cellManager.currentCell?.type === "interior" && !g.fastTravelUI.isVisible);
+    await until(() => g.cellManager.currentCell?.type === "interior" && !g.ui.isScreenFadeActive);
     await new Promise((r) => setTimeout(r, 200));
     const inside = {
       cell: g.cellManager.currentCell?.type,
@@ -263,7 +267,7 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
       dressed: !!g.scene.materials.find((m: any) => m.name === "intWall_cave_01")?.metadata?.dressed,
     };
     travel.travel("start_village");
-    await until(() => g.cellManager.currentCell?.type === "exterior" && g.world.visible);
+    await until(() => g.cellManager.currentCell?.type === "exterior" && g.world.visible && !g.ui.isScreenFadeActive);
     g.ui.showNotification = orig;
     return { inside, back: g.cellManager.currentCell?.type, outdoorsShown: g.world.visible, said };
   });
@@ -278,6 +282,25 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
     const g = (window as any).__camelotGame;
     return { open: g.graphicsSettingsUI.isVisible, paused: g.isPaused };
   })).toEqual({ open: false, paused: false });
+  await page.locator("#renderCanvas").click({ force: true });
+
+  // A character level-up: ten major-skill raises open the dialog; picking
+  // three attributes and confirming levels up and gives play back (it used
+  // to soft-lock: the dialog shown had lost its confirm).
+  const before = await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    const major = g.classSystem.chosenClass.majorSkills[0];
+    for (let i = 0; i < 10; i++) g.playerLevelSystem.handleSkillLevelUp(major);
+    return g.playerLevelSystem.characterLevel as number;
+  });
+  await expect(page.locator(".level-up")).toBeVisible();
+  const attrs = page.locator(".level-up__attr-btn");
+  for (let i = 0; i < 3; i++) await attrs.nth(i).click();
+  await page.locator(".level-up__confirm-btn").click();
+  expect(await page.evaluate(() => {
+    const g = (window as any).__camelotGame;
+    return { level: g.playerLevelSystem.characterLevel, open: g.levelUpUI.isVisible, blocked: g.interactionSystem.isBlocked };
+  })).toEqual({ level: before + 1, open: false, blocked: false });
   await page.locator("#renderCanvas").click({ force: true });
 
   // A guard stops the player for a bounty; Escape resists arrest.

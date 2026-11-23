@@ -104,6 +104,7 @@ import { FastTravelFeature, TravelKey, TravelHostKey } from "./features/fast-tra
 import { DeathFeature, DeathHostKey } from "./features/death/death-feature";
 import { SpoilsFeature, SpoilsHostKey } from "./features/spoils/spoils-feature";
 import { CharacterFeature, CharacterHostKey, CharacterKey } from "./features/character/character-feature";
+import { ProgressionFeature, ProgressionHostKey, ProgressionKey } from "./features/progression/progression-feature";
 import { DialogueServicesFeature, DialogueHostKey } from "./features/dialogue-services/dialogue-services-feature";
 import { SurvivalFeature, SurvivalHostKey } from "./features/survival/survival-feature";
 import { LevelScalingSystem } from "./systems/level-scaling-system";
@@ -117,9 +118,9 @@ import { MerchantRestockSystem } from "./systems/merchant-restock-system";
 import type { BirthsignSystem } from "./systems/birthsign-system";
 import type { ClassSystem } from "./systems/class-system";
 import type { RaceSystem } from "./systems/race-system";
-import { PlayerLevelSystem } from "./systems/player-level-system";
+import type { PlayerLevelSystem } from "./systems/player-level-system";
 import { CharacterCreationUI } from "./ui/character-creation-ui";
-import { CharacterSheetUI } from "./ui/character-sheet-ui";
+import type { CharacterSheetUI } from "./ui/character-sheet-ui";
 import { persistSkipOnboardingTips } from "./onboarding-preferences";
 import { OnboardingFeature, OnboardingHostKey, OnboardingKey, type OnboardingService } from "./features/onboarding/onboarding-feature";
 import { QuestCreatorSystem } from "./systems/quest-creator-system";
@@ -149,7 +150,7 @@ import type { FastTravelUI } from "./ui/fast-travel-ui";
 import type { SpellMakingUI } from "./ui/spell-making-ui";
 import type { GuardEncounterUI } from "./ui/guard-encounter-ui";
 import { ArrestFeature, ArrestKey, LawKey } from "./features/arrest/arrest-feature";
-import { LevelUpUI } from "./ui/level-up-ui";
+import type { LevelUpUI } from "./ui/level-up-ui";
 import { StableUI } from "./ui/stable-ui";
 import { SaddlebagUI } from "./ui/saddlebag-ui";
 import { DailyScheduleSystem } from "./systems/daily-schedule-system";
@@ -255,9 +256,10 @@ export class Game {
   public get fastTravelUI(): FastTravelUI { return this._fastTravel.menu; }
   public get spellMakingUI(): SpellMakingUI { return this._spellMaking.panel; }
   public get guardEncounterUI(): GuardEncounterUI { return this.kernel.services.get(ArrestKey).panel; }
-  public levelUpUI: LevelUpUI;
+  private readonly _progression = new ProgressionFeature();
+  public get levelUpUI(): LevelUpUI { return this._progression.levelUp; }
   /** Tab-open HTML overlay — identity, attributes, skills, reputation. */
-  public characterSheetUI!: CharacterSheetUI;
+  public get characterSheetUI(): CharacterSheetUI { return this._progression.sheet; }
   public get stableUI(): StableUI { return this.mounts.stable; }
   public get saddlebagUI(): SaddlebagUI { return this.mounts.saddlebag; }
   public uiAnimator: UIAnimator = new UIAnimator();
@@ -408,7 +410,7 @@ export class Game {
   public get raceSystem(): RaceSystem { return this._character.races; }
 
   // v12 systems (Oblivion depth: character progression — skill-based level-up)
-  public playerLevelSystem: PlayerLevelSystem;
+  public get playerLevelSystem(): PlayerLevelSystem { return this._progression.levels; }
 
   // v18 systems
   public dailyScheduleSystem: DailyScheduleSystem;
@@ -749,13 +751,6 @@ export class Game {
       modeChanged: () => this._refreshHelpOverlayIfVisible(),
     });
 
-    this.levelUpUI = new LevelUpUI();
-    this.levelUpUI.onConfirm = (primary, sec1, sec2) => {
-      this.playerLevelSystem.confirmLevelUp(primary, sec1, sec2);
-      this.interactionSystem.isBlocked = false;
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
-    };
 
     // ── v2 system wiring ──────────────────────────────────────────────────────
     this.stealthSystem   = new StealthSystem(this.player, this.scheduleSystem.npcs, this.ui, this.scene);
@@ -956,7 +951,7 @@ export class Game {
       this.ui.showNotification(`${name} skill increased to ${newLevel}!`, 2500);
       this.eventBus.emit("skill:levelUp" as any, { skillId, newLevel });
       // Notify PlayerLevelSystem so it can track major-skill level-ups.
-      this.playerLevelSystem?.handleSkillLevelUp(skillId);
+      this.kernel.services.get(ProgressionKey).skillRaised(skillId);
       this.saveSystem.markDirty();
     };
     this.saveSystem.setSkillProgressionSystem(this.skillProgressionSystem);
@@ -1049,7 +1044,6 @@ export class Game {
     this.saveSystem.setSpellMakingSystem(this.spellMakingSystem);
     this.spellMakingUI.setAnimator(this.uiAnimator);
 
-    this.levelUpUI = new LevelUpUI();
     this.levelUpUI.setAnimator(this.uiAnimator);
 
     // RespawnSystem — register the test cave as a respawnable zone (72 game-hours)
@@ -1077,55 +1071,7 @@ export class Game {
     this.saveSystem.setClassSystem(this.classSystem);
 
     // ── v12 system wiring (Oblivion depth: skill-based character progression) ──
-    this.playerLevelSystem = new PlayerLevelSystem();
-    this.playerLevelSystem.attachToClassSystem(this.classSystem);
-    this.playerLevelSystem.attachToAttributeSystem(this.attributeSystem);
-    this.playerLevelSystem.onLevelUpReady = (bonuses) => {
-      // Open the interactive level-up dialog so the player can choose 3 attributes.
-      this.interactionSystem.isBlocked = true;
-      document.exitPointerLock();
-      this.player.camera.detachControl();
-      this.levelUpUI.open(this.playerLevelSystem.characterLevel + 1, bonuses);
-    };
-    this.playerLevelSystem.onLevelUpComplete = (newLevel) => {
-      // Sync derived stats after attribute bonuses have been applied.
-      this.player.maxHealth      = this.attributeSystem.maxHealth;
-      this.player.maxMagicka     = this.attributeSystem.maxMagicka;
-      this.player.maxStamina     = this.attributeSystem.maxStamina;
-      this.player.maxCarryWeight = this.attributeSystem.carryWeight;
-      this.ui.showNotification(`Character Level ${newLevel}!`, 4000);
-      this.eventBus.emit("player:levelUp", { newLevel });
-      this.trainerSystem.onCharacterLevelUp();
-      // Grant one perk point per character level-up.
-      this.perkSystem.addPerkPoints(1);
-      this.saveSystem.markDirty();
-      if (this.characterSheetUI.isVisible) this._refreshCharacterSheet();
-      // Auto-open attribute panel on character level-up — only when no other
-      // modal owns the screen.
-      if (!this.isPaused && !this.ui.isAttributePanelOpen && !this._isCombatInputBlocked()) {
-        this.ui.toggleAttributePanel(true);
-        this.ui.refreshAttributePanel(this.attributeSystem);
-        this._suspendGameplayInput();
-      }
-    };
     this.saveSystem.setPlayerLevelSystem(this.playerLevelSystem);
-
-    this.characterSheetUI = new CharacterSheetUI();
-    // Character sheet ✕ button (its Escape path is owned by the game cascade).
-    // Must wire after construction — assigning earlier throws and aborts Game.init
-    // (boot-smoke / character-create never appear).
-    this.characterSheetUI.onClose = () => {
-      this.ui.setCharacterSheetOpen(false);
-      this._restoreGameplayInput();
-    };
-    // Perk spending from the character sheet (points come from level-ups).
-    this.characterSheetUI.onPerkUnlock = (perkId) => {
-      if (this.perkSystem.unlock(perkId)) {
-        this.saveSystem.markDirty();
-        this._refreshCharacterSheet();
-      }
-    };
-
 
     // ── v18 DailyScheduleSystem ───────────────────────────────────────────────
     // Connects TimeSystem → ScheduleSystem so NPC daily behaviours are driven
@@ -1532,18 +1478,7 @@ export class Game {
                 const tabEv = kbInfo.event as KeyboardEvent;
                 if (tabEv.repeat) return;
                 tabEv.preventDefault();
-                // Tab: the character sheet (open over play only).
-                if (this.characterSheetUI.isVisible) {
-                    this.characterSheetUI.hide();
-                    this.ui.setCharacterSheetOpen(false);
-                    this._restoreGameplayInput();
-                    return;
-                }
-                if (this._isCombatInputBlocked()) return;
-                this._refreshCharacterSheet();
-                this.characterSheetUI.show();
-                this.ui.setCharacterSheetOpen(true);
-                this._suspendGameplayInput();
+                this.kernel.services.get(ProgressionKey).toggleSheet();
             } else if (kbInfo.event.key === "F5" && !kbInfo.event.shiftKey) {
                 if (!this.isPaused) this.saveSystem.save();
             } else if (kbInfo.event.key === "F9" && !kbInfo.event.shiftKey) {
@@ -2455,32 +2390,6 @@ export class Game {
   }
 
 
-  /** Push latest progression snapshot into the Character Sheet DOM overlay. */
-  private _refreshCharacterSheet(): void {
-    const sb = this.birthsignSystem.getStatBonuses();
-    this.characterSheetUI.update({
-      name:            this.player.name,
-      level:           this.playerLevelSystem.characterLevel,
-      xpLevel:         this.player.level,
-      raceName:        this.raceSystem.chosenRace?.name,
-      className:       this.classSystem.chosenClass?.name,
-      birthsignName:   this.birthsignSystem.chosenBirthsign?.name,
-      specialization:  this.classSystem.chosenClass?.specialization,
-      attributes:      this.attributeSystem.getAll(),
-      skills:          this.skillProgressionSystem.getAllSkills(),
-      maxHealth:       this.attributeSystem.maxHealth + sb.maxHealth,
-      maxMagicka:      this.attributeSystem.maxMagicka + sb.maxMagicka,
-      maxStamina:      this.attributeSystem.maxStamina + sb.maxStamina,
-      carryWeight:     this.attributeSystem.carryWeight + sb.carryWeight,
-      fame:            this.fameSystem.fame,
-      infamy:          this.fameSystem.infamy,
-      fameLabel:       this.fameSystem.fameLabel,
-      infamyLabel:     this.fameSystem.infamyLabel,
-      perkPoints:      this.perkSystem.perkPoints,
-      perks:           this.perkSystem.getAllPerks(),
-      gearCondition:   this.smithing.getEquippedConditionSummary(),
-    });
-  }
 
 
   /** Unregister an NPC from every system and dispose it. */
@@ -2688,6 +2597,43 @@ export class Game {
         },
       });
       k.install(this._character);
+      k.services.provide(ProgressionHostKey, {
+        get attributes() { return game.attributeSystem; },
+        get classes() { return game.classSystem; },
+        perks: () => this.perkSystem,
+        syncMaxStats: syncMax,
+        levelReached: () => this.trainerSystem.onCharacterLevelUp(),
+        offerAttributes: () => {
+          if (this.isPaused || this.ui.isAttributePanelOpen || this._isCombatInputBlocked()) return;
+          this.ui.toggleAttributePanel(true);
+          this.ui.refreshAttributePanel(this.attributeSystem);
+          this._suspendGameplayInput();
+        },
+        sheet: () => {
+          const sb = this.birthsignSystem.getStatBonuses();
+          return {
+            name: this.player.name,
+            xpLevel: this.player.level,
+            raceName: this.raceSystem.chosenRace?.name,
+            className: this.classSystem.chosenClass?.name,
+            birthsignName: this.birthsignSystem.chosenBirthsign?.name,
+            specialization: this.classSystem.chosenClass?.specialization,
+            attributes: this.attributeSystem.getAll(),
+            skills: this.skillProgressionSystem.getAllSkills(),
+            maxHealth: this.attributeSystem.maxHealth + sb.maxHealth,
+            maxMagicka: this.attributeSystem.maxMagicka + sb.maxMagicka,
+            maxStamina: this.attributeSystem.maxStamina + sb.maxStamina,
+            carryWeight: this.attributeSystem.carryWeight + sb.carryWeight,
+            fame: this.fameSystem.fame,
+            infamy: this.fameSystem.infamy,
+            fameLabel: this.fameSystem.fameLabel,
+            infamyLabel: this.fameSystem.infamyLabel,
+            gearCondition: this.smithing.getEquippedConditionSummary(),
+          };
+        },
+        setSheetOpen: (open) => this.ui.setCharacterSheetOpen(open),
+      });
+      k.install(this._progression);
       k.services.provide(SettingsHostKey, {
         tier: () => this.graphics.tier,
         applyTier: (tier) => { this.lodSystem?.setQuality(tier); location.reload(); },
@@ -2937,7 +2883,7 @@ export class Game {
         ({ id, isOpen: () => ui.isVisible, close: () => { ui.close(); restore(); } });
       this._modals.add(
         { id: "character-sheet", isOpen: () => this.characterSheetUI.isVisible,
-          close: () => { this.characterSheetUI.hide(); this.ui.setCharacterSheetOpen(false); restore(); } },
+          close: () => this.kernel.services.get(ProgressionKey).closeSheet() },
         { id: "inventory", isOpen: () => this.inventorySystem.isOpen, close: () => { this.inventorySystem.toggleInventory(); restore(); } },
         { id: "quest-log", isOpen: () => this.questSystem.isLogOpen, close: () => { this.questSystem.toggleQuestLog(); restore(); } },
         { id: "skill-tree", isOpen: () => this.skillTreeSystem.isOpen, close: () => { this.skillTreeSystem.toggle(); restore(); } },

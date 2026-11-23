@@ -424,6 +424,13 @@ state, scope and save codec.
   24. **Settings** (`src/features/settings/`): the settings dialog
       (graphics tier, difficulty, audio, look sensitivity, fullscreen), the
       gear button, and the credits.
+
+  25. **Progression** (`src/features/progression/`): character levels from
+      major-skill raises, the level-up dialog, a perk point per level, and
+      the character sheet (Tab). The game built the level-up dialog twice,
+      and the second copy, the one shown, had no confirm handler. Confirming
+      a level-up did nothing, and Escape is blocked there, so the player
+      was stuck.
 - `src/world/dragon-lair.ts` (the tundra dragon boss and its body) and
   `src/game/weapon-archetype.ts` (which archetype a weapon fights as).
 - `src/game/player-pack.ts`: gold (one coin stack, mirrored into the

@@ -285,6 +285,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   game underneath them.
 - Fast travel into an interior (the Old Cave) hides the open world and gives
   the room its rock walls and torchlight, as walking in through the door does.
+- Confirming a character level-up works again. The dialog used to stay up with
+  play blocked, which left the game stuck.
 
 ### Changed
 - Plain B still opens Enchanting. B with Shift held now opens Smithing.
