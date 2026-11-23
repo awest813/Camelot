@@ -2,16 +2,13 @@ import { Scene } from "@babylonjs/core/scene";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
-import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import type { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import type { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
 
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { AtmosphereController } from "./rendering/sky-dome";
 import { createTerrainMaterial } from "./rendering/terrain-material";
 import { WeaponViewModel } from "./rendering/viewmodel";
@@ -96,6 +93,7 @@ import type { EnchantingUI } from "./ui/enchanting-ui";
 import { LodSystem } from "./systems/lod-system";
 import { WorldEnvironment } from "./rendering/world-environment";
 import { ChunkContent } from "./world/chunk-content";
+import { dressInterior } from "./world/interior-dressing";
 import { WeatherSystem } from "./systems/weather-system";
 import { GraphicsSystem, persistGraphicsTier } from "./systems/graphics-system";
 import { QuickSlotSystem, isConsumableItem, type QuickSlotKey } from "./systems/quickslot-system";
@@ -2659,57 +2657,16 @@ export class Game {
       // LodSystem prunes disposed meshes in update(); chunk CDN props keep stable
       // refs for the exterior world, so we do not clear the registry here.
 
-      // Sync world visibility with cell type (hide exterior when in interior)
-      const isInterior = this.cellManager.isInterior;
-      this.world.setVisible(!isInterior);
-      if (isInterior) this._dressInterior(cellId);
+      this._presentCell(cellId);
   }
 
-  /**
-   * Give a freshly built interior cell real surfaces (rock walls, earthen
-   * floor) and torchlight.  Torch meshes are named after the cell's walls so
-   * they go when the cell's meshes are disposed on exit.
-   */
-  private _dressInterior(cellId: string): void {
-      const tm = this.world.textureManager;
-      const anchor = this.scene.getMeshByName("floor_" + cellId);
-      for (const mesh of this.scene.meshes) {
-          const mat = mesh.material;
-          if (!(mat instanceof StandardMaterial) || mat.metadata?.dressed) continue;
-          if (mat.name === "intFloor_" + cellId) {
-              tm.applySurface(mat, "dirt", 3, 3, { tintStrength: 0 });
-              mat.specularColor = new Color3(0.06, 0.05, 0.04);
-              mat.metadata = { dressed: true };
-          } else if (mat.name === "intWall_" + cellId) {
-              tm.applySurface(mat, "rock", 4, 1, { tintStrength: 0 });
-              mat.specularColor = new Color3(0.1, 0.09, 0.08);
-              mat.specularPower = 32;
-              mat.metadata = { dressed: true };
-          }
-      }
-      if (!anchor) return;
-      const torchMat = new StandardMaterial(`intTorchFlame_${cellId}`, this.scene);
-      torchMat.emissiveColor = new Color3(1.0, 0.4, 0.05);
-      torchMat.disableLighting = true;
-      for (const [x, z] of [[-5.7, 0], [5.7, 0]] as const) {
-          const flame = MeshBuilder.CreateCylinder(
-              `intTorch_${cellId}_${x}`, { height: 0.3, diameterTop: 0, diameterBottom: 0.13, tessellation: 6 }, this.scene,
-          );
-          flame.position.set(x, 2.1, z);
-          flame.material = torchMat;
-          flame.isPickable = false;
-          // Disposed with the room.
-          flame.parent = anchor;
-          flame.position.set(x - anchor.position.x, 2.1 - anchor.position.y, z - anchor.position.z);
-          const light = new PointLight(`intTorch_${cellId}_${x}_light`, new Vector3(x, 2.2, z), this.scene);
-          light.diffuse = new Color3(1.0, 0.6, 0.2);
-          light.intensity = 1.1;
-          light.range = 10;
-          flame.onDisposeObservable.addOnce(() => light.dispose());
-          this._env.fireFx?.attach({ flame, light, kind: "torch" });
-      }
-      anchor.onDisposeObservable.addOnce(() => torchMat.dispose());
+  /** Hide the outdoors inside an interior, and dress a freshly built room. */
+  private _presentCell(cellId: string): void {
+      const isInterior = this.cellManager.isInterior;
+      this.world.setVisible(!isInterior);
+      if (isInterior) dressInterior(cellId, { scene: this.scene, textures: this.world.textureManager, fireFx: this._env.fireFx });
   }
+
 
   private _beginPortalTransition(portalId: string): void {
       if (!this.cellManager.portals.has(portalId)) return;
@@ -2918,7 +2875,8 @@ export class Game {
         encumbered: () => this.player.isEncumbered,
         isInterior: (id) => this.cellManager.getCellDefinition(id)?.type === "interior",
         indoors: () => this.cellManager.isInterior,
-        enterCell: (id, at) => { this.cellManager.enterCellById(id, at, true); },
+        // Entered quietly (the trip has its own message), so present the cell here.
+        enterCell: (id, at) => { if (this.cellManager.enterCellById(id, at, true)) this._presentCell(id); },
         fade: (onBlack, onDone) => this.ui.playScreenFadeSequence({
           fadeOutMs: 400, holdMs: 120, fadeInMs: 450, onBlack, onComplete: onDone,
         }),

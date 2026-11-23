@@ -283,6 +283,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
   mouse back from the editor.
 - Escape closes the shouts panel and the World Builder, instead of pausing the
   game underneath them.
+- Fast travel into an interior (the Old Cave) hides the open world and gives
+  the room its rock walls and torchlight, as walking in through the door does.
 
 ### Changed
 - Plain B still opens Enchanting. B with Shift held now opens Smithing.

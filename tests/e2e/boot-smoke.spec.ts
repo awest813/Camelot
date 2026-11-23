@@ -232,6 +232,28 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
     return loot() > before;
   }), "the kill dropped loot").toBe(true);
 
+  // Fast travel into the Old Cave: the outdoors is hidden and the room is
+  // dressed (rock, torchlight); then travel back out.
+  const cave = await page.evaluate(async () => {
+    const g = (window as any).__camelotGame;
+    const travel = g.kernel.services.get({ name: "travel" });
+    const host = g.kernel.services.get({ name: "travel-host" });
+    host.inCombat = () => false;
+    g.fastTravelSystem.discoverLocation("cave_01", "Old Cave", { x: -8, y: 2, z: 8 });
+    travel.travel("cave_01");
+    await new Promise((r) => setTimeout(r, 1500));
+    const inside = {
+      cell: g.cellManager.currentCell?.type,
+      outdoorsShown: g.world.visible,
+      torch: !!g.scene.getMeshByName("intTorch_cave_01_-5.7"),
+      dressed: !!g.scene.materials.find((m: any) => m.name === "intWall_cave_01")?.metadata?.dressed,
+    };
+    travel.travel("start_village");
+    await new Promise((r) => setTimeout(r, 1500));
+    return { inside, back: g.cellManager.currentCell?.type, outdoorsShown: g.world.visible };
+  });
+  expect(cave).toEqual({ inside: { cell: "interior", outdoorsShown: false, torch: true, dressed: true }, back: "exterior", outdoorsShown: true });
+
   // A guard stops the player for a bounty; Escape resists arrest.
   const arrest = await page.evaluate(() => {
     const g = (window as any).__camelotGame;
