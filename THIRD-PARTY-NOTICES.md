@@ -17,6 +17,17 @@ in `node_modules/@babylonjs/havok` after install.
 
 `recast-detour` wraps Recast Navigation. See that package's license after install.
 
+## bitECS
+
+Mozilla Public License 2.0. Copyright Nathaniel Martin and contributors.
+Used unmodified from the `bitecs` package (0.4); its source and license are
+in `node_modules/bitecs` after install, and at
+https://github.com/NateTheGreatt/bitECS.
+
+## Preact
+
+MIT License. Copyright Jason Miller and contributors.
+
 ## KayKit Character Packs: Adventurers and Skeletons
 
 CC0 1.0 Universal. Kay Lousberg, kaylousberg.com. Credit is not required and

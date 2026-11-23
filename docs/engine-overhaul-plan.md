@@ -578,6 +578,20 @@ Preact in Phase 8.
 **Exit:** no system reads `mesh.name` for identity, and NPC flags are
 components.
 
+**Progress:**
+
+- bitECS 0.4 added, behind `src/core/ecs/actors.ts` (`ActorStore`: spawn,
+  despawn, has / set, query, and the NPC body in a side table). Ids come
+  from the store and are never reused. bitECS 0.4.0's own id versioning is
+  broken: recycled ids stop "existing" once its index arrays shuffle, which
+  showed up in the village e2e. So the store maps its ids to bitECS's
+  slots, and a churn test pins this.
+- Every NPC gets an actor id when it's built and leaves the store with its
+  body. Its ten flags (dead, in dialogue, aggressive, hostile on sight,
+  provoked, telegraphing, staggered, hit-react, guard, unblockable) are tag
+  components behind the same `npc.isDead` / … accessors, so no caller
+  changed.
+
 ### Phase 4 — Consolidation (3 weeks)
 
 - One quest engine, one inventory and one schedule pipeline.

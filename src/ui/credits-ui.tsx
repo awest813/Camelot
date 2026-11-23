@@ -23,6 +23,8 @@ export const CREDITS_SECTIONS: readonly CreditsSection[] = [
       "Babylon.js — Apache License 2.0",
       "Havok Physics via @babylonjs/havok",
       "Recast Navigation (recast-detour)",
+      "bitECS — Mozilla Public License 2.0",
+      "Preact — MIT License",
     ],
   },
   {

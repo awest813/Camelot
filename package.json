@@ -51,6 +51,7 @@
     "@floating-ui/dom": "^1.7.6",
     "@mathigon/boost": "^1.2.37",
     "3d-tiles-renderer": "^0.4.24",
+    "bitecs": "^0.4.0",
     "delaunator": "^5.1.0",
     "dompurify": "^3.4.0",
     "mistreevous": "^4.3.1",

@@ -1,4 +1,6 @@
 import { Scene } from "@babylonjs/core/scene";
+import { actors } from "./actors";
+import { Aggressive, Dead, Guard, HitReact, HostileOnSight, InDialogue, Provoked, Staggered, Telegraphing, Unblockable, type ActorId } from "../core/ecs/actors";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
@@ -107,9 +109,11 @@ export class NPC {
   // Health
   public health: number = 100;
   public maxHealth: number = 100;
-  public isDead: boolean = false;
+  public get isDead(): boolean { return actors.has(this.actorId, Dead); }
+  public set isDead(on: boolean) { actors.set(this.actorId, Dead, on); }
   /** True when the NPC is actively engaged in a dialogue session with the player. */
-  public isInDialogue: boolean = false;
+  public get isInDialogue(): boolean { return actors.has(this.actorId, InDialogue); }
+  public set isInDialogue(on: boolean) { actors.set(this.actorId, InDialogue, on); }
 
   // ─── AI State Machine ───────────────────────────────────────────────────────
 
@@ -122,7 +126,8 @@ export class NPC {
    * true  → ALERT | CHASE | ATTACK | RETURN
    * false → IDLE  | PATROL
    */
-  public isAggressive: boolean = false;
+  public get isAggressive(): boolean { return actors.has(this.actorId, Aggressive); }
+  public set isAggressive(on: boolean) { actors.set(this.actorId, Aggressive, on); }
   /**
    * Whether this NPC turns on the player just for coming close (or for being
    * spotted by it).  Monsters, bandits and the restless dead are hostile on
@@ -130,12 +135,14 @@ export class NPC {
    * not — they only fight once {@link provoked}.  Defaults to true so ad-hoc
    * enemy spawns keep their behaviour.
    */
-  public hostileOnSight: boolean = true;
+  public get hostileOnSight(): boolean { return actors.has(this.actorId, HostileOnSight); }
+  public set hostileOnSight(on: boolean) { actors.set(this.actorId, HostileOnSight, on); }
   /**
    * Set when the player attacks this NPC (or a guard is resisted).  A provoked
    * NPC fights like a hostile one until it gives up and walks home.
    */
-  public provoked: boolean = false;
+  public get provoked(): boolean { return actors.has(this.actorId, Provoked); }
+  public set provoked(on: boolean) { actors.set(this.actorId, Provoked, on); }
 
   /** World position where this NPC was initially spawned; used for RETURN state. */
   public spawnPosition: Vector3;
@@ -193,7 +200,8 @@ export class NPC {
   public attackTimer: number = 0;
   public attackCooldown: number = 2; // seconds between attacks
   /** True while the NPC is in a visible pre-strike telegraph animation window. */
-  public isAttackTelegraphing: boolean = false;
+  public get isAttackTelegraphing(): boolean { return actors.has(this.actorId, Telegraphing); }
+  public set isAttackTelegraphing(on: boolean) { actors.set(this.actorId, Telegraphing, on); }
   /** Remaining seconds before a telegraphed strike resolves. */
   public attackTelegraphTimer: number = 0;
   /** Strike reach factor used when resolving telegraphed attacks. */
@@ -211,7 +219,8 @@ export class NPC {
   // ─── Stagger (power-attack interrupt) ───────────────────────────────────────
 
   /** True while the NPC is briefly staggered after a player power attack. */
-  public isStaggered: boolean = false;
+  public get isStaggered(): boolean { return actors.has(this.actorId, Staggered); }
+  public set isStaggered(on: boolean) { actors.set(this.actorId, Staggered, on); }
   /** Remaining seconds of the current stagger. */
   public staggerTimer: number = 0;
 
@@ -219,7 +228,8 @@ export class NPC {
    * Set to true when the NPC takes damage (non-lethal). Consumed by the game loop
    * to trigger a one-frame hit-reaction animation request.
    */
-  public justTakenDamageVisual: boolean = false;
+  public get justTakenDamageVisual(): boolean { return actors.has(this.actorId, HitReact); }
+  public set justTakenDamageVisual(on: boolean) { actors.set(this.actorId, HitReact, on); }
 
   // ─── Faction & role ─────────────────────────────────────────────────────────
 
@@ -230,7 +240,8 @@ export class NPC {
    * True for NPCs that enforce laws and challenge the player when there is an
    * active bounty in their faction.  Only guards challenge; witnesses do not.
    */
-  public isGuard: boolean = false;
+  public get isGuard(): boolean { return actors.has(this.actorId, Guard); }
+  public set isGuard(on: boolean) { actors.set(this.actorId, Guard, on); }
 
   /**
    * Loot table ID resolved by LootTableSystem on death.
@@ -301,7 +312,8 @@ export class NPC {
   public disarmTimer: number = 0;
 
   /** True while the NPC's current telegraphed blow is unblockable (elites). */
-  public isAttackUnblockable: boolean = false;
+  public get isAttackUnblockable(): boolean { return actors.has(this.actorId, Unblockable); }
+  public set isAttackUnblockable(on: boolean) { actors.set(this.actorId, Unblockable, on); }
 
   /** Probability [0, 1] that the NPC dodges a player's melee attack. */
   public dodgeChance: number = 0.05;
@@ -352,10 +364,16 @@ export class NPC {
    */
   public static onCreated: ((npc: NPC) => void) | null = null;
 
+  /** This NPC's id in the actor store (its flags are components there). */
+  public readonly actorId: ActorId = actors.spawn(this);
+
   constructor(scene: Scene, position: Vector3, name: string) {
     this.scene = scene;
     this.spawnPosition = position.clone();
+    this.hostileOnSight = true;
     this._createMesh(position, name);
+    // The actor goes with its body.
+    this.mesh.onDisposeObservable?.addOnce(() => actors.despawn(this.actorId));
     NPC.onCreated?.(this);
   }
 
