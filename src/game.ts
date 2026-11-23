@@ -106,6 +106,7 @@ import { FastTravelFeature, TravelKey, TravelHostKey } from "./features/fast-tra
 import { DeathFeature, DeathHostKey } from "./features/death/death-feature";
 import { SpoilsFeature, SpoilsHostKey } from "./features/spoils/spoils-feature";
 import { DialogueServicesFeature, DialogueHostKey } from "./features/dialogue-services/dialogue-services-feature";
+import { SurvivalFeature, SurvivalHostKey } from "./features/survival/survival-feature";
 import { LevelScalingSystem } from "./systems/level-scaling-system";
 import { FameSystem } from "./systems/fame-system";
 import { ActiveEffectsSystem } from "./systems/active-effects-system";
@@ -155,7 +156,7 @@ import { DailyScheduleSystem } from "./systems/daily-schedule-system";
 import { HorseSystem } from "./systems/horse-system";
 import { SwimmingSystem } from "./systems/swimming-system";
 import { DiseaseSystem } from "./systems/disease-system";
-import { SurvivalSystem } from "./systems/survival-system";
+import type { SurvivalSystem } from "./systems/survival-system";
 import type { TravelEventSystem } from "./systems/travel-event-system";
 import { AmbientEventSystem } from "./systems/ambient-event-system";
 import { LeveledListSystem, ALL_BUILT_IN_LEVELED_LISTS } from "./systems/leveled-list-system";
@@ -415,7 +416,8 @@ export class Game {
   public diseaseSystem: DiseaseSystem;
 
   // v28+ survival / flavor-event systems
-  public survivalSystem!: SurvivalSystem;
+  private readonly _survival = new SurvivalFeature();
+  public get survivalSystem(): SurvivalSystem { return this._survival.needs; }
   public get travelEventSystem(): TravelEventSystem { return this.kernel.services.get(WorldEventsKey).travel; }
   public get ambientEventSystem(): AmbientEventSystem { return this.kernel.services.get(WorldEventsKey).ambient; }
   public leveledListSystem!: LeveledListSystem;
@@ -1319,20 +1321,7 @@ export class Game {
     };
     this.saveSystem.setDiseaseSystem(this.diseaseSystem);
 
-    // ── v28: Survival needs (hunger / fatigue / cold) ──────────────────────
-    this.survivalSystem = new SurvivalSystem();
-    this.survivalSystem.onHungerLevelChanged = (level) => {
-      if (level === "hungry") this.ui.showNotification("You are getting hungry. Find some food.", 3000);
-      if (level === "starving") this.ui.showNotification("You are starving!", 3500);
-    };
-    this.survivalSystem.onFatigueLevelChanged = (level) => {
-      if (level === "tired") this.ui.showNotification("You are getting tired. Rest soon (T).", 3000);
-      if (level === "exhausted") this.ui.showNotification("You are exhausted!", 3500);
-    };
-    this.survivalSystem.onColdLevelChanged = (level) => {
-      if (level === "cold") this.ui.showNotification("You are cold. Seek shelter or fire.", 3000);
-      if (level === "freezing") this.ui.showNotification("You are freezing! Health is draining.", 3500);
-    };
+    // Survival needs (hunger / fatigue / cold): the survival feature.
     this.saveSystem.setSurvivalSystem(this.survivalSystem);
 
     // ── v22: Event Manager (Dungeon Master) ───────────────────────────────
@@ -2509,35 +2498,6 @@ export class Game {
         }
       }
 
-      // ── Survival needs ────────────────────────────────────────────────────
-      // Cold drains in the tundra and in bad weather; elsewhere it recovers.
-      {
-        const p = this.player.camera.position;
-        const biome = this.world.getBiome(
-          Math.floor(p.x / this.world.chunkSize),
-          Math.floor(p.z / this.world.chunkSize),
-        );
-        const weather = this.weatherSystem?.state ?? "clear";
-        const isCold = biome === "tundra" || weather === "rain" || weather === "storm";
-        this.survivalSystem.update(deltaTime, isCold);
-        this.skillProgressionSystem.globalXpMultiplier = this.survivalSystem.xpMultiplier;
-
-        // Apply derived penalties to the player.
-        const staminaRegenPenalty = this.survivalSystem.staminaRegenPenalty;
-        if (staminaRegenPenalty < 0) {
-          this.player.stamina = Math.max(0, this.player.stamina + staminaRegenPenalty * deltaTime);
-        }
-        const maxStamina = this.player.maxStamina + this.survivalSystem.maxStaminaPenalty;
-        if (this.player.stamina > maxStamina) this.player.stamina = maxStamina;
-        const maxMagicka = this.player.maxMagicka + this.survivalSystem.maxMagickaPenalty;
-        if (this.player.magicka > maxMagicka) this.player.magicka = maxMagicka;
-        const frost = this.survivalSystem.frostDamagePerSecond;
-        if (frost > 0) {
-          this.player.health = Math.max(0, this.player.health - frost * deltaTime);
-          this.player.notifyDamageTaken();
-        }
-      }
-
       this.projectileSystem.update(deltaTime);
       this.spellSystem.update(deltaTime);
 
@@ -3070,6 +3030,17 @@ export class Game {
         },
       });
       k.install(new DialogueServicesFeature());
+      k.services.provide(SurvivalHostKey, {
+        body: () => this.player,
+        isCold: () => {
+          const p = this.player.camera.position;
+          const biome = this.world.getBiome(Math.floor(p.x / this.world.chunkSize), Math.floor(p.z / this.world.chunkSize));
+          const weather = this.weatherSystem?.state ?? "clear";
+          return biome === "tundra" || weather === "rain" || weather === "storm";
+        },
+        setXpMultiplier: (m) => { this.skillProgressionSystem.globalXpMultiplier = m; },
+      });
+      k.install(this._survival);
       k.services.provide(OnboardingHostKey, {
         // Space must never skip a tip while a menu, dialog or the editor is open.
         screenFree: () => !this._isCombatInputBlocked()

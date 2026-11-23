@@ -410,6 +410,9 @@ state, scope and save codec.
   20. **Dialogue services** (`src/features/dialogue-services/`): a
       trainer's lesson and a night at the inn, from `dialogue:action`. The
       game's dialogue host now just emits the action.
+
+  21. **Survival** (`src/features/survival/`): hunger, fatigue and cold,
+      their warnings and costs, as a sim-phase system.
 - `src/game/player-pack.ts`: gold (one coin stack, mirrored into the
   framework inventory) and items, with the framework-to-game id mapping.
   It replaces four hand-built gold stacks and the dialogue count, consume
