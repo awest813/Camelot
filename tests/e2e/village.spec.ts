@@ -319,7 +319,7 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     const g = (window as any).__camelotGame; const c = g.player.camera.position;
     const b = g.scheduleSystem.npcs.find((n: any) => /^Barkeeper_/.test(n.mesh.name)
       && Math.hypot(n.mesh.position.x - c.x, n.mesh.position.z - c.z) < 40);
-    return { found: !!b, visible: !!b?.mesh.isEnabled(), talks: !!b?.mesh.metadata };
+    return { found: !!b, visible: !!b?.mesh.isEnabled(), talks: !!b?.mesh.metadata && !b.isAsleep };
   });
   expect(barkeep, "the barkeeper is up and serving at 23:00").toEqual({ found: true, visible: true, talks: true });
   const onWatch = await page.evaluate(() => {

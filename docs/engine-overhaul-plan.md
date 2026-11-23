@@ -690,6 +690,14 @@ components.
     `event-script-system`, `equipment-visual-system`,
     `quaternius-asset-manifest`, and the
     `world/babylon-world-chunk-*` adapters.
+- Schedules:
+  - Block matching lives in one place, `scheduledBehaviorAt(blocks, hour)`
+    in `schedule-system.ts`. The daily schedule system had its own copy.
+  - Sleep is the `Asleep` actor tag (`npc.isAsleep`). It used to be a
+    hack: blanking the NPC's mesh metadata so interaction couldn't see
+    it. The interaction prompt now says "X is asleep" and won't start a
+    conversation. The daily schedule system also forgets sleepers that
+    have left the world; before, it kept them forever.
 
 ### Phase 5 — Persistence (1–2 weeks)
 

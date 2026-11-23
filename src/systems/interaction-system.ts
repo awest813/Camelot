@@ -90,6 +90,8 @@ export class InteractionSystem {
           if (metadata.type === 'npc') {
               if (metadata.npc.isAggressive) {
                   this.ui.setInteractionText(`${metadata.npc.displayName} is hostile`);
+              } else if (metadata.npc.isAsleep) {
+                  this.ui.setInteractionText(`${metadata.npc.displayName} is asleep`);
               } else {
                   const sneakPrompt = this._pickpocketPromptFor(metadata.npc);
                   this.ui.setInteractionText(
@@ -138,6 +140,8 @@ export class InteractionSystem {
               this.ui.showNotification(`${metadata.npc.displayName} is hostile!`, 1500);
               return;
           }
+          // Asleep by their schedule: no talking (or pickpocketing) until they wake.
+          if (metadata.npc.isAsleep) return;
           if (this._pickpocketPromptFor(metadata.npc) && this.onPickpocketNpc) {
               this.onPickpocketNpc(metadata.npc);
               return;

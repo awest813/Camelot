@@ -1,6 +1,6 @@
 import { Scene } from "@babylonjs/core/scene";
 import { actors } from "./actors";
-import { Aggressive, Dead, Engaged, Guard, HitReact, HostileOnSight, InDialogue, Provoked, Staggered, Telegraphing, Unblockable, type ActorId } from "../core/ecs/actors";
+import { Aggressive, Asleep, Dead, Engaged, Guard, HitReact, HostileOnSight, InDialogue, Provoked, Staggered, Telegraphing, Unblockable, type ActorId } from "../core/ecs/actors";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
@@ -119,6 +119,9 @@ export class NPC {
   /** True when the NPC is actively engaged in a dialogue session with the player. */
   public get isInDialogue(): boolean { return actors.has(this.actorId, InDialogue); }
   public set isInDialogue(on: boolean) { actors.set(this.actorId, InDialogue, on); }
+  /** Asleep by its schedule (the daily schedule system sets it). */
+  public get isAsleep(): boolean { return actors.has(this.actorId, Asleep); }
+  public set isAsleep(on: boolean) { actors.set(this.actorId, Asleep, on); }
 
   // ─── AI State Machine ───────────────────────────────────────────────────────
 

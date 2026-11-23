@@ -84,6 +84,19 @@ describe("InteractionSystem", () => {
     expect(ui.setCrosshairActive).toHaveBeenCalledWith(true);
   });
 
+  it("a sleeping NPC can't be talked to, and says so", () => {
+    const npc = { isAggressive: false, isAsleep: true, key: "Smith", displayName: "Smith", mesh: { name: "Smith" } };
+    player.raycastForward.mockReturnValue({
+      pickedMesh: { metadata: { type: "npc", npc } },
+    });
+    system.update();
+    system.update();
+    system.update();
+    expect(ui.setInteractionText).toHaveBeenCalledWith("Smith is asleep");
+    system.interact();
+    expect(dialogue.startDialogue).not.toHaveBeenCalled();
+  });
+
   it("calls tryTransition when interacting with a portal", () => {
     const tryTransition = vi.fn(() => true);
     system.cellManager = {

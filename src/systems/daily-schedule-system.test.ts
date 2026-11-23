@@ -72,28 +72,29 @@ describe("DailyScheduleSystem — sleep interactivity", () => {
     daily = new DailyScheduleSystem(schedule, time);
   });
 
-  it("does not clear metadata for NPC without schedule blocks", () => {
+  it("an NPC without schedule blocks never sleeps", () => {
     const npc = makeNPC("Guard", [], { type: "npc" });
     schedule.addNPC(npc);
     // Force a re-sync at an hour that would be sleep if blocks existed
     (daily as any)._syncHour(22);
-    expect(npc.mesh.metadata).toEqual({ type: "npc" });
+    expect(npc.isAsleep).toBeFalsy();
+    expect(npc.mesh.metadata, "interaction metadata is never touched").toEqual({ type: "npc" });
   });
 
-  it("clears metadata when NPC enters sleep block", () => {
+  it("marks the NPC asleep when it enters a sleep block", () => {
     const npc = makeNPC("Innkeeper", [
       { startHour: 22, endHour: 6, behavior: "sleep" as const },
     ]);
     schedule.addNPC(npc);
-    // Initially at hour 8 — awake, metadata intact
-    expect(npc.mesh.metadata).toEqual({ type: "npc" });
+    // Initially at hour 8 — awake
+    expect(npc.isAsleep).toBeFalsy();
 
     // Advance to sleep hour
     (daily as any)._syncHour(22);
-    expect(npc.mesh.metadata).toBeNull();
+    expect(npc.isAsleep).toBe(true);
   });
 
-  it("restores metadata when NPC wakes up", () => {
+  it("wakes the NPC when the sleep block ends", () => {
     const originalMeta = { type: "npc", npc: "ref" };
     const npc = makeNPC("Shopkeeper", [
       { startHour: 22, endHour: 6, behavior: "sleep" as const },
@@ -103,23 +104,22 @@ describe("DailyScheduleSystem — sleep interactivity", () => {
 
     // Sleep
     (daily as any)._syncHour(23);
-    expect(npc.mesh.metadata).toBeNull();
+    expect(npc.isAsleep).toBe(true);
 
     // Wake up
     (daily as any)._syncHour(8);
+    expect(npc.isAsleep).toBe(false);
     expect(npc.mesh.metadata).toEqual(originalMeta);
   });
 
-  it("does not touch metadata of dead NPCs", () => {
+  it("does not put dead NPCs to sleep", () => {
     const npc = makeNPC("Guard", [
       { startHour: 22, endHour: 6, behavior: "sleep" as const },
     ]);
     npc.isDead = true;
     schedule.addNPC(npc);
     (daily as any)._syncHour(22);
-    // Metadata should remain unchanged (it would be set to null in _die() anyway,
-    // but DailyScheduleSystem must not interfere with dead NPCs).
-    expect(npc.mesh.metadata).toEqual({ type: "npc" });
+    expect(npc.isAsleep).toBeFalsy();
   });
 });
 
@@ -150,7 +150,7 @@ describe("DailyScheduleSystem — callbacks", () => {
 
     const daily = new DailyScheduleSystem(schedule, time);
     // NPC should now be sleeping after construction sync
-    expect(npc.mesh.metadata).toBeNull();
+    expect(npc.isAsleep).toBe(true);
 
     const wakeSpy = vi.fn();
     daily.onNPCWake = wakeSpy;
@@ -200,11 +200,11 @@ describe("DailyScheduleSystem — onHourChange integration", () => {
     ]);
     schedule.addNPC(npc);
 
-    expect(npc.mesh.metadata).toEqual({ type: "npc" });
+    expect(npc.isAsleep).toBeFalsy();
 
     // Simulate the clock hitting 22:00
     time.onHourChange!(22);
-    expect(npc.mesh.metadata).toBeNull();
+    expect(npc.isAsleep).toBe(true);
   });
 });
 
@@ -266,7 +266,7 @@ describe("DailyScheduleSystem — midnight-wrap block", () => {
     const daily = new DailyScheduleSystem(schedule, time);
 
     expect(daily.isSleeping("Innkeeper")).toBe(true);
-    expect(npc.mesh.metadata).toBeNull();
+    expect(npc.isAsleep).toBe(true);
   });
 
   it("does NOT mark as sleeping outside the midnight-wrap block", () => {
@@ -313,7 +313,7 @@ describe("DailyScheduleSystem — save/restore", () => {
     daily.restoreFromSave({ sleepingNpcNames: ["Blacksmith"] });
 
     expect(daily.isSleeping("Blacksmith")).toBe(false);
-    expect(npc.mesh.metadata).not.toBeNull();
+    expect(npc.isAsleep).toBe(false);
   });
 
   it("restoreFromSave at sleep hour leaves NPC non-interactive", () => {
@@ -331,6 +331,6 @@ describe("DailyScheduleSystem — save/restore", () => {
     daily.restoreFromSave({ sleepingNpcNames: ["Miller"] });
 
     expect(daily.isSleeping("Miller")).toBe(true);
-    expect(npc.mesh.metadata).toBeNull();
+    expect(npc.isAsleep).toBe(true);
   });
 });

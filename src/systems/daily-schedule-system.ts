@@ -1,18 +1,18 @@
 import type { NPC, ScheduleBehaviorType } from "../entities/npc";
-import type { ScheduleSystem } from "./schedule-system";
+import { scheduledBehaviorAt, type ScheduleSystem } from "./schedule-system";
 import type { TimeSystem } from "./time-system";
 
 /**
  * DailyScheduleSystem — Connects TimeSystem to ScheduleSystem for automatic
- * time-of-day NPC behaviour switching and non-interactive sleep enforcement.
+ * time-of-day NPC behaviour switching, and marks who is asleep.
  *
  * Responsibilities:
  *   - Hooks into `TimeSystem.onHourChange` so `ScheduleSystem.currentHour` is
  *     kept in sync without a per-frame manual assignment in the game loop.
- *   - When an NPC enters a `"sleep"` schedule block, its `mesh.metadata` is
- *     cleared to prevent interaction or dialogue.
- *   - When the NPC leaves the sleep block, `mesh.metadata` is restored to the
- *     saved pre-sleep value.
+ *   - When an NPC enters a `"sleep"` schedule block it is marked asleep (the
+ *     `Asleep` actor tag, `npc.isAsleep`); the interaction system won't let
+ *     the player talk to it.  It wakes when the block ends.  (This used to
+ *     blank the NPC's mesh metadata, hiding it from interaction entirely.)
  *   - Fires `onNPCSleep` / `onNPCWake` callbacks for UI notifications.
  *   - Provides `getSaveState` / `restoreFromSave` (SAVE_VERSION 18).
  *
@@ -43,11 +43,8 @@ export class DailyScheduleSystem {
   private _scheduleSystem: ScheduleSystem;
   private _timeSystem: TimeSystem;
 
-  /**
-   * Maps each sleeping NPC to the metadata value it held before sleep so that
-   * we can restore it precisely when the NPC wakes up.
-   */
-  private _sleepingNpcs: Map<NPC, object | null> = new Map();
+  /** The NPCs this system put to sleep. */
+  private _sleepingNpcs = new Set<NPC>();
 
   // ── Callbacks ──────────────────────────────────────────────────────────────
 
@@ -77,9 +74,9 @@ export class DailyScheduleSystem {
    * Returns `true` if the named NPC is currently in a sleep state managed by
    * this system.
    */
-  public isSleeping(npcMeshName: string): boolean {
-    for (const [npc] of this._sleepingNpcs) {
-      if (npc.key === npcMeshName) return true;
+  public isSleeping(npcKey: string): boolean {
+    for (const npc of this._sleepingNpcs) {
+      if (npc.key === npcKey) return true;
     }
     return false;
   }
@@ -102,7 +99,7 @@ export class DailyScheduleSystem {
    */
   public getSaveState(): DailyScheduleSaveState {
     const sleepingNpcNames: string[] = [];
-    for (const [npc] of this._sleepingNpcs) {
+    for (const npc of this._sleepingNpcs) {
       sleepingNpcNames.push(npc.key);
     }
     return { sleepingNpcNames };
@@ -138,6 +135,9 @@ export class DailyScheduleSystem {
    * their current schedule block is "sleep".
    */
   private _applyScheduledInteractivity(): void {
+    // Forget sleepers that have left the world.
+    const tracked = new Set(this._scheduleSystem.npcs);
+    for (const npc of this._sleepingNpcs) if (!tracked.has(npc)) this._sleepingNpcs.delete(npc);
     for (const npc of this._scheduleSystem.npcs) {
       if (npc.isDead) continue;
 
@@ -146,39 +146,19 @@ export class DailyScheduleSystem {
       const wasSleeping = this._sleepingNpcs.has(npc);
 
       if (isSleeping && !wasSleeping) {
-        // NPC is entering sleep — save current metadata and clear it.
-        this._sleepingNpcs.set(npc, npc.mesh.metadata as object | null);
-        npc.mesh.metadata = null;
+        this._sleepingNpcs.add(npc);
+        npc.isAsleep = true;
         this.onNPCSleep?.(npc);
       } else if (!isSleeping && wasSleeping) {
-        // NPC is waking up — restore saved metadata.
-        const savedMetadata = this._sleepingNpcs.get(npc) ?? null;
         this._sleepingNpcs.delete(npc);
-        npc.mesh.metadata = savedMetadata;
+        npc.isAsleep = false;
         this.onNPCWake?.(npc);
       }
     }
   }
 
-  /**
-   * Returns the scheduled behavior for `npc` at the given `hour`, or `null`
-   * if no block matches or the NPC has no schedule defined.
-   *
-   * Mirrors the private block-matching logic in ScheduleSystem so that
-   * DailyScheduleSystem can independently derive sleep state.
-   */
   private _getScheduledBehavior(npc: NPC, hour: number): ScheduleBehaviorType | null {
-    if (hour < 0 || npc.scheduleBlocks.length === 0) return null;
-
-    for (const block of npc.scheduleBlocks) {
-      // Blocks that cross midnight (e.g. startHour=22, endHour=6) wrap around.
-      const wraps = block.startHour > block.endHour;
-      const inBlock = wraps
-        ? hour >= block.startHour || hour < block.endHour
-        : hour >= block.startHour && hour < block.endHour;
-      if (inBlock) return block.behavior;
-    }
-
-    return null;
+    return scheduledBehaviorAt(npc.scheduleBlocks, hour);
   }
+
 }

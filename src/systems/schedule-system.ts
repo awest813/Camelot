@@ -1,5 +1,5 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { NPC, AIState, ScheduleBehaviorType } from "../entities/npc";
+import { NPC, AIState, ScheduleBehaviorType, type ScheduleBlock } from "../entities/npc";
 import { actors } from "../entities/actors";
 import type { LodTier } from "../core/ecs/actors";
 
@@ -22,6 +22,25 @@ const MAX_DETOURS = 4;
  * ticks by actor id so the work stays even.
  */
 export const SCHEDULE_TICK_EVERY: Record<LodTier, number> = { near: 1, mid: 2, far: 4 };
+
+/**
+ * The behaviour an NPC's schedule blocks give for `hour` (0–23), or null when
+ * no block covers it (or the hour is unknown, -1).  Blocks that wrap midnight
+ * (e.g. 22 → 6) are handled.  The one place block matching lives.
+ */
+export function scheduledBehaviorAt(
+  blocks: readonly ScheduleBlock[], hour: number,
+): ScheduleBehaviorType | null {
+  if (hour < 0) return null;
+  for (const block of blocks) {
+    const wraps = block.startHour > block.endHour;
+    const inBlock = wraps
+      ? (hour >= block.startHour || hour < block.endHour)
+      : (hour >= block.startHour && hour < block.endHour);
+    if (inBlock) return block.behavior;
+  }
+  return null;
+}
 
 /** Per-NPC progress tracking for the stuck check. */
 interface StuckTracker {
@@ -186,19 +205,9 @@ export class ScheduleSystem {
    * Returns null when no blocks are defined or `currentHour` is -1.
    */
   private _getScheduledBehavior(npc: NPC): ScheduleBehaviorType | null {
-    if (this.currentHour < 0 || npc.scheduleBlocks.length === 0) return null;
-
-    const hour = this.currentHour;
-    for (const block of npc.scheduleBlocks) {
-      // Handle blocks that wrap midnight (e.g. 22 → 6)
-      const wraps = block.startHour > block.endHour;
-      const inBlock = wraps
-        ? (hour >= block.startHour || hour < block.endHour)
-        : (hour >= block.startHour && hour < block.endHour);
-      if (inBlock) return block.behavior;
-    }
-    return null;
+    return scheduledBehaviorAt(npc.scheduleBlocks, this.currentHour);
   }
+
 
   private _applyScheduledBehavior(
     npc: NPC,

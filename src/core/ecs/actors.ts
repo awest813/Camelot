@@ -35,6 +35,8 @@ export const Unblockable = {};
 /** Took damage this frame (the hit-react animation plays). */
 export const HitReact = {};
 export const Guard = {};
+/** In a sleep block of its schedule: can't be talked to until it wakes. */
+export const Asleep = {};
 /** In a fighting state: alert, investigating, chasing or attacking. */
 export const Engaged = {};
 /** Belongs to a loaded chunk, and leaves the world when it unloads. */
