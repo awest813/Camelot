@@ -808,6 +808,27 @@ one replay runs in CI.
   installing features, the game reports any that declared nothing as a
   console error, which fails the boot smoke test. The kernel exposes
   `installed()`, and a feature's context carries its `id`.
+- Replays at kernel scope (`src/core/replay.ts`). `ReplayRecorder` logs
+  what is fed into a kernel: its seed, the events emitted into it, and
+  the phases run with their time steps. The log is plain JSON.
+  `replay(log, kernel)` feeds it to a fresh kernel, and
+  `verifyReplay(...)` compares the observed end state.
+  - A CI test records a 400-hour village-raid session: hourly rolls on
+    the kernel's seeded stream, raids starting, the player cutting every
+    raider down. It sends the log through JSON, replays it, and requires
+    the same state: rewards, notifications, despawns and raid history.
+    The same inputs under another seed must diverge.
+  - Not covered yet: the whole game. That needs the remaining 51
+    unseeded `Math.random` calls on kernel streams (the `unseeded-random`
+    ratchet tracks them), and the frame loop and input adapter driving
+    the kernel. Then the recorder can sit on the input adapter.
+
+**Exit check:**
+- Round-trip over all codecs: met (see above).
+- Old fixtures migrate: met. The v29 fixture loads, including starter
+  quests moving into the quest engine.
+- One replay runs in CI: met at kernel scope. A whole-game replay waits
+  on the remaining unseeded randomness.
 
 ### Phase 6 — World and navigation (3 weeks)
 
