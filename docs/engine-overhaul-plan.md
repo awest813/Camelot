@@ -397,6 +397,8 @@ state, scope and save codec.
   sun shadows, sky dome, horizon, post-processing, water, grass, fire and
   weather particles, window glow, and the per-frame blend from clock and
   weather. Render counts are unchanged.
+- NPC visuals (`src/rendering/npc-visuals.ts`): rigged character models,
+  dragon bodies, and routing AI state to animation with a distance LOD.
 - `RngStreams.reseed` and `restoreFromSave` reset streams in place. A stream
   a feature kept from install time used to go stale at the first new game or
   load: it was no longer seeded from the world and was not saved. This

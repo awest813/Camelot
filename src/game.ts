@@ -16,7 +16,7 @@ import type { AtmosphereController } from "./rendering/sky-dome";
 import { createTerrainMaterial } from "./rendering/terrain-material";
 import { WeaponViewModel } from "./rendering/viewmodel";
 import { AdaptiveResolution } from "./rendering/adaptive-resolution";
-import { CharacterModelLibrary, modelForNpcName, type CharacterRig } from "./rendering/character-models";
+import { NpcVisuals } from "./rendering/npc-visuals";
 import { Player } from "./entities/player";
 import { UIManager } from "./ui/ui-manager";
 import { WorldManager } from "./world/world-manager";
@@ -196,9 +196,6 @@ import { GraphicsSettingsUI, type CameraSensitivity } from "./ui/graphics-settin
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
-/** Pseudo fast-travel destination that triggers Mark & Recall teleportation. */
-/** Squared distance beyond which NPC procedural animation updates are skipped. */
-const NPC_ANIMATION_FAR_DISTANCE_SQ = 100 * 100;
 /** NPCs below this height fell through the world (e.g. spawned before their chunk). */
 const NPC_FALL_RECOVERY_Y = -30;
 /** Inventory item ID used for player gold (bounty payment check). */
@@ -253,11 +250,8 @@ export class Game {
   /** First-person weapon (CC0 KayKit weapons). */
   private _viewModel: WeaponViewModel | null = null;
   /** Rigged NPC models (CC0 KayKit characters). */
-  private _characterModels: CharacterModelLibrary | null = null;
-  private readonly _npcRigs: Map<NPC, CharacterRig> = new Map();
+  private _npcVisuals!: NpcVisuals;
   /** Village plans by chunk key (null = no village there); deterministic, cached. */
-  /** Dragon bosses' bodies (generated dark-fantasy dragon parented to the capsule). */
-  private readonly _dragonVisuals = new Map<NPC, { root: AbstractMesh; yaw: number; last: Vector3; t: number }>();
   /** DefaultRenderingPipeline (bloom, FXAA, sharpen, tone-mapping, vignette). */
   public get renderingPipeline(): DefaultRenderingPipeline | null { return this._env?.pipeline ?? null; }
   public scheduleSystem: ScheduleSystem;
@@ -644,7 +638,13 @@ export class Game {
     this.player = new Player(this.scene, this.canvas);
     // Post-processing and skybox require the camera, so initialise after Player.
     this._env.initSky(this.player.camera);
-    this._initCharacterModels();
+    this._npcVisuals = new NpcVisuals({
+      scene: this.scene,
+      shadows: this.shadowGenerator,
+      modelBase: `${import.meta.env.BASE_URL ?? "/"}model/kaykit/`,
+      animation: () => this.animationSystem,
+    });
+    this._npcVisuals.init();
     this._viewModel = new WeaponViewModel(
       this.scene, this.player.camera, `${import.meta.env.BASE_URL ?? "/"}model/kaykit/weapons/`,
     );
@@ -3088,31 +3088,6 @@ export class Game {
 
 
 
-  /**
-   * Give every NPC a rigged, animated body.  The physics capsule keeps doing
-   * collision and picking; the model follows it, faces its travel direction
-   * (or the player in combat) and plays skeletal clips routed through
-   * AnimationSystem.
-   */
-  private _initCharacterModels(): void {
-    const base = `${import.meta.env.BASE_URL ?? "/"}model/kaykit/`;
-    const library = new CharacterModelLibrary(this.scene, base, this.shadowGenerator);
-    this._characterModels = library;
-    library.preload();
-    NPC.onCreated = (npc) => {
-      const id = modelForNpcName(npc.mesh.name);
-      if (!id) return;
-      void library.attach(npc.mesh, id).then((rig) => {
-        if (!rig) return;
-        this._npcRigs.set(npc, rig);
-        npc.mesh.onDisposeObservable.addOnce(() => {
-          this._npcRigs.delete(npc);
-          this.animationSystem?.unregisterSkeletal(npc.mesh.name);
-        });
-        this.animationSystem?.registerSkeletal(npc.mesh.name, rig);
-      });
-    };
-  }
 
   /**
    * Put an NPC that fell through the world back at its spawn point.  Bodies
@@ -3129,56 +3104,7 @@ export class Game {
     this.scene.onAfterPhysicsObservable.addOnce(() => { body.disablePreStep = true; });
   }
 
-  /** Dragon bodies: face the player when fighting, else the travel direction; collapse on death. */
-  private _updateDragonVisuals(dt: number): void {
-    const playerPos = this.player.camera.position;
-    for (const [npc, v] of this._dragonVisuals) {
-      if (v.root.isDisposed()) { this._dragonVisuals.delete(npc); continue; }
-      v.t += dt;
-      const pos = npc.mesh.position;
-      if (npc.isDead) {
-        // Slump into the ground over a couple of seconds.
-        v.root.position.y = Math.max(-2.4, v.root.position.y - dt * 0.7);
-        continue;
-      }
-      let target: number | null = null;
-      if (npc.isAggressive || npc.aiState === AIState.ALERT) {
-        target = Math.atan2(playerPos.x - pos.x, playerPos.z - pos.z);
-      } else {
-        const dx = pos.x - v.last.x, dz = pos.z - v.last.z;
-        if (dx * dx + dz * dz > 1e-4) target = Math.atan2(dx, dz);
-      }
-      v.last.copyFrom(pos);
-      if (target !== null) {
-        let d = target - v.yaw;
-        while (d > Math.PI) d -= Math.PI * 2;
-        while (d < -Math.PI) d += Math.PI * 2;
-        v.yaw += d * Math.min(1, dt * 3);
-        setInstanceYaw(v.root, v.yaw);
-      }
-      // Slow breathing bob.
-      v.root.position.y = -1 + Math.sin(v.t * 1.6) * 0.06;
-    }
-  }
 
-  /** Per-frame rig facing, gait speed, hit flash and distance LOD. */
-  private _updateNpcRigs(dt: number): void {
-    this._updateDragonVisuals(dt);
-    if (this._npcRigs.size === 0) return;
-    const playerPos = this.player.camera.position;
-    for (const [npc, rig] of this._npcRigs) {
-      // Follow the LodSystem's capsule cull so culled NPCs stop drawing too.
-      const shown = npc.mesh.isVisible;
-      if (rig.pivot.isEnabled(false) !== shown) rig.pivot.setEnabled(shown);
-      const far = Vector3.DistanceSquared(npc.mesh.position, playerPos) > NPC_ANIMATION_FAR_DISTANCE_SQ;
-      rig.setPaused(far && !npc.isDead);
-      if (far) continue;
-      // Fighters track the player; so does whoever the player is talking to.
-      const engaged = !npc.isDead
-        && (npc.isAggressive || npc.aiState === AIState.ALERT || npc.isAttackTelegraphing || npc.isInDialogue);
-      rig.update(dt, npc.mesh.position, engaged ? playerPos : null);
-    }
-  }
 
 
 
@@ -3399,25 +3325,8 @@ export class Game {
 
       for (const npc of this.scheduleSystem.npcs) {
         if (npc.mesh.position.y < NPC_FALL_RECOVERY_Y && !npc.isDead) this._recoverFallenNpc(npc);
-        const hitReact = npc.justTakenDamageVisual;
-        if (hitReact) npc.justTakenDamageVisual = false;
-        // Animation LOD: beyond 100u a capsule is a few pixels and its loop
-        // re-syncs from aiState on the next near update — skip the work.
-        // Dead NPCs always route so death animations play.
-        if (
-          !npc.isDead &&
-          !hitReact &&
-          Vector3.DistanceSquared(npc.mesh.position, this.player.camera.position) > NPC_ANIMATION_FAR_DISTANCE_SQ
-        ) {
-          continue;
-        }
-        this.animationSystem.updateNPCAnimation(
-          npc.mesh, npc.aiState, npc.isAttackTelegraphing,
-          npc.isStaggered, npc.isDead, hitReact,
-        );
       }
-
-      this._updateNpcRigs(deltaTime);
+      this._npcVisuals.update(deltaTime, this.player.camera.position, this.scheduleSystem.npcs);
       this.interactionSystem.update();
 
       const weatherScale = this.weatherSystem?.state === "clear" ? 1.0 : (this.weatherSystem?.fogDensity ? 0.7 : 1.0);
@@ -4227,8 +4136,7 @@ export class Game {
           setInstanceScale(root, 2.5);
           setInstanceYaw(root, yaw);
           for (const m of root.getChildMeshes(false)) m.isPickable = false;
-          this._dragonVisuals.set(dragonNpc, { root, yaw, last: dragonNpc.mesh.position.clone(), t: 0 });
-          dragonNpc.mesh.onDisposeObservable.addOnce(() => this._dragonVisuals.delete(dragonNpc));
+          this._npcVisuals.addDragon(dragonNpc, root, yaw);
           this._chunks.track(chunkKey, chunkRecord, root, "boss");
         });
   }
