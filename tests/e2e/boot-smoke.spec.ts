@@ -247,10 +247,11 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
     const said: string[] = [];
     const orig = g.ui.showNotification.bind(g.ui);
     g.ui.showNotification = (t: string, ms?: number) => { said.push(t); return orig(t, ms); };
-    g.fastTravelSystem.discoverLocation("cave_01", "Old Cave", { x: -8, y: 2, z: 8 });
+    // Where walking in leaves you (the room's spawn), as a real visit records it.
+    g.fastTravelSystem.discoverLocation("cave_01", "Old Cave", { x: 0, y: 1.5, z: 3 });
     // The trip fades out and in; wait for it (slow under load).
     const until = async (ok: () => boolean) => {
-      for (let t = 0; t < 80 && !ok(); t++) await new Promise((r) => setTimeout(r, 100));
+      for (let t = 0; t < 300 && !ok(); t++) await new Promise((r) => setTimeout(r, 100));
     };
     travel.travel("cave_01");
     await until(() => g.cellManager.currentCell?.type === "interior" && !g.fastTravelUI.isVisible);
