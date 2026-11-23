@@ -738,6 +738,17 @@ components.
     The mirror and its id table are removed.
   - The framework keeps its own inventory engine as the default for hosts
     that don't supply hooks.
+
+**Status against the exit table:**
+
+| Concern | Status |
+|---|---|
+| Quests | Done: one engine; the log is a view. |
+| Inventory | Done, with "keep" and "retire" swapped (see above). |
+| Schedules | `ScheduleSystem` plus the shared block matcher. The daily layer only keeps the hour in sync and sets the `Asleep` tag. |
+| NPC AI | One model, the combat state machine. The behaviour-tree goal layer is not built. |
+| Streaming | Done: `ChunkManager` plus `WorldManager` as its adapter. |
+| Jobs, raids | Open. They are features with their own rules and quest-log entries; nothing for them is left in `game.ts`. Making them framework "radiant" templates is still to do. |
 - The quest log has an API; features no longer change quest objects
   directly. The quest-log service has `setProgress`, `finish` and
   `remove`, and `quests()` is read-only. A `managed` quest belongs to a
