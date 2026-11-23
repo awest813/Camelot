@@ -52,6 +52,8 @@ export class ServiceRegistry {
 
 /** What a feature sees while installing: the kernel plus its own scope. */
 export interface FeatureContext {
+  /** The installing feature's id. */
+  readonly id: string;
   readonly kernel: Kernel;
   readonly scope: Scope;
   /** Register a system in a phase, owned by the feature's scope. */
@@ -85,6 +87,7 @@ export class Kernel {
     const scope = this.scope.child(feature.id);
     this._features.set(feature.id, scope);
     const ctx: FeatureContext = {
+      id: feature.id,
       kernel: this,
       scope,
       system: (s) => { scope.add(this.phases.register(s)); },
@@ -109,6 +112,11 @@ export class Kernel {
 
   public isInstalled(id: string): boolean {
     return this._features.has(id);
+  }
+
+  /** Ids of the installed features, in install order. */
+  public installed(): string[] {
+    return [...this._features.keys()];
   }
 
   public dispose(): void {

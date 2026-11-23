@@ -14,7 +14,7 @@
 import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
-import { FeedbackKey, PurseKey } from "../services";
+import { FeedbackKey, PurseKey, ownTransient } from "../services";
 import { TravelKey } from "../fast-travel/fast-travel-feature";
 
 /** Seconds between falling and waking. */
@@ -49,6 +49,12 @@ export class DeathFeature implements Feature {
     const s = ctx.kernel.services;
     let down = false;
     let wake = 0;
+    // A load restores health: a fall in progress ends and the player gets up.
+    ownTransient(ctx, "a fall in progress", () => {
+      if (!down) return;
+      down = false;
+      s.get(DeathHostKey).rise();
+    });
 
     ctx.system({
       id: "death.watch", phase: "sim", update: (dt) => {

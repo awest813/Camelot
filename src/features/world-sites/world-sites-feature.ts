@@ -19,7 +19,7 @@ import { createServiceKey } from "../../core/kernel";
 import type { FantasyAssetKey } from "../../systems/fantasy-asset-loader";
 import type { BiomeType } from "../../world/world-manager";
 import { toWorld } from "../../world/village-buildings";
-import { ActorsKey, SiteBuilderKey, VillagesKey, WorldInfoKey, type SiteBuilderService } from "../services";
+import { ActorsKey, SiteBuilderKey, VillagesKey, WorldInfoKey, type SiteBuilderService, declareStateless } from "../services";
 
 export interface WorldSitesService {
   /** Fill a freshly loaded chunk. */
@@ -62,6 +62,7 @@ export class WorldSitesFeature implements Feature {
   public readonly id = "world-sites";
 
   public install(ctx: FeatureContext): void {
+    declareStateless(ctx, "what goes where comes from the world seed");
     const s = ctx.kernel.services;
     ctx.provide(WorldSitesKey, {
       populate: (chunkKey, cx, cz, biome) => {

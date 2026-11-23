@@ -17,7 +17,7 @@ import { GuardEncounterUI, type GuardEncounterAction } from "../../ui/guard-enco
 import { AIState, type NPC } from "../../entities/npc";
 import type { CrimeSystem } from "../../systems/crime-system";
 import type { PersuasionSystem } from "../../systems/persuasion-system";
-import { FeedbackKey, ModalKey, PlayerKey, PurseKey, SkillsKey } from "../services";
+import { FeedbackKey, ModalKey, PlayerKey, PurseKey, SkillsKey, declareStateless } from "../services";
 
 /** The law the arrest acts on. */
 export interface LawService {
@@ -50,6 +50,7 @@ export class ArrestFeature implements Feature {
   private _s: ServiceRegistry | null = null;
 
   public install(ctx: FeatureContext): void {
+    declareStateless(ctx, "bounties and jail time belong to the crime and jail systems, which the save system saves");
     const s = ctx.kernel.services;
     this._s = s;
     const crime = s.get(LawKey).crime;

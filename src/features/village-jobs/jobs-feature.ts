@@ -15,7 +15,7 @@ import { createServiceKey } from "../../core/kernel";
 import { VillageJobBoard, type JobContext } from "../../systems/village-jobs";
 import { JobBoardUI } from "../../ui/job-board-ui";
 import type { Quest } from "../../systems/quest-system";
-import { FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, VillagesKey, type FeedbackService, type InventoryService, type ModalService, type PlayerService, type QuestLogService, type VillagesService, ownSave } from "../services";
+import { FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, VillagesKey, type FeedbackService, type InventoryService, type ModalService, type PlayerService, type QuestLogService, type VillagesService, ownSave, ownTransient } from "../services";
 
 export interface JobBoardRef {
   boardId: string;
@@ -101,8 +101,9 @@ export class VillageJobsFeature implements Feature {
       if (board) this.open(board);
     });
     ctx.on("questlog:opened", () => this._syncAll());
-    ctx.on("save:loaded", () => {
-      // Drop job entries the loaded state no longer has, then mirror it back.
+    // The quest-log entries mirror the saved jobs: drop the ones the loaded
+    // state no longer has, then mirror it back.
+    ownTransient(ctx, "the quest-log entries for active jobs", () => {
       this._pruneStale();
       this._syncAll();
     });

@@ -16,7 +16,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { NPC } from "../../entities/npc";
 import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
-import { BuildingsKey, ScheduleKey } from "../services";
+import { BuildingsKey, ScheduleKey, ownTransient } from "../services";
 
 /** A sleeper this close (m) to a building at its bed spot goes inside. */
 export const DOOR_REACH = 2.5;
@@ -44,6 +44,7 @@ export class IndoorsFeature implements Feature {
   private readonly _inside = new Map<NPC, Inside>();
 
   public install(ctx: FeatureContext): void {
+    ownTransient(ctx, "who is inside (the wake check lets out anyone whose schedule no longer says sleep)");
     const s = ctx.kernel.services;
 
     ctx.provide(IndoorsKey, {

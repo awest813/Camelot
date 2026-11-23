@@ -227,11 +227,68 @@ export interface SavesService {
 }
 export const SavesKey = createServiceKey<SavesService>("saves");
 
+/*
+ * Persistence declarations.  Every feature says what happens to its state
+ * across a save and a load: it owns a part of the save (`ownSave`), it
+ * keeps state on purpose that a load resets (`ownTransient`), or it has
+ * nothing of its own to keep (`declareStateless`).  `undeclaredFeatures`
+ * lists any that said nothing; the boot smoke test requires none.
+ */
+
+/** One feature's answer to "what happens to your state on load?". */
+export type PersistenceDeclaration =
+  | { kind: "saved"; key: string }
+  | { kind: "transient"; what: string }
+  | { kind: "stateless"; why: string };
+
+const ledgers = new WeakMap<object, Map<string, PersistenceDeclaration[]>>();
+
+function declare(ctx: FeatureContext, d: PersistenceDeclaration): void {
+  let ledger = ledgers.get(ctx.kernel);
+  if (!ledger) ledgers.set(ctx.kernel, (ledger = new Map()));
+  const list = ledger.get(ctx.id) ?? [];
+  list.push(d);
+  ledger.set(ctx.id, list);
+  ctx.scope.add(() => {
+    const now = ledger!.get(ctx.id);
+    const i = now?.indexOf(d) ?? -1;
+    if (now && i >= 0) now.splice(i, 1);
+    if (now?.length === 0) ledger!.delete(ctx.id);
+  });
+}
+
+/** What each installed feature declared about its state. */
+export function persistenceOf(kernel: object): ReadonlyMap<string, readonly PersistenceDeclaration[]> {
+  return ledgers.get(kernel) ?? new Map();
+}
+
+/** Installed features that declared nothing about their state. */
+export function undeclaredFeatures(kernel: { installed(): string[] }): string[] {
+  const ledger = persistenceOf(kernel);
+  return kernel.installed().filter((id) => !ledger.has(id));
+}
+
 /**
  * Own a part of the save for as long as the feature is installed.  Without
- * a save service (headless tests) it does nothing.
+ * a save service (headless tests) it only records the declaration.
  */
 export function ownSave(ctx: FeatureContext, codec: SaveCodec): void {
+  declare(ctx, { kind: "saved", key: codec.key });
   const saves = ctx.kernel.services.tryGet(SavesKey);
   if (saves) ctx.scope.add(saves.register(codec));
+}
+
+/**
+ * State the feature keeps on purpose but doesn't save (`what`, e.g. "a raid
+ * in progress").  `reset` runs after every load, once all saved state is
+ * back; leave it out when the feature's own systems re-derive the state.
+ */
+export function ownTransient(ctx: FeatureContext, what: string, reset?: () => void): void {
+  declare(ctx, { kind: "transient", what });
+  if (reset) ctx.on("save:loaded", reset);
+}
+
+/** The feature keeps nothing across a load (`why`, e.g. "its state is the time system's"). */
+export function declareStateless(ctx: FeatureContext, why: string): void {
+  declare(ctx, { kind: "stateless", why });
 }

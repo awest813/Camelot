@@ -10,7 +10,7 @@
 import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import type { TrainerSystem } from "../../systems/trainer-system";
-import { FeedbackKey, PurseKey, SkillsKey } from "../services";
+import { FeedbackKey, PurseKey, SkillsKey, declareStateless } from "../services";
 
 export interface DialogueHostService {
   readonly trainers: TrainerSystem;
@@ -26,6 +26,7 @@ export class DialogueServicesFeature implements Feature {
   public readonly id = "dialogue-services";
 
   public install(ctx: FeatureContext): void {
+    declareStateless(ctx, "lessons and nights at the inn take effect at once");
     const s = ctx.kernel.services;
     const notify = (text: string, ms: number) => s.get(FeedbackKey).notify(text, ms);
 

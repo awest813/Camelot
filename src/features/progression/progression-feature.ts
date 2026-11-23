@@ -17,7 +17,7 @@ import { CharacterSheetUI, type CharacterSheetData } from "../../ui/character-sh
 import type { AttributeSystem } from "../../systems/attribute-system";
 import type { ClassSystem } from "../../systems/class-system";
 import type { PerkSystem } from "../../systems/perk-system";
-import { FeedbackKey, GameplayKey, ModalKey } from "../services";
+import { FeedbackKey, GameplayKey, ModalKey, declareStateless } from "../services";
 
 export interface ProgressionHostService {
   readonly attributes: AttributeSystem;
@@ -58,6 +58,7 @@ export class ProgressionFeature implements Feature {
   private _s: ServiceRegistry | null = null;
 
   public install(ctx: FeatureContext): void {
+    declareStateless(ctx, "levels, attributes and perks are saved by the save system");
     const s = ctx.kernel.services;
     this._s = s;
     const host = () => s.get(ProgressionHostKey);

@@ -15,7 +15,7 @@ import { createServiceKey } from "../../core/kernel";
 import { DynamicWorldEventSystem } from "../../systems/dynamic-world-event-system";
 import { TravelEventSystem } from "../../systems/travel-event-system";
 import { AmbientEventSystem } from "../../systems/ambient-event-system";
-import { FeedbackKey, LootKey, PlayerKey, WorldStateKey } from "../services";
+import { FeedbackKey, LootKey, PlayerKey, WorldStateKey, declareStateless } from "../services";
 
 export interface WorldEventsService {
   readonly dynamic: DynamicWorldEventSystem;
@@ -143,6 +143,7 @@ export class WorldEventsFeature implements Feature {
   }
 
   public install(ctx: FeatureContext): void {
+    declareStateless(ctx, "event cooldowns are saved by the save system");
     const s = ctx.kernel.services;
     ctx.provide(WorldEventsKey, { dynamic: this.dynamic, travel: this.travel, ambient: this.ambient });
 

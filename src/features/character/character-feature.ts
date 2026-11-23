@@ -17,7 +17,7 @@ import type { AttributeSystem } from "../../systems/attribute-system";
 import type { SkillProgressionSystem } from "../../systems/skill-progression-system";
 import type { CharacterCreationResult } from "../../ui/character-creation-ui";
 import type { WorldSeed } from "../../world/world-seed";
-import { FeedbackKey } from "../services";
+import { FeedbackKey, declareStateless } from "../services";
 
 /** What the wizard returns. */
 export type CharacterChoice = CharacterCreationResult;
@@ -62,6 +62,7 @@ export class CharacterFeature implements Feature {
   private _creating = false;
 
   public install(ctx: FeatureContext): void {
+    declareStateless(ctx, "race, birthsign and class are saved by the save system");
     const s = ctx.kernel.services;
     const host = () => s.get(CharacterHostKey);
     const feedback = () => s.get(FeedbackKey);

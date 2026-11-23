@@ -21,7 +21,7 @@ import { IndoorsKey, type IndoorsService } from "../indoors/indoors-feature";
 
 /** Hold name used to keep sheltering townsfolk inside. */
 const SHELTER_HOLD = "raid";
-import { ActorsKey, ClockKey, FeedbackKey, PlayerKey, VillagesKey, type ActorsService, type FeedbackService, type GameClockService, type PlayerService, type VillagesService, ownSave } from "../services";
+import { ActorsKey, ClockKey, FeedbackKey, PlayerKey, VillagesKey, type ActorsService, type FeedbackService, type GameClockService, type PlayerService, type VillagesService, ownSave, ownTransient } from "../services";
 
 /** Service accessors, resolved at call time (the game provides them). */
 interface RaidDeps {
@@ -104,7 +104,7 @@ export class VillageRaidFeature implements Feature {
     });
 
     // Raids aren't saved: a load mid-raid sends the raiders off.
-    ctx.on("save:loaded", () => this._clearAftermath());
+    ownTransient(ctx, "a raid in progress (a load sends the raiders off)", () => this._clearAftermath());
 
     ctx.on("npc:released", ({ npcName }) => {
       for (const set of [this._raiders, this._sheltered]) {

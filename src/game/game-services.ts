@@ -13,7 +13,7 @@ import { Loot } from "../entities/loot";
 import { VillageRaidFeature } from "../features/village-raids/raid-feature";
 import { actors } from "../entities/actors";
 import { Aggressive, Dead } from "../core/ecs/actors";
-import { ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey, QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
+import { undeclaredFeatures, ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey, QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
 import { VillagesFeature } from "../features/villages/villages-feature";
 import { WorldSitesFeature } from "../features/world-sites/world-sites-feature";
 import { IndoorsFeature } from "../features/indoors/indoors-feature";
@@ -542,4 +542,9 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
 
       const jobs = new VillageJobsFeature();
       k.install(jobs);
+
+      // Every feature must say what happens to its state on load (saved,
+      // transient or stateless).  The boot smoke test fails on this error.
+      const undeclared = undeclaredFeatures(k);
+      if (undeclared.length > 0) console.error(`[features] no persistence declared: ${undeclared.join(", ")}`);
   }

@@ -13,7 +13,7 @@ import { createServiceKey } from "../../core/kernel";
 import { GraphicsSettingsUI, type CameraSensitivity, type Difficulty } from "../../ui/graphics-settings-ui";
 import { CreditsUI } from "../../ui/credits-ui";
 import { persistGraphicsTier, type QualityTier } from "../../systems/graphics-system";
-import { FeedbackKey, GameplayKey, ModalKey } from "../services";
+import { FeedbackKey, GameplayKey, ModalKey, declareStateless } from "../services";
 
 /** NPC damage to the player, by difficulty. */
 export const DIFFICULTY_DAMAGE: Record<Difficulty, number> = { easy: 0.6, normal: 1.0, hard: 1.5 };
@@ -56,6 +56,7 @@ export class SettingsFeature implements Feature {
   private _s: ServiceRegistry | null = null;
 
   public install(ctx: FeatureContext): void {
+    declareStateless(ctx, "settings are player preferences, kept outside the save");
     const s = ctx.kernel.services;
     this._s = s;
     const host = () => s.get(SettingsHostKey);

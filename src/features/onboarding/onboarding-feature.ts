@@ -12,7 +12,7 @@ import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { TutorialSystem } from "../../systems/tutorial-system";
 import { hasCompletedOnboardingTips, persistOnboardingTipsCompleted, shouldSkipOnboardingTips } from "../../onboarding-preferences";
-import { FeedbackKey } from "../services";
+import { FeedbackKey, declareStateless } from "../services";
 
 export type OnboardingStepId = "move" | "inventory" | "interact" | "sneak" | "quests";
 
@@ -48,6 +48,7 @@ export class OnboardingFeature implements Feature {
   private _banner: HTMLDivElement | null = null;
 
   public install(ctx: FeatureContext): void {
+    declareStateless(ctx, "tip progress is a player preference, kept outside the save");
     const s = ctx.kernel.services;
     const t = this.tips;
     t.onStepBegin = (_i, step) => this._show(step.message, step.advanceHint);

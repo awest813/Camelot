@@ -15,7 +15,7 @@ import { createServiceKey } from "../../core/kernel";
 import type { Rng } from "../../core/rng/rng";
 import { FastTravelSystem } from "../../systems/fast-travel-system";
 import { FastTravelUI, type FastTravelOptionView } from "../../ui/fast-travel-ui";
-import { FastTravelKey, FeedbackKey, GameplayKey, ModalKey } from "../services";
+import { FastTravelKey, FeedbackKey, GameplayKey, ModalKey, declareStateless } from "../services";
 
 /** The menu row id for "Recall to Mark". */
 export const RECALL_ID = "__recall";
@@ -69,6 +69,7 @@ export class FastTravelFeature implements Feature {
   }
 
   public install(ctx: FeatureContext): void {
+    declareStateless(ctx, "known places and the Recall mark are saved by the save system");
     const s = ctx.kernel.services;
     this._s = s;
     this._rng = ctx.kernel.rng.stream("travel-arrival");

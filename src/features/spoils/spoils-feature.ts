@@ -13,7 +13,7 @@ import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import type { Item } from "../../systems/inventory-system";
 import { LEVEL_ITEM_TEMPLATES } from "../../content/leveled-gear";
-import { FeedbackKey } from "../services";
+import { FeedbackKey, declareStateless } from "../services";
 
 /** Elites whose death also drops leveled gear. */
 const ELITE = /^(DragonBoss|Bandit Chief)/;
@@ -35,6 +35,7 @@ export class SpoilsFeature implements Feature {
   public readonly id = "spoils";
 
   public install(ctx: FeatureContext): void {
+    declareStateless(ctx, "drops are rolled at the kill and become ordinary pickups");
     const s = ctx.kernel.services;
     ctx.on("player:kill", ({ npcId, at, lootTableId }) => {
       if (!at) return;

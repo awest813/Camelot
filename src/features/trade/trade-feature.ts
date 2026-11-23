@@ -20,7 +20,7 @@ import type { BarterSystem } from "../../systems/barter-system";
 import type { ShopSystem } from "../../systems/shop-system";
 import type { ContainerSystem } from "../../systems/container-system";
 import type { Item } from "../../systems/inventory-system";
-import { FeedbackKey, ModalKey, PurseKey } from "../services";
+import { FeedbackKey, ModalKey, PurseKey, declareStateless } from "../services";
 
 const DEFAULT_MERCHANT = "merchant_01";
 
@@ -53,6 +53,7 @@ export class TradeFeature implements Feature {
   private _s: ServiceRegistry | null = null;
 
   public install(ctx: FeatureContext): void {
+    declareStateless(ctx, "merchant stock and gold belong to the barter and restock systems, which the save system saves");
     const s = ctx.kernel.services;
     this._s = s;
     const host = () => s.get(TradeHostKey);

@@ -29,10 +29,7 @@ import { toWorld } from "../../world/village-buildings";
 import { buildVillageWell, WELL_RADIUS } from "../../world/village-well";
 import { createNoticeMaterials } from "../../rendering/notice-texture";
 import { getQuaterniusBasePath } from "../../systems/fantasy-asset-loader";
-import {
-  ActorsKey, FastTravelKey, FeedbackKey, PlayerKey, SiteBuilderKey, VillagesKey, WorldInfoKey,
-  type SiteBuilderService,
-} from "../services";
+import { ActorsKey, FastTravelKey, FeedbackKey, PlayerKey, SiteBuilderKey, VillagesKey, WorldInfoKey, type SiteBuilderService, declareStateless } from "../services";
 
 export { VillagesKey } from "../services";
 export type { VillagesService } from "../services";
@@ -49,6 +46,7 @@ export class VillagesFeature implements Feature {
   private _services: ServiceRegistry | null = null;
 
   public install(ctx: FeatureContext): void {
+    declareStateless(ctx, "plans come from the world seed, and discovery belongs to fast travel");
     const s = ctx.kernel.services;
     this._services = s;
     const world = () => s.get(WorldInfoKey);

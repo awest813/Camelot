@@ -789,6 +789,25 @@ one replay runs in CI.
   loaded, and each stub must get back exactly its own data, with time
   restored before the daily schedule. The save-fixture e2e still loads
   the checked-in fixtures.
+- Transient state is declared per feature. Every feature says what
+  happens to its state on load, with one of three helpers in
+  `features/services.ts`:
+  - `ownSave(ctx, codec)`: it owns a part of the save. Ten features do.
+  - `ownTransient(ctx, what, reset?)`: it keeps state on purpose that a
+    load resets, with an optional reset that runs once everything saved
+    is back. Four features do: raids (a raid in progress), jobs (their
+    quest-log entries), death (a fall in progress, where a load now gets
+    the player straight up), and indoors (who is inside; its wake check
+    re-derives it).
+  - `declareStateless(ctx, why)`: nothing of its own to keep, with the
+    reason (saved by the save system's own parts, derived from the world
+    seed, or a player preference outside the save). The other thirteen
+    do.
+
+  Raids and jobs used to listen for `save:loaded` directly. After
+  installing features, the game reports any that declared nothing as a
+  console error, which fails the boot smoke test. The kernel exposes
+  `installed()`, and a feature's context carries its `id`.
 
 ### Phase 6 — World and navigation (3 weeks)
 
