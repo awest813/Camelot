@@ -3,7 +3,8 @@
  * pays the fine, goes to jail, talks their way out, or resists.
  *
  * Inputs:   services law, purse, skills, feedback, modal, player; the crime
- *           system's guard challenge.
+ *           system's guard challenge; events `player:kill` and
+ *           `player:assault` (crimes against peaceful settlers).
  * Outputs:  the `arrest` service; `crime:committed` and
  *           `disposition:changed` events.
  *
@@ -25,7 +26,11 @@ export interface LawService {
   /** Serve time for a bounty: the clock moves on and skills slip. */
   serveJail(bounty: number, factionId: string): { message: string };
   addInfamy(amount: number): void;
+  /** Game time (minutes) for crime records. */
+  now(): number;
 }
+
+const ASSAULT_DEBOUNCE_MS = 3000;
 
 export interface ArrestService {
   readonly panel: GuardEncounterUI;
@@ -56,6 +61,20 @@ export class ArrestFeature implements Feature {
       ctx.kernel.events.emit("crime:committed", { crimeType: "challenge", factionId, bounty });
     };
     this.panel.onResolve = (action) => this._resolve(action, ctx);
+
+    // Killing or striking a peaceful settler is a crime; witnesses post a
+    // bounty and nearby guards come for the player.  Assault is booked at
+    // most once per 3 s, so a combo doesn't stack five bounties.
+    let lastAssault = Number.NEGATIVE_INFINITY;
+    ctx.on("player:kill", ({ civilian, factionId }) => {
+      if (civilian) crime.commitCrime("murder", factionId ?? "village_guard", s.get(LawKey).now());
+    });
+    ctx.on("player:assault", ({ factionId }) => {
+      const now = performance.now();
+      if (now - lastAssault < ASSAULT_DEBOUNCE_MS) return;
+      lastAssault = now;
+      crime.commitCrime("assault", factionId, s.get(LawKey).now());
+    });
 
     ctx.provide(ArrestKey, {
       panel: this.panel,

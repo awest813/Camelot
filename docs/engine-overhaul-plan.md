@@ -434,6 +434,17 @@ state, scope and save codec.
 - `src/game/combat-controls.ts`: what each combat input does (swing or draw
   a bow, power attack, dodge, block, cast or charge a staff, cycle spells,
   loose an arrow, racial power), bound to the input adapter in one place.
+- Crimes against peaceful settlers (murder via `player:kill`, assault via a
+  new `player:assault` event) are booked by the arrest feature.
+- Composition root (`src/game/game-services.ts`): the services the game
+  provides to features, and installing them, moved out of `game.ts`. The
+  game hands over the few private parts it needs as an explicit, typed
+  `GameInternals`.
+
+**Exit status:** `game.ts` is 2,367 lines, under the 2,500 target. Not done
+yet: most features still register their save state through `saveSystem`
+setters instead of owning a save codec. That moves to the entity store
+(Phase 3), where saves are per-feature anyway.
 - `src/world/dragon-lair.ts` (the tundra dragon boss and its body) and
   `src/game/weapon-archetype.ts` (which archetype a weapon fights as).
 - `src/game/player-pack.ts`: gold (one coin stack, mirrored into the

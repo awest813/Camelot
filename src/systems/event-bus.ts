@@ -9,7 +9,16 @@ import type { NPC } from "../entities/npc";
  */
 export interface GameEvents {
   /** The player killed an NPC (where it fell, and its loot table if any). */
-  "player:kill": { npcId: string; npcName: string; xp: number; at?: { x: number; y: number; z: number }; lootTableId?: string };
+  "player:kill": {
+    npcId: string; npcName: string; xp: number;
+    at?: { x: number; y: number; z: number };
+    lootTableId?: string;
+    /** A peaceful settler (killing one is murder), and their faction. */
+    civilian?: boolean;
+    factionId?: string;
+  };
+  /** The player struck a peaceful settler (an assault). */
+  "player:assault": { npcId: string; factionId: string };
   /** An item was picked up (from loot, container, etc.). */
   "player:pickup": { itemId: string; quantity: number };
   /** The player gained a level. */

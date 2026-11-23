@@ -1,14 +1,11 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { Color3 } from "@babylonjs/core/Maths/math.color";
 import type { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import type { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline";
-
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
-import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { AtmosphereController } from "./rendering/sky-dome";
 import { createTerrainMaterial } from "./rendering/terrain-material";
 import { WeaponViewModel } from "./rendering/viewmodel";
@@ -26,7 +23,6 @@ import { KeyboardEventTypes } from "@babylonjs/core/Events/keyboardEvents";
 import { BabylonInputAdapter, type InputAction } from "./adapters/babylon/babylon-input-adapter";
 import { GamepadInputSystem } from "./systems/gamepad-input-system";
 import { InventorySystem } from "./systems/inventory-system";
-import { applyDamageWithResistance } from "./systems/combat-shared";
 import { EquipmentSystem } from "./systems/equipment-system";
 import { SaveSystem } from "./systems/save-system";
 import { AchievementSystem } from "./platform/achievement-system";
@@ -38,7 +34,6 @@ import { InteractionSystem } from "./systems/interaction-system";
 import { SkillTreeSystem } from "./systems/skill-tree-system";
 import { AudioSystem } from "./systems/audio-system";
 import { NavigationSystem } from "./systems/navigation-system";
-import { Loot } from "./entities/loot";
 import { FrameworkRuntime } from "./framework/runtime/framework-runtime";
 import { frameworkBaseContent } from "./framework/content/base-content";
 import { MapEditorSystem } from "./systems/map-editor-system";
@@ -75,17 +70,12 @@ import type { ItemConditionSystem } from "./systems/item-condition-system";
 import { CraftingFeature, CraftingKey, type CraftingService } from "./features/crafting/crafting-feature";
 import { Kernel } from "./core/kernel";
 import { EditorSuite } from "./features/editor/editor-suite";
-import { VillageRaidFeature, RaidsKey, type RaidsService } from "./features/village-raids/raid-feature";
-import {
-  ActorsKey, AnimationKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey,
-  QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey,
-} from "./features/services";
-import { VillagesFeature, VillagesKey, type VillagesService } from "./features/villages/villages-feature";
-import { WorldSitesFeature, WorldSitesKey, type WorldSitesService } from "./features/world-sites/world-sites-feature";
-import { IndoorsFeature } from "./features/indoors/indoors-feature";
-import { MountsFeature, MountsKey, MountHostKey, type MountsService } from "./features/mounts/mounts-feature";
-import { WorldEventsFeature, WorldEventsKey } from "./features/world-events/world-events-feature";
-import { VillageJobsFeature, JobsKey, type JobsService } from "./features/village-jobs/jobs-feature";
+import { RaidsKey, type RaidsService } from "./features/village-raids/raid-feature";
+import { VillagesKey, type VillagesService } from "./features/villages/villages-feature";
+import { WorldSitesKey, type WorldSitesService } from "./features/world-sites/world-sites-feature";
+import { MountsKey, type MountsService } from "./features/mounts/mounts-feature";
+import { WorldEventsKey } from "./features/world-events/world-events-feature";
+import { JobsKey, type JobsService } from "./features/village-jobs/jobs-feature";
 import type { ForgeRegistry, SmithingController } from "./systems/smithing-controller";
 import type { EnchantingSystem } from "./systems/enchanting-system";
 import type { EnchantingUI } from "./ui/enchanting-ui";
@@ -93,20 +83,16 @@ import { LodSystem } from "./systems/lod-system";
 import { WorldEnvironment } from "./rendering/world-environment";
 import { ChunkContent } from "./world/chunk-content";
 import { dressInterior } from "./world/interior-dressing";
-import { spawnDragon } from "./world/dragon-lair";
 import { WeatherSystem } from "./systems/weather-system";
 import { GraphicsSystem } from "./systems/graphics-system";
 import { QuickSlotSystem, isConsumableItem, type QuickSlotKey } from "./systems/quickslot-system";
 import { WaitSystem } from "./systems/wait-system";
 import { SkillProgressionSystem } from "./systems/skill-progression-system";
 import type { FastTravelSystem } from "./systems/fast-travel-system";
-import { FastTravelFeature, TravelKey, TravelHostKey } from "./features/fast-travel/fast-travel-feature";
-import { DeathFeature, DeathHostKey } from "./features/death/death-feature";
-import { SpoilsFeature, SpoilsHostKey } from "./features/spoils/spoils-feature";
-import { CharacterFeature, CharacterHostKey, CharacterKey } from "./features/character/character-feature";
-import { ProgressionFeature, ProgressionHostKey, ProgressionKey } from "./features/progression/progression-feature";
-import { DialogueServicesFeature, DialogueHostKey } from "./features/dialogue-services/dialogue-services-feature";
-import { SurvivalFeature, SurvivalHostKey } from "./features/survival/survival-feature";
+import { FastTravelFeature, TravelKey } from "./features/fast-travel/fast-travel-feature";
+import { CharacterFeature, CharacterKey } from "./features/character/character-feature";
+import { ProgressionFeature, ProgressionKey } from "./features/progression/progression-feature";
+import { SurvivalFeature } from "./features/survival/survival-feature";
 import { LevelScalingSystem } from "./systems/level-scaling-system";
 import { FameSystem } from "./systems/fame-system";
 import { ActiveEffectsSystem } from "./systems/active-effects-system";
@@ -119,10 +105,8 @@ import type { BirthsignSystem } from "./systems/birthsign-system";
 import type { ClassSystem } from "./systems/class-system";
 import type { RaceSystem } from "./systems/race-system";
 import type { PlayerLevelSystem } from "./systems/player-level-system";
-import { CharacterCreationUI } from "./ui/character-creation-ui";
 import type { CharacterSheetUI } from "./ui/character-sheet-ui";
-import { persistSkipOnboardingTips } from "./onboarding-preferences";
-import { OnboardingFeature, OnboardingHostKey, OnboardingKey, type OnboardingService } from "./features/onboarding/onboarding-feature";
+import { OnboardingKey, type OnboardingService } from "./features/onboarding/onboarding-feature";
 import { QuestCreatorSystem } from "./systems/quest-creator-system";
 import { QuestCreatorUI } from "./ui/quest-creator-ui";
 import { DialogueCreatorSystem } from "./systems/dialogue-creator-system";
@@ -140,7 +124,6 @@ import { SpawnCreatorSystem } from "./systems/spawn-creator-system";
 import { SpawnCreatorUI } from "./ui/spawn-creator-ui";
 import { WorldBuilderSystem } from "./systems/world-builder-system";
 import { WorldBuilderUI } from "./ui/world-builder-ui";
-
 import { ContentBundleSystem } from "./systems/content-bundle-system";
 import { ContentBundleUI } from "./ui/content-bundle-ui";
 import { EditorHubUI } from "./ui/editor-hub-ui";
@@ -149,7 +132,7 @@ import { buildHelpOverlayLines } from "./ui/editor-help-overlay";
 import type { FastTravelUI } from "./ui/fast-travel-ui";
 import type { SpellMakingUI } from "./ui/spell-making-ui";
 import type { GuardEncounterUI } from "./ui/guard-encounter-ui";
-import { ArrestFeature, ArrestKey, LawKey } from "./features/arrest/arrest-feature";
+import { ArrestKey } from "./features/arrest/arrest-feature";
 import type { LevelUpUI } from "./ui/level-up-ui";
 import { StableUI } from "./ui/stable-ui";
 import { SaddlebagUI } from "./ui/saddlebag-ui";
@@ -163,13 +146,13 @@ import { AmbientEventSystem } from "./systems/ambient-event-system";
 import { LeveledListSystem, ALL_BUILT_IN_LEVELED_LISTS } from "./systems/leveled-list-system";
 import { EventManagerSystem } from "./systems/event-manager-system";
 import { AnimationSystem } from "./systems/animation-system";
-import { FantasyAssetLoader, setInstanceScale, setInstanceYaw, type FantasyAssetKey } from "./systems/fantasy-asset-loader";
+import { FantasyAssetLoader } from "./systems/fantasy-asset-loader";
 import type { PetSystem } from "./systems/pet-system";
 import type { PetUI } from "./ui/pet-ui";
-import { PetsFeature, PetsKey, type PetsService } from "./features/pets/pets-feature";
+import { PetsKey, type PetsService } from "./features/pets/pets-feature";
 import type { PickpocketSystem } from "./systems/pickpocket-system";
 import type { PickpocketUI } from "./ui/pickpocket-ui";
-import { PickpocketFeature, PickpocketKey, ThiefHostKey, COIN_PURSE } from "./features/pickpocket/pickpocket-feature";
+import { PickpocketFeature, PickpocketKey, COIN_PURSE } from "./features/pickpocket/pickpocket-feature";
 import { AssetBrowserSystem } from "./systems/asset-browser-system";
 import { AssetBrowserUI } from "./ui/asset-browser-ui";
 import { BundleMergeSystem } from "./systems/bundle-merge-system";
@@ -179,16 +162,15 @@ import { ModManifestSystem } from "./systems/mod-manifest-system";
 import { ModManifestUI } from "./ui/mod-manifest-ui";
 import type { BarterUI } from "./ui/barter-ui";
 import type { ContainerUI } from "./ui/container-ui";
-import { TradeFeature, TradeHostKey } from "./features/trade/trade-feature";
+import { TradeFeature } from "./features/trade/trade-feature";
 import type { Item } from "./systems/inventory-system";
 import { ScreenshotSystem } from "./systems/screenshot-system";
 import { UIAnimator } from "./ui/ui-animator";
 import { MarkRecallSystem } from "./systems/mark-recall-system";
 import { TrainerSystem } from "./systems/trainer-system";
 import type { FollowerSystem } from "./systems/follower-system";
-
 import type { FollowerUI } from "./ui/follower-ui";
-import { FollowersFeature, FollowersKey, type FollowersService } from "./features/followers/followers-feature";
+import { FollowersKey, type FollowersService } from "./features/followers/followers-feature";
 import { ActiveEffectHUD } from "./ui/active-effect-hud";
 import { HudPresenter, type HudSources } from "./ui/hud-presenter";
 import { ModalRegistry } from "./ui/modal-registry";
@@ -196,6 +178,7 @@ import { PlayerPack } from "./game/player-pack";
 import { QuestBridge } from "./game/quest-bridge";
 import { NpcRoster } from "./game/npc-roster";
 import { CombatControls } from "./game/combat-controls";
+import { installGameFeatures } from "./game/game-services";
 import { weaponArchetypeOf } from "./game/weapon-archetype";
 import { QuickSlotHUD } from "./ui/quickslot-hud";
 import { PerkSystem } from "./systems/perk-system";
@@ -203,9 +186,9 @@ import { DynamicWorldEventSystem } from "./systems/dynamic-world-event-system";
 import type { DynamicEventReward } from "./systems/dynamic-world-event-system";
 import type { DragonShoutSystem } from "./systems/dragon-shout-system";
 import type { ShoutUI } from "./ui/shout-ui";
-import { ShoutsFeature, ShoutsKey, ShoutHostKey, type ShoutsService } from "./features/shouts/shouts-feature";
+import { ShoutsKey, type ShoutsService } from "./features/shouts/shouts-feature";
 import type { GraphicsSettingsUI } from "./ui/graphics-settings-ui";
-import { SettingsFeature, SettingsHostKey, SettingsKey } from "./features/settings/settings-feature";
+import { SettingsFeature, SettingsKey } from "./features/settings/settings-feature";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -494,7 +477,6 @@ export class Game {
   private _chunks!: ChunkContent;
 
   /** Debounce for witnessed-assault crime reports (one per 3s per combat burst). */
-  private _lastAssaultCrimeMs: number = Number.NEGATIVE_INFINITY;
   /** True once the Bandit Bounty framework quest has been activated by a bandit kill. */
   private _banditQuestStarted: boolean = false;
   /** Active difficulty setting (scales NPC→player damage). */
@@ -1366,17 +1348,15 @@ export class Game {
     this.combatSystem.onNPCDeath = (name, xp, npc) => {
         const npcName = /dragon/i.test(npc.mesh.name) ? npc.mesh.name : name;
         const p = npc.mesh.position;
-        this.eventBus.emit("player:kill", { npcId: npc.mesh.name, npcName, xp, at: { x: p.x, y: p.y, z: p.z }, lootTableId: npc.lootTableId ?? undefined });
+        this.eventBus.emit("player:kill", {
+          npcId: npc.mesh.name, npcName, xp, at: { x: p.x, y: p.y, z: p.z }, lootTableId: npc.lootTableId ?? undefined,
+          civilian: this._isSettlementNpc(npc), factionId: npc.factionId ?? "village_guard",
+        });
         // Bandit Bounty: activate on the first bandit kill so that kill counts.
         if (!this._banditQuestStarted && this._quests.targetId(name) === "Bandit") {
             this._banditQuestStarted = true;
             this.frameworkRuntime.questEngine.activateQuest("quest_bandit_bounty");
             this.ui.showNotification("📜 New quest: Bandit Bounty — bring proof to collect.", 3500);
-        }
-        // Murder: killing a non-hostile settlement NPC is a crime; witnessed
-        // kills post a bounty and nearby guards will challenge the player.
-        if (this._isSettlementNpc(npc)) {
-            this.crimeSystem.commitCrime("murder", npc.factionId ?? "village_guard", this.timeSystem.elapsedGameTime);
         }
         this.questSystem.onKill(name);
         this._quests.apply("kill", this._quests.targetId(name));
@@ -1388,14 +1368,10 @@ export class Game {
 
     };
     this.projectileSystem.onNPCDeath = this.combatSystem.onNPCDeath;
+    // Striking a peaceful settler is an assault (the arrest feature books it).
     this.combatSystem.onNpcDamaged = (npc) => {
-        // Assault: attacking non-hostile settlement NPCs is a crime.
-        // Debounced so a multi-hit combo doesn't stack five bounties.
         if (npc.isDead || !this._isSettlementNpc(npc)) return;
-        const nowMs = performance.now();
-        if (nowMs - this._lastAssaultCrimeMs < 3000) return;
-        this._lastAssaultCrimeMs = nowMs;
-        this.crimeSystem.commitCrime("assault", npc.factionId ?? "village_guard", this.timeSystem.elapsedGameTime);
+        this.eventBus.emit("player:assault", { npcId: npc.mesh.name, factionId: npc.factionId ?? "village_guard" });
     };
     this.combatSystem.onWeaponHit = (powerAttack) => this.smithing.onWeaponHit(powerAttack);
     this.combatSystem.onPlayerHit = () => {
@@ -2246,477 +2222,43 @@ export class Game {
       this._roster.remove(npc);
   }
 
-  /**
-   * Provide the services features use and install the features
-   * (engine overhaul, Phase 1).  Services resolve lazily, so systems created
-   * later in the constructor are fine.
-   */
+  /** Wire the features to the game (src/game/game-services.ts). */
   private _installFeatures(): void {
-      const k = this.kernel;
-      // eslint-disable-next-line @typescript-eslint/no-this-alias -- getters below
-      const game = this;
-      k.services.provide(ClockKey, {
-        hour: () => this.timeSystem.hour,
-        elapsedHours: () => this.timeSystem.elapsedGameHours,
-      });
-      k.services.provide(PlayerKey, {
-        position: () => this.player.camera.position,
-        level: () => this.playerLevelSystem.characterLevel,
-      });
-      k.services.provide(FeedbackKey, {
-        notify: (text, ms) => this.ui.showNotification(text, ms ?? 3000),
-        grant: (reward) => this._grantDynamicWorldEventReward(reward),
-        addFame: (n) => this.fameSystem.addFame(n),
-        markDirty: () => this.saveSystem.markDirty(),
-      });
-      k.services.provide(ActorsKey, {
-        residents: (chunkKey) => this._chunks.record(chunkKey)?.npcs ?? [],
-        spawnArchetype: (chunkKey, archetype, x, z) => {
-          const record = this._chunks.record(chunkKey);
-          return record ? this._spawnArchetypeNpc(archetype, record, x, z) : null;
-        },
-        despawn: (npc) => this._despawnNpc(npc),
-        isTalkingTo: (npc) => npc.isInDialogue || npc.mesh.name === this._currentDialogueNpcName,
-        byName: (name) => this.scheduleSystem.npcs.find((n) => n.mesh.name === name),
-        all: () => this.scheduleSystem.npcs,
-      });
-      k.services.provide(WorldInfoKey, {
-        get chunkSize() { return game.world.chunkSize; },
-        biome: (cx, cz) => this.world.getBiome(cx, cz),
-        pondAt: (cx, cz) => !!this.world.pondAt(cx, cz),
-      });
-      k.services.provide(TravelHostKey, {
-        position: () => this.player.camera.position,
-        teleport: (to) => { this.player.camera.position.copyFrom(to); },
-        inCombat: () => this._isPlayerInCombat(),
-        sneaking: () => this.stealthSystem.isCrouching,
-        encumbered: () => this.player.isEncumbered,
-        isInterior: (id) => this.cellManager.getCellDefinition(id)?.type === "interior",
-        indoors: () => this.cellManager.isInterior,
-        // Entered quietly (the trip has its own message), so present the cell here.
-        enterCell: (id, at) => { if (this.cellManager.enterCellById(id, at, true)) this._presentCell(id); },
-        fade: (onBlack, onDone) => this.ui.playScreenFadeSequence({
-          fadeOutMs: 400, holdMs: 120, fadeInMs: 450, onBlack, onComplete: onDone,
-        }),
-        passHours: (hours) => {
-          this.timeSystem.advanceHours(hours);
-          this.respawnSystem.update(this.timeSystem.elapsedGameTime);
-          this.merchantRestockSystem.update(this.timeSystem.elapsedGameTime, this.barterSystem);
-          this._updateDynamicWorldEventsOnHourChange();
-          return this.timeSystem.timeString;
-        },
-        arrivalEvent: (at) => this.travelEventSystem.rollEvent({
-          gameTimeHours: this.timeSystem.elapsedGameHours % 24,
-          activeBiomeIds: [this.world.getBiome(Math.floor(at.x / this.world.chunkSize), Math.floor(at.z / this.world.chunkSize))],
-          weatherId: this.weatherSystem.state,
-          playerLevel: this.playerLevelSystem.characterLevel,
-          getFlag: (flag) => this.frameworkRuntime.getFlag(flag),
-          setFlag: (flag, value) => this.frameworkRuntime.setFlag(flag, value),
-        })?.notification ?? null,
-        hasMark: () => this.markRecallSystem.hasMarked,
-        recall: () => !!this.markRecallSystem.recall(),
-      });
-      k.install(this._fastTravel);
-      k.services.provide(DeathHostKey, {
-        health: () => this.player.health,
-        maxHealth: () => this.player.maxHealth,
-        setHealth: (v) => { this.player.health = v; },
-        position: () => this.player.camera.position,
-        flash: () => this.ui.showHitFlash("rgba(180, 0, 0, 0.55)"),
-        closeScreens: () => {
-          if (this.dialogueSystem.isInDialogue) this.dialogueSystem.endDialogue();
-          if (this.inventorySystem.isOpen) this.inventorySystem.toggleInventory();
-          if (this._containerUI.isVisible) this._containerUI.onClose?.();
-          if (this._barterUI.isVisible) this._barterUI.onClose?.();
-          this._restoreGameplayInput();
-        },
-        purgeEffects: () => {
-          for (const effect of this.activeEffectsSystem.activeEffects) this.activeEffectsSystem.removeEffect(effect.id);
-        },
-        calmAttackers: () => {
-          // So the waking place is not a fight (and fast travel isn't blocked).
-          for (const npc of this.scheduleSystem.npcs) {
-            if (npc.isDead) continue;
-            if (npc.aiState === AIState.ALERT || npc.aiState === AIState.INVESTIGATE || npc.aiState === AIState.CHASE || npc.aiState === AIState.ATTACK) {
-              npc.aiState = npc.patrolPoints.length > 0 ? AIState.RETURN : AIState.IDLE;
-              npc.isAggressive = false;
-            }
-          }
-        },
-      });
-      k.install(new DeathFeature());
-      k.services.provide(ThiefHostKey, {
-        crouching: () => this.stealthSystem.isCrouching,
-        noticed: (npcId) => {
-          const npc = this.scheduleSystem.npcs.find((n) => n.mesh.name === npcId);
-          return npc ? this.stealthSystem.getDetectionLevel(npc) >= 30 : true;
-        },
-        reportTheft: (npcId) => {
-          const npc = this.scheduleSystem.npcs.find((n) => n.mesh.name === npcId);
-          this.crimeSystem.commitCrime("theft", npc?.factionId ?? "village_guard", this.timeSystem.elapsedGameTime);
-        },
-        receive: (itemId) => this._grantPickpocketItem(itemId),
-      });
-      k.install(this._thief);
-      k.services.provide(TradeHostKey, {
-        get barter() { return game.barterSystem; },
-        get shops() { return game.shopSystem; },
-        get containers() { return game.containerSystem; },
-        items: () => this.inventorySystem.items,
-        hour: () => this.timeSystem.hour,
-        reputationFactor: (npcName) => {
-          const fame = 1 - (this.fameSystem.dispositionModifier / 20) * 0.15;
-          return fame * (npcName ? this.persuasionSystem.getMerchantPriceMultiplier(npcName) : 1.0);
-        },
-      });
-      k.install(this._trade);
-      k.services.provide(SpoilsHostKey, {
-        level: () => this.player.level,
-        roll: (tableId, level) => this.lootTableSystem.rollTable(tableId, undefined, { playerLevel: level }).items.map((d) => ({
-          id: d.id, name: d.name, description: d.description ?? "", stackable: d.stackable ?? false,
-          quantity: d.quantity ?? 1, weight: d.weight, stats: d.stats, slot: d.slot as Item["slot"],
-        })),
-        resolveLeveled: (listId, level) => this.leveledListSystem.resolve(listId, level).value ?? null,
-        drop: (at, item) => { new Loot(this.scene, at, item); },
-      });
-      k.install(new SpoilsFeature());
-      const syncMax = () => {
-        this.player.maxHealth = this.attributeSystem.maxHealth;
-        this.player.maxMagicka = this.attributeSystem.maxMagicka;
-        this.player.maxStamina = this.attributeSystem.maxStamina;
-        this.player.maxCarryWeight = this.attributeSystem.carryWeight;
-      };
-      k.services.provide(CharacterHostKey, {
-        get attributes() { return game.attributeSystem; },
-        get skills() { return game.skillProgressionSystem; },
-        syncMaxStats: syncMax,
-        addMaxStats: (b) => {
-          this.player.maxHealth += b.maxHealth;
-          this.player.maxMagicka += b.maxMagicka;
-          this.player.maxStamina += b.maxStamina;
-          this.player.maxCarryWeight += b.carryWeight;
-        },
-        setRacialTraits: (t) => {
-          this.swimSystem.hasWaterBreathing = t.waterBreathing;
-          this.diseaseSystem.diseaseResistanceChance = t.diseaseImmune ? 1.0 : 0;
-        },
-        beginCreation: () => {
-          this._inCharacterCreation = true;
-          this.isPaused = true;
-          this.interactionSystem.isBlocked = true;
-          this.ui.toggleCrosshair(false);
-          document.exitPointerLock();
-          this.player.camera.detachControl();
-        },
-        endCreation: () => {
-          this._inCharacterCreation = false;
-          this.interactionSystem.isBlocked = false;
-          this.isPaused = false;
-          this.ui.toggleCrosshair(true);
-          this.canvas.requestPointerLock();
-          this.player.camera.attachControl(this.canvas, true);
-        },
-        ask: () => {
-          const creator = new CharacterCreationUI();
-          creator.setAnimator(this.uiAnimator);
-          return creator.open();
-        },
-        becomeHero: (name, bonus) => {
-          this.player.name = name;
-          this.player.health = this.attributeSystem.maxHealth + bonus.maxHealth;
-          this.player.magicka = this.attributeSystem.maxMagicka + bonus.maxMagicka;
-          this.player.stamina = this.attributeSystem.maxStamina + bonus.maxStamina;
-        },
-        seedWorld: (seed) => {
-          this.world.setSeed(seed);
-          // Feature randomness (raids, …) derives from the world seed too.
-          this.kernel.rng.reseed(seed.seedString);
-        },
-        welcome: (skipTips) => {
-          if (skipTips !== null) persistSkipOnboardingTips(skipTips);
-          this._tips.start();
-          this._achievements?.unlock("ACH_TAKE_UP_THE_SWORD");
-          if (this.workspaceDraftSystem.hasDraft()) {
-            const result = this.workspaceDraftSystem.restore();
-            if (result.restoredCount > 0) {
-              const ts = result.savedAt ? new Date(result.savedAt).toLocaleTimeString() : "unknown";
-              this.ui.showNotification(`Workspace draft restored (${result.restoredSystems.join(", ")}) — saved at ${ts}`, 4000);
-            }
-          }
-        },
-      });
-      k.install(this._character);
-      k.services.provide(ProgressionHostKey, {
-        get attributes() { return game.attributeSystem; },
-        get classes() { return game.classSystem; },
-        perks: () => this.perkSystem,
-        syncMaxStats: syncMax,
-        levelReached: () => this.trainerSystem.onCharacterLevelUp(),
-        offerAttributes: () => {
-          if (this.isPaused || this.ui.isAttributePanelOpen || this._isCombatInputBlocked()) return;
-          this.ui.toggleAttributePanel(true);
-          this.ui.refreshAttributePanel(this.attributeSystem);
-          this._suspendGameplayInput();
-        },
-        sheet: () => {
-          const sb = this.birthsignSystem.getStatBonuses();
-          return {
-            name: this.player.name,
-            xpLevel: this.player.level,
-            raceName: this.raceSystem.chosenRace?.name,
-            className: this.classSystem.chosenClass?.name,
-            birthsignName: this.birthsignSystem.chosenBirthsign?.name,
-            specialization: this.classSystem.chosenClass?.specialization,
-            attributes: this.attributeSystem.getAll(),
-            skills: this.skillProgressionSystem.getAllSkills(),
-            maxHealth: this.attributeSystem.maxHealth + sb.maxHealth,
-            maxMagicka: this.attributeSystem.maxMagicka + sb.maxMagicka,
-            maxStamina: this.attributeSystem.maxStamina + sb.maxStamina,
-            carryWeight: this.attributeSystem.carryWeight + sb.carryWeight,
-            fame: this.fameSystem.fame,
-            infamy: this.fameSystem.infamy,
-            fameLabel: this.fameSystem.fameLabel,
-            infamyLabel: this.fameSystem.infamyLabel,
-            gearCondition: this.smithing.getEquippedConditionSummary(),
-          };
-        },
-        setSheetOpen: (open) => this.ui.setCharacterSheetOpen(open),
-      });
-      k.install(this._progression);
-      k.services.provide(SettingsHostKey, {
-        tier: () => this.graphics.tier,
-        applyTier: (tier) => { this.lodSystem?.setQuality(tier); location.reload(); },
-        setDamageTaken: (m) => { this.combatSystem.difficultyMultiplier = m; },
-        get audio() { return game.audioSystem; },
-        setLookSensibility: (v) => { if (this.player?.camera) this.player.camera.angularSensibility = v; },
-        toggleFullscreen: getDesktopBridge() ? () => { void getDesktopBridge()?.toggleFullscreen(); } : null,
-        paused: () => this.isPaused,
-      });
-      k.install(this._settings);
-      k.services.provide(DialogueHostKey, {
-        get trainers() { return game.trainerSystem; },
-        skillName: (id) => this.skillProgressionSystem.getSkill(id as never)?.name ?? id,
-        restAtInn: (hours) => {
-          const result = this.waitSystem.rest(hours, this.timeSystem, this.player);
-          if (!result.ok) return null;
-          this.survivalSystem.rest(hours * 22);
-          return result.message;
-        },
-      });
-      k.install(new DialogueServicesFeature());
-      k.services.provide(SurvivalHostKey, {
-        body: () => this.player,
-        isCold: () => {
-          const p = this.player.camera.position;
-          const biome = this.world.getBiome(Math.floor(p.x / this.world.chunkSize), Math.floor(p.z / this.world.chunkSize));
-          const weather = this.weatherSystem?.state ?? "clear";
-          return biome === "tundra" || weather === "rain" || weather === "storm";
-        },
-        setXpMultiplier: (m) => { this.skillProgressionSystem.globalXpMultiplier = m; },
-      });
-      k.install(this._survival);
-      k.services.provide(OnboardingHostKey, {
-        // Space must never skip a tip while a menu, dialog or the editor is open.
-        screenFree: () => !this._isCombatInputBlocked()
-          && !this.ui.isAttributePanelOpen && !this.ui.isWaitDialogOpen
-          && !this.alchemyUI.isVisible && !this.enchantingUI.isVisible && !this.craftingUI.isVisible
-          && !this.spellMakingUI.isVisible && !this.editorHubUI.isVisible,
-      });
-      k.install(new OnboardingFeature());
-      this.saveSystem.setFastTravelSystem(this._fastTravel.places);
-      const record = (chunkKey: string) => this._chunks.record(chunkKey);
-      k.services.provide(SiteBuilderKey, {
-        get scene() { return game.scene; },
-        isLive: (chunkKey) => !!record(chunkKey),
-        placeBuilding: (chunkKey, kind, origin) => {
-          const r = record(chunkKey);
-          if (r) this._chunks.placeBuilding(chunkKey, r, kind, origin);
-        },
-        placeProp: (chunkKey, key, x, z, rot) => {
-          const r = record(chunkKey);
-          if (r) this._chunks.placeProp(chunkKey, r, key, { x: 0, z: 0, rot: 0 }, x, z, rot);
-        },
-        placeSmithy: (chunkKey, x, z, rot) => {
-          const r = record(chunkKey);
-          if (r) this._chunks.placeSmithy(chunkKey, r, x, z, rot);
-        },
-        ownStructure: (chunkKey, mesh) => {
-          const r = record(chunkKey);
-          if (r) this._chunks.track(chunkKey, r, mesh, "structure");
-          else mesh.dispose();
-        },
-        own: (chunkKey, mesh) => {
-          const r = record(chunkKey);
-          if (r) r.roots.push(mesh);
-          else mesh.dispose();
-        },
-        addKeepOut: (fp) => {
-          return this._chunks.addKeepOut(fp);
-        },
-        nightFlame: (name, x, y, z) => this._chunks.nightFlame(name, x, y, z),
-        placeAsset: (chunkKey, key, at) => {
-          if (!record(chunkKey)) return;
-          this.fantasyAssets.getInstance(key, (root) => {
-            if (!root) return;
-            const r = record(chunkKey);
-            if (!r) { root.dispose(); return; }
-            root.position.set(at.x, at.y ?? 0, at.z);
-            setInstanceYaw(root, at.yaw);
-            if (at.scale !== undefined) setInstanceScale(root, at.scale);
-            this._chunks.track(chunkKey, r, root, at.tier ?? "prop");
-          });
-        },
-        spawnDragon: (chunkKey, x, z, yaw) => spawnDragon({ scene: this.scene, chunks: this._chunks, roster: this._roster, assets: this.fantasyAssets, visuals: this._npcVisuals }, chunkKey, x, z, yaw),
-      });
-      k.services.provide(InventoryKey, {
-        count: (id) => this.inventorySystem.items.reduce((n, i) => (i.id === id ? n + i.quantity : n), 0),
-        remove: (id, amount) => this.inventorySystem.removeQuantity(id, amount),
-      });
-      k.services.provide(QuestLogKey, {
-        quests: () => this.questSystem.getQuests(),
-        add: (quest) => this.questSystem.addQuest(quest, true),
-      });
-      k.services.provide(ScheduleKey, {
-        behaviorOf: (npc) => this.scheduleSystem.behaviorOf(npc),
-      });
-      k.services.provide(BuildingsKey, {
-        nearBuilding: (x, z, margin) => this._chunks.nearBuilding(x, z, margin),
-      });
-      k.services.provide(ModalKey, {
-        suspendGameplay: () => this._suspendGameplayInput(),
-        restoreGameplay: () => this._restoreGameplayInput(),
-      });
-
-      k.services.provide(WorldStateKey, {
-        weather: () => this.weatherSystem.state,
-        hasBounty: () => this.crimeSystem.getTotalBounty() > 0,
-        biomeAt: (x, z) => this.world.getBiome(Math.floor(x / this.world.chunkSize), Math.floor(z / this.world.chunkSize)),
-      });
-      const lootRng = k.rng.stream("loot-drops");
-      k.services.provide(LootKey, {
-        dropNear: (tableId, count) => {
-          const context = { playerLevel: this.player.level };
-          for (let i = 0; i < count; i++) {
-            const drop = this.lootTableSystem.rollTable(tableId, undefined, context).items[0];
-            if (!drop) continue;
-            const angle = lootRng.next() * Math.PI * 2;
-            const dist = 6 + lootRng.next() * 6;
-            const p = this.player.camera.position;
-            new Loot(this.scene, new Vector3(p.x + Math.cos(angle) * dist, 0.5, p.z + Math.sin(angle) * dist), {
-              id: drop.id,
-              name: drop.name,
-              description: drop.description ?? "",
-              stackable: drop.stackable ?? false,
-              quantity: drop.quantity ?? 1,
-              weight: drop.weight,
-              stats: drop.stats,
-              slot: drop.slot as Item["slot"],
-            });
-          }
-        },
-      });
-
-      const worldEvents = new WorldEventsFeature();
-      k.install(worldEvents);
-      this.saveSystem.setDynamicWorldEventSystem(worldEvents.dynamic);
-      // Persist flavor-event cooldowns so reloading can't reroll one-shots.
-      this.saveSystem.setTravelEventSystem(worldEvents.travel);
-      this.saveSystem.setAmbientEventSystem(worldEvents.ambient);
-
-      k.services.provide(AnimationKey, {
-        idle: (m) => this.animationSystem.playIdle(m),
-        walk: (m) => this.animationSystem.playWalk(m),
-        run: (m) => this.animationSystem.playRun(m),
-        death: (m) => this.animationSystem.playDeath(m),
-        release: (name) => this.animationSystem.unregisterMesh(name),
-      });
-      k.services.provide(GameplayKey, { canAct: () => !this._isCombatInputBlocked() });
-      k.services.provide(SkillsKey, {
-        level: (id) => this.skillProgressionSystem?.getSkill(id)?.level ?? 0,
-        gainXP: (id, base) => this.skillProgressionSystem?.gainXP(id, base * (this.classSystem?.xpMultiplierFor(id) ?? 1)),
-      });
-      k.install(this._crafting);
-      this._spellMaking = new SpellMakingFeature(this.spellSystem);
-      k.install(this._spellMaking);
-      k.services.provide(LawKey, {
-        get crime() { return game.crimeSystem; },
-        get persuasion() { return game.persuasionSystem; },
-        serveJail: (bounty, factionId) => this.jailSystem.serveJailTime(
-          bounty, factionId, this.timeSystem, this.skillProgressionSystem, this.crimeSystem, this.timeSystem.gameTime,
-        ),
-        addInfamy: (n) => this.fameSystem.addInfamy(n),
-      });
-      k.install(new ArrestFeature());
-      k.services.provide(PurseKey, {
-        gold: () => this._pack.gold(),
-        spend: (amount) => this._pack.spendGold(amount),
-      });
-      const pets = new PetsFeature(this.scene);
-      k.install(pets);
-      this.saveSystem.setPetSystem(pets.pets);
-      k.services.provide(ShoutHostKey, {
-        gameTime: () => this.timeSystem.gameTime,
-        stance: () => {
-          const forward = this.player.getForwardDirection(1);
-          forward.y = 0;
-          forward.normalize();
-          return { origin: this.player.camera.position, forward };
-        },
-        targets: () => this.combatSystem.npcs,
-        dash: (distance) => {
-          const f = this.player.getForwardDirection(1);
-          const flat = new Vector3(f.x, 0, f.z);
-          if (flat.lengthSquared() <= 0.001) return;
-          flat.normalize();
-          // Stop short of any wall between the player and the dash target.
-          const pick = this.player.raycastForward(distance);
-          const reach = pick?.hit ? Math.max(1, pick.distance - 0.8) : distance;
-          this.player.camera.position.addInPlace(flat.scale(reach));
-        },
-        addEffect: (effect) => this.activeEffectsSystem.addEffect(effect),
-        damage: (npc, raw, type) => {
-          if (npc.isDead) return;
-          const damage = applyDamageWithResistance(raw, npc, type);
-          npc.takeDamage(damage);
-          this.combatSystem.notifyHostileHit(npc, damage);
-          if (npc.isDead) {
-            this.ui.showNotification(`${npc.mesh.name} defeated!`);
-            this.combatSystem.onNPCDeath?.(npc.mesh.name, npc.xpReward, npc);
-          }
-        },
-        setAttackSpeedMultiplier: (m) => { this.combatSystem.externalAttackSpeedMultiplier = m; },
-        clearWeather: () => this.weatherSystem.forceWeather("clear"),
-      });
-      const shouts = new ShoutsFeature();
-      k.install(shouts);
-      this.saveSystem.setDragonShoutSystem(shouts.shouts);
-      const followers = new FollowersFeature();
-      k.install(followers);
-      this.saveSystem.setFollowerSystem(followers.followers);
-      // A starter wolf companion for new games.
-      pets.pets.grantPet("pet_wolf");
-
-      k.services.provide(MountHostKey, {
-        canAct: () => !this.isPaused && !this.dialogueSystem.isInDialogue,
-        setMoveSpeedMultiplier: (m) => { (this.player as unknown as { moveSpeedMultiplier?: number }).moveSpeedMultiplier = m; },
-        unlockAchievement: (id) => { this._achievements?.unlock(id as never); },
-        give: (item) => { this.inventorySystem.addItem(item); },
-      });
-      const mounts = new MountsFeature();
-      k.install(mounts);
-      this.saveSystem.setHorseSystem(mounts.horses);
-
-      k.install(new IndoorsFeature());
-      k.install(new VillagesFeature());
-      k.install(new WorldSitesFeature());
-
-      const raids = new VillageRaidFeature();
-      k.install(raids);
-      this.saveSystem.setVillageRaids(raids.rules);
-
-      const jobs = new VillageJobsFeature();
-      k.install(jobs);
-      this.saveSystem.setVillageJobs(jobs.rules);
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- the internals' getters
+    const self = this;
+    installGameFeatures(this, {
+      get achievements() { return self._achievements; },
+      get barterUI() { return self._barterUI; },
+      get character() { return self._character; },
+      get chunks() { return self._chunks; },
+      get containerUI() { return self._containerUI; },
+      get crafting() { return self._crafting; },
+      get currentDialogueNpcName() { return self._currentDialogueNpcName; },
+      get fastTravel() { return self._fastTravel; },
+      get inCharacterCreation() { return self._inCharacterCreation; },
+      set inCharacterCreation(v) { self._inCharacterCreation = v; },
+      get npcVisuals() { return self._npcVisuals; },
+      get pack() { return self._pack; },
+      get progression() { return self._progression; },
+      get roster() { return self._roster; },
+      get settings() { return self._settings; },
+      get spellMaking() { return self._spellMaking; },
+      set spellMaking(v) { self._spellMaking = v; },
+      get survival() { return self._survival; },
+      get thief() { return self._thief; },
+      get tips() { return self._tips; },
+      get trade() { return self._trade; },
+      despawnNpc: (...a: Parameters<Game["_despawnNpc"]>) => self._despawnNpc(...a),
+      grantDynamicWorldEventReward: (...a: Parameters<Game["_grantDynamicWorldEventReward"]>) => self._grantDynamicWorldEventReward(...a),
+      grantPickpocketItem: (...a: Parameters<Game["_grantPickpocketItem"]>) => self._grantPickpocketItem(...a),
+      isCombatInputBlocked: (...a: Parameters<Game["_isCombatInputBlocked"]>) => self._isCombatInputBlocked(...a),
+      isPlayerInCombat: (...a: Parameters<Game["_isPlayerInCombat"]>) => self._isPlayerInCombat(...a),
+      presentCell: (...a: Parameters<Game["_presentCell"]>) => self._presentCell(...a),
+      restoreGameplayInput: (...a: Parameters<Game["_restoreGameplayInput"]>) => self._restoreGameplayInput(...a),
+      spawnArchetypeNpc: (...a: Parameters<Game["_spawnArchetypeNpc"]>) => self._spawnArchetypeNpc(...a),
+      suspendGameplayInput: (...a: Parameters<Game["_suspendGameplayInput"]>) => self._suspendGameplayInput(...a),
+      updateDynamicWorldEventsOnHourChange: (...a: Parameters<Game["_updateDynamicWorldEventsOnHourChange"]>) => self._updateDynamicWorldEventsOnHourChange(...a),
+    });
   }
 
   /** Remove one NPC from the world and every system (and its chunk's list). */

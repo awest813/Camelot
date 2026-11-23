@@ -21,6 +21,8 @@ function setup(opts: { gold?: number; bounty?: number; outcome?: Outcome; speech
     adjustBounty: (f: string, d: number) => crime.setBounty(f, (bounties.get(f) ?? 0) + d),
     clearBounty: (f: string) => { bounties.set(f, 0); return 0; },
     payBounty: (f: string, g: number) => { const b = bounties.get(f) ?? 0; if (b <= 0 || g < b) return 0; bounties.set(f, 0); return b; },
+    crimes: [] as string[],
+    commitCrime: (type: string, faction: string) => { crime.crimes.push(`${type}:${faction}`); },
   };
   const persuasion = {
     canAttemptPersuasion: () => (opts.speech ?? 30) >= 10,
@@ -31,7 +33,7 @@ function setup(opts: { gold?: number; bounty?: number; outcome?: Outcome; speech
   const modal = { suspendGameplay: vi.fn(), restoreGameplay: vi.fn() };
   k.services.provide(LawKey, {
     crime: crime as unknown as CrimeSystem, persuasion: persuasion as unknown as PersuasionSystem,
-    serveJail: jail, addInfamy: vi.fn(),
+    serveJail: jail, addInfamy: vi.fn(), now: () => 600,
   });
   k.services.provide(PurseKey, { gold: () => gold, spend: (n) => { if (gold < n) return false; gold -= n; return true; } });
   k.services.provide(SkillsKey, { level: () => opts.speech ?? 30, gainXP: (_id, n) => { xp.push(n); } });
@@ -43,7 +45,7 @@ function setup(opts: { gold?: number; bounty?: number; outcome?: Outcome; speech
   k.install(new ArrestFeature());
   const guard = { mesh: { name: "Guard Captain" }, isAggressive: false, provoked: false, aiState: AIState.IDLE, lastKnownPlayerPos: null } as unknown as NPC;
   const stop = () => crime.onGuardChallenge!(guard, "town", bounties.get("town")!);
-  return { k, notes, xp, modal, jail, guard, stop, committed, panel: k.services.get(ArrestKey).panel,
+  return { k, notes, xp, modal, jail, guard, stop, committed, crime, panel: k.services.get(ArrestKey).panel,
     gold: () => gold, bounty: () => bounties.get("town")!, persuasion };
 }
 
@@ -100,6 +102,15 @@ describe("ArrestFeature (headless, through the kernel)", () => {
     expect(t.jail).toHaveBeenCalledWith(60, "town");
     expect(t.notes.at(-1)).toBe("You served your time.");
     expect(t.panel.isVisible).toBe(false);
+    t.k.uninstall("arrest");
+  });
+
+  it("killing a settler is murder; striking one is assault, booked once per combo", () => {
+    const t = setup();
+    t.k.events.emit("player:kill", { npcId: "Bandit_1", npcName: "Bandit", xp: 5, civilian: false });
+    t.k.events.emit("player:kill", { npcId: "Farmer_1", npcName: "Farmer", xp: 5, civilian: true, factionId: "town" });
+    for (let i = 0; i < 5; i++) t.k.events.emit("player:assault", { npcId: "Smith_1", factionId: "town" });
+    expect(t.crime.crimes).toEqual(["murder:town", "assault:town"]);
     t.k.uninstall("arrest");
   });
 });
