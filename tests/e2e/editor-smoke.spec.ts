@@ -107,11 +107,19 @@ test("editor and tool chords reach their handlers", async ({ page }) => {
   await page.keyboard.press("Control+y");
   expect(await g<number>("g.mapEditorSystem.entityCount"), "Ctrl+Y redoes").toBe(count0 + 1);
 
+  // A tool opened and closed inside the editor leaves the editor holding input.
+  await page.keyboard.press("Shift+F12");
+  expect(await g<boolean>("g.itemCreatorUI.isVisible")).toBe(true);
+  await page.evaluate(() => (window as any).__camelotGame.itemCreatorUI.close());
+  expect(await g<boolean>("g._focus.holds('editor') && !g._focus.holds('menu') && g.interactionSystem.isBlocked"), "the editor still holds input").toBe(true);
+  await canvas.focus();
+
   // Gameplay keys do nothing in the editor.
   await page.keyboard.press("j");
   expect(await g<boolean>("g.questSystem.isLogOpen"), "J in the editor").toBe(false);
   await page.keyboard.press("F2");
   expect(await g<boolean>("g.mapEditorSystem.isEnabled")).toBe(false);
+  expect(await g<boolean>("!g._focus.held && !g.interactionSystem.isBlocked"), "leaving the editor gives play its input back").toBe(true);
 
   // Shift+F12: the Item Creator, from play; the same chord closes it.
   await canvas.click({ force: true });

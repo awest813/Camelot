@@ -77,6 +77,11 @@ export class DialogueSystem {
   public onTalkStart: ((npcName: string) => void) | null = null;
   /** Fired after dialogue UI and cinematic camera are torn down (pointer lock restored). */
   public onDialogueClosed: (() => void) | null = null;
+  /**
+   * Who has the player's input (the game's PlayFocus).  When set, a
+   * conversation holds it instead of locking the pointer itself.
+   */
+  public focus: { take(holder: "dialogue"): void; give(holder: "dialogue"): void } | null = null;
   /** Optional session factory. If provided, dialogue UI is driven by framework data. */
   public dialogueSessionProvider: ((npc: NPC) => DialogueSession | null) | null = null;
 
@@ -184,11 +189,15 @@ export class DialogueSystem {
     });
 
     // Detach player controls and free the cursor so choices can be clicked.
-    this.player.camera.detachControl();
-    try {
-      if (typeof document !== "undefined" && document.pointerLockElement) document.exitPointerLock();
-    } catch (_) {
-      // headless — ignore
+    if (this.focus) {
+      this.focus.take("dialogue");
+    } else {
+      this.player.camera.detachControl();
+      try {
+        if (typeof document !== "undefined" && document.pointerLockElement) document.exitPointerLock();
+      } catch (_) {
+        // headless — ignore
+      }
     }
 
     // Show UI
@@ -446,11 +455,15 @@ export class DialogueSystem {
     // Restore controls and pointer lock so mouse-look works immediately.
     // Wrapped in try/catch so tests running in a headless Node environment
     // don't fail when canvas.requestPointerLock() is not available.
-    try {
-      this.canvas.requestPointerLock();
-      this.player.camera.attachControl(this.canvas, true);
-    } catch (_) {
-      // headless / test environment — ignore
+    if (this.focus) {
+      this.focus.give("dialogue");
+    } else {
+      try {
+        this.canvas.requestPointerLock();
+        this.player.camera.attachControl(this.canvas, true);
+      } catch (_) {
+        // headless / test environment — ignore
+      }
     }
 
     if (this.onDialogueClosed) this.onDialogueClosed();

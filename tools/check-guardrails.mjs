@@ -7,6 +7,8 @@
  *  Rules (error):
  *   - framework-no-babylon    src/framework/** must not import @babylonjs/* (the domain
  *                             layer stays engine-free).
+ *   - pointer-lock-owner      only the play-focus owner locks or unlocks the pointer
+ *                             (Phase 2); standalone fallbacks are allowlisted.
  *
  *  Ratchets (error when a count goes UP from tools/guardrails-baseline.json;
  *  a note when it goes down, so the baseline can be tightened with --update):
@@ -34,6 +36,12 @@ const BASELINE = join(ROOT, "tools", "guardrails-baseline.json");
  * shrink (move code out, then lower the baseline with --update).
  */
 const SLACK = { "game-ts-lines": 40 };
+
+/**
+ * Where pointer lock may change: the PlayFocus wiring in game.ts, and the
+ * dialogue / inventory systems' fallbacks for when they run without a game.
+ */
+const POINTER_LOCK_ALLOWLIST = ["src/game.ts", "src/systems/dialogue-system.ts", "src/systems/inventory-system.ts"];
 
 /** Files allowed to call Math.random (the future RNG module lives here). */
 const RANDOM_ALLOWLIST = [/^src\/core\/rng\//];
@@ -68,6 +76,9 @@ export function measure() {
     const code = stripComments(f.text);
     if (f.path.startsWith("src/framework/") && /from\s+["']@babylonjs\//.test(code)) {
       violations.push({ rule: "framework-no-babylon", file: f.path });
+    }
+    if (/\b(requestPointerLock|exitPointerLock)\s*\(/.test(code) && !POINTER_LOCK_ALLOWLIST.includes(f.path)) {
+      violations.push({ rule: "pointer-lock-owner", file: f.path });
     }
     if (!RANDOM_ALLOWLIST.some((re) => re.test(f.path))) {
       const n = (code.match(/Math\.random\s*\(/g) ?? []).length;

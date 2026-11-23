@@ -21,6 +21,8 @@ export interface Item {
 
 export class InventorySystem {
   public items: Item[] = [];
+  /** Who has the player's input (the game's PlayFocus); the inventory holds it while open. */
+  public focus: { take(holder: "menu"): void; give(holder: "menu"): void } | null = null;
   public maxCapacity: number = 20;
   public isOpen: boolean = false;
   /** Fired once each time the inventory panel is opened (after pointer lock is released). */
@@ -151,14 +153,20 @@ export class InventorySystem {
       // But we need to make sure InteractionSystem clears text too.
       this._ui.setInteractionText("");
 
-      document.exitPointerLock();
-      this._player.camera.detachControl();
+      if (this.focus) this.focus.take("menu");
+      else {
+        document.exitPointerLock();
+        this._player.camera.detachControl();
+      }
       this._updateUI();
       this.onOpen?.();
     } else {
       this._ui.toggleInventory(false);
-      this._canvas.requestPointerLock();
-      this._player.camera.attachControl(this._canvas, true);
+      if (this.focus) this.focus.give("menu");
+      else {
+        this._canvas.requestPointerLock();
+        this._player.camera.attachControl(this._canvas, true);
+      }
     }
   }
 

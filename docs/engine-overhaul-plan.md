@@ -526,6 +526,20 @@ setters instead of owning a save codec. That moves to the entity store
 **Exit:** no feature touches `requestPointerLock`, `exitPointerLock` or raw
 `keydown` directly.
 
+**Progress:**
+
+- `src/input/play-focus.ts`: who has the player's input. Play has it unless
+  a named holder does: a menu, the pause menu, the map editor, character
+  creation, or a conversation. It is the one place that locks and unlocks
+  the pointer, attaches the camera and blocks world interaction. Holders
+  stack: closing a tool inside the map editor keeps the editor's hold.
+  Before, each menu, the editor suite (8 call sites), the dialogue and
+  inventory systems and character creation all locked and unlocked the
+  pointer themselves.
+- The editor's three copies of "turn the map editor on" are one.
+- Guardrail `pointer-lock-owner`: pointer lock only in the focus wiring
+  (plus the dialogue / inventory fallbacks for running without a game).
+
 ### Phase 3 — Entity model for actors (3–4 weeks)
 
 - Add bitECS. Entity ids for NPCs and the player, with components

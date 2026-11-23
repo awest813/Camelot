@@ -62,6 +62,8 @@ export interface EditorHooks {
   suspendGameplay(): void;
   /** Give input back to play. */
   restoreGameplay(): void;
+  /** The map editor holds input while it is on. */
+  editorMode(on: boolean): void;
   /** The map editor turned on or off (e.g. refresh the help overlay). */
   modeChanged(): void;
 }
@@ -365,7 +367,7 @@ export class EditorSuite {
     this.questCreatorSystem = new QuestCreatorSystem();
     this.questCreatorUI = new QuestCreatorUI(this.questCreatorSystem);
     this.questCreatorUI.onClose = () => {
-      this.host.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.hooks.restoreGameplay();
       this.workspaceDraftSystem.markDirty();
     };
 
@@ -373,7 +375,7 @@ export class EditorSuite {
     this.dialogueCreatorSystem = new DialogueCreatorSystem();
     this.dialogueCreatorUI = new DialogueCreatorUI(this.dialogueCreatorSystem);
     this.dialogueCreatorUI.onClose = () => {
-      this.host.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.hooks.restoreGameplay();
       this.workspaceDraftSystem.markDirty();
     };
 
@@ -381,7 +383,7 @@ export class EditorSuite {
     this.npcCreatorSystem = new NpcCreatorSystem();
     this.npcCreatorUI = new NpcCreatorUI(this.npcCreatorSystem);
     this.npcCreatorUI.onClose = () => {
-      this.host.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.hooks.restoreGameplay();
       this.workspaceDraftSystem.markDirty();
     };
 
@@ -389,7 +391,7 @@ export class EditorSuite {
     this.itemCreatorSystem = new ItemCreatorSystem();
     this.itemCreatorUI = new ItemCreatorUI(this.itemCreatorSystem);
     this.itemCreatorUI.onClose = () => {
-      this.host.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.hooks.restoreGameplay();
       this.workspaceDraftSystem.markDirty();
     };
 
@@ -397,7 +399,7 @@ export class EditorSuite {
     this.factionCreatorSystem = new FactionCreatorSystem();
     this.factionCreatorUI = new FactionCreatorUI(this.factionCreatorSystem);
     this.factionCreatorUI.onClose = () => {
-      this.host.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.hooks.restoreGameplay();
       this.workspaceDraftSystem.markDirty();
     };
 
@@ -405,7 +407,7 @@ export class EditorSuite {
     this.lootTableCreatorSystem = new LootTableCreatorSystem();
     this.lootTableCreatorUI = new LootTableCreatorUI(this.lootTableCreatorSystem);
     this.lootTableCreatorUI.onClose = () => {
-      this.host.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.hooks.restoreGameplay();
       this.workspaceDraftSystem.markDirty();
     };
 
@@ -413,7 +415,7 @@ export class EditorSuite {
     this.spawnCreatorSystem = new SpawnCreatorSystem();
     this.spawnCreatorUI = new SpawnCreatorUI(this.spawnCreatorSystem);
     this.spawnCreatorUI.onClose = () => {
-      this.host.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.hooks.restoreGameplay();
       this.workspaceDraftSystem.markDirty();
     };
 
@@ -421,11 +423,8 @@ export class EditorSuite {
     this.worldBuilderSystem = new WorldBuilderSystem();
     this.worldBuilderUI = new WorldBuilderUI(this.worldBuilderSystem);
     this.worldBuilderUI.onClose = () => {
-      this.host.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
       this.workspaceDraftSystem.markDirty();
-      if (this.mapEditorSystem.isEnabled || this.host.isPaused) return;
-      this.host.canvas.requestPointerLock();
-      this.host.player.camera.attachControl(this.host.canvas, true);
+      this.hooks.restoreGameplay();
     };
     this.worldBuilderUI.onApplyToWorld = (worldSeed, config) => {
       this.host.world.setSeed(worldSeed);
@@ -483,26 +482,13 @@ export class EditorSuite {
       .attachWorldBuilder(this.worldBuilderSystem);
     this.contentBundleUI = new ContentBundleUI(this.contentBundleSystem);
     this.contentBundleUI.onClose = () => {
-      this.host.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      if (this.mapEditorSystem.isEnabled || this.host.isPaused) return;
-      this.host.canvas.requestPointerLock();
-      this.host.player.camera.attachControl(this.host.canvas, true);
+      this.hooks.restoreGameplay();
     };
     this.contentBundleUI.onPlayFromHere = (systemId) => {
-      this.host.interactionSystem.isBlocked = true;
-      document.exitPointerLock();
-      this.host.player.camera.detachControl();
+      this.hooks.suspendGameplay();
       switch (systemId) {
         case "map":
-          if (!this.mapEditorSystem.isEnabled) {
-            this.mapEditorSystem.toggle();
-            this.mapEditorToolbar.show();
-            this.editorLayout.setVisible("hierarchy", true);
-            this.editorLayout.setVisible("palette", true);
-            this.editorLayout.setVisible("layers", true);
-            this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-            this.refreshToolbar();
-          }
+          this._enterMapEditor(null);
           break;
         case "quest":        this.questCreatorUI.open();        break;
         case "dialogue":     this.dialogueCreatorUI.open();     break;
@@ -520,10 +506,7 @@ export class EditorSuite {
     this.assetBrowserSystem = new AssetBrowserSystem();
     this.assetBrowserUI = new AssetBrowserUI(this.assetBrowserSystem);
     this.assetBrowserUI.onClose = () => {
-      this.host.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      if (this.mapEditorSystem.isEnabled || this.host.isPaused) return;
-      this.host.canvas.requestPointerLock();
-      this.host.player.camera.attachControl(this.host.canvas, true);
+      this.hooks.restoreGameplay();
     };
     // Insert opens the asset's authoring tool (same dispatch as the hub).
     this.assetBrowserUI.onInsert = (asset) => {
@@ -558,20 +541,14 @@ export class EditorSuite {
     this.bundleMergeSystem = new BundleMergeSystem();
     this.bundleMergeUI = new BundleMergeUI(this.bundleMergeSystem);
     this.bundleMergeUI.onClose = () => {
-      this.host.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      if (this.mapEditorSystem.isEnabled || this.host.isPaused) return;
-      this.host.canvas.requestPointerLock();
-      this.host.player.camera.attachControl(this.host.canvas, true);
+      this.hooks.restoreGameplay();
     };
 
     // ── Mod Manifest ────────────────────────────────────────────────────────────
     this.modManifestSystem = new ModManifestSystem();
     this.modManifestUI = new ModManifestUI(this.modManifestSystem);
     this.modManifestUI.onClose = () => {
-      this.host.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      if (this.mapEditorSystem.isEnabled || this.host.isPaused) return;
-      this.host.canvas.requestPointerLock();
-      this.host.player.camera.attachControl(this.host.canvas, true);
+      this.hooks.restoreGameplay();
     };
 
     // ── Workspace Draft ─────────────────────────────────────────────────────────
@@ -595,7 +572,7 @@ export class EditorSuite {
       onOpen: (tool) => this.openTool(tool),
     });
     this.editorHubUI.onClose = () => {
-      this.host.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
+      this.hooks.restoreGameplay();
     };
     this.seedAssetBrowser();
   }
@@ -631,21 +608,10 @@ export class EditorSuite {
    * matching creator UI. Shared by the Editor Hub and Asset Browser Insert.
    */
   public openTool(tool: EditorToolId): void {
-      this.host.interactionSystem.isBlocked = true;
-      document.exitPointerLock();
-      this.host.player.camera.detachControl();
+      this.hooks.suspendGameplay();
       switch (tool) {
         case "map":
-          if (!this.mapEditorSystem.isEnabled) {
-            this.mapEditorSystem.toggle();
-            this.mapEditorToolbar.show();
-            this.editorLayout.setVisible("hierarchy", true);
-            this.editorLayout.setVisible("palette", true);
-            this.editorLayout.setVisible("layers", true);
-            this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-            this.refreshToolbar();
-            this.host.ui.showNotification("Map Editor enabled (F2 to exit)", 2500);
-          }
+          this._enterMapEditor("Map Editor enabled (F2 to exit)");
           break;
         case "quest":
           this.questCreatorUI.open();
@@ -761,18 +727,22 @@ export class EditorSuite {
 
   /** F2: the map editor on or off. */
   public toggleMapEditor(): void {
-    if (this.mapEditorSystem.isEnabled) { this.exitMapEditor(); return; }
+    if (this.mapEditorSystem.isEnabled) this.exitMapEditor();
+    else this._enterMapEditor("Map editor mode enabled");
+  }
+
+  /** Turn the map editor on (it holds input) with its panels. */
+  private _enterMapEditor(notice: string | null): void {
+    if (this.mapEditorSystem.isEnabled) return;
     this.mapEditorSystem.toggle();
-    this.host.interactionSystem.isBlocked = true;
-    document.exitPointerLock();
-    this.host.player.camera.detachControl();
+    this.hooks.editorMode(true);
     this.mapEditorToolbar.show();
     this.editorLayout.setVisible("hierarchy", true);
     this.editorLayout.setVisible("palette", true);
     this.editorLayout.setVisible("layers", true);
     this.refreshToolbar();
     this.mapEditorHierarchyPanel.refresh(this.mapEditorSystem.listEntitySummaries());
-    this.host.ui.showNotification("Map editor mode enabled", 1800);
+    if (notice) this.host.ui.showNotification(notice, notice.startsWith("Map Editor enabled") ? 2500 : 1800);
     this.hooks.modeChanged();
   }
 
@@ -785,7 +755,7 @@ export class EditorSuite {
       this.editorLayout.setVisible(panel, false);
     }
     this.editorLayout.clearSelection();
-    this.hooks.restoreGameplay();
+    this.hooks.editorMode(false);
     if (!opts.quiet) this.host.ui.showNotification("Map editor mode disabled", 1800);
     this.hooks.modeChanged();
   }

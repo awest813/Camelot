@@ -178,6 +178,7 @@ import { PlayerPack } from "./game/player-pack";
 import { QuestBridge } from "./game/quest-bridge";
 import { NpcRoster } from "./game/npc-roster";
 import { CombatControls } from "./game/combat-controls";
+import { PlayFocus } from "./input/play-focus";
 import { installGameFeatures } from "./game/game-services";
 import { weaponArchetypeOf } from "./game/weapon-archetype";
 import { QuickSlotHUD } from "./ui/quickslot-hud";
@@ -533,6 +534,14 @@ export class Game {
     twang: () => this.audioSystem.playMeleeAttack(),
     notify: (text, ms) => this.ui.showNotification(text, ms),
   });
+  /** Who has the player's input; the one place pointer lock changes. */
+  private readonly _focus = new PlayFocus({
+    lockPointer: () => this.canvas.requestPointerLock(),
+    unlockPointer: () => { if (typeof document !== "undefined") document.exitPointerLock(); },
+    attachCamera: () => this.player.camera.attachControl(this.canvas, true),
+    detachCamera: () => this.player.camera.detachControl(),
+    setInteractionBlocked: (b) => { if (this.interactionSystem) this.interactionSystem.isBlocked = b; },
+  });
   /** Panels that take over the screen (Escape, pause, input blocking). */
   private readonly _modals = new ModalRegistry();
   /** Bars, clock, compass, readouts and the debug overlay. */
@@ -725,6 +734,8 @@ export class Game {
     };
     this.interactionSystem  = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem, this.ui);
     this.interactionSystem.cellManager = this.cellManager;
+    this.dialogueSystem.focus = this._focus;
+    this.inventorySystem.focus = this._focus;
     this.inventorySystem.onOpen = () => this._tips.did("inventory");
     this.skillTreeSystem    = new SkillTreeSystem(this.player, this.ui);
     this.ui.onSkillPurchase = (treeIdx, skillIdx) => this.skillTreeSystem.purchaseSkill(treeIdx, skillIdx);
@@ -746,6 +757,7 @@ export class Game {
     this.editors = new EditorSuite(this, {
       suspendGameplay: () => this._suspendGameplayInput(),
       restoreGameplay: () => this._restoreGameplayInput(),
+      editorMode: (on) => { if (on) this._focus.take("editor"); else this._focus.give("editor"); },
       modeChanged: () => this._refreshHelpOverlayIfVisible(),
     });
 
@@ -1250,9 +1262,6 @@ export class Game {
       this.ui.showNotification(`Pick a consumable in your inventory for slot ${key}.`, 3000);
       if (!this.inventorySystem.isOpen) {
         this.inventorySystem.toggleInventory();
-        this.interactionSystem.isBlocked = true;
-        document.exitPointerLock();
-        this.player.camera.detachControl();
       }
     };
     // Leaving the inventory cancels a pending quick-slot assignment.
@@ -1782,14 +1791,10 @@ export class Game {
           this._gameplayLoop.reset();
           this.editors.exitMapEditor({ quiet: true });
           this._modals.closeAll();
-          this.interactionSystem.isBlocked = true;
           this.ui.setInteractionText("");
-          document.exitPointerLock();
-          this.player.camera.detachControl();
+          this._focus.take("pause");
       } else {
-          this.interactionSystem.isBlocked = false;
-          this.canvas.requestPointerLock();
-          this.player.camera.attachControl(this.canvas, true);
+          this._focus.give("pause");
       }
   }
 
@@ -2235,6 +2240,7 @@ export class Game {
       get crafting() { return self._crafting; },
       get currentDialogueNpcName() { return self._currentDialogueNpcName; },
       get fastTravel() { return self._fastTravel; },
+      get focus() { return self._focus; },
       get inCharacterCreation() { return self._inCharacterCreation; },
       set inCharacterCreation(v) { self._inCharacterCreation = v; },
       get npcVisuals() { return self._npcVisuals; },
@@ -2330,27 +2336,14 @@ export class Game {
   }
 
 
-  /**
-   * Suspend player input while a modal menu is open: block interaction,
-   * release the pointer, and detach camera control.
-   */
+  /** A menu takes input from play (see PlayFocus). */
   private _suspendGameplayInput(): void {
-      this.interactionSystem.isBlocked = true;
-      document.exitPointerLock();
-      this.player.camera.detachControl();
+      this._focus.take("menu");
   }
 
-  /**
-   * Restore player input after a modal menu closes: re-attach camera control
-   * and re-lock the pointer (unless a superseding mode — pause, map editor,
-   * character creation — still owns the screen).
-   */
+  /** The menu let go; play has input again unless the pause menu, editor, … still hold it. */
   private _restoreGameplayInput(): void {
-      this.interactionSystem.isBlocked = this.mapEditorSystem.isEnabled;
-      if (!this.mapEditorSystem.isEnabled && !this.isPaused && !this._inCharacterCreation) {
-          this.canvas.requestPointerLock();
-          this.player.camera.attachControl(this.canvas, true);
-      }
+      this._focus.give("menu");
   }
 
   /** Check if the player is looking at an interactable object or NPC within 3 units. */

@@ -50,6 +50,7 @@ export interface GameInternals {
   readonly crafting: Game["_crafting"];
   readonly currentDialogueNpcName: Game["_currentDialogueNpcName"];
   readonly fastTravel: Game["_fastTravel"];
+  readonly focus: Game["_focus"];
   inCharacterCreation: Game["_inCharacterCreation"];
   readonly npcVisuals: Game["_npcVisuals"];
   readonly pack: Game["_pack"];
@@ -227,18 +228,14 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
         beginCreation: () => {
           gi.inCharacterCreation = true;
           game.isPaused = true;
-          game.interactionSystem.isBlocked = true;
           game.ui.toggleCrosshair(false);
-          document.exitPointerLock();
-          game.player.camera.detachControl();
+          gi.focus.take("creation");
         },
         endCreation: () => {
           gi.inCharacterCreation = false;
-          game.interactionSystem.isBlocked = false;
           game.isPaused = false;
           game.ui.toggleCrosshair(true);
-          game.canvas.requestPointerLock();
-          game.player.camera.attachControl(game.canvas, true);
+          gi.focus.give("creation");
         },
         ask: () => {
           const creator = new CharacterCreationUI();
