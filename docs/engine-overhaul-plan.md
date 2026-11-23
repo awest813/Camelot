@@ -623,10 +623,10 @@ components.
   scope. Codecs are written under their key and read back from the raw
   save, after the built-in state. A save without the key passes
   `undefined`, so the codec can reset. A codec that throws is logged and
-  the load continues. Six features now own their part: pets, shouts,
-  followers, mounts, raids and jobs. Their six setters and twelve
-  save/load lines are gone from the save system. Save keys are unchanged,
-  so existing saves load.
+  the load continues. Ten features now own their part: pets, shouts,
+  followers, mounts, raids, jobs, crafting, survival, spell making and
+  pickpocket. Their setters and save/load lines are gone from the save
+  system. Save keys are unchanged, so existing saves load.
 
 ### Phase 4 — Consolidation (3 weeks)
 

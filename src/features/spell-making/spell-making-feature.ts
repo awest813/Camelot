@@ -13,7 +13,7 @@ import { SpellMakingSystem } from "../../systems/spell-making-system";
 import { SpellMakingUI } from "../../ui/spell-making-ui";
 import type { SpellSystem } from "../../systems/spell-system";
 import type { BarterSystem } from "../../systems/barter-system";
-import { FeedbackKey, GameplayKey, ModalKey, PurseKey, SkillsKey } from "../services";
+import { FeedbackKey, GameplayKey, ModalKey, PurseKey, SkillsKey, ownSave } from "../services";
 
 export interface SpellMakingService {
   readonly altar: SpellMakingSystem;
@@ -43,6 +43,7 @@ export class SpellMakingFeature implements Feature {
   }
 
   public install(ctx: FeatureContext): void {
+    ownSave(ctx, { key: "spellMaking", save: () => this.altar.getSaveState(), load: (data) => { if (data) this.altar.restoreFromSave(data as never); } });
     const s = ctx.kernel.services;
     const modal = () => s.get(ModalKey);
 

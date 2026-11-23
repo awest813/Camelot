@@ -796,7 +796,6 @@ export class Game {
     this.saveSystem.setStealthSystem(this.stealthSystem);
 
     // ── Pickpocket wiring (sneak-thief loop) ────────────────────────────────
-    this.saveSystem.setPickpocketSystem(this.pickpocketSystem);
     this.interactionSystem.stealthSystem = this.stealthSystem;
     this.interactionSystem.pickpocketSystem = this.pickpocketSystem;
     this.interactionSystem.sneakLevelProvider = () =>
@@ -868,7 +867,6 @@ export class Game {
     });
     this.saveSystem.setAlchemySystem(this.alchemySystem);
     this.saveSystem.setEnchantingSystem(this.enchantingSystem);
-    this.saveSystem.setCraftingSystem(this.craftingSystem);
     this._installFeatures();
     // Forget condition for gear that left the world (dropped, or wiped by a shop restock).
     this.saveSystem.onBeforeSave = () => {
@@ -1056,7 +1054,6 @@ export class Game {
     this.saveSystem.setJailSystem(this.jailSystem);
 
     // ── v10 system wiring (Oblivion depth: spell making, respawn, merchant restock) ──
-    this.saveSystem.setSpellMakingSystem(this.spellMakingSystem);
     this.spellMakingUI.setAnimator(this.uiAnimator);
 
     this.levelUpUI.setAnimator(this.uiAnimator);
@@ -1145,7 +1142,6 @@ export class Game {
     this.saveSystem.setDiseaseSystem(this.diseaseSystem);
 
     // Survival needs (hunger / fatigue / cold): the survival feature.
-    this.saveSystem.setSurvivalSystem(this.survivalSystem);
 
     // ── v22: Event Manager (Dungeon Master) ───────────────────────────────
     this.eventManagerSystem = new EventManagerSystem();

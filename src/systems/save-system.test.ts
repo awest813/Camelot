@@ -98,15 +98,6 @@ describe('SaveSystem', () => {
         expect(data.inventory[0].instanceId).toBe('tidied');
     });
 
-    it('persists crafting state when a crafting system is attached', () => {
-        saveSystem.setCraftingSystem({
-            getSystemState: () => ({ recipeSnapshots: [{ id: 'r1', craftCount: 2 }], discoveredRecipeIds: ['r1'] }),
-        } as any);
-        saveSystem.save();
-        const data = JSON.parse(localStorageMock['camelot_save']);
-        expect(data.crafting.recipeSnapshots).toEqual([{ id: 'r1', craftCount: 2 }]);
-    });
-
     it('feature codecs own their part of the save: written, read back, and absent saves reset', () => {
         let pets = ['wolf'];
         const loads: unknown[] = [];
@@ -272,12 +263,14 @@ describe('SaveSystem', () => {
         expect(mockPlayer.name).toBe('Someone Else');
     });
 
-    it('should restore v23+ systems (e.g. pickpocket stats) instead of dropping them', () => {
+    it('should restore feature-owned state (e.g. pickpocket stats) instead of dropping it', () => {
         const mockPickpocket = {
             getSaveState: vi.fn(() => ({ totalAttempts: 3, totalSuccesses: 2, totalCaught: 1 })),
             restoreFromSave: vi.fn(),
         };
-        saveSystem.setPickpocketSystem(mockPickpocket as any);
+        saveSystem.registerCodec({
+            key: 'pickpocket', save: () => mockPickpocket.getSaveState(), load: (d) => mockPickpocket.restoreFromSave(d),
+        });
         saveSystem.save();
 
         mockPickpocket.restoreFromSave.mockClear();

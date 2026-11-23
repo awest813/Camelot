@@ -25,7 +25,6 @@ import type { FastTravelSystem } from "./fast-travel-system";
 import type { FameSystem } from "./fame-system";
 import type { ActiveEffectsSystem } from "./active-effects-system";
 import type { JailSystem } from "./jail-system";
-import type { SpellMakingSystem } from "./spell-making-system";
 import type { RespawnSystem } from "./respawn-system";
 import type { MerchantRestockSystem } from "./merchant-restock-system";
 import type { BirthsignSystem } from "./birthsign-system";
@@ -38,11 +37,8 @@ import type { DiseaseSystem } from "./disease-system";
 import type { EventManagerSystem } from "./event-manager-system";
 import type { MarkRecallSystem } from "./mark-recall-system";
 import type { TrainerSystem } from "./trainer-system";
-import type { PickpocketSystem } from "./pickpocket-system";
 import type { ItemConditionSystem } from "./item-condition-system";
-import type { CraftingSystem } from "./crafting-system";
 import type { PerkSystem } from "./perk-system";
-import type { SurvivalSystem } from "./survival-system";
 import type { DynamicWorldEventSystem } from "./dynamic-world-event-system";
 import type { TravelEventSystem } from "./travel-event-system";
 import type { AmbientEventSystem } from "./ambient-event-system";
@@ -300,7 +296,6 @@ export class SaveSystem {
   private _jailSystem: JailSystem | null = null;
 
   // v13 optional systems
-  private _spellMakingSystem: SpellMakingSystem | null = null;
   private _respawnSystem: RespawnSystem | null = null;
   private _merchantRestockSystem: MerchantRestockSystem | null = null;
 
@@ -331,14 +326,11 @@ export class SaveSystem {
   private _markRecallSystem: MarkRecallSystem | null = null;
   private _trainerSystem: TrainerSystem | null = null;
   // ── v25 optional systems ──────────────────────────────────────────────────
-  private _pickpocketSystem: PickpocketSystem | null = null;
   private _itemConditionSystem: ItemConditionSystem | null = null;
-  private _craftingSystem: CraftingSystem | null = null;
   // ── v26 optional systems ──────────────────────────────────────────────────
   // ── v27 optional systems ──────────────────────────────────────────────────
   private _perkSystem: PerkSystem | null = null;
   // ── v28 optional systems ──────────────────────────────────────────────────
-  private _survivalSystem: SurvivalSystem | null = null;
   private _dynamicWorldEventSystem: DynamicWorldEventSystem | null = null;
   private _travelEventSystem: TravelEventSystem | null = null;
   private _ambientEventSystem: AmbientEventSystem | null = null;
@@ -440,7 +432,6 @@ export class SaveSystem {
 
   // ── v13 system injection ──────────────────────────────────────────────────
 
-  public setSpellMakingSystem(s: SpellMakingSystem): void       { this._spellMakingSystem = s; }
   public setRespawnSystem(s: RespawnSystem): void               { this._respawnSystem = s; }
   public setMerchantRestockSystem(s: MerchantRestockSystem): void { this._merchantRestockSystem = s; }
 
@@ -486,9 +477,7 @@ export class SaveSystem {
 
   // ── v25 system injection ──────────────────────────────────────────────────
 
-  public setPickpocketSystem(s: PickpocketSystem): void       { this._pickpocketSystem = s; }
   public setItemConditionSystem(s: ItemConditionSystem): void { this._itemConditionSystem = s; }
-  public setCraftingSystem(s: CraftingSystem): void           { this._craftingSystem = s; }
 
   // ── v26 system injection ──────────────────────────────────────────────────
 
@@ -499,7 +488,6 @@ export class SaveSystem {
 
   // ── v28 system injection ──────────────────────────────────────────────────
 
-  public setSurvivalSystem(s: SurvivalSystem): void           { this._survivalSystem = s; }
   public setDynamicWorldEventSystem(s: DynamicWorldEventSystem): void { this._dynamicWorldEventSystem = s; }
   public setTravelEventSystem(s: TravelEventSystem): void { this._travelEventSystem = s; }
   public setAmbientEventSystem(s: AmbientEventSystem): void { this._ambientEventSystem = s; }
@@ -592,7 +580,6 @@ export class SaveSystem {
     if (this._fameSystem)             data.fame             = this._fameSystem.getSaveState();
     if (this._activeEffectsSystem)    data.activeEffects    = this._activeEffectsSystem.getSaveState();
     if (this._jailSystem)             data.jail             = this._jailSystem.getSaveState();
-    if (this._spellMakingSystem)      data.spellMaking      = this._spellMakingSystem.getSaveState();
     if (this._respawnSystem)          data.respawn          = this._respawnSystem.getSaveState();
     if (this._merchantRestockSystem)  data.merchantRestock  = this._merchantRestockSystem.getSaveState();
     if (this._birthsignSystem)        data.birthsign        = this._birthsignSystem.getSaveState();
@@ -605,11 +592,8 @@ export class SaveSystem {
     if (this._eventManagerSystem)     data.eventManager     = this._eventManagerSystem.getSaveState();
     if (this._markRecallSystem)       data.markRecall       = this._markRecallSystem.getSaveState();
     if (this._trainerSystem)          data.trainer          = this._trainerSystem.getSaveState();
-    if (this._pickpocketSystem)       data.pickpocket       = this._pickpocketSystem.getSaveState();
     if (this._itemConditionSystem)    data.itemCondition    = this._itemConditionSystem.getSaveState();
-    if (this._craftingSystem)         data.crafting         = this._craftingSystem.getSystemState();
     if (this._perkSystem)             data.perks            = this._perkSystem.getSaveState();
-    if (this._survivalSystem)         data.survival         = this._survivalSystem.getSaveState();
     if (this._dynamicWorldEventSystem) data.dynamicWorldEvents = this._dynamicWorldEventSystem.getSnapshot();
     if (this._travelEventSystem) data.travelEvents = this._travelEventSystem.getSnapshot();
     if (this._ambientEventSystem) data.ambientEvents = this._ambientEventSystem.getSnapshot();
@@ -804,8 +788,6 @@ export class SaveSystem {
     if (this._jailSystem && data.jail)
       this._jailSystem.restoreFromSave(data.jail as any);
     // v13 systems
-    if (this._spellMakingSystem && data.spellMaking)
-      this._spellMakingSystem.restoreFromSave(data.spellMaking as any);
     if (this._respawnSystem && data.respawn)
       this._respawnSystem.restoreFromSave(data.respawn as any);
     if (this._merchantRestockSystem && data.merchantRestock)
@@ -846,23 +828,14 @@ export class SaveSystem {
       this._trainerSystem.restoreFromSave(data.trainer as any);
 
     // v25 systems
-    if (this._pickpocketSystem && data.pickpocket)
-      this._pickpocketSystem.restoreFromSave(data.pickpocket as any);
     if (this._itemConditionSystem && data.itemCondition)
       this._itemConditionSystem.restoreFromSave(data.itemCondition as any);
-    if (this._craftingSystem && data.crafting) {
-      const c = data.crafting as any;
-      if (Array.isArray(c.recipeSnapshots) && Array.isArray(c.discoveredRecipeIds))
-        this._craftingSystem.restoreSystemState(c);
-    }
 
     // v27 systems
     if (this._perkSystem && data.perks)
       this._perkSystem.restoreFromSave(data.perks as any);
 
     // v28 systems
-    if (this._survivalSystem && data.survival)
-      this._survivalSystem.restoreFromSave(data.survival as any);
     if (this._dynamicWorldEventSystem && data.dynamicWorldEvents)
       this._dynamicWorldEventSystem.restoreSnapshot(data.dynamicWorldEvents as any);
     if (this._travelEventSystem && data.travelEvents)

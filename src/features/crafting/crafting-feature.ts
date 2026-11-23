@@ -30,7 +30,7 @@ import type { Player } from "../../entities/player";
 import type { UIManager } from "../../ui/ui-manager";
 import type { InventorySystem } from "../../systems/inventory-system";
 import type { EquipmentSystem } from "../../systems/equipment-system";
-import { FeedbackKey, GameplayKey, ModalKey, PlayerKey, SkillsKey } from "../services";
+import { FeedbackKey, GameplayKey, ModalKey, PlayerKey, SkillsKey, ownSave } from "../services";
 
 /** The concrete systems crafting is built on. */
 export interface CraftingDeps {
@@ -108,6 +108,10 @@ export class CraftingFeature implements Feature {
   }
 
   public install(ctx: FeatureContext): void {
+    ownSave(ctx, { key: "crafting", save: () => this.recipes.getSystemState(), load: (data) => {
+      const c = data as { recipeSnapshots?: unknown; discoveredRecipeIds?: unknown } | undefined;
+      if (c && Array.isArray(c.recipeSnapshots) && Array.isArray(c.discoveredRecipeIds)) this.recipes.restoreSystemState(c as never);
+    } });
     const s = ctx.kernel.services;
     this._s = s;
     const feedback = () => s.get(FeedbackKey);

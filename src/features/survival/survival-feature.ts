@@ -12,7 +12,7 @@
 import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { SurvivalSystem } from "../../systems/survival-system";
-import { FeedbackKey } from "../services";
+import { FeedbackKey, ownSave } from "../services";
 
 /** The body the needs act on. */
 export interface SurvivalBody {
@@ -48,6 +48,7 @@ export class SurvivalFeature implements Feature {
   public readonly needs = new SurvivalSystem();
 
   public install(ctx: FeatureContext): void {
+    ownSave(ctx, { key: "survival", save: () => this.needs.getSaveState(), load: (data) => { if (data) this.needs.restoreFromSave(data as never); } });
     const s = ctx.kernel.services;
     const warn = (level: string) => {
       const w = WARNINGS[level];

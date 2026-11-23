@@ -12,7 +12,7 @@ import { createServiceKey } from "../../core/kernel";
 import { PickpocketSystem, type PickpocketableItem } from "../../systems/pickpocket-system";
 import { PickpocketUI } from "../../ui/pickpocket-ui";
 import type { NPC } from "../../entities/npc";
-import { FeedbackKey, ModalKey, SkillsKey } from "../services";
+import { FeedbackKey, ModalKey, SkillsKey, ownSave } from "../services";
 
 /** A mark's awareness (lowers the odds of a clean lift). */
 const MARK_AWARENESS = 30;
@@ -77,6 +77,7 @@ export class PickpocketFeature implements Feature {
   }
 
   public install(ctx: FeatureContext): void {
+    ownSave(ctx, { key: "pickpocket", save: () => this.system.getSaveState(), load: (data) => { if (data) this.system.restoreFromSave(data as never); } });
     const s = ctx.kernel.services;
     this._s = s;
     this._roll = () => ctx.kernel.rng.stream("pickpocket").next() * 100;
