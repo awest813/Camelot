@@ -4,6 +4,14 @@ import { Scene } from "@babylonjs/core/scene";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { NPC } from "../entities/npc";
 import { ChunkContent, type ChunkContentDeps } from "./chunk-content";
+import { actors } from "../entities/actors";
+import { ChunkOwned } from "../core/ecs/actors";
+
+function fakeNpc(name: string): NPC {
+  const npc = { mesh: { name } } as unknown as NPC & { actorId: number };
+  npc.actorId = actors.spawn(npc);
+  return npc;
+}
 
 function setup() {
   const scene = new Scene(new NullEngine());
@@ -29,18 +37,36 @@ describe("ChunkContent", () => {
     const prop = MeshBuilder.CreateBox("prop", {}, t.scene);
     t.c.track("1,2", rec, prop, "structure");
     expect(t.lod.registerHierarchy).toHaveBeenCalledWith(prop, 145);
-    const npc = { mesh: { name: "villager" } } as unknown as NPC;
-    rec.npcs.push(npc);
+    const npc = fakeNpc("villager");
+    rec.addNpc(npc);
+    expect(actors.has(npc.actorId, ChunkOwned)).toBe(true);
 
     t.c.close("1,2");
     expect(prop.isDisposed()).toBe(true);
     expect(t.released).toEqual([npc]);
+    expect(actors.has(npc.actorId, ChunkOwned), "no longer chunk-owned").toBe(false);
     expect(t.c.record("1,2")).toBeUndefined();
 
     // An asset that finishes loading after its chunk went.
     const late = MeshBuilder.CreateBox("late", {}, t.scene);
     t.c.track("1,2", rec, late, "prop");
     expect(late.isDisposed()).toBe(true);
+  });
+
+  it("unloading is a scope dispose: anything a feature adds to the chunk's scope goes too", () => {
+    const t = setup();
+    const rec = t.c.open("3,3");
+    const gone: string[] = [];
+    t.c.scopeOf("3,3")!.add(() => gone.push("feature thing"));
+    rec.own(MeshBuilder.CreateBox("collider", {}, t.scene), () => gone.push("collider"));
+    t.c.close("3,3");
+    expect(gone).toEqual(["collider", "feature thing"]);
+    expect(t.c.scopeOf("3,3")).toBeUndefined();
+    expect(rec.closed).toBe(true);
+    // An NPC spawned for a chunk that already went is released at once.
+    const late = fakeNpc("late");
+    rec.addNpc(late);
+    expect(t.released).toEqual([late]);
   });
 
   it("buildings keep NPCs out; the keep-out lifts on undo", () => {
@@ -56,9 +82,10 @@ describe("ChunkContent", () => {
   it("forget takes an NPC off its chunk without releasing it", () => {
     const t = setup();
     const rec = t.c.open("0,0");
-    const npc = { mesh: { name: "guard" } } as unknown as NPC;
-    rec.npcs.push(npc);
+    const npc = fakeNpc("guard");
+    rec.addNpc(npc);
     t.c.forget(npc);
+    expect(actors.has(npc.actorId, ChunkOwned)).toBe(false);
     t.c.close("0,0");
     expect(t.released).toEqual([]);
   });

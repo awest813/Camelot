@@ -83,7 +83,7 @@ import type { EnchantingSystem } from "./systems/enchanting-system";
 import type { EnchantingUI } from "./ui/enchanting-ui";
 import { LodSystem } from "./systems/lod-system";
 import { WorldEnvironment } from "./rendering/world-environment";
-import { ChunkContent } from "./world/chunk-content";
+import { ChunkContent, type ChunkRecord } from "./world/chunk-content";
 import { dressInterior } from "./world/interior-dressing";
 import { WeatherSystem } from "./systems/weather-system";
 import { GraphicsSystem } from "./systems/graphics-system";
@@ -1872,14 +1872,14 @@ export class Game {
    */
   private _spawnArchetypeNpc(
       archetypeId: string,
-      chunkRecord: { npcs: NPC[] },
+      chunkRecord: ChunkRecord,
       x: number,
       z: number,
   ): NPC | null {
       const npc = this.npcArchetypeSystem.spawnNpc(archetypeId, this.scene, new Vector3(x, 2, z));
       if (!npc) return null;
       this._roster.add(npc, { regional: true });
-      chunkRecord.npcs.push(npc);
+      chunkRecord.addNpc(npc);
       return npc;
   }
 

@@ -35,6 +35,8 @@ export const Unblockable = {};
 /** Took damage this frame (the hit-react animation plays). */
 export const HitReact = {};
 export const Guard = {};
+/** Belongs to a loaded chunk, and leaves the world when it unloads. */
+export const ChunkOwned = {};
 
 /*
  * LOD tiers, by distance from the player.  An actor has at most one; an

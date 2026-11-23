@@ -39,7 +39,7 @@ export function spawnDragon(d: DragonLairDeps, chunkKey: string, x: number, z: n
   // culling (toggling it would reveal it; the body culls with the chunk).
   dragon.mesh.isVisible = false;
   d.roster.add(dragon, { regional: true, cull: false, pockets: false });
-  record.npcs.push(dragon);
+  record.addNpc(dragon);
 
   d.assets.getInstance("qDragonSmall", (root) => {
     if (!root) return;

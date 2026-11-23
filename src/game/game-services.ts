@@ -369,7 +369,7 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
         },
         own: (chunkKey, mesh) => {
           const r = record(chunkKey);
-          if (r) r.roots.push(mesh);
+          if (r) r.own(mesh);
           else mesh.dispose();
         },
         addKeepOut: (fp) => {

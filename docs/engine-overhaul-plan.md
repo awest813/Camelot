@@ -608,6 +608,15 @@ components.
   twice. The schedule system runs mid NPCs every 2nd tick and far ones every
   4th. The skipped time is banked and passed on, and NPCs are spread across
   ticks by actor id. Combat AI still runs every tick for every NPC.
+- Chunk ownership via scopes. Each loaded chunk's `ChunkRecord` owns a
+  `Scope`, a child of one "chunks" scope. Unloading a chunk disposes that
+  scope: placed meshes are disposed with their culling and shadow
+  registrations, then the chunk's NPCs are released. Chunk NPCs carry the
+  `ChunkOwned` actor tag while they belong to it. Two leaks are closed:
+  - an NPC spawned for a chunk that has already unloaded is released at
+    once;
+  - re-opening a chunk key disposes the old record first.
+  `scopeOf(chunkKey)` lets other code tie its own clean-up to a chunk.
 
 ### Phase 4 — Consolidation (3 weeks)
 

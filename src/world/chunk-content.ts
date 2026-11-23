@@ -1,7 +1,8 @@
 /**
  * What the world puts in each loaded chunk: props, village buildings (with
  * wall colliders and keep-out footprints), smithies, night flames, and the
- * chunk's own NPCs.  Everything placed for a chunk goes when it unloads.
+ * chunk's own NPCs.  Each loaded chunk has a scope that owns all of it, so
+ * unloading a chunk is disposing its scope.
  *
  * The world-sites feature decides what goes where; this places it.
  *
@@ -19,14 +20,75 @@ import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
 import type { Scene } from "@babylonjs/core/scene";
 import type { NPC } from "../entities/npc";
+import { Scope } from "../core/scope";
+import { actors } from "../entities/actors";
+import { ChunkOwned } from "../core/ecs/actors";
 import type { LodSystem } from "../systems/lod-system";
 import type { FireFx } from "../rendering/particles-fx";
 import type { ForgeRegistry } from "../systems/smithing-controller";
 import { setInstanceYaw, type FantasyAssetKey, type FantasyAssetLoader } from "../systems/fantasy-asset-loader";
 import { buildingFootprint, buildingLayout, buildingWallColliders, toWorld, WALL_HEIGHT, type BuildingKind } from "./village-buildings";
 
-/** A chunk's placed meshes and its own NPCs. */
-export interface ChunkRecord { roots: AbstractMesh[]; npcs: NPC[] }
+/**
+ * A loaded chunk: a scope owning what was placed for it, and its NPCs.
+ * Its NPCs carry the `ChunkOwned` actor tag while they belong to it.
+ */
+export class ChunkRecord {
+  private readonly _npcs = new Set<NPC>();
+  /** How many meshes it owns (used to give wall colliders unique names). */
+  private _meshes = 0;
+
+  constructor(public readonly scope: Scope, private readonly _release: (npc: NPC) => void) {
+    // Registered first, so it runs last: props go, then the NPCs.
+    scope.add(() => {
+      const npcs = [...this._npcs];
+      this._npcs.clear();
+      for (const npc of npcs) {
+        actors.set(npc.actorId, ChunkOwned, false);
+        _release(npc);
+      }
+    });
+  }
+
+  public get npcs(): readonly NPC[] {
+    return [...this._npcs];
+  }
+
+  public get meshCount(): number {
+    return this._meshes;
+  }
+
+  /** Whether the chunk has unloaded. */
+  public get closed(): boolean {
+    return this.scope.disposed;
+  }
+
+  /** Own a mesh: disposed with the chunk (immediately if it already went). */
+  public own(mesh: AbstractMesh, onDispose?: () => void): void {
+    this._meshes++;
+    this.scope.add(() => {
+      onDispose?.();
+      mesh.dispose();
+    });
+  }
+
+  /**
+   * Own an NPC: released from every system when the chunk unloads (at once,
+   * if it already has).
+   */
+  public addNpc(npc: NPC): void {
+    if (this.closed) { this._release(npc); return; }
+    this._npcs.add(npc);
+    actors.set(npc.actorId, ChunkOwned, true);
+  }
+
+  /** Let go of an NPC (it is being removed some other way). */
+  public forget(npc: NPC): boolean {
+    if (!this._npcs.delete(npc)) return false;
+    actors.set(npc.actorId, ChunkOwned, false);
+    return true;
+  }
+}
 
 /** A building's ground (centre, yaw, half sizes incl. margin) that NPCs keep out of. */
 export interface Footprint { x: number; z: number; cos: number; sin: number; hw: number; hd: number }
@@ -50,6 +112,8 @@ type Origin = { x: number; z: number; rot: number };
 
 export class ChunkContent {
   private readonly _records = new Map<string, ChunkRecord>();
+  /** Parent of every chunk's scope. */
+  private readonly _scope = new Scope("chunks");
   public readonly footprints = new Set<Footprint>();
   private _candleMat: StandardMaterial | null = null;
 
@@ -62,31 +126,28 @@ export class ChunkContent {
 
   /** A chunk loaded: start its record. */
   public open(chunkKey: string): ChunkRecord {
-    const record: ChunkRecord = { roots: [], npcs: [] };
+    this.close(chunkKey);
+    const record = new ChunkRecord(this._scope.child(chunkKey), (npc) => this._d.releaseNpc(npc));
     this._records.set(chunkKey, record);
     return record;
   }
 
-  /** A chunk unloaded: dispose what was placed for it and release its NPCs. */
+  /** A chunk unloaded: dispose its scope (its meshes, then its NPCs). */
   public close(chunkKey: string): void {
     const record = this._records.get(chunkKey);
     if (!record) return;
     this._records.delete(chunkKey);
-    for (const root of record.roots) {
-      this._d.lod.unregister(root);
-      this._d.shadows()?.removeShadowCaster(root, true);
-      // Materials and textures belong to the shared asset template: keep them.
-      root.dispose();
-    }
-    for (const npc of record.npcs) this._d.releaseNpc(npc);
+    record.scope.dispose();
+  }
+
+  /** The scope of a loaded chunk: anything added to it goes when the chunk does. */
+  public scopeOf(chunkKey: string): Scope | undefined {
+    return this._records.get(chunkKey)?.scope;
   }
 
   /** Take an NPC off its chunk's list (it is being removed some other way). */
   public forget(npc: NPC): void {
-    for (const record of this._records.values()) {
-      const i = record.npcs.indexOf(npc);
-      if (i >= 0) { record.npcs.splice(i, 1); return; }
-    }
+    for (const record of this._records.values()) if (record.forget(npc)) return;
   }
 
   /** Whether (x, z) is within `margin` m of a loaded building. */
@@ -122,9 +183,14 @@ export class ChunkContent {
       root.dispose();
       return;
     }
-    record.roots.push(root);
-    this._d.shadows()?.addShadowCaster(root, true);
+    const shadows = this._d.shadows();
+    shadows?.addShadowCaster(root, true);
     this._d.lod.registerHierarchy(root, DRAW_DISTANCE[tier]);
+    // Materials and textures belong to the shared asset template: keep them.
+    record.own(root, () => {
+      this._d.lod.unregister(root);
+      shadows?.removeShadowCaster(root, true);
+    });
   }
 
   /** One prop, offset from a site origin and turned with it. */
@@ -181,7 +247,7 @@ export class ChunkContent {
     };
     buildingWallColliders(kind).forEach((w, i) => {
       const p = toWorld(w, origin);
-      const box = MeshBuilder.CreateBox(`bldg_wall_${chunkKey}_${record.roots.length}_${i}`, {
+      const box = MeshBuilder.CreateBox(`bldg_wall_${chunkKey}_${record.meshCount}_${i}`, {
         width: w.width, depth: w.depth, height: WALL_HEIGHT,
       }, scene);
       box.position.set(p.x, WALL_HEIGHT / 2, p.z);
@@ -203,7 +269,7 @@ export class ChunkContent {
         this.footprints.add(fp);
         box.onDisposeObservable.addOnce(() => this.footprints.delete(fp));
       }
-      record.roots.push(box);
+      record.own(box);
     });
   }
 
