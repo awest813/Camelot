@@ -1,7 +1,7 @@
 /**
  * How NPCs look in motion: rigged character models that follow the physics
  * capsules, dragon bodies, and routing each NPC's AI state to its animation
- * (with a distance LOD).
+ * (skipped for NPCs in the far LOD tier, see `npc-tier-system.ts`).
  *
  * Moved out of game.ts (engine overhaul, Phase 1).
  */
@@ -13,9 +13,11 @@ import { AIState, NPC } from "../entities/npc";
 import { CharacterModelLibrary, modelForNpcName, type CharacterRig } from "./character-models";
 import type { AnimationSystem } from "../systems/animation-system";
 import { setInstanceYaw } from "../systems/fantasy-asset-loader";
+import { actors } from "../entities/actors";
+import { LodFar } from "../core/ecs/actors";
 
-/** Squared distance beyond which NPC animation updates are skipped. */
-export const NPC_ANIMATION_FAR_DISTANCE_SQ = 100 * 100;
+const isFar = (npc: NPC): boolean => actors.has(npc.actorId, LodFar);
+
 
 interface DragonBody { root: AbstractMesh; yaw: number; last: Vector3; t: number }
 
@@ -70,10 +72,10 @@ export class NpcVisuals {
       for (const npc of npcs) {
         const hitReact = npc.justTakenDamageVisual;
         if (hitReact) npc.justTakenDamageVisual = false;
-        // Animation LOD: beyond 100 m a capsule is a few pixels and its loop
-        // re-syncs from aiState on the next near update, so skip the work.
-        // Dead NPCs always route so death animations play.
-        if (!npc.isDead && !hitReact && Vector3.DistanceSquared(npc.mesh.position, playerPos) > NPC_ANIMATION_FAR_DISTANCE_SQ) continue;
+        // Far tier: a capsule is a few pixels and its loop re-syncs from
+        // aiState once it comes nearer, so skip the work.  Dead NPCs always
+        // route so death animations play.
+        if (!npc.isDead && !hitReact && isFar(npc)) continue;
         anim.updateNPCAnimation(npc.mesh, npc.aiState, npc.isAttackTelegraphing, npc.isStaggered, npc.isDead, hitReact);
       }
     }
@@ -112,13 +114,13 @@ export class NpcVisuals {
     }
   }
 
-  /** Rig facing, gait speed, hit flash and distance LOD. */
+  /** Rig facing, gait speed, hit flash; far-tier rigs pause. */
   private _updateRigs(dt: number, playerPos: Vector3): void {
     for (const [npc, rig] of this._rigs) {
       // Follow the LOD system's capsule cull so culled NPCs stop drawing too.
       const shown = npc.mesh.isVisible;
       if (rig.pivot.isEnabled(false) !== shown) rig.pivot.setEnabled(shown);
-      const far = Vector3.DistanceSquared(npc.mesh.position, playerPos) > NPC_ANIMATION_FAR_DISTANCE_SQ;
+      const far = isFar(npc);
       rig.setPaused(far && !npc.isDead);
       if (far) continue;
       // Fighters track the player; so does whoever the player is talking to.

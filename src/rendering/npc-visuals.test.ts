@@ -6,16 +6,20 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { AIState, type NPC } from "../entities/npc";
 import type { AnimationSystem } from "../systems/animation-system";
 import { NpcVisuals } from "./npc-visuals";
+import { actors } from "../entities/actors";
+import { NpcTierSystem } from "../systems/npc-tier-system";
 
 function npc(scene: Scene, name: string, x: number, extra: Partial<NPC> = {}): NPC {
   const mesh = MeshBuilder.CreateBox(name, {}, scene);
   mesh.position.set(x, 0, 0);
-  return { mesh, aiState: AIState.IDLE, isDead: false, isAggressive: false, isAttackTelegraphing: false,
-    isStaggered: false, isInDialogue: false, justTakenDamageVisual: false, ...extra } as unknown as NPC;
+  const fake = { mesh, aiState: AIState.IDLE, isDead: false, isAggressive: false, isAttackTelegraphing: false,
+    isStaggered: false, isInDialogue: false, justTakenDamageVisual: false, ...extra } as unknown as NPC & { actorId: number };
+  fake.actorId = actors.spawn(fake);
+  return fake;
 }
 
 describe("NpcVisuals", () => {
-  it("animates nearby NPCs, the dead and the just-hit; skips the far", () => {
+  it("animates nearby NPCs, the dead and the just-hit; skips the far tier", () => {
     const scene = new Scene(new NullEngine());
     const anim = { updateNPCAnimation: vi.fn() };
     const v = new NpcVisuals({ scene, shadows: null, modelBase: "/", animation: () => anim as unknown as AnimationSystem });
@@ -23,6 +27,7 @@ describe("NpcVisuals", () => {
     const far = npc(scene, "far", 500);
     const farDead = npc(scene, "farDead", 500, { isDead: true });
     const farHit = npc(scene, "farHit", 500, { justTakenDamageVisual: true });
+    new NpcTierSystem(actors).update(Vector3.Zero(), [near, far, farDead, farHit]);
     v.update(0.016, Vector3.Zero(), [near, far, farDead, farHit]);
     const routed = anim.updateNPCAnimation.mock.calls.map((c) => (c[0] as { name: string }).name);
     expect(routed).toEqual(["near", "farDead", "farHit"]);

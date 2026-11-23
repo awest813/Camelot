@@ -36,6 +36,17 @@ export const Unblockable = {};
 export const HitReact = {};
 export const Guard = {};
 
+/*
+ * LOD tiers, by distance from the player.  An actor has at most one; an
+ * actor with none (not yet tiered, e.g. in a test) counts as near.
+ *   near: everything runs every tick.
+ *   mid:  animated, but its schedule (walking about town) runs at a lower rate.
+ *   far:  its animation is paused and its schedule runs at a lower rate.
+ */
+export const LodMid = {};
+export const LodFar = {};
+export type LodTier = "near" | "mid" | "far";
+
 export type ActorTag = typeof Dead;
 
 export class ActorStore<Body = unknown> {
@@ -85,6 +96,16 @@ export class ActorStore<Body = unknown> {
     if (eid === undefined) return;
     if (on) addComponent(this._world, eid, tag);
     else removeComponent(this._world, eid, tag);
+  }
+
+  /** Put an actor in a LOD tier (it leaves its old one). */
+  public setTier(id: ActorId, tier: LodTier): void {
+    this.set(id, LodMid, tier === "mid");
+    this.set(id, LodFar, tier === "far");
+  }
+
+  public tier(id: ActorId): LodTier {
+    return this.has(id, LodFar) ? "far" : this.has(id, LodMid) ? "mid" : "near";
   }
 
   /** Every actor with all of `tags`. */

@@ -600,6 +600,14 @@ components.
   with the same name (the boot-time "Guard" and others) used to share and
   overwrite each other's animation state. Guardrail `npc-identity` keeps
   `.mesh.name` out of identity.
+- NPC LOD tiers (`src/systems/npc-tier-system.ts`). Each tick, before the
+  schedules, every NPC is put in a tier by its distance from the player:
+  near (within 40 m), mid, or far (beyond 100 m). Tiers are actor components
+  (`LodMid`, `LodFar`) with 4 m of hysteresis at each edge. NPC visuals pause
+  far NPCs' animation and rigs; they used to measure distance themselves,
+  twice. The schedule system runs mid NPCs every 2nd tick and far ones every
+  4th. The skipped time is banked and passed on, and NPCs are spread across
+  ticks by actor id. Combat AI still runs every tick for every NPC.
 
 ### Phase 4 — Consolidation (3 weeks)
 

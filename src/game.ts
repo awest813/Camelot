@@ -11,6 +11,8 @@ import { createTerrainMaterial } from "./rendering/terrain-material";
 import { WeaponViewModel } from "./rendering/viewmodel";
 import { AdaptiveResolution } from "./rendering/adaptive-resolution";
 import { NpcVisuals } from "./rendering/npc-visuals";
+import { NpcTierSystem } from "./systems/npc-tier-system";
+import { actors } from "./entities/actors";
 import { Player } from "./entities/player";
 import { UIManager } from "./ui/ui-manager";
 import { WorldManager } from "./world/world-manager";
@@ -222,6 +224,7 @@ export class Game {
   private _viewModel: WeaponViewModel | null = null;
   /** Rigged NPC models (CC0 KayKit characters). */
   private _npcVisuals!: NpcVisuals;
+  private readonly _npcTiers = new NpcTierSystem(actors);
   /** Village plans by chunk key (null = no village there); deterministic, cached. */
   /** DefaultRenderingPipeline (bloom, FXAA, sharpen, tone-mapping, vignette). */
   public get renderingPipeline(): DefaultRenderingPipeline | null { return this._env?.pipeline ?? null; }
@@ -1900,6 +1903,8 @@ export class Game {
       this.timeSystem.update(deltaTime);
       this._updateDynamicWorldEventsOnHourChange();
 
+      // LOD tiers first: the schedules and NPC visuals read them.
+      this._npcTiers.update(this.player.camera.position, this.scheduleSystem.npcs);
       this.scheduleSystem.update(deltaTime);
       // Kernel features (indoors, raids, …) run their fixed-step systems here,
       // right after the schedules they react to.

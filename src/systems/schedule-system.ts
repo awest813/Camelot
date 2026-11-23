@@ -1,5 +1,7 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { NPC, AIState, ScheduleBehaviorType } from "../entities/npc";
+import { actors } from "../entities/actors";
+import type { LodTier } from "../core/ecs/actors";
 
 /** How far a "wander" destination is picked from the NPC's home position. */
 const WANDER_RADIUS = 8;
@@ -12,6 +14,14 @@ const DETOUR_SECONDS = 1.1;
 const SIDESTEP_PROBE = 0.9;
 /** Give up on a target after this many sidesteps that didn't help. */
 const MAX_DETOURS = 4;
+
+/**
+ * How often (in ticks) an NPC's schedule runs, by LOD tier.  Between runs
+ * its capsule keeps the velocity it was given, and the skipped time is
+ * banked and handed over on its next run.  NPCs are spread across the
+ * ticks by actor id so the work stays even.
+ */
+export const SCHEDULE_TICK_EVERY: Record<LodTier, number> = { near: 1, mid: 2, far: 4 };
 
 /** Per-NPC progress tracking for the stuck check. */
 interface StuckTracker {
@@ -61,6 +71,9 @@ export class ScheduleSystem {
   /** Per-NPC wander destination (refreshed when reached or expired). */
   private _wanderTargets: WeakMap<NPC, Vector3> = new WeakMap();
   private _stuck: WeakMap<NPC, StuckTracker> = new WeakMap();
+  /** Time banked for mid / far NPCs between their runs. */
+  private _banked: WeakMap<NPC, number> = new WeakMap();
+  private _tick = 0;
 
   public addNPC(npc: NPC): void {
     this.npcs.push(npc);
@@ -74,8 +87,20 @@ export class ScheduleSystem {
   }
 
   public update(deltaTime: number): void {
+    const tick = this._tick++;
     for (const npc of this.npcs) {
-      this._updateNPC(npc, deltaTime);
+      const every = SCHEDULE_TICK_EVERY[actors.tier(npc.actorId)];
+      if (every === 1) {
+        this._updateNPC(npc, deltaTime);
+        continue;
+      }
+      const banked = (this._banked.get(npc) ?? 0) + deltaTime;
+      if ((tick + npc.actorId) % every !== 0) {
+        this._banked.set(npc, banked);
+        continue;
+      }
+      this._banked.set(npc, 0);
+      this._updateNPC(npc, banked);
     }
   }
 
