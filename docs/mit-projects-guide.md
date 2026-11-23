@@ -50,8 +50,8 @@ Choosing **MIT-licensed** (or MIT-compatible ISC / CC0) libraries guarantees:
 | Project | License | NPM / Repo | Value for Camelot |
 |---|---|---|---|
 | **Yuka** | MIT | `yuka` / [Mugen87/yuka](https://github.com/Mugen87/yuka) | Headless JavaScript game AI engine: Autonomous steering behaviors (seek, flee, arrive, pursuit, evade, wander, obstacle avoidance, flocking), spatial indexing, and corridor path smoothing. |
-| **mistreevous** | MIT | `mistreevous` (Integrated) | High-performance behavior tree library for NPC decision-making, stealth awareness, and combat states. |
-| **xstate** | MIT | `xstate` (Integrated) | Finite state machines and statecharts for NPC lifecycle, daily schedules, and dialogue state management. |
+| **mistreevous** | MIT | `mistreevous` (removed: its one module was never wired in) | High-performance behavior tree library for NPC decision-making, stealth awareness, and combat states. |
+| **xstate** | MIT | `xstate` (removed: its one module was never wired in) | Finite state machines and statecharts for NPC lifecycle, daily schedules, and dialogue state management. |
 | **ngraph.path** / **pathfinding** | MIT | `ngraph.path` / `pathfinding` | Headless A*, Dijkstra, and Bi-directional search over topological graphs. Ideal for global trade routes, fast-travel cost calculations, and army movements across provinces. |
 
 ---
@@ -62,7 +62,7 @@ Choosing **MIT-licensed** (or MIT-compatible ISC / CC0) libraries guarantees:
 |---|---|---|---|
 | **Quaternius Assets** | CC0 (Public Domain) | [quaternius.com](https://quaternius.com/) (Integrated) | Stylized low-poly Arthurian/fantasy characters, monsters, modular nature props, and rigged animations. |
 | **Kenney Assets** | CC0 (Public Domain) | [kenney.nl](https://kenney.nl/) | Modular medieval castle kits, dungeon kits, weapons, and UI audio assets. |
-| **3d-tiles-renderer** | Apache 2.0 / MIT | `3d-tiles-renderer` (Integrated) | Hierarchical Level of Detail (HLOD) 3D tiles for rendering massive terrain datasets and sprawling kingdoms. |
+| **3d-tiles-renderer** | Apache 2.0 / MIT | `3d-tiles-renderer` (removed: its adapter was never wired in) | Hierarchical Level of Detail (HLOD) 3D tiles for rendering massive terrain datasets and sprawling kingdoms. |
 | **gltf-pipeline** | Apache 2.0 / MIT | `gltf-pipeline` | Optimizes and compresses GLB/glTF files with Draco mesh compression and texture resizing, shrinking bundle size by 60–80%. |
 
 ---

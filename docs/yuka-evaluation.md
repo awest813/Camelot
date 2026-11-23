@@ -37,8 +37,8 @@ these are trivially mapped to Babylon.js equivalents.
 | Layer | Tool | Role |
 |-------|------|------|
 | Pathfinding | `recast-detour` + BabylonJS `RecastJSPlugin` | NavMesh build + path queries (`NavigationSystem`) |
-| Behavior trees | `mistreevous` | NPC decision-making trees (`NpcBehaviorTreeSystem`) |
-| State machines | `xstate` | Formalised NPC AI states (`NpcAIStateMachine`) |
+| Behavior trees | (none) | `mistreevous` and its `NpcBehaviorTreeSystem` were removed unused (engine overhaul, Phase 4) |
+| State machines | Custom | The combat system's own state machine; `xstate` and its `NpcAIStateMachine` were removed unused |
 | Combat AI | Custom | Distance bands, cooldowns, threat handoff (`CombatSystem`) |
 | Schedules | Custom | Daily schedule blocks (`NpcScheduleSystem`, `DailyScheduleSystem`) |
 | Offscreen | Custom | NPC state while unloaded (`OffscreenSimulationSystem`) |

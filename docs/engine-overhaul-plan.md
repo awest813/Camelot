@@ -660,6 +660,18 @@ components.
 
 **Exit:** the domain table above is fully on its "Keep" column.
 
+**Progress:**
+
+- Removed three dependencies and the modules that were their only users.
+  None of these modules was imported by the game, only by its own test:
+  - `3d-tiles-renderer` (`tiles-renderer-system.ts`);
+  - `xstate` (`npc-ai-state-machine.ts`);
+  - `mistreevous` (`npc-behavior-tree.ts`).
+
+  The combat system's state machine is the one NPC AI model. The
+  behaviour-tree goal layer from the domain table gets built on that, not
+  on these.
+
 ### Phase 5 — Persistence (1–2 weeks)
 
 - A save registry and per-feature codecs, with migrations from the current
