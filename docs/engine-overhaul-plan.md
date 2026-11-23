@@ -401,6 +401,11 @@ state, scope and save codec.
       once the talk ends, priced by reputation) and containers.
       `dialogue:action` now carries the action's payload, so the merchant
       id travels with it.
+
+  18. **Onboarding** (`src/features/onboarding/`): the five first-run tips
+      as data. Each advances when the player does what it teaches (the game
+      calls `did(step)`, or `questlog:opened` / `pickpocket:opened` arrive),
+      or on Space when the screen is free.
 - `game.update()` runs the `ui` phase each frame. The pet, follower and
   shout HUD chips are `ui` systems of their features.
 - World environment (`src/rendering/world-environment.ts`): the lights and

@@ -117,8 +117,8 @@ import { RaceSystem } from "./systems/race-system";
 import { PlayerLevelSystem } from "./systems/player-level-system";
 import { CharacterCreationUI } from "./ui/character-creation-ui";
 import { CharacterSheetUI } from "./ui/character-sheet-ui";
-import { TutorialSystem } from "./systems/tutorial-system";
-import { hasCompletedOnboardingTips, persistOnboardingTipsCompleted, persistSkipOnboardingTips, shouldSkipOnboardingTips } from "./onboarding-preferences";
+import { persistSkipOnboardingTips } from "./onboarding-preferences";
+import { OnboardingFeature, OnboardingHostKey, OnboardingKey, type OnboardingService } from "./features/onboarding/onboarding-feature";
 import { QuestCreatorSystem } from "./systems/quest-creator-system";
 import { QuestCreatorUI } from "./ui/quest-creator-ui";
 import { DialogueCreatorSystem } from "./systems/dialogue-creator-system";
@@ -564,8 +564,8 @@ export class Game {
   ]);
 
   /** Short post-creation tips; advances on Space or when the hinted action occurs. */
-  private readonly _onboardingTutorial = new TutorialSystem();
-  private _onboardingTipEl: HTMLDivElement | null = null;
+  /** First-run tips (the onboarding feature). */
+  private get _tips(): OnboardingService { return this.kernel.services.get(OnboardingKey); }
   private _lastDynamicWorldEventHour = -1;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
@@ -707,9 +707,6 @@ export class Game {
     this.questSystem        = new QuestSystem(this.ui);
     this.questSystem.onOpen = () => {
       this.eventBus.emit("questlog:opened", {});
-      if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === "quests") {
-        this._onboardingTutorial.advance();
-      }
     };
     this.saveSystem.setQuestSystem(this.questSystem);
     this.saveSystem.onAfterLoad = () => {
@@ -730,11 +727,7 @@ export class Game {
     };
     this.interactionSystem  = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem, this.ui);
     this.interactionSystem.cellManager = this.cellManager;
-    this.inventorySystem.onOpen = () => {
-      if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === "inventory") {
-        this._onboardingTutorial.advance();
-      }
-    };
+    this.inventorySystem.onOpen = () => this._tips.did("inventory");
     this.skillTreeSystem    = new SkillTreeSystem(this.player, this.ui);
     this.ui.onSkillPurchase = (treeIdx, skillIdx) => this.skillTreeSystem.purchaseSkill(treeIdx, skillIdx);
     this.saveSystem.setSkillTreeSystem(this.skillTreeSystem);
@@ -1500,7 +1493,6 @@ export class Game {
     this.guardEncounterUI.setAnimator(uiAnimator);
     this.saddlebagUI.setAnimator(uiAnimator);
 
-    this._wireOnboardingTutorialUi();
 
     this._runCharacterCreation().catch((error: unknown) => {
       console.error("Character creation failed; applying defaults", error);
@@ -1696,18 +1688,14 @@ export class Game {
         this.saveSystem.markDirty();
         const frameworkItemId = this._toFrameworkInventoryItemId(id);
         if (frameworkItemId) this.frameworkRuntime.inventoryEngine.addItem(frameworkItemId, 1);
-        if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === "interact") {
-          this._onboardingTutorial.advance();
-        }
+        this._tips.did("interact");
     };
     this.dialogueSystem.onTalkStart  = (name)  => {
         this.questSystem.onTalk(name);
         this._applyFrameworkQuestEvent("talk", this._toFrameworkTargetId(name));
         // Speechcraft XP each time dialogue is initiated
         this.skillProgressionSystem.gainXP("speechcraft", 8 * this.classSystem.xpMultiplierFor("speechcraft"));
-        if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === "interact") {
-          this._onboardingTutorial.advance();
-        }
+        this._tips.did("interact");
     };
     this.dialogueSystem.onDialogueClosed = () => {
       this.barterSystem.playerGold = this._getInventoryGold();
@@ -2396,7 +2384,7 @@ export class Game {
         if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
         const crouching = this.stealthSystem.toggleCrouch();
         this.ui.showNotification(crouching ? "Sneaking..." : "Standing", 1200);
-        this._advanceOnboardingStep("sneak");
+        this._tips.did("sneak");
       }
     });
 
@@ -2635,7 +2623,7 @@ export class Game {
     // ── Skyrim/Oblivion-style action handlers ─────────────────────────────
     adapter.onAction("jump", () => {
       // Space also advances the onboarding tutorial when active
-      if (this._tryAdvanceOnboardingTutorial()) return;
+      if (this._tips.space()) return;
 
       if (this._isCombatInputBlocked() || !this.player.camera.applyGravity) return;
       if (this.player.stamina >= 10) {
@@ -2827,7 +2815,7 @@ export class Game {
     }
 
     persistSkipOnboardingTips(selection.skipGameplayTips);
-    this._startOnboardingTutorialIfNeeded();
+    this._tips.start();
     this._inCharacterCreation = false;
     this._achievements?.unlock("ACH_TAKE_UP_THE_SWORD");
 
@@ -2867,127 +2855,15 @@ export class Game {
       this.attributeSystem,
       this.skillProgressionSystem,
     );
-    this._startOnboardingTutorialIfNeeded();
+    this._tips.start();
     this._achievements?.unlock("ACH_TAKE_UP_THE_SWORD");
   }
 
-  private _wireOnboardingTutorialUi(): void {
-    this._onboardingTutorial.onStepBegin = (_index, step) => {
-      this._showOnboardingTipBanner(step.message, step.advanceHint);
-    };
-    this._onboardingTutorial.onStepComplete = () => {
-      /* next step's onStepBegin refreshes the banner */
-    };
-    this._onboardingTutorial.onTutorialComplete = () => {
-      this._removeOnboardingTipBanner();
-      persistOnboardingTipsCompleted();
-      this.ui.showNotification("Tutorial tips dismissed. Press Esc for pause anytime.", 3200);
-    };
-    this._onboardingTutorial.onTutorialSkipped = () => {
-      this._removeOnboardingTipBanner();
-    };
-  }
 
-  private _showOnboardingTipBanner(message: string, advanceHint?: string): void {
-    if (typeof document === "undefined") return;
-    this._removeOnboardingTipBanner();
-    const wrap = document.createElement("div");
-    wrap.className = "onboarding-tip";
-    wrap.setAttribute("role", "status");
-    wrap.setAttribute("aria-live", "polite");
-    const title = document.createElement("p");
-    title.className = "onboarding-tip__title";
-    title.textContent = "Getting started";
-    const msg = document.createElement("p");
-    msg.className = "onboarding-tip__msg";
-    msg.textContent = message;
-    wrap.appendChild(title);
-    wrap.appendChild(msg);
-    const hintText =
-      advanceHint?.trim() ||
-      "Press Space to continue when you are ready (or perform the highlighted action).";
-    const hint = document.createElement("p");
-    hint.className = "onboarding-tip__hint";
-    hint.textContent = hintText;
-    wrap.appendChild(hint);
-    document.body.appendChild(wrap);
-    this._onboardingTipEl = wrap;
-  }
 
-  private _removeOnboardingTipBanner(): void {
-    if (this._onboardingTipEl?.parentNode) {
-      this._onboardingTipEl.parentNode.removeChild(this._onboardingTipEl);
-    }
-    this._onboardingTipEl = null;
-  }
 
-  /** @returns true if Space was consumed to advance onboarding */
-  private _tryAdvanceOnboardingTutorial(): boolean {
-    if (!this._onboardingTutorial.isActive) return false;
-    // Space must never skip a tip while any blocking overlay owns the screen.
-    // `_isCombatInputBlocked()` covers pause, dialogue, editor, inventory, quest
-    // log, skill tree, level-up, guard encounter, spellmaking, barter, container,
-    // fast travel, stable, saddlebag, pet, pickpocket, character sheet, graphics
-    // settings, and any overlay that sets `interactionSystem.isBlocked`.
-    if (this._isCombatInputBlocked()) return false;
-    if (
-      this.ui.isAttributePanelOpen ||
-      this.ui.isWaitDialogOpen ||
-      this.alchemyUI.isVisible ||
-      this.enchantingUI.isVisible ||
-      this.craftingUI.isVisible ||
-      this.spellMakingUI.isVisible ||
-      this.editorHubUI.isVisible
-    ) {
-      return false;
-    }
-    this._onboardingTutorial.advance();
-    return true;
-  }
 
-  /**
-   * Auto-advance the onboarding tutorial when the player performs the action
-   * the active step teaches (e.g. crouching during the sneak step).
-   */
-  private _advanceOnboardingStep(stepId: string): void {
-    if (this._onboardingTutorial.isActive && this._onboardingTutorial.currentStep?.id === stepId) {
-      this._onboardingTutorial.advance();
-    }
-  }
 
-  private _startOnboardingTutorialIfNeeded(): void {
-    if (typeof document === "undefined") return;
-    if (shouldSkipOnboardingTips() || hasCompletedOnboardingTips()) return;
-
-    this._onboardingTutorial.clearSteps();
-    this._onboardingTutorial.addStep({
-      id: "move",
-      message: "Move with W A S D and look with the mouse. Click the game view if the cursor does not turn.",
-      advanceHint: "Press Space when you have tried moving.",
-    });
-    this._onboardingTutorial.addStep({
-      id: "inventory",
-      message: "Press I to open your inventory. Equip gear from there when you find items in the world.",
-      advanceHint: "Open inventory with I, or press Space to skip ahead.",
-    });
-    this._onboardingTutorial.addStep({
-      id: "interact",
-      message: "Face loot or a friendly NPC and press E to take items or start a conversation.",
-      advanceHint: "Use E on something, or press Space to continue.",
-    });
-    this._onboardingTutorial.addStep({
-      id: "sneak",
-      message: "Press C to crouch and sneak. Stay undetected and press E behind an NPC to pickpocket.",
-      advanceHint: "Try crouching with C, or press Space to continue.",
-    });
-    this._onboardingTutorial.addStep({
-      id: "quests",
-      message: "Press J to open the quest log and track objectives.",
-      advanceHint: "Open the log with J, or press Space to finish tips.",
-    });
-
-    this._onboardingTutorial.start();
-  }
 
   /**
    * Attach a persistent gear button (⚙) to the DOM that opens the graphics
@@ -4072,7 +3948,14 @@ export class Game {
         },
       });
       k.install(this._trade);
-      k.events.on("pickpocket:opened", () => this._advanceOnboardingStep("sneak"));
+      k.services.provide(OnboardingHostKey, {
+        // Space must never skip a tip while a menu, dialog or the editor is open.
+        screenFree: () => !this._isCombatInputBlocked()
+          && !this.ui.isAttributePanelOpen && !this.ui.isWaitDialogOpen
+          && !this.alchemyUI.isVisible && !this.enchantingUI.isVisible && !this.craftingUI.isVisible
+          && !this.spellMakingUI.isVisible && !this.editorHubUI.isVisible,
+      });
+      k.install(new OnboardingFeature());
       this.saveSystem.setFastTravelSystem(this._fastTravel.places);
       const record = (chunkKey: string) => this._chunks.record(chunkKey);
       k.services.provide(SiteBuilderKey, {
