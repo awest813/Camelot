@@ -419,6 +419,11 @@ state, scope and save codec.
   and give helpers.
 - `src/game/quest-bridge.ts`: quest events into the framework, its
   rewards out, and failing quests whose NPC was killed.
+- `src/game/npc-roster.ts`: one way to bring an NPC into the world (every
+  tracking system, scaling, culling, pickpocket stock) and take it out. The
+  structure spawner's removal skipped `npc:released`, so features kept
+  references to removed NPCs. The chunk path skipped the pickpocket stock,
+  which leaked.
 
   18. **Onboarding** (`src/features/onboarding/`): the five first-run tips
       as data. Each advances when the player does what it teaches (the game

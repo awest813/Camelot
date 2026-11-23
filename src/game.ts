@@ -193,6 +193,7 @@ import { HudPresenter, type HudSources } from "./ui/hud-presenter";
 import { ModalRegistry } from "./ui/modal-registry";
 import { PlayerPack } from "./game/player-pack";
 import { QuestBridge } from "./game/quest-bridge";
+import { NpcRoster } from "./game/npc-roster";
 import { QuickSlotHUD } from "./ui/quickslot-hud";
 import { PerkSystem } from "./systems/perk-system";
 import { DynamicWorldEventSystem } from "./systems/dynamic-world-event-system";
@@ -504,6 +505,20 @@ export class Game {
       item: (id) => this.frameworkRuntime.contentRegistry.getItemDefinition(id) ?? undefined,
     }),
   );
+  /** Bringing NPCs into the world and taking them out, the same way every time. */
+  private readonly _roster = new NpcRoster({
+    schedule: () => this.scheduleSystem,
+    trackers: () => [this.combatSystem, this.stealthSystem, this.crimeSystem, this.spellSystem, this.projectileSystem],
+    lod: () => this.lodSystem,
+    scale: (npc, regional) => {
+      const level = this.player.level;
+      if (!regional) { this.levelScalingSystem?.scaleNPC(npc, level); return; }
+      const p = npc.mesh.position, size = this.world.chunkSize;
+      this.levelScalingSystem?.scaleNPC(npc, level, this.world.getRegionAt(Math.floor(p.x / size), Math.floor(p.z / size))?.dangerLevel);
+    },
+    pockets: () => ({ registerNpc: (npc) => this._thief.registerNpc(npc), forget: (name) => { this.pickpocketSystem.removeNpcInventory(name); } }),
+    events: () => this.eventBus,
+  });
   /** Quest events in, framework quest rewards and failures out. */
   private readonly _quests = new QuestBridge({
     framework: () => this.frameworkRuntime,
@@ -976,23 +991,9 @@ export class Game {
       this.levelScalingSystem.scaleNPC(this.scheduleSystem.npcs[0], this.player.level);
     }
     // Scale newly spawned structure NPCs and register them for cleanup
-    this.world.structures.onNPCSpawn = (npc) => {
-      this.scheduleSystem.addNPC(npc);
-      this.levelScalingSystem.scaleNPC(npc, this.player.level);
-      this.lodSystem.register(npc.mesh, 120);
-      this._thief.registerNpc(npc);
-    };
-
-    this.world.structures.onNPCRemove = (npc) => {
-      this.scheduleSystem.removeNPC(npc);
-      this.combatSystem.removeNPC(npc);
-      this.stealthSystem.removeNPC(npc);
-      this.crimeSystem.removeNPC(npc);
-      this.spellSystem.removeNPC(npc);
-      this.projectileSystem.removeNPC(npc);
-      this.pickpocketSystem.removeNpcInventory(npc.mesh.name);
-      this.lodSystem.unregister(npc.mesh);
-    };
+    this.world.structures.onNPCSpawn = (npc) => this._roster.add(npc);
+    // The structure disposes its own NPCs.
+    this.world.structures.onNPCRemove = (npc) => this._roster.remove(npc, { dispose: false });
 
     /** Unified world-state persistence: check if an item belongs to the player or was already taken. */
     this.world.structures.onCheckLootCollected = (itemId) => {
@@ -2428,13 +2429,7 @@ export class Game {
   ): NPC | null {
       const npc = this.npcArchetypeSystem.spawnNpc(archetypeId, this.scene, new Vector3(x, 2, z));
       if (!npc) return null;
-      this.scheduleSystem.addNPC(npc);
-      const cx = Math.floor(x / this.world.chunkSize);
-      const cz = Math.floor(z / this.world.chunkSize);
-      const reg = this.world.getRegionAt(cx, cz);
-      this.levelScalingSystem?.scaleNPC(npc, this.player.level, reg?.dangerLevel);
-      this._thief.registerNpc(npc);
-      this.lodSystem.register(npc.mesh, 120);
+      this._roster.add(npc, { regional: true });
       chunkRecord.npcs.push(npc);
       return npc;
   }
@@ -2847,9 +2842,7 @@ export class Game {
         dragonNpc.lootTableId  = "boss_loot";
         // Hide the default capsule — the CDN model provides the visual
         dragonNpc.mesh.isVisible = false;
-        this.scheduleSystem.addNPC(dragonNpc);
-        const reg = this.world.getRegionAt(cx, cz);
-        this.levelScalingSystem?.scaleNPC(dragonNpc, this.player.level, reg?.dangerLevel);
+        this._roster.add(dragonNpc, { regional: true, cull: false, pockets: false });
         chunkRecord.npcs.push(dragonNpc);
         // NOTE: the capsule stays unregistered in LodSystem — visibility toggling
         // would reveal it; the CDN model root is LOD-tracked via _trackChunkProp.
@@ -2875,15 +2868,7 @@ export class Game {
 
   /** Unregister an NPC from every system and dispose it. */
   private _releaseNpc(npc: NPC): void {
-      this.scheduleSystem.removeNPC(npc);
-      this.combatSystem.removeNPC(npc);
-      this.stealthSystem.removeNPC(npc);
-      this.crimeSystem.removeNPC(npc);
-      this.spellSystem.removeNPC(npc);
-      this.projectileSystem.removeNPC(npc);
-      this.lodSystem.unregister(npc.mesh);
-      this.eventBus.emit("npc:released", { npcName: npc.mesh.name });
-      npc.mesh.dispose();
+      this._roster.remove(npc);
   }
 
   /**
