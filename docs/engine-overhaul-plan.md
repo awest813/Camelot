@@ -671,6 +671,25 @@ components.
   The combat system's state machine is the one NPC AI model. The
   behaviour-tree goal layer from the domain table gets built on that, not
   on these.
+- Removed four modules that duplicated a system the game already uses:
+  - `skeletal-animation-system` (the animation system drives rigs);
+  - `skill-tree-ui` (the UI manager owns the skill tree panel; its e2e
+    harness and its 49 specs tested only the orphan);
+  - `wait-ui` (the UI manager's wait dialog is the one in use);
+  - `tooltip-ui`, which was also the only user of `@floating-ui/dom`, so
+    that dependency is gone too.
+- Still unreachable from `src/app.ts`, but features rather than duplicates.
+  Each is kept, with its tests, until its phase wires it in or drops it:
+  - Phase 6, world: `offscreen-simulation-system` (the off-screen
+    schedules), `region-system`, `biome-system`, `encounter-system`,
+    `landmark-system`, `inn-system`, `standing-stone-system`,
+    `dungeon-generator-system`, `weather-schedule-system`;
+  - Phase 9, editor: `map-annotation-system`, `map-pack-system`,
+    `recent-projects-system`, `standalone-editor-shell`;
+  - other: `journal-system` and `journal-ui`, `camera-scripting-system`,
+    `event-script-system`, `equipment-visual-system`,
+    `quaternius-asset-manifest`, and the
+    `world/babylon-world-chunk-*` adapters.
 
 ### Phase 5 — Persistence (1–2 weeks)
 

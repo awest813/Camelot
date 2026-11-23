@@ -48,7 +48,6 @@
     "@babylonjs/loaders": "^8.52.1",
     "@babylonjs/materials": "^8.52.1",
     "@babylonjs/post-processes": "^8.52.1",
-    "@floating-ui/dom": "^1.7.6",
     "@mathigon/boost": "^1.2.37",
     "bitecs": "^0.4.0",
     "delaunator": "^5.1.0",

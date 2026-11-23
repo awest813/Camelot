@@ -1,11 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Playwright configuration for the Camelot skill-tree audit suite.
+ * Playwright configuration for the Camelot end-to-end suite.
  *
- * The test harness (`tests/e2e/harness/skill-tree-harness.html`) is served
- * by the Vite dev server so that TypeScript module imports are compiled on
- * the fly — no separate build step is required.
+ * The game is served by the Vite dev server (vite.e2e.config.ts), so
+ * TypeScript modules compile on the fly and no build step is needed.
  *
  * Run: npm run test:e2e
  */
