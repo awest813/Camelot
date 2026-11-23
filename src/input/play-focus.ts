@@ -1,14 +1,14 @@
 /**
  * Who has the player's input.  Play has it (pointer locked, mouse-look on,
  * world interaction live) unless something holds it: a menu, the pause
- * menu, the map editor, character creation, a conversation.  Holders are
+ * menu, the map editor, character creation, a conversation, lying fallen.  Holders are
  * named, so letting go of one (closing a tool) doesn't hand input back
  * while another (the editor around it) still holds it.
  *
  * The one place that locks and unlocks the pointer (engine overhaul,
  * Phase 2).
  */
-export type FocusHolder = "menu" | "pause" | "editor" | "creation" | "dialogue";
+export type FocusHolder = "menu" | "pause" | "editor" | "creation" | "dialogue" | "fallen";
 
 export interface PlayFocusDeps {
   lockPointer(): void;

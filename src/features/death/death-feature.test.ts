@@ -13,7 +13,7 @@ function setup() {
   const pos = new Vector3(100, 2, 100);
   const host = {
     health: () => health, maxHealth: () => 120, setHealth: (v: number) => { health = v; },
-    position: () => pos, flash: vi.fn(), closeScreens: vi.fn(), purgeEffects: vi.fn(), calmAttackers: vi.fn(),
+    position: () => pos, flash: vi.fn(), closeScreens: vi.fn(), purgeEffects: vi.fn(), calmAttackers: vi.fn(), fall: vi.fn(), rise: vi.fn(),
   };
   k.services.provide(DeathHostKey, host);
   k.services.provide(PurseKey, { gold: () => gold, spend: (n) => { gold -= n; return true; } });
@@ -47,6 +47,8 @@ describe("DeathFeature (headless, through the kernel)", () => {
     expect(t.notes.at(-1)).toBe("You awaken at Millbrook. (25 gold lost)");
     expect(t.host.closeScreens).toHaveBeenCalledOnce();
     expect(t.host.calmAttackers).toHaveBeenCalledOnce();
+    expect(t.host.fall).toHaveBeenCalledOnce();
+    expect(t.host.rise).toHaveBeenCalledOnce();
     // One fall, one event.
     t.step(10);
     expect(t.died).toHaveLength(1);

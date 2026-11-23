@@ -82,6 +82,8 @@ export class DialogueSystem {
    * conversation holds it instead of locking the pointer itself.
    */
   public focus: { take(holder: "dialogue"): void; give(holder: "dialogue"): void } | null = null;
+  /** False when a camera director runs the framing as one of its shots. */
+  public driveCamera = true;
   /** Optional session factory. If provided, dialogue UI is driven by framework data. */
   public dialogueSessionProvider: ((npc: NPC) => DialogueSession | null) | null = null;
 
@@ -418,7 +420,8 @@ export class DialogueSystem {
    * gone (dead, unloaded, hidden, hostile) or the player was moved away.
    */
   public update(dt: number): void {
-    this.camera.update(dt);
+    // With a camera director the framing is one of its shots (see game.ts).
+    if (this.driveCamera) this.camera.update(dt);
     const npc = this._activeNpc;
     if (!this._isInDialogue || !npc) return;
     const mesh = npc.mesh as { isDisposed?: () => boolean; isEnabled?: () => boolean; position: { x: number; z: number } };

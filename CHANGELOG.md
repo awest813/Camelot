@@ -220,6 +220,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
     setting: on the lowest setting, and in the WebGPU renderer, the effects
     pipeline is off, so the grade is applied by the materials instead.
 
+### Added
+- Falling in battle now tips the view toward the ground until you wake, and
+  holds the controls while you're down.
+
 ### Fixed
 - NPCs no longer walk through buildings: each cottage, house and inn now
   physically blocks them, and physics projectiles too. You can still walk

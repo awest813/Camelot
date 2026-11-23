@@ -207,10 +207,20 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
 
   // Death: fall at 0 health, wake a few seconds later at half health.
   await page.evaluate(() => { (window as any).__camelotGame.player.health = 0; });
+  // While down, the death shot has the camera and play has no input.
+  await expect.poll(
+    () => page.evaluate(() => { const g = (window as any).__camelotGame; return `${g._camera.current}/${g._focus.holds("fallen")}`; }),
+    { timeout: 20_000, message: "the fall takes the camera" },
+  ).toBe("death/true");
   await expect.poll(
     () => page.evaluate(() => (window as any).__camelotGame.player.health),
     { timeout: 45_000, message: "the player wakes (game-clock seconds run slow under load)" },
   ).toBeGreaterThan(0);
+  // Back on their feet: the view eases upright and input returns.
+  await expect.poll(
+    () => page.evaluate(() => { const g = (window as any).__camelotGame; return `${g._camera.current}/${g._focus.holds("fallen")}/${Math.abs(g.player.camera.rotation.z) < 0.01}`; }),
+    { timeout: 20_000, message: "getting up gives the camera back" },
+  ).toBe("gameplay/false/true");
 
   // Pickpocket picker on a peaceful NPC (they carry a coin purse); Escape closes it.
   expect(await page.evaluate(() => {

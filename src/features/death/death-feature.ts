@@ -35,6 +35,9 @@ export interface DeathHostService {
   purgeEffects(): void;
   /** Living attackers stand down. */
   calmAttackers(): void;
+  /** The player goes down (the view sags; input is held) and gets back up. */
+  fall(): void;
+  rise(): void;
 }
 
 export const DeathHostKey = createServiceKey<DeathHostService>("death-host");
@@ -57,10 +60,11 @@ export class DeathFeature implements Feature {
           wake = REVIVE_DELAY;
           ctx.kernel.events.emit("player:died", {});
           host.flash();
+          host.fall();
           s.get(FeedbackKey).notify("You have fallen...", 4000);
           return;
         }
-        if (alive) { down = false; return; } // healed in time
+        if (alive) { down = false; host.rise(); return; } // healed in time
         wake -= dt;
         if (wake > 0) return;
         down = false;
@@ -74,6 +78,7 @@ export class DeathFeature implements Feature {
     const host = s.get(DeathHostKey);
     const feedback = s.get(FeedbackKey);
     host.setHealth(Math.round(host.maxHealth() * 0.5));
+    host.rise();
     host.closeScreens();
     host.purgeEffects();
     host.calmAttackers();

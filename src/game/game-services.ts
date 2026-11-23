@@ -51,6 +51,7 @@ export interface GameInternals {
   readonly currentDialogueNpcName: Game["_currentDialogueNpcName"];
   readonly fastTravel: Game["_fastTravel"];
   readonly focus: Game["_focus"];
+  readonly deathCamera: Game["_deathCamera"];
   inCharacterCreation: Game["_inCharacterCreation"];
   readonly npcVisuals: Game["_npcVisuals"];
   readonly pack: Game["_pack"];
@@ -168,6 +169,8 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
             }
           }
         },
+        fall: () => { gi.focus.take("fallen"); gi.deathCamera.fall(); },
+        rise: () => { gi.deathCamera.rise(); gi.focus.give("fallen"); },
       });
       k.install(new DeathFeature());
       k.services.provide(ThiefHostKey, {
@@ -338,10 +341,8 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
       k.install(gi.survival);
       k.services.provide(OnboardingHostKey, {
         // Space must never skip a tip while a menu, dialog or the editor is open.
-        screenFree: () => !gi.isCombatInputBlocked()
-          && !game.ui.isAttributePanelOpen && !game.ui.isWaitDialogOpen
-          && !game.alchemyUI.isVisible && !game.enchantingUI.isVisible && !game.craftingUI.isVisible
-          && !game.spellMakingUI.isVisible && !game.editorHubUI.isVisible,
+        // Every panel is in the modal registry, which the input block asks.
+        screenFree: () => !gi.isCombatInputBlocked(),
       });
       k.install(new OnboardingFeature());
       game.saveSystem.setFastTravelSystem(gi.fastTravel.places);

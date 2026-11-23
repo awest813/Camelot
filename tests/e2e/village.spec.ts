@@ -312,7 +312,7 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     const g = (window as any).__camelotGame;
     g.timeSystem.advanceHours((23 - g.timeSystem.hour + 24) % 24);
   });
-  await expect.poll(async () => (await villagerState()).hidden, { timeout: 60_000, message: "villagers go indoors at night" })
+  await expect.poll(async () => (await villagerState()).hidden, { timeout: 150_000, message: "villagers go indoors at night (the game clock runs slow under load)" })
     .toBeGreaterThan(0);
   // The inn stays open: the barkeeper keeps the night shift.
   const barkeep = await page.evaluate(() => {

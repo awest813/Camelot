@@ -546,6 +546,19 @@ setters instead of owning a save codec. That moves to the entity store
   `_EDITOR_ADAPTER_KEYS` and the legacy keyboard branches (Tab is now the
   `toggleCharacterSheet` binding, ignoring auto-repeat). The game's
   keyboard observable is a dozen lines.
+- The last hand-kept modal lists (the HUD's crosshair check and the
+  onboarding "is the screen free?") ask the modal registry.
+- Camera stack (`src/rendering/camera-director.ts`): the player's own view
+  unless a shot runs. The dialogue framing is one shot. The new death fall
+  is another (the view sags and rolls while down, and eases back on
+  waking; it outranks dialogue). Falling also takes a `fallen` focus hold,
+  so mouse-look can't fight it. Cinematics slot in as further shots.
+
+**Phase 2 exit check:** pointer lock is only in the focus wiring (enforced
+by guardrail). No feature listens to raw `keydown`. The remaining
+`keydown` listeners are panels' own keyboard handling inside their dialogs,
+and app-level shortcuts in `app.ts`. They are ported with the panels to
+Preact in Phase 8. The Preact modal stack itself is still to do.
 
 ### Phase 3 — Entity model for actors (3–4 weeks)
 

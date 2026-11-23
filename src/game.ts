@@ -179,6 +179,7 @@ import { QuestBridge } from "./game/quest-bridge";
 import { NpcRoster } from "./game/npc-roster";
 import { CombatControls } from "./game/combat-controls";
 import { PlayFocus } from "./input/play-focus";
+import { CameraDirector, DeathCamera } from "./rendering/camera-director";
 import { installGameFeatures } from "./game/game-services";
 import { weaponArchetypeOf } from "./game/weapon-archetype";
 import { QuickSlotHUD } from "./ui/quickslot-hud";
@@ -542,6 +543,9 @@ export class Game {
     detachCamera: () => this.player.camera.detachControl(),
     setInteractionBlocked: (b) => { if (this.interactionSystem) this.interactionSystem.isBlocked = b; },
   });
+  /** The camera stack: the player's view unless a shot (dialogue framing, the death fall) runs. */
+  private readonly _camera = new CameraDirector();
+  private readonly _deathCamera = new DeathCamera(() => this.player?.camera ?? null);
   /** Panels that take over the screen (Escape, pause, input blocking). */
   private readonly _modals = new ModalRegistry();
   /** Bars, clock, compass, readouts and the debug overlay. */
@@ -724,6 +728,11 @@ export class Game {
     this.interactionSystem  = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem, this.ui);
     this.interactionSystem.cellManager = this.cellManager;
     this.dialogueSystem.focus = this._focus;
+    // The camera stack runs the dialogue framing (and outranks it with the death fall).
+    this.dialogueSystem.driveCamera = false;
+    const framing = this.dialogueSystem.camera;
+    this._camera.add({ id: "dialogue", get active() { return framing.phase !== "idle"; }, update: (dt) => framing.update(dt) });
+    this._camera.add(this._deathCamera);
     this.inventorySystem.focus = this._focus;
     this.inventorySystem.onOpen = () => this._tips.did("inventory");
     this.skillTreeSystem    = new SkillTreeSystem(this.player, this.ui);
@@ -2013,6 +2022,7 @@ export class Game {
       // Conversation framing (turn to the speaker, zoom in / back out), and
       // ending it if the speaker is gone or the player was moved away.
       this.dialogueSystem.update(frameDelta);
+      this._camera.update(frameDelta);
 
       if (this._viewModel) {
         this._viewModel.setVisible(
@@ -2048,12 +2058,8 @@ export class Game {
         characterLevel: () => this.playerLevelSystem.characterLevel,
         inventoryOpen: () => this.inventorySystem.isOpen,
         talking: () => this.dialogueSystem.isInDialogue,
-        overlayOpen: () =>
-          this._barterUI.isVisible || this._containerUI.isVisible || this.levelUpUI.isVisible ||
-          this.guardEncounterUI.isVisible || this.spellMakingUI.isVisible || this.fastTravelUI.isVisible ||
-          this.stableUI.isVisible || this.saddlebagUI.isVisible || this.petUI.isVisible ||
-          this.followerUI.isVisible || this.pickpocketUI.isVisible || this.craftingUI.isVisible ||
-          this.jobs.window.isVisible || this.graphicsSettingsUI.isVisible || !!this._creditsUI?.isVisible,
+        // Any registered panel, plus the two that Escape can't close.
+        overlayOpen: () => this._modals.anyOpen() || this.levelUpUI.isVisible || this.guardEncounterUI.isVisible,
         cellName: () => this.cellManager.currentCell?.name ?? "exterior",
         weatherLabel: () => this.weatherSystem.label,
         lodCulled: () => this._lastLodCulled,
@@ -2202,6 +2208,7 @@ export class Game {
       get currentDialogueNpcName() { return self._currentDialogueNpcName; },
       get fastTravel() { return self._fastTravel; },
       get focus() { return self._focus; },
+      get deathCamera() { return self._deathCamera; },
       get inCharacterCreation() { return self._inCharacterCreation; },
       set inCharacterCreation(v) { self._inCharacterCreation = v; },
       get npcVisuals() { return self._npcVisuals; },
