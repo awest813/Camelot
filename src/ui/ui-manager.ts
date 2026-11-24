@@ -20,6 +20,7 @@ import { AttributePanelView } from "./attribute-panel";
 import { QuestLogView } from "./quest-log-panel";
 import { PauseMenuView, type PauseActions } from "./pause-menu";
 import { SkillTreeView } from "./skill-tree-panel";
+import { InventoryPanelView } from "./inventory-panel";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -89,13 +90,18 @@ export class UIManager {
   public staminaBar: Rectangle;
 
   // Inventory
-  public inventoryPanel: Rectangle;
-  public inventoryGrid: Grid;
-  public inventoryDescription: TextBlock;
-  public statsText: TextBlock;
+  /** The inventory (a Preact panel; see inventory-panel.tsx), drawn from the state below. */
+  private readonly _inventory = new InventoryPanelView(() => ({
+    items: this._inventoryItems,
+    equippedIds: this._equippedIds,
+    stats: this._lastStatsText ?? "Stats:\nHP: --\nMP: --\nSP: --",
+    equipment: this._equipmentLines,
+    isConsumable: (item) => !!this.isConsumableItem?.(item),
+    detail: (item) => this.itemDetailSuffix?.(item) ?? "",
+  }));
+  private _inventoryItems: Item[] = [];
+  private _equipmentLines: string[] = ["Main Hand", "Off Hand", "Head", "Chest", "Legs", "Feet"].map((slot) => `${slot}: --`);
   private _lastStatsText: string | null = null;
-  public equipmentText: TextBlock;
-  private _inventoryMainGrid: Grid | null = null;
 
   private _equippedIds: Set<string> = new Set();
 
@@ -232,7 +238,7 @@ export class UIManager {
    * closes it through its modal registry, which also gives control back.
    * Without a handler the panel just closes.
    */
-  public onPanelClosed: ((id: "wait" | "attributes" | "quest-log" | "skill-tree") => void) | null = null;
+  public onPanelClosed: ((id: "wait" | "attributes" | "quest-log" | "skill-tree" | "inventory") => void) | null = null;
   /** Called with the chosen hour count when the player confirms the wait. */
   public onWaitConfirm: ((hours: number) => void) | null = null;
 
@@ -244,7 +250,6 @@ export class UIManager {
   constructor(scene: Scene) {
     this.scene = scene;
     this._initUI();
-    this._initInventoryUI();
     this._initDebugOverlay();
     this._initStealthHUD();
     this._initClockHUD();
@@ -259,7 +264,6 @@ export class UIManager {
 
     if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
       window.addEventListener("resize", () => {
-        if (this.inventoryPanel?.isVisible) this._adaptInventoryLayout();
       });
     }
 
@@ -473,141 +477,6 @@ export class UIManager {
     return this._transitionOverlay !== null && this._transitionOverlay.isVisible && this._transitionOverlay.alpha > 0.001;
   }
 
-  private _initInventoryUI(): void {
-    this.inventoryPanel = new Rectangle();
-    this.inventoryPanel.width = "620px";
-    this.inventoryPanel.height = "620px";
-    this.inventoryPanel.cornerRadius = 8;
-    this.inventoryPanel.color = T.PANEL_BORDER;
-    this.inventoryPanel.thickness = 2;
-    this.inventoryPanel.background = T.PANEL_BG;
-    this.inventoryPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
-    this.inventoryPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
-    this.inventoryPanel.left = "-20px";
-    this.inventoryPanel.isVisible = false;
-    this._ui.addControl(this.inventoryPanel);
-
-    // Title bar
-    const titleBar = new Rectangle();
-    titleBar.width = "100%";
-    titleBar.height = "44px";
-    titleBar.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    titleBar.thickness = 0;
-    titleBar.background = "rgba(30, 20, 0, 0.60)";
-    titleBar.cornerRadius = 8;
-    this.inventoryPanel.addControl(titleBar);
-
-    const title = new TextBlock();
-    title.text = "✦  INVENTORY  [I]  ✦";
-    title.color = T.TITLE;
-    title.fontSize = 19;
-    title.fontWeight = "bold";
-    titleBar.addControl(title);
-
-    // Separator
-    const sep = new Rectangle();
-    sep.width = "96%";
-    sep.height = "1px";
-    sep.background = T.PANEL_BORDER;
-    sep.thickness = 0;
-    sep.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    sep.top = "44px";
-    this.inventoryPanel.addControl(sep);
-
-    // Main Grid: 60% items | 40% details
-    const mainGrid = new Grid();
-    mainGrid.width = "580px";
-    mainGrid.height = "550px";
-    mainGrid.top = "50px";
-    mainGrid.addColumnDefinition(0.6);
-    mainGrid.addColumnDefinition(0.4);
-    this.inventoryPanel.addControl(mainGrid);
-    this._inventoryMainGrid = mainGrid;
-
-    // Inventory Grid (Left)
-    this.inventoryGrid = new Grid();
-    this.inventoryGrid.width = "100%";
-    this.inventoryGrid.height = "100%";
-    for (let i = 0; i < 6; i++) this.inventoryGrid.addRowDefinition(1);
-    for (let i = 0; i < 4; i++) this.inventoryGrid.addColumnDefinition(1);
-    mainGrid.addControl(this.inventoryGrid, 0, 0);
-
-    // Right panel
-    const rightPanel = new StackPanel();
-    rightPanel.width = "100%";
-    rightPanel.height = "100%";
-    mainGrid.addControl(rightPanel, 0, 1);
-
-    // Description box
-    const descContainer = new Rectangle();
-    descContainer.width = "100%";
-    descContainer.height = "155px";
-    descContainer.color = T.PANEL_BORDER;
-    descContainer.thickness = 1;
-    descContainer.background = "rgba(20, 12, 2, 0.80)";
-    descContainer.cornerRadius = 4;
-    rightPanel.addControl(descContainer);
-
-    this.inventoryDescription = new TextBlock();
-    this.inventoryDescription.text = "";
-    this.inventoryDescription.color = T.TEXT;
-    this.inventoryDescription.fontSize = 13;
-    this.inventoryDescription.textWrapping = true;
-    this.inventoryDescription.paddingLeft = "8px";
-    this.inventoryDescription.paddingRight = "8px";
-    this.inventoryDescription.paddingTop = "8px";
-    this.inventoryDescription.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    descContainer.addControl(this.inventoryDescription);
-
-    // Stats box
-    const statsContainer = new Rectangle();
-    statsContainer.width = "100%";
-    statsContainer.height = "155px";
-    statsContainer.color = T.PANEL_BORDER;
-    statsContainer.thickness = 1;
-    statsContainer.background = "rgba(20, 12, 2, 0.80)";
-    statsContainer.cornerRadius = 4;
-    statsContainer.top = "8px";
-    rightPanel.addControl(statsContainer);
-
-    this.statsText = new TextBlock();
-    this.statsText.text = "Stats:\nHP: --\nMP: --\nSP: --";
-    this.statsText.color = T.TEXT;
-    this.statsText.fontSize = 13;
-    this.statsText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    this.statsText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this.statsText.paddingTop = "10px";
-    this.statsText.paddingLeft = "12px";
-    statsContainer.addControl(this.statsText);
-
-    // Equipment box
-    const equipContainer = new Rectangle();
-    equipContainer.width = "100%";
-    equipContainer.height = "218px";
-    equipContainer.color = T.EQUIP_BORDER;
-    equipContainer.thickness = 1;
-    equipContainer.background = "rgba(22, 14, 0, 0.90)";
-    equipContainer.cornerRadius = 4;
-    equipContainer.top = "16px";
-    rightPanel.addControl(equipContainer);
-
-    this.equipmentText = new TextBlock();
-    this.equipmentText.text = "Equipment:\nMain Hand: --\nOff Hand: --\nHead: --\nChest: --\nLegs: --\nFeet: --";
-    this.equipmentText.color = T.TITLE;
-    this.equipmentText.fontSize = 12;
-    this.equipmentText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    this.equipmentText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this.equipmentText.paddingTop = "10px";
-    this.equipmentText.paddingLeft = "12px";
-    equipContainer.addControl(this.equipmentText);
-  }
-
-
-
-
-
-  // ── Public methods ────────────────────────────────────────────────────────────
-
   public toggleSkillTree(visible: boolean): void {
     this.isSkillTreeOpen = visible;
     if (visible) {
@@ -713,39 +582,18 @@ export class UIManager {
     return { width, height };
   }
 
-  private _adaptInventoryLayout(): void {
-    if (!this.inventoryPanel) return;
-    const vp = this._getViewportSize();
-    const invW = Math.min(620, Math.max(320, vp.width - 24));
-    const invH = Math.min(620, Math.max(380, vp.height - 24));
-    this.inventoryPanel.width = `${invW}px`;
-    this.inventoryPanel.height = `${invH}px`;
-    if (this._inventoryMainGrid) {
-      this._inventoryMainGrid.width = `${Math.max(280, invW - 40)}px`;
-      this._inventoryMainGrid.height = `${Math.max(300, invH - 70)}px`;
-    }
-    if (vp.width < 720) {
-      this.inventoryPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-      this.inventoryPanel.left = "0px";
-    } else {
-      this.inventoryPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
-      this.inventoryPanel.left = "-20px";
-    }
-  }
-
-
-
-
-
   public toggleInventory(visible: boolean): void {
-    const wasOpen = this.inventoryPanel.isVisible;
-    if (visible) this._adaptInventoryLayout();
-    this.inventoryPanel.isVisible = visible;
-    this._syncCrosshairVisibility();
-    if (!visible) {
-      this.inventoryDescription.text = "";
-      if (wasOpen) this.onInventoryClosed?.();
+    const wasOpen = this._inventory.isOpen;
+    if (visible) {
+      this._inventory.open({
+        onItem: (item) => this.onInventoryItemClick?.(item),
+        onClose: () => this._closedByPlayer("inventory", () => this.toggleInventory(false)),
+      });
+    } else {
+      this._inventory.close();
     }
+    this._syncCrosshairVisibility();
+    if (!visible && wasOpen) this.onInventoryClosed?.();
   }
 
   public togglePauseMenu(visible: boolean): void {
@@ -769,14 +617,14 @@ export class UIManager {
   }
 
   /** A panel closed from inside: the game's registry closes it, else `fallback`. */
-  private _closedByPlayer(id: "wait" | "attributes" | "quest-log" | "skill-tree", fallback: () => void): void {
+  private _closedByPlayer(id: "wait" | "attributes" | "quest-log" | "skill-tree" | "inventory", fallback: () => void): void {
     if (this.onPanelClosed) this.onPanelClosed(id);
     else fallback();
   }
 
   private _syncCrosshairVisibility(): void {
     const hasBlockingPanelOpen =
-      this.inventoryPanel.isVisible ||
+      this._inventory.isOpen ||
       this.isPauseMenuOpen ||
       this.isQuestLogOpen ||
       this.isSkillTreeOpen ||
@@ -820,7 +668,7 @@ export class UIManager {
       `HP: ${Math.floor(player.health)} / ${player.maxHealth}\nMP: ${Math.floor(player.magicka)} / ${player.maxMagicka}\nSP: ${Math.floor(player.stamina)} / ${player.maxStamina}\nDMG Bonus: +${player.bonusDamage}\nArmor: ${player.bonusArmor}`;
     if (this._lastStatsText === text) return;
     this._lastStatsText = text;
-    this.statsText.text = text;
+    this._inventory.render();
   }
 
   public setEquippedIds(ids: Set<string>): void {
@@ -828,119 +676,8 @@ export class UIManager {
   }
 
   public updateInventory(items: Item[]): void {
-    while (this.inventoryGrid.children.length > 0) {
-      this.inventoryGrid.children[0].dispose();
-    }
-
-    items.forEach((item, index) => {
-      if (index >= 20) return;
-
-      const row = Math.floor(index / 4);
-      const col = index % 4;
-      const isEquipped = this._equippedIds.has(item.id);
-
-      const slot = new Rectangle();
-      slot.width = "82px";
-      slot.height = "82px";
-      slot.cornerRadius = 5;
-      slot.color = isEquipped ? T.EQUIP_BORDER : T.PANEL_BORDER;
-      slot.thickness = isEquipped ? 2 : 1;
-      slot.background = isEquipped ? T.EQUIP_BG : T.SLOT_BG;
-      slot.isPointerBlocker = true;
-      slot.hoverCursor = "pointer";
-
-      slot.isFocusInvisible = false;
-      slot.tabIndex = 0;
-      slot.accessibilityTag = { description: item.name };
-
-      const baseColor  = isEquipped ? T.EQUIP_BG  : T.SLOT_BG;
-      const hoverColor = isEquipped ? "rgba(60, 44, 0, 0.95)" : T.SLOT_HOVER;
-
-      let isFocused = false;
-      const useHint = (): string => {
-        if (this.isConsumableItem?.(item)) return "\n[Click to Use]";
-        if (item.slot) {
-          const equipped = this._equippedIds.has(item.id);
-          return equipped ? "\n[Click to Unequip]" : "\n[Click to Equip]";
-        }
-        return "";
-      };
-
-      const setHoverState = () => {
-        const equipped = this._equippedIds.has(item.id);
-        const hint = useHint();
-        this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}${this.itemDetailSuffix?.(item) ?? ""}${hint}`;
-        slot.background = hoverColor;
-        if (slot.thickness !== 3) slot.thickness = equipped ? 2 : 1;
-      };
-      const setFocusState = () => {
-        isFocused = true;
-        const equipped = this._equippedIds.has(item.id);
-        const hint = useHint();
-        this.inventoryDescription.text = `${item.name}\n${item.description}\nQty: ${item.quantity}${this.itemDetailSuffix?.(item) ?? ""}${hint}`;
-        slot.background = hoverColor;
-        slot.thickness = 3; // Distinct visual indicator for keyboard focus
-      };
-      const setNormalState = () => {
-        if (!isFocused) {
-          this.inventoryDescription.text = "";
-        }
-        slot.background = baseColor;
-        if (!isFocused) {
-          const equipped = this._equippedIds.has(item.id);
-          slot.thickness = equipped ? 2 : 1;
-        }
-      };
-      const setBlurState = () => {
-        isFocused = false;
-        setNormalState();
-      };
-
-      slot.onPointerEnterObservable.add(setHoverState);
-      slot.onPointerOutObservable.add(setNormalState);
-      slot.onFocusObservable.add(setFocusState);
-      slot.onBlurObservable.add(setBlurState);
-
-      const triggerItem = () => {
-        if (this.onInventoryItemClick) {
-          this.onInventoryItemClick(item);
-        }
-      };
-
-      const clickable = Boolean(this.isConsumableItem?.(item) || item.slot);
-      if (clickable) {
-        slot.onPointerUpObservable.add(triggerItem);
-        slot.onKeyboardEventProcessedObservable.add((evt) => {
-          if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
-            triggerItem();
-          }
-        });
-      }
-
-      const icon = getItemIcon(item);
-      const text = new TextBlock();
-      text.text = `${icon} ${item.name}` + (item.quantity > 1 ? ` (${item.quantity})` : "");
-      text.color = isEquipped ? T.TITLE : T.TEXT;
-      text.fontSize = 11;
-      text.textWrapping = true;
-      slot.addControl(text);
-
-      this.inventoryGrid.addControl(slot, row, col);
-    });
-
-    for (let index = Math.min(items.length, 20); index < 20; index++) {
-      const row = Math.floor(index / 4);
-      const col = index % 4;
-
-      const emptySlot = new Rectangle();
-      emptySlot.width = "82px";
-      emptySlot.height = "82px";
-      emptySlot.cornerRadius = 5;
-      emptySlot.color = "rgba(107, 79, 18, 0.25)";
-      emptySlot.thickness = 1;
-      emptySlot.background = "rgba(16, 12, 4, 0.35)";
-      this.inventoryGrid.addControl(emptySlot, row, col);
-    }
+    this._inventoryItems = items;
+    this._inventory.render();
   }
 
   public updateEquipment(slots: Map<EquipSlot, import("../systems/inventory-system").Item>): void {
@@ -952,12 +689,8 @@ export class UIManager {
       { key: "legs",     label: "Legs"      },
       { key: "feet",     label: "Feet"      },
     ];
-    const lines = ["Equipment:"];
-    for (const { key, label } of slotLabels) {
-      const item = slots.get(key);
-      lines.push(`${label}: ${item ? item.name : "--"}`);
-    }
-    this.equipmentText.text = lines.join("\n");
+    this._equipmentLines = slotLabels.map(({ key, label }) => `${label}: ${slots.get(key)?.name ?? "--"}`);
+    this._inventory.render();
   }
 
   public setInteractionText(text: string): void {

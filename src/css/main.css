@@ -6430,3 +6430,26 @@ button.craft-panel__row:focus-visible,
 .skill-tree__rank { margin: 0; font-size: 12px; color: var(--panel-title); }
 .skill-tree__desc { margin: 0; font-size: 11px; color: var(--panel-dim); }
 .skill-tree__skill .craft-panel__btn { align-self: flex-start; }
+
+/* Inventory (Phase 8). */
+.inventory__panel { width: min(720px, calc(100vw - 32px)); }
+.inventory__layout { display: grid; grid-template-columns: 3fr 2fr; gap: 12px; }
+@media (max-width: 640px) { .inventory__layout { grid-template-columns: 1fr; } }
+.inventory__grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.inventory__slot {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  width: 100%; min-height: 58px; padding: 4px; box-sizing: border-box;
+  border: 1px solid var(--panel-border); border-radius: 6px;
+  background: rgba(22, 16, 6, 0.88); color: var(--panel-text); font: inherit; font-size: 12px; cursor: pointer;
+}
+.inventory__slot:hover, .inventory__slot:focus-visible { background: rgba(52, 38, 10, 0.92); outline: 2px solid var(--panel-border-strong); outline-offset: 1px; }
+.inventory__slot[aria-disabled="true"] { cursor: default; }
+.inventory__slot.is-equipped { border: 2px solid var(--panel-title); background: rgba(44, 30, 4, 0.88); }
+.inventory__slot.is-empty { cursor: default; opacity: 0.35; }
+.inventory__side { display: flex; flex-direction: column; gap: 10px; color: var(--panel-text); font-size: 13px; }
+.inventory__detail { min-height: 110px; border: 1px solid var(--panel-border); border-radius: 8px; padding: 8px; background: var(--panel-section-bg); }
+.inventory__detail p { margin: 2px 0; }
+.inventory__detail-name { margin: 0 0 4px; font-size: 14px; color: var(--panel-title); }
+.inventory__hint { color: var(--panel-good); }
+.inventory__stats { margin: 0; font: inherit; white-space: pre-wrap; color: var(--panel-text); }
+.inventory__equipment ul { list-style: none; margin: 0; padding: 0; color: var(--panel-dim); }

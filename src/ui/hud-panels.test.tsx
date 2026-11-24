@@ -99,3 +99,35 @@ describe("SkillTreeView", () => {
     expect(document.querySelector(".craft-panel__subtitle")!.textContent).toBe("Skill Points: 0");
   });
 });
+
+describe("InventoryPanelView", () => {
+  it("shows twenty slots, marks equipped items, describes the hovered item, and clicks only usable ones", async () => {
+    const { InventoryPanelView } = await import("./inventory-panel");
+    const items = [
+      { id: "sword", name: "Iron Sword", description: "Sharp.", stackable: false, quantity: 1, slot: "mainHand" },
+      { id: "potion", name: "Potion", description: "Heals.", stackable: true, quantity: 3 },
+      { id: "rock", name: "Rock", description: "A rock.", stackable: true, quantity: 1 },
+    ] as never[];
+    const clicked: string[] = [];
+    const view = new InventoryPanelView(() => ({
+      items, equippedIds: new Set(["sword"]), stats: "Stats:\nHP: 10 / 10", equipment: ["Main Hand: Iron Sword"],
+      isConsumable: (i) => (i as { id: string }).id === "potion", detail: () => "",
+    }));
+    view.open({ onItem: (i) => clicked.push((i as { id: string }).id), onClose: () => {} });
+    expect(document.querySelectorAll(".inventory__grid li")).toHaveLength(20);
+    const slots = Array.from(document.querySelectorAll<HTMLButtonElement>("button.inventory__slot"));
+    expect(slots.map((b) => b.textContent?.replace(/^\S+ /, ""))).toEqual(["Iron Sword", "Potion (3)", "Rock"]);
+    expect(slots[0].classList.contains("is-equipped")).toBe(true);
+    slots[0].dispatchEvent(new FocusEvent("focus"));
+    await Promise.resolve();
+    slots[0].focus();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.querySelector(".inventory__hint")?.textContent).toBe("[Click to Unequip]");
+    for (const b of slots) b.click();
+    expect(clicked, "the rock does nothing").toEqual(["sword", "potion"]);
+    expect(document.querySelector(".inventory__stats")!.textContent).toBe("Stats:\nHP: 10 / 10");
+    expect(view.isOpen).toBe(true);
+    view.close();
+    expect(view.isOpen).toBe(false);
+  });
+});

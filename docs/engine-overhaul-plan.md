@@ -1090,6 +1090,14 @@ from a CDN at runtime.
   tree, with each skill's stars, description and one button (Upgrade,
   🔒 Locked, Need Points or ✦ Mastered, disabled unless it can be bought).
   The ✕ and Escape close it through `onPanelClosed("skill-tree")`.
+- The inventory is Preact (`inventory-panel.tsx`): the 4×5 grid with
+  equipped items marked, the hovered or focused item's details and
+  click hint, the stats, and the equipment. Only usable or equippable
+  items react to clicks. Items, equipped ids, stats and equipment are
+  plain state in `UIManager`, and the view redraws from it. Five public
+  GUI fields are gone (`inventoryPanel`, `inventoryGrid`,
+  `inventoryDescription`, `statsText`, `equipmentText`). `ui-manager.ts`
+  is down to about 1,400 lines from 2,400.
 - Babylon GUI files: 12 → 10 (the `babylon-gui-files` ratchet). Remaining:
   `ui-manager.ts` (the HUD, inventory, pause, quest log, skill tree, wait
   and attribute panels), the dialogue system, the seven map-editor
