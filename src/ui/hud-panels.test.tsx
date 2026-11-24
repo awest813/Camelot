@@ -79,3 +79,23 @@ describe("QuestLogView", () => {
     expect(close).toHaveBeenCalledOnce();
   });
 });
+
+describe("SkillTreeView", () => {
+  it("shows ranks and the right action per skill: upgrade, locked, need points, mastered", async () => {
+    const { SkillTreeView } = await import("./skill-tree-panel");
+    const skill = (id: string, rank: number, max: number) => ({ id, name: id, description: `${id} desc`, currentRank: rank, maxRank: max, effect: () => {} });
+    const trees = [{ name: "Combat", skills: [skill("Blade", 1, 3), skill("Riposte", 0, 1), skill("Mastery", 2, 2)] }];
+    const bought: number[][] = [];
+    const view = new SkillTreeView();
+    view.open({ onBuy: (t, s) => bought.push([t, s]), onClose: () => {} });
+    view.refresh({ trees, skillPoints: 1, prereqMet: (_t, s) => s !== 1 });
+    const buttons = () => Array.from(document.querySelectorAll<HTMLButtonElement>(".skill-tree__skill button")).map((b) => [b.textContent, b.disabled]);
+    expect(buttons()).toEqual([["Upgrade", false], ["🔒 Locked", true], ["✦ Mastered", true]]);
+    expect(document.querySelector(".skill-tree__rank")!.textContent).toBe("★☆☆  (1/3)");
+    byLabel("Upgrade Blade").click();
+    expect(bought).toEqual([[0, 0]]);
+    view.refresh({ trees, skillPoints: 0, prereqMet: () => true });
+    expect(buttons()[0]).toEqual(["Need Points", true]);
+    expect(document.querySelector(".craft-panel__subtitle")!.textContent).toBe("Skill Points: 0");
+  });
+});

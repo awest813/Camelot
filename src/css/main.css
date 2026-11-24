@@ -6418,3 +6418,15 @@ button.craft-panel__row:focus-visible,
 .pause-menu__subtitle { margin: -2px 0 14px; color: var(--panel-dim); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
 .pause-menu__items { display: flex; flex-direction: column; gap: 8px; }
 .pause-menu__item { width: 100%; padding: 9px 12px; font-size: 14px; }
+
+/* Skill trees (Phase 8). */
+.skill-tree__panel { width: min(900px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 32px)); overflow-y: auto; }
+.skill-tree__columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.skill-tree__column { max-height: none; }
+.skill-tree__skill { border: 1px solid var(--panel-border); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 3px; }
+.skill-tree__skill--max { border-color: rgba(94, 196, 94, 0.5); }
+.skill-tree__skill--locked { opacity: 0.7; }
+.skill-tree__name { margin: 0; font-size: 13px; color: var(--panel-text); }
+.skill-tree__rank { margin: 0; font-size: 12px; color: var(--panel-title); }
+.skill-tree__desc { margin: 0; font-size: 11px; color: var(--panel-dim); }
+.skill-tree__skill .craft-panel__btn { align-self: flex-start; }

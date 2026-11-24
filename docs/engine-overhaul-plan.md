@@ -1086,6 +1086,10 @@ from a CDN at runtime.
   public Babylon `Button` fields wired one by one. Escape inside the menu
   resumes, like the Escape that opened it, and so do Resume and a click
   outside. Boot-smoke covers pausing and resuming both ways.
+- The skill trees are Preact (`skill-tree-panel.tsx`): one column per
+  tree, with each skill's stars, description and one button (Upgrade,
+  🔒 Locked, Need Points or ✦ Mastered, disabled unless it can be bought).
+  The ✕ and Escape close it through `onPanelClosed("skill-tree")`.
 - Babylon GUI files: 12 → 10 (the `babylon-gui-files` ratchet). Remaining:
   `ui-manager.ts` (the HUD, inventory, pause, quest log, skill tree, wait
   and attribute panels), the dialogue system, the seven map-editor

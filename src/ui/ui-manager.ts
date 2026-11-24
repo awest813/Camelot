@@ -19,6 +19,7 @@ import { WaitDialogPanel } from "./wait-dialog";
 import { AttributePanelView } from "./attribute-panel";
 import { QuestLogView } from "./quest-log-panel";
 import { PauseMenuView, type PauseActions } from "./pause-menu";
+import { SkillTreeView } from "./skill-tree-panel";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -188,9 +189,9 @@ export class UIManager {
   private _transitionFadeObserver: any = null;
 
   // Skill Tree
-  public skillTreePanel: Rectangle;
-  private _skillPointsLabel: TextBlock;
-  private _skillTreeContent: StackPanel;
+  /** The skill trees (a Preact panel; see skill-tree-panel.tsx). */
+  private readonly _skillTree = new SkillTreeView();
+  public isSkillTreeOpen = false;
 
   /** Called when the player clicks a skill upgrade button. Set by Game. */
   public onSkillPurchase: ((treeIndex: number, skillIndex: number) => void) | null = null;
@@ -226,12 +227,12 @@ export class UIManager {
   private readonly _waitDialog = new WaitDialogPanel();
   public isWaitDialogOpen: boolean = false;
   /**
-   * The player closed one of these panels from inside it ("wait",
-   * "attributes", "quest-log": its ✕, Escape, Cancel or Wait).  The game
+   * The player closed one of these panels from inside it (its ✕, Escape,
+   * Cancel or Wait).  The game
    * closes it through its modal registry, which also gives control back.
    * Without a handler the panel just closes.
    */
-  public onPanelClosed: ((id: "wait" | "attributes" | "quest-log") => void) | null = null;
+  public onPanelClosed: ((id: "wait" | "attributes" | "quest-log" | "skill-tree") => void) | null = null;
   /** Called with the chosen hour count when the player confirms the wait. */
   public onWaitConfirm: ((hours: number) => void) | null = null;
 
@@ -244,7 +245,6 @@ export class UIManager {
     this.scene = scene;
     this._initUI();
     this._initInventoryUI();
-    this._initSkillTreeUI();
     this._initDebugOverlay();
     this._initStealthHUD();
     this._initClockHUD();
@@ -260,7 +260,6 @@ export class UIManager {
     if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
       window.addEventListener("resize", () => {
         if (this.inventoryPanel?.isVisible) this._adaptInventoryLayout();
-        if (this.skillTreePanel?.isVisible) this._adaptSkillTreeLayout();
       });
     }
 
@@ -605,230 +604,33 @@ export class UIManager {
 
 
 
-  private _initSkillTreeUI(): void {
-    this.skillTreePanel = new Rectangle();
-    this.skillTreePanel.width = "780px";
-    this.skillTreePanel.height = "560px";
-    this.skillTreePanel.cornerRadius = 8;
-    this.skillTreePanel.color = T.PANEL_BORDER;
-    this.skillTreePanel.thickness = 2;
-    this.skillTreePanel.background = T.PANEL_BG;
-    this.skillTreePanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    this.skillTreePanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
-    this.skillTreePanel.zIndex = 10;
-    this.skillTreePanel.isVisible = false;
-    this._ui.addControl(this.skillTreePanel);
 
-    // Title bar
-    const titleBar = new Rectangle();
-    titleBar.width = "100%";
-    titleBar.height = "42px";
-    titleBar.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    titleBar.thickness = 0;
-    titleBar.background = "rgba(30, 20, 0, 0.60)";
-    titleBar.cornerRadius = 8;
-    this.skillTreePanel.addControl(titleBar);
-
-    const title = new TextBlock();
-    title.text = "✦  SKILL TREE  [K]";
-    title.color = T.TITLE;
-    title.fontSize = 17;
-    title.fontWeight = "bold";
-    titleBar.addControl(title);
-
-    const sep = new Rectangle();
-    sep.width = "96%";
-    sep.height = "1px";
-    sep.background = T.PANEL_BORDER;
-    sep.thickness = 0;
-    sep.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    sep.top = "42px";
-    this.skillTreePanel.addControl(sep);
-
-    this._skillPointsLabel = new TextBlock();
-    this._skillPointsLabel.text = "Skill Points: 0";
-    this._skillPointsLabel.color = T.GOOD;
-    this._skillPointsLabel.fontSize = 14;
-    this._skillPointsLabel.height = "30px";
-    this._skillPointsLabel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this._skillPointsLabel.top = "48px";
-    this.skillTreePanel.addControl(this._skillPointsLabel);
-
-    this._skillTreeContent = new StackPanel();
-    this._skillTreeContent.isVertical = false;
-    this._skillTreeContent.width = "756px";
-    this._skillTreeContent.height = "462px";
-    this._skillTreeContent.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this._skillTreeContent.top = "84px";
-    this.skillTreePanel.addControl(this._skillTreeContent);
-  }
 
   // ── Public methods ────────────────────────────────────────────────────────────
 
   public toggleSkillTree(visible: boolean): void {
-    if (visible) this._adaptSkillTreeLayout();
-    this.skillTreePanel.isVisible = visible;
+    this.isSkillTreeOpen = visible;
+    if (visible) {
+      this._skillTree.open({
+        onBuy: (t, sk) => this.onSkillPurchase?.(t, sk),
+        onClose: () => this._closedByPlayer("skill-tree", () => this.toggleSkillTree(false)),
+      });
+    } else {
+      this._skillTree.close();
+    }
     this._syncCrosshairVisibility();
   }
 
   /**
-   * Re-render the skill tree panel.
-   * @param trees            Skill tree data (ranks, names, prerequisites).
-   * @param skillPoints      Unspent skill points.
-   * @param prereqMet        Optional predicate consulted per skill — return
-   *   false to render the skill as locked ("🔒 Locked" instead of a clickable
-   *   upgrade button).  The game passes
-   *   `SkillTreeSystem.arePrerequisitesMet` here.
+   * Show the skill trees: ranks, unspent points, and (via `prereqMet`)
+   * which skills are still locked behind their prerequisites.
    */
   public refreshSkillTree(
     trees: SkillTree[],
     skillPoints: number,
     prereqMet?: (treeIndex: number, skillIndex: number) => boolean,
   ): void {
-    this._skillPointsLabel.text = `Skill Points: ${skillPoints}`;
-
-    while (this._skillTreeContent.children.length > 0) {
-      this._skillTreeContent.children[0].dispose();
-    }
-
-    trees.forEach((tree, treeIdx) => {
-      const col = new StackPanel();
-      col.isVertical = true;
-      col.width = "252px";
-      col.height = "100%";
-      col.paddingLeft = "8px";
-      col.paddingRight = "8px";
-
-      // Column header
-      const headerBg = new Rectangle();
-      headerBg.width = "100%";
-      headerBg.height = "34px";
-      headerBg.cornerRadius = 5;
-      headerBg.background = "rgba(50, 36, 0, 0.85)";
-      headerBg.thickness = 1;
-      headerBg.color = T.PANEL_BORDER;
-      col.addControl(headerBg);
-
-      const header = new TextBlock();
-      header.text = tree.name.toUpperCase();
-      header.color = T.TITLE;
-      header.fontSize = 14;
-      header.fontWeight = "bold";
-      headerBg.addControl(header);
-
-      tree.skills.forEach((skill, skillIdx) => {
-        const isMax  = skill.currentRank >= skill.maxRank;
-        const isLocked = !isMax && prereqMet ? !prereqMet(treeIdx, skillIdx) : false;
-        const canBuy = !isMax && !isLocked && skillPoints > 0;
-
-        const card = new Rectangle();
-        card.width = "236px";
-        card.height = "132px";
-        card.cornerRadius = 6;
-        card.color = isMax ? "#3a6a3a" : T.PANEL_BORDER;
-        card.thickness = 1;
-        card.background = isMax ? "rgba(10, 28, 10, 0.88)" : "rgba(16, 10, 2, 0.92)";
-        card.paddingTop = "6px";
-        col.addControl(card);
-
-        const inner = new StackPanel();
-        inner.isVertical = true;
-        inner.width = "100%";
-        card.addControl(inner);
-
-        const nameText = new TextBlock();
-        nameText.text = skill.name;
-        nameText.color = isMax ? T.GOOD : T.TEXT;
-        nameText.fontSize = 13;
-        nameText.fontWeight = "bold";
-        nameText.height = "24px";
-        inner.addControl(nameText);
-
-        const stars = "★".repeat(skill.currentRank) + "☆".repeat(skill.maxRank - skill.currentRank);
-        const rankText = new TextBlock();
-        rankText.text = `${stars}  (${skill.currentRank}/${skill.maxRank})`;
-        rankText.color = T.TITLE;
-        rankText.fontSize = 12;
-        rankText.height = "20px";
-        inner.addControl(rankText);
-
-        const descText = new TextBlock();
-        descText.text = skill.description;
-        descText.color = T.DIM;
-        descText.fontSize = 11;
-        descText.height = "22px";
-        descText.textWrapping = true;
-        inner.addControl(descText);
-
-        const buyLabel = isMax ? "✦ MASTERED" : (isLocked ? "🔒 Locked" : (canBuy ? "[+] Upgrade" : "Need Points"));
-        const buyBtn = Button.CreateSimpleButton(`skill_${treeIdx}_${skillIdx}`, buyLabel);
-        buyBtn.width = "90%";
-        buyBtn.height = "30px";
-        buyBtn.color = isMax ? T.GOOD : (canBuy ? T.TITLE : T.DIM);
-        buyBtn.background = isMax ? "rgba(10,40,10,0.65)" : (canBuy ? "rgba(60,40,0,0.85)" : "rgba(18,12,2,0.55)");
-        buyBtn.cornerRadius = 4;
-        buyBtn.thickness = 1;
-        buyBtn.fontSize = 12;
-        buyBtn.hoverCursor = canBuy ? "pointer" : "default";
-
-        buyBtn.isFocusInvisible = false;
-        buyBtn.tabIndex = 0;
-        buyBtn.accessibilityTag = {
-          description: isMax
-            ? `${skill.name} Mastered`
-            : (isLocked ? `${skill.name} Locked — prerequisites not met` : (canBuy ? `Upgrade ${skill.name}` : `Need Points for ${skill.name}`))
-        };
-
-        const defaultBg = isMax ? "rgba(10,40,10,0.65)" : (canBuy ? "rgba(60,40,0,0.85)" : "rgba(18,12,2,0.55)");
-        const focusBg   = isMax ? "rgba(20,60,20,0.85)" : (canBuy ? "rgba(100,70,0,0.95)" : "rgba(30,20,10,0.75)");
-
-        let isFocused = false;
-        const setHoverState = () => {
-          buyBtn.background = focusBg;
-          buyBtn.color = T.TEXT;
-          if (buyBtn.thickness !== 2) buyBtn.thickness = 1;
-        };
-        const setFocusState = () => {
-          isFocused = true;
-          buyBtn.background = focusBg;
-          buyBtn.color = T.TEXT;
-          buyBtn.thickness = 2;
-        };
-        const setNormalState = () => {
-          buyBtn.background = defaultBg;
-          buyBtn.color = isMax ? T.GOOD : (canBuy ? T.TITLE : T.DIM);
-          if (!isFocused) {
-            buyBtn.thickness = 1;
-          }
-        };
-        const setBlurState = () => {
-          isFocused = false;
-          setNormalState();
-        };
-
-        buyBtn.onPointerEnterObservable.add(setHoverState);
-        buyBtn.onPointerOutObservable.add(setNormalState);
-        buyBtn.onFocusObservable.add(setFocusState);
-        buyBtn.onBlurObservable.add(setBlurState);
-
-        if (canBuy) {
-          const triggerPurchase = () => {
-            if (this.onSkillPurchase) this.onSkillPurchase(treeIdx, skillIdx);
-          };
-
-          buyBtn.onPointerUpObservable.add(triggerPurchase);
-          buyBtn.onKeyboardEventProcessedObservable.add((evt) => {
-            if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
-              triggerPurchase();
-            }
-          });
-        }
-
-        inner.addControl(buyBtn);
-      });
-
-      this._skillTreeContent.addControl(col);
-    });
+    this._skillTree.refresh({ trees, skillPoints, prereqMet });
   }
 
   private _createButton(text: string, parent: StackPanel): Button {
@@ -933,18 +735,7 @@ export class UIManager {
 
 
 
-  private _adaptSkillTreeLayout(): void {
-    if (!this.skillTreePanel) return;
-    const vp = this._getViewportSize();
-    const sW = Math.min(780, Math.max(320, vp.width - 24));
-    const sH = Math.min(560, Math.max(360, vp.height - 24));
-    this.skillTreePanel.width = `${sW}px`;
-    this.skillTreePanel.height = `${sH}px`;
-    if (this._skillTreeContent) {
-      this._skillTreeContent.width = `${Math.max(280, sW - 24)}px`;
-      this._skillTreeContent.height = `${Math.max(260, sH - 98)}px`;
-    }
-  }
+
 
   public toggleInventory(visible: boolean): void {
     const wasOpen = this.inventoryPanel.isVisible;
@@ -978,7 +769,7 @@ export class UIManager {
   }
 
   /** A panel closed from inside: the game's registry closes it, else `fallback`. */
-  private _closedByPlayer(id: "wait" | "attributes" | "quest-log", fallback: () => void): void {
+  private _closedByPlayer(id: "wait" | "attributes" | "quest-log" | "skill-tree", fallback: () => void): void {
     if (this.onPanelClosed) this.onPanelClosed(id);
     else fallback();
   }
@@ -988,7 +779,7 @@ export class UIManager {
       this.inventoryPanel.isVisible ||
       this.isPauseMenuOpen ||
       this.isQuestLogOpen ||
-      this.skillTreePanel.isVisible ||
+      this.isSkillTreeOpen ||
       this.isAttributePanelOpen ||
       this.isWaitDialogOpen ||
       this._characterSheetOpen ||
