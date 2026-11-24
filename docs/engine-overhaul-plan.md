@@ -1079,8 +1079,8 @@ from a CDN at runtime.
   `UIManager.onPanelClosed(id)`, and the game closes it through its modal
   registry, which also gives control back. That replaces
   `onWaitDialogClosed` and `onAttributePanelClosed` (callback-properties
-  61 → 60). The quest log had no such hook, so closing it from inside left
-  the game's state stale.
+  61 → 60). The quest log's new ✕ and Escape use the same path. (The old
+  quest log could only be closed with J.)
 - Babylon GUI files: 12 → 10 (the `babylon-gui-files` ratchet). Remaining:
   `ui-manager.ts` (the HUD, inventory, pause, quest log, skill tree, wait
   and attribute panels), the dialogue system, the seven map-editor
