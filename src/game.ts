@@ -941,10 +941,8 @@ export class Game {
         this.saveSystem.markDirty();
       }
     };
-    // Wait-dialog buttons close the panel themselves — restore input like Escape does.
-    this.ui.onWaitDialogClosed = () => this._restoreGameplayInput();
-    // Attribute panel ✕ button closes without going through a game toggle.
-    this.ui.onAttributePanelClosed = () => this._restoreGameplayInput();
+    // Panels the player closes from inside go through the modal registry.
+    this.ui.onPanelClosed = (id) => this._modals.close(id);
 
     // ── v8 system wiring (Oblivion depth: skill progression, fast travel, level scaling) ──
     this.skillProgressionSystem = new SkillProgressionSystem();

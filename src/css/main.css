@@ -6385,3 +6385,29 @@ button.craft-panel__row:focus-visible,
 @media (max-width: 760px) {
   .craft-panel__columns--three { grid-template-columns: 1fr; }
 }
+
+/* Wait dialog (Phase 8). */
+.wait-dialog__panel { width: min(420px, calc(100vw - 32px)); }
+.wait-dialog__selector { display: flex; align-items: center; gap: 10px; }
+.wait-dialog__range { flex: 1; accent-color: #d69c49; }
+.wait-dialog__hours { min-width: 3.5em; text-align: right; color: var(--panel-title); font-weight: 700; font-size: 18px; }
+
+/* Attributes panel (Phase 8). */
+.attribute-panel__panel { width: min(480px, calc(100vw - 32px)); }
+.attribute-panel__table { width: 100%; border-collapse: collapse; color: var(--panel-text); font-size: 14px; }
+.attribute-panel__table th { text-align: left; font-weight: 600; padding: 4px 6px; }
+.attribute-panel__table td { padding: 4px 6px; }
+.attribute-panel__value { color: var(--panel-title); font-weight: 700; text-align: right; width: 3em; }
+.attribute-panel__hint { color: var(--panel-dim); font-size: 12px; }
+
+/* Quest log (Phase 8). */
+.quest-log__panel { width: min(420px, calc(100vw - 32px)); max-height: min(560px, calc(100vh - 32px)); overflow-y: auto; }
+.quest-log__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.quest-log__quest { border-bottom: 1px solid var(--panel-border); padding-bottom: 8px; }
+.quest-log__name { margin: 0 0 4px; font-size: 15px; color: var(--panel-title); }
+.quest-log__quest--done .quest-log__name { color: var(--panel-dim); }
+.quest-log__quest--failed .quest-log__name { color: var(--status-error); }
+.quest-log__objectives { list-style: none; margin: 0; padding-left: 14px; color: var(--panel-text); font-size: 13px; }
+.quest-log__objectives .is-done { color: var(--panel-dim); }
+.quest-log__reward { margin: 4px 0 0 14px; color: var(--panel-dim); font-size: 12px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

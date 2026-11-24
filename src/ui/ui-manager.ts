@@ -15,6 +15,9 @@ import { Player } from "../entities/player";
 import type { SkillTree } from "../systems/skill-tree-system";
 import { AttributeSystem, ATTRIBUTE_NAMES, type AttributeName } from "../systems/attribute-system";
 import { keepGuiAtCssResolution } from "./gui-resolution";
+import { WaitDialogPanel } from "./wait-dialog";
+import { AttributePanelView } from "./attribute-panel";
+import { QuestLogView } from "./quest-log-panel";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -143,8 +146,9 @@ export class UIManager {
   private _crosshairArms: Rectangle[] = [];
 
   // Quest Log
-  public questLogPanel: Rectangle;
-  public questLogContent: StackPanel;
+  /** The quest log (a Preact panel; see quest-log-panel.tsx). */
+  private readonly _questLog = new QuestLogView();
+  public isQuestLogOpen = false;
 
   // XP Bar
   public xpBar: Rectangle;
@@ -215,23 +219,24 @@ export class UIManager {
   private _lastCombatStateVisible: boolean | null = null;
 
   // ── Attribute Panel ───────────────────────────────────────────────────────
-  public attributePanel: Rectangle | null = null;
-  private _attributePanelContent: StackPanel | null = null;
-  private _attributePendingLabel: TextBlock | null = null;
+  /** The Attributes panel (a Preact panel; see attribute-panel.tsx). */
+  private readonly _attributePanel = new AttributePanelView();
   public isAttributePanelOpen: boolean = false;
 
   /** Called when the player clicks a "+1" attribute button.  Set by Game. */
   public onAttributeSpend: ((name: AttributeName) => void) | null = null;
 
   // ── Wait Dialog ───────────────────────────────────────────────────────────
-  private _waitPanel: Rectangle | null = null;
-  private _waitHoursLabel: TextBlock | null = null;
-  private _waitHoursValue: number = 8;
+  /** The Wait dialog (a Preact panel; see wait-dialog.tsx). */
+  private readonly _waitDialog = new WaitDialogPanel();
   public isWaitDialogOpen: boolean = false;
-  /** Fired when the wait dialog closes via its own buttons (Wait/Cancel) so the game layer can restore input. */
-  public onWaitDialogClosed: (() => void) | null = null;
-  /** Fired when the attribute panel closes via its own ✕ button so the game layer can restore input. */
-  public onAttributePanelClosed: (() => void) | null = null;
+  /**
+   * The player closed one of these panels from inside it ("wait",
+   * "attributes", "quest-log": its ✕, Escape, Cancel or Wait).  The game
+   * closes it through its modal registry, which also gives control back.
+   * Without a handler the panel just closes.
+   */
+  public onPanelClosed: ((id: "wait" | "attributes" | "quest-log") => void) | null = null;
   /** Called with the chosen hour count when the player confirms the wait. */
   public onWaitConfirm: ((hours: number) => void) | null = null;
 
@@ -245,13 +250,10 @@ export class UIManager {
     this._initUI();
     this._initInventoryUI();
     this._initPauseMenu();
-    this._initQuestLogUI();
     this._initSkillTreeUI();
     this._initDebugOverlay();
     this._initStealthHUD();
     this._initClockHUD();
-    this._initAttributePanel();
-    this._initWaitDialog();
     this._initCompassHUD();
   }
 
@@ -265,7 +267,6 @@ export class UIManager {
       window.addEventListener("resize", () => {
         if (this.inventoryPanel?.isVisible) this._adaptInventoryLayout();
         if (this.pausePanel?.isVisible) this._adaptPauseLayout();
-        if (this.questLogPanel?.isVisible) this._adaptQuestLogLayout();
         if (this.skillTreePanel?.isVisible) this._adaptSkillTreeLayout();
       });
     }
@@ -672,55 +673,6 @@ export class UIManager {
     this.quitButton     = this._createButton("Quit to Menu",  panel);
   }
 
-  private _initQuestLogUI(): void {
-    this.questLogPanel = new Rectangle();
-    this.questLogPanel.width = "380px";
-    this.questLogPanel.height = "500px";
-    this.questLogPanel.cornerRadius = 8;
-    this.questLogPanel.color = T.PANEL_BORDER;
-    this.questLogPanel.thickness = 2;
-    this.questLogPanel.background = T.PANEL_BG;
-    this.questLogPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    this.questLogPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
-    this.questLogPanel.left = "20px";
-    this.questLogPanel.zIndex = 10;
-    this.questLogPanel.isVisible = false;
-    this._ui.addControl(this.questLogPanel);
-
-    // Title bar
-    const titleBar = new Rectangle();
-    titleBar.width = "100%";
-    titleBar.height = "42px";
-    titleBar.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    titleBar.thickness = 0;
-    titleBar.background = "rgba(30, 20, 0, 0.60)";
-    titleBar.cornerRadius = 8;
-    this.questLogPanel.addControl(titleBar);
-
-    const title = new TextBlock();
-    title.text = "✦  QUEST LOG  [J]";
-    title.color = T.TITLE;
-    title.fontSize = 17;
-    title.fontWeight = "bold";
-    titleBar.addControl(title);
-
-    const sep = new Rectangle();
-    sep.width = "96%";
-    sep.height = "1px";
-    sep.background = T.PANEL_BORDER;
-    sep.thickness = 0;
-    sep.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    sep.top = "42px";
-    this.questLogPanel.addControl(sep);
-
-    this.questLogContent = new StackPanel();
-    this.questLogContent.width = "360px";
-    this.questLogContent.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this.questLogContent.top = "52px";
-    this.questLogContent.isVertical = true;
-    this.questLogPanel.addControl(this.questLogContent);
-  }
-
   private _initSkillTreeUI(): void {
     this.skillTreePanel = new Rectangle();
     this.skillTreePanel.width = "780px";
@@ -1054,25 +1006,6 @@ export class UIManager {
     this._pauseCard.height = `${Math.min(680, Math.max(420, vp.height - 24))}px`;
   }
 
-  private _adaptQuestLogLayout(): void {
-    if (!this.questLogPanel) return;
-    const vp = this._getViewportSize();
-    const qW = Math.min(380, Math.max(280, vp.width - 24));
-    const qH = Math.min(500, Math.max(320, vp.height - 24));
-    this.questLogPanel.width = `${qW}px`;
-    this.questLogPanel.height = `${qH}px`;
-    if (this.questLogContent) {
-      this.questLogContent.width = `${Math.max(260, qW - 20)}px`;
-    }
-    if (vp.width < 640) {
-      this.questLogPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-      this.questLogPanel.left = "0px";
-    } else {
-      this.questLogPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-      this.questLogPanel.left = "20px";
-    }
-  }
-
   private _adaptSkillTreeLayout(): void {
     if (!this.skillTreePanel) return;
     const vp = this._getViewportSize();
@@ -1111,18 +1044,25 @@ export class UIManager {
   }
 
   public toggleQuestLog(visible: boolean): void {
-    if (visible) this._adaptQuestLogLayout();
-    this.questLogPanel.isVisible = visible;
+    this.isQuestLogOpen = visible;
+    if (visible) this._questLog.open(() => this._closedByPlayer("quest-log", () => this.toggleQuestLog(false)));
+    else this._questLog.close();
     this._syncCrosshairVisibility();
+  }
+
+  /** A panel closed from inside: the game's registry closes it, else `fallback`. */
+  private _closedByPlayer(id: "wait" | "attributes" | "quest-log", fallback: () => void): void {
+    if (this.onPanelClosed) this.onPanelClosed(id);
+    else fallback();
   }
 
   private _syncCrosshairVisibility(): void {
     const hasBlockingPanelOpen =
       this.inventoryPanel.isVisible ||
       this.pausePanel.isVisible ||
-      this.questLogPanel.isVisible ||
+      this.isQuestLogOpen ||
       this.skillTreePanel.isVisible ||
-      !!this.attributePanel?.isVisible ||
+      this.isAttributePanelOpen ||
       this.isWaitDialogOpen ||
       this._characterSheetOpen ||
       this._htmlOverlayCount > 0 ||
@@ -1138,72 +1078,7 @@ export class UIManager {
   }
 
   public updateQuestLog(quests: Quest[]): void {
-    while (this.questLogContent.children.length > 0) {
-      this.questLogContent.children[0].dispose();
-    }
-
-    const active = quests.filter(q => q.isActive && !q.isCompleted && !q.isFailed);
-    const failed = quests.filter(q => q.isFailed);
-    const done   = quests.filter(q => q.isCompleted && !q.isFailed);
-
-    const addEntry = (quest: Quest): void => {
-      const header = new TextBlock();
-      header.text = (quest.isCompleted ? "✓ " : quest.isFailed ? "✕ " : "◆ ") + quest.name;
-      header.color = quest.isCompleted ? T.DIM : quest.isFailed ? T.HP_FILL : T.TITLE;
-      header.fontSize = 14;
-      header.fontWeight = "bold";
-      header.height = "26px";
-      header.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-      header.paddingLeft = "12px";
-      header.paddingTop = "4px";
-      this.questLogContent.addControl(header);
-
-      for (const obj of quest.objectives) {
-        const objText = new TextBlock();
-        const check = obj.completed ? "✓" : "○";
-        objText.text = `    ${check} ${obj.description} (${obj.current}/${obj.required})`;
-        objText.color = obj.completed ? T.DIM : T.TEXT;
-        objText.fontSize = 12;
-        objText.height = "20px";
-        objText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-        objText.paddingLeft = "12px";
-        this.questLogContent.addControl(objText);
-      }
-
-      if (quest.reward) {
-        const rewardText = new TextBlock();
-        rewardText.text = `    Reward: ${quest.reward}`;
-        rewardText.color = T.GOOD;
-        rewardText.fontSize = 11;
-        rewardText.height = "18px";
-        rewardText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-        rewardText.paddingLeft = "12px";
-        this.questLogContent.addControl(rewardText);
-      }
-
-      // Subtle divider between quest entries
-      const questSep = new Rectangle();
-      questSep.width = "88%";
-      questSep.height = "1px";
-      questSep.background = "rgba(107, 79, 18, 0.35)";
-      questSep.thickness = 0;
-      questSep.paddingTop = "4px";
-      this.questLogContent.addControl(questSep);
-    };
-
-    for (const q of active) addEntry(q);
-    for (const q of failed) addEntry(q);
-    for (const q of done)   addEntry(q);
-
-    if (active.length === 0 && failed.length === 0 && done.length === 0) {
-      const empty = new TextBlock();
-      empty.text = "No quests yet.";
-      empty.color = T.DIM;
-      empty.fontSize = 13;
-      empty.height = "30px";
-      empty.paddingLeft = "12px";
-      this.questLogContent.addControl(empty);
-    }
+    this._questLog.update(quests);
   }
 
   public toggleCrosshair(visible: boolean): void {
@@ -1970,225 +1845,24 @@ export class UIManager {
 
   // ── Attribute Panel ───────────────────────────────────────────────────────
 
-  private _initAttributePanel(): void {
-    const panel = new Rectangle("attributePanel");
-    panel.width = "420px";
-    panel.height = "520px";
-    panel.cornerRadius = 8;
-    panel.color = T.PANEL_BORDER;
-    panel.thickness = 2;
-    panel.background = T.PANEL_BG;
-    panel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    panel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
-    panel.zIndex = 12;
-    panel.isVisible = false;
-    this._ui.addControl(panel);
-    this.attributePanel = panel;
-
-    // Title
-    const title = new TextBlock("attrTitle");
-    title.text = "Attributes";
-    title.color = T.TITLE;
-    title.fontSize = 22;
-    title.fontWeight = "bold";
-    title.height = "40px";
-    title.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    title.top = "14px";
-    panel.addControl(title);
-
-    // Pending points label
-    const pending = new TextBlock("attrPending");
-    pending.text = "Points available: 0";
-    pending.color = T.GOOD;
-    pending.fontSize = 14;
-    pending.height = "22px";
-    pending.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    pending.top = "54px";
-    panel.addControl(pending);
-    this._attributePendingLabel = pending;
-
-    // Separator
-    const sep = new Rectangle("attrSep");
-    sep.width = "380px";
-    sep.height = "1px";
-    sep.background = T.PANEL_BORDER;
-    sep.thickness = 0;
-    sep.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    sep.top = "82px";
-    panel.addControl(sep);
-
-    // Scrollable content
-    const content = new StackPanel("attrContent");
-    content.isVertical = true;
-    content.width = "390px";
-    content.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    content.top = "92px";
-    panel.addControl(content);
-    this._attributePanelContent = content;
-
-    // Close button
-    const closeBtn = Button.CreateSimpleButton("attrClose", "Close [U]");
-    closeBtn.width = "120px";
-    closeBtn.height = "32px";
-    closeBtn.color = T.TEXT;
-    closeBtn.background = T.BTN_BG;
-    closeBtn.cornerRadius = 4;
-    closeBtn.fontSize = 13;
-    closeBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-    closeBtn.top = "-14px";
-    closeBtn.onPointerUpObservable.add(() => {
-      this.toggleAttributePanel(false);
-      this.onAttributePanelClosed?.();
-    });
-    this._applyA11y(closeBtn, "Close Attribute Panel");
-    panel.addControl(closeBtn);
-  }
-
   public toggleAttributePanel(visible: boolean): void {
-    if (!this.attributePanel) return;
     this.isAttributePanelOpen = visible;
-    this.attributePanel.isVisible = visible;
+    if (visible) {
+      this._attributePanel.open({
+        onSpend: (name) => this.onAttributeSpend?.(name),
+        onClose: () => this._closedByPlayer("attributes", () => this.toggleAttributePanel(false)),
+      });
+    } else {
+      this._attributePanel.close();
+    }
     this._syncCrosshairVisibility();
   }
 
-  /**
-   * Refresh the attribute panel contents with current values and pending points.
-   */
+  /** Show the current attribute values and pending points. */
   public refreshAttributePanel(attributes: AttributeSystem): void {
-    if (!this._attributePanelContent || !this._attributePendingLabel) return;
-
-    this._attributePendingLabel.text = `Points available: ${attributes.pendingPoints}`;
-
-    // Clear existing rows
-    while (this._attributePanelContent.children.length > 0) {
-      this._attributePanelContent.children[0].dispose();
-    }
-
-    const ATTR_DISPLAY_NAMES: Record<AttributeName, string> = {
-      strength:     "Strength",
-      endurance:    "Endurance",
-      intelligence: "Intelligence",
-      agility:      "Agility",
-      willpower:    "Willpower",
-      speed:        "Speed",
-      luck:         "Luck",
-    };
-
-    for (const name of ATTRIBUTE_NAMES) {
-      const row = new StackPanel(`attrRow_${name}`);
-      row.isVertical = false;
-      row.width = "390px";
-      row.height = "46px";
-      row.paddingTop = "4px";
-      row.paddingBottom = "4px";
-      this._attributePanelContent.addControl(row);
-
-      // Attribute name label
-      const nameLabel = new TextBlock(`attrName_${name}`);
-      nameLabel.text = ATTR_DISPLAY_NAMES[name];
-      nameLabel.color = T.TEXT;
-      nameLabel.fontSize = 14;
-      nameLabel.width = "130px";
-      nameLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-      nameLabel.paddingLeft = "8px";
-      row.addControl(nameLabel);
-
-      // Current value
-      const valueLabel = new TextBlock(`attrValue_${name}`);
-      valueLabel.text = String(attributes.get(name));
-      valueLabel.color = T.TITLE;
-      valueLabel.fontSize = 16;
-      valueLabel.fontWeight = "bold";
-      valueLabel.width = "50px";
-      valueLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-      row.addControl(valueLabel);
-
-      // Derived stat hint
-      const hint = this._getAttributeHint(name, attributes);
-      const hintLabel = new TextBlock(`attrHint_${name}`);
-      hintLabel.text = hint;
-      hintLabel.color = T.DIM;
-      hintLabel.fontSize = 12;
-      hintLabel.width = "160px";
-      hintLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-      row.addControl(hintLabel);
-
-      // Spend button
-      const spendBtn = Button.CreateSimpleButton(`attrSpend_${name}`, "+1");
-      spendBtn.width = "40px";
-      spendBtn.height = "28px";
-
-      const canSpend = attributes.pendingPoints > 0;
-      spendBtn.color = canSpend ? T.GOOD : T.DIM;
-      spendBtn.background = T.BTN_BG;
-      spendBtn.cornerRadius = 4;
-      spendBtn.fontSize = 13;
-      spendBtn.isEnabled = canSpend;
-      // Disabled GUI buttons paint disabledColor (#9a9a9a) instead of background.
-      spendBtn.disabledColor = T.BTN_BG;
-      spendBtn.disabledColorItem = T.DIM;
-      spendBtn.isFocusInvisible = false;
-      spendBtn.tabIndex = 0;
-      spendBtn.accessibilityTag = {
-        description: canSpend ? `Increase ${ATTR_DISPLAY_NAMES[name]}` : `Need points to increase ${ATTR_DISPLAY_NAMES[name]}`
-      };
-
-      let isFocused = false;
-      const setHoverState = () => {
-        spendBtn.background = T.BTN_HOVER;
-        spendBtn.color = T.TEXT;
-        if (spendBtn.thickness !== 2) spendBtn.thickness = 1;
-      };
-      const setFocusState = () => {
-        isFocused = true;
-        spendBtn.background = T.BTN_HOVER;
-        spendBtn.color = T.TEXT;
-        spendBtn.thickness = 2; // Distinct visual indicator for keyboard focus
-      };
-      const setNormalState = () => {
-        spendBtn.background = T.BTN_BG;
-        spendBtn.color = canSpend ? T.GOOD : T.DIM;
-        // Do not reset focus style if the button is still actively focused
-        if (!isFocused) {
-          spendBtn.thickness = 1;
-        }
-      };
-      const setBlurState = () => { isFocused = false; setNormalState(); };
-
-      spendBtn.onPointerEnterObservable.add(setHoverState);
-      spendBtn.onPointerOutObservable.add(setNormalState);
-      spendBtn.onFocusObservable.add(setFocusState);
-      spendBtn.onBlurObservable.add(setBlurState);
-
-      // In Babylon.js GUI, buttons need to manually notify pointer up for keyboard interaction.
-      spendBtn.onKeyboardEventProcessedObservable.add((evt) => {
-        if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
-          spendBtn.onPointerUpObservable.notifyObservers(null as any);
-        }
-      });
-
-      spendBtn.onPointerUpObservable.add(() => {
-        if (canSpend) {
-          this.onAttributeSpend?.(name);
-        }
-      });
-
-      row.addControl(spendBtn);
-    }
+    this._attributePanel.refresh(attributes);
   }
 
-  private _getAttributeHint(name: AttributeName, attrs: AttributeSystem): string {
-    switch (name) {
-      case "strength":     return `Dmg +${attrs.meleeDamageBonus.toFixed(1)}`;
-      case "endurance":    return `HP max ${attrs.maxHealth}`;
-      case "intelligence": return `MP max ${attrs.maxMagicka.toFixed(0)}`;
-      case "agility":      return `Speed ×${attrs.speedMultiplier.toFixed(2)}`;
-      case "willpower":    return `MP max ${attrs.maxMagicka.toFixed(0)}`;
-      case "speed":        return `Speed ×${attrs.speedMultiplier.toFixed(2)}`;
-      case "luck":         return `Crit ${(attrs.critChance * 100).toFixed(1)}%`;
-      default:             return "";
-    }
-  }
 
   // ── Wait Dialog ───────────────────────────────────────────────────────────
 
@@ -2208,142 +1882,22 @@ export class UIManager {
     });
   }
 
-  private _initWaitDialog(): void {
-    const panel = new Rectangle("waitPanel");
-    panel.width  = "340px";
-    panel.height = "260px";
-    panel.cornerRadius = 8;
-    panel.color = T.PANEL_BORDER;
-    panel.thickness = 2;
-    panel.background = T.PANEL_BG;
-    panel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    panel.verticalAlignment   = Control.VERTICAL_ALIGNMENT_CENTER;
-    panel.zIndex = 15;
-    panel.isVisible = false;
-    this._ui.addControl(panel);
-    this._waitPanel = panel;
-
-    // Title
-    const title = new TextBlock("waitTitle");
-    title.text   = "Wait";
-    title.color  = T.TITLE;
-    title.fontSize = 20;
-    title.fontWeight = "bold";
-    title.height = "36px";
-    title.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    title.top    = "14px";
-    panel.addControl(title);
-
-    // Subtitle
-    const sub = new TextBlock("waitSub");
-    sub.text   = "How many hours do you wish to wait?";
-    sub.color  = T.DIM;
-    sub.fontSize = 13;
-    sub.height = "24px";
-    sub.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    sub.top    = "50px";
-    panel.addControl(sub);
-
-    // Hour selector row
-    const selectorRow = new StackPanel("waitSelectorRow");
-    selectorRow.isVertical = false;
-    selectorRow.width  = "300px";
-    selectorRow.height = "50px";
-    selectorRow.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    selectorRow.top    = "86px";
-    selectorRow.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    panel.addControl(selectorRow);
-
-    const btnMinus = Button.CreateSimpleButton("waitMinus", "◀");
-    btnMinus.width  = "44px";
-    btnMinus.height = "44px";
-    btnMinus.color  = T.TEXT;
-    btnMinus.background = T.BTN_BG;
-    btnMinus.cornerRadius = 6;
-    btnMinus.fontSize = 18;
-
-    this._applyA11y(btnMinus, "Decrease wait time");
-    selectorRow.addControl(btnMinus);
-
-    const hoursLabel = new TextBlock("waitHours");
-    hoursLabel.text  = `${this._waitHoursValue} h`;
-    hoursLabel.color = T.TITLE;
-    hoursLabel.fontSize = 24;
-    hoursLabel.fontWeight = "bold";
-    hoursLabel.width = "110px";
-    hoursLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    selectorRow.addControl(hoursLabel);
-    this._waitHoursLabel = hoursLabel;
-
-    const btnPlus = Button.CreateSimpleButton("waitPlus", "▶");
-    btnPlus.width  = "44px";
-    btnPlus.height = "44px";
-    btnPlus.color  = T.TEXT;
-    btnPlus.background = T.BTN_BG;
-    btnPlus.cornerRadius = 6;
-    btnPlus.fontSize = 18;
-
-    this._applyA11y(btnPlus, "Increase wait time");
-    selectorRow.addControl(btnPlus);
-
-    // Hook: change hour value
-    const clamp = (v: number) => Math.max(1, Math.min(24, v));
-    const refresh = () => {
-      if (this._waitHoursLabel) this._waitHoursLabel.text = `${this._waitHoursValue} h`;
-    };
-    btnMinus.onPointerUpObservable.add(() => { this._waitHoursValue = clamp(this._waitHoursValue - 1); refresh(); });
-    btnPlus.onPointerUpObservable.add(()  => { this._waitHoursValue = clamp(this._waitHoursValue + 1); refresh(); });
-
-    // Confirm / Cancel buttons
-    const btnRow = new StackPanel("waitBtnRow");
-    btnRow.isVertical = false;
-    btnRow.width  = "300px";
-    btnRow.height = "44px";
-    btnRow.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-    btnRow.top    = "-20px";
-    btnRow.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    panel.addControl(btnRow);
-
-    const waitBtn = Button.CreateSimpleButton("waitConfirm", "Wait");
-    waitBtn.width  = "130px";
-    waitBtn.height = "38px";
-    waitBtn.color  = T.GOOD;
-    waitBtn.background = T.BTN_BG;
-    waitBtn.cornerRadius = 4;
-    waitBtn.fontSize = 14;
-    waitBtn.paddingRight = "8px";
-    waitBtn.onPointerUpObservable.add(() => {
-      this.onWaitConfirm?.(this._waitHoursValue);
-      this.toggleWaitDialog(false);
-      this.onWaitDialogClosed?.();
-    });
-
-    this._applyA11y(waitBtn, "Confirm wait");
-    btnRow.addControl(waitBtn);
-
-    const cancelBtn = Button.CreateSimpleButton("waitCancel", "Cancel");
-    cancelBtn.width  = "130px";
-    cancelBtn.height = "38px";
-    cancelBtn.color  = T.TEXT;
-    cancelBtn.background = T.BTN_BG;
-    cancelBtn.cornerRadius = 4;
-    cancelBtn.fontSize = 14;
-    cancelBtn.paddingLeft = "8px";
-    cancelBtn.onPointerUpObservable.add(() => {
-      this.toggleWaitDialog(false);
-      this.onWaitDialogClosed?.();
-    });
-
-    this._applyA11y(cancelBtn, "Cancel wait");
-    btnRow.addControl(cancelBtn);
-  }
-
   public toggleWaitDialog(visible: boolean): void {
-    if (!this._waitPanel) return;
     this.isWaitDialogOpen = visible;
-    this._waitPanel.isVisible = visible;
+    if (visible) {
+      this._waitDialog.open({
+        onWait: (hours) => {
+          this.onWaitConfirm?.(hours);
+          this._closedByPlayer("wait", () => this.toggleWaitDialog(false));
+        },
+        onCancel: () => this._closedByPlayer("wait", () => this.toggleWaitDialog(false)),
+      });
+    } else {
+      this._waitDialog.close();
+    }
     this._syncCrosshairVisibility();
   }
+
 
   // ── Compass HUD ───────────────────────────────────────────────────────────
 

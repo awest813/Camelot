@@ -1063,6 +1063,24 @@ from a CDN at runtime.
     without pausing.
   - Tests: jsdom tests drive both panels by clicks, and boot-smoke opens
     each by key and closes it with Escape.
+- The wait dialog, attribute panel and quest log moved out of
+  `ui-manager.ts` into Preact panels (`wait-dialog.tsx`,
+  `attribute-panel.tsx`, `quest-log-panel.tsx`), mounted with a shared
+  `PanelHost`. `UIManager` keeps the same methods (`toggleWaitDialog`,
+  `toggleAttributePanel` / `refreshAttributePanel`, `toggleQuestLog` /
+  `updateQuestLog`) and delegates to them.
+  - The wait dialog gains a slider and arrow keys, and keeps 1–24 h and
+    the remembered choice.
+  - The attributes are a table with hints, and +1 is disabled until
+    points are waiting.
+  - The quest log keeps its order (active, failed, completed), and screen
+    readers hear the state.
+- One close path: a panel the player closes from inside calls
+  `UIManager.onPanelClosed(id)`, and the game closes it through its modal
+  registry, which also gives control back. That replaces
+  `onWaitDialogClosed` and `onAttributePanelClosed` (callback-properties
+  61 → 60). The quest log had no such hook, so closing it from inside left
+  the game's state stale.
 - Babylon GUI files: 12 → 10 (the `babylon-gui-files` ratchet). Remaining:
   `ui-manager.ts` (the HUD, inventory, pause, quest log, skill tree, wait
   and attribute panels), the dialogue system, the seven map-editor
