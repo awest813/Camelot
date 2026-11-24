@@ -16,6 +16,22 @@ describe("GraphicsSettingsUI", () => {
     ui.destroy();
   });
 
+  it("sets the interface size and reduced motion at once, and keeps them", async () => {
+    const { applyPrefs, loadPrefs } = await import("./accessibility");
+    ui.show("high");
+    const chips = () => Array.from(document.querySelectorAll<HTMLButtonElement>('[aria-label="Interface size"] button'));
+    expect(chips().map((b) => b.textContent)).toEqual(["85% Size", "100% Size", "125% Size", "150% Size", "Reduce Motion"]);
+    expect(chips()[1].getAttribute("aria-pressed")).toBe("true");
+    chips()[3].click();
+    expect(document.documentElement.style.getPropertyValue("--ui-scale")).toBe("1.5");
+    expect(chips()[3].getAttribute("aria-pressed")).toBe("true");
+    chips()[4].click();
+    expect(document.documentElement.classList.contains("reduce-motion")).toBe(true);
+    expect(loadPrefs()).toEqual({ uiScale: 1.5, reduceMotion: true });
+    localStorage.clear();
+    applyPrefs({ uiScale: 1, reduceMotion: false });
+  });
+
   it("starts hidden", () => {
     expect(ui.isVisible).toBe(false);
   });

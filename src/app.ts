@@ -14,6 +14,7 @@ import HavokPhysics from "@babylonjs/havok";
 
 import MainScene from "./playground/main-scene";
 import { hydrateDesktopSave } from "./platform/desktop-bridge";
+import { applyPrefs, loadPrefs } from "./ui/accessibility";
 
 class App {
   public engine: Engine | WebGPUEngine;
@@ -25,6 +26,8 @@ class App {
   private _boundEvents = false;
 
   constructor() {
+    // Interface scale and reduced motion, before any UI is drawn.
+    applyPrefs(loadPrefs());
     // create the canvas html element and attach it to the webpage
     this.canvas = document.createElement("canvas");
     this.canvas.style.width = "100%";

@@ -1,4 +1,5 @@
 import { animateMini, type DOMKeyframesDefinition } from "motion";
+import { reducedMotion } from "./accessibility";
 
 // ── Animation constants ───────────────────────────────────────────────────────
 
@@ -37,16 +38,15 @@ export interface UIAnimatorOptions {
  *    animation completes so the caller can then set `display: none`.
  */
 export class UIAnimator {
-  private readonly _reducedMotion: boolean;
+  private readonly _fixed: boolean | undefined;
 
   constructor(options: UIAnimatorOptions = {}) {
-    if (options.reducedMotion !== undefined) {
-      this._reducedMotion = options.reducedMotion;
-    } else {
-      this._reducedMotion =
-        typeof window !== "undefined" &&
-        window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
-    }
+    this._fixed = options.reducedMotion;
+  }
+
+  /** The option given, else the player's setting (which follows the system's until changed). */
+  private get _reducedMotion(): boolean {
+    return this._fixed ?? reducedMotion();
   }
 
   /**

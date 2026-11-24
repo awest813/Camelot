@@ -14,6 +14,7 @@ vi.mock("motion", () => {
 });
 
 import { animateMini } from "motion";
+import { applyPrefs, loadPrefs } from "./accessibility";
 const mockAnimate = animateMini as ReturnType<typeof vi.fn>;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -55,23 +56,34 @@ describe("UIAnimator", () => {
       expect(mockAnimate).toHaveBeenCalledOnce();
     });
 
-    it("honours prefers-reduced-motion when matchMedia reports reduce", () => {
+    it("honours prefers-reduced-motion (through the player's setting, which starts from it)", () => {
       const original = window.matchMedia;
       window.matchMedia = vi.fn().mockReturnValue({ matches: true }) as typeof window.matchMedia;
-      const a = new UIAnimator();
+      applyPrefs(loadPrefs());
       window.matchMedia = original;
-      const el = makeEl();
-      a.panelIn(el);
+      const a = new UIAnimator();
+      a.panelIn(makeEl());
       expect(mockAnimate).not.toHaveBeenCalled();
+      applyPrefs({ uiScale: 1, reduceMotion: false });
     });
 
     it("animates normally when matchMedia reports no reduced-motion preference", () => {
       const original = window.matchMedia;
       window.matchMedia = vi.fn().mockReturnValue({ matches: false }) as typeof window.matchMedia;
-      const a = new UIAnimator();
+      applyPrefs(loadPrefs());
       window.matchMedia = original;
-      const el = makeEl();
-      a.panelIn(el);
+      const a = new UIAnimator();
+      a.panelIn(makeEl());
+      expect(mockAnimate).toHaveBeenCalledOnce();
+    });
+
+    it("follows a change of the setting made after it was created", () => {
+      const a = new UIAnimator();
+      applyPrefs({ uiScale: 1, reduceMotion: true });
+      a.panelIn(makeEl());
+      expect(mockAnimate).not.toHaveBeenCalled();
+      applyPrefs({ uiScale: 1, reduceMotion: false });
+      a.panelIn(makeEl());
       expect(mockAnimate).toHaveBeenCalledOnce();
     });
   });

@@ -1,6 +1,7 @@
 import type { QualityTier } from "../systems/graphics-system";
 import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 import { getGraphicsTierIcon, getDifficultyIcon } from "./icon-utils";
+import { applyPrefs, currentPrefs, savePrefs, UI_SCALES, type AccessibilityPrefs } from "./accessibility";
 
 // ── Tier metadata ─────────────────────────────────────────────────────────────
 
@@ -74,6 +75,8 @@ export class GraphicsSettingsUI {
   private _difficultyBtns: Map<Difficulty, HTMLButtonElement> = new Map();
   private _volumeBtns: Map<number, HTMLButtonElement> = new Map();
   private _sensBtns: Map<CameraSensitivity, HTMLButtonElement> = new Map();
+  private _scaleBtns: Map<number, HTMLButtonElement> = new Map();
+  private _motionBtn: HTMLButtonElement | null = null;
   private _muteBtn: HTMLButtonElement | null = null;
   private _statusEl: HTMLSpanElement | null = null;
 
@@ -95,6 +98,7 @@ export class GraphicsSettingsUI {
     this._highlightDifficulty(currentDifficulty);
     this._highlightAudio(isMuted, volume);
     this._highlightSensitivity(sensitivity);
+    this._highlightInterface(currentPrefs());
     if (this._root) this._root.style.display = "flex";
     this.isVisible = true;
     if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
@@ -114,6 +118,8 @@ export class GraphicsSettingsUI {
     this._difficultyBtns.clear();
     this._volumeBtns.clear();
     this._sensBtns.clear();
+    this._scaleBtns.clear();
+    this._motionBtn = null;
     this._muteBtn = null;
     this._statusEl = null;
     this.isVisible = false;
@@ -157,6 +163,26 @@ export class GraphicsSettingsUI {
       btn.classList.toggle("is-active", s === sensitivity);
       btn.setAttribute("aria-pressed", String(s === sensitivity));
     }
+  }
+
+  private _highlightInterface(prefs: AccessibilityPrefs): void {
+    for (const [scale, btn] of this._scaleBtns) {
+      btn.classList.toggle("is-active", scale === prefs.uiScale);
+      btn.setAttribute("aria-pressed", String(scale === prefs.uiScale));
+    }
+    if (this._motionBtn) {
+      this._motionBtn.classList.toggle("is-active", prefs.reduceMotion);
+      this._motionBtn.setAttribute("aria-pressed", String(prefs.reduceMotion));
+    }
+  }
+
+  /** Interface preferences apply at once and are kept in the browser. */
+  private _setInterface(change: Partial<AccessibilityPrefs>, status: string): void {
+    const prefs = { ...currentPrefs(), ...change };
+    applyPrefs(prefs);
+    savePrefs(prefs);
+    this._highlightInterface(prefs);
+    this.showStatus(status);
   }
 
   public showStatus(message: string): void {
@@ -366,7 +392,40 @@ export class GraphicsSettingsUI {
 
     panel.appendChild(sensRow);
 
-    // ── Section 5: Display (desktop / Steam only) ────────────────────────────
+    // ── Section 5: Interface (accessibility) ─────────────────────────────────
+    const uiTitle = document.createElement("h3");
+    uiTitle.className = "graphics-settings__title";
+    uiTitle.textContent = "Interface";
+    uiTitle.style.marginTop = "18px";
+    panel.appendChild(uiTitle);
+
+    const uiRow = document.createElement("div");
+    uiRow.className = "graphics-settings__sens-row";
+    uiRow.setAttribute("role", "group");
+    uiRow.setAttribute("aria-label", "Interface size");
+    for (const scale of UI_SCALES) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "graphics-settings__chip-btn";
+      btn.textContent = `${Math.round(scale * 100)}% Size`;
+      btn.addEventListener("click", () => this._setInterface({ uiScale: scale }, `Interface size: ${Math.round(scale * 100)}%`));
+      this._scaleBtns.set(scale, btn);
+      uiRow.appendChild(btn);
+    }
+    const motionBtn = document.createElement("button");
+    motionBtn.type = "button";
+    motionBtn.className = "graphics-settings__chip-btn";
+    motionBtn.textContent = "Reduce Motion";
+    motionBtn.title = "No camera shake, screen flashes or interface animations";
+    motionBtn.addEventListener("click", () => {
+      const on = !currentPrefs().reduceMotion;
+      this._setInterface({ reduceMotion: on }, on ? "Reduced motion on" : "Reduced motion off");
+    });
+    this._motionBtn = motionBtn;
+    uiRow.appendChild(motionBtn);
+    panel.appendChild(uiRow);
+
+    // ── Section 6: Display (desktop / Steam only) ────────────────────────────
     if (this.onToggleFullscreen) {
       const displayTitle = document.createElement("h3");
       displayTitle.className = "graphics-settings__title";

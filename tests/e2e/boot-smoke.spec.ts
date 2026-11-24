@@ -293,6 +293,21 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
   // (The canvas holds the pointer lock, so click the button itself.)
   await page.evaluate(() => (document.querySelector(".graphics-settings-btn") as HTMLButtonElement).click());
   expect(await page.evaluate(() => (window as any).__camelotGame.graphicsSettingsUI.isVisible), "settings open").toBe(true);
+  // Interface size 150%: the HUD grows, the 3D view keeps its resolution.
+  const scaled = await page.evaluate(() => {
+    const eng = (window as any).__camelotGame.scene.getEngine();
+    const size = () => ({ bar: document.querySelector(".hud-bar")!.getBoundingClientRect().width, render: eng.getRenderWidth() });
+    const before = size();
+    const chip = [...document.querySelectorAll<HTMLButtonElement>('[aria-label="Interface size"] button')].find((b) => b.textContent === "150% Size")!;
+    chip.click();
+    eng.resize();
+    const after = size();
+    [...document.querySelectorAll<HTMLButtonElement>('[aria-label="Interface size"] button')].find((b) => b.textContent === "100% Size")!.click();
+    return { ratio: after.bar / before.bar, sameRender: after.render === before.render, kept: localStorage.getItem("camelot.accessibility") };
+  });
+  expect(scaled.ratio, "the HUD scales with the interface size").toBeCloseTo(1.5, 2);
+  expect(scaled.sameRender, "the 3D view keeps its resolution").toBe(true);
+  expect(scaled.kept, "the choice is kept").toContain('"uiScale":1');
   await page.keyboard.press("Escape");
   expect(await page.evaluate(() => {
     const g = (window as any).__camelotGame;

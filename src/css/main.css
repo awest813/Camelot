@@ -6272,8 +6272,8 @@ body.is-in-dialogue .quickslot-hud {
   --panel-text: #eee0c0;
   --panel-dim: #a79377;
   --panel-good: var(--status-ok);
-  --panel-warn: #d47a17;
-  --panel-selected-bg: rgba(80, 56, 10, 0.8);
+  --panel-warn: #e08a2a;
+  --panel-selected-bg: rgba(64, 44, 8, 0.97);
 }
 
 .craft-panel__panel {
@@ -6557,4 +6557,21 @@ button.craft-panel__row:focus-visible,
   .hud-bar { width: calc((100vw - 64px) / 3); }
   .hud-xp { width: calc(100vw - 32px); }
   .hud-notifications { width: min(320px, calc(100vw - 32px)); }
+}
+
+/* ── Accessibility (Phase 8) ──────────────────────────────────────────────────
+ * Interface scale: every UI root (each child of <body> but the canvas) is
+ * zoomed, so the 3D view keeps its resolution. */
+body > :not(#renderCanvas) { zoom: var(--ui-scale, 1); }
+/* A visible focus ring for any control that doesn't draw its own. */
+:where(button, [role="button"], a[href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--panel-border-strong);
+  outline-offset: 2px;
+}
+/* Reduced motion (the player's setting, which follows the system's until changed). */
+.reduce-motion *, .reduce-motion *::before, .reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }

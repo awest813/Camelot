@@ -13,6 +13,7 @@ import { Player } from "../entities/player";
 import type { SkillTree } from "../systems/skill-tree-system";
 import { AttributeSystem, ATTRIBUTE_NAMES, type AttributeName } from "../systems/attribute-system";
 import { HudDom } from "./hud-dom";
+import { reducedMotion, uiScale } from "./accessibility";
 import { WaitDialogPanel } from "./wait-dialog";
 import { AttributePanelView } from "./attribute-panel";
 import { QuestLogView } from "./quest-log-panel";
@@ -397,6 +398,7 @@ export class UIManager {
    * Higher intensity (> 0.5) creates violent shaking; lower (< 0.3) is subtle.
    */
   public shakeCamera(intensity: number = 0.5): void {
+    if (reducedMotion()) return;
     this._cameraTrauma = Math.min(1.0, this._cameraTrauma + intensity);
     
     if (!this._cameraShakeObs) {
@@ -502,6 +504,7 @@ export class UIManager {
 
   /** Flash a translucent color overlay to signal being hit or dealing damage. */
   public showHitFlash(color: string = "red"): void {
+    if (reducedMotion()) return; // no full-screen flashes
     this.hud.showFlash(color);
   }
 
@@ -526,7 +529,8 @@ export class UIManager {
     const rect = engine.getRenderingCanvas?.()?.getBoundingClientRect();
     const x = rect ? rect.left + screenPos.x * (rect.width / w) : screenPos.x;
     const y = rect ? rect.top + screenPos.y * (rect.height / h) : screenPos.y;
-    this.hud.showDamageNumber(x, y, `-${damage}`, color ?? "#FF6030");
+    // The HUD is zoomed by the interface scale.
+    this.hud.showDamageNumber(x / uiScale(), y / uiScale(), `-${damage}`, color ?? "#FF6030");
   }
 
   // ── Debug / Performance Overlay ───────────────────────────────────────────

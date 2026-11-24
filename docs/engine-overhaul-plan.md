@@ -1127,7 +1127,29 @@ from a CDN at runtime.
   `gui-resolution.ts`. **Exit met for the game:** none of its UI is
   Babylon GUI. The colour tokens the GUI code shared
   (`SHARED_UI_PANEL`) are gone; the CSS `--panel-*` tokens replace them.
-  The remaining Phase 8 item is the accessibility pass.
+- Accessibility pass (`ui/accessibility.ts`, settings → Interface):
+  - **Scaling:** interface size 85 / 100 / 125 / 150 %. Every UI root
+    (each child of `<body>` but the canvas) is zoomed by `--ui-scale`,
+    so the 3D view keeps its resolution. Damage numbers are placed in the
+    zoomed space.
+  - **Motion:** a Reduce Motion toggle that starts from the system's
+    `prefers-reduced-motion`. It stops CSS animations and transitions,
+    the camera shake, the full-screen hit and heal flashes, and the panel
+    animator, which now reads the live setting instead of a value fixed
+    at start-up.
+  - **Focus:** a default visible focus ring for every control that
+    doesn't draw its own.
+  - **Contrast:** `contrast.test.ts` holds the panel tokens, the
+    conversation box and the HUD to WCAG AA (4.5:1). It composites
+    translucent backgrounds over white, the worst case. It caught two
+    failures, now fixed: the warning colour (`#d47a17` → `#e08a2a`) and
+    the selected-row background (made more opaque).
+  - Both settings apply at once and are kept in the browser. Boot-smoke
+    checks that 150 % scales the HUD by 1.5 without changing the render
+    size.
+
+**Phase 8 done.** Babylon GUI is left only in the in-game map editor,
+which Phase 9 replaces.
 
 ### Phase 9 — Editor app (3 weeks; after Phases 1 and 8)
 
