@@ -344,6 +344,20 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
     await page.keyboard.press(key);
     expect(await isOpen(), `${key} closes`).toBe(false);
   }
+  // The pause menu (Preact): Escape pauses, Escape inside it resumes, and so does Resume.
+  const paused = () => page.evaluate(() => (window as any).__camelotGame.isPaused) as Promise<boolean>;
+  await page.locator("#renderCanvas").focus();
+  await page.keyboard.press("Escape");
+  expect(await paused(), "Escape pauses").toBe(true);
+  await expect(page.locator("#pause-title")).toBeVisible();
+  await page.keyboard.press("Escape");
+  expect(await paused(), "Escape in the menu resumes").toBe(false);
+  await expect(page.locator("#pause-title")).toHaveCount(0);
+  await page.locator("#renderCanvas").focus();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Resume", exact: true }).first().click();
+  expect(await paused(), "Resume resumes").toBe(false);
+
   // The crafting panels (Preact, on the DOM layer) open by key; Escape closes them.
   for (const [key, open, title] of [
     ["l", "g.alchemyUI.isVisible", "#alchemy-title"], ["b", "g.enchantingUI.isVisible", "#enchanting-title"],

@@ -161,15 +161,19 @@ describe('UIManager', () => {
     });
 
     describe('pause menu', () => {
-        it('initializes all pause menu buttons including settingsButton', () => {
-            expect(uiManager.resumeButton).toBeDefined();
-            expect(uiManager.saveButton).toBeDefined();
-            expect(uiManager.loadButton).toBeDefined();
-            expect(uiManager.exportButton).toBeDefined();
-            expect(uiManager.importButton).toBeDefined();
-            expect(uiManager.settingsButton).toBeDefined();
-            expect(uiManager.creditsButton).toBeDefined();
-            expect(uiManager.quitButton).toBeDefined();
+        it('opens with the actions the game set and hides the crosshair', () => {
+            const resume = vi.fn();
+            uiManager.setPauseActions({ resume, save: vi.fn(), load: vi.fn(), exportSave: vi.fn(), importSave: vi.fn(), settings: vi.fn(), credits: vi.fn(), quit: vi.fn() });
+            uiManager.togglePauseMenu(true);
+            expect(uiManager.isPauseMenuOpen).toBe(true);
+            expect(uiManager.crosshair.isVisible).toBe(false);
+            const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('.pause-menu__item')).map((b) => b.textContent);
+            expect(buttons).toEqual(['Resume', 'Save Game', 'Load Game', 'Export Save', 'Import Save…', 'Settings', 'Credits', 'Quit to Menu']);
+            document.querySelector<HTMLButtonElement>('.pause-menu__item')!.click();
+            expect(resume).toHaveBeenCalledOnce();
+            uiManager.togglePauseMenu(false);
+            expect(document.querySelector('.pause-menu__item')).toBeNull();
+            expect(uiManager.crosshair.isVisible).toBe(true);
         });
     });
 });

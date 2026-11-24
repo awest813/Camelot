@@ -18,6 +18,7 @@ import { keepGuiAtCssResolution } from "./gui-resolution";
 import { WaitDialogPanel } from "./wait-dialog";
 import { AttributePanelView } from "./attribute-panel";
 import { QuestLogView } from "./quest-log-panel";
+import { PauseMenuView, type PauseActions } from "./pause-menu";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
@@ -109,16 +110,10 @@ export class UIManager {
   public isConsumableItem: ((item: Item) => boolean) | null = null;
 
   // Pause Menu
-  public pausePanel: Rectangle;
-  private _pauseCard: Rectangle | null = null;
-  public resumeButton: Button;
-  public saveButton: Button;
-  public loadButton: Button;
-  public exportButton: Button;
-  public importButton: Button;
-  public settingsButton: Button;
-  public creditsButton: Button;
-  public quitButton: Button;
+  /** The pause menu (a Preact panel; see pause-menu.tsx). */
+  private readonly _pauseMenu = new PauseMenuView();
+  private _pauseActions: PauseActions | null = null;
+  public isPauseMenuOpen = false;
 
   private _hpPulseObs: any = null;
 
@@ -249,7 +244,6 @@ export class UIManager {
     this.scene = scene;
     this._initUI();
     this._initInventoryUI();
-    this._initPauseMenu();
     this._initSkillTreeUI();
     this._initDebugOverlay();
     this._initStealthHUD();
@@ -266,7 +260,6 @@ export class UIManager {
     if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
       window.addEventListener("resize", () => {
         if (this.inventoryPanel?.isVisible) this._adaptInventoryLayout();
-        if (this.pausePanel?.isVisible) this._adaptPauseLayout();
         if (this.skillTreePanel?.isVisible) this._adaptSkillTreeLayout();
       });
     }
@@ -610,68 +603,7 @@ export class UIManager {
     equipContainer.addControl(this.equipmentText);
   }
 
-  private _initPauseMenu(): void {
-    this.pausePanel = new Rectangle();
-    this.pausePanel.width = "100%";
-    this.pausePanel.height = "100%";
-    this.pausePanel.background = "rgba(0, 0, 0, 0.82)";
-    this.pausePanel.isVisible = false;
-    this.pausePanel.zIndex = 100;
-    this._ui.addControl(this.pausePanel);
 
-    // Central card
-    const card = new Rectangle();
-    card.width = "340px";
-    card.height = "680px";
-    card.cornerRadius = 10;
-    card.color = T.PANEL_BORDER;
-    card.thickness = 2;
-    card.background = T.PANEL_BG;
-    card.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
-    this.pausePanel.addControl(card);
-    this._pauseCard = card;
-
-    const panel = new StackPanel();
-    panel.width = "290px";
-    panel.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
-    card.addControl(panel);
-
-    const gameName = new TextBlock();
-    gameName.text = "CAMELOT";
-    gameName.color = T.TITLE;
-    gameName.fontSize = 36;
-    gameName.fontWeight = "bold";
-    gameName.height = "64px";
-    gameName.shadowColor = "rgba(0,0,0,0.9)";
-    gameName.shadowBlur = 8;
-    panel.addControl(gameName);
-
-    const subtitle = new TextBlock();
-    subtitle.text = "—  PAUSED  [Esc]  —";
-    subtitle.color = T.DIM;
-    subtitle.fontSize = 14;
-    subtitle.height = "26px";
-    panel.addControl(subtitle);
-
-    const divider = new Rectangle();
-    divider.width = "75%";
-    // Babylon padding lives inside the height: 1px + 14px padding left a
-    // negative content box that painted a bar over the subtitle.
-    divider.height = "15px";
-    divider.background = T.PANEL_BORDER;
-    divider.thickness = 0;
-    divider.paddingBottom = "14px";
-    panel.addControl(divider);
-
-    this.resumeButton   = this._createButton("Resume",        panel);
-    this.saveButton     = this._createButton("Save Game",     panel);
-    this.loadButton     = this._createButton("Load Game",     panel);
-    this.exportButton   = this._createButton("Export Save",   panel);
-    this.importButton   = this._createButton("Import Save…",  panel);
-    this.settingsButton = this._createButton("Settings",      panel);
-    this.creditsButton  = this._createButton("Credits",       panel);
-    this.quitButton     = this._createButton("Quit to Menu",  panel);
-  }
 
   private _initSkillTreeUI(): void {
     this.skillTreePanel = new Rectangle();
@@ -999,12 +931,7 @@ export class UIManager {
     }
   }
 
-  private _adaptPauseLayout(): void {
-    if (!this._pauseCard) return;
-    const vp = this._getViewportSize();
-    this._pauseCard.width = `${Math.min(340, Math.max(260, vp.width - 24))}px`;
-    this._pauseCard.height = `${Math.min(680, Math.max(420, vp.height - 24))}px`;
-  }
+
 
   private _adaptSkillTreeLayout(): void {
     if (!this.skillTreePanel) return;
@@ -1031,16 +958,16 @@ export class UIManager {
   }
 
   public togglePauseMenu(visible: boolean): void {
-    if (visible) this._adaptPauseLayout();
-    this.pausePanel.isVisible = visible;
+    this.isPauseMenuOpen = visible;
+    if (visible && this._pauseActions) this._pauseMenu.open(this._pauseActions);
+    else this._pauseMenu.close();
     this._syncCrosshairVisibility();
   }
 
-  /** Desktop builds say "Quit to Desktop"; the browser keeps "Quit to Menu". */
-  public setQuitButtonLabel(label: string): void {
-    const block = this.quitButton?.textBlock;
-    if (block) block.text = label;
-    if (this.quitButton) this.quitButton.accessibilityTag = { description: label };
+  /** What the pause menu's buttons do (the game sets this once). */
+  public setPauseActions(actions: PauseActions): void {
+    this._pauseActions = actions;
+    if (this.isPauseMenuOpen) this._pauseMenu.open(actions);
   }
 
   public toggleQuestLog(visible: boolean): void {
@@ -1059,7 +986,7 @@ export class UIManager {
   private _syncCrosshairVisibility(): void {
     const hasBlockingPanelOpen =
       this.inventoryPanel.isVisible ||
-      this.pausePanel.isVisible ||
+      this.isPauseMenuOpen ||
       this.isQuestLogOpen ||
       this.skillTreePanel.isVisible ||
       this.isAttributePanelOpen ||

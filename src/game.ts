@@ -1431,27 +1431,20 @@ export class Game {
         if (down) this.editors.handleKey(ev);
     });
 
-    // Wire up Pause Menu buttons
-    this.ui.resumeButton.onPointerUpObservable.add(() => this.togglePause());
-    this.ui.saveButton.onPointerUpObservable.add(() => this.saveSystem.save());
-    this.ui.loadButton.onPointerUpObservable.add(() => this.saveSystem.load());
-    this.ui.exportButton.onPointerUpObservable.add(() => {
-      // Export the CURRENT state, not the last persisted one.
-      this.saveSystem.save(true);
-      this.saveSystem.exportToFile();
-    });
-    this.ui.importButton.onPointerUpObservable.add(() => this._openSaveImportPicker());
-    this.ui.settingsButton?.onPointerUpObservable.add(() => this.kernel.services.get(SettingsKey).open());
-    this.ui.creditsButton.onPointerUpObservable.add(() => this.kernel.services.get(SettingsKey).openCredits());
+    // What the pause menu's buttons do.
     const desktop = getDesktopBridge();
-    if (desktop) {
-      this.ui.setQuitButtonLabel("Quit to Desktop");
-      this.ui.quitButton.onPointerUpObservable.add(() => {
-        desktop.quit();
-      });
-    } else {
-      this.ui.quitButton.onPointerUpObservable.add(() => window.location.reload());
-    }
+    this.ui.setPauseActions({
+      resume: () => this.togglePause(),
+      save: () => this.saveSystem.save(),
+      load: () => this.saveSystem.load(),
+      // Export the CURRENT state, not the last persisted one.
+      exportSave: () => { this.saveSystem.save(true); this.saveSystem.exportToFile(); },
+      importSave: () => this._openSaveImportPicker(),
+      settings: () => this.kernel.services.get(SettingsKey).open(),
+      credits: () => this.kernel.services.get(SettingsKey).openCredits(),
+      quit: desktop ? () => desktop.quit() : () => window.location.reload(),
+      quitLabel: desktop ? "Quit to Desktop" : "Quit to Menu",
+    });
 
     // Wire decoupled input adapter after all systems are initialized
     this._registerModals();

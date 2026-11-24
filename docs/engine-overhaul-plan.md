@@ -1081,6 +1081,11 @@ from a CDN at runtime.
   `onWaitDialogClosed` and `onAttributePanelClosed` (callback-properties
   61 → 60). The quest log's new ✕ and Escape use the same path. (The old
   quest log could only be closed with J.)
+- The pause menu is Preact (`pause-menu.tsx`). The game hands it its
+  actions with one `ui.setPauseActions({...})`, which replaces eight
+  public Babylon `Button` fields wired one by one. Escape inside the menu
+  resumes, like the Escape that opened it, and so do Resume and a click
+  outside. Boot-smoke covers pausing and resuming both ways.
 - Babylon GUI files: 12 → 10 (the `babylon-gui-files` ratchet). Remaining:
   `ui-manager.ts` (the HUD, inventory, pause, quest log, skill tree, wait
   and attribute panels), the dialogue system, the seven map-editor
