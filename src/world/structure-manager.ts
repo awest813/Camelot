@@ -15,6 +15,7 @@ import { BiomeType } from "./world-manager";
 import type { WorldSeed } from "./world-seed";
 import type { ProceduralTextureManager } from "../systems/procedural-texture-manager";
 import type { LodSystem } from "../systems/lod-system";
+import { STRUCTURES, type Rolled, type StructureMaterial, type StructureSpec } from "../content/structures";
 
 interface StructureSpawn {
   meshes: Mesh[];
@@ -123,19 +124,12 @@ export class StructureManager {
     const oz = (this._rand(chunkX, chunkZ, 2) - 0.5) * chunkSize * 0.4;
     const origin = new Vector3(worldX + ox, 0, worldZ + oz);
 
-    let spawn: StructureSpawn;
-    switch (biome) {
-      case "plains":
-      case "forest":
-        spawn = this._buildRuins(chunkX, chunkZ, origin);
-        break;
-      case "desert":
-        spawn = this._buildDesertShrine(chunkX, chunkZ, origin);
-        break;
-      case "tundra":
-        spawn = this._buildWatchtower(chunkX, chunkZ, origin);
-        break;
+    const spec = STRUCTURES.find((st) => st.biomes.includes(biome));
+    if (!spec) {
+      this._chunkStructures.set(key, { meshes: [], loot: [], bodies: [], npcs: [], lights: [] });
+      return;
     }
+    const spawn = this._buildFromSpec(spec, chunkX, chunkZ, origin);
 
     this._chunkStructures.set(key, spawn);
     if (this.mergeStatic) this._mergeStaticMeshes(spawn, key);
@@ -262,295 +256,72 @@ export class StructureManager {
 
   // ─── Structure builders ────────────────────────────────────────────────────
 
-  /**
-   * Stone ruins: partial walls forming an open courtyard with rubble and a
-   * loot chest. One hostile guard NPC patrols inside.
-   */
-  private _buildRuins(cx: number, cz: number, origin: Vector3): StructureSpawn {
+  /** Build a structure from its spec (`content/structures.ts`), part by part, in order. */
+  private _buildFromSpec(spec: StructureSpec, cx: number, cz: number, origin: Vector3): StructureSpawn {
     const meshes: Mesh[] = [];
     const loot: Loot[] = [];
     const bodies: PhysicsAggregate[] = [];
     const lights: PointLight[] = [];
-    // Aged limestone — warm earthy grey with subtle specular for weathered stone
-    const mat = this._mat(
-      "ruins_stone",
-      new Color3(0.50, 0.44, 0.36),
-      new Color3(0.14, 0.12, 0.09),
-      28,
+    const npcs: NPC[] = [];
+    const c = `${cx}_${cz}`;
+    const named = (name: string) => name.replace("{c}", c);
+    const num = (v: Rolled): number => {
+      if (typeof v === "number") return v;
+      if ("jitter" in v) return (this._rand(cx, cz, v.jitter) - 0.5) * v.spread;
+      return v.base + this._rand(cx, cz, v.slot) * v.range;
+    };
+    const rgb = (v: readonly [number, number, number]) => new Color3(v[0], v[1], v[2]);
+    const material = (key: string, m: StructureMaterial) => this._mat(
+      key, rgb(m.diffuse), rgb(m.specular), m.power,
+      m.emissive || m.disableLighting ? { emissive: m.emissive ? rgb(m.emissive) : undefined, disableLighting: m.disableLighting } : undefined,
     );
+    const shared = (key: string): StructureMaterial => {
+      const m = spec.materials[key];
+      if (!m) throw new Error(`structure '${spec.id}' uses material '${key}' it doesn't define`);
+      return m;
+    };
+    for (const [key, m] of Object.entries(spec.materials)) material(key, m);
+    const at = (dx: number, y: number, dz: number) => new Vector3(origin.x + dx, y, origin.z + dz);
 
-    // Four partial walls at varying heights for a crumbled look
-    const walls: Array<{ dx: number; dz: number; w: number; h: number; d: number }> = [
-      { dx: 0,  dz:  4, w: 7.0, h: 3.0, d: 0.8 }, // north — tallest
-      { dx: 0,  dz: -4, w: 4.0, h: 2.0, d: 0.8 }, // south — shorter, crumbled
-      { dx: -4, dz:  0, w: 0.8, h: 3.0, d: 6.0 }, // west
-      { dx:  4, dz:  0, w: 0.8, h: 2.2, d: 4.0 }, // east — partial
-    ];
-    for (let i = 0; i < walls.length; i++) {
-      const { dx, dz, w, h, d } = walls[i];
-      const wall = MeshBuilder.CreateBox(`ruins_wall_${cx}_${cz}_${i}`, { width: w, height: h, depth: d }, this._scene);
-      wall.position.set(origin.x + dx, h / 2, origin.z + dz);
-      wall.material = mat;
-      bodies.push(new PhysicsAggregate(wall, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
-      meshes.push(this._shadow(wall));
+    for (const part of spec.parts) {
+      if ("box" in part) {
+        const w = num(part.w), h = num(part.h), d = num(part.d);
+        const box = MeshBuilder.CreateBox(named(part.box), { width: w, height: h, depth: d }, this._scene);
+        box.position.set(origin.x + num(part.dx), part.y ?? h / 2, origin.z + num(part.dz));
+        if (part.rotY !== undefined) box.rotation.y = num(part.rotY);
+        box.material = typeof part.mat === "string" ? material(part.mat, shared(part.mat)) : material(part.mat.name, part.mat);
+        if (part.collider) bodies.push(new PhysicsAggregate(box, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
+        meshes.push(part.shadow ? this._shadow(box) : box);
+      } else if ("chest" in part) {
+        const { mesh, body } = this._addChest(named(part.chest), at(part.dx, 0, part.dz), loot, cx, cz, part.slot);
+        meshes.push(mesh);
+        bodies.push(body);
+      } else if ("torch" in part) {
+        this._addTorch(named(part.torch), at(part.dx, part.y, part.dz), meshes, lights);
+      } else if ("campfire" in part) {
+        this._addCampfire(named(part.campfire), at(part.dx, 0, part.dz), meshes, lights);
+      } else if ("barrel" in part) {
+        this._addBarrel(named(part.barrel), at(part.dx, 0, part.dz), meshes, bodies);
+      } else if ("banner" in part) {
+        this._addBanner(named(part.banner), at(part.dx, 0, part.dz), rgb(part.color), part.mat, meshes);
+      } else if ("stone" in part) {
+        this._addStandingStone(named(part.stone), at(part.dx, 0, part.dz), num(part.height), meshes, bodies);
+      } else if ("relic" in part) {
+        const id = named(part.relic);
+        if (!this.onCheckLootCollected || !this.onCheckLootCollected(id)) {
+          loot.push(new Loot(this._scene, at(part.dx, part.y, part.dz), { id, stackable: false, quantity: 1, ...part.item, stats: { ...part.item.stats } }));
+        }
+      } else {
+        const npc = new NPC(this._scene, at(part.dx, 2, part.dz), `${part.npc}_${c}`);
+        npc.aggroRange = part.aggroRange;
+        npc.attackDamage = part.attackDamage;
+        npc.xpReward = part.xpReward;
+        npc.patrolPoints = part.patrol.map(([dx, dz]) => at(dx, 2, dz));
+        if (this.onNPCSpawn) this.onNPCSpawn(npc);
+        npcs.push(npc);
+      }
     }
-
-    // Scattered rubble blocks inside
-    for (let i = 0; i < 4; i++) {
-      const bw = 0.5 + this._rand(cx, cz, i + 10) * 0.7;
-      const bh = 0.3 + this._rand(cx, cz, i + 11) * 0.4;
-      const bd = 0.5 + this._rand(cx, cz, i + 12) * 0.7;
-      const rubble = MeshBuilder.CreateBox(`ruins_rubble_${cx}_${cz}_${i}`, { width: bw, height: bh, depth: bd }, this._scene);
-      rubble.position.set(
-        origin.x + (this._rand(cx, cz, i + 20) - 0.5) * 5,
-        bh / 2,
-        origin.z + (this._rand(cx, cz, i + 21) - 0.5) * 5,
-      );
-      rubble.rotation.y = this._rand(cx, cz, i + 22) * Math.PI;
-      rubble.material = mat;
-      meshes.push(rubble);
-    }
-
-    // Loot chest at the center
-    const { mesh: chestMesh, body: chestBody } = this._addChest(`ruins_chest_${cx}_${cz}`, new Vector3(origin.x, 0, origin.z), loot, cx, cz, 0);
-    meshes.push(chestMesh);
-    bodies.push(chestBody);
-
-    // ── Fantasy props ──────────────────────────────────────────────────────
-
-    // Two wall torches on the north wall flanking the entrance
-    this._addTorch(`ruins_torch_L_${cx}_${cz}`, new Vector3(origin.x - 2.5, 2.4, origin.z + 3.5), meshes, lights);
-    this._addTorch(`ruins_torch_R_${cx}_${cz}`, new Vector3(origin.x + 2.5, 2.4, origin.z + 3.5), meshes, lights);
-
-    // Guard campfire in the center courtyard
-    this._addCampfire(`ruins_campfire_${cx}_${cz}`, new Vector3(origin.x, 0, origin.z - 1), meshes, lights);
-
-    // Scattered barrels (guard supplies)
-    this._addBarrel(`ruins_barrel_A_${cx}_${cz}`, new Vector3(origin.x - 3.0, 0, origin.z + 1.5), meshes, bodies);
-    this._addBarrel(`ruins_barrel_B_${cx}_${cz}`, new Vector3(origin.x - 3.3, 0, origin.z + 2.2), meshes, bodies);
-
-    // Faction banner on east wall — dark red to mark a bandit/enemy camp
-    this._addBanner(`ruins_banner_${cx}_${cz}`, new Vector3(origin.x + 3.5, 0, origin.z), new Color3(0.55, 0.06, 0.04), "bandits", meshes);
-
-    // A pair of standing stones flanking the ruined entrance for Ayleid ambiance
-    this._addStandingStone(`ruins_monolith_L_${cx}_${cz}`, new Vector3(origin.x - 5.5, 0, origin.z - 2), 2.2, meshes, bodies);
-    this._addStandingStone(`ruins_monolith_R_${cx}_${cz}`, new Vector3(origin.x + 5.5, 0, origin.z - 2), 1.8, meshes, bodies);
-
-    // Hostile guard NPC
-    const guard = new NPC(this._scene, new Vector3(origin.x + 2, 2, origin.z + 2), `RuinGuard_${cx}_${cz}`);
-    guard.aggroRange = 12;
-    guard.attackDamage = 7;
-    guard.xpReward = 30;
-    guard.patrolPoints = [
-      new Vector3(origin.x + 2, 2, origin.z + 2),
-      new Vector3(origin.x - 2, 2, origin.z - 2),
-    ];
-    if (this.onNPCSpawn) this.onNPCSpawn(guard);
-
-    return { meshes, loot, bodies, npcs: [guard], lights };
-  }
-
-  /**
-   * Desert shrine: raised stone platform with four pillars, a central altar,
-   * and an ancient relic loot item.
-   */
-  private _buildDesertShrine(cx: number, cz: number, origin: Vector3): StructureSpawn {
-    const meshes: Mesh[] = [];
-    const loot: Loot[] = [];
-    const bodies: PhysicsAggregate[] = [];
-    const lights: PointLight[] = [];
-    // Sun-bleached sandstone platform
-    const stoneMat = this._mat(
-      "shrine_stone",
-      new Color3(0.80, 0.64, 0.34),
-      new Color3(0.24, 0.18, 0.07),
-      36,
-    );
-    // Golden altar stone with a warm glow
-    const altarMat = this._mat(
-      "shrine_altar",
-      new Color3(0.90, 0.74, 0.26),
-      new Color3(0.38, 0.28, 0.08),
-      52,
-    );
-
-    // Raised platform
-    const platform = MeshBuilder.CreateBox(`shrine_platform_${cx}_${cz}`, { width: 5, height: 0.4, depth: 5 }, this._scene);
-    platform.position.set(origin.x, 0.2, origin.z);
-    platform.material = stoneMat;
-    bodies.push(new PhysicsAggregate(platform, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
-    meshes.push(this._shadow(platform));
-
-    // Altar block
-    const altar = MeshBuilder.CreateBox(`shrine_altarBlock_${cx}_${cz}`, { width: 1.5, height: 0.8, depth: 0.9 }, this._scene);
-    altar.position.set(origin.x, 0.8, origin.z);
-    altar.material = altarMat;
-    meshes.push(this._shadow(altar));
-
-    // Four corner pillars at varying heights
-    const corners: [number, number][] = [[-2.5, -2.5], [2.5, -2.5], [-2.5, 2.5], [2.5, 2.5]];
-    for (let i = 0; i < 4; i++) {
-      const [px, pz] = corners[i];
-      const ph = 3 + this._rand(cx, cz, i + 5) * 2;
-      const pillar = MeshBuilder.CreateBox(`shrine_pillar_${cx}_${cz}_${i}`, { width: 0.6, height: ph, depth: 0.6 }, this._scene);
-      pillar.position.set(origin.x + px, ph / 2, origin.z + pz);
-      pillar.material = stoneMat;
-      bodies.push(new PhysicsAggregate(pillar, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
-      meshes.push(this._shadow(pillar));
-    }
-
-    // Ancient relic on the altar — equippable off-hand talisman
-    const relicId = `shrine_relic_${cx}_${cz}`;
-    if (!this.onCheckLootCollected || !this.onCheckLootCollected(relicId)) {
-      const relic = new Loot(this._scene, new Vector3(origin.x, 1.6, origin.z), {
-        id: relicId,
-        name: "Ancient Relic",
-        description: "A weathered relic found on a desert altar. +3 Damage.",
-        stackable: false,
-        quantity: 1,
-        slot: "offHand",
-        stats: { damage: 3 },
-      });
-      loot.push(relic);
-    }
-
-    // ── Fantasy props ──────────────────────────────────────────────────────
-
-    // Altar torch — sacred shrine flame
-    this._addTorch(`shrine_torch_A_${cx}_${cz}`, new Vector3(origin.x - 1.0, 0.4, origin.z - 1.2), meshes, lights);
-    this._addTorch(`shrine_torch_B_${cx}_${cz}`, new Vector3(origin.x + 1.0, 0.4, origin.z - 1.2), meshes, lights);
-
-    // Four outer standing stones in a ritual ring — Oblivion-style Ayleid ruin
-    const ringR = 5.5;
-    for (let i = 0; i < 4; i++) {
-      const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
-      const sx = origin.x + Math.cos(angle) * ringR;
-      const sz = origin.z + Math.sin(angle) * ringR;
-      const sh = 1.8 + this._rand(cx, cz, i + 40) * 1.2;
-      this._addStandingStone(`shrine_menhir_${cx}_${cz}_${i}`, new Vector3(sx, 0, sz), sh, meshes, bodies);
-    }
-
-    // Glowing rune emissive slab in the platform center — mystical altar glow
-    const runeSlab = MeshBuilder.CreateBox(`shrine_rune_${cx}_${cz}`, { width: 1.2, height: 0.04, depth: 0.7 }, this._scene);
-    runeSlab.position.set(origin.x, 0.42, origin.z);
-    runeSlab.material = this._mat(
-      "shrine_rune",
-      new Color3(0.1, 0.5, 0.9),
-      new Color3(0.0, 0.0, 0.0),
-      1,
-      { emissive: new Color3(0.0, 0.28, 0.70), disableLighting: true },
-    );
-    meshes.push(runeSlab);
-
-    return { meshes, loot, bodies, npcs: [], lights };
-  }
-
-  /**
-   * Tundra watchtower: tall square stone tower with a doorway on the south side,
-   * a wooden roof, a loot chest inside, and a hostile guard NPC out front.
-   */
-  private _buildWatchtower(cx: number, cz: number, origin: Vector3): StructureSpawn {
-    const meshes: Mesh[] = [];
-    const loot: Loot[] = [];
-    const bodies: PhysicsAggregate[] = [];
-    const lights: PointLight[] = [];
-    // Cold granite stone — blue-grey tint with reflective highlights
-    const stoneMat = this._mat(
-      "tower_stone",
-      new Color3(0.50, 0.48, 0.50),
-      new Color3(0.18, 0.18, 0.22),
-      42,
-    );
-    // Weathered dark timber
-    const woodMat = this._mat(
-      "tower_wood",
-      new Color3(0.36, 0.24, 0.12),
-      new Color3(0.08, 0.05, 0.02),
-      14,
-    );
-
-    const tW = 4;   // exterior width
-    const tH = 8;   // wall height
-    const wT = 0.6; // wall thickness
-
-    // North wall (full)
-    const nWall = MeshBuilder.CreateBox(`tower_N_${cx}_${cz}`, { width: tW, height: tH, depth: wT }, this._scene);
-    nWall.position.set(origin.x, tH / 2, origin.z + tW / 2);
-    nWall.material = stoneMat;
-    bodies.push(new PhysicsAggregate(nWall, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
-    meshes.push(this._shadow(nWall));
-
-    // South wall — two pillar segments flanking a 1.6 m doorway
-    for (const side of [-1, 1]) {
-      const pillar = MeshBuilder.CreateBox(`tower_Spillar${side}_${cx}_${cz}`, { width: 1.0, height: tH, depth: wT }, this._scene);
-      pillar.position.set(origin.x + side * 1.5, tH / 2, origin.z - tW / 2);
-      pillar.material = stoneMat;
-      bodies.push(new PhysicsAggregate(pillar, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
-      meshes.push(this._shadow(pillar));
-    }
-
-    // Lintel above doorway
-    const lintelH = tH - 2.5;
-    const lintel = MeshBuilder.CreateBox(`tower_lintel_${cx}_${cz}`, { width: 1.8, height: lintelH, depth: wT }, this._scene);
-    lintel.position.set(origin.x, tH - lintelH / 2, origin.z - tW / 2);
-    lintel.material = stoneMat;
-    bodies.push(new PhysicsAggregate(lintel, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
-    meshes.push(this._shadow(lintel));
-
-    // East wall
-    const eWall = MeshBuilder.CreateBox(`tower_E_${cx}_${cz}`, { width: wT, height: tH, depth: tW }, this._scene);
-    eWall.position.set(origin.x + tW / 2, tH / 2, origin.z);
-    eWall.material = stoneMat;
-    bodies.push(new PhysicsAggregate(eWall, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
-    meshes.push(this._shadow(eWall));
-
-    // West wall
-    const wWall = MeshBuilder.CreateBox(`tower_W_${cx}_${cz}`, { width: wT, height: tH, depth: tW }, this._scene);
-    wWall.position.set(origin.x - tW / 2, tH / 2, origin.z);
-    wWall.material = stoneMat;
-    bodies.push(new PhysicsAggregate(wWall, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
-    meshes.push(this._shadow(wWall));
-
-    // Wooden roof platform
-    const roof = MeshBuilder.CreateBox(`tower_roof_${cx}_${cz}`, { width: tW - wT, height: 0.2, depth: tW - wT }, this._scene);
-    roof.position.set(origin.x, tH + 0.1, origin.z);
-    roof.material = woodMat;
-    bodies.push(new PhysicsAggregate(roof, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
-    meshes.push(this._shadow(roof));
-
-    // Chest inside tower base
-    const { mesh: chestMesh, body: chestBody } = this._addChest(`tower_chest_${cx}_${cz}`, new Vector3(origin.x + 1, 0, origin.z + 1), loot, cx, cz, 60);
-    meshes.push(chestMesh);
-    bodies.push(chestBody);
-
-    // ── Fantasy props ──────────────────────────────────────────────────────
-
-    // Torches flanking the doorway — guard post lighting
-    this._addTorch(`tower_torch_L_${cx}_${cz}`, new Vector3(origin.x - 1.2, 2.8, origin.z - tW / 2 - 0.1), meshes, lights);
-    this._addTorch(`tower_torch_R_${cx}_${cz}`, new Vector3(origin.x + 1.2, 2.8, origin.z - tW / 2 - 0.1), meshes, lights);
-
-    // Supply barrels stacked by the east wall
-    this._addBarrel(`tower_barrel_A_${cx}_${cz}`, new Vector3(origin.x + tW / 2 - 0.5, 0, origin.z - 0.5), meshes, bodies);
-    this._addBarrel(`tower_barrel_B_${cx}_${cz}`, new Vector3(origin.x + tW / 2 - 0.5, 0, origin.z + 0.4), meshes, bodies);
-
-    // Guard faction banner — Imperial/Legion blue
-    this._addBanner(`tower_banner_${cx}_${cz}`, new Vector3(origin.x - tW / 2 - 0.2, 0, origin.z), new Color3(0.10, 0.20, 0.65), "imperial", meshes);
-
-    // Campfire outside (guard warming spot)
-    this._addCampfire(`tower_campfire_${cx}_${cz}`, new Vector3(origin.x + 3.5, 0, origin.z - tW / 2 - 3), meshes, lights);
-
-    // Guard NPC positioned in front of the doorway
-    const guard = new NPC(this._scene, new Vector3(origin.x, 2, origin.z - tW / 2 - 2), `TowerGuard_${cx}_${cz}`);
-    guard.aggroRange = 15;
-    guard.attackDamage = 8;
-    guard.xpReward = 40;
-    guard.patrolPoints = [
-      new Vector3(origin.x,     2, origin.z - tW / 2 - 2),
-      new Vector3(origin.x + 3, 2, origin.z - tW / 2 - 2),
-    ];
-    if (this.onNPCSpawn) this.onNPCSpawn(guard);
-
-    return { meshes, loot, bodies, npcs: [guard], lights };
+    return { meshes, loot, bodies, npcs, lights };
   }
 
   // ─── Fantasy props ─────────────────────────────────────────────────────────
@@ -765,7 +536,9 @@ export class StructureManager {
       this._scene,
     );
     stone.position.set(position.x, position.y + height / 2, position.z);
-    stone.rotation.y = Math.random() * 0.3 - 0.15; // slight angle variation
+    // Slight lean, fixed by where the stone stands (it used to be re-rolled
+    // unseeded on every load).
+    stone.rotation.y = (Math.abs(Math.sin(position.x * 12.9898 + position.z * 78.233)) % 1) * 0.3 - 0.15;
     stone.material   = stoneMat;
     bodies.push(new PhysicsAggregate(stone, PhysicsShapeType.BOX, { mass: 0 }, this._scene));
     meshes.push(this._shadow(stone));

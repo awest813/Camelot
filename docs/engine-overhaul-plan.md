@@ -869,9 +869,26 @@ the navmesh.
   - Placement is identical. A test runs the old code (kept verbatim as a
     test fixture) and the specs over 12,800 chunks across the four
     biomes, and requires the same calls in the same order.
-- Next: the procedural structures (ruins, desert shrines, watchtowers in
-  `StructureManager`) as specs; then navmesh tiles and off-screen
-  schedules.
+- Procedural structures are data too. `content/structures.ts` describes
+  the ruins (plains and forest), the desert shrine and the tundra
+  watchtower.
+  - A structure has shared materials, made up front, and an ordered list
+    of parts: boxes (sizes, offsets and rotation can be rolled, with an
+    optional collider and shadow), chests, torches, campfires, barrels,
+    banners, standing stones, a relic, and a guard NPC with stats and a
+    patrol.
+  - `StructureManager._buildFromSpec` replaced the three hand-written
+    builders; the file went from 939 to 712 lines.
+  - The build is the same. A test keeps the old manager verbatim as a
+    fixture and builds 24 structures with both into real NullEngine
+    scenes: every mesh (name, position, rotation, size, material, parent),
+    material, light, fire hook and NPC (stats and patrol) must match, with
+    and without the loot already taken.
+  - One deliberate change: a standing stone's lean was `Math.random()`,
+    re-rolled every time its chunk loaded. It is now fixed by where the
+    stone stands. The fixture carries that one-line change, with a note.
+    The unseeded-random ratchet goes to 18.
+- Next: navmesh tiles and off-screen schedules.
 
 ### Phase 7 — Rendering and assets (4 weeks; can run in parallel from Phase 2)
 
