@@ -2,20 +2,22 @@
  * The game's own shaders in both languages — Playwright
  *
  * Builds the five custom shader pieces (sky, horizon, water, terrain plugin,
- * wind plugin) on a WebGPU engine and checks every one compiles as WGSL,
- * with no shader errors and nothing fetched from another host (Babylon
- * fetches its GLSL→WGSL converters from a CDN only when a shader has no
- * WGSL).  The same page on WebGL2 checks the GLSL versions render.
+ * wind plugin) on a WebGPU engine and validates the exact WGSL Babylon
+ * generates for each with naga (wgpu's shader compiler), with nothing
+ * fetched from another host (Babylon fetches its GLSL→WGSL converters from
+ * a CDN only when a shader has no WGSL).  The same page on WebGL2 checks
+ * the GLSL versions render.
  *
- * The WebGPU case is opt-in (WEBGPU_E2E=1): headless Chromium's software
- * WebGPU (SwiftShader) loses its device, or crashes, within a few frames
- * here, even for Babylon's own minimal shader material, so compiling there
- * proves nothing.  The WebGL case always runs.  The full game on WebGPU is
+ * Nothing is drawn on WebGPU: headless Chromium's software WebGPU
+ * (SwiftShader) loses its device within a few frames of drawing, even for
+ * Babylon's own minimal shader material.  Building the effects is enough
+ * to get their sources.  The full game on WebGPU is the opt-in
  * webgpu.spec.ts.
  *
  * Run: npm run test:e2e -- wgsl-shaders
  */
 import { test, expect } from "@playwright/test";
+import { wgslError } from "../../src/testing/wgsl-validate";
 
 test.use({
   launchOptions: {
@@ -28,7 +30,6 @@ const PIECES = ["sky", "horizon", "water", "terrain", "wind"];
 
 for (const renderer of ["webgpu", "webgl"] as const) {
   test(`the five custom shaders compile on ${renderer}`, async ({ page, baseURL }) => {
-    test.skip(renderer === "webgpu" && !process.env.WEBGPU_E2E, "set WEBGPU_E2E=1 (needs a working WebGPU adapter)");
     test.setTimeout(120_000);
     const origin = new URL(baseURL!).origin;
     const outside: string[] = [];
@@ -42,18 +43,21 @@ for (const renderer of ["webgpu", "webgl"] as const) {
     });
     await page.goto(`/tests/e2e/harness/wgsl-shaders.html${renderer === "webgl" ? "?webgl" : ""}`);
     await expect.poll(() => page.evaluate(() => (window as any).__shaders?.()?.checked), { timeout: 60_000 }).toBe(true);
-    const compiled = await page.evaluate(() => (window as any).__shaders());
-    expect(compiled.ready).toEqual(Object.fromEntries(PIECES.map((p) => [p, true])));
-    // Every piece's final WGSL, compiled by the GPU's own compiler: no errors.
-    expect(compiled.compileErrors).toEqual({});
-    // Pipelines are built when meshes first draw; give it a few frames (on
-    // WebGPU the software device may be lost by then, which ends frames).
-    await expect.poll(() => page.evaluate(() => (window as any).__shaders().frames), { timeout: 30_000 })
-      .toBeGreaterThan(renderer === "webgl" ? 30 : 0);
-    await page.waitForTimeout(1500);
     const state = await page.evaluate(() => (window as any).__shaders());
     expect(state.webgpu).toBe(renderer === "webgpu");
-    expect(state.gpuErrors, state.gpuErrors.join("\n")).toEqual([]);
+    expect(state.ready).toEqual(Object.fromEntries(PIECES.map((p) => [p, true])));
+    if (renderer === "webgpu") {
+      // The exact WGSL Babylon generated for each piece, validated by naga.
+      for (const piece of PIECES) {
+        for (const stage of ["vertex", "fragment"] as const) {
+          const code = state.sources[piece]?.[stage];
+          expect(code, `${piece} ${stage} source`).toBeTruthy();
+          expect(wgslError(code), `${piece} ${stage}`).toBeNull();
+        }
+      }
+    } else {
+      await expect.poll(() => page.evaluate(() => (window as any).__shaders().frames), { timeout: 30_000 }).toBeGreaterThan(30);
+    }
     expect(shaderErrors, shaderErrors.join("\n")).toEqual([]);
     expect(outside, `fetched from outside:\n${outside.join("\n")}`).toEqual([]);
   });

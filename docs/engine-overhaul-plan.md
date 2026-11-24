@@ -979,22 +979,24 @@ from a CDN at runtime.
   - WebGPU starts only when the browser offers an adapter.
   - If the device is lost in the first 20 s, the game remembers WebGL2 on
     this machine and reloads.
-- The default is still WebGL2. What was verified:
-  - Under WebGPU, all five materials compile to ready effects.
-  - The two plugins render 600 frames under WebGPU.
-  - On WebGL2, the shader harness (`tests/e2e/harness/wgsl-shaders.html`)
-    renders all five.
-
-  What couldn't be: whether the three ShaderMaterials' WGSL compiles on a
-  real GPU. Headless Chromium's software WebGPU in CI loses its device, or
-  crashes, within a few frames even for Babylon's own minimal WGSL shader
-  material. A compile error on a real GPU wouldn't lose the device, so the
-  fallback wouldn't catch it. The WebGPU e2e checks (the shader harness and
-  the full game) are opt-in with `WEBGPU_E2E=1`.
-
-  Next step: validate the generated WGSL offline (for example with naga's
-  validator) or run `WEBGPU_E2E=1` on a machine with a GPU, then set
-  `DEFAULT_RENDERER` to WebGPU.
+- WebGPU is the default where the browser has an adapter, with WebGL2 as
+  the fallback.
+  - The WGSL is validated. `tests/e2e/wgsl-shaders.spec.ts` builds the five
+    pieces on a WebGPU engine (building effects, not drawing) and checks
+    the exact WGSL Babylon generates for each, vertex and fragment, with
+    naga (`naga-wasm`, wgpu's shader compiler, a dev dependency, via
+    `src/testing/wgsl-validate.ts`). It also checks that nothing is
+    fetched from another host. A syntax error in the horizon or a type
+    error in the sky fails it and names the shader. The same page on
+    WebGL2 renders the GLSL versions.
+  - Babylon's god-rays pass (`VolumetricLightScatteringPostProcess`) has
+    no WGSL, so it is off on WebGPU. Running its GLSL there would mean
+    fetching the converters. Depth of field (also GLSL-only) was already
+    off.
+  - CI's headless Chromium software WebGPU loses its device within a few
+    frames of drawing, so CI can't play the whole game on WebGPU. That
+    spec is opt-in (`WEBGPU_E2E=1`), and the e2e suite runs the game on
+    WebGL2 through the fallback (no adapter there).
 
 ### Phase 8 — UI consolidation (3 weeks; can run in parallel from Phase 2)
 

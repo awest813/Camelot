@@ -67,40 +67,32 @@ const pieces = {
 };
 /** The effect each piece draws with (plugins live on the sub-mesh's effect). */
 const effectOf = (mesh, mat) => mesh.subMeshes?.[0]?.effect ?? mat.getEffect?.() ?? null;
+/** Build the piece's effect without drawing (drawing is what software WebGPU can't keep up). */
+const prepare = (mesh, mat) => (mat.isReadyForSubMesh && mesh.subMeshes?.[0] ? mat.isReadyForSubMesh(mesh, mesh.subMeshes[0]) : mat.isReady(mesh));
 
-// Render a frame at a time until every piece has a ready effect, then hand
-// each effect's final WGSL to the GPU compiler and keep its error messages.
-// (Done before the render loop: compile errors arrive asynchronously, and a
-// software device can be lost after a few frames.)
-const compileErrors = {};
+// Prepare every piece's effect, then hand over its final shader sources
+// (the spec validates the WGSL with naga).  On WebGL the scene then renders.
+const sources = {};
 let checked = false;
 (async () => {
-  for (let i = 0; i < 200; i++) {
-    scene.render();
-    const all = Object.values(pieces).every(([mesh, mat]) => effectOf(mesh, mat)?.isReady());
+  for (let i = 0; i < 400; i++) {
+    const all = Object.values(pieces).map(([mesh, mat]) => prepare(mesh, mat) && effectOf(mesh, mat)?.isReady()).every(Boolean);
     if (all) break;
     await new Promise((r) => setTimeout(r, 50));
   }
-  if (webgpu) {
-    for (const [name, [mesh, mat]] of Object.entries(pieces)) {
-      const effect = effectOf(mesh, mat);
-      for (const [stage, code] of [["vertex", effect?.vertexSourceCode], ["fragment", effect?.fragmentSourceCode]]) {
-        if (!code) { compileErrors[`${name}.${stage}`] = ["no source"]; continue; }
-        const info = await engine._device.createShaderModule({ code }).getCompilationInfo();
-        const errors = info.messages.filter((m) => m.type === "error").map((m) => `${m.lineNum}:${m.linePos} ${m.message}`);
-        if (errors.length) compileErrors[`${name}.${stage}`] = errors;
-      }
-    }
+  for (const [name, [mesh, mat]] of Object.entries(pieces)) {
+    const effect = effectOf(mesh, mat);
+    sources[name] = { vertex: effect?.vertexSourceCode ?? null, fragment: effect?.fragmentSourceCode ?? null };
   }
   checked = true;
-  engine.runRenderLoop(() => scene.render());
+  if (!webgpu) engine.runRenderLoop(() => scene.render());
 })();
 
 window.__shaders = () => ({
   webgpu: !!engine.isWebGPU,
   frames: engine.frameId,
   checked,
-  compileErrors,
+  sources,
   gpuErrors,
   ready: Object.fromEntries(Object.entries(pieces).map(([k, [mesh, mat]]) => [k, !!mat.isReady(mesh)])),
 });

@@ -23,11 +23,10 @@ export function pickRenderer(
 }
 
 /**
- * WebGL2 until the WGSL versions of the sky, horizon and water shader
- * materials have been checked on real WebGPU hardware (or by a WGSL
- * validator); the two material plugins are verified rendering under WebGPU.
+ * WebGPU, where the browser has an adapter (else WebGL2).  Every custom
+ * shader has WGSL, validated by naga in tests/e2e/wgsl-shaders.spec.ts.
  */
-export const DEFAULT_RENDERER: "webgpu" | "webgl" = "webgl";
+export const DEFAULT_RENDERER: "webgpu" | "webgl" = "webgpu";
 
 /** Set when WebGPU failed on this machine: the game starts on WebGL2 from then on. */
 export const RENDERER_FALLBACK_KEY = "camelot_renderer_fallback";

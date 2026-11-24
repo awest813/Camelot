@@ -308,7 +308,9 @@ export function createPostFx(
   // God rays are created on the first live frame: building the scattering
   // pass while the game is still paused behind character creation produced
   // transient framebuffer feedback-loop errors alongside SSAO's prepass.
-  let godRaysPending = postEnabled && fx.godRays && !!sunMesh;
+  // Not on WebGPU yet: Babylon's scattering pass has no WGSL, and running
+  // its GLSL there means fetching the converters from Babylon's CDN.
+  let godRaysPending = postEnabled && fx.godRays && !!sunMesh && !engine.isWebGPU;
   let liveFrames = 0;
   const createGodRays = (): void => {
     godRaysPending = false;
