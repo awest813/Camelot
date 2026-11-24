@@ -1,8 +1,8 @@
 {
   "budgets": {
-    "entry-js": 1489040,
-    "total-js": 6407796,
-    "largest-js": 2962596,
-    "models": 34062186
+    "entry-js": 1094474,
+    "total-js": 6241739,
+    "largest-js": 2735664,
+    "models": 13732606
   }
 }

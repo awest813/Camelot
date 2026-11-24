@@ -1162,6 +1162,48 @@ which Phase 9 replaces.
 **Exit:** the game bundle has no editor code. The editor app opens a world,
 edits content bundles and can play-test through the shared kernel.
 
+**Progress:**
+
+- Two apps from one build. `index.html` boots `src/main.ts` (the game).
+  `editor.html` boots `src/editor-main.ts`, which is the same `App` and
+  `Game` with the editor suite plugged in through a factory.
+- **The game knows only `game/editor-plugin.ts`.** The interface covers:
+  - whether the map editor is active;
+  - the keys play didn't take;
+  - toggle and exit;
+  - the G gizmo cycle;
+  - the tool windows, for the modal registry;
+  - `started()`, which restores a workspace draft.
+
+  `game.editors` is `null` in the game. Thirty-six forwarding getters
+  and every editor import left `game.ts`, and the draft restore moved out
+  of `game-services.ts` into the suite.
+- **Play-testing is the real game.** The editor app runs the full
+  kernel and features, so leaving the map editor is a play-test.
+  Babylon's inspector is the editor app's (Shift+Ctrl+Alt+I, loaded on
+  first use) and is gone from the game, including its dev build.
+- **Proof in the build:**
+  - A small Vite plugin writes `dist/.vite/chunk-modules.json`, listing
+    each chunk's modules and imports.
+  - `check-bundle.mjs` walks everything the game page can load, static
+    and lazy, and fails on any editor module: the suite, the map-editor
+    panels, creators, hub, layout, asset browser, bundle tools, workspace
+    drafts, `editor-main`, the inspector and Babylon GUI. A unit test
+    covers the walk.
+  - `babylon-vendor` now holds only what the game page reaches.
+    Babylon code only the editor loads (GUI) goes to `babylon-editor`.
+- **Sizes:**
+  - Game up-front code: about 1,440 → 1,038 KB (the old `index` chunk
+    carried the editors).
+  - All game JS: 5.9 MB.
+  - The editor app's own extra JS: 7.1 MB, mostly the inspector.
+  - Budgets re-baselined. The bundle measures now come from the chunk
+    report: the game page's code loaded up front, all the JS it can
+    load, and its largest chunk.
+- **E2E:** `editor-smoke` opens every tool and drives the chords on
+  `/editor.html`. A new test checks that the game page has no editors
+  and that F2 and F11 do nothing there.
+
 **Total:** roughly 27–33 engineer-weeks sequentially, or about 18–20 weeks
 with the rendering and UI tracks in parallel.
 

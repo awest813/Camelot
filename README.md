@@ -74,7 +74,7 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 - Real-time HUD bars and XP display.
 - Pause menu with quick save/load actions.
 - Notifications for items, combat, and quest events.
-- Debug inspector and FPS overlay support.
+- FPS overlay; the Babylon inspector is in the editor app (Shift+Ctrl+Alt+I).
 - **Compass HUD**: top-center strip showing scrolling cardinal direction (N / NE / E …) based on camera heading.
 - **Wait / Rest** (T key): choose 1–24 in-game hours to skip time; clock advances and resources restore proportionally.
 - **Fast Travel Menu** (Y): choose discovered destinations with estimated travel time; world clock advances on arrival.
@@ -82,7 +82,7 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 
 ## Map Editor
 
-The in-engine **Map Editor** (activated with F2) lets you author world content without leaving the game runtime.
+The editors live in the **editor app**, a second page next to the game: `/editor.html`, or `npm run dev` and open `http://localhost:8088/editor.html`. It runs the same game with the editor suite plugged in, so leaving the map editor puts you straight into a play-test. There, the **Map Editor** (F2) lets you author world content in the running world, and the creators, bundle tools and asset browser are on their shortcuts or the Editor Hub (F11). Shift+Ctrl+Alt+I opens Babylon's inspector. The game page (`/`) ships none of this code.
 
 ### Phase 1 — Foundational Editing (complete)
 
@@ -154,7 +154,7 @@ The in-engine **Map Editor** (activated with F2) lets you author world content w
 | F9             | Quick load                                               |
 | Esc            | Pause menu / close open panel                            |
 
-### Map Editor (active while F2 mode is on — these keys override their gameplay bindings)
+### Map Editor (editor app only; active while F2 mode is on — these keys override their gameplay bindings)
 
 | Key / Button      | Action                                  |
 | ----------------- | --------------------------------------- |

@@ -40,14 +40,6 @@ import { AudioSystem } from "./systems/audio-system";
 import { NavigationSystem } from "./systems/navigation-system";
 import { FrameworkRuntime } from "./framework/runtime/framework-runtime";
 import { frameworkBaseContent } from "./framework/content/base-content";
-import { MapEditorSystem } from "./systems/map-editor-system";
-import { MapEditorPropertyPanel } from "./ui/map-editor-property-panel";
-import { MapEditorToolbar } from "./ui/map-editor-toolbar";
-import { MapEditorHierarchyPanel } from "./ui/map-editor-hierarchy-panel";
-import { MapEditorValidationPanel } from "./ui/map-editor-validation-panel";
-import { MapEditorPalettePanel } from "./ui/map-editor-palette-panel";
-import { MapEditorLayerPanel } from "./ui/map-editor-layer-panel";
-import { MapEditorNotesPanel } from "./ui/map-editor-notes-panel";
 import { AttributeSystem } from "./systems/attribute-system";
 import { TimeSystem } from "./systems/time-system";
 import { StealthSystem } from "./systems/stealth-system";
@@ -73,7 +65,6 @@ import type { CraftingUI } from "./ui/crafting-ui";
 import type { ItemConditionSystem } from "./systems/item-condition-system";
 import { CraftingFeature, CraftingKey, type CraftingService } from "./features/crafting/crafting-feature";
 import { Kernel } from "./core/kernel";
-import { EditorSuite } from "./features/editor/editor-suite";
 import { RaidsKey, type RaidsService } from "./features/village-raids/raid-feature";
 import { VillagesKey, type VillagesService } from "./features/villages/villages-feature";
 import { WorldSitesKey, type WorldSitesService } from "./features/world-sites/world-sites-feature";
@@ -111,28 +102,9 @@ import type { RaceSystem } from "./systems/race-system";
 import type { PlayerLevelSystem } from "./systems/player-level-system";
 import type { CharacterSheetUI } from "./ui/character-sheet-ui";
 import { OnboardingKey, type OnboardingService } from "./features/onboarding/onboarding-feature";
-import { QuestCreatorSystem } from "./systems/quest-creator-system";
-import { QuestCreatorUI } from "./ui/quest-creator-ui";
-import { DialogueCreatorSystem } from "./systems/dialogue-creator-system";
-import { DialogueCreatorUI } from "./ui/dialogue-creator-ui";
 import { resolveDialogueIdForNpcMeshName } from "./systems/dialogue-npc-resolve";
-import { NpcCreatorSystem } from "./systems/npc-creator-system";
-import { NpcCreatorUI } from "./ui/npc-creator-ui";
-import { ItemCreatorSystem } from "./systems/item-creator-system";
-import { ItemCreatorUI } from "./ui/item-creator-ui";
-import { FactionCreatorSystem } from "./systems/faction-creator-system";
-import { FactionCreatorUI } from "./ui/faction-creator-ui";
-import { LootTableCreatorSystem } from "./systems/loot-table-creator-system";
-import { LootTableCreatorUI } from "./ui/loot-table-creator-ui";
-import { SpawnCreatorSystem } from "./systems/spawn-creator-system";
-import { SpawnCreatorUI } from "./ui/spawn-creator-ui";
-import { WorldBuilderSystem } from "./systems/world-builder-system";
-import { WorldBuilderUI } from "./ui/world-builder-ui";
-import { ContentBundleSystem } from "./systems/content-bundle-system";
-import { ContentBundleUI } from "./ui/content-bundle-ui";
-import { EditorHubUI } from "./ui/editor-hub-ui";
-import { EditorLayout } from "./ui/editor-layout";
 import { buildHelpOverlayLines } from "./ui/editor-help-overlay";
+import type { EditorFactory, EditorPlugin } from "./game/editor-plugin";
 import type { FastTravelUI } from "./ui/fast-travel-ui";
 import type { SpellMakingUI } from "./ui/spell-making-ui";
 import type { GuardEncounterUI } from "./ui/guard-encounter-ui";
@@ -157,13 +129,6 @@ import { PetsKey, type PetsService } from "./features/pets/pets-feature";
 import type { PickpocketSystem } from "./systems/pickpocket-system";
 import type { PickpocketUI } from "./ui/pickpocket-ui";
 import { PickpocketFeature, PickpocketKey, COIN_PURSE } from "./features/pickpocket/pickpocket-feature";
-import { AssetBrowserSystem } from "./systems/asset-browser-system";
-import { AssetBrowserUI } from "./ui/asset-browser-ui";
-import { BundleMergeSystem } from "./systems/bundle-merge-system";
-import { BundleMergeUI } from "./ui/bundle-merge-ui";
-import { WorkspaceDraftSystem } from "./systems/workspace-draft-system";
-import { ModManifestSystem } from "./systems/mod-manifest-system";
-import { ModManifestUI } from "./ui/mod-manifest-ui";
 import type { BarterUI } from "./ui/barter-ui";
 import type { ContainerUI } from "./ui/container-ui";
 import { TradeFeature } from "./features/trade/trade-feature";
@@ -296,43 +261,10 @@ export class Game {
   public get forges(): ForgeRegistry { return this._crafting.forges; }
   public get craftingUI(): CraftingUI { return this._crafting.forgePanel; }
   /** Radiant work offered by innkeepers ("Any work going?"). */
-  /** In-game editor tools (moves to the separate editor app in Phase 9). */
-  public editors!: EditorSuite;
-  public get mapEditorSystem(): MapEditorSystem { return this.editors.mapEditorSystem; }
-  public get mapEditorPropertyPanel(): MapEditorPropertyPanel { return this.editors.mapEditorPropertyPanel; }
-  public get mapEditorToolbar(): MapEditorToolbar { return this.editors.mapEditorToolbar; }
-  public get mapEditorHierarchyPanel(): MapEditorHierarchyPanel { return this.editors.mapEditorHierarchyPanel; }
-  public get mapEditorValidationPanel(): MapEditorValidationPanel { return this.editors.mapEditorValidationPanel; }
-  public get mapEditorPalettePanel(): MapEditorPalettePanel { return this.editors.mapEditorPalettePanel; }
-  public get mapEditorLayerPanel(): MapEditorLayerPanel { return this.editors.mapEditorLayerPanel; }
-  public get mapEditorNotesPanel(): MapEditorNotesPanel { return this.editors.mapEditorNotesPanel; }
-  public get questCreatorSystem(): QuestCreatorSystem { return this.editors.questCreatorSystem; }
-  public get questCreatorUI(): QuestCreatorUI { return this.editors.questCreatorUI; }
-  public get dialogueCreatorSystem(): DialogueCreatorSystem { return this.editors.dialogueCreatorSystem; }
-  public get dialogueCreatorUI(): DialogueCreatorUI { return this.editors.dialogueCreatorUI; }
-  public get npcCreatorSystem(): NpcCreatorSystem { return this.editors.npcCreatorSystem; }
-  public get npcCreatorUI(): NpcCreatorUI { return this.editors.npcCreatorUI; }
-  public get itemCreatorSystem(): ItemCreatorSystem { return this.editors.itemCreatorSystem; }
-  public get itemCreatorUI(): ItemCreatorUI { return this.editors.itemCreatorUI; }
-  public get factionCreatorSystem(): FactionCreatorSystem { return this.editors.factionCreatorSystem; }
-  public get factionCreatorUI(): FactionCreatorUI { return this.editors.factionCreatorUI; }
-  public get lootTableCreatorSystem(): LootTableCreatorSystem { return this.editors.lootTableCreatorSystem; }
-  public get lootTableCreatorUI(): LootTableCreatorUI { return this.editors.lootTableCreatorUI; }
-  public get spawnCreatorSystem(): SpawnCreatorSystem { return this.editors.spawnCreatorSystem; }
-  public get spawnCreatorUI(): SpawnCreatorUI { return this.editors.spawnCreatorUI; }
-  public get worldBuilderSystem(): WorldBuilderSystem { return this.editors.worldBuilderSystem; }
-  public get worldBuilderUI(): WorldBuilderUI { return this.editors.worldBuilderUI; }
-  public get contentBundleSystem(): ContentBundleSystem { return this.editors.contentBundleSystem; }
-  public get contentBundleUI(): ContentBundleUI { return this.editors.contentBundleUI; }
-  public get assetBrowserSystem(): AssetBrowserSystem { return this.editors.assetBrowserSystem; }
-  public get assetBrowserUI(): AssetBrowserUI { return this.editors.assetBrowserUI; }
-  public get bundleMergeSystem(): BundleMergeSystem { return this.editors.bundleMergeSystem; }
-  public get bundleMergeUI(): BundleMergeUI { return this.editors.bundleMergeUI; }
-  public get modManifestSystem(): ModManifestSystem { return this.editors.modManifestSystem; }
-  public get modManifestUI(): ModManifestUI { return this.editors.modManifestUI; }
-  public get workspaceDraftSystem(): WorkspaceDraftSystem { return this.editors.workspaceDraftSystem; }
-  public get editorHubUI(): EditorHubUI { return this.editors.editorHubUI; }
-  public get editorLayout(): EditorLayout { return this.editors.editorLayout; }
+  /** The editor suite, when the editor app plugged it in (see game/editor-plugin.ts). */
+  public editors: EditorPlugin | null = null;
+  /** True while the map editor holds the world. */
+  public get mapEditorActive(): boolean { return this.editors?.mapEditorActive ?? false; }
 
   /** Feature runtime (engine overhaul): events, phases, services, RNG, scopes. */
   public kernel!: Kernel;
@@ -578,7 +510,7 @@ export class Game {
   private get _tips(): OnboardingService { return this.kernel.services.get(OnboardingKey); }
   private _lastDynamicWorldEventHour = -1;
 
-  constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine) {
+  constructor(scene: Scene, canvas: HTMLCanvasElement, engine: Engine | WebGPUEngine, private readonly _editorFactory?: EditorFactory) {
     this.scene = scene;
     this.canvas = canvas;
     this.engine = engine;
@@ -599,7 +531,7 @@ export class Game {
     if (!this._helpOverlayEl) return;
 
     if (this._helpOverlayVisible) {
-      this._helpOverlayEl.innerHTML = buildHelpOverlayLines(this.mapEditorSystem.isEnabled).join("<br>");
+      this._helpOverlayEl.innerHTML = buildHelpOverlayLines(this.mapEditorActive).join("<br>");
       this._helpOverlayEl.style.display = "block";
     } else {
       this._helpOverlayEl.style.display = "none";
@@ -608,12 +540,10 @@ export class Game {
 
   private _refreshHelpOverlayIfVisible(): void {
     if (!this._helpOverlayVisible || !this._helpOverlayEl) return;
-    this._helpOverlayEl.textContent = buildHelpOverlayLines(this.mapEditorSystem.isEnabled).join("\n");
+    this._helpOverlayEl.textContent = buildHelpOverlayLines(this.mapEditorActive).join("\n");
   }
 
-  private _refreshEditorToolbar(): void { return this.editors.refreshToolbar(); }
 
-  private _refreshLayerPanel(): void { return this.editors.refreshLayerPanel(); }
 
   init(): void {
     // Apply the tier's hardware scaling level before the first render.
@@ -755,8 +685,9 @@ export class Game {
       return this._createFrameworkDialogueSession(targetNpc.key);
     };
     this._loadFrameworkMods();
-    // Editor tools (map editor, creators, bundles, asset browser, hub).
-    this.editors = new EditorSuite(this, {
+    // Editor tools (map editor, creators, bundles, asset browser, hub): only
+    // in the editor app, which passes them in.
+    this.editors = this._editorFactory?.(this, {
       suspendGameplay: () => this._suspendGameplayInput(),
       restoreGameplay: () => this._restoreGameplayInput(),
       editorMode: (on) => {
@@ -765,7 +696,7 @@ export class Game {
         this._inputAdapter.setContext(on ? "editor" : "play");
       },
       modeChanged: () => this._refreshHelpOverlayIfVisible(),
-    });
+    }) ?? null;
 
 
     // ── v2 system wiring ──────────────────────────────────────────────────────
@@ -1245,7 +1176,7 @@ export class Game {
     // Quick-slot assign mode: clicking a HUD slot opens the inventory; the
     // next consumable clicked there is bound to that slot.
     this.quickSlotHUD.onAssign = (key, _currentItemId) => {
-      if (this.isPaused || this.mapEditorSystem.isEnabled || this.dialogueSystem.isInDialogue) return;
+      if (this.isPaused || this.mapEditorActive || this.dialogueSystem.isInDialogue) return;
       this._quickSlotAssignKey = key;
       this.ui.showNotification(`Pick a consumable in your inventory for slot ${key}.`, 3000);
       if (!this.inventorySystem.isOpen) {
@@ -1428,7 +1359,7 @@ export class Game {
           shift: ev.shiftKey, ctrlOrMeta: ev.ctrlKey || ev.metaKey, repeat: ev.repeat,
         });
         if (handled !== null) { ev.preventDefault(); return; }
-        if (down) this.editors.handleKey(ev);
+        if (down) this.editors?.handleKey(ev);
     });
 
     // What the pause menu's buttons do.
@@ -1574,10 +1505,8 @@ export class Game {
     adapter.onAction("toggleFollowerPanel", () => {
       // In map-editor mode G cycles the gizmo (the adapter consumes the key
       // before the legacy editor branch can see it).
-      if (this.mapEditorSystem.isEnabled) {
-        const mode = this.mapEditorSystem.cycleGizmoMode();
-        this.ui.showNotification(`Editor gizmo: ${mode}`, 1400);
-        this._refreshEditorToolbar();
+      if (this.editors?.mapEditorActive) {
+        this.editors.cycleGizmo();
         return;
       }
       this.followers.togglePanel();
@@ -1628,7 +1557,7 @@ export class Game {
       if (this.dialogueSystem.isInDialogue) return;
       if (this.levelUpUI.isVisible) return;
       if (this.guardEncounterUI.isVisible) { this.kernel.services.get(ArrestKey).resist(); return; }
-      if (this.mapEditorSystem.isEnabled) { this.editors.exitMapEditor(); return; }
+      if (this.editors?.mapEditorActive) { this.editors.exitMapEditor(); return; }
       // Otherwise close the top panel, or pause.
       if (this._modals.closeTop()) return;
       this.togglePause();
@@ -1650,7 +1579,7 @@ export class Game {
     adapter.onAction("helpOverlay", () => {
       this._toggleHelpOverlay();
     });
-    adapter.onAction("toggleMapEditor", () => this.editors.toggleMapEditor());
+    adapter.onAction("toggleMapEditor", () => this.editors?.toggleMapEditor());
     adapter.onAction("toggleCharacterSheet", () => this.kernel.services.get(ProgressionKey).toggleSheet());
 
     // ── Skyrim/Oblivion-style action handlers ─────────────────────────────
@@ -1703,7 +1632,7 @@ export class Game {
     });
 
     adapter.onAction("togglePOV", () => {
-      if (this.mapEditorSystem.isEnabled) return;
+      if (this.mapEditorActive) return;
       if (!this.isPaused && !this.dialogueSystem.isInDialogue) {
         const curFov = this.player.camera.fov;
         this.player.camera.fov = curFov >= 1.8 ? 0.8 : 1.8;
@@ -1721,7 +1650,7 @@ export class Game {
 
       if (this.isPaused) {
           this._gameplayLoop.reset();
-          this.editors.exitMapEditor({ quiet: true });
+          this.editors?.exitMapEditor({ quiet: true });
           this._modals.closeAll();
           this.ui.setInteractionText("");
           this._focus.take("pause");
@@ -1984,7 +1913,7 @@ export class Game {
 
       if (this._viewModel) {
         this._viewModel.setVisible(
-          this.player.health > 0 && !this.dialogueSystem.isInDialogue && !this.mapEditorSystem.isEnabled,
+          this.player.health > 0 && !this.dialogueSystem.isInDialogue && !this.mapEditorActive,
         );
         this._viewModel.update(frameDelta, {
           blocking: this.combatSystem.isBlocking,
@@ -2208,8 +2137,6 @@ export class Game {
   /** Every panel that takes over the screen, in Escape order. */
   private _registerModals(): void {
       const restore = () => this._restoreGameplayInput();
-      const tool = (id: string, ui: { isVisible: boolean; close(): void }) =>
-        ({ id, isOpen: () => ui.isVisible, close: () => { ui.close(); restore(); } });
       this._modals.add(
         { id: "character-sheet", isOpen: () => this.characterSheetUI.isVisible,
           close: () => this.kernel.services.get(ProgressionKey).closeSheet() },
@@ -2233,13 +2160,7 @@ export class Game {
         { id: "saddlebag", isOpen: () => this.saddlebagUI.isVisible, close: () => this.saddlebagUI.close() },
         { id: "credits", isOpen: () => !!this._creditsUI?.isVisible, close: () => { this._creditsUI!.hide(); this._creditsUI!.onClose?.(); } },
         { id: "graphics", isOpen: () => this.graphicsSettingsUI.isVisible, close: () => { this.graphicsSettingsUI.hide(); this.graphicsSettingsUI.onClose?.(); } },
-        tool("quest-creator", this.questCreatorUI), tool("dialogue-creator", this.dialogueCreatorUI),
-        tool("npc-creator", this.npcCreatorUI), tool("item-creator", this.itemCreatorUI),
-        tool("faction-creator", this.factionCreatorUI), tool("loot-table-creator", this.lootTableCreatorUI),
-        tool("spawn-creator", this.spawnCreatorUI), tool("world-builder", this.worldBuilderUI),
-        tool("content-bundle", this.contentBundleUI), tool("asset-browser", this.assetBrowserUI),
-        tool("bundle-merge", this.bundleMergeUI), tool("mod-manifest", this.modManifestUI),
-        tool("editor-hub", this.editorHubUI),
+        ...(this.editors?.windows() ?? []),
         { id: "wait", isOpen: () => this.ui.isWaitDialogOpen, close: () => { this.ui.toggleWaitDialog(false); restore(); } },
       );
   }
@@ -2247,7 +2168,7 @@ export class Game {
   private _isCombatInputBlocked(): boolean {
       return (
           this.isPaused ||
-          this.mapEditorSystem.isEnabled ||
+          this.mapEditorActive ||
           this.levelUpUI.isVisible ||
           this.guardEncounterUI.isVisible ||
           this.dialogueSystem.isInDialogue ||

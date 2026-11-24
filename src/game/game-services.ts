@@ -287,13 +287,7 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
           if (skipTips !== null) persistSkipOnboardingTips(skipTips);
           gi.tips.start();
           gi.achievements?.unlock("ACH_TAKE_UP_THE_SWORD");
-          if (game.workspaceDraftSystem.hasDraft()) {
-            const result = game.workspaceDraftSystem.restore();
-            if (result.restoredCount > 0) {
-              const ts = result.savedAt ? new Date(result.savedAt).toLocaleTimeString() : "unknown";
-              game.ui.showNotification(`Workspace draft restored (${result.restoredSystems.join(", ")}) — saved at ${ts}`, 4000);
-            }
-          }
+          game.editors?.started();
         },
       });
       k.install(gi.character);

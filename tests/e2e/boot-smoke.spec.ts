@@ -298,11 +298,11 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
     const eng = (window as any).__camelotGame.scene.getEngine();
     const size = () => ({ bar: document.querySelector(".hud-bar")!.getBoundingClientRect().width, render: eng.getRenderWidth() });
     const before = size();
-    const chip = [...document.querySelectorAll<HTMLButtonElement>('[aria-label="Interface size"] button')].find((b) => b.textContent === "150% Size")!;
+    const chip = Array.from(document.querySelectorAll<HTMLButtonElement>('[aria-label="Interface size"] button')).find((b) => b.textContent === "150% Size")!;
     chip.click();
     eng.resize();
     const after = size();
-    [...document.querySelectorAll<HTMLButtonElement>('[aria-label="Interface size"] button')].find((b) => b.textContent === "100% Size")!.click();
+    Array.from(document.querySelectorAll<HTMLButtonElement>('[aria-label="Interface size"] button')).find((b) => b.textContent === "100% Size")!.click();
     return { ratio: after.bar / before.bar, sameRender: after.render === before.render, kept: localStorage.getItem("camelot.accessibility") };
   });
   expect(scaled.ratio, "the HUD scales with the interface size").toBeCloseTo(1.5, 2);

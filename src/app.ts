@@ -15,8 +15,15 @@ import HavokPhysics from "@babylonjs/havok";
 import MainScene from "./playground/main-scene";
 import { hydrateDesktopSave } from "./platform/desktop-bridge";
 import { applyPrefs, loadPrefs } from "./ui/accessibility";
+import type { EditorFactory } from "./game/editor-plugin";
 
-class App {
+export interface AppOptions {
+  /** The editor app plugs its suite into the game (see game/editor-plugin.ts). */
+  editors?: EditorFactory;
+}
+
+/** The page: canvas, engine, physics, the game, and the render loop. */
+export class App {
   public engine: Engine | WebGPUEngine;
   public scene: Scene;
 
@@ -25,7 +32,7 @@ class App {
   private _lastFpsWriteMs = Number.NEGATIVE_INFINITY;
   private _boundEvents = false;
 
-  constructor() {
+  constructor(private readonly _options: AppOptions = {}) {
     // Interface scale and reduced motion, before any UI is drawn.
     applyPrefs(loadPrefs());
     // create the canvas html element and attach it to the webpage
@@ -112,7 +119,7 @@ class App {
     // before Game constructs SaveSystem.
     await hydrateDesktopSave();
 
-    new MainScene(this.scene, this.canvas, this.engine);
+    new MainScene(this.scene, this.canvas, this.engine, this._options.editors);
 
     // Dev-only handle for in-browser debugging and the visual-shots e2e spec.
     if (import.meta.env.DEV) {
@@ -162,29 +169,6 @@ class App {
 
     this._boundEvents = true;
 
-    // Imports and hide/show the Inspector
-    // Works only in DEV mode to reduce the size of the PRODUCTION build
-    // Comment IF statement to work in both modes
-    if (import.meta.env.DEV) {
-      await import("@babylonjs/core/Debug/debugLayer");
-      await import("@babylonjs/inspector");
-
-      window.addEventListener("keydown", (ev) => {
-        // Shift+Ctrl+Alt+I
-        if (ev.repeat) {
-          return;
-        }
-
-        if (ev.shiftKey && ev.ctrlKey && ev.altKey && ev.code === "KeyI") {
-          if (this.scene.debugLayer.isVisible()) {
-            this.scene.debugLayer.hide();
-          } else {
-            this.scene.debugLayer.show();
-          }
-        }
-      });
-    } // End of IF statement
-
     // resize window
     window.addEventListener("resize", () => {
       this.engine.resize();
@@ -224,5 +208,3 @@ class App {
     document.body.appendChild(errorBanner);
   }
 }
-
-new App();

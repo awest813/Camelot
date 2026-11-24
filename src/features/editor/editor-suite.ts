@@ -53,21 +53,12 @@ import { ModManifestSystem } from "../../systems/mod-manifest-system";
 import { ModManifestUI } from "../../ui/mod-manifest-ui";
 import type { Item } from "../../systems/inventory-system";
 import type { Game } from "../../game";
+import type { EditorHooks, EditorPlugin, EditorWindow } from "../../game/editor-plugin";
 
 /** What the editors use from the game. */
 export type EditorHost = Pick<Game, "canvas" | "cellManager" | "fastTravelSystem" | "frameworkRuntime" | "interactionSystem" | "isPaused" | "lootTableSystem" | "player" | "scene" | "ui" | "world">;
 
-/** Game input hand-off and notifications the editors need. */
-export interface EditorHooks {
-  /** Give input to a panel (release the pointer, stop the camera). */
-  suspendGameplay(): void;
-  /** Give input back to play. */
-  restoreGameplay(): void;
-  /** The map editor holds input while it is on. */
-  editorMode(on: boolean): void;
-  /** The map editor turned on or off (e.g. refresh the help overlay). */
-  modeChanged(): void;
-}
+export type { EditorHooks } from "../../game/editor-plugin";
 
 /** A tool window that opens and closes. */
 interface ToolWindow { readonly isVisible: boolean; open(): void; close(): void }
@@ -89,7 +80,7 @@ const ASSET_TYPE_TO_EDITOR_TOOL: Readonly<Record<string, EditorToolId>> = {
   map: "map",
 };
 
-export class EditorSuite {
+export class EditorSuite implements EditorPlugin {
   public mapEditorSystem!: MapEditorSystem;
   public mapEditorPropertyPanel!: MapEditorPropertyPanel;
   public mapEditorToolbar!: MapEditorToolbar;
@@ -582,6 +573,43 @@ export class EditorSuite {
       this.hooks.restoreGameplay();
     };
     this.seedAssetBrowser();
+  }
+
+  public get mapEditorActive(): boolean {
+    return this.mapEditorSystem.isEnabled;
+  }
+
+  /** G in the map editor: the next gizmo mode. */
+  public cycleGizmo(): string {
+    const mode = this.mapEditorSystem.cycleGizmoMode();
+    this.host.ui.showNotification(`Editor gizmo: ${mode}`, 1400);
+    this.refreshToolbar();
+    return mode;
+  }
+
+  /** The tool windows, for the game's modal registry (Escape closes the top one). */
+  public windows(): EditorWindow[] {
+    const tool = (id: string, ui: { isVisible: boolean; close(): void }): EditorWindow =>
+      ({ id, isOpen: () => ui.isVisible, close: () => { ui.close(); this.hooks.restoreGameplay(); } });
+    return [
+      tool("quest-creator", this.questCreatorUI), tool("dialogue-creator", this.dialogueCreatorUI),
+      tool("npc-creator", this.npcCreatorUI), tool("item-creator", this.itemCreatorUI),
+      tool("faction-creator", this.factionCreatorUI), tool("loot-table-creator", this.lootTableCreatorUI),
+      tool("spawn-creator", this.spawnCreatorUI), tool("world-builder", this.worldBuilderUI),
+      tool("content-bundle", this.contentBundleUI), tool("asset-browser", this.assetBrowserUI),
+      tool("bundle-merge", this.bundleMergeUI), tool("mod-manifest", this.modManifestUI),
+      tool("editor-hub", this.editorHubUI),
+    ];
+  }
+
+  /** The player is in the world: bring back a saved workspace draft. */
+  public started(): void {
+    if (!this.workspaceDraftSystem.hasDraft()) return;
+    const result = this.workspaceDraftSystem.restore();
+    if (result.restoredCount > 0) {
+      const ts = result.savedAt ? new Date(result.savedAt).toLocaleTimeString() : "unknown";
+      this.host.ui.showNotification(`Workspace draft restored (${result.restoredSystems.join(", ")}) — saved at ${ts}`, 4000);
+    }
   }
 
   public refreshToolbar(): void {

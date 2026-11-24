@@ -7,11 +7,17 @@ function pathResolve(dir: string) {
 }
 
 type ModuleInfoLookup = (id: string) => { isEntry: boolean; importers: readonly string[] } | null;
-const staticReachCache = new Map<string, boolean>();
+const staticReachCache = new Map<string, Map<string, boolean>>();
 
-/** True when `id` is reachable from an entry through static imports only. */
-function isStaticallyReachable(id: string, getModuleInfo: ModuleInfoLookup): boolean {
-  const cached = staticReachCache.get(id);
+/** The entry modules: the game page and the editor page. */
+const GAME_ENTRY = "/index.html";
+const EDITOR_ENTRY = "/editor.html";
+
+/** True when `id` is reachable from an entry module (by path suffix) through static imports only. */
+function isStaticallyReachable(id: string, getModuleInfo: ModuleInfoLookup, entry = GAME_ENTRY): boolean {
+  let cache = staticReachCache.get(entry);
+  if (!cache) staticReachCache.set(entry, (cache = new Map()));
+  const cached = cache.get(id);
   if (cached !== undefined) return cached;
   // Breadth-first walk up the static importer graph.
   const seen = new Set<string>([id]);
@@ -21,7 +27,7 @@ function isStaticallyReachable(id: string, getModuleInfo: ModuleInfoLookup): boo
     const current = queue.shift()!;
     const info = getModuleInfo(current);
     if (!info) continue;
-    if (info.isEntry || staticReachCache.get(current) === true) {
+    if ((info.isEntry && current.endsWith(entry)) || cache.get(current) === true) {
       reachable = true;
       break;
     }
@@ -32,8 +38,33 @@ function isStaticallyReachable(id: string, getModuleInfo: ModuleInfoLookup): boo
       }
     }
   }
-  staticReachCache.set(id, reachable);
+  cache.set(id, reachable);
   return reachable;
+}
+
+/**
+ * Write dist/.vite/chunk-modules.json: each chunk's modules and imports, so
+ * tools/check-bundle.mjs can prove the game page loads no editor code.
+ */
+function chunkModulesReport() {
+  return {
+    name: "camelot-chunk-modules",
+    apply: "build" as const,
+    generateBundle(_: unknown, bundle: Record<string, any>) {
+      const report: Record<string, unknown> = {};
+      for (const [file, out] of Object.entries(bundle)) {
+        if (out.type !== "chunk") continue;
+        report[file] = {
+          entry: out.isEntry ? out.name : null,
+          facade: out.facadeModuleId ?? null,
+          imports: out.imports,
+          dynamicImports: out.dynamicImports,
+          modules: Object.keys(out.modules).map((m: string) => m.replace(process.cwd() + "/", "")),
+        };
+      }
+      (this as any).emitFile({ type: "asset", fileName: ".vite/chunk-modules.json", source: JSON.stringify(report) });
+    },
+  };
 }
 
 // https://vitejs.dev/config/
@@ -44,7 +75,7 @@ export default ({ mode }: { mode: string }) => {
     base: env.VITE_PUBLIC_PATH,
     root,
     // plugin
-    plugins: vitePlugins(env),
+    plugins: [...vitePlugins(env), chunkModulesReport()],
     // alias
     resolve: {
       alias: {
@@ -92,6 +123,8 @@ export default ({ mode }: { mode: string }) => {
       chunkSizeWarningLimit: 550,
       assetsInlineLimit: 4096,
       rollupOptions: {
+        // Two apps: the game, and the editor (the game plus the editor suite).
+        input: { index: pathResolve("index.html"), editor: pathResolve("editor.html") },
         output: {
           manualChunks(id, { getModuleInfo }) {
             // Only claim Babylon modules reachable through static imports. Babylon
@@ -100,6 +133,9 @@ export default ({ mode }: { mode: string }) => {
             // eagerly-preloaded chunk shipped ~1 MB the WebGL game never runs.
             if (id.includes("@babylonjs")) {
               if (isStaticallyReachable(id, getModuleInfo)) return "babylon-vendor";
+              // Static Babylon code only the editor app loads (GUI, …): its own
+              // chunk, so the game page never fetches it.
+              if (isStaticallyReachable(id, getModuleInfo, EDITOR_ENTRY)) return "babylon-editor";
               // Lazily-loaded shaders: one chunk per language, so WebGL fetches a
               // single GLSL file on first material compile (not a waterfall of
               // tiny chunks) and WGSL is only ever fetched by the WebGPU engine.
