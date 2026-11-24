@@ -888,7 +888,37 @@ the navmesh.
     re-rolled every time its chunk loaded. It is now fixed by where the
     stone stands. The fixture carries that one-line change, with a note.
     The unseeded-random ratchet goes to 18.
-- Next: navmesh tiles and off-screen schedules.
+- The navmesh is on by default, built in a worker, and covers buildings.
+  - Input: the loaded ground chunks plus every mesh marked as a nav
+    obstacle (`markNavObstacle`): building wall colliders and the village
+    well. Walls rise above an agent's head, so Recast leaves them out, and
+    doorways are gaps between wall boxes, so they stay walkable.
+  - Building: chunk loads and unloads request a rebuild, debounced by 2 s.
+    `navmesh.worker.ts` runs the Recast build in 64-cell tiles (about
+    0.2 s for a 250 m area with 60 walls in Node) and sends back the
+    serialized navmesh. The main thread lazily loads Recast only to
+    deserialize it and answer path queries. A newer build supersedes an
+    older reply, and without workers (Node) it builds in place.
+  - Use: combat already pathed when a navmesh existed. Schedules now do
+    too: villagers walking to work, home or a wander spot follow the
+    route around buildings and re-plan every 4 s. Until the navmesh is
+    in, they walk straight and sidestep as before.
+  - recast-detour's factory writes to `this`, which an ES module call
+    leaves undefined. `loadRecast` passes it an object, which is why the
+    old opt-in path (`VITE_ENABLE_NAVMESH=true`) could never have loaded
+    in a browser. `VITE_ENABLE_NAVMESH=false` turns the navmesh off.
+  - Tests: real Recast in Node builds from a ground chunk and a house.
+    Paths go around the house, the way in is the doorway, and a villager
+    driven by the real `ScheduleSystem` walks round to work. The control,
+    with no navmesh, walks straight through. The village e2e checks that
+    the navmesh loads from the worker, includes the walls, and routes
+    across the village.
+  - Not per-chunk incremental: each rebuild covers the loaded area (in
+    tiles, off the main thread). Swapping single tiles as chunks stream
+    needs Detour's tile API, which the recast-detour binding doesn't
+    expose. Steering beyond path-following (separation, avoidance) is not
+    done either.
+- Next: off-screen schedules.
 
 ### Phase 7 — Rendering and assets (4 weeks; can run in parallel from Phase 2)
 

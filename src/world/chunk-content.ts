@@ -20,6 +20,7 @@ import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
 import type { Scene } from "@babylonjs/core/scene";
 import type { NPC } from "../entities/npc";
+import { markNavObstacle } from "../systems/navmesh-build";
 import { Scope } from "../core/scope";
 import { actors } from "../entities/actors";
 import { ChunkOwned } from "../core/ecs/actors";
@@ -255,6 +256,8 @@ export class ChunkContent {
       box.isVisible = false;
       box.isPickable = false;
       box.checkCollisions = false;
+      // NPCs path around it (the navmesh is built from walls like this).
+      markNavObstacle(box);
       box.freezeWorldMatrix();
       try {
         const agg = new PhysicsAggregate(box, PhysicsShapeType.BOX, { mass: 0 }, scene);

@@ -34,6 +34,7 @@ import { ActorsKey, FastTravelKey, FeedbackKey, PlayerKey, SiteBuilderKey, Villa
 export { VillagesKey } from "../services";
 export type { VillagesService } from "../services";
 import { JobsKey } from "../village-jobs/jobs-feature";
+import { markNavObstacle } from "../../systems/navmesh-build";
 
 
 
@@ -183,6 +184,7 @@ export class VillagesFeature implements Feature {
     col.position.set(x, 0.5, z);
     col.isVisible = false;
     col.isPickable = false;
+    markNavObstacle(col);
     col.freezeWorldMatrix();
     const removeKeepOut = site.addKeepOut({ x, z, cos: 1, sin: 0, hw: WELL_RADIUS + 0.5, hd: WELL_RADIUS + 0.5 });
     col.onDisposeObservable.addOnce(removeKeepOut);

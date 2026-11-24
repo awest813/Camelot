@@ -43,6 +43,20 @@ export function scheduledBehaviorAt(
   return null;
 }
 
+/** Re-plan a navmesh route this often (s), in case the world changed. */
+const ROUTE_REFRESH_SECONDS = 4;
+/** A waypoint counts as reached within this distance (m). */
+const WAYPOINT_REACH = 0.6;
+
+/** An NPC's planned route to its current target. */
+interface Route { tx: number; tz: number; path: Vector3[]; i: number; age: number }
+
+/** What the schedule system needs from the navmesh. */
+export interface NavPaths {
+  readonly isReady: boolean;
+  findPath(from: Vector3, to: Vector3): Vector3[];
+}
+
 /** Per-NPC progress tracking for the stuck check. */
 interface StuckTracker {
   x: number;
@@ -82,6 +96,14 @@ export class ScheduleSystem {
    * walls.  Unset means everywhere is walkable.
    */
   public walkable: ((x: number, z: number) => boolean) | null = null;
+
+  /**
+   * Paths on the navmesh, when there is one.  NPCs walking somewhere (work,
+   * home, a wander spot) follow its route around buildings; without it they
+   * walk straight and sidestep when stuck.
+   */
+  public nav: NavPaths | null = null;
+  private _routes: WeakMap<NPC, Route> = new WeakMap();
 
   /** Fired each update while a sleeping NPC stands at its bed spot (home). */
   public onSleepArrive: ((npc: NPC) => void) | null = null;
@@ -299,6 +321,18 @@ export class ScheduleSystem {
       return true;
     }
 
+    // On the navmesh: head for the route's next waypoint.
+    const waypoint = this._routeWaypoint(npc, target, deltaTime);
+    if (waypoint) {
+      waypoint.subtractToRef(npc.mesh.position, this._direction);
+      this._direction.y = 0;
+      if (this._direction.lengthSquared() > 1e-6) {
+        this._direction.normalize();
+        this._steer(npc, speed);
+        return false;
+      }
+    }
+
     const st = this._trackProgress(npc, target, deltaTime);
     if (st.detours >= MAX_DETOURS) {
       // Blocked for good (e.g. the target is behind a wall): stand still
@@ -327,20 +361,44 @@ export class ScheduleSystem {
       }
       this._direction.set(fz * st.side + fx * 0.3, 0, -fx * st.side + fz * 0.3).normalize();
     }
-    this._direction.scaleToRef(speed, this._velocity);
-
-    if (npc.physicsAggregate?.body) {
-      npc.physicsAggregate.body.getLinearVelocityToRef(this._currentVel);
-      this._newVel.set(this._velocity.x, this._currentVel.y, this._velocity.z);
-      npc.physicsAggregate.body.setLinearVelocity(this._newVel);
-
-      this._lookAtTarget.set(
-        npc.mesh.position.x + this._direction.x, npc.mesh.position.y, npc.mesh.position.z + this._direction.z,
-      );
-      npc.mesh.lookAt(this._lookAtTarget);
-    }
-
+    this._steer(npc, speed);
     return false;
+  }
+
+  /** Walk along `this._direction` (normalised, horizontal) at `speed`, facing it. */
+  private _steer(npc: NPC, speed: number): void {
+    this._direction.scaleToRef(speed, this._velocity);
+    if (!npc.physicsAggregate?.body) return;
+    npc.physicsAggregate.body.getLinearVelocityToRef(this._currentVel);
+    this._newVel.set(this._velocity.x, this._currentVel.y, this._velocity.z);
+    npc.physicsAggregate.body.setLinearVelocity(this._newVel);
+    this._lookAtTarget.set(
+      npc.mesh.position.x + this._direction.x, npc.mesh.position.y, npc.mesh.position.z + this._direction.z,
+    );
+    npc.mesh.lookAt(this._lookAtTarget);
+  }
+
+  /**
+   * The next waypoint of the NPC's navmesh route to `target`, planning one
+   * when the target changes (and again every few seconds).  Null when there
+   * is no navmesh, no route, or the route is used up (the last metre or so
+   * is walked straight).
+   */
+  private _routeWaypoint(npc: NPC, target: Vector3, deltaTime: number): Vector3 | null {
+    if (!this.nav?.isReady) return null;
+    let route = this._routes.get(npc);
+    if (!route || route.tx !== target.x || route.tz !== target.z || route.age > ROUTE_REFRESH_SECONDS) {
+      route = { tx: target.x, tz: target.z, path: this.nav.findPath(npc.mesh.position, target), i: 0, age: 0 };
+      this._routes.set(npc, route);
+    }
+    route.age += deltaTime;
+    const p = npc.mesh.position;
+    while (route.i < route.path.length) {
+      const w = route.path[route.i];
+      if ((w.x - p.x) ** 2 + (w.z - p.z) ** 2 > WAYPOINT_REACH * WAYPOINT_REACH) break;
+      route.i++;
+    }
+    return route.i < route.path.length ? route.path[route.i] : null;
   }
 
   /**

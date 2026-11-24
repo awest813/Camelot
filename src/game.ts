@@ -660,6 +660,8 @@ export class Game {
     this._env.initFoliage(this.world);
     this.navigationSystem = new NavigationSystem(this.scene);
     this.scheduleSystem = new ScheduleSystem();
+    // Villagers walking to work, home or a wander spot follow navmesh routes.
+    this.scheduleSystem.nav = this.navigationSystem;
     this.scheduleSystem.walkable = (x, z) => this._chunks.isWalkable(x, z);
 
     // ── v2 Oblivion-lite systems ──────────────────────────────────────────────
@@ -1166,6 +1168,8 @@ export class Game {
         // What goes where lives in the world-sites feature (villages, camps,
         // inns, homesteads, the dragon, wild nature).
         this.worldSites.populate(chunkKey, cx, cz, biome);
+        // New ground and walls: the navmesh rebuilds (debounced, in a worker).
+        this.navigationSystem.requestRebuild();
       };
 
       // Dispose chunk-scoped CDN props and NPCs when their chunk unloads so
@@ -1174,6 +1178,7 @@ export class Game {
         const key = `${cx},${cz}`;
         this.eventBus.emit("chunk:unloaded", { chunkKey: key });
         this._chunks.close(key);
+        this.navigationSystem.requestRebuild();
       };
     }
 

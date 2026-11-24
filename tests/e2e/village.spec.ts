@@ -86,6 +86,25 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   }
   expect(state.calm, "villagers don't attack a visitor").toBe(true);
 
+  // ── The navmesh: built in its worker from the ground and the village walls ──
+  await expect.poll(() => page.evaluate(() => (window as any).__camelotGame.navigationSystem.isReady), {
+    timeout: 60_000, message: "the navmesh loads",
+  }).toBe(true);
+  const nav = await page.evaluate((v) => {
+    const g = (window as any).__camelotGame;
+    const ns = g.navigationSystem;
+    const V = g.player.camera.position.constructor;
+    const path = ns.findPath(new V(v!.x - 18, 0, v!.z - 18), new V(v!.x + 18, 0, v!.z + 18));
+    return {
+      inWorker: !!ns._worker,
+      walls: ns.collectInputMeshes().filter((m: any) => m.name.startsWith("bldg_wall_")).length,
+      waypoints: path.length,
+    };
+  }, v);
+  expect(nav.inWorker, "built off the main thread").toBe(true);
+  expect(nav.walls, "the village walls are in it").toBeGreaterThan(10);
+  expect(nav.waypoints, "a route across the village").toBeGreaterThan(1);
+
   // ── The innkeeper offers work in the job window; it lands in the quest log and the save ──
   const job = await page.evaluate(() => {
     const g = (window as any).__camelotGame;

@@ -1,118 +1,104 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { RecastJSPlugin } from "@babylonjs/core/Navigation/Plugins/recastJSPlugin";
+import { buildNavmeshData, geometryFromMeshes, isNavObstacle, loadRecast, type RecastModule } from "./navmesh-build";
+import type { NavBuildReply, NavBuildRequest } from "./navmesh.worker";
+
+/** On unless the build turns it off (`VITE_ENABLE_NAVMESH=false`); unit tests opt in. */
+const NAVMESH_ENABLED = import.meta.env.VITE_ENABLE_NAVMESH !== "false" && import.meta.env.MODE !== "test";
 
 /**
- * Recast/Detour navmesh parameters tuned for a humanoid-scale RPG world.
+ * NavigationSystem — Recast/Detour navmesh for NPC pathfinding.
  *
- * cs / ch    — voxel resolution (smaller = more accurate, more expensive)
- * walkable*  — agent shape / terrain constraints
- * maxEdgeLen — maximum polygon edge length in the simplified mesh
- */
-const NAV_PARAMS = {
-  cs: 0.3,
-  ch: 0.2,
-  walkableSlopeAngle: 35,
-  walkableHeight: 2,       // voxels of clear headroom required
-  walkableClimb: 0.5,      // max step height an agent can climb
-  walkableRadius: 0.5,     // NPC capsule radius in world units
-  maxEdgeLen: 12,
-  maxSimplificationError: 1.3,
-  minRegionArea: 8,
-  mergeRegionArea: 20,
-  maxVertsPerPoly: 6,
-  detailSampleDist: 6,
-  detailSampleMaxError: 1,
-};
-
-const NAVMESH_ENABLED = import.meta.env.VITE_ENABLE_NAVMESH === "true";
-
-/**
- * NavigationSystem — Recast/Detour integration for NPC pathfinding.
- *
- * Wraps Babylon.js's RecastJSPlugin which itself is a thin TypeScript
- * binding over the recast-detour WebAssembly port of the C++ Recast/Detour
- * navigation-mesh library (https://github.com/recastnavigation/recastnavigation).
+ * The navmesh covers the loaded area: every ground chunk plus the meshes
+ * marked as obstacles (building walls, the village well; see
+ * `navmesh-build.ts`), so paths go around buildings and in through their
+ * doorways.  Recast builds it in tiles.
  *
  * Lifecycle
  * ---------
- * 1. Construction kicks off async WASM loading when VITE_ENABLE_NAVMESH=true.
- * 2. Once loaded, the plugin builds an initial navmesh from any already-loaded
- *    ground chunk meshes.
- * 3. When terrain changes (new chunks load), call requestRebuild(). The rebuild
- *    is debounced by REBUILD_DELAY seconds so rapid chunk loads don't spam Recast.
- * 4. Call update(deltaTime) every frame to tick the debounce timer.
- * 5. NPCs use findPath(from, to) → Vector3[] to get a list of waypoints; they
- *    then follow the waypoints via their existing physics-based movement code.
- *    If the plugin is not yet ready, findPath returns [] and the caller should
- *    fall back to direct line movement.
+ * 1. When chunks load or unload, call `requestRebuild()`.  The rebuild is
+ *    debounced (REBUILD_DELAY) so a burst of chunk loads builds once.
+ * 2. The build runs in a worker (`navmesh.worker.ts`): the geometry goes
+ *    over, the serialized navmesh comes back, and the main thread loads it.
+ *    Without workers (Node) it builds in place.
+ * 3. Recast (recast-detour) is loaded lazily, after boot, in the worker and
+ *    here (to load built navmeshes and answer path queries).
+ * 4. `findPath(from, to)` returns waypoints, or [] until the first navmesh
+ *    is in (callers fall back to walking straight).
  */
 export class NavigationSystem {
   private _plugin: RecastJSPlugin | null = null;
-  private _scene: Scene;
-  private _enabled: boolean = NAVMESH_ENABLED;
-  private _ready: boolean = false;
+  private _recast: RecastModule | null = null;
+  private readonly _scene: Scene;
+  private readonly _enabled: boolean;
+  private _ready = false;
+  private _worker: Worker | null = null;
+  private _buildId = 0;
+  /** A finished build that arrived before Recast loaded on this thread. */
+  private _pendingData: Uint8Array | null = null;
+  private _loading: Promise<void> | null = null;
 
   // Debounced rebuild state
-  private _rebuildPending: boolean = false;
-  private _rebuildTimer: number = 0;
+  private _rebuildPending = false;
+  private _rebuildTimer = 0;
 
-  /**
-   * Seconds of inactivity after requestRebuild() before the navmesh is actually
-   * rebuilt. Prevents rebuilding dozens of times as multiple chunks load at once.
-   */
+  /** Seconds after the last `requestRebuild()` before the navmesh rebuilds. */
   private static readonly REBUILD_DELAY = 2.0;
 
-  constructor(scene: Scene) {
+  /** How many navmeshes have been loaded (tests and the debug overlay read it). */
+  public builds = 0;
+
+  constructor(scene: Scene, opts: { enabled?: boolean } = {}) {
     this._scene = scene;
-    this._init();
+    this._enabled = opts.enabled ?? NAVMESH_ENABLED;
+    if (this._enabled) this.requestRebuild();
   }
 
   // ─── Public API ────────────────────────────────────────────────────────────
 
-  /**
-   * True once Recast/Detour is loaded and a navmesh has been successfully built.
-   * NPCs should fall back to direct-line movement when this is false.
-   */
+  /** True once a navmesh is loaded; until then callers walk straight. */
   public get isReady(): boolean {
     return this._ready;
   }
 
-  /**
-   * Build (or rebuild) the navigation mesh from the given ground meshes.
-   * Only call this when the mesh collection has settled — prefer requestRebuild()
-   * to let the debounce handle timing automatically.
-   */
-  public buildNavMesh(groundMeshes: Mesh[]): void {
-    if (!this._enabled || !this._plugin || groundMeshes.length === 0) return;
-    try {
-      this._plugin.createNavMesh(groundMeshes, NAV_PARAMS);
-      this._ready = true;
-    } catch (e) {
-      console.warn("[Nav] createNavMesh failed:", e);
-      this._ready = false;
-    }
+  /** Load Recast on this thread (queries and loading built navmeshes need it). */
+  public load(): Promise<void> {
+    this._loading ??= (async () => {
+      const { default: Recast } = await import("recast-detour");
+      this._recast = (await loadRecast(Recast)) as RecastModule;
+      this._plugin = new RecastJSPlugin(this._recast);
+      if (this._pendingData) this._apply(this._pendingData);
+    })().catch((e) => {
+      console.warn("[Nav] recast-detour failed to load; NPCs walk straight.", e);
+    });
+    return this._loading;
+  }
+
+  /** The meshes the navmesh is built from: the ground chunks and the obstacles. */
+  public collectInputMeshes(): AbstractMesh[] {
+    return this._scene.meshes.filter((m) => !m.isDisposed() && (m.name.startsWith("chunk_") || isNavObstacle(m)));
   }
 
   /**
-   * Request a navmesh rebuild after terrain has changed (e.g. new chunk loaded).
-   * The actual rebuild fires REBUILD_DELAY seconds after the last call, so calling
-   * this every frame while chunks load is safe.
+   * Build now from `meshes`, on this thread (Recast must be loaded).  The
+   * game builds through the worker; this is for tools and tests.
    */
+  public buildNow(meshes: readonly AbstractMesh[] = this.collectInputMeshes()): boolean {
+    if (!this._recast || meshes.length === 0) return false;
+    this._apply(buildNavmeshData(this._recast, geometryFromMeshes(meshes)));
+    return true;
+  }
+
+  /** Rebuild soon (terrain or obstacles changed). Safe to call every frame. */
   public requestRebuild(): void {
     if (!this._enabled) return;
     this._rebuildPending = true;
     this._rebuildTimer = 0;
   }
 
-  /**
-   * Compute a world-space path between two positions using the navmesh.
-   *
-   * @returns Array of Vector3 waypoints from `from` to `to`, or [] when the
-   *          navmesh is not ready or the query fails (caller should use direct
-   *          line movement as fallback).
-   */
+  /** Waypoints from `from` to `to` on the navmesh, or [] when there is none yet. */
   public findPath(from: Vector3, to: Vector3): Vector3[] {
     if (!this._ready || !this._plugin) return [];
     try {
@@ -122,11 +108,7 @@ export class NavigationSystem {
     }
   }
 
-  /**
-   * Snap an arbitrary world position onto the nearest point on the navmesh.
-   * Useful for clamping NPC spawn positions or target waypoints to walkable area.
-   * Falls back to the original position when the navmesh is not ready.
-   */
+  /** The nearest navmesh point to `position` (the position itself when there is no navmesh). */
   public getClosestPoint(position: Vector3): Vector3 {
     if (!this._ready || !this._plugin) return position.clone();
     try {
@@ -136,67 +118,69 @@ export class NavigationSystem {
     }
   }
 
-  /**
-   * Collect all currently-loaded ground chunk meshes from the scene.
-   * WorldManager names ground chunks "chunk_<x>,<z>", so this filters by prefix.
-   */
-  public collectGroundMeshes(): Mesh[] {
-    return this._scene.meshes.filter(
-      m => m.name.startsWith("chunk_") && !m.isDisposed()
-    ) as Mesh[];
+  /** Per-frame tick: runs the debounced rebuild. */
+  public update(deltaTime: number): void {
+    if (!this._enabled || !this._rebuildPending) return;
+    this._rebuildTimer += deltaTime;
+    if (this._rebuildTimer < NavigationSystem.REBUILD_DELAY) return;
+    this._rebuildPending = false;
+    this._rebuildTimer = 0;
+    this._startBuild();
   }
 
-  /**
-   * Per-frame tick — handles the debounced navmesh rebuild.
-   * Must be called once per frame from Game.update().
-   */
-  public update(deltaTime: number): void {
-    if (!this._enabled || !this._plugin || !this._rebuildPending) return;
-    this._rebuildTimer += deltaTime;
-    if (this._rebuildTimer >= NavigationSystem.REBUILD_DELAY) {
-      this._rebuildPending = false;
-      this._rebuildTimer = 0;
-      this.buildNavMesh(this.collectGroundMeshes());
-    }
+  public dispose(): void {
+    this._worker?.terminate();
+    this._worker = null;
+    this._plugin?.dispose();
+    this._plugin = null;
   }
 
   // ─── Private ───────────────────────────────────────────────────────────────
 
-  /**
-   * Asynchronously load the recast-detour WASM module and initialise the plugin.
-   *
-   * Uses a dynamic import so the rest of the game initialises synchronously and
-   * pathfinding becomes available in the background. Navmesh pathfinding is
-   * optional because the direct-line fallback is cheaper and robust enough for
-   * the default build.
-   *
-   * To enable: set `VITE_ENABLE_NAVMESH=true` and install `recast-detour`.
-   * npm: https://www.npmjs.com/package/recast-detour
-   */
-  private async _init(): Promise<void> {
-    if (!this._enabled) return;
+  private _startBuild(): void {
+    const meshes = this.collectInputMeshes();
+    if (meshes.length === 0) { this.requestRebuild(); return; }
+    void this.load();
+    const geometry = geometryFromMeshes(meshes);
+    const id = ++this._buildId;
+    const worker = this._ensureWorker();
+    if (!worker) {
+      // No workers here: build in place once Recast is loaded.
+      void this.load().then(() => {
+        if (id === this._buildId && this._recast) this._apply(buildNavmeshData(this._recast, geometry));
+      });
+      return;
+    }
+    worker.postMessage({ id, geometry } satisfies NavBuildRequest, [geometry.positions.buffer, geometry.indices.buffer]);
+  }
 
+  private _ensureWorker(): Worker | null {
+    if (this._worker || typeof Worker === "undefined") return this._worker;
     try {
-      // recast-detour is a WASM port of the Recast/Detour C++ navigation library,
-      // packaged specifically for use with Babylon.js's RecastJSPlugin.
-      const { default: Recast } = await import("recast-detour");
-      const recast = await Recast();
-      this._plugin = new RecastJSPlugin(recast);
-
-      // Attempt an initial navmesh build from whatever chunks are already loaded.
-      const meshes = this.collectGroundMeshes();
-      if (meshes.length > 0) {
-        this.buildNavMesh(meshes);
-      } else {
-        // Schedule a rebuild once the world has had time to generate its first chunks.
-        this.requestRebuild();
-      }
+      this._worker = new Worker(new URL("./navmesh.worker.ts", import.meta.url), { type: "module" });
+      this._worker.onmessage = (e: MessageEvent<NavBuildReply>) => {
+        const reply = e.data;
+        if (reply.id !== this._buildId) return; // a newer build is on its way
+        if ("error" in reply) { console.warn("[Nav] navmesh build failed:", reply.error); return; }
+        if (this._plugin) this._apply(reply.data);
+        else this._pendingData = reply.data;
+      };
     } catch (e) {
-      console.warn(
-        "[Nav] recast-detour unavailable — install with `npm install recast-detour`.\n" +
-        "      NPCs will use direct line-of-sight movement as fallback.",
-        e
-      );
+      console.warn("[Nav] navmesh worker unavailable; building on the main thread.", e);
+      this._worker = null;
+    }
+    return this._worker;
+  }
+
+  private _apply(data: Uint8Array): void {
+    this._pendingData = null;
+    if (!this._plugin) { this._pendingData = data; return; }
+    try {
+      this._plugin.buildFromNavmeshData(data);
+      this._ready = true;
+      this.builds++;
+    } catch (e) {
+      console.warn("[Nav] loading the navmesh failed:", e);
     }
   }
 }
