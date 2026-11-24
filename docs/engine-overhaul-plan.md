@@ -849,6 +849,30 @@ one replay runs in CI.
 **Exit:** no placement code in `game.ts`. NPCs path around buildings using
 the navmesh.
 
+**Progress:**
+
+- No placement code in `game.ts`. The village guard (who patrols by day
+  and sleeps at night) and the starting forge moved into the
+  starting-area content, `STARTER_GUARD` and `STARTER_FORGE`. The guard
+  comes into the world through the NPC roster like every other NPC. Three
+  special cases that looked up `scheduleSystem.npcs[0]` (culling, level
+  scaling, the schedule) are gone.
+- Wild sites are data. `content/sites.ts` describes the scattered nature
+  and every wild site: obelisk, homestead, dragon, forest inn, haunted
+  house, graveyard, bandit camp, snow field and skull.
+  - A site has the biomes it appears in, a roll, a position, an optional
+    rotation and variants, and a list of parts: buildings, props, rings
+    of props, NPCs, forges, single assets and the dragon. A part can
+    depend on the variant or on a roll.
+  - One builder, `world/site-specs.ts`, reads them. The world-sites
+    feature lost about 150 lines of hand-written placement.
+  - Placement is identical. A test runs the old code (kept verbatim as a
+    test fixture) and the specs over 12,800 chunks across the four
+    biomes, and requires the same calls in the same order.
+- Next: the procedural structures (ruins, desert shrines, watchtowers in
+  `StructureManager`) as specs; then navmesh tiles and off-screen
+  schedules.
+
 ### Phase 7 — Rendering and assets (4 weeks; can run in parallel from Phase 2)
 
 - Render feature modules and the uniform block helper.

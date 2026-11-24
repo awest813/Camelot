@@ -1,12 +1,14 @@
 /**
  * The starting area's hand-placed content: a chest, the Old Cave, starter
- * gear and three enchanted weapons on the ground, and the first quests
+ * gear and three enchanted weapons on the ground, the village guard, a
+ * forge, and the first quests
  * (framework quests, added to the content the game's runtime is built from).
  */
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Loot } from "../entities/loot";
+import { NPC } from "../entities/npc";
 import type { Item } from "../systems/inventory-system";
 import type { QuestDefinition } from "../framework/quests/quest-types";
 import type { ContainerSystem } from "../systems/container-system";
@@ -66,8 +68,24 @@ export const STARTER_QUESTS: readonly QuestDefinition[] = [
   },
 ];
 
+/** The village guard: the starter quests' "Guard", patrolling by day, asleep by night. */
+export const STARTER_GUARD = {
+  name: "Guard",
+  at: [10, 2, 10] as const,
+  patrol: [[10, 2, 10], [10, 2, 20], [20, 2, 20], [20, 2, 10]] as const,
+};
+
+/** A forge near the start, so steel work is reachable from day one. */
+export const STARTER_FORGE = { x: -4, z: -5 };
+
 export interface StartingAreaDeps {
   scene: Scene;
+  /** Bring an NPC into the world (every tracking system, scaling, culling). */
+  addNpc(npc: NPC): void;
+  /** Give an NPC the guard's day/night schedule. */
+  guardSchedule(npc: NPC): void;
+  /** A forge and anvil that stay for good. */
+  placeSmithy(x: number, z: number): void;
   assets: FantasyAssetLoader;
   containers: ContainerSystem;
   cells: CellManager;
@@ -76,6 +94,13 @@ export interface StartingAreaDeps {
 }
 
 export function seedStartingArea(d: StartingAreaDeps): void {
+  const guard = new NPC(d.scene, new Vector3(...STARTER_GUARD.at), STARTER_GUARD.name);
+  guard.patrolPoints = STARTER_GUARD.patrol.map((p) => new Vector3(...p));
+  d.addNpc(guard);
+  d.guardSchedule(guard);
+
+  d.placeSmithy(STARTER_FORGE.x, STARTER_FORGE.z);
+
   d.containers.spawnContainer({
     id: "chest_01",
     name: "Old Chest",

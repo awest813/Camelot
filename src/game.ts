@@ -680,11 +680,6 @@ export class Game {
     // fastTravelSystem is ready). Exterior CDN props stay in LodSystem across
     // interior transitions; disposed meshes are pruned in lodSystem.update().
 
-    // Test NPC
-    const npc = new NPC(this.scene, new Vector3(10, 2, 10), "Guard");
-    npc.patrolPoints = [new Vector3(10, 2, 10), new Vector3(10, 2, 20), new Vector3(20, 2, 20), new Vector3(20, 2, 10)];
-    this.scheduleSystem.addNPC(npc);
-
     // Wire up structure NPC spawning so guards are tracked by schedule & combat.
     // (Full wiring including level scaling is done in the v8 block below.)
 
@@ -826,12 +821,6 @@ export class Game {
     this.npcArchetypeSystem.scheduleSystem = this.npcScheduleSystem;
     this.npcArchetypeSystem.registerAll(frameworkBaseContent.npcArchetypes);
 
-    // Demo guard: day/night schedule (patrol vs sleep) driven by TimeSystem → DailyScheduleSystem.
-    const demoGuard = this.scheduleSystem.npcs.find((n) => n.key === "Guard");
-    if (demoGuard) {
-      this.npcScheduleSystem.applySchedule(demoGuard, SCHED_GUARD);
-    }
-
     this.spellSystem     = new SpellSystem(this.player, this.scheduleSystem.npcs, this.ui, this.scene);
     // Seed the player with the two starter spells
     this.spellSystem.learnSpell("flames");
@@ -850,10 +839,6 @@ export class Game {
     this.lodSystem.setCamera(this.player.camera);
     this.world.setLodSystem(this.lodSystem);
     this._gamepadInput.setCamera(this.player.camera);
-    // Distance-cull the demo guard's capsule alongside the world props.
-    if (this.scheduleSystem.npcs[0]) {
-      this.lodSystem.register(this.scheduleSystem.npcs[0].mesh, 120);
-    }
 
     // Register v3 systems with save
     this.saveSystem.setSpellSystem(this.spellSystem);
@@ -1000,10 +985,6 @@ export class Game {
     this.interactionSystem.onPortalTransition = (portalId) => this._beginPortalTransition(portalId);
 
     this.levelScalingSystem = new LevelScalingSystem();
-    // Scale the test NPC on spawn (guard if the npcs list is unexpectedly empty)
-    if (this.scheduleSystem.npcs[0]) {
-      this.levelScalingSystem.scaleNPC(this.scheduleSystem.npcs[0], this.player.level);
-    }
     // Scale newly spawned structure NPCs and register them for cleanup
     this.world.structures.onNPCSpawn = (npc) => this._roster.add(npc);
     // The structure disposes its own NPCs.
@@ -1322,13 +1303,12 @@ export class Game {
       this.eventBus.emit("stealth:detected", { npcName: detectedBy.key });
     };
 
-    // Spell cast events forwarded to event bus
-    // A forge near the starting area so steel work is reachable from day one.
-    this._chunks.placeSmithy(null, null, -4, -5);
-
-    // The starting area: a chest, the Old Cave, weapons on the ground, the first quests.
+    // The starting area: the guard, a forge, a chest, the Old Cave, weapons on the ground.
     seedStartingArea({
       scene: this.scene,
+      addNpc: (npc) => this._roster.add(npc),
+      guardSchedule: (npc) => { this.npcScheduleSystem.applySchedule(npc, SCHED_GUARD); },
+      placeSmithy: (x, z) => this._chunks.placeSmithy(null, null, x, z),
       assets: this.fantasyAssets,
       containers: this.containerSystem,
       cells: this.cellManager,
