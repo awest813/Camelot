@@ -43,6 +43,29 @@ export function scheduledBehaviorAt(
   return null;
 }
 
+/**
+ * Where an NPC's schedule puts it at `hour`: its work spot, its home (to
+ * sleep, or to wander round), or one of its patrol points (which one turns
+ * with the hour).  `at` is null when the schedule says nothing for that
+ * hour, or names a place the NPC doesn't have.
+ */
+export function scheduledSpot(
+  npc: Pick<NPC, "scheduleBlocks" | "workPosition" | "homePosition" | "patrolPoints" | "spawnPosition">,
+  hour: number,
+): { behavior: ScheduleBehaviorType | null; at: Vector3 | null } {
+  const behavior = scheduledBehaviorAt(npc.scheduleBlocks, Math.floor(hour) % 24);
+  switch (behavior) {
+    case "work": return { behavior, at: npc.workPosition ?? npc.spawnPosition ?? null };
+    case "sleep":
+    case "wander": return { behavior, at: npc.homePosition ?? npc.spawnPosition ?? null };
+    case "patrol": {
+      const points = npc.patrolPoints;
+      return { behavior, at: points.length ? points[Math.floor(hour) % points.length] : null };
+    }
+    default: return { behavior: null, at: null };
+  }
+}
+
 /** Re-plan a navmesh route this often (s), in case the world changed. */
 const ROUTE_REFRESH_SECONDS = 4;
 /** A waypoint counts as reached within this distance (m). */

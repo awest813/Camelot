@@ -16,6 +16,7 @@ import { Aggressive, Dead } from "../core/ecs/actors";
 import { undeclaredFeatures, ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey, QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
 import { VillagesFeature } from "../features/villages/villages-feature";
 import { WorldSitesFeature } from "../features/world-sites/world-sites-feature";
+import { RoutinesFeature } from "../features/routines/routines-feature";
 import { IndoorsFeature } from "../features/indoors/indoors-feature";
 import { MountsFeature, MountHostKey } from "../features/mounts/mounts-feature";
 import { WorldEventsFeature } from "../features/world-events/world-events-feature";
@@ -555,6 +556,7 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
       k.install(mounts);
 
       k.install(new IndoorsFeature());
+      k.install(new RoutinesFeature());
       k.install(new VillagesFeature());
       k.install(new WorldSitesFeature());
 

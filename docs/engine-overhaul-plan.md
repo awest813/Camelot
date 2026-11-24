@@ -918,7 +918,32 @@ the navmesh.
     needs Detour's tile API, which the recast-detour binding doesn't
     expose. Steering beyond path-following (separation, avoidance) is not
     done either.
-- Next: off-screen schedules.
+- Off-screen routines (`features/routines/`). `scheduledSpot(npc, hour)`
+  says where an NPC's schedule puts it: work, home (to sleep or wander),
+  or a patrol point that turns with the hour. The routines feature uses it
+  in two places:
+  - A resident arriving with its chunk appears there, not where the village
+    plan first stood it: the smith is at the forge at noon, and sleepers
+    go straight indoors.
+  - When time passes in a jump of an hour or more between two ticks
+    (waiting, fast travel, jail, a load), every calm NPC moves to its spot
+    for the new hour. Fighting, talking and already-indoors NPCs are left
+    alone.
+
+  `teleportNpc` is the one way to move an NPC instantly (its body
+  follows); the fall recovery in `game.ts` uses it too. The older
+  `offscreen-simulation-system` (string ids, merchant gold) stays unwired.
+  Only two playtests use it.
+
+**Exit check:**
+- No placement code in `game.ts`: met.
+- NPCs path around buildings using the navmesh: met. Combat chases and
+  daily schedules follow navmesh routes built from the walls, shown by
+  the real-Recast unit test and the village e2e.
+- Data-driven site builder for all site types: met for wild sites and
+  procedural structures. Villages were already data (`planVillage`).
+- Left open: per-chunk incremental navmesh tiles (each rebuild covers the
+  loaded area), and steering beyond path-following.
 
 ### Phase 7 — Rendering and assets (4 weeks; can run in parallel from Phase 2)
 

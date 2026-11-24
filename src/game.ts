@@ -13,6 +13,7 @@ import { AdaptiveResolution } from "./rendering/adaptive-resolution";
 import { NpcVisuals } from "./rendering/npc-visuals";
 import { NpcTierSystem } from "./systems/npc-tier-system";
 import { actors } from "./entities/actors";
+import { teleportNpc } from "./entities/npc-teleport";
 import { Dead, Engaged } from "./core/ecs/actors";
 import { Player } from "./entities/player";
 import { UIManager } from "./ui/ui-manager";
@@ -1747,13 +1748,7 @@ export class Game {
    * otherwise fall forever.
    */
   private _recoverFallenNpc(npc: NPC): void {
-    const body = npc.physicsAggregate?.body;
-    npc.mesh.position.set(npc.spawnPosition.x, Math.max(npc.spawnPosition.y, 2), npc.spawnPosition.z);
-    if (!body) return;
-    body.setLinearVelocity(Vector3.Zero());
-    // Let the physics step read the teleported transform once.
-    body.disablePreStep = false;
-    this.scene.onAfterPhysicsObservable.addOnce(() => { body.disablePreStep = true; });
+    teleportNpc(npc, npc.spawnPosition.x, Math.max(npc.spawnPosition.y, 2), npc.spawnPosition.z);
   }
 
   /** Remove world loot objects whose item IDs are now in inventory or equipment (called after load). */

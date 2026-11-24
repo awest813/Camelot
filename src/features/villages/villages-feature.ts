@@ -35,6 +35,7 @@ export { VillagesKey } from "../services";
 export type { VillagesService } from "../services";
 import { JobsKey } from "../village-jobs/jobs-feature";
 import { markNavObstacle } from "../../systems/navmesh-build";
+import { RoutinesKey } from "../routines/routines-feature";
 
 
 
@@ -165,6 +166,8 @@ export class VillagesFeature implements Feature {
           { startHour: 8, endHour: 18, behavior: "sleep" },
         ];
       }
+      // Where its routine has it right now (at the forge by day, indoors at night).
+      this._services?.tryGet(RoutinesKey)?.place(npc);
     }
     this._loaded.set(chunkKey, plan);
   }
