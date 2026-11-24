@@ -6453,3 +6453,59 @@ button.craft-panel__row:focus-visible,
 .inventory__hint { color: var(--panel-good); }
 .inventory__stats { margin: 0; font: inherit; white-space: pre-wrap; color: var(--panel-text); }
 .inventory__equipment ul { list-style: none; margin: 0; padding: 0; color: var(--panel-dim); }
+
+/* Conversation box (Phase 8): bottom of the screen, over the world, not modal. */
+.dialogue-box {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 30;
+  box-sizing: border-box;
+  width: min(820px, calc(100vw - 32px));
+  max-height: calc(60vh);
+  overflow-y: auto;
+  padding: 12px 20px 16px;
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  color: var(--panel-text);
+  font-family: inherit;
+}
+.dialogue-box__speaker {
+  margin: 0 0 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--panel-border);
+  color: var(--panel-title);
+  font-size: 16px;
+  font-weight: bold;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+}
+.dialogue-box__text {
+  margin: 0 0 14px;
+  font-size: 17px;
+  font-style: italic;
+  line-height: 24px;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+}
+.dialogue-box__choices { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.dialogue-box__choice {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: rgba(36, 24, 12, 0.95);
+  color: var(--panel-text);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.dialogue-box__choice[aria-current="true"] {
+  border: 2px solid var(--panel-border-strong);
+  background: rgba(60, 40, 18, 0.95);
+  color: var(--panel-title);
+}
+.dialogue-box__choice:focus-visible { outline: 2px solid var(--panel-border-strong); outline-offset: 2px; }
+.dialogue-box__choice:disabled { background: rgba(20, 16, 10, 0.9); color: var(--panel-dim); cursor: default; }

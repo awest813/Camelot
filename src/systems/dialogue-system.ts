@@ -1,26 +1,16 @@
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { AdvancedDynamicTexture, Button, Control, Rectangle, StackPanel, TextBlock } from "@babylonjs/gui/2D";
 import { NPC, AIState } from "../entities/npc";
 import { Player } from "../entities/player";
 import { DialogueSession } from "../framework/dialogue/dialogue-engine";
 import { DialogueNodeView } from "../framework/dialogue/dialogue-types";
-import { SHARED_UI_PANEL as D } from "../ui/ui-manager";
-import { keepGuiAtCssResolution } from "../ui/gui-resolution";
+import { DialogueBoxPanel } from "../ui/dialogue-box";
 import { DialogueCamera } from "./dialogue-camera";
 
 /** Speaker's face, relative to the NPC capsule centre (1 m above its feet). */
 const NPC_FACE_OFFSET_Y = 0.62;
 /** A conversation ends if the player ends up farther than this (m) from the speaker. */
 const MAX_TALK_DISTANCE = 7;
-
-// Panel layout (px).
-const PANEL_WIDTH = 820;
-const HEADER_HEIGHT = 58;
-const CHOICE_HEIGHT = 42;
-const LINE_HEIGHT = 24;
-/** Rough characters per line of the italic speech text at 17px in the panel. */
-const CHARS_PER_LINE = 86;
 
 export interface DialogueChoiceOption {
   text: string;
@@ -35,32 +25,21 @@ export function displayNameOf(meshName: string): string {
   return meshName.replace(/_\d+$/, "");
 }
 
-/** Estimated wrapped line count for the speech text. */
-export function estimateLines(text: string, charsPerLine = CHARS_PER_LINE): number {
-  let lines = 0;
-  for (const para of text.split("\n")) lines += Math.max(1, Math.ceil(para.length / charsPerLine));
-  return lines;
-}
-
 export class DialogueSystem {
   public scene: Scene;
   public player: Player;
   public npcs: NPC[];
   public canvas: HTMLCanvasElement;
 
-  private _ui: AdvancedDynamicTexture;
-  private _dialoguePanel: Rectangle;
-  private _nameLabel: TextBlock;
-  private _textBlock: TextBlock;
-  private _choicesPanel: StackPanel;
+  private readonly _box = new DialogueBoxPanel();
+  private _speaker = "";
+  private _text = "";
   /**
    * Bethesda-style framing: the player's own camera turns to the speaker and
    * zooms in.  The game calls `camera.update(dt)` every frame.
    */
   public readonly camera = new DialogueCamera();
   private _isInDialogue: boolean = false;
-  private _choiceCount: number = 0;
-  private _buttons: Button[] = [];
   /** Highlighted choice (keyboard / hover); -1 = none. */
   private _selected = -1;
   /** Bumped on every render so stale button callbacks can't fire twice. */
@@ -100,78 +79,6 @@ export class DialogueSystem {
     this.player = player;
     this.npcs = npcs;
     this.canvas = canvas;
-    this._initUI();
-  }
-
-  private _initUI(): void {
-    this._ui = AdvancedDynamicTexture.CreateFullscreenUI("DialogueUI");
-    keepGuiAtCssResolution(this._ui, this.scene?.getEngine?.());
-
-    // Main Panel (Bottom)
-    this._dialoguePanel = new Rectangle();
-    this._dialoguePanel.width = `${PANEL_WIDTH}px`;
-    this._dialoguePanel.height = "290px";
-    this._dialoguePanel.cornerRadius = 8;
-    this._dialoguePanel.color = D.PANEL_BORDER;
-    this._dialoguePanel.thickness = 2;
-    this._dialoguePanel.background = D.PANEL_BG;
-    this._dialoguePanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-    this._dialoguePanel.top = "-18px";
-    this._dialoguePanel.isVisible = false;
-    this._ui.addControl(this._dialoguePanel);
-
-    // NPC name header
-    this._nameLabel = new TextBlock();
-    this._nameLabel.text = "";
-    this._nameLabel.color = D.TITLE;
-    this._nameLabel.fontSize = 16;
-    this._nameLabel.fontWeight = "bold";
-    this._nameLabel.height = "50px";
-    this._nameLabel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this._nameLabel.paddingTop = "12px";
-    this._nameLabel.paddingLeft = "20px";
-    this._nameLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    this._nameLabel.shadowColor = "rgba(0,0,0,0.9)";
-    this._nameLabel.shadowBlur = 4;
-    this._dialoguePanel.addControl(this._nameLabel);
-
-    // Separator below header area
-    const sep = new Rectangle();
-    sep.width = "96%";
-    sep.height = "1px";
-    sep.background = D.PANEL_BORDER;
-    sep.thickness = 0;
-    sep.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    sep.top = "54px";
-    this._dialoguePanel.addControl(sep);
-
-    // NPC dialogue text
-    this._textBlock = new TextBlock();
-    this._textBlock.text = "";
-    this._textBlock.color = D.TEXT;
-    this._textBlock.fontSize = 17;
-    this._textBlock.fontStyle = "italic";
-    this._textBlock.textWrapping = true;
-    this._textBlock.height = `${LINE_HEIGHT * 2}px`;
-    this._textBlock.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this._textBlock.top = `${HEADER_HEIGHT + 4}px`;
-    this._textBlock.paddingLeft = "20px";
-    this._textBlock.paddingRight = "20px";
-    this._textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    this._textBlock.shadowColor = "rgba(0,0,0,0.8)";
-    this._textBlock.shadowBlur = 3;
-    this._dialoguePanel.addControl(this._textBlock);
-
-    // Choices Panel
-    this._choicesPanel = new StackPanel();
-    this._choicesPanel.height = "130px";
-    this._choicesPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-    this._choicesPanel.paddingBottom = "16px";
-    // An explicit width (rather than side padding) keeps 100%-wide buttons
-    // inside the panel; with padding their right edge was clipped.
-    this._choicesPanel.width = `${PANEL_WIDTH - 40}px`;
-    this._choicesPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    this._dialoguePanel.addControl(this._choicesPanel);
   }
 
   public startDialogue(npc: NPC): void {
@@ -202,10 +109,7 @@ export class DialogueSystem {
       }
     }
 
-    // Show UI
-    this._choiceCount = 0;
     this._choices = [];
-    this._dialoguePanel.isVisible = true;
 
     const session = this.dialogueSessionProvider ? this.dialogueSessionProvider(npc) : null;
     const node = session?.getCurrentNode() ?? null;
@@ -254,28 +158,29 @@ export class DialogueSystem {
 
   /**
    * Show a line and its choices.  Every choice is numbered by position
-   * (locked ones too, so numbers never shift); the panel grows to fit the
-   * text and the choice list.
+   * (locked ones too, so numbers never shift).
    */
   private _render(speaker: string, text: string, options: DialogueChoiceOption[]): void {
-    const token = ++this._renderToken;
-    this._nameLabel.text = `✦  ${speaker}`;
-    this._textBlock.text = `"${text}"`;
-    this._choicesPanel.clearControls();
-    this._choiceCount = 0;
-    this._buttons = [];
+    ++this._renderToken;
+    this._speaker = speaker;
+    this._text = text;
     this._choices = options;
-    options.forEach((opt, i) => this._addChoice(opt, i, token));
-
-    // Fit the panel to the content.
-    const textHeight = estimateLines(this._textBlock.text) * LINE_HEIGHT + 8;
-    const listHeight = options.length * CHOICE_HEIGHT;
-    this._textBlock.height = `${textHeight}px`;
-    this._choicesPanel.height = `${listHeight + 12}px`;
-    this._dialoguePanel.height = `${HEADER_HEIGHT + textHeight + listHeight + 30}px`;
-
     this._setSelected(options.findIndex((o) => o.enabled));
     this._installKeyHandler();
+  }
+
+  /** Draw the box from the current line, choices and highlight. */
+  private _draw(): void {
+    if (!this._isInDialogue) return;
+    const token = this._renderToken;
+    this._box.show({
+      speaker: this._speaker,
+      text: this._text,
+      choices: this._choices,
+      selected: this._selected,
+      onHover: (i) => { if (i !== this._selected) this._setSelected(i); },
+      onPick: (i) => this._activate(i, token),
+    });
   }
 
   private _handleFrameworkChoice(choiceId: string): void {
@@ -307,13 +212,7 @@ export class DialogueSystem {
 
   private _setSelected(index: number): void {
     this._selected = index;
-    this._buttons.forEach((b, i) => {
-      if (!this._choices[i]?.enabled) return;
-      const on = i === index;
-      b.background = on ? D.BTN_HOVER : D.BTN_BG;
-      b.color = on ? D.TITLE : D.TEXT;
-      b.thickness = on ? 2 : 1;
-    });
+    this._draw();
   }
 
   /** Move the highlight to the next enabled choice in `dir` (wrapping). */
@@ -328,46 +227,6 @@ export class DialogueSystem {
         return;
       }
     }
-  }
-
-  private _addChoice(opt: DialogueChoiceOption, index: number, token: number): void {
-    const enabled = opt.enabled;
-    const num = index < 9 ? `[${index + 1}]  ` : "";
-    const label = enabled ? `${num}${opt.text}` : `${num}${opt.text}  —  ${opt.reason ?? "unavailable"}`;
-
-    const button = Button.CreateSimpleButton(`btn_choice_${this._choiceCount++}`, label);
-    button.width = "100%";
-    button.height = `${CHOICE_HEIGHT}px`;
-    button.color = enabled ? D.TEXT : D.DIM;
-    button.background = enabled ? D.BTN_BG : "rgba(20, 16, 10, 0.9)";
-    button.cornerRadius = 6;
-    button.thickness = 1;
-    button.fontSize = 15;
-    button.paddingBottom = "6px";
-    button.hoverCursor = enabled ? "pointer" : "default";
-    button.isEnabled = enabled;
-    // Disabled GUI buttons paint disabledColor (#9a9a9a) instead of background.
-    button.disabledColor = "rgba(20, 16, 10, 0.9)";
-    button.disabledColorItem = D.DIM;
-
-    // Left-align text like a standard RPG choice list
-    if (button.textBlock) {
-      button.textBlock.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-      button.textBlock.paddingLeft = "16px";
-    }
-
-    button.isFocusInvisible = false;
-    button.tabIndex = 0;
-    button.accessibilityTag = { description: label };
-
-    if (enabled) {
-      // Mouse and keyboard share one highlight.
-      button.onPointerEnterObservable.add(() => this._setSelected(index));
-      button.onFocusObservable.add(() => this._setSelected(index));
-      button.onPointerUpObservable.add(() => this._activate(index, token));
-    }
-    this._buttons.push(button);
-    this._choicesPanel.addControl(button);
   }
 
   private _installKeyHandler(): void {
@@ -444,13 +303,9 @@ export class DialogueSystem {
     }
     this._activeSession = null;
     this._choices = [];
-    this._buttons = [];
     this._selected = -1;
     this._renderToken++;
-
-    // Hide UI
-    this._dialoguePanel.isVisible = false;
-    this._choicesPanel.clearControls();
+    this._box.hide();
 
     // Ease the zoom back out (the player is left facing the speaker).
     this.camera.end();

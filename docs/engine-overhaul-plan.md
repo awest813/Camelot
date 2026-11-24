@@ -1098,10 +1098,18 @@ from a CDN at runtime.
   GUI fields are gone (`inventoryPanel`, `inventoryGrid`,
   `inventoryDescription`, `statsText`, `equipmentText`). `ui-manager.ts`
   is down to about 1,400 lines from 2,400.
-- Babylon GUI files: 12 → 10 (the `babylon-gui-files` ratchet). Remaining:
-  `ui-manager.ts` (the HUD, inventory, pause, quest log, skill tree, wait
-  and attribute panels), the dialogue system, the seven map-editor
-  panels (which move with the editor in Phase 9) and `gui-resolution.ts`.
+- The conversation box is Preact (`dialogue-box.tsx`): the speaker, the
+  line (announced politely to screen readers), and numbered choices as
+  buttons, with locked ones disabled and their reason shown. The
+  dialogue system still owns the conversation, the keys (capture phase,
+  so digits never reach the quick slots) and the one highlight that the
+  mouse and keyboard share. The text no longer needs a hand-estimated
+  line count, because the box grows to fit.
+- Babylon GUI files: 12 → 9 (the `babylon-gui-files` ratchet). Remaining:
+  `ui-manager.ts` (the HUD: bars, crosshair, notifications, clock,
+  compass, stealth eye, debug overlay, and the world-space damage
+  numbers), the seven map-editor panels (which move with the editor in
+  Phase 9) and `gui-resolution.ts`.
 
 ### Phase 9 — Editor app (3 weeks; after Phases 1 and 8)
 

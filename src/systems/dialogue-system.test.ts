@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { DialogueSystem, type DialogueChoiceOption } from "./dialogue-system";
 
 
@@ -36,70 +36,6 @@ vi.mock("@babylonjs/core/Cameras/arcRotateCamera", () => {
   return { ArcRotateCamera };
 });
 vi.mock("@babylonjs/core/Cameras/camera", () => ({ Camera: vi.fn() }));
-vi.mock("@babylonjs/gui/2D", () => {
-  const makeMockObs = () => ({ add: vi.fn() });
-
-  function Rectangle(this: Record<string, unknown>) {
-    this.isVisible = false;
-    this.addControl = vi.fn();
-    this.width = ""; this.height = ""; this.cornerRadius = 0;
-    this.color = ""; this.thickness = 0; this.background = "";
-    this.verticalAlignment = 0; this.top = "";
-  }
-
-  function StackPanel(this: Record<string, unknown>) {
-    this.addControl = vi.fn();
-    this.clearControls = vi.fn();
-    this.height = ""; this.verticalAlignment = 0;
-    this.paddingBottom = ""; this.paddingLeft = ""; this.paddingRight = "";
-  }
-
-  function TextBlock(this: Record<string, unknown>) {
-    this.text = ""; this.color = ""; this.fontSize = 0; this.fontWeight = "";
-    this.height = ""; this.verticalAlignment = 0; this.paddingTop = "";
-    this.paddingLeft = ""; this.paddingRight = "";
-    this.textHorizontalAlignment = 0;
-    this.shadowColor = ""; this.shadowBlur = 0;
-    this.fontStyle = ""; this.textWrapping = false;
-  }
-
-  return {
-    AdvancedDynamicTexture: {
-      CreateFullscreenUI: vi.fn(() => ({ addControl: vi.fn() })),
-    },
-    Button: {
-      CreateSimpleButton: vi.fn((_name: string, _text: string) => ({
-        width: "", height: "", color: "", background: "",
-        cornerRadius: 0, thickness: 0, fontSize: 0,
-        paddingBottom: "", hoverCursor: "", isEnabled: true,
-        isFocusInvisible: false, tabIndex: 0,
-        accessibilityTag: null as unknown,
-        textBlock: { textHorizontalAlignment: 0, paddingLeft: "" },
-        onPointerEnterObservable: makeMockObs(),
-        onPointerOutObservable: makeMockObs(),
-        onFocusObservable: makeMockObs(),
-        onBlurObservable: makeMockObs(),
-        onKeyboardEventProcessedObservable: makeMockObs(),
-        onPointerUpObservable: makeMockObs(),
-      })),
-    },
-    Control: {
-      VERTICAL_ALIGNMENT_BOTTOM: 2,
-      VERTICAL_ALIGNMENT_TOP: 0,
-      HORIZONTAL_ALIGNMENT_LEFT: 0,
-      HORIZONTAL_ALIGNMENT_CENTER: 2,
-    },
-    Rectangle,
-    StackPanel,
-    TextBlock,
-  };
-});
-vi.mock("../ui/ui-manager", () => ({
-  SHARED_UI_PANEL: {
-    PANEL_BORDER: "#888", PANEL_BG: "#111", TITLE: "#fff", TEXT: "#ccc",
-    DIM: "#555", BTN_BG: "#222", BTN_HOVER: "#444",
-  },
-}));
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -151,6 +87,7 @@ describe("DialogueSystem", () => {
   beforeEach(() => {
     ({ sys } = makeSystem());
   });
+  afterEach(() => sys.endDialogue());
 
   it("starts not in dialogue", () => {
     expect(sys.isInDialogue).toBe(false);
@@ -375,11 +312,37 @@ describe("DialogueSystem", () => {
     });
 
     it("shows a readable speaker name in the fallback conversation", async () => {
-      const { displayNameOf, estimateLines } = await import("./dialogue-system");
+      const { displayNameOf } = await import("./dialogue-system");
       expect(displayNameOf("Innkeeper_10042")).toBe("Innkeeper");
       expect(displayNameOf("Town Guard_7")).toBe("Town Guard");
-      expect(estimateLines("short")).toBe(1);
-      expect(estimateLines("x".repeat(200))).toBe(3);
+    });
+
+    it("draws the box on the page: speaker, line, numbered choices, the reason for a locked one", () => {
+      const { session, chosen } = sessionWithLockedMiddle();
+      sys.dialogueSessionProvider = () => session as never;
+      sys.startDialogue(makeNpc());
+      const box = document.querySelector(".dialogue-box")!;
+      expect(box.querySelector(".dialogue-box__speaker")!.textContent).toContain("Innkeeper");
+      expect(box.querySelector(".dialogue-box__text")!.textContent).toBe('"What\'ll it be?"');
+      const buttons = Array.from(box.querySelectorAll<HTMLButtonElement>(".dialogue-box__choice"));
+      expect(buttons.map((b) => b.textContent)).toEqual(["[1]  Ale.", "[2]  A room.  —  needs 10 gold coins", "[3]  Goodbye."]);
+      expect(buttons.map((b) => b.disabled)).toEqual([false, true, false]);
+      expect(buttons[0].getAttribute("aria-current")).toBe("true");
+
+      // The keyboard highlight and the mouse share one selection.
+      key("ArrowDown");
+      expect(document.querySelectorAll(".dialogue-box__choice")[2].getAttribute("aria-current")).toBe("true");
+      document.querySelectorAll<HTMLButtonElement>(".dialogue-box__choice")[0].dispatchEvent(new MouseEvent("mouseenter"));
+      expect(document.querySelectorAll(".dialogue-box__choice")[0].getAttribute("aria-current")).toBe("true");
+
+      // A click picks it; a locked choice can't be clicked.
+      document.querySelectorAll<HTMLButtonElement>(".dialogue-box__choice")[0].click();
+      expect(chosen).toEqual(["a"]);
+      document.querySelectorAll<HTMLButtonElement>(".dialogue-box__choice")[1].click();
+      expect(chosen).toEqual(["a"]);
+
+      sys.endDialogue();
+      expect(document.querySelector(".dialogue-box")).toBeNull();
     });
   });
 });
