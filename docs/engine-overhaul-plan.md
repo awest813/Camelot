@@ -1025,6 +1025,17 @@ from a CDN at runtime.
 - Nothing is fetched from a CDN at runtime (boot-smoke checks this). The
   remote props stay opt-in (`VITE_ENABLE_REMOTE_PROPS`).
 
+**Exit check:**
+- Budgets met on the census scenes: yes; `perf-budget.spec.ts` passes.
+- Model size at most 50% of before: yes, 41% (19 of 46 MB).
+- WebGPU is the default where supported: yes, with WebGL2 as fallback.
+- Nothing fetched from a CDN at runtime: yes; boot-smoke and the shader
+  harness check it.
+- Not done yet from the bullet list: thin-instanced vegetation (vegetation
+  is merged per material per chunk), a light budget across sites, model
+  LODs and an asset manifest, and god rays on WebGPU (waiting on WGSL for
+  Babylon's scattering pass).
+
 ### Phase 8 — UI consolidation (3 weeks; can run in parallel from Phase 2)
 
 - Move the Babylon GUI panels (dialogue, inventory, pause, quest log, skill
