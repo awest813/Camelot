@@ -32,7 +32,7 @@ function setup() {
   const items: Item[] = [];
   const deps = {
     player: { carryWeight: 0, gearDamagePenalty: 0, gearArmorPenalty: 0, maxCarryWeight: 300, health: 50, maxHealth: 100 },
-    ui: { showNotification: vi.fn(), uiTexture: {} },
+    ui: { showNotification: vi.fn() },
     inventory: {
       items,
       get totalWeight() { return items.reduce((n, i) => n + (i.weight ?? 0) * i.quantity, 0); },

@@ -1,4 +1,4 @@
-import type { AdvancedDynamicTexture } from "@babylonjs/gui/2D";
+import { AdvancedDynamicTexture } from "@babylonjs/gui/2D";
 
 /** The slice of a Babylon engine this helper needs (keeps test mocks small). */
 interface ScalingEngineLike {
@@ -35,4 +35,15 @@ export function keepGuiAtCssResolution(
   // setHardwareScalingLevel() resizes the engine, so a tier change mid-game
   // arrives here too.
   engine.onResizeObservable?.add(sync);
+}
+
+/**
+ * A fullscreen GUI texture kept at CSS-pixel resolution.  Only the in-game
+ * map editor's panels still draw with Babylon GUI (they move to the editor
+ * app in Phase 9); the game's own UI is on the DOM layer.
+ */
+export function createFullscreenGui(name: string, engine: ScalingEngineLike | null | undefined): AdvancedDynamicTexture {
+  const ui = AdvancedDynamicTexture.CreateFullscreenUI(name);
+  keepGuiAtCssResolution(ui, engine);
+  return ui;
 }

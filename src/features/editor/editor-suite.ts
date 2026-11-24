@@ -15,6 +15,7 @@ import { Loot } from "../../entities/loot";
 import { frameworkBaseContent } from "../../framework/content/base-content";
 import { MapEditorSystem } from "../../systems/map-editor-system";
 import { MapEditorPropertyPanel } from "../../ui/map-editor-property-panel";
+import { createFullscreenGui } from "../../ui/gui-resolution";
 import { MapEditorToolbar } from "../../ui/map-editor-toolbar";
 import { MapEditorHierarchyPanel } from "../../ui/map-editor-hierarchy-panel";
 import { MapEditorValidationPanel } from "../../ui/map-editor-validation-panel";
@@ -125,6 +126,12 @@ export class EditorSuite {
   public editorHubUI!: EditorHubUI;
   public editorLayout!: EditorLayout;
 
+  /** The map editor panels' Babylon GUI texture (made on first use). */
+  private _gui: ReturnType<typeof createFullscreenGui> | null = null;
+  private get guiTexture(): ReturnType<typeof createFullscreenGui> {
+    return this._gui ??= createFullscreenGui("EditorUI", this.host.scene.getEngine?.());
+  }
+
   constructor(private readonly host: EditorHost, private readonly hooks: EditorHooks) {
     this.mapEditorSystem = new MapEditorSystem(this.host.scene);
     this.mapEditorSystem.currentAuthor = this.loadAuthor();
@@ -139,7 +146,7 @@ export class EditorSuite {
     this.editorLayout.registerPanel("validation", { side: "bottom", size: 200, isVisible: false });
 
     // ── Map editor property panel ─────────────────────────────────────────────
-    this.mapEditorPropertyPanel = new MapEditorPropertyPanel(this.host.ui.uiTexture);
+    this.mapEditorPropertyPanel = new MapEditorPropertyPanel(this.guiTexture);
     this.mapEditorPropertyPanel.onApply = (entityId, props, layerName) => {
       this.mapEditorSystem.setEntityProperties(entityId, props);
       this.mapEditorSystem.setEntityLayer(entityId, layerName);
@@ -213,7 +220,7 @@ export class EditorSuite {
     };
 
     // ── Map editor toolbar ────────────────────────────────────────────────────
-    this.mapEditorToolbar = new MapEditorToolbar(this.host.ui.uiTexture);
+    this.mapEditorToolbar = new MapEditorToolbar(this.guiTexture);
     this.mapEditorToolbar.onPlacementTypeChange = (ptype) => {
       this.mapEditorSystem.currentPlacementType = ptype;
       this.refreshToolbar();
@@ -230,13 +237,13 @@ export class EditorSuite {
     };
 
     // ── Map editor hierarchy panel ────────────────────────────────────────────
-    this.mapEditorHierarchyPanel = new MapEditorHierarchyPanel(this.host.ui.uiTexture);
+    this.mapEditorHierarchyPanel = new MapEditorHierarchyPanel(this.guiTexture);
     this.mapEditorHierarchyPanel.onEntityClick = (entityId) => {
       this.mapEditorSystem.selectEntityById(entityId);
     };
 
     // ── Map editor validation panel ───────────────────────────────────────────
-    this.mapEditorValidationPanel = new MapEditorValidationPanel(this.host.ui.uiTexture);
+    this.mapEditorValidationPanel = new MapEditorValidationPanel(this.guiTexture);
     this.mapEditorValidationPanel.onRevalidate = () => {
       const report = this.mapEditorSystem.validateMap(0.5, {
         knownLootTableIds: this.host.lootTableSystem.getTableIds(),
@@ -248,7 +255,7 @@ export class EditorSuite {
     };
 
     // ── Map editor palette panel ──────────────────────────────────────────────
-    this.mapEditorPalettePanel = new MapEditorPalettePanel(this.host.ui.uiTexture);
+    this.mapEditorPalettePanel = new MapEditorPalettePanel(this.guiTexture);
     this.mapEditorPalettePanel.onPlacementTypeChange = (ptype) => {
       this.mapEditorSystem.currentPlacementType = ptype;
       this.refreshToolbar();
@@ -302,7 +309,7 @@ export class EditorSuite {
     };
 
     // ── Map editor layer panel ────────────────────────────────────────────────
-    this.mapEditorLayerPanel = new MapEditorLayerPanel(this.host.ui.uiTexture);
+    this.mapEditorLayerPanel = new MapEditorLayerPanel(this.guiTexture);
     this.mapEditorLayerPanel.onLayerVisibilityChange = (name, visible) => {
       this.mapEditorSystem.setLayerVisible(name, visible);
       this.refreshLayerPanel();
@@ -337,7 +344,7 @@ export class EditorSuite {
     };
 
     // ── Map editor notes panel ────────────────────────────────────────────────
-    this.mapEditorNotesPanel = new MapEditorNotesPanel(this.host.ui.uiTexture);
+    this.mapEditorNotesPanel = new MapEditorNotesPanel(this.guiTexture);
     this.mapEditorNotesPanel.onSave = (text) => {
       this.mapEditorSystem.notes = text;
       this.host.ui.showNotification("Scene notes saved", 1200);

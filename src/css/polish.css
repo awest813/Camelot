@@ -143,7 +143,7 @@
 
 .quickslot-hud {
   position: fixed;
-  /* Clears the Babylon GUI XP row (bottom 50–78px) — at 56px the XP bar ran through the slots. */
+  /* Clears the HUD's XP row (bottom 50–78px) — at 56px the XP bar ran through the slots. */
   bottom: 86px;
   left: 50%;
   transform: translateX(-50%);

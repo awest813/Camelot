@@ -5,8 +5,6 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { Observer } from "@babylonjs/core/Misc/observable";
-import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Grid, Button } from "@babylonjs/gui/2D";
-import { LinearGradient } from "@babylonjs/gui/2D/controls/gradient/LinearGradient";
 import { Item } from "../systems/inventory-system";
 import { Quest } from "../systems/quest-system";
 import { EquipSlot } from "../systems/equipment-system";
@@ -14,7 +12,7 @@ import { getItemIcon } from "./icon-utils";
 import { Player } from "../entities/player";
 import type { SkillTree } from "../systems/skill-tree-system";
 import { AttributeSystem, ATTRIBUTE_NAMES, type AttributeName } from "../systems/attribute-system";
-import { keepGuiAtCssResolution } from "./gui-resolution";
+import { HudDom } from "./hud-dom";
 import { WaitDialogPanel } from "./wait-dialog";
 import { AttributePanelView } from "./attribute-panel";
 import { QuestLogView } from "./quest-log-panel";
@@ -22,49 +20,8 @@ import { PauseMenuView, type PauseActions } from "./pause-menu";
 import { SkillTreeView } from "./skill-tree-panel";
 import { InventoryPanelView } from "./inventory-panel";
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
-const T = {
-  PANEL_BG:     "rgba(8, 5, 2, 0.94)",
-  PANEL_BORDER: "#8B6914",
-  TITLE:        "#E8C656",
-  TEXT:         "#F2E8D8",
-  DIM:          "#A89880",
-  GOOD:         "#5EC45E",
-  HP_FILL:      "#CC1A1A",
-  HP_BG:        "rgba(60, 4, 4, 0.72)",
-  MP_FILL:      "#1A4ACC",
-  MP_BG:        "rgba(4, 12, 60, 0.72)",
-  SP_FILL:      "#1A8840",
-  SP_BG:        "rgba(4, 28, 12, 0.72)",
-  XP_FILL:      "#E8C656",
-  XP_BG:        "rgba(30, 18, 0, 0.75)",
-  BTN_BG:       "rgba(32, 22, 8, 0.96)",
-  BTN_HOVER:    "rgba(72, 52, 14, 0.98)",
-  SLOT_BG:      "rgba(22, 16, 6, 0.88)",
-  SLOT_HOVER:   "rgba(52, 38, 10, 0.92)",
-  EQUIP_BG:     "rgba(44, 30, 4, 0.88)",
-  EQUIP_BORDER: "#E8C656",
-};
-
-/** Subset of `T` for panels that should match the main HUD (e.g. dialogue). */
-export const SHARED_UI_PANEL = {
-  PANEL_BG:     T.PANEL_BG,
-  PANEL_BORDER: T.PANEL_BORDER,
-  TITLE:        T.TITLE,
-  TEXT:         T.TEXT,
-  DIM:          T.DIM,
-  BTN_BG:       T.BTN_BG,
-  BTN_HOVER:    T.BTN_HOVER,
-} as const;
-
 /** Cardinal labels for the compass strip, clockwise from north. */
 const COMPASS_DIRECTIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
-
-const clampPercentage = (current: number, max: number): string => {
-  if (max <= 0) return "0%";
-  const percent = (current / max) * 100;
-  return `${Math.min(100, Math.max(0, percent))}%`;
-};
 
 type RotatableCamera = {
   rotation: Vector3;
@@ -80,14 +37,8 @@ const hasRotatableCamera = (camera: unknown): camera is RotatableCamera => {
 
 export class UIManager {
   public scene: Scene;
-  /** The underlying Babylon.js AdvancedDynamicTexture used for all 2-D UI. */
-  public get uiTexture(): AdvancedDynamicTexture { return this._ui; }
-  private _ui: AdvancedDynamicTexture;
-
-  // Bars
-  public healthBar: Rectangle;
-  public magickaBar: Rectangle;
-  public staminaBar: Rectangle;
+  /** The HUD's elements (see hud-dom.ts). */
+  public readonly hud = new HudDom();
 
   // Inventory
   /** The inventory (a Preact panel; see inventory-panel.tsx), drawn from the state below. */
@@ -122,39 +73,15 @@ export class UIManager {
   private _pauseActions: PauseActions | null = null;
   public isPauseMenuOpen = false;
 
-  private _hpPulseObs: any = null;
-
-  // ── Pooled transient feedback ─────────────────────────────────────────────
-  // Notifications, damage numbers, hit flashes, and impact sparks reuse
-  // pre-allocated controls/meshes driven by one shared observer each, so
-  // combat bursts don't allocate controls and observers per event.
-  private _notifyRows: Array<{ rect: Rectangle; label: TextBlock; remainingMs: number }> = [];
-  private _notifyObs: Observer<Scene> | null = null;
-
-  private _damageRows: Array<{ label: TextBlock; topPx: number; elapsedMs: number; active: boolean }> = [];
-  private _damageObs: Observer<Scene> | null = null;
-  private readonly _damageLifetimeMs = 1000;
-
-  private _flashRows: Array<{ rect: Rectangle; t: number; active: boolean }> = [];
-  private _flashObs: Observer<Scene> | null = null;
-  private readonly _flashDurationMs = 420;
-
+  // Impact sparks reuse pre-allocated meshes driven by one shared observer.
   private _sparkRows: Array<{ mesh: Mesh; mat: StandardMaterial; scale: number; active: boolean }> = [];
   private _sparkObs: Observer<Scene> | null = null;
-
-  // Interaction
-  public interactionLabel: TextBlock;
-  public crosshair: Rectangle;
-  private _crosshairArms: Rectangle[] = [];
 
   // Quest Log
   /** The quest log (a Preact panel; see quest-log-panel.tsx). */
   private readonly _questLog = new QuestLogView();
   public isQuestLogOpen = false;
 
-  // XP Bar
-  public xpBar: Rectangle;
-  private _xpLevelLabel: TextBlock;
   /** True while the HTML Character Sheet overlay is open (hides crosshair with other blocking panels). */
   private _characterSheetOpen: boolean = false;
   private _htmlOverlayCount: number = 0;
@@ -187,12 +114,9 @@ export class UIManager {
   private _cameraShakeObs: Observer<Scene> | null = null;
   public onHitStopRequested: ((durationMs: number) => void) | null = null;
 
-  // Notifications
-  public notificationPanel: StackPanel;
-
-  /** Full-screen fade for cell loads and scripted cuts (above HUD, below pause at 100). */
-  private _transitionOverlay: Rectangle | null = null;
-  private _transitionFadeObserver: any = null;
+  /** Full-screen fade for cell loads and scripted cuts. */
+  private _fadeAlpha = 0;
+  private _transitionFadeObserver: Observer<Scene> | null = null;
 
   // Skill Tree
   /** The skill trees (a Preact panel; see skill-tree-panel.tsx). */
@@ -202,23 +126,8 @@ export class UIManager {
   /** Called when the player clicks a skill upgrade button. Set by Game. */
   public onSkillPurchase: ((treeIndex: number, skillIndex: number) => void) | null = null;
 
-  // ── Debug / Performance Overlay ──────────────────────────────────────────
-  private _debugPanel: Rectangle | null = null;
-  private _debugText: TextBlock | null = null;
   public isDebugVisible: boolean = false;
-
-  // ── Stealth HUD ────────────────────────────────────────────────────────
-  private _stealthPanel: Rectangle | null = null;
-  private _stealthLabel: TextBlock | null = null;
   private _lastStealthHudLabel: "Hidden" | "Caution" | "Detected" | null | undefined = undefined;
-
-  // ── Clock HUD ─────────────────────────────────────────────────────────
-  private _clockLabel: TextBlock | null = null;
-
-  // ── Combat state readout (combo / finisher / riposte) ────────────────────
-  private _combatStateLabel: TextBlock | null = null;
-  private _lastCombatStateText: string | null = null;
-  private _lastCombatStateVisible: boolean | null = null;
 
   // ── Attribute Panel ───────────────────────────────────────────────────────
   /** The Attributes panel (a Preact panel; see attribute-panel.tsx). */
@@ -242,169 +151,13 @@ export class UIManager {
   /** Called with the chosen hour count when the player confirms the wait. */
   public onWaitConfirm: ((hours: number) => void) | null = null;
 
-  // ── Compass HUD ────────────────────────────────────────────────────────────
-  private _compassPanel: Rectangle | null = null;
-  private _compassLabel: TextBlock | null = null;
   private _lastCompassIndex: number = -1;
 
   constructor(scene: Scene) {
     this.scene = scene;
-    this._initUI();
-    this._initDebugOverlay();
-    this._initStealthHUD();
-    this._initClockHUD();
-    this._initCompassHUD();
-  }
-
-  // ── Init methods ─────────────────────────────────────────────────────────────
-
-  private _initUI(): void {
-    this._ui = AdvancedDynamicTexture.CreateFullscreenUI("UI");
-    keepGuiAtCssResolution(this._ui, this.scene?.getEngine?.());
-
-    if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
-      window.addEventListener("resize", () => {
-      });
-    }
-
-    // ── Cross-shaped Crosshair ────────────────────────────────────────────────
-    this.crosshair = new Rectangle("crosshairContainer");
-    this.crosshair.width = "30px";
-    this.crosshair.height = "30px";
-    this.crosshair.thickness = 0;
-    this.crosshair.background = "transparent";
-    this._ui.addControl(this.crosshair);
-
-    // 4 arms: top, bottom, left, right (with a gap at center)
-    const armDefs = [
-      { w: "2px", h: "9px", top: "-10px", left:   "0px" }, // top
-      { w: "2px", h: "9px", top:  "10px", left:   "0px" }, // bottom
-      { w: "9px", h: "2px", top:   "0px", left: "-10px" }, // left
-      { w: "9px", h: "2px", top:   "0px", left:  "10px" }, // right
-    ];
-    for (const def of armDefs) {
-      const arm = new Rectangle();
-      arm.width = def.w;
-      arm.height = def.h;
-      arm.top = def.top;
-      arm.left = def.left;
-      arm.cornerRadius = 1;
-      arm.thickness = 0;
-      arm.background = "rgba(248, 246, 240, 0.92)";
-      this.crosshair.addControl(arm);
-      this._crosshairArms.push(arm);
-    }
-    // Center dot
-    const dot = new Rectangle();
-    dot.width = "3px";
-    dot.height = "3px";
-    dot.cornerRadius = 2;
-    dot.thickness = 0;
-    dot.background = "rgba(248, 246, 240, 0.95)";
-    this.crosshair.addControl(dot);
-    this._crosshairArms.push(dot);
-
-    // ── Interaction Label ─────────────────────────────────────────────────────
-    this.interactionLabel = new TextBlock();
-    this.interactionLabel.text = "";
-    this.interactionLabel.color = T.TEXT;
-    this.interactionLabel.fontSize = 18;
-    this.interactionLabel.fontWeight = "bold";
-    this.interactionLabel.top = "60px";
-    this.interactionLabel.shadowColor = "rgba(0,0,0,0.85)";
-    this.interactionLabel.shadowBlur = 6;
-    this.interactionLabel.shadowOffsetY = 1;
-    this._ui.addControl(this.interactionLabel);
-
-    // ── Status Bars (Bottom Center) ───────────────────────────────────────────
-    const barsPanel = new StackPanel();
-    barsPanel.isVertical = false;
-    barsPanel.height = "28px";
-    barsPanel.width = "630px";
-    barsPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    barsPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-    barsPanel.top = "-18px";
-    this._ui.addControl(barsPanel);
-
-    // Magicka Bar (left)
-    const { container: mpContainer, bar: mpBar } = this._createBar("MP", T.MP_FILL, T.MP_BG, barsPanel);
-    mpContainer.paddingRight = "8px";
-    this.magickaBar = mpBar;
-
-    // Health Bar (center)
-    const { container: hpContainer, bar: hpBar } = this._createBar("HP", T.HP_FILL, T.HP_BG, barsPanel);
-    hpContainer.paddingLeft = "8px";
-    hpContainer.paddingRight = "8px";
-    this.healthBar = hpBar;
-
-    // Stamina Bar (right)
-    const { container: spContainer, bar: spBar } = this._createBar("SP", T.SP_FILL, T.SP_BG, barsPanel);
-    spContainer.paddingLeft = "8px";
-    this.staminaBar = spBar;
-
-    // ── XP Bar ────────────────────────────────────────────────────────────────
-    const xpRow = new StackPanel();
-    xpRow.isVertical = false;
-    xpRow.height = "28px";
-    xpRow.width = "630px";
-    xpRow.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    xpRow.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-    xpRow.top = "-50px";
-    this._ui.addControl(xpRow);
-
-    this._xpLevelLabel = new TextBlock();
-    this._xpLevelLabel.text = "CL 1\nLv.1";
-    this._xpLevelLabel.color = T.TITLE;
-    this._xpLevelLabel.fontSize = 10;
-    this._xpLevelLabel.fontWeight = "bold";
-    this._xpLevelLabel.lineSpacing = "-2px";
-    this._xpLevelLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    this._xpLevelLabel.width = "56px";
-    this._xpLevelLabel.height = "100%";
-    xpRow.addControl(this._xpLevelLabel);
-
-    const xpBarContainer = new Rectangle();
-    xpBarContainer.width = "568px";
-    xpBarContainer.height = "8px";
-    xpBarContainer.cornerRadius = 5;
-    xpBarContainer.color = "rgba(212, 160, 23, 0.45)";
-    xpBarContainer.thickness = 1;
-    xpBarContainer.background = T.XP_BG;
-    xpRow.addControl(xpBarContainer);
-
-    this.xpBar = new Rectangle();
-    this.xpBar.width = "0%";
-    this.xpBar.height = "100%";
-    this.xpBar.cornerRadius = 5;
-    this.xpBar.thickness = 0;
-    this.xpBar.background = T.XP_FILL;
-    this.xpBar.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    xpBarContainer.addControl(this.xpBar);
-
-    // ── Notifications (Top-Right) ─────────────────────────────────────────────
-    this.notificationPanel = new StackPanel();
-    this.notificationPanel.width = "320px";
-    this.notificationPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
-    this.notificationPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this.notificationPanel.top = "70px";
-    this.notificationPanel.left = "-16px";
-    this.notificationPanel.isVertical = true;
-    // Rows change height/visibility between layouts; don't clip a toast to the
-    // previous frame's stack height.
-    this.notificationPanel.clipChildren = false;
-    this.notificationPanel.clipContent = false;
-    this._ui.addControl(this.notificationPanel);
-
-    this._transitionOverlay = new Rectangle("screenTransition");
-    this._transitionOverlay.width = "100%";
-    this._transitionOverlay.height = "100%";
-    this._transitionOverlay.thickness = 0;
-    this._transitionOverlay.background = "black";
-    this._transitionOverlay.alpha = 0;
-    this._transitionOverlay.isVisible = false;
-    this._transitionOverlay.isPointerBlocker = true;
-    this._transitionOverlay.zIndex = 5000;
-    this._ui.addControl(this._transitionOverlay);
+    this.updateCompass(0);
+    this.updateClock("08:00");
+    this.updateXP(0, 1, 1, 1);
   }
 
   /**
@@ -419,16 +172,15 @@ export class UIManager {
     onComplete?: () => void;
   } = {}): void {
     this.cancelScreenFade();
-    if (!this._transitionOverlay) return;
 
     const fadeOutMs = options.fadeOutMs ?? 380;
     const holdMs = options.holdMs ?? 120;
     const fadeInMs = options.fadeInMs ?? 420;
     const total = fadeOutMs + holdMs + fadeInMs;
 
-    const overlay = this._transitionOverlay;
-    overlay.isVisible = true;
-    overlay.alpha = 0;
+    const setAlpha = (a: number) => { this._fadeAlpha = a; this.hud.setFade(a); };
+    setAlpha(0);
+    this.hud.fade.hidden = false;
 
     let elapsed = 0;
     let blackFired = false;
@@ -440,20 +192,19 @@ export class UIManager {
       // (at ~9 fps one frame is longer than it), or the move never happens.
       if (!blackFired && elapsed > fadeOutMs) {
         blackFired = true;
-        overlay.alpha = 1;
+        setAlpha(1);
         options.onBlack?.();
       }
 
       if (elapsed <= fadeOutMs) {
-        overlay.alpha = Math.min(1, elapsed / fadeOutMs);
+        setAlpha(Math.min(1, elapsed / fadeOutMs));
       } else if (elapsed <= fadeOutMs + holdMs) {
-        overlay.alpha = 1;
+        setAlpha(1);
       } else if (elapsed <= total) {
         const t = (elapsed - fadeOutMs - holdMs) / fadeInMs;
-        overlay.alpha = Math.max(0, 1 - t);
+        setAlpha(Math.max(0, 1 - t));
       } else {
-        overlay.alpha = 0;
-        overlay.isVisible = false;
+        setAlpha(0);
         this.scene.onBeforeRenderObservable.remove(this._transitionFadeObserver);
         this._transitionFadeObserver = null;
         options.onComplete?.();
@@ -467,14 +218,12 @@ export class UIManager {
       this.scene.onBeforeRenderObservable.remove(this._transitionFadeObserver);
       this._transitionFadeObserver = null;
     }
-    if (this._transitionOverlay) {
-      this._transitionOverlay.alpha = 0;
-      this._transitionOverlay.isVisible = false;
-    }
+    this._fadeAlpha = 0;
+    this.hud.setFade(0);
   }
 
   public get isScreenFadeActive(): boolean {
-    return this._transitionOverlay !== null && this._transitionOverlay.isVisible && this._transitionOverlay.alpha > 0.001;
+    return this._fadeAlpha > 0.001;
   }
 
   public toggleSkillTree(visible: boolean): void {
@@ -502,85 +251,9 @@ export class UIManager {
     this._skillTree.refresh({ trees, skillPoints, prereqMet });
   }
 
-  private _createButton(text: string, parent: StackPanel): Button {
-    const button = Button.CreateSimpleButton("btn_" + text, text);
-    button.width = "100%";
-    button.height = "52px";
-    button.color = T.TEXT;
-    button.cornerRadius = 6;
-    button.background = T.BTN_BG;
-    button.paddingBottom = "8px";
-    button.hoverCursor = "pointer";
-    button.thickness = 1;
-    button.fontSize = 16;
-
-    button.isFocusInvisible = false;
-    button.tabIndex = 0;
-    button.accessibilityTag = { description: text };
-
-    let isFocused = false;
-    const setHover = () => {
-      button.background = T.BTN_HOVER;
-      button.color = T.TITLE;
-      if (button.thickness !== 2) button.thickness = 1;
-    };
-    const setFocus = () => {
-      isFocused = true;
-      button.background = T.BTN_HOVER;
-      button.color = T.TITLE;
-      button.thickness = 2; // Distinct visual indicator for keyboard focus
-    };
-    const setNormal = () => {
-      button.background = T.BTN_BG;
-      button.color = T.TEXT;
-      if (!isFocused) {
-        button.thickness = 1;
-      }
-    };
-    const setBlur = () => {
-      isFocused = false;
-      setNormal();
-    };
-
-    button.onPointerEnterObservable.add(setHover);
-    button.onPointerOutObservable.add(setNormal);
-    button.onFocusObservable.add(setFocus);
-    button.onBlurObservable.add(setBlur);
-
-    button.onKeyboardEventProcessedObservable.add((evt) => {
-      if (evt.type === "keyup" && (evt.key === "Enter" || evt.key === " ")) {
-        button.onPointerUpObservable.notifyObservers(null as any);
-      }
-    });
-
-    parent.addControl(button);
-    return button;
-  }
 
   /** Fired once when the inventory panel transitions from open to closed. */
   public onInventoryClosed: (() => void) | null = null;
-
-  private _getViewportSize(): { width: number; height: number } {
-    let width = 1280;
-    let height = 720;
-    if (typeof window !== "undefined" && typeof window.innerWidth === "number" && window.innerWidth > 0) {
-      width = window.innerWidth;
-      height = window.innerHeight > 0 ? window.innerHeight : 720;
-    } else {
-      const engine = (this.scene as any)?.getEngine?.();
-      if (engine && typeof engine.getRenderWidth === "function") {
-        const ew = engine.getRenderWidth();
-        const eh = engine.getRenderHeight();
-        if (ew > 0) width = ew;
-        if (eh > 0) height = eh;
-      } else {
-        const size = (this._ui as any)?.getSize?.();
-        if (size?.width && size.width > 0) width = size.width;
-        if (size?.height && size.height > 0) height = size.height;
-      }
-    }
-    return { width, height };
-  }
 
   public toggleInventory(visible: boolean): void {
     const wasOpen = this._inventory.isOpen;
@@ -648,18 +321,16 @@ export class UIManager {
   }
 
   public toggleCrosshair(visible: boolean): void {
-    this.crosshair.isVisible = visible;
+    this.hud.setCrosshair(visible);
+  }
+
+  /** Whether the crosshair is showing (hidden while a panel owns the screen). */
+  public get isCrosshairVisible(): boolean {
+    return !this.hud.crosshair.hidden;
   }
 
   public setCrosshairActive(active: boolean): void {
-    const color = active ? T.TITLE : "rgba(255,255,255,0.9)";
-    const scale = active ? 1.25 : 1.0;
-    if (this._crosshairArms[0]?.background === color) return;
-    for (const arm of this._crosshairArms) {
-      arm.background = color;
-    }
-    this.crosshair.scaleX = scale;
-    this.crosshair.scaleY = scale;
+    this.hud.setCrosshairActive(active);
   }
 
   public updateStats(player: Player, characterLevel: number): void {
@@ -694,194 +365,31 @@ export class UIManager {
   }
 
   public setInteractionText(text: string): void {
-    this.interactionLabel.text = text;
+    this.hud.setText(this.hud.interaction, text);
   }
 
-  /** Pre-allocate the fixed notification rows (once). */
-  private _ensureNotifyRows(): void {
-    if (this._notifyRows.length > 0) return;
-    for (let i = 0; i < 6; i++) {
-      const rect = new Rectangle();
-      rect.width = "100%";
-      // Grow with the wrapped label: a fixed 40px single line clipped long
-      // messages at both edges ("r travelers gossiping about … on th").
-      rect.adaptHeightToChildren = true;
-      rect.cornerRadius = 8;
-      rect.color = "rgba(232, 198, 86, 0.55)";
-      rect.thickness = 2;
-      rect.background = "rgba(14, 10, 4, 0.96)";
-      rect.paddingBottom = "5px";
-      rect.shadowOffsetX = 0;
-      rect.shadowOffsetY = 2;
-      rect.shadowBlur = 10;
-      rect.shadowColor = "rgba(0,0,0,0.55)";
-      rect.isVisible = false;
-
-      const label = new TextBlock();
-      label.text = "";
-      label.color = T.TITLE;
-      label.fontSize = 14;
-      label.fontWeight = "bold";
-      label.shadowColor = "rgba(0,0,0,0.75)";
-      label.shadowBlur = 4;
-      label.shadowOffsetY = 1;
-      label.textWrapping = true;
-      label.resizeToFit = true;
-      label.width = "100%";
-      label.paddingTop = "9px";
-      label.paddingBottom = "9px";
-      label.paddingLeft = "14px";
-      label.paddingRight = "14px";
-      rect.addControl(label);
-
-      this.notificationPanel.addControl(rect);
-      this._notifyRows.push({ rect, label, remainingMs: 0 });
-    }
-  }
 
   public showNotification(text: string, duration: number = 3000): void {
-    this._ensureNotifyRows();
-
-    // Prefer the bottom-most free row so new messages appear where the old
-    // implementation stacked them; when all rows are busy, overwrite the one
-    // closest to expiring.
-    let row = this._notifyRows[this._notifyRows.length - 1];
-    for (let i = this._notifyRows.length - 1; i >= 0; i--) {
-      if (this._notifyRows[i].remainingMs <= 0) {
-        row = this._notifyRows[i];
-        break;
-      }
-      if (this._notifyRows[i].remainingMs < row.remainingMs) {
-        row = this._notifyRows[i];
-      }
-    }
-
-    row.label.text = text;
-    row.rect.isVisible = true;
-    row.remainingMs = duration;
-    // Newest toast at the bottom of the stack, whichever pooled row it reused.
-    const panelChildren = this.notificationPanel.children;
-    if (panelChildren[panelChildren.length - 1] !== row.rect) {
-      this.notificationPanel.removeControl(row.rect);
-      this.notificationPanel.addControl(row.rect);
-    }
-
-    if (!this._notifyObs) {
-      this._notifyObs = this.scene.onBeforeRenderObservable.add(() => {
-        const dt = this.scene.getEngine().getDeltaTime();
-        let anyActive = false;
-        for (const r of this._notifyRows) {
-          if (r.remainingMs <= 0) continue;
-          r.remainingMs -= dt;
-          if (r.remainingMs <= 0) {
-            r.remainingMs = 0;
-            r.rect.isVisible = false;
-          } else {
-            anyActive = true;
-          }
-        }
-        if (!anyActive && this._notifyObs) {
-          this.scene.onBeforeRenderObservable.remove(this._notifyObs);
-          this._notifyObs = null;
-        }
-      });
-    }
+    this.hud.notify(text, duration);
   }
 
-  private _createBar(label: string, fillColor: string, trackColor: string, parent: StackPanel): { container: Rectangle, bar: Rectangle } {
-    const container = new Rectangle();
-    container.width = "192px";
-    container.height = "22px";
-    container.cornerRadius = 6;
-    container.color = "rgba(212, 160, 23, 0.45)";
-    container.thickness = 1;
-    container.background = trackColor;
-    parent.addControl(container);
 
-    const bar = new Rectangle();
-    bar.width = "100%";
-    bar.height = "100%";
-    bar.cornerRadius = 5;
-    bar.thickness = 0;
-    
-    // Create a vertical gradient for the bar fill
-    const gradient = new LinearGradient(0, 0, 0, 1);
-    gradient.addColorStop(0, fillColor);
-    gradient.addColorStop(1, this._darkenColor(fillColor, 0.35));
-    bar.backgroundGradient = gradient;
-    
-    bar.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    container.addControl(bar);
-
-    // Subtle top sheen/highlight
-    const sheen = new Rectangle();
-    sheen.width = "100%";
-    sheen.height = "40%";
-    sheen.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    sheen.background = "rgba(255, 252, 240, 0.12)";
-    sheen.thickness = 0;
-    sheen.cornerRadius = 5;
-    container.addControl(sheen);
-
-    // Label overlaid on top of bar
-    const labelText = new TextBlock();
-    labelText.text = label;
-    labelText.color = "#FFF8E7";
-    labelText.fontSize = 11;
-    labelText.fontWeight = "bold";
-    labelText.width = "100%";
-    labelText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    labelText.paddingLeft = "10px";
-    labelText.shadowColor = "rgba(0,0,0,0.7)";
-    labelText.shadowBlur = 4;
-    container.addControl(labelText);
-
-    return { container, bar };
-  }
-
-  /** Helper to darken a hex or rgba color. */
-  private _darkenColor(color: string, amount: number): string {
-    if (color.startsWith("rgba")) {
-      return color.replace(/[\d.]+\)$/, (m) => (parseFloat(m) * (1 - amount)).toString() + ")");
-    }
-    // Simple hex darken fallback (assuming valid hex)
-    return color; 
-  }
 
   public updateHealth(current: number, max: number): void {
-    const percent = max > 0 ? (current / max) : 0;
-    this.healthBar.width = clampPercentage(current, max);
-
-    // Low health pulse effect
-    if (percent > 0 && percent < 0.25) {
-      if (!this._hpPulseObs) {
-        let time = 0;
-        this._hpPulseObs = this.scene.onBeforeRenderObservable.add(() => {
-          time += this.scene.getEngine().getDeltaTime() * 0.006;
-          const pulse = 0.7 + Math.sin(time) * 0.3;
-          this.healthBar.alpha = pulse;
-        });
-      }
-    } else {
-      if (this._hpPulseObs) {
-        this.scene.onBeforeRenderObservable.remove(this._hpPulseObs);
-        this._hpPulseObs = null;
-        this.healthBar.alpha = 1.0;
-      }
-    }
+    this.hud.setBar(this.hud.health, current, max);
   }
 
   public updateMagicka(current: number, max: number): void {
-    this.magickaBar.width = clampPercentage(current, max);
+    this.hud.setBar(this.hud.magicka, current, max);
   }
 
   public updateStamina(current: number, max: number): void {
-    this.staminaBar.width = clampPercentage(current, max);
+    this.hud.setBar(this.hud.stamina, current, max);
   }
 
   public updateXP(current: number, max: number, xpLevel: number, characterLevel: number): void {
-    this.xpBar.width = clampPercentage(current, max);
-    this._xpLevelLabel.text = `CL ${characterLevel}\nLv.${xpLevel}`;
+    this.hud.setBar(this.hud.xp, current, max);
+    this.hud.setText(this.hud.level, `CL ${characterLevel}\nLv.${xpLevel}`);
   }
 
   /**
@@ -994,52 +502,7 @@ export class UIManager {
 
   /** Flash a translucent color overlay to signal being hit or dealing damage. */
   public showHitFlash(color: string = "red"): void {
-    if (this._flashRows.length === 0) {
-      for (let i = 0; i < 3; i++) {
-        const flash = new Rectangle();
-        flash.width = "100%";
-        flash.height = "100%";
-        flash.background = color;
-        flash.thickness = 0;
-        flash.alpha = 0;
-        flash.isPointerBlocker = false;
-        flash.zIndex = 1;
-        flash.isVisible = false;
-        this._ui.addControl(flash);
-        this._flashRows.push({ rect: flash, t: 0, active: false });
-      }
-    }
-
-    // All busy — restart the one closest to finished.
-    let row = this._flashRows.find((r) => !r.active)
-      ?? this._flashRows.reduce((a, b) => (a.t > b.t ? a : b));
-    row.active = true;
-    row.t = 0;
-    row.rect.background = color;
-    row.rect.alpha = 0.45;
-    row.rect.isVisible = true;
-
-    if (!this._flashObs) {
-      this._flashObs = this.scene.onBeforeRenderObservable.add(() => {
-        const dt = this.scene.getEngine().getDeltaTime();
-        let anyActive = false;
-        for (const r of this._flashRows) {
-          if (!r.active) continue;
-          r.t += dt / this._flashDurationMs;
-          r.rect.alpha = Math.max(0, 0.45 * (1 - r.t));
-          if (r.t >= 1) {
-            r.rect.isVisible = false;
-            r.active = false;
-          } else {
-            anyActive = true;
-          }
-        }
-        if (!anyActive && this._flashObs) {
-          this.scene.onBeforeRenderObservable.remove(this._flashObs);
-          this._flashObs = null;
-        }
-      });
-    }
+    this.hud.showFlash(color);
   }
 
   /** Special curative flash (green/white) for healing events. */
@@ -1055,104 +518,27 @@ export class UIManager {
     const camera = scene.activeCamera;
     if (!camera) return;
     const engine = scene.getEngine();
-    const viewport = camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight());
+    const w = engine.getRenderWidth(), h = engine.getRenderHeight();
+    const viewport = camera.viewport.toGlobal(w, h);
     const screenPos = Vector3.Project(worldPos, Matrix.Identity(), scene.getTransformMatrix(), viewport);
     if (screenPos.z < 0 || screenPos.z > 1) return;
-
-    const hw = engine.getRenderWidth() / 2;
-    const hh = engine.getRenderHeight() / 2;
-
-    if (this._damageRows.length === 0) {
-      for (let i = 0; i < 12; i++) {
-        const label = new TextBlock();
-        label.text = "";
-        label.color = "#FF6030";
-        label.fontSize = 24;
-        label.fontWeight = "bold";
-        label.shadowColor = "black";
-        label.shadowBlur = 4;
-        label.zIndex = 60;
-        label.isVisible = false;
-        this._ui.addControl(label);
-        this._damageRows.push({ label, topPx: 0, elapsedMs: 0, active: false });
-      }
-    }
-
-    // All busy — overwrite the number closest to expiring.
-    let row = this._damageRows.find((r) => !r.active)
-      ?? this._damageRows.reduce((a, b) => (a.elapsedMs > b.elapsedMs ? a : b));
-    row.active = true;
-    row.elapsedMs = 0;
-    row.topPx = screenPos.y - hh;
-    row.label.text = `-${damage}`;
-    row.label.color = color ?? "#FF6030";
-    row.label.left = `${screenPos.x - hw}px`;
-    row.label.top = `${row.topPx}px`;
-    row.label.alpha = 1;
-    row.label.isVisible = true;
-
-    if (!this._damageObs) {
-      this._damageObs = this.scene.onBeforeRenderObservable.add(() => {
-        const dt = this.scene.getEngine().getDeltaTime();
-        const moveRate = 30 * (dt / 1000);
-        let anyActive = false;
-        for (const r of this._damageRows) {
-          if (!r.active) continue;
-          r.elapsedMs += dt;
-          r.topPx -= moveRate;
-          r.label.top = `${r.topPx}px`;
-          r.label.alpha = Math.max(0, 1 - r.elapsedMs / this._damageLifetimeMs);
-          if (r.elapsedMs >= this._damageLifetimeMs) {
-            r.label.isVisible = false;
-            r.active = false;
-          } else {
-            anyActive = true;
-          }
-        }
-        if (!anyActive && this._damageObs) {
-          this.scene.onBeforeRenderObservable.remove(this._damageObs);
-          this._damageObs = null;
-        }
-      });
-    }
+    // Render pixels → CSS pixels of the page.
+    const rect = engine.getRenderingCanvas?.()?.getBoundingClientRect();
+    const x = rect ? rect.left + screenPos.x * (rect.width / w) : screenPos.x;
+    const y = rect ? rect.top + screenPos.y * (rect.height / h) : screenPos.y;
+    this.hud.showDamageNumber(x, y, `-${damage}`, color ?? "#FF6030");
   }
 
   // ── Debug / Performance Overlay ───────────────────────────────────────────
 
-  private _initDebugOverlay(): void {
-    this._debugPanel = new Rectangle("debugPanel");
-    this._debugPanel.width = "320px";
-    this._debugPanel.height = "200px";
-    this._debugPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    this._debugPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this._debugPanel.left = "10px";
-    this._debugPanel.top = "10px";
-    this._debugPanel.background = "rgba(0,0,0,0.70)";
-    this._debugPanel.thickness = 1;
-    this._debugPanel.color = "#444";
-    this._debugPanel.isVisible = false;
-    this._ui.addControl(this._debugPanel);
-
-    this._debugText = new TextBlock("debugText");
-    this._debugText.text = "";
-    this._debugText.color = "#88FF88";
-    this._debugText.fontSize = 11;
-    this._debugText.fontFamily = "monospace";
-    this._debugText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    this._debugText.textVerticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this._debugText.paddingLeft = "8px";
-    this._debugText.paddingTop = "8px";
-    this._debugPanel.addControl(this._debugText);
-  }
 
   /**
    * Toggle the performance/debug overlay (F3).
    * Returns the new visibility state.
    */
   public toggleDebugOverlay(): boolean {
-    if (!this._debugPanel) return false;
     this.isDebugVisible = !this.isDebugVisible;
-    this._debugPanel.isVisible = this.isDebugVisible;
+    this.hud.debug.hidden = !this.isDebugVisible;
     return this.isDebugVisible;
   }
 
@@ -1174,7 +560,7 @@ export class UIManager {
     lodCulled?: number;
     weather?: string;
   }): void {
-    if (!this._debugText || !this.isDebugVisible) return;
+    if (!this.isDebugVisible) return;
     const lines = [
       `FPS:        ${metrics.fps.toFixed(0)}`,
       `Draw calls: ${metrics.drawCalls}`,
@@ -1192,76 +578,25 @@ export class UIManager {
     if (metrics.weather !== undefined) {
       lines.push(`Weather:    ${metrics.weather}`);
     }
-    this._debugText.text = lines.join("\n");
+    this.hud.setText(this.hud.debug, lines.join("\n"));
   }
 
   // ── Stealth HUD ───────────────────────────────────────────────────────────
 
-  private _initStealthHUD(): void {
-    this._stealthPanel = new Rectangle("stealthPanel");
-    this._stealthPanel.width = "90px";
-    this._stealthPanel.height = "28px";
-    this._stealthPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    this._stealthPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-    this._stealthPanel.left = "12px";
-    this._stealthPanel.top = "-80px";
-    this._stealthPanel.background = "rgba(0,0,0,0.65)";
-    this._stealthPanel.thickness = 1;
-    this._stealthPanel.color = "#555";
-    this._stealthPanel.isVisible = false;
-    this._ui.addControl(this._stealthPanel);
-
-    this._stealthLabel = new TextBlock("stealthLabel");
-    this._stealthLabel.text = "Hidden";
-    this._stealthLabel.color = "#88FFAA";
-    this._stealthLabel.fontSize = 13;
-    this._stealthLabel.fontWeight = "bold";
-    this._stealthPanel.addControl(this._stealthLabel);
-  }
 
   /** Update the stealth eye indicator. Pass null to hide it. */
   public updateStealthHUD(label: "Hidden" | "Caution" | "Detected" | null): void {
-    if (!this._stealthPanel || !this._stealthLabel) return;
     if (label === this._lastStealthHudLabel) return;
     this._lastStealthHudLabel = label;
-    if (!label) {
-      this._stealthPanel.isVisible = false;
-      return;
-    }
-    this._stealthPanel.isVisible = true;
-    this._stealthLabel.text = label;
-    this._stealthLabel.color =
-      label === "Hidden"   ? "#88FFAA" :
-      label === "Caution"  ? "#FFDD44" :
-      "#FF4444";
+    this.hud.setStealth(label);
   }
 
   // ── Clock HUD ─────────────────────────────────────────────────────────────
 
-  private _initClockHUD(): void {
-    this._clockLabel = new TextBlock("clockLabel");
-    this._clockLabel.text = "08:00";
-    this._clockLabel.color = T.TEXT;
-    this._clockLabel.fontSize = 13;
-    this._clockLabel.alpha = 0.85;
-    this._clockLabel.fontFamily = "monospace";
-    // A TextBlock defaults to a full-screen box with centred text, so without an
-    // explicit size the alignment below moved nothing and the clock sat on the
-    // crosshair. Sized box, docked under the compass (top-right holds the FPS chip).
-    this._clockLabel.width = "80px";
-    this._clockLabel.height = "18px";
-    this._clockLabel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    this._clockLabel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this._clockLabel.top = "54px";
-    this._clockLabel.shadowColor = "rgba(0,0,0,0.9)";
-    this._clockLabel.shadowBlur = 2;
-    this._clockLabel.shadowOffsetY = 1;
-    this._ui.addControl(this._clockLabel);
-  }
 
   /** Update the in-game clock display (under the compass). */
   public updateClock(timeString: string): void {
-    if (this._clockLabel) this._clockLabel.text = timeString;
+    this.hud.setText(this.hud.clock, timeString);
   }
 
   // ── Combat state readout ──────────────────────────────────────────────────
@@ -1271,27 +606,7 @@ export class UIManager {
    * ("Combo ×2", "FINISHER READY", "Riposte ready!").  Pass null to hide.
    */
   public updateCombatState(text: string | null): void {
-    if (!this._combatStateLabel) {
-      const label = new TextBlock("combatStateLabel");
-      label.text = "";
-      label.color = T.TITLE;
-      label.fontSize = 15;
-      label.fontWeight = "bold";
-      label.shadowColor = "rgba(0,0,0,0.8)";
-      label.shadowBlur = 4;
-      label.height = "24px";
-      label.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-      label.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-      label.top = "-96px";
-      label.isVisible = false;
-      this._ui.addControl(label);
-      this._combatStateLabel = label;
-    }
-    if (text === this._lastCombatStateText && (text !== null) === this._lastCombatStateVisible) return;
-    this._lastCombatStateText = text;
-    this._lastCombatStateVisible = text !== null;
-    this._combatStateLabel.text = text ?? "";
-    this._combatStateLabel.isVisible = text !== null;
+    this.hud.setCombatState(text);
   }
 
   // ── Attribute Panel ───────────────────────────────────────────────────────
@@ -1318,20 +633,6 @@ export class UIManager {
   // ── Wait Dialog ───────────────────────────────────────────────────────────
 
 
-  private _applyA11y(btn: Button, desc: string): void {
-    btn.isFocusInvisible = false;
-    btn.tabIndex = 0;
-    btn.accessibilityTag = { description: desc };
-    let focused = false;
-    btn.onFocusObservable.add(() => { focused = true; btn.thickness = 2; });
-    btn.onBlurObservable.add(() => { focused = false; btn.thickness = 1; });
-    btn.onPointerOutObservable.add(() => { if (!focused) btn.thickness = 1; });
-    btn.onKeyboardEventProcessedObservable.add((e) => {
-      if (e.type === "keyup" && (e.key === "Enter" || e.key === " ")) {
-        btn.onPointerUpObservable.notifyObservers(null as any);
-      }
-    });
-  }
 
   public toggleWaitDialog(visible: boolean): void {
     this.isWaitDialogOpen = visible;
@@ -1352,32 +653,6 @@ export class UIManager {
 
   // ── Compass HUD ───────────────────────────────────────────────────────────
 
-  private _initCompassHUD(): void {
-    // Outer pill container at the top center
-    const panel = new Rectangle("compassPanel");
-    panel.width  = "220px";
-    panel.height = "32px";
-    panel.cornerRadius = 6;
-    panel.color = T.PANEL_BORDER;
-    panel.thickness = 1;
-    panel.background = "rgba(6, 4, 2, 0.72)";
-    panel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    panel.verticalAlignment   = Control.VERTICAL_ALIGNMENT_TOP;
-    panel.top = "6px";
-    panel.zIndex = 5;
-    this._ui.addControl(panel);
-    this._compassPanel = panel;
-
-    const label = new TextBlock("compassLabel");
-    label.text  = "N";
-    label.color = T.TEXT;
-    label.fontSize = 13;
-    label.fontFamily = "monospace";
-    label.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    label.textVerticalAlignment   = Control.VERTICAL_ALIGNMENT_CENTER;
-    panel.addControl(label);
-    this._compassLabel = label;
-  }
 
   /**
    * Update the compass strip from the camera's Y-axis rotation.
@@ -1386,8 +661,6 @@ export class UIManager {
    *                    Positive values rotate clockwise (East).
    */
   public updateCompass(yawRadians: number): void {
-    if (!this._compassLabel) return;
-
     // Normalise yaw to [0, 360)
     const deg = ((yawRadians * (180 / Math.PI)) % 360 + 360) % 360;
 
@@ -1402,6 +675,6 @@ export class UIManager {
     const curr = COMPASS_DIRECTIONS[idx];
     const next = COMPASS_DIRECTIONS[(idx + 1) % 8];
 
-    this._compassLabel.text = `${prev}  ‹ ${curr} ›  ${next}`;
+    this.hud.setText(this.hud.compass, `${prev}  ‹ ${curr} ›  ${next}`);
   }
 }

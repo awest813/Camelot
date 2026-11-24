@@ -1105,11 +1105,29 @@ from a CDN at runtime.
   so digits never reach the quick slots) and the one highlight that the
   mouse and keyboard share. The text no longer needs a hand-estimated
   line count, because the box grows to fit.
-- Babylon GUI files: 12 → 9 (the `babylon-gui-files` ratchet). Remaining:
-  `ui-manager.ts` (the HUD: bars, crosshair, notifications, clock,
-  compass, stealth eye, debug overlay, and the world-space damage
-  numbers), the seven map-editor panels (which move with the editor in
-  Phase 9) and `gui-resolution.ts`.
+- The HUD is on the DOM (`hud-dom.ts`): crosshair, interaction prompt,
+  the three bars and the XP bar, notifications, compass, clock, stealth
+  eye, combat line, debug overlay, hit flash, damage numbers and the
+  screen fade. It uses plain elements updated in place, because the bars
+  change every frame and don't need a re-render. CSS does the low-health
+  pulse and the flash, and the damage numbers animate with the Web
+  Animations API, which replaced four per-frame observers and their
+  control pools. The bars are labelled progress bars, and notifications
+  are a polite live region. Damage numbers are projected to CSS pixels
+  of the canvas, which the old GUI only got right at a hardware scaling
+  of 1. `UIManager` has no Babylon GUI left. Its public `healthBar`,
+  `crosshair`, `notificationPanel` and similar fields are gone:
+  `ui.hud` holds the elements, and `isCrosshairVisible` replaces
+  `crosshair.isVisible`.
+- The game no longer makes a fullscreen GUI texture. The in-game map
+  editor makes its own on first use (`createFullscreenGui` in
+  `gui-resolution.ts`).
+- Babylon GUI files: 12 → 8 (the `babylon-gui-files` ratchet). Left: the
+  seven map-editor panels, which move with the editor in Phase 9, and
+  `gui-resolution.ts`. **Exit met for the game:** none of its UI is
+  Babylon GUI. The colour tokens the GUI code shared
+  (`SHARED_UI_PANEL`) are gone; the CSS `--panel-*` tokens replace them.
+  The remaining Phase 8 item is the accessibility pass.
 
 ### Phase 9 — Editor app (3 weeks; after Phases 1 and 8)
 
