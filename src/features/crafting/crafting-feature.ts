@@ -77,9 +77,9 @@ export class CraftingFeature implements Feature {
 
   constructor(deps: CraftingDeps) {
     this.alchemy = new AlchemySystem(deps.player, deps.ui);
-    this.alchemyPanel = new AlchemyUI(deps.ui.uiTexture, this.alchemy);
+    this.alchemyPanel = new AlchemyUI(this.alchemy);
     this.enchanting = new EnchantingSystem(deps.player, deps.inventory, deps.equipment, deps.ui);
-    this.enchantingPanel = new EnchantingUI(deps.ui.uiTexture, this.enchanting);
+    this.enchantingPanel = new EnchantingUI(this.enchanting);
     this.smithing = new SmithingController(this.recipes, this.conditions, {
       inventory: deps.inventory,
       equipment: deps.equipment,

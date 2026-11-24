@@ -344,6 +344,20 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
     await page.keyboard.press(key);
     expect(await isOpen(), `${key} closes`).toBe(false);
   }
+  // The crafting panels (Preact, on the DOM layer) open by key; Escape closes them.
+  for (const [key, open, title] of [
+    ["l", "g.alchemyUI.isVisible", "#alchemy-title"], ["b", "g.enchantingUI.isVisible", "#enchanting-title"],
+  ] as const) {
+    const isOpen = () => page.evaluate((src) => new Function("g", `return ${src}`)((window as any).__camelotGame), open) as Promise<boolean>;
+    await page.locator("#renderCanvas").focus();
+    await page.keyboard.press(key);
+    expect(await isOpen(), `${key} opens`).toBe(true);
+    await expect(page.locator(title)).toBeVisible();
+    await page.keyboard.press("Escape");
+    expect(await isOpen(), `Escape closes the ${key} panel`).toBe(false);
+    expect(await page.evaluate(() => (window as any).__camelotGame.isPaused), "that Escape doesn't also pause").toBe(false);
+    await expect(page.locator(title)).toHaveCount(0);
+  }
   await page.locator("#renderCanvas").click({ force: true });
 
   // The credits (the first Preact panel) open, and Escape closes them.

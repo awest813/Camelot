@@ -6259,3 +6259,129 @@ body::before {
 body.is-in-dialogue .quickslot-hud {
   display: none !important;
 }
+
+/* ── Panels on the DOM layer (engine overhaul, Phase 8) ───────────────────────
+ * Design tokens for game panels, and the shared list/button pieces the
+ * crafting panels (alchemy, enchanting) build on. */
+:root {
+  --panel-bg: rgba(12, 8, 4, 0.96);
+  --panel-section-bg: rgba(26, 18, 11, 0.9);
+  --panel-border: rgba(214, 156, 73, 0.28);
+  --panel-border-strong: rgba(233, 184, 111, 0.8);
+  --panel-title: #d4a017;
+  --panel-text: #eee0c0;
+  --panel-dim: #a79377;
+  --panel-good: var(--status-ok);
+  --panel-warn: #d47a17;
+  --panel-selected-bg: rgba(80, 56, 10, 0.8);
+}
+
+.craft-panel__panel {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(640px, calc(100vh - 32px));
+}
+
+.craft-panel__subtitle {
+  margin: -4px 0 10px;
+  color: var(--panel-dim);
+  font-size: 13px;
+}
+
+.craft-panel__columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  min-height: 0;
+}
+
+@media (max-width: 600px) {
+  .craft-panel__columns { grid-template-columns: 1fr; }
+}
+
+.craft-panel__section {
+  border: 1px solid var(--panel-border);
+  border-radius: 9px;
+  background: var(--panel-section-bg);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.craft-panel__section-title {
+  margin: 0 0 2px;
+  color: #ddb77f;
+  font-size: 14px;
+}
+
+.craft-panel__empty {
+  margin: 4px 0;
+  color: var(--panel-dim);
+  font-size: 12px;
+}
+
+.craft-panel__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--panel-text);
+  padding: 6px 10px;
+  font: inherit;
+}
+
+button.craft-panel__row { cursor: pointer; }
+button.craft-panel__row:hover { background: rgba(40, 30, 8, 0.7); }
+button.craft-panel__row:focus-visible,
+.craft-panel__btn:focus-visible {
+  outline: 2px solid var(--panel-border-strong);
+  outline-offset: 2px;
+}
+
+.craft-panel__row[aria-pressed="true"],
+.craft-panel__row.is-selected {
+  border-color: var(--panel-title);
+  background: var(--panel-selected-bg);
+}
+
+.craft-panel__row-name { font-size: 13px; }
+.craft-panel__row[aria-pressed="true"] .craft-panel__row-name { color: var(--panel-title); }
+.craft-panel__row-detail { display: block; color: var(--panel-dim); font-size: 11px; margin-top: 2px; }
+
+.craft-panel__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.craft-panel__status { flex: 1 1 100%; margin: 0; font-size: 13px; color: var(--panel-dim); }
+.craft-panel__status--ok { color: var(--panel-good); }
+.craft-panel__status--warn { color: var(--panel-warn); }
+
+.craft-panel__btn {
+  border: 1px solid rgba(214, 156, 73, 0.5);
+  border-radius: 8px;
+  background: rgba(36, 24, 12, 0.95);
+  color: #edd7b6;
+  padding: 6px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.craft-panel__btn:hover:enabled { background: rgba(60, 40, 18, 0.95); border-color: var(--panel-border-strong); }
+.craft-panel__btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.craft-panel__btn--primary { background: linear-gradient(180deg, rgba(133, 84, 30, 0.94), rgba(96, 56, 18, 0.98)); }
+.craft-panel__btn--small { padding: 3px 10px; font-size: 12px; }
+.craft-panel__columns--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 760px) {
+  .craft-panel__columns--three { grid-template-columns: 1fr; }
+}

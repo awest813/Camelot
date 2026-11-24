@@ -1045,6 +1045,29 @@ from a CDN at runtime.
 
 **Exit:** Babylon GUI is used only for world-space UI.
 
+**Progress:**
+
+- Design tokens for game panels (`--panel-*` in `css/main.css`) and a
+  shared set of panel pieces (`.craft-panel__*`: sections, selectable rows
+  with `aria-pressed`, a status line, buttons with visible focus), all
+  built on the Phase 2 `ModalDialog`.
+- The alchemy and enchanting panels are Preact (`alchemy-ui.tsx`,
+  `enchanting-ui.tsx`). Their class APIs are the same (`toggle`,
+  `refresh`, `isVisible`, the `on…` events); only their constructors lost
+  the GUI texture.
+  - Behaviour is unchanged: alchemy takes 2–4 ingredients, Craft is
+    disabled under two, and choosing an item limits enchanting to the
+    effects its kind can take.
+  - New: real buttons with keyboard focus, labelled sections, a live
+    status line, focus kept in the dialog, and Escape closes the panel
+    without pausing.
+  - Tests: jsdom tests drive both panels by clicks, and boot-smoke opens
+    each by key and closes it with Escape.
+- Babylon GUI files: 12 → 10 (the `babylon-gui-files` ratchet). Remaining:
+  `ui-manager.ts` (the HUD, inventory, pause, quest log, skill tree, wait
+  and attribute panels), the dialogue system, the seven map-editor
+  panels (which move with the editor in Phase 9) and `gui-resolution.ts`.
+
 ### Phase 9 — Editor app (3 weeks; after Phases 1 and 8)
 
 - Move the in-game editors into a separate app as a second Vite entry
