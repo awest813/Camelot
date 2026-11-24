@@ -12,6 +12,7 @@
  *      the newly wired survival / flavor-event state.
  *   5. A save load (F9) does not crash the running game.
  *   6. No uncaught page errors and no unexpected console errors accumulate.
+ *   7. Nothing is fetched from another host (no CDN at runtime).
  *
  * Run: npm run test:e2e -- boot-smoke
  */
@@ -77,8 +78,17 @@ async function completeCharacterCreation(page: Page) {
   await expect(root).toHaveCount(0, { timeout: 30_000 });
 }
 
-test("game boots, plays, saves, and loads without errors", async ({ page }) => {
+test("game boots, plays, saves, and loads without errors", async ({ page, baseURL }) => {
   test.setTimeout(240_000);
+
+  // Nothing at runtime comes from another host (no CDN): every asset,
+  // shader and worker ships with the game.
+  const origin = new URL(baseURL!).origin;
+  const outsideRequests: string[] = [];
+  page.on("request", (r) => {
+    const u = r.url();
+    if (!u.startsWith(origin) && !u.startsWith("data:") && !u.startsWith("blob:")) outsideRequests.push(u);
+  });
 
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
@@ -390,5 +400,6 @@ test("game boots, plays, saves, and loads without errors", async ({ page }) => {
 
   // Error hygiene across the whole run.
   expect(pageErrors, `uncaught page errors:\n${pageErrors.join("\n")}`).toEqual([]);
+  expect(outsideRequests, `fetched from another host:\n${outsideRequests.join("\n")}`).toEqual([]);
   expect(consoleErrors, `console errors:\n${consoleErrors.join("\n")}`).toEqual([]);
 });

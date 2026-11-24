@@ -997,6 +997,33 @@ from a CDN at runtime.
     frames of drawing, so CI can't play the whole game on WebGPU. That
     spec is opt-in (`WEBGPU_E2E=1`), and the e2e suite runs the game on
     WebGL2 through the fallback (no adapter there).
+- Models are 41% of their old size: `public/model` went from 46 MB to
+  19 MB (exit target: at most 50%). `tools/optimize-models.mjs`
+  (glTF-Transform, meshoptimizer and sharp, all dev dependencies) does it.
+  - Geometry and animation: meshopt compression with quantization,
+    resampled animations, unused data pruned. 31.4 MB of GLBs became
+    12.6 MB.
+  - Textures: WebP (`EXT_texture_webp`), at most 1024 px. The packs share
+    textures between models (113 files referenced 393 times). Embedding
+    them would have duplicated them, so each is converted once beside the
+    original (12.0 MB became 4.8 MB) and the models point at the WebP
+    copy. The originals and 23 textures no model used are gone.
+  - Skeletons: quantization uses one volume per model, and identical skins
+    are folded back together. Per-mesh volumes had split each character's
+    one skin into one per mesh, giving each a skeleton and a bone texture.
+    That doubled texture counts and broke the render budget until fixed.
+  - Babylon's meshopt decoder would have come from its CDN, so it ships as
+    `public/vendor/meshopt_decoder.js`. `tools/vendor-meshopt-decoder.mjs`
+    generates it from the installed meshoptimizer, and a unit test keeps
+    the two in step.
+  - Checks: every model is compressed, every texture it points at exists,
+    no model has duplicate skins, and the village well's textures exist
+    (`tools/model-assets.test.ts`). The village e2e fails on any model
+    that fails to load. Boot-smoke fails on any request to another host.
+    The render budget passes. A close-up screenshot of the village guard
+    shows the skinning and textures intact.
+- Nothing is fetched from a CDN at runtime (boot-smoke checks this). The
+  remote props stay opt-in (`VITE_ENABLE_REMOTE_PROPS`).
 
 ### Phase 8 — UI consolidation (3 weeks; can run in parallel from Phase 2)
 

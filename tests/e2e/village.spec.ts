@@ -32,6 +32,9 @@ async function completeCharacterCreation(page: Page) {
 test("a village is built, populated and discovered on entry", async ({ page }) => {
   test.setTimeout(300_000);
   const pageErrors: string[] = [];
+  // Every model loads (they are meshopt-compressed with WebP textures).
+  const loadFailures: string[] = [];
+  page.on("console", (m) => { if (/failed to load|Unable to load/i.test(m.text())) loadFailures.push(m.text().slice(0, 300)); });
   page.on("pageerror", (err) => {
     if (!/pointer\s*lock|pointerlock/i.test(err.message)) pageErrors.push(`${err.name}: ${err.message}`);
   });
@@ -356,4 +359,5 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     .toBe(0);
 
   expect(pageErrors, `uncaught page errors:\n${pageErrors.join("\n")}`).toEqual([]);
+  expect(loadFailures, `models that failed to load:\n${loadFailures.join("\n")}`).toEqual([]);
 });

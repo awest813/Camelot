@@ -47,9 +47,9 @@ function materials(scene: Scene, textureBase: string): WellMaterials {
   water.specularColor = new Color3(0.25, 0.28, 0.3);
   water.specularPower = 96;
   mats = {
-    stone: texturedMaterial(scene, "well_stone", t("T_RockTrim_BaseColor.jpg"), 0.35, 0.35, new Color3(0.82, 0.8, 0.78)),
-    wood: texturedMaterial(scene, "well_wood", t("T_WoodTrim_BaseColor.jpg"), 0.5, 1, new Color3(0.8, 0.74, 0.68)),
-    roof: texturedMaterial(scene, "well_roof", t("T_RoundTiles_BaseColor.jpg"), 1.5, 0.75, new Color3(0.85, 0.82, 0.8)),
+    stone: texturedMaterial(scene, "well_stone", t("T_RockTrim_BaseColor.webp"), 0.35, 0.35, new Color3(0.82, 0.8, 0.78)),
+    wood: texturedMaterial(scene, "well_wood", t("T_WoodTrim_BaseColor.webp"), 0.5, 1, new Color3(0.8, 0.74, 0.68)),
+    roof: texturedMaterial(scene, "well_roof", t("T_RoundTiles_BaseColor.webp"), 1.5, 0.75, new Color3(0.85, 0.82, 0.8)),
     water,
   };
   _materials.set(scene, mats);

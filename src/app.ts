@@ -4,6 +4,11 @@ import { AxesViewer } from "@babylonjs/core/Debug/axesViewer";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { guardEarlyDeviceLoss, pickRenderer } from "./rendering/renderer-choice";
+import { MeshoptCompression } from "@babylonjs/core/Meshes/Compression/meshoptCompression";
+
+// The models are meshopt-compressed (tools/optimize-models.mjs); their decoder
+// ships with the game instead of coming from Babylon's CDN.
+MeshoptCompression.Configuration = { decoder: { url: `${import.meta.env.BASE_URL ?? "/"}vendor/meshopt_decoder.js` } };
 import { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 import HavokPhysics from "@babylonjs/havok";
 

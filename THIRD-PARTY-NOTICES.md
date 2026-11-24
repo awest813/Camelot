@@ -28,6 +28,12 @@ https://github.com/NateTheGreatt/bitECS.
 
 MIT License. Copyright Jason Miller and contributors.
 
+## meshoptimizer (glTF decoder)
+
+MIT License. Copyright (C) 2016-2026, Arseny Kapoulkine. The models are
+meshopt-compressed (`tools/optimize-models.mjs`); its decoder ships as
+`public/vendor/meshopt_decoder.js`.
+
 ## KayKit Character Packs: Adventurers and Skeletons
 
 CC0 1.0 Universal. Kay Lousberg, kaylousberg.com. Credit is not required and

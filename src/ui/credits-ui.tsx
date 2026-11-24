@@ -25,6 +25,7 @@ export const CREDITS_SECTIONS: readonly CreditsSection[] = [
       "Recast Navigation (recast-detour)",
       "bitECS — Mozilla Public License 2.0",
       "Preact — MIT License",
+      "meshoptimizer glTF decoder (Arseny Kapoulkine) — MIT License",
     ],
   },
   {
