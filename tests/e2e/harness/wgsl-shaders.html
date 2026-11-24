@@ -1,0 +1,107 @@
+<!doctype html>
+<!--
+  The game's five custom shader pieces on their own: the sky dome, the
+  horizon ranges, a pond, the terrain plugin and the wind plugin, on a
+  WebGPU engine (WGSL) or, with ?webgl, a WebGL2 one (GLSL).
+  Used by tests/e2e/wgsl-shaders.spec.ts.
+-->
+<html><head><meta charset="utf-8"><title>WGSL shaders</title></head>
+<body style="margin:0"><canvas id="c" width="640" height="360"></canvas>
+<script type="module">
+import { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
+import { Engine } from "@babylonjs/core/Engines/engine";
+import "@babylonjs/core/Engines/WebGPU/Extensions/index";
+import { Scene } from "@babylonjs/core/scene";
+import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
+import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { RawTexture } from "@babylonjs/core/Materials/Textures/rawTexture";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { AtmosphereController } from "/src/rendering/sky-dome.ts";
+import { HorizonMountains } from "/src/rendering/horizon.ts";
+import { WaterRenderer } from "/src/rendering/water.ts";
+import { TerrainMaterialPlugin, TERRAIN_WEIGHTS_KIND } from "/src/rendering/terrain-material.ts";
+import { WindPlugin } from "/src/rendering/foliage.ts";
+
+const webgpu = !location.search.includes("webgl");
+const canvas = document.getElementById("c");
+const engine = webgpu ? new WebGPUEngine(canvas) : new Engine(canvas);
+const gpuErrors = [];
+if (webgpu) {
+  await engine.initAsync();
+  // Shader compile and pipeline errors arrive here, not through isReady().
+  engine._device.addEventListener("uncapturederror", (e) => { gpuErrors.push(String(e.error?.message ?? e.error).slice(0, 600)); });
+}
+const scene = new Scene(engine);
+const cam = new FreeCamera("cam", new Vector3(0, 3, -12), scene);
+cam.setTarget(new Vector3(0, 1, 0));
+cam.maxZ = 3000;
+new HemisphericLight("h", new Vector3(0, 1, 0), scene);
+
+const sky = new AtmosphereController(scene);
+const horizon = new HorizonMountains(scene);
+const pond = new WaterRenderer(scene).createPond("pond", { x: 4, z: 4, radius: 3, depth: 1 });
+
+const tex = () => RawTexture.CreateRGBATexture(new Uint8Array([120, 160, 90, 255, 110, 150, 80, 255, 130, 170, 100, 255, 100, 140, 70, 255]), 2, 2, scene);
+const ground = MeshBuilder.CreateGround("ground", { width: 20, height: 20, subdivisions: 4 }, scene);
+ground.setVerticesData(TERRAIN_WEIGHTS_KIND, new Float32Array(ground.getTotalVertices() * 4).fill(0.25), false, 4);
+const terrain = new StandardMaterial("terrainMat", scene);
+const plugin = new TerrainMaterialPlugin(terrain);
+for (let i = 0; i < 4; i++) { plugin.albedo[i] = tex(); plugin.normals[i] = tex(); }
+ground.material = terrain;
+
+const tree = MeshBuilder.CreateCylinder("tree", { height: 4 }, scene);
+tree.position.y = 2;
+const foliage = new StandardMaterial("foliage", scene);
+const wind = new WindPlugin(foliage, { fade: true });
+wind.fadeStart = 50; wind.fadeEnd = 80;
+tree.material = foliage;
+
+const pieces = {
+  sky: [sky.mesh, sky.material],
+  horizon: [horizon.meshes[0], horizon.meshes[0].material],
+  water: [pond, pond.material],
+  terrain: [ground, terrain],
+  wind: [tree, foliage],
+};
+/** The effect each piece draws with (plugins live on the sub-mesh's effect). */
+const effectOf = (mesh, mat) => mesh.subMeshes?.[0]?.effect ?? mat.getEffect?.() ?? null;
+
+// Render a frame at a time until every piece has a ready effect, then hand
+// each effect's final WGSL to the GPU compiler and keep its error messages.
+// (Done before the render loop: compile errors arrive asynchronously, and a
+// software device can be lost after a few frames.)
+const compileErrors = {};
+let checked = false;
+(async () => {
+  for (let i = 0; i < 200; i++) {
+    scene.render();
+    const all = Object.values(pieces).every(([mesh, mat]) => effectOf(mesh, mat)?.isReady());
+    if (all) break;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  if (webgpu) {
+    for (const [name, [mesh, mat]] of Object.entries(pieces)) {
+      const effect = effectOf(mesh, mat);
+      for (const [stage, code] of [["vertex", effect?.vertexSourceCode], ["fragment", effect?.fragmentSourceCode]]) {
+        if (!code) { compileErrors[`${name}.${stage}`] = ["no source"]; continue; }
+        const info = await engine._device.createShaderModule({ code }).getCompilationInfo();
+        const errors = info.messages.filter((m) => m.type === "error").map((m) => `${m.lineNum}:${m.linePos} ${m.message}`);
+        if (errors.length) compileErrors[`${name}.${stage}`] = errors;
+      }
+    }
+  }
+  checked = true;
+  engine.runRenderLoop(() => scene.render());
+})();
+
+window.__shaders = () => ({
+  webgpu: !!engine.isWebGPU,
+  frames: engine.frameId,
+  checked,
+  compileErrors,
+  gpuErrors,
+  ready: Object.fromEntries(Object.entries(pieces).map(([k, [mesh, mat]]) => [k, !!mat.isReady(mesh)])),
+});
+</script></body></html>

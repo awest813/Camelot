@@ -958,6 +958,44 @@ the navmesh.
 50% of today's. WebGPU is the default where supported, and nothing is fetched
 from a CDN at runtime.
 
+**Progress:**
+
+- WGSL for all five custom shader pieces. Each keeps its GLSL version, and
+  the material picks the language from the engine
+  (`rendering/shader-language.ts`). Babylon converts GLSL for WebGPU by
+  fetching glslang and twgsl from its CDN, but only when a shader has no
+  WGSL, so these never need it.
+  - The terrain and wind material plugins declare both languages
+    (`isCompatible`) and carry WGSL injection code. Before this, WebGPU
+    refused the terrain plugin outright and the game failed to start.
+  - The sky dome, horizon and water `ShaderMaterial`s are registered in
+    both shader stores.
+- The WebGPU engine path now starts at all. The engine's texture and
+  render-target extensions are separate modules and weren't imported, so
+  `createDynamicTexture` was missing.
+- Renderer choice (`rendering/renderer-choice.ts`). `?renderer=` wins,
+  then a WebGL2 fallback remembered on this machine, then
+  `VITE_RENDERER`, then `DEFAULT_RENDERER`.
+  - WebGPU starts only when the browser offers an adapter.
+  - If the device is lost in the first 20 s, the game remembers WebGL2 on
+    this machine and reloads.
+- The default is still WebGL2. What was verified:
+  - Under WebGPU, all five materials compile to ready effects.
+  - The two plugins render 600 frames under WebGPU.
+  - On WebGL2, the shader harness (`tests/e2e/harness/wgsl-shaders.html`)
+    renders all five.
+
+  What couldn't be: whether the three ShaderMaterials' WGSL compiles on a
+  real GPU. Headless Chromium's software WebGPU in CI loses its device, or
+  crashes, within a few frames even for Babylon's own minimal WGSL shader
+  material. A compile error on a real GPU wouldn't lose the device, so the
+  fallback wouldn't catch it. The WebGPU e2e checks (the shader harness and
+  the full game) are opt-in with `WEBGPU_E2E=1`.
+
+  Next step: validate the generated WGSL offline (for example with naga's
+  validator) or run `WEBGPU_E2E=1` on a machine with a GPU, then set
+  `DEFAULT_RENDERER` to WebGPU.
+
 ### Phase 8 — UI consolidation (3 weeks; can run in parallel from Phase 2)
 
 - Move the Babylon GUI panels (dialogue, inventory, pause, quest log, skill

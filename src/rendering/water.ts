@@ -7,7 +7,6 @@
  * fade, and the scene's EXP2 fog.
  */
 import type { Scene } from "@babylonjs/core/scene";
-import { Effect } from "@babylonjs/core/Materials/effect";
 import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
@@ -16,6 +15,7 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { Vector2, Vector3, Vector4 } from "@babylonjs/core/Maths/math.vector";
 import type { AtmosphereState } from "./atmosphere";
 import { UniformCache } from "./uniform-cache";
+import { registerShaders, shaderLanguageFor } from "./shader-language";
 
 export interface Pond {
   x: number;
@@ -138,7 +138,84 @@ void main(void) {
 }
 `;
 
-let _registered = false;
+/* The same water in WGSL, for the WebGPU engine (keep the two in step). */
+
+const VERTEX_WGSL = `
+attribute position: vec3f;
+uniform world: mat4x4f;
+uniform viewProjection: mat4x4f;
+varying vWorld: vec3f;
+@vertex
+fn main(input: VertexInputs) -> FragmentInputs {
+  let w = uniforms.world * vec4f(vertexInputs.position, 1.0);
+  vertexOutputs.vWorld = w.xyz;
+  vertexOutputs.position = uniforms.viewProjection * w;
+}
+`;
+
+const FRAGMENT_WGSL = `
+varying vWorld: vec3f;
+uniform cameraPos: vec3f;
+uniform time: f32;
+uniform sunDir: vec3f;
+uniform sunColor: vec3f;
+uniform zenith: vec3f;
+uniform horizon: vec3f;
+uniform fogColor: vec3f;
+uniform fogDensity: f32;
+uniform pond: vec4f;
+uniform wind: vec2f;
+uniform ambient: vec3f;
+
+fn h(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(127.1, 311.7))) * 43758.5453); }
+fn n2(p: vec2f) -> f32 {
+  let i = floor(p);
+  let f = fract(p);
+  let u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h(i), h(i + vec2f(1.0, 0.0)), u.x), mix(h(i + vec2f(0.0, 1.0)), h(i + vec2f(1.0, 1.0)), u.x), u.y);
+}
+fn heightAt(p: vec2f) -> f32 {
+  let time = uniforms.time;
+  let w = uniforms.wind * time;
+  return n2(p * 0.45 + w * 0.5) * 0.5
+       + n2(p * 1.2 - w * 0.7 + vec2f(7.0)) * 0.3
+       + n2(p * 2.9 + w * 1.1 + vec2f(3.0)) * 0.12
+       + sin(dot(p, vec2f(0.7, 0.4)) * 1.6 + time * 1.2) * 0.04;
+}
+
+@fragment
+fn main(input: FragmentInputs) -> FragmentOutputs {
+  let world = fragmentInputs.vWorld;
+  let p = world.xz;
+  let pond = uniforms.pond;
+  let e = 0.06;
+  let hc = heightAt(p);
+  let n = normalize(vec3f(hc - heightAt(p + vec2f(e, 0.0)), e * 6.0, hc - heightAt(p + vec2f(0.0, e))));
+  let v = normalize(uniforms.cameraPos - world);
+  let fres = 0.02 + 0.8 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
+  let r = reflect(-v, n);
+  let sky = mix(uniforms.horizon, uniforms.zenith, pow(clamp(r.y, 0.0, 1.0), 0.45)) * 0.85;
+  let spec = pow(max(dot(r, uniforms.sunDir), 0.0), 220.0) * 4.0 + pow(max(dot(r, uniforms.sunDir), 0.0), 24.0) * 0.12;
+
+  let dist = length(p - pond.xy);
+  let centre = 1.0 - smoothstep(0.0, pond.z, dist);
+  let shallow = vec3f(0.13, 0.2, 0.15);
+  let deep = vec3f(0.02, 0.06, 0.07);
+  let waterBody = mix(shallow, deep, centre) * (vec3f(0.35) + uniforms.ambient * 0.8);
+
+  var col = mix(waterBody, sky, fres) + uniforms.sunColor * spec;
+  // Soft shoreline: fade out over the outer rim; foam-ish brightening at the edge.
+  let shore = 1.0 - smoothstep(pond.z * 0.82, pond.z * 1.02, dist);
+  let edge = smoothstep(pond.z * 0.78, pond.z * 0.95, dist) * shore;
+  col += vec3f(0.12) * edge * (0.5 + 0.5 * n2(p * 4.0 + vec2f(uniforms.time)));
+  let alpha = mix(0.62, 0.95, fres) * shore;
+
+  let d = length(uniforms.cameraPos - world);
+  let fogF = exp(-pow(uniforms.fogDensity * d, 2.0));
+  col = mix(uniforms.fogColor, col, fogF);
+  fragmentOutputs.color = vec4f(col, alpha);
+}
+`;
 
 /** Shared material + per-pond meshes; update once per frame. */
 export class WaterRenderer {
@@ -148,11 +225,7 @@ export class WaterRenderer {
   private readonly _tmpW = new Vector2();
 
   constructor(private readonly _scene: Scene) {
-    if (!_registered) {
-      Effect.ShadersStore["camelotWaterVertexShader"] = VERTEX;
-      Effect.ShadersStore["camelotWaterFragmentShader"] = FRAGMENT;
-      _registered = true;
-    }
+    registerShaders("camelotWater", { vertex: VERTEX, fragment: FRAGMENT }, { vertex: VERTEX_WGSL, fragment: FRAGMENT_WGSL });
   }
 
   /** Build the water surface for a pond.  Disposed with the returned mesh. */
@@ -167,6 +240,7 @@ export class WaterRenderer {
         "world", "viewProjection", "cameraPos", "time", "sunDir", "sunColor", "zenith", "horizon",
         "fogColor", "fogDensity", "pond", "wind", "ambient",
       ],
+      shaderLanguage: shaderLanguageFor(this._scene),
       needAlphaBlending: true,
     });
     mat.backFaceCulling = false;

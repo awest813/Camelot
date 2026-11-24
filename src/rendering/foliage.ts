@@ -24,6 +24,7 @@ import "@babylonjs/core/Meshes/thinInstanceMesh";
 import type { ProceduralTextureManager } from "../systems/procedural-texture-manager";
 import type { BiomeType } from "../world/world-manager";
 import { biomeWeightsAt } from "./terrain-material";
+import { ShaderLanguage } from "@babylonjs/core/Materials/shaderLanguage";
 
 // ── Wind ──────────────────────────────────────────────────────────────────────
 
@@ -69,20 +70,28 @@ export class WindPlugin extends MaterialPluginBase {
     return "WindPlugin";
   }
 
-  public override getUniforms(): { ubo: { name: string; size: number; type: string }[]; vertex: string; fragment: string } {
+  /** GLSL (WebGL) and WGSL (WebGPU) both. */
+  public override isCompatible(shaderLanguage: ShaderLanguage): boolean {
+    return shaderLanguage === ShaderLanguage.GLSL || shaderLanguage === ShaderLanguage.WGSL;
+  }
+
+  public override getUniforms(shaderLanguage: ShaderLanguage = ShaderLanguage.GLSL): { ubo: { name: string; size: number; type: string }[]; vertex: string; fragment: string } {
+    const decl = shaderLanguage === ShaderLanguage.WGSL
+      ? `#ifdef WIND
+uniform windParams: vec4f;
+uniform windShape: vec4f;
+#endif`
+      : `#ifdef WIND
+uniform vec4 windParams;
+uniform vec4 windShape;
+#endif`;
     return {
       ubo: [
         { name: "windParams", size: 4, type: "vec4" },
         { name: "windShape", size: 4, type: "vec4" },
       ],
-      vertex: `#ifdef WIND
-uniform vec4 windParams;
-uniform vec4 windShape;
-#endif`,
-      fragment: `#ifdef WIND
-uniform vec4 windParams;
-uniform vec4 windShape;
-#endif`,
+      vertex: decl,
+      fragment: decl,
     };
   }
 
@@ -92,7 +101,8 @@ uniform vec4 windShape;
     ubo.updateFloat4("windShape", this.height, this.amplitude, this.flutter, this.fadeEnd > 0 ? this.fadeStart + this.fadeEnd * 1000 : 0);
   }
 
-  public override getCustomCode(shaderType: string): { [pointName: string]: string } | null {
+  public override getCustomCode(shaderType: string, shaderLanguage: ShaderLanguage = ShaderLanguage.GLSL): { [pointName: string]: string } | null {
+    if (shaderLanguage === ShaderLanguage.WGSL) return this._wgsl(shaderType);
     if (shaderType === "vertex") {
       return {
         CUSTOM_VERTEX_UPDATE_WORLDPOS: `#ifdef WIND
@@ -130,6 +140,51 @@ float windDither(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.0671105
     float d = length(vPositionW.xz - vEyePosition.xz);
     float k = clamp((d - fStart) / max(fEnd - fStart, 0.001), 0.0, 1.0);
     if (k > windDither(gl_FragCoord.xy)) discard;
+  }
+}
+#endif`,
+    };
+  }
+
+  /** The same sway and fade in WGSL, for the WebGPU engine (keep the two in step). */
+  private _wgsl(shaderType: string): { [pointName: string]: string } | null {
+    if (shaderType === "vertex") {
+      return {
+        CUSTOM_VERTEX_UPDATE_WORLDPOS: `#ifdef WIND
+{
+  let t = uniforms.windParams.x;
+  let s = uniforms.windParams.y;
+  let dir = uniforms.windParams.zw;
+  var h = clamp(positionUpdated.y / uniforms.windShape.x, 0.0, 1.0);
+  h *= h;
+  let ph = dot(worldPos.xz, vec2f(0.13, 0.09));
+  let gust = 0.6 + 0.4 * sin(t * 0.35 + dot(worldPos.xz, dir) * 0.02);
+  let sway = sin(t * 1.4 + ph) * 0.6 + sin(t * 3.1 + ph * 2.7) * 0.25;
+  let off = dir * (s * gust * (0.6 + sway)) + vec2f(-dir.y, dir.x) * sway * 0.25 * s;
+  let a = uniforms.windShape.y * h;
+  worldPos = vec4f(worldPos.x + off.x * a, worldPos.y - length(off) * a * 0.15, worldPos.z + off.y * a, worldPos.w);
+  if (uniforms.windShape.z > 0.0) {
+    let f = sin(t * 7.0 + dot(positionUpdated, vec3f(3.1, 2.3, 4.7)) + ph * 5.0);
+    worldPos = vec4f(worldPos.xyz + vec3f(f, f * 0.5, -f) * uniforms.windShape.z * (0.4 + s) * h, worldPos.w);
+  }
+}
+#endif`,
+      };
+    }
+    if (!this._fade) return null;
+    return {
+      CUSTOM_FRAGMENT_DEFINITIONS: `#ifdef WIND_FADE
+fn windDither(p: vec2f) -> f32 { return fract(52.9829189 * fract(dot(p, vec2f(0.06711056, 0.00583715)))); }
+#endif`,
+      CUSTOM_FRAGMENT_MAIN_BEGIN: `#ifdef WIND_FADE
+{
+  let packed = uniforms.windShape.w;
+  if (packed > 0.0) {
+    let fEnd = floor(packed / 1000.0);
+    let fStart = packed - fEnd * 1000.0;
+    let d = length(fragmentInputs.vPositionW.xz - scene.vEyePosition.xz);
+    let k = clamp((d - fStart) / max(fEnd - fStart, 0.001), 0.0, 1.0);
+    if (k > windDither(fragmentInputs.position.xy)) { discard; }
   }
 }
 #endif`,

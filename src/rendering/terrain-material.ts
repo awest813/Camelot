@@ -13,6 +13,7 @@
 import type { Scene } from "@babylonjs/core/scene";
 import { MaterialPluginBase } from "@babylonjs/core/Materials/materialPluginBase";
 import { MaterialDefines } from "@babylonjs/core/Materials/materialDefines";
+import { ShaderLanguage } from "@babylonjs/core/Materials/shaderLanguage";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { UniformBuffer } from "@babylonjs/core/Materials/uniformBuffer";
 import type { BaseTexture } from "@babylonjs/core/Materials/Textures/baseTexture";
@@ -152,6 +153,71 @@ const FRAGMENT_BEFORE_LIGHTS = `
 #endif
 `;
 
+/* The same surface in WGSL, for the WebGPU engine (keep the two in step). */
+
+const WGSL_FRAGMENT_DEFINITIONS = `
+#ifdef TERRAIN
+varying vTerrainW: vec4f;
+var tAlb0Sampler: sampler; var tAlb0: texture_2d<f32>;
+var tAlb1Sampler: sampler; var tAlb1: texture_2d<f32>;
+var tAlb2Sampler: sampler; var tAlb2: texture_2d<f32>;
+var tAlb3Sampler: sampler; var tAlb3: texture_2d<f32>;
+var tNrm0Sampler: sampler; var tNrm0: texture_2d<f32>;
+var tNrm1Sampler: sampler; var tNrm1: texture_2d<f32>;
+var tNrm2Sampler: sampler; var tNrm2: texture_2d<f32>;
+var tNrm3Sampler: sampler; var tNrm3: texture_2d<f32>;
+fn tHash(p: vec2f) -> f32 { var p3 = fract(vec3f(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+fn tNoise(p: vec2f) -> f32 {
+  let i = floor(p); let f = fract(p); let u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(tHash(i), tHash(i + vec2f(1.0, 0.0)), u.x), mix(tHash(i + vec2f(0.0, 1.0)), tHash(i + vec2f(1.0, 1.0)), u.x), u.y);
+}
+fn tSample4(t: texture_2d<f32>, s: sampler, a: vec2f, b: vec2f, m: f32) -> vec4f { return mix(textureSample(t, s, a), textureSample(t, s, b), m); }
+#endif
+`;
+
+const WGSL_FRAGMENT_DIFFUSE = `
+#ifdef TERRAIN
+{
+  let wp = fragmentInputs.vPositionW.xz;
+  let uvA = wp * uniforms.terrainScale;
+  let uvB = mat2x2f(0.799, -0.602, 0.602, 0.799) * wp * uniforms.terrainScale * 0.41 + vec2f(0.37, 0.71);
+  let tMacro = tNoise(wp * 0.015) * 0.6 + tNoise(wp * 0.06) * 0.4;
+  let m = smoothstep(0.3, 0.7, tNoise(wp * 0.04 + vec2f(13.0)));
+  let w = fragmentInputs.vTerrainW / max(dot(fragmentInputs.vTerrainW, vec4f(1.0)), 0.0001);
+  var alb = tSample4(tAlb0, tAlb0Sampler, uvA, uvB, m).rgb * w.x
+          + tSample4(tAlb1, tAlb1Sampler, uvA, uvB, m).rgb * w.y
+          + tSample4(tAlb2, tAlb2Sampler, uvA, uvB, m).rgb * w.z
+          + tSample4(tAlb3, tAlb3Sampler, uvA, uvB, m).rgb * w.w;
+  alb *= mix(0.88, 1.08, tMacro);
+  let dry = smoothstep(0.62, 0.85, tMacro) * w.x;
+  alb = mix(alb, alb * vec3f(1.12, 1.05, 0.82), dry * 0.25);
+  let dirt = smoothstep(0.74, 0.88, tNoise(wp * 0.11 + vec2f(41.0))) * (w.x + w.y);
+  alb = mix(alb, vec3f(0.40, 0.32, 0.22) * (0.8 + 0.4 * tNoise(wp * 0.7)), dirt * 0.32);
+  baseColor = vec4f(alb, baseColor.a);
+  terrainMix = vec3f(m, dirt, 0.0);
+  terrainUVA = uvA; terrainUVB = uvB;
+}
+#endif
+`;
+
+const WGSL_FRAGMENT_BEFORE_LIGHTS = `
+#ifdef TERRAIN
+{
+  let w = fragmentInputs.vTerrainW / max(dot(fragmentInputs.vTerrainW, vec4f(1.0)), 0.0001);
+  let m = terrainMix.x;
+  var n = (tSample4(tNrm0, tNrm0Sampler, terrainUVA, terrainUVB, m).xyz * w.x
+         + tSample4(tNrm1, tNrm1Sampler, terrainUVA, terrainUVB, m).xyz * w.y
+         + tSample4(tNrm2, tNrm2Sampler, terrainUVA, terrainUVB, m).xyz * w.z
+         + tSample4(tNrm3, tNrm3Sampler, terrainUVA, terrainUVB, m).xyz * w.w) * 2.0 - vec3f(1.0);
+  n = vec3f(n.xy * uniforms.terrainBump * (1.0 - terrainMix.y * 0.5), n.z);
+  let N = normalW;
+  let T = normalize(vec3f(1.0, 0.0, 0.0) - N * N.x);
+  let B = cross(T, N);
+  normalW = normalize(T * n.x - B * n.y + N * n.z);
+}
+#endif
+`;
+
 /** StandardMaterial plugin implementing the blended terrain surface. */
 export class TerrainMaterialPlugin extends MaterialPluginBase {
   public albedo: (BaseTexture | null)[] = [null, null, null, null];
@@ -188,13 +254,23 @@ export class TerrainMaterialPlugin extends MaterialPluginBase {
     samplers.push("tAlb0", "tAlb1", "tAlb2", "tAlb3", "tNrm0", "tNrm1", "tNrm2", "tNrm3");
   }
 
-  public override getUniforms(): { ubo: { name: string; size: number; type: string }[]; fragment: string } {
+  /** GLSL (WebGL) and WGSL (WebGPU) both. */
+  public override isCompatible(shaderLanguage: ShaderLanguage): boolean {
+    return shaderLanguage === ShaderLanguage.GLSL || shaderLanguage === ShaderLanguage.WGSL;
+  }
+
+  public override getUniforms(shaderLanguage: ShaderLanguage = ShaderLanguage.GLSL): { ubo: { name: string; size: number; type: string }[]; fragment: string } {
     return {
       ubo: [
         { name: "terrainScale", size: 1, type: "float" },
         { name: "terrainBump", size: 1, type: "float" },
       ],
-      fragment: `#ifdef TERRAIN
+      fragment: shaderLanguage === ShaderLanguage.WGSL
+        ? `#ifdef TERRAIN
+uniform terrainScale: f32;
+uniform terrainBump: f32;
+#endif`
+        : `#ifdef TERRAIN
 uniform float terrainScale;
 uniform float terrainBump;
 #endif`,
@@ -214,7 +290,28 @@ uniform float terrainBump;
     for (const t of [...this.albedo, ...this.normals]) if (t) activeTextures.push(t);
   }
 
-  public override getCustomCode(shaderType: string): { [pointName: string]: string } | null {
+  public override getCustomCode(shaderType: string, shaderLanguage: ShaderLanguage = ShaderLanguage.GLSL): { [pointName: string]: string } | null {
+    if (shaderLanguage === ShaderLanguage.WGSL) {
+      if (shaderType === "vertex") {
+        return {
+          CUSTOM_VERTEX_DEFINITIONS: `#ifdef TERRAIN
+attribute terrainWeights: vec4f;
+varying vTerrainW: vec4f;
+#endif`,
+          CUSTOM_VERTEX_MAIN_END: `#ifdef TERRAIN
+vertexOutputs.vTerrainW = vertexInputs.terrainWeights;
+#endif`,
+        };
+      }
+      return {
+        CUSTOM_FRAGMENT_DEFINITIONS: WGSL_FRAGMENT_DEFINITIONS,
+        CUSTOM_FRAGMENT_MAIN_BEGIN: `#ifdef TERRAIN
+var terrainMix = vec3f(0.0); var terrainUVA = vec2f(0.0); var terrainUVB = vec2f(0.0);
+#endif`,
+        CUSTOM_FRAGMENT_UPDATE_DIFFUSE: WGSL_FRAGMENT_DIFFUSE,
+        CUSTOM_FRAGMENT_BEFORE_LIGHTS: WGSL_FRAGMENT_BEFORE_LIGHTS,
+      };
+    }
     if (shaderType === "vertex") {
       return {
         CUSTOM_VERTEX_DEFINITIONS: `#ifdef TERRAIN

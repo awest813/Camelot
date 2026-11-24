@@ -3,6 +3,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { AxesViewer } from "@babylonjs/core/Debug/axesViewer";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
+import { guardEarlyDeviceLoss, pickRenderer } from "./rendering/renderer-choice";
 import { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 import HavokPhysics from "@babylonjs/havok";
 
@@ -40,13 +41,15 @@ class App {
   }
 
   private async _initEngine(): Promise<void> {
-    const useWebGPU = import.meta.env.VITE_USE_WEBGPU === "true";
-
-    if (useWebGPU) {
-      await this._initWebGPUEngine();
-    } else {
-      await this._initWebGL2Engine();
+    if (pickRenderer() === "webgpu") {
+      try {
+        await this._initWebGPUEngine();
+        return;
+      } catch (err) {
+        console.warn("[Engine] WebGPU unavailable; using WebGL2.", err);
+      }
     }
+    await this._initWebGL2Engine();
   }
 
   private async _initWebGL2Engine(): Promise<void> {
@@ -62,7 +65,17 @@ class App {
   private async _initWebGPUEngine(): Promise<void> {
     // Loaded on demand: the WebGPU engine (and the WGSL shaders it pulls in)
     // stays out of the default WebGL bundle.
-    const { WebGPUEngine } = await import("@babylonjs/core/Engines/webgpuEngine");
+    const [{ WebGPUEngine }] = await Promise.all([
+      import("@babylonjs/core/Engines/webgpuEngine"),
+      // The WebGPU engine's texture, render-target, query… extensions are
+      // separate modules (the WebGL engine's come with it).
+      import("@babylonjs/core/Engines/WebGPU/Extensions/index"),
+    ]);
+    // Ask for an adapter first: a browser can expose WebGPU and still have
+    // no adapter to give (blocklisted or headless GPUs), and Babylon logs
+    // that as a fatal error.
+    const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
+    if (!gpu || !(await gpu.requestAdapter())) throw new Error("no WebGPU adapter");
     const webgpu = new WebGPUEngine(this.canvas, {
       adaptToDeviceRatio: true,
       antialias: false,
@@ -70,6 +83,7 @@ class App {
     await webgpu.initAsync();
     this.engine = webgpu;
     this._applyPerformanceRenderScale();
+    guardEarlyDeviceLoss(webgpu);
   }
 
   private _applyPerformanceRenderScale(): void {

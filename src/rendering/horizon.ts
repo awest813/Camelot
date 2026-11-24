@@ -7,7 +7,6 @@
  * perspective), so the world fades into ranges instead of a hard line.
  */
 import type { Scene } from "@babylonjs/core/scene";
-import { Effect } from "@babylonjs/core/Materials/effect";
 import { ShaderMaterial } from "@babylonjs/core/Materials/shaderMaterial";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
@@ -16,6 +15,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { TileableNoise } from "./texture-synth";
 import type { AtmosphereState } from "./atmosphere";
 import { UniformCache } from "./uniform-cache";
+import { registerShaders, shaderLanguageFor } from "./shader-language";
 
 const VERTEX = `
 precision highp float;
@@ -68,7 +68,59 @@ void main(void) {
 }
 `;
 
-let _registered = false;
+/* The same ranges in WGSL, for the WebGPU engine (keep the two in step). */
+
+const VERTEX_WGSL = `
+attribute position: vec3f;
+attribute normal: vec3f;
+attribute uv: vec2f;
+uniform world: mat4x4f;
+uniform viewProjection: mat4x4f;
+varying vNormal: vec3f;
+varying vHeight: f32;
+varying vLayer: f32;
+varying vWorld: vec3f;
+@vertex
+fn main(input: VertexInputs) -> FragmentInputs {
+  let w = uniforms.world * vec4f(vertexInputs.position, 1.0);
+  vertexOutputs.vWorld = w.xyz;
+  vertexOutputs.vNormal = vertexInputs.normal;
+  vertexOutputs.vHeight = vertexInputs.uv.x;
+  vertexOutputs.vLayer = vertexInputs.uv.y;
+  vertexOutputs.position = uniforms.viewProjection * w;
+}
+`;
+
+const FRAGMENT_WGSL = `
+varying vNormal: vec3f;
+varying vHeight: f32;
+varying vLayer: f32;
+varying vWorld: vec3f;
+uniform lightDir: vec3f;
+uniform lightColor: vec3f;
+uniform ambientColor: vec3f;
+uniform hazeColor: vec3f;
+uniform snowLine: f32;
+uniform hazeBoost: f32;
+fn h1(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(127.1, 311.7))) * 43758.5453); }
+@fragment
+fn main(input: FragmentInputs) -> FragmentOutputs {
+  let n = normalize(fragmentInputs.vNormal);
+  let height = fragmentInputs.vHeight;
+  let diff = max(dot(n, -uniforms.lightDir), 0.0);
+  let rock = mix(vec3f(0.30, 0.31, 0.33), vec3f(0.40, 0.38, 0.34), h1(floor(fragmentInputs.vWorld.xz * 0.05)));
+  let grass = vec3f(0.22, 0.30, 0.16);
+  let snow = smoothstep(uniforms.snowLine - 6.0, uniforms.snowLine + 4.0, height + (n.y - 0.5) * 30.0);
+  let base = mix(mix(grass, rock, smoothstep(10.0, 40.0, height)), vec3f(0.92, 0.94, 0.98), snow);
+  var col = base * (uniforms.ambientColor * 0.75 + uniforms.lightColor * diff * 0.9);
+  // Aerial perspective: the far ring melts more into the haze.
+  var haze = mix(0.38, 0.6, fragmentInputs.vLayer);
+  // Valleys sit in denser air than peaks; the base melts fully into the fog.
+  haze += (1.0 - smoothstep(-10.0, 50.0, height)) * 0.6;
+  col = mix(col, uniforms.hazeColor, clamp(haze + uniforms.hazeBoost, 0.0, 1.0));
+  fragmentOutputs.color = vec4f(col, 1.0);
+}
+`;
 
 function ringGeometry(radius: number, segments: number, baseHeight: number, amp: number, seed: number, layer: number): VertexData {
   const noise = new TileableNoise(seed);
@@ -118,14 +170,11 @@ export class HorizonMountains {
   private readonly _uniforms = new UniformCache();
 
   constructor(scene: Scene) {
-    if (!_registered) {
-      Effect.ShadersStore["camelotHorizonVertexShader"] = VERTEX;
-      Effect.ShadersStore["camelotHorizonFragmentShader"] = FRAGMENT;
-      _registered = true;
-    }
+    registerShaders("camelotHorizon", { vertex: VERTEX, fragment: FRAGMENT }, { vertex: VERTEX_WGSL, fragment: FRAGMENT_WGSL });
     this._material = new ShaderMaterial("horizonMat", scene, { vertex: "camelotHorizon", fragment: "camelotHorizon" }, {
       attributes: ["position", "normal", "uv"],
       uniforms: ["world", "viewProjection", "lightDir", "lightColor", "ambientColor", "hazeColor", "snowLine", "hazeBoost"],
+      shaderLanguage: shaderLanguageFor(scene),
     });
     this._material.backFaceCulling = false;
     this._material.setFloat("snowLine", 110);
