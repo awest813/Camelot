@@ -1032,9 +1032,24 @@ from a CDN at runtime.
 - Nothing fetched from a CDN at runtime: yes; boot-smoke and the shader
   harness check it.
 - Not done yet from the bullet list: thin-instanced vegetation (vegetation
-  is merged per material per chunk), a light budget across sites, model
-  LODs and an asset manifest, and god rays on WebGPU (waiting on WGSL for
-  Babylon's scattering pass).
+  is merged per material per chunk), model LODs and an asset manifest,
+  and god rays on WebGPU (waiting on WGSL for Babylon's scattering pass).
+- **Light budget across sites:** done after the exit check. `FireFx`
+  lights every torch, campfire, candle stand and interior torch from a
+  fixed pool of four point lights (`fireLight_0..3`). The pool lights
+  are always enabled; they move to the nearest burning fires within 45 m
+  (2 Hz, each lit fire keeping its slot) and go dark at intensity 0 when
+  unused. A fire's own `PointLight` is only a description and is
+  switched off on attach, so the structure builders and their golden
+  tests are unchanged.
+  - Before: up to four lights were switched on and off by distance. That
+    changed every material's light count and compiled new shader
+    variants mid-play, and `scene.lights` grew with each loaded site.
+  - Now the light count is constant.
+  - Tests: unit tests cover slot assignment and the pool (nearest four,
+    walking away, night-only candles, a removed fire). `village.spec`
+    checks that only the pool's lights are on, that the candles are lit
+    at night, and that the enabled set is the same as by day.
 
 ### Phase 8 — UI consolidation (3 weeks; can run in parallel from Phase 2)
 

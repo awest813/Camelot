@@ -71,6 +71,17 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     { timeout: 90_000 },
   ).toBe(6);
 
+  // The light budget (checked again at night below): the same few always-on
+  // point lights from the fire light pool, whatever is loaded.
+  const pointLights = () => page.evaluate((v) => {
+    const g = (window as any).__camelotGame;
+    const on = g.scene.lights.filter((l: any) => l.getClassName() === "PointLight" && l.isEnabled());
+    return { names: on.map((l: any) => l.name) as string[],
+      litNear: on.filter((l: any) => l.intensity > 0 && Math.hypot(l.position.x - v!.x, l.position.z - v!.z) < 45).length };
+  }, v);
+  const dayLights = await pointLights();
+  expect(dayLights.names.every((n) => /^fireLight_\d+$/.test(n)), `only the pool's lights are on: ${dayLights.names}`).toBe(true);
+
   const state = await page.evaluate((v) => {
     const g = (window as any).__camelotGame;
     const near = (x: number, z: number, r: number) => Math.hypot(x - v!.x, z - v!.z) < r;
@@ -336,6 +347,11 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   });
   await expect.poll(async () => (await villagerState()).hidden, { timeout: 150_000, message: "villagers go indoors at night (the game clock runs slow under load)" })
     .toBeGreaterThan(0);
+  // At night the candle stands are lit by the pool, and the count of enabled
+  // point lights is unchanged (no shader variants for a changing light count).
+  await expect.poll(async () => (await pointLights()).litNear, { timeout: 10_000, message: "candles lit at night" }).toBeGreaterThan(0);
+  expect((await pointLights()).names).toEqual(dayLights.names);
+
   // The inn stays open: the barkeeper keeps the night shift.
   const barkeep = await page.evaluate(() => {
     const g = (window as any).__camelotGame; const c = g.player.camera.position;

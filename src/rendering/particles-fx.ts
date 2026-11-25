@@ -17,7 +17,8 @@ import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
-import type { PointLight } from "@babylonjs/core/Lights/pointLight";
+import { PointLight } from "@babylonjs/core/Lights/pointLight";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
 
 type Profile = (x: number, y: number) => number;
 
@@ -52,9 +53,31 @@ const streak: Profile = (x, y) => Math.max(0, 1 - Math.abs(x) * 2.2) * Math.max(
 
 // ── Fire ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Keep the lights that stay lit in their slots; put the newly wanted ones in
+ * the free slots.  `wanted` is at most `slots.length` long, nearest first.
+ */
+export function assignSlots<T extends object>(slots: ReadonlyArray<T | null>, wanted: ReadonlyArray<T>): Array<T | null> {
+  const keep = new Set(wanted);
+  const out = slots.map((s) => (s !== null && keep.has(s) ? s : null));
+  const placed = new Set(out);
+  let free = 0;
+  for (const w of wanted) {
+    if (placed.has(w)) continue;
+    while (free < out.length && out[free] !== null) free++;
+    if (free >= out.length) break;
+    out[free] = w;
+  }
+  return out;
+}
+
 interface FireEntry {
   flame: Mesh;
-  light: PointLight;
+  /** Where its light shines from, and how (copied from the light it came with). */
+  at: Vector3;
+  diffuse: Color3;
+  specular: Color3;
+  range: number;
   base: number;
   systems: ParticleSystem[];
   phase: number;
@@ -62,8 +85,19 @@ interface FireEntry {
   nightOnly: boolean;
 }
 
+/**
+ * Fires: particles, flicker, and the light budget across all sites.
+ *
+ * The light budget is a fixed pool of point lights, always enabled, moved
+ * to the nearest burning fires (2 Hz) and dark (intensity 0) when unused.
+ * A fire's own PointLight only describes its light and is switched off for
+ * good on attach.  So the number of enabled lights never changes, which
+ * keeps every material on one shader variant (switching lights on and off
+ * changed their light count and compiled new variants mid-play), and the
+ * scene has the same few lights however many sites are loaded.
+ */
 export class FireFx {
-  /** Point lights kept enabled (nearest to the player). */
+  /** Size of the light pool (the nearest fires that cast light). Read when the pool is made. */
   public maxActiveLights = 4;
   /** Lights farther than this are always off. */
   public lightRange = 45;
@@ -74,6 +108,8 @@ export class FireFx {
   private readonly _softTex: RawTexture;
   private _time = 0;
   private _lightTimer = 0;
+  private _pool: PointLight[] = [];
+  private _slots: Array<FireEntry | null> = [];
 
   constructor(private readonly _scene: Scene, private readonly _particleScale: number) {
     this._flameTex = sprite(_scene, "fxFlame", 32, 64, flameProfile);
@@ -167,50 +203,92 @@ export class FireFx {
       info.flame.scaling.set(0.6, 0.55, 0.6);
     }
 
+    const l = info.light;
     const entry: FireEntry = {
-      flame: info.flame, light: info.light, base: info.light.intensity, systems,
+      flame: info.flame, at: l.position.clone(), diffuse: l.diffuse.clone(), specular: l.specular.clone(),
+      range: l.range, base: l.intensity, systems,
       phase: Math.random() * 100, nightOnly: !!info.nightOnly,
     };
+    // The pool lights it; its own light only described it.
+    l.setEnabled(false);
     this._fires.add(entry);
     info.flame.onDisposeObservable.addOnce(() => {
       for (const s of entry.systems) s.dispose(false);
       this._fires.delete(entry);
+      const slot = this._slots.indexOf(entry);
+      if (slot >= 0) { this._slots[slot] = null; this._pool[slot].intensity = 0; }
     });
   }
 
+  /** The pool's lights (made on first use). */
+  public get lights(): ReadonlyArray<PointLight> {
+    this._ensurePool();
+    return this._pool;
+  }
+
+  private _ensurePool(): void {
+    if (this._pool.length > 0) return;
+    for (let i = 0; i < this.maxActiveLights; i++) {
+      const light = new PointLight(`fireLight_${i}`, new Vector3(0, -1000, 0), this._scene);
+      light.intensity = 0;
+      light.range = 1;
+      this._pool.push(light);
+      this._slots.push(null);
+    }
+  }
+
   public update(dt: number, player: Vector3): void {
+    this._ensurePool();
     this._time += dt;
-    // Flicker: layered sines + noise-ish jitter.
-    for (const f of this._fires) {
+    // Flicker the lit fires.
+    for (let i = 0; i < this._slots.length; i++) {
+      const f = this._slots[i];
+      if (!f) continue;
       const t = this._time * 9 + f.phase;
       const k = 0.82 + 0.1 * Math.sin(t) + 0.06 * Math.sin(t * 2.7 + 1.3) + 0.04 * Math.sin(t * 7.1);
-      f.light.intensity = f.base * k;
+      this._pool[i].intensity = f.base * k;
     }
-    // Nearest-light management (2 Hz).
+    // Which fires get the pool (2 Hz).
     this._lightTimer -= dt;
     if (this._lightTimer > 0) return;
     this._lightTimer = 0.5;
-    const list = [...this._fires].map((f) => ({ f, d: Vector3.DistanceSquared(f.light.position, player) }));
+    const list = [...this._fires].map((f) => ({ f, d: Vector3.DistanceSquared(f.at, player) }));
     list.sort((a, b) => a.d - b.d);
     const maxD2 = this.lightRange * this.lightRange;
-    let lit = 0;
-    list.forEach(({ f, d }) => {
+    const wanted: FireEntry[] = [];
+    for (const { f, d } of list) {
       const burning = !f.nightOnly || this.night;
       if (f.nightOnly && f.flame.isEnabled() !== burning) f.flame.setEnabled(burning);
-      const on = burning && lit < this.maxActiveLights && d < maxD2;
-      if (on) lit++;
-      if (f.light.isEnabled() !== on) f.light.setEnabled(on);
+      if (burning && d < maxD2 && wanted.length < this._pool.length) wanted.push(f);
       // Cull far (or unlit) particle systems too.
       const near = burning && d < 70 * 70;
       for (const s of f.systems) {
         if (near && !s.isStarted()) s.start();
         else if (!near && s.isStarted()) s.stop();
       }
+    }
+    this._slots = assignSlots(this._slots, wanted);
+    this._slots.forEach((f, i) => {
+      const light = this._pool[i];
+      if (!f) { light.intensity = 0; return; }
+      light.position.copyFrom(f.at);
+      light.diffuse.copyFrom(f.diffuse);
+      light.specular.copyFrom(f.specular);
+      light.range = f.range;
+      if (light.intensity === 0) light.intensity = f.base; // newly lit; the flicker takes over next frame
     });
+  }
+
+  /** The fires the pool is lighting, by slot (for tests and the debug overlay). */
+  public get litFires(): number {
+    return this._slots.filter((f) => f !== null).length;
   }
 
   public dispose(): void {
     for (const f of this._fires) for (const s of f.systems) s.dispose(false);
+    for (const l of this._pool) l.dispose();
+    this._pool = [];
+    this._slots = [];
     this._fires.clear();
     this._flameTex.dispose();
     this._softTex.dispose();
