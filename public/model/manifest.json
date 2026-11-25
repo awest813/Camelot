@@ -1,0 +1,532 @@
+{
+  "generatedBy": "tools/build-character-lods.mjs",
+  "lodRatio": 0.25,
+  "models": {
+    "kaykit/Barbarian.glb": {
+      "bytes": 678688,
+      "tris": 6543,
+      "lod1": {
+        "file": "kaykit/Barbarian.lod1.glb",
+        "bytes": 103160,
+        "tris": 3622
+      }
+    },
+    "kaykit/Knight.glb": {
+      "bytes": 696720,
+      "tris": 6952,
+      "lod1": {
+        "file": "kaykit/Knight.lod1.glb",
+        "bytes": 114112,
+        "tris": 3650
+      }
+    },
+    "kaykit/Mage.glb": {
+      "bytes": 670372,
+      "tris": 5683,
+      "lod1": {
+        "file": "kaykit/Mage.lod1.glb",
+        "bytes": 95928,
+        "tris": 3014
+      }
+    },
+    "kaykit/Rogue.glb": {
+      "bytes": 675336,
+      "tris": 6377,
+      "lod1": {
+        "file": "kaykit/Rogue.lod1.glb",
+        "bytes": 95332,
+        "tris": 3145
+      }
+    },
+    "kaykit/Rogue_Hooded.glb": {
+      "bytes": 670888,
+      "tris": 6035,
+      "lod1": {
+        "file": "kaykit/Rogue_Hooded.lod1.glb",
+        "bytes": 93412,
+        "tris": 3062
+      }
+    },
+    "kaykit/Skeleton_Mage.glb": {
+      "bytes": 743164,
+      "tris": 4588,
+      "lod1": {
+        "file": "kaykit/Skeleton_Mage.lod1.glb",
+        "bytes": 86876,
+        "tris": 2493
+      }
+    },
+    "kaykit/Skeleton_Minion.glb": {
+      "bytes": 760148,
+      "tris": 5288,
+      "lod1": {
+        "file": "kaykit/Skeleton_Minion.lod1.glb",
+        "bytes": 98928,
+        "tris": 2910
+      }
+    },
+    "kaykit/Skeleton_Rogue.glb": {
+      "bytes": 764188,
+      "tris": 5278,
+      "lod1": {
+        "file": "kaykit/Skeleton_Rogue.lod1.glb",
+        "bytes": 101776,
+        "tris": 2861
+      }
+    },
+    "kaykit/Skeleton_Warrior.glb": {
+      "bytes": 780256,
+      "tris": 5934,
+      "lod1": {
+        "file": "kaykit/Skeleton_Warrior.lod1.glb",
+        "bytes": 113132,
+        "tris": 3202
+      }
+    },
+    "quaternius/animations/AttackMelee.glb": {
+      "bytes": 2904,
+      "tris": 72
+    },
+    "quaternius/animations/AttackRanged.glb": {
+      "bytes": 2864,
+      "tris": 72
+    },
+    "quaternius/animations/Block.glb": {
+      "bytes": 2736,
+      "tris": 60
+    },
+    "quaternius/animations/Cast.glb": {
+      "bytes": 2840,
+      "tris": 72
+    },
+    "quaternius/animations/Death.glb": {
+      "bytes": 2532,
+      "tris": 48
+    },
+    "quaternius/animations/Dodge.glb": {
+      "bytes": 2844,
+      "tris": 72
+    },
+    "quaternius/animations/Hit.glb": {
+      "bytes": 2840,
+      "tris": 72
+    },
+    "quaternius/animations/Idle.glb": {
+      "bytes": 2840,
+      "tris": 72
+    },
+    "quaternius/animations/Pickup.glb": {
+      "bytes": 2848,
+      "tris": 72
+    },
+    "quaternius/animations/Run.glb": {
+      "bytes": 2840,
+      "tris": 72
+    },
+    "quaternius/animations/Sit.glb": {
+      "bytes": 2864,
+      "tris": 72
+    },
+    "quaternius/animations/UAL_Clips.glb": {
+      "bytes": 900324,
+      "tris": 13744
+    },
+    "quaternius/animations/Walk.glb": {
+      "bytes": 2840,
+      "tris": 72
+    },
+    "quaternius/characters/Archer.glb": {
+      "bytes": 506964,
+      "tris": 32906,
+      "lod1": {
+        "file": "quaternius/characters/Archer.lod1.glb",
+        "bytes": 254484,
+        "tris": 8964
+      }
+    },
+    "quaternius/characters/Barbarian.glb": {
+      "bytes": 200900,
+      "tris": 12704,
+      "lod1": {
+        "file": "quaternius/characters/Barbarian.lod1.glb",
+        "bytes": 89216,
+        "tris": 3174
+      }
+    },
+    "quaternius/characters/Guard.glb": {
+      "bytes": 3756,
+      "tris": 138
+    },
+    "quaternius/characters/Innkeeper.glb": {
+      "bytes": 302796,
+      "tris": 19648
+    },
+    "quaternius/characters/Knight.glb": {
+      "bytes": 3608,
+      "tris": 126
+    },
+    "quaternius/characters/Mage.glb": {
+      "bytes": 514976,
+      "tris": 33730
+    },
+    "quaternius/characters/Merchant.glb": {
+      "bytes": 341364,
+      "tris": 23238
+    },
+    "quaternius/characters/Rogue.glb": {
+      "bytes": 514976,
+      "tris": 33730,
+      "lod1": {
+        "file": "quaternius/characters/Rogue.lod1.glb",
+        "bytes": 253476,
+        "tris": 9143
+      }
+    },
+    "quaternius/characters/VillagerFemale.glb": {
+      "bytes": 347768,
+      "tris": 23616,
+      "lod1": {
+        "file": "quaternius/characters/VillagerFemale.lod1.glb",
+        "bytes": 151920,
+        "tris": 5902
+      }
+    },
+    "quaternius/characters/VillagerMale.glb": {
+      "bytes": 307368,
+      "tris": 20119,
+      "lod1": {
+        "file": "quaternius/characters/VillagerMale.lod1.glb",
+        "bytes": 136392,
+        "tris": 5025
+      }
+    },
+    "quaternius/monsters/Bat.glb": {
+      "bytes": 2752,
+      "tris": 56
+    },
+    "quaternius/monsters/DragonSmall.glb": {
+      "bytes": 9288,
+      "tris": 436
+    },
+    "quaternius/monsters/Ghost.glb": {
+      "bytes": 2612,
+      "tris": 42
+    },
+    "quaternius/monsters/Goblin.glb": {
+      "bytes": 234568,
+      "tris": 15232
+    },
+    "quaternius/monsters/Orc.glb": {
+      "bytes": 200900,
+      "tris": 12704
+    },
+    "quaternius/monsters/Skeleton.glb": {
+      "bytes": 3012,
+      "tris": 84
+    },
+    "quaternius/monsters/Slime.glb": {
+      "bytes": 114200,
+      "tris": 7528
+    },
+    "quaternius/monsters/Spider.glb": {
+      "bytes": 3472,
+      "tris": 120
+    },
+    "quaternius/monsters/Troll.glb": {
+      "bytes": 2872,
+      "tris": 72
+    },
+    "quaternius/monsters/Wolf.glb": {
+      "bytes": 3408,
+      "tris": 104
+    },
+    "quaternius/nature/BushLarge.glb": {
+      "bytes": 31720,
+      "tris": 900
+    },
+    "quaternius/nature/BushSmall.glb": {
+      "bytes": 3708,
+      "tris": 48
+    },
+    "quaternius/nature/DeadTree.glb": {
+      "bytes": 144944,
+      "tris": 5802
+    },
+    "quaternius/nature/Fern.glb": {
+      "bytes": 8008,
+      "tris": 288
+    },
+    "quaternius/nature/FlowerBlue.glb": {
+      "bytes": 29212,
+      "tris": 1690
+    },
+    "quaternius/nature/FlowerRed.glb": {
+      "bytes": 15600,
+      "tris": 755
+    },
+    "quaternius/nature/GrassClump.glb": {
+      "bytes": 11320,
+      "tris": 622
+    },
+    "quaternius/nature/Log.glb": {
+      "bytes": 2352,
+      "tris": 36
+    },
+    "quaternius/nature/Mushroom.glb": {
+      "bytes": 32940,
+      "tris": 3216
+    },
+    "quaternius/nature/OakTree.glb": {
+      "bytes": 102568,
+      "tris": 3505
+    },
+    "quaternius/nature/PineTree.glb": {
+      "bytes": 92680,
+      "tris": 3648
+    },
+    "quaternius/nature/RockLarge.glb": {
+      "bytes": 8320,
+      "tris": 342
+    },
+    "quaternius/nature/RockMedium.glb": {
+      "bytes": 6724,
+      "tris": 244
+    },
+    "quaternius/nature/RockSmall.glb": {
+      "bytes": 5888,
+      "tris": 128
+    },
+    "quaternius/nature/Stump.glb": {
+      "bytes": 2584,
+      "tris": 48
+    },
+    "quaternius/nature/WillowTree.glb": {
+      "bytes": 252028,
+      "tris": 9134
+    },
+    "quaternius/outfits/BootsHeavy.glb": {
+      "bytes": 2072,
+      "tris": 12
+    },
+    "quaternius/outfits/BootsLight.glb": {
+      "bytes": 159340,
+      "tris": 9172
+    },
+    "quaternius/outfits/ChestHeavy.glb": {
+      "bytes": 2072,
+      "tris": 12
+    },
+    "quaternius/outfits/ChestLight.glb": {
+      "bytes": 99876,
+      "tris": 4606
+    },
+    "quaternius/outfits/ChestRobe.glb": {
+      "bytes": 95276,
+      "tris": 2188
+    },
+    "quaternius/outfits/CloakLong.glb": {
+      "bytes": 2076,
+      "tris": 12
+    },
+    "quaternius/outfits/CloakShort.glb": {
+      "bytes": 37296,
+      "tris": 1376
+    },
+    "quaternius/outfits/HelmetHeavy.glb": {
+      "bytes": 2196,
+      "tris": 18
+    },
+    "quaternius/outfits/HelmetLight.glb": {
+      "bytes": 45160,
+      "tris": 2136
+    },
+    "quaternius/outfits/HelmetMage.glb": {
+      "bytes": 2632,
+      "tris": 46
+    },
+    "quaternius/outfits/LegsHeavy.glb": {
+      "bytes": 2072,
+      "tris": 12
+    },
+    "quaternius/outfits/LegsLight.glb": {
+      "bytes": 33048,
+      "tris": 1128
+    },
+    "quaternius/outfits/Shield.glb": {
+      "bytes": 29856,
+      "tris": 1404
+    },
+    "quaternius/outfits/ShieldTower.glb": {
+      "bytes": 2232,
+      "tris": 24
+    },
+    "quaternius/props/Altar.glb": {
+      "bytes": 23220,
+      "tris": 1526
+    },
+    "quaternius/props/Anvil.glb": {
+      "bytes": 13800,
+      "tris": 750
+    },
+    "quaternius/props/BannerStand.glb": {
+      "bytes": 13444,
+      "tris": 429
+    },
+    "quaternius/props/Barrel.glb": {
+      "bytes": 24880,
+      "tris": 824
+    },
+    "quaternius/props/Bed.glb": {
+      "bytes": 32172,
+      "tris": 1600
+    },
+    "quaternius/props/Bench.glb": {
+      "bytes": 12012,
+      "tris": 404
+    },
+    "quaternius/props/Bookshelf.glb": {
+      "bytes": 34008,
+      "tris": 2148
+    },
+    "quaternius/props/Cauldron.glb": {
+      "bytes": 29092,
+      "tris": 2020
+    },
+    "quaternius/props/Chair.glb": {
+      "bytes": 13724,
+      "tris": 496
+    },
+    "quaternius/props/Chest.glb": {
+      "bytes": 63148,
+      "tris": 2546
+    },
+    "quaternius/props/Crate.glb": {
+      "bytes": 26824,
+      "tris": 1576
+    },
+    "quaternius/props/Flag.glb": {
+      "bytes": 13792,
+      "tris": 448
+    },
+    "quaternius/props/Forge.glb": {
+      "bytes": 13784,
+      "tris": 618
+    },
+    "quaternius/props/Fountain.glb": {
+      "bytes": 3360,
+      "tris": 108
+    },
+    "quaternius/props/Lantern.glb": {
+      "bytes": 82928,
+      "tris": 5738
+    },
+    "quaternius/props/MarketStall.glb": {
+      "bytes": 32740,
+      "tris": 1496
+    },
+    "quaternius/props/NoticeBoard.glb": {
+      "bytes": 4000,
+      "tris": 144
+    },
+    "quaternius/props/Shelf.glb": {
+      "bytes": 9964,
+      "tris": 480
+    },
+    "quaternius/props/SignPost.glb": {
+      "bytes": 33244,
+      "tris": 2084
+    },
+    "quaternius/props/Table.glb": {
+      "bytes": 23508,
+      "tris": 986
+    },
+    "quaternius/props/Well.glb": {
+      "bytes": 2912,
+      "tris": 74
+    },
+    "quaternius/village/Chimney.glb": {
+      "bytes": 5456,
+      "tris": 130
+    },
+    "quaternius/village/CornerBrick.glb": {
+      "bytes": 42380,
+      "tris": 3102
+    },
+    "quaternius/village/CornerWood.glb": {
+      "bytes": 3416,
+      "tris": 12
+    },
+    "quaternius/village/Door.glb": {
+      "bytes": 17132,
+      "tris": 470
+    },
+    "quaternius/village/Fence.glb": {
+      "bytes": 4056,
+      "tris": 40
+    },
+    "quaternius/village/FloorWood.glb": {
+      "bytes": 3548,
+      "tris": 32
+    },
+    "quaternius/village/Gable4.glb": {
+      "bytes": 10112,
+      "tris": 252
+    },
+    "quaternius/village/Gable6.glb": {
+      "bytes": 12144,
+      "tris": 328
+    },
+    "quaternius/village/Roof4x4.glb": {
+      "bytes": 45352,
+      "tris": 1996
+    },
+    "quaternius/village/Roof4x6.glb": {
+      "bytes": 53320,
+      "tris": 2520
+    },
+    "quaternius/village/Roof6x8.glb": {
+      "bytes": 72852,
+      "tris": 3796
+    },
+    "quaternius/village/Shutters.glb": {
+      "bytes": 9360,
+      "tris": 136
+    },
+    "quaternius/village/Wagon.glb": {
+      "bytes": 49364,
+      "tris": 1672
+    },
+    "quaternius/village/WallBrick.glb": {
+      "bytes": 8160,
+      "tris": 56
+    },
+    "quaternius/village/WallBrickDoor.glb": {
+      "bytes": 8928,
+      "tris": 136
+    },
+    "quaternius/village/WallBrickWindow.glb": {
+      "bytes": 9888,
+      "tris": 116
+    },
+    "quaternius/village/WallPlaster.glb": {
+      "bytes": 7788,
+      "tris": 86
+    },
+    "quaternius/village/WallPlasterDoor.glb": {
+      "bytes": 10580,
+      "tris": 137
+    },
+    "quaternius/village/WallPlasterWindow.glb": {
+      "bytes": 10000,
+      "tris": 124
+    },
+    "quaternius/village/WallTimber.glb": {
+      "bytes": 10816,
+      "tris": 248
+    },
+    "quaternius/village/Window.glb": {
+      "bytes": 14468,
+      "tris": 354
+    }
+  }
+}

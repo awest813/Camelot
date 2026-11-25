@@ -114,13 +114,16 @@ export class NpcVisuals {
     }
   }
 
-  /** Rig facing, gait speed, hit flash; far-tier rigs pause. */
+  /** Rig facing, gait speed, hit flash, detail (LOD from 40 m); far-tier rigs pause. */
   private _updateRigs(dt: number, playerPos: Vector3): void {
     for (const [npc, rig] of this._rigs) {
       // Follow the LOD system's capsule cull so culled NPCs stop drawing too.
       const shown = npc.mesh.isVisible;
       if (rig.pivot.isEnabled(false) !== shown) rig.pivot.setEnabled(shown);
       const far = isFar(npc);
+      // 40 m and farther (mid and far tiers): the model's LOD.
+      const detail = actors.tier(npc.actorId) === "near" ? 0 : 1;
+      if (rig.detail !== detail) rig.setDetail(detail);
       rig.setPaused(far && !npc.isDead);
       if (far) continue;
       // Fighters track the player; so does whoever the player is talking to.

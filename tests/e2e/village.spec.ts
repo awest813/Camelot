@@ -374,6 +374,15 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   await expect.poll(async () => (await villagerState()).hidden, { timeout: 10_000, message: "and come out in the morning" })
     .toBe(0);
 
+  // Character LODs: from 70 m the villagers draw their reduced models
+  // (public/model/*.lod1.glb, bound to each rig's skeleton).
+  await page.evaluate((v) => { (window as any).__camelotGame.player.camera.position.set(v!.x + 70, 6, v!.z); }, v);
+  await expect.poll(() => page.evaluate(() => {
+    const rigs = [...(window as any).__camelotGame._npcVisuals._rigs.values()];
+    return rigs.filter((r: any) => r.detail === 1 && r.lodMeshes?.some((m: any) => m.isEnabled(false))
+      && r.meshes.every((m: any) => m.getTotalVertices() === 0 || !m.isEnabled(false))).length;
+  }), { timeout: 30_000, message: "distant rigs switch to their LOD" }).toBeGreaterThan(2);
+
   expect(pageErrors, `uncaught page errors:\n${pageErrors.join("\n")}`).toEqual([]);
   expect(loadFailures, `models that failed to load:\n${loadFailures.join("\n")}`).toEqual([]);
 });

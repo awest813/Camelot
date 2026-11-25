@@ -159,10 +159,22 @@ export function skeletalClipFor(clip: AnimationClip, model: CharacterModelId): {
 const HIT_FLASH = new Color3(1, 0.25, 0.2);
 
 /** One NPC's instantiated, animated model. */
+/** Detail level: 0 the full model, 1 its LOD (NPCs 40 m and farther). */
+export type RigDetail = 0 | 1;
+
+/** Makes a rig's LOD meshes, bound to the rig's skeleton (null: the model has none). */
+export type LodMaker = (rig: CharacterRig) => Promise<AbstractMesh[] | null>;
+
 export class CharacterRig {
   /** Yaw pivot under the capsule; rotate this to face a direction. */
   public readonly pivot: TransformNode;
   public readonly meshes: AbstractMesh[];
+  /** The LOD's meshes, once made. */
+  public lodMeshes: AbstractMesh[] | null = null;
+  private _detail: RigDetail = 0;
+  private _lodRequested = false;
+  /** Set by the library when the model has a LOD. */
+  public makeLod: LodMaker | null = null;
   private readonly _groups = new Map<string, AnimationGroup>();
   private _current: AnimationGroup | null = null;
   private _currentName = "";
@@ -258,11 +270,41 @@ export class CharacterRig {
     if (this._flashTimer > 0) {
       this._flashTimer -= dt;
       const on = this._flashTimer > 0;
-      for (const m of this.meshes) {
+      for (const m of this.lodMeshes ? [...this.meshes, ...this.lodMeshes] : this.meshes) {
         m.renderOverlay = on;
         if (on) { m.overlayColor = HIT_FLASH; m.overlayAlpha = 0.55; }
       }
     }
+  }
+
+  public get detail(): RigDetail {
+    return this._detail;
+  }
+
+  /**
+   * Full model (0) or its LOD (1).  The LOD is made on first use; until it
+   * is ready (or when the model has none) the full model stays.
+   */
+  public setDetail(detail: RigDetail): void {
+    if (this._disposed) return;
+    this._detail = detail;
+    if (detail === 1 && !this.lodMeshes && !this._lodRequested && this.makeLod) {
+      this._lodRequested = true;
+      void this.makeLod(this).then((lod) => {
+        if (!lod) return;
+        if (this._disposed) { for (const m of lod) m.dispose(false, false); return; }
+        this.lodMeshes = lod;
+        this._applyDetail();
+      });
+    }
+    this._applyDetail();
+  }
+
+  private _applyDetail(): void {
+    const lod = this._detail === 1 && !!this.lodMeshes;
+    // Only parts with geometry: the empty glTF parent nodes hold LOD parts too.
+    for (const m of this.meshes) if (m.getTotalVertices() > 0 && m.isEnabled(false) === lod) m.setEnabled(!lod);
+    for (const m of this.lodMeshes ?? []) if (m.isEnabled(false) !== lod) m.setEnabled(lod);
   }
 
   /** Pause skeletal evaluation (distance LOD) without losing the clip. */
@@ -279,6 +321,7 @@ export class CharacterRig {
     for (const g of this._groups.values()) g.dispose();
     this._groups.clear();
     for (const m of this.meshes) this._shadows?.removeShadowCaster(m, false);
+    for (const m of this.lodMeshes ?? []) this._shadows?.removeShadowCaster(m, false);
     this.pivot.dispose(false, false);
   }
 }
@@ -358,7 +401,17 @@ export function optimizeCharacterContainer(container: AssetContainer, scene: Sce
   }
 }
 
+/** The last name segment: "<tag>|<lod>|Body" → "Body". */
+const baseName = (name: string): string => name.slice(name.lastIndexOf("|") + 1);
+
+/** public/model/manifest.json (tools/build-character-lods.mjs): which models have a LOD. */
+interface ModelManifest { models: Record<string, { lod1?: { file: string } }> }
+
 interface LibraryEntry {
+  /** The model's path under public/model ("kaykit/Knight.glb"), the manifest's key. */
+  key: string;
+  /** Its LOD's container (loaded on first use), or null when it has none. */
+  lod: Promise<AssetContainer | null> | null;
   container: AssetContainer | null;
   failed: boolean;
   promise: Promise<AssetContainer | null>;
@@ -371,6 +424,7 @@ export class CharacterModelLibrary {
   private readonly _entries = new Map<CharacterModelId, LibraryEntry>();
   private _counter = 0;
   private _ualClips: Promise<AssetContainer | null> | null = null;
+  private _manifest: Promise<ModelManifest | null> | null = null;
   /** Folder holding the Quaternius humans (characters/) and UAL clips (animations/). */
   private readonly _quaterniusBase: string;
 
@@ -395,6 +449,82 @@ export class CharacterModelLibrary {
     return this._ualClips;
   }
 
+  /** The model folder (parent of kaykit/ and quaternius/). */
+  private get _modelRoot(): string {
+    return this._baseUrl.replace(/kaykit\/?$/, "");
+  }
+
+  private _loadManifest(): Promise<ModelManifest | null> {
+    this._manifest ??= fetch(`${this._modelRoot}manifest.json`)
+      .then((r) => (r.ok ? (r.json() as Promise<ModelManifest>) : null))
+      .catch(() => null);
+    return this._manifest;
+  }
+
+  /** A model's LOD container, prepared like the full model (loaded once, on first use). */
+  private _loadLod(e: LibraryEntry): Promise<AssetContainer | null> {
+    e.lod ??= this._loadManifest().then((manifest) => {
+      const file = manifest?.models[e.key]?.lod1?.file;
+      if (!file) return null;
+      const slash = file.lastIndexOf("/");
+      return SceneLoader.LoadAssetContainerAsync(this._modelRoot + file.slice(0, slash + 1), file.slice(slash + 1), this._scene)
+        .then((c) => { optimizeCharacterContainer(c, this._scene); return c; });
+    }).catch((err) => {
+      console.warn(`[character-models] no LOD for ${e.key}`, err);
+      return null;
+    });
+    return e.lod;
+  }
+
+  /**
+   * The rig's LOD meshes: the LOD stamped out, each skinned mesh moved onto
+   * the rig's skeleton (same joints, same order: the LOD is the same skin),
+   * under the rig's node of the same name, with the rig's material of the
+   * same name.  The LOD's own nodes and skeleton are dropped.
+   */
+  private async _makeLod(rig: CharacterRig, e: LibraryEntry, tag: string): Promise<AbstractMesh[] | null> {
+    const container = await this._loadLod(e);
+    if (!container) return null;
+    const inst = container.instantiateModelsToScene((n) => `${tag}|lod|${n}`, false, { doNotInstantiate: true });
+    for (const g of inst.animationGroups) g.dispose();
+    const skeletons = new Set(rig.meshes.map((m) => m.skeleton).filter((k): k is NonNullable<typeof k> => !!k));
+    const nodes = new Map<string, TransformNode>();
+    // Parents: the rig's nodes (bones' nodes, empty glTF parents), never a drawn part.
+    for (const n of rig.pivot.getDescendants(false)) {
+      if (n instanceof TransformNode && !(n instanceof Mesh && n.getTotalVertices() > 0)) nodes.set(baseName(n.name), n);
+    }
+    const materials = new Map(rig.meshes.filter((m) => m.material).map((m) => [baseName(m.material!.name), m.material!]));
+    const out: AbstractMesh[] = [];
+    for (const root of inst.rootNodes) {
+      for (const m of [root, ...root.getDescendants(false)]) {
+        if (!(m instanceof Mesh) || m.getTotalVertices() === 0) continue;
+        const own = m.skeleton;
+        const target = own
+          ? [...skeletons].find((k) => k.bones.length === own.bones.length
+            && k.bones.every((b, i) => baseName(b.name) === baseName(own.bones[i].name)))
+          : undefined;
+        if (own && !target) continue; // no matching skeleton: leave this part out
+        // Same hierarchy, so the local transform carries over as it is.
+        const parent = m.parent ? nodes.get(baseName(m.parent.name)) : undefined;
+        m.parent = parent ?? rig.pivot;
+        if (target) m.skeleton = target;
+        const mat = m.material ? materials.get(baseName(m.material.name)) : undefined;
+        if (mat) m.material = mat;
+        m.isPickable = false;
+        m.receiveShadows = true;
+        m.setEnabled(false);
+        this._shadows?.addShadowCaster(m, false);
+        out.push(m);
+      }
+    }
+    const kept = new Set<unknown>(out);
+    // The rest of the stamp (its nodes and skeleton) is not needed; the
+    // kept meshes have moved out from under it.
+    for (const root of inst.rootNodes) if (!kept.has(root)) root.dispose(false, false);
+    for (const k of inst.skeletons) k.dispose();
+    return out.length > 0 ? out : null;
+  }
+
   public preload(ids: readonly CharacterModelId[] = CHARACTER_MODELS_PRELOAD): void {
     for (const id of ids) this._load(id);
   }
@@ -402,10 +532,11 @@ export class CharacterModelLibrary {
   private _load(id: CharacterModelId): LibraryEntry {
     let entry = this._entries.get(id);
     if (entry) return entry;
-    const e: LibraryEntry = { container: null, failed: false, scale: 1, promise: Promise.resolve(null) };
     const [root, file] = isQuaterniusHuman(id)
       ? [`${this._quaterniusBase}characters/`, QUATERNIUS_HUMAN_FILES[id]]
       : [this._baseUrl, `${id}.glb`];
+    const key = (root + file).slice(this._modelRoot.length);
+    const e: LibraryEntry = { key, lod: null, container: null, failed: false, scale: 1, promise: Promise.resolve(null) };
     if (isQuaterniusHuman(id)) void this._loadUalClips();
     e.promise = SceneLoader.LoadAssetContainerAsync(root, file, this._scene)
       .then((container) => {
@@ -500,6 +631,7 @@ export class CharacterModelLibrary {
     for (const child of capsule.getChildMeshes(true)) child.setEnabled(false);
 
     const rig = new CharacterRig(id, pivot, meshes, inst.animationGroups, this._shadows);
+    rig.makeLod = (r) => this._makeLod(r, entry, tag);
     capsule.onDisposeObservable.addOnce(() => rig.dispose());
     rig.play("idle");
     return rig;

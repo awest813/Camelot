@@ -1031,9 +1031,39 @@ from a CDN at runtime.
 - WebGPU is the default where supported: yes, with WebGL2 as fallback.
 - Nothing fetched from a CDN at runtime: yes; boot-smoke and the shader
   harness check it.
-- Not done yet from the bullet list: thin-instanced vegetation (vegetation
-  is merged per material per chunk), model LODs and an asset manifest,
-  and god rays on WebGPU (waiting on WGSL for Babylon's scattering pass).
+- Not done yet from the bullet list: god rays on WebGPU (waiting on WGSL
+  for Babylon's scattering pass).
+- **Thin-instanced vegetation: measured, not done.** A chunk's vegetation
+  costs about 3 ms to build: 2.3 ms generating it, most of that the
+  procedural tree geometry, and 0.6 ms merging about 9 meshes. Thin
+  instances would save under 1 ms a chunk, and since each tree is unique
+  by its seed they would cost variety. The grass is already
+  thin-instanced.
+- **Character LODs and the model manifest** (`tools/build-character-lods.mjs`):
+  - Measured first: from 70 m outside a village, skinned characters were
+    231k of 354k triangles (65%), all of them past 40 m.
+  - **Build:** the tool writes `<model>.lod1.glb` for the 14 models the
+    rigs use. Each keeps the same skin at about a quarter of the
+    triangles for Quaternius and half for the already-low KayKit
+    models. Animations and textures are left out. 1.8 MB in all. It
+    then writes `public/model/manifest.json`: every model's size and
+    triangle count, and its LOD.
+  - **Runtime:** the character library reads the manifest. It makes a
+    rig's LOD the first time that NPC is 40 m or farther away (the mid
+    and far tiers): the LOD is stamped out and each part moved onto the
+    rig's own skeleton (same joints, same order), under the same-named
+    node, with the rig's material of that name. The rig then shows one
+    set or the other.
+  - **Result**, measured in one run with the LODs on, then forced off:
+    character triangles 193.5k → 73.8k (−62%), frame triangles 312.5k →
+    192.8k (−38%).
+  - **Tests:**
+    - a unit test keeps the LOD list in step with the rig models and
+      checks each LOD's skins and triangle ratio;
+    - the same test fails if a full model changed since its LOD was
+      built;
+    - `village.spec` checks that rigs at 70 m draw their LODs;
+    - a zoomed screenshot shows a LOD rig skinned and textured.
 - **Light budget across sites:** done after the exit check. `FireFx`
   lights every torch, campfire, candle stand and interior torch from a
   fixed pool of four point lights (`fireLight_0..3`). The pool lights
