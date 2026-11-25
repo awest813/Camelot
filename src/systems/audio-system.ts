@@ -1,4 +1,5 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { cosmeticRng } from "../core/rng/rng";
 
 /**
  * Procedural audio system using the Web Audio API.
@@ -237,7 +238,7 @@ export class AudioSystem {
     const buffer = this._ctx.createBuffer(1, length, rate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < length; i++) {
-      data[i] = Math.random() * 2 - 1;
+      data[i] = cosmeticRng.next() * 2 - 1;
     }
     return buffer;
   }

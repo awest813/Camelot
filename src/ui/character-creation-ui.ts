@@ -6,6 +6,7 @@ import { shouldSkipOnboardingTips } from "../onboarding-preferences";
 import { WorldSeed, type WorldType, type BiomeScale, type StructureDensity } from "../world/world-seed";
 import type { BiomeType } from "../world/world-manager";
 import type { UIAnimator } from "./ui-animator";
+import { freshEntropy } from "../core/rng/rng";
 
 export interface CharacterCreationResult {
   name: string;
@@ -661,7 +662,7 @@ export class CharacterCreationUI {
         randomBtn.textContent = "Randomize";
         randomBtn.title = "Generate a random numeric seed";
         randomBtn.addEventListener("click", () => {
-          const r = Math.floor(Math.random() * 0xffffffff);
+          const r = freshEntropy();
           worldSeedString = String(r);
           seedInput.value = worldSeedString;
         });
@@ -1051,7 +1052,7 @@ export class CharacterCreationUI {
         randomNameBtn.addEventListener("click", () => {
           const pool = getSuggestionsForCategory(selectedNameCategory);
           if (pool.length > 0) {
-            const pick = pool[Math.floor(Math.random() * pool.length)];
+            const pick = pool[freshEntropy() % pool.length];
             enteredName = pick.name;
             nameInput.value = pick.name;
             setBtnDisabled(continueButton, false);
@@ -1229,7 +1230,7 @@ export class CharacterCreationUI {
         if (!enteredName.trim() || !selectedRace || !selectedBirthsign || !selectedClass) return;
 
         const trimmed = worldSeedString.trim();
-        const rawSeed = trimmed || String(Math.floor(Math.random() * 0xffffffff));
+        const rawSeed = trimmed || String(freshEntropy());
         const isNumericSeed = /^\d+$/.test(rawSeed);
         const numericSeedCandidate = isNumericSeed ? Number(rawSeed) : NaN;
         const seedArg: string | number =

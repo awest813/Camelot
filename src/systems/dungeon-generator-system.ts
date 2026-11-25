@@ -40,6 +40,7 @@
  * // layout.tiles is a 2D array, layout.rooms has placed positions
  * ```
  */
+import { Rng, freshEntropy } from "../core/rng/rng";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -285,7 +286,7 @@ export class DungeonGeneratorSystem {
    * @param graph   The dungeon graph describing rooms and connections.
    * @param options Optional generation parameters.
    * @param seedFn  Optional seeded random function; receives a slot number and
-   *                returns a float in [0, 1). When omitted, `Math.random` is used.
+   *                returns a float in [0, 1). When omitted, a freshly seeded generator is used.
    * @returns       The generated layout, or `null` if generation failed.
    */
   public generate(
@@ -294,7 +295,8 @@ export class DungeonGeneratorSystem {
     seedFn?: SeedFunction,
   ): DungeonLayout | null {
     const opts = { ...DEFAULT_OPTIONS, ...options };
-    const rand = seedFn ?? ((_slot: number) => Math.random());
+    const fresh = seedFn ? null : new Rng(freshEntropy());
+    const rand = seedFn ?? ((_slot: number) => fresh!.next());
 
     // Build adjacency from edges
     const children = new Map<string, string[]>();

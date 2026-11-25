@@ -18,6 +18,7 @@
  *   recents.addProject({ name: "My Mod" });  // track a project
  *   recents.getProjects();                   // newest-first list
  */
+import { freshId } from "../core/rng/rng";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -193,6 +194,6 @@ export class RecentProjectsSystem {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
       return crypto.randomUUID();
     }
-    return `proj_${Date.now()}_${++RecentProjectsSystem._idCounter}_${Math.random().toString(36).slice(2, 8)}`;
+    return `proj_${Date.now()}_${++RecentProjectsSystem._idCounter}_${freshId()}`;
   }
 }

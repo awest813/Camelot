@@ -14,6 +14,7 @@ import {
 } from "../world/river-network";
 import { ArthurianNameGenerator } from "../world/arthurian-names";
 import { generatePoissonPoints } from "../world/poisson-disk";
+import { Rng, freshEntropy, freshId } from "../core/rng/rng";
 
 // ─── Interfaces & Types ───────────────────────────────────────────────────────
 
@@ -560,7 +561,7 @@ export class WorldBuilderSystem {
   }
 
   public randomizeSeed(): string {
-    const randomValue = Math.floor(Math.random() * 0xffffffff).toString();
+    const randomValue = freshEntropy().toString();
     this.setSeed(randomValue);
     return randomValue;
   }
@@ -702,11 +703,13 @@ export class WorldBuilderSystem {
 
   /** Generates a procedurally-named Arthurian region with randomized bounds and danger. */
   public generateArthurianRegion(biome: BiomeType = "plains"): WorldRegion {
-    const id = `reg_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
-    const name = ArthurianNameGenerator.generateRegionName(Math.floor(Math.random() * 0xffff), biome);
-    const boundsRadius = Math.floor(2 + Math.random() * 3);
-    const centerCX = Math.floor((Math.random() - 0.5) * 8);
-    const centerCZ = Math.floor((Math.random() - 0.5) * 8);
+    // A new random region: its own freshly seeded generator.
+    const r = new Rng(freshEntropy());
+    const id = `reg_${Date.now().toString(36)}_${freshId()}`;
+    const name = ArthurianNameGenerator.generateRegionName(r.int(0, 0xffff), biome);
+    const boundsRadius = Math.floor(2 + r.next() * 3);
+    const centerCX = Math.floor((r.next() - 0.5) * 8);
+    const centerCZ = Math.floor((r.next() - 0.5) * 8);
 
     return {
       id,
@@ -718,8 +721,8 @@ export class WorldBuilderSystem {
         maxCZ: centerCZ + boundsRadius,
       },
       biome,
-      dangerLevel: Math.floor(1 + Math.random() * 8),
-      encounterRate: Math.round((0.6 + Math.random() * 1.2) * 10) / 10,
+      dangerLevel: Math.floor(1 + r.next() * 8),
+      encounterRate: Math.round((0.6 + r.next() * 1.2) * 10) / 10,
       description: `Historical Arthurian territory of ${name}.`,
     };
   }
@@ -956,7 +959,7 @@ export class WorldBuilderSystem {
   public duplicateRegion(id: string): WorldRegion | null {
     const existing = this._regions.get(id);
     if (!existing) return null;
-    const newId = `reg_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`;
+    const newId = `reg_${Date.now().toString(36)}_${freshId()}`;
     const copy: WorldRegion = {
       ...existing,
       id: newId,

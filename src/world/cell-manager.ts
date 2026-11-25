@@ -5,6 +5,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Player } from "../entities/player";
+import { cosmeticRng } from "../core/rng/rng";
 
 export type CellType = "exterior" | "interior";
 
@@ -170,7 +171,7 @@ export class CellManager {
     });
 
     // Slow shimmer.
-    let t = Math.random() * 10;
+    let t = cosmeticRng.next() * 10;
     const pulse = this._scene.onBeforeRenderObservable?.add(() => {
       t += this._scene.getEngine().getDeltaTime() / 1000;
       const k = 0.85 + 0.15 * Math.sin(t * 2.1) + 0.05 * Math.sin(t * 5.3);

@@ -120,6 +120,31 @@ export class RngStreams {
 }
 
 /**
+ * Fresh entropy (a uint32), for values that should differ every time on
+ * purpose: a new world's seed, "Randomize" buttons, unique ids in the
+ * editor tools.  Not for simulation: that takes a named stream, so a seed
+ * replays it.  From the platform's crypto where there is one.
+ */
+export function freshEntropy(): number {
+  const c = (globalThis as { crypto?: { getRandomValues?(a: Uint32Array): Uint32Array } }).crypto;
+  if (c?.getRandomValues) return c.getRandomValues(new Uint32Array(1))[0];
+  return Math.floor(Math.random() * 0x100000000) >>> 0;
+}
+
+/** A short random id suffix (base 36), from fresh entropy. */
+export function freshId(): string {
+  return freshEntropy().toString(36);
+}
+
+/**
+ * Variation that is only seen or heard, never simulated: flame flicker
+ * phases, lightning timing, noise buffers, shimmer.  One seeded stream, so
+ * even this is the same from run to run; keeping it apart keeps it from
+ * shifting the simulation's streams.
+ */
+export const cosmeticRng = new Rng("cosmetic");
+
+/**
  * Unseeded fallback for code that hasn't been given a stream yet.  Prefer a
  * named stream; this exists so migrated code can drop `Math.random()` now
  * and take a stream later.

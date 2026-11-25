@@ -1266,6 +1266,23 @@ with the rendering and UI tracks in parallel.
 | Feature logic testable headless | none | all features |
 | Save codecs with round-trip tests | 0 | all |
 
+**Where they stand** (2026-11-25; the guardrail counts come from
+`tools/check-guardrails.mjs`, sizes from `tools/check-bundle.mjs`):
+
+- `game.ts`: 2,202 lines. Not there yet.
+- Unseeded `Math.random`: **0** (target met). Each remaining call went to
+  one of three places in `core/rng/rng.ts`:
+  - visual-only variation (flame phases, lightning timing, noise
+    buffers, shimmer) to the seeded `cosmeticRng`;
+  - deliberately fresh values (a new world's seed, Randomize, editor
+    ids) to `freshEntropy()` / `freshId()`, which use crypto;
+  - the dungeon generator's unseeded fallback to a freshly seeded `Rng`.
+  The ratchet now holds it at 0.
+- Callback properties in `game.ts`: 60.
+- Main JS chunk: 1,038 KB loaded up front, since the editors left
+  (Phase 9). Target 900 KB.
+- Model payload: 13 MB on disk, 1.8 MB of it character LODs. Target met.
+
 ## Risks
 
 - **Regression risk during extraction.** Mitigation: the existing 5,900 unit

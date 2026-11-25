@@ -19,6 +19,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { cosmeticRng } from "../core/rng/rng";
 
 type Profile = (x: number, y: number) => number;
 
@@ -207,7 +208,7 @@ export class FireFx {
     const entry: FireEntry = {
       flame: info.flame, at: l.position.clone(), diffuse: l.diffuse.clone(), specular: l.specular.clone(),
       range: l.range, base: l.intensity, systems,
-      phase: Math.random() * 100, nightOnly: !!info.nightOnly,
+      phase: cosmeticRng.next() * 100, nightOnly: !!info.nightOnly,
     };
     // The pool lights it; its own light only described it.
     l.setEnabled(false);
@@ -451,7 +452,7 @@ export class WeatherFx {
       this._nextFlash -= dt;
       if (this._nextFlash <= 0) {
         this._flash = 1;
-        this._nextFlash = 5 + Math.random() * 11;
+        this._nextFlash = 5 + cosmeticRng.next() * 11;
       }
     }
     // Double-flicker decay.
