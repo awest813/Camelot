@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ActiveEffectsSystem } from "./active-effects-system";
 import type { AffectablePlayer } from "./active-effects-system";
+import { listen } from "../testing/listen";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -161,7 +162,7 @@ describe("ActiveEffectsSystem", () => {
 
   it("fires onEffectExpired for expired effects", () => {
     const cb = vi.fn();
-    aes.onEffectExpired = cb;
+    listen(aes, "effect:expired", (p) => cb(p.effect));
     aes.addEffect({ id: "short", name: "S", effectType: "silence", magnitude: 1, duration: 0.5 });
     aes.update(1, makePlayer());
     expect(cb).toHaveBeenCalledOnce();

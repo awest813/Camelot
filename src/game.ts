@@ -822,10 +822,7 @@ export class Game {
       this.scene.getLightByName("sun") as any,
       { ambientBase: this.graphics.lighting.ambientBase, sunBase: this.graphics.lighting.sunBase },
     );
-    this.weatherSystem.onWeatherChange = (state) => {
-      this.ui.showNotification(`Weather: ${this.weatherSystem.label}`, 2500);
-      this.eventBus.emit("weather:changed" as any, { state });
-    };
+    this.weatherSystem.events = this.eventBus;
     this.saveSystem.setWeatherSystem(this.weatherSystem);
 
     // QuickSlotSystem: bind consumable items to hotkeys 7, 8, 9, 0.
@@ -954,15 +951,11 @@ export class Game {
 
     // ── v9 system wiring (Oblivion parity: fame, active effects, jail) ─────────
     this.fameSystem = new FameSystem();
-    this.fameSystem.onFameChange = (fame, infamy) => {
-      this.eventBus.emit("fame:changed" as any, { fame, infamy });
-    };
+    this.fameSystem.events = this.eventBus;
     this.saveSystem.setFameSystem(this.fameSystem);
 
     this.activeEffectsSystem = new ActiveEffectsSystem();
-    this.activeEffectsSystem.onEffectExpired = (effect) => {
-      this.ui.showNotification(`${effect.name} has worn off.`, 1800);
-    };
+    this.activeEffectsSystem.events = this.eventBus;
     this.saveSystem.setActiveEffectsSystem(this.activeEffectsSystem);
 
     this.jailSystem = new JailSystem();
@@ -976,20 +969,12 @@ export class Game {
     // RespawnSystem — register the test cave as a respawnable zone (72 game-hours)
     this.respawnSystem = new RespawnSystem();
     this.respawnSystem.registerZone("cave_01", 72);
-    this.respawnSystem.onZoneRespawn = (zoneId) => {
-      this.ui.showNotification(`${zoneId} has respawned — new dangers await!`, 2500);
-      this.eventBus.emit("zone:respawned" as any, { zoneId });
-    };
+    this.respawnSystem.events = this.eventBus;
     this.saveSystem.setRespawnSystem(this.respawnSystem);
 
     // MerchantRestockSystem — restock the starter merchant every 72 game-hours
     this.merchantRestockSystem = new MerchantRestockSystem();
-    this.merchantRestockSystem.onRestock = (merchantId) => {
-      const merchant = this.barterSystem.getMerchant(merchantId);
-      const name = merchant?.name ?? merchantId;
-      this.ui.showNotification(`${name} has restocked their wares.`, 2000);
-      this.saveSystem.markDirty();
-    };
+    this.merchantRestockSystem.events = this.eventBus;
     this.saveSystem.setMerchantRestockSystem(this.merchantRestockSystem);
 
     // Race, birthsign and class: the character feature.
@@ -1026,18 +1011,8 @@ export class Game {
     if (this.raceSystem.chosenRace?.waterBreathing) {
       this.swimSystem.hasWaterBreathing = true;
     }
-    this.swimSystem.onEnterWater = () => {
-      this.ui.showNotification("Entered water.", 1500);
-    };
-    this.swimSystem.onExitWater = () => {
-      this.ui.showNotification("Surfaced.", 1500);
-    };
-    this.swimSystem.onBreathLow = () => {
-      this.ui.showNotification("Running out of breath!", 2000);
-    };
-    this.swimSystem.onDrowning = (_dmg) => {
-      this.player.notifyDamageTaken();
-    };
+    this.swimSystem.events = this.eventBus;
+    this.eventBus.on("swim:drowning", () => this.player.notifyDamageTaken());
     this.saveSystem.setSwimmingSystem(this.swimSystem);
 
     // ── v21: Disease system ────────────────────────────────────────────────
@@ -1046,23 +1021,14 @@ export class Game {
     if (this.raceSystem.chosenRace?.id === "argonian") {
       this.diseaseSystem.diseaseResistanceChance = 1.0;
     }
-    this.diseaseSystem.onDiseaseContracted = (id) => {
-      const def = this.diseaseSystem.getDefinition(id);
-      this.ui.showNotification(`Contracted ${def?.name ?? id}!`, 3000);
-    };
-    this.diseaseSystem.onDiseaseCured = (id) => {
-      const def = this.diseaseSystem.getDefinition(id);
-      this.ui.showNotification(`Cured of ${def?.name ?? id}.`, 2000);
-    };
+    this.diseaseSystem.events = this.eventBus;
     this.saveSystem.setDiseaseSystem(this.diseaseSystem);
 
     // Survival needs (hunger / fatigue / cold): the survival feature.
 
     // ── v22: Event Manager (Dungeon Master) ───────────────────────────────
     this.eventManagerSystem = new EventManagerSystem();
-    this.eventManagerSystem.onEventTriggered = (_id, def) => {
-      this.ui.showNotification(`📜 ${def.title}`, 3000);
-    };
+    this.eventManagerSystem.events = this.eventBus;
     this.saveSystem.setEventManagerSystem(this.eventManagerSystem);
 
     // ── v23 Animation System ───────────────────────────────────────────────
@@ -1114,13 +1080,8 @@ export class Game {
 
     // ── v24: Mark & Recall ────────────────────────────────────────────────
     this.markRecallSystem = new MarkRecallSystem();
-    this.markRecallSystem.onMark = (_pos, _cellId) => {
-      this.ui.showNotification("Position Marked.", 2000);
-    };
-    this.markRecallSystem.onRecall = (pos, _cellId) => {
-      this.player.camera.position.set(pos.x, pos.y, pos.z);
-      this.ui.showNotification("Recalled to marked position.", 2000);
-    };
+    this.markRecallSystem.events = this.eventBus;
+    this.eventBus.on("mark:recalled", ({ position }) => this.player.camera.position.set(position.x, position.y, position.z));
     this.saveSystem.setMarkRecallSystem(this.markRecallSystem);
 
     // ── v24: Trainer System ───────────────────────────────────────────────
@@ -1137,10 +1098,7 @@ export class Game {
 
     // ── v27: Perk System ──────────────────────────────────────────────────
     this.perkSystem = new PerkSystem(this.player, this.skillProgressionSystem);
-    this.perkSystem.onPerkUnlocked = (_id, name) => {
-      this.ui.showNotification(`Perk unlocked: ${name}!`, 3500);
-      this.saveSystem.markDirty();
-    };
+    this.perkSystem.events = this.eventBus;
     this.saveSystem.setPerkSystem(this.perkSystem);
 
     this._lastDynamicWorldEventHour = Math.floor(this.timeSystem.elapsedGameHours);

@@ -4,6 +4,7 @@ import {
   type DMPersonality,
   type ManagedEventDefinition,
 } from "./event-manager-system";
+import { listen } from "../testing/listen";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -257,7 +258,7 @@ describe("EventManagerSystem — tick()", () => {
 
   it("tick() invokes onEventTriggered callback", () => {
     const spy = vi.fn();
-    em.onEventTriggered = spy;
+    listen(em, "worldEvent:triggered", (p) => spy(p.eventId, p.def, p.context));
     em.queueEvent("bandit-ambush", { region: "forest" });
     em.tick(rngAlways);
     expect(spy).toHaveBeenCalledOnce();
@@ -410,7 +411,7 @@ describe("EventManagerSystem — triggerEvent / resolveEvent", () => {
 
   it("triggerEvent() fires onEventTriggered", () => {
     const spy = vi.fn();
-    em.onEventTriggered = spy;
+    listen(em, "worldEvent:triggered", (p) => spy(p.eventId, p.def, p.context));
     em.triggerEvent("bandit-ambush", { loc: "crossroads" }, rngAlways);
     expect(spy).toHaveBeenCalledWith(
       "bandit-ambush",
@@ -480,7 +481,7 @@ describe("EventManagerSystem — rollEvent()", () => {
 
   it("fires onEventTriggered on a successful roll", () => {
     const spy = vi.fn();
-    em.onEventTriggered = spy;
+    listen(em, "worldEvent:triggered", (p) => spy(p.eventId, p.def, p.context));
     em.rollEvent(rngAlways);
     expect(spy).toHaveBeenCalledOnce();
   });

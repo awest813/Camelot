@@ -24,6 +24,7 @@
  * (stored as bytes).  We use a generous 1000 cap to give the progression more
  * room over a long playthrough.
  */
+import type { GameEventBus } from "./event-bus";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -48,15 +49,12 @@ export interface FameSaveState {
 // ── System ─────────────────────────────────────────────────────────────────────
 
 export class FameSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _fame:   number = 0;
   private _infamy: number = 0;
 
-  /**
-   * Fired whenever fame or infamy changes.
-   * @param fame   New fame total.
-   * @param infamy New infamy total.
-   */
-  public onFameChange: ((fame: number, infamy: number) => void) | null = null;
 
   // ── Accessors ──────────────────────────────────────────────────────────────
 
@@ -115,7 +113,7 @@ export class FameSystem {
   public addFame(amount: number): void {
     if (amount <= 0) return;
     this._fame = Math.min(FAME_MAX, this._fame + Math.round(amount));
-    this.onFameChange?.(this._fame, this._infamy);
+    this.events?.emit("fame:changed", { fame: this._fame, infamy: this._infamy });
   }
 
   /**
@@ -125,7 +123,7 @@ export class FameSystem {
   public addInfamy(amount: number): void {
     if (amount <= 0) return;
     this._infamy = Math.min(FAME_MAX, this._infamy + Math.round(amount));
-    this.onFameChange?.(this._fame, this._infamy);
+    this.events?.emit("fame:changed", { fame: this._fame, infamy: this._infamy });
   }
 
   // ── Persistence ────────────────────────────────────────────────────────────

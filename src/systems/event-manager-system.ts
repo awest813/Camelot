@@ -1,3 +1,4 @@
+import type { GameEventBus } from "./event-bus";
 // ─── Event Manager System ────────────────────────────────────────────────────
 // A headless "Dungeon Master" that owns, schedules, and fires managed world
 // events.  The DM's *personality* (DMPersonality) acts as a set of personal
@@ -129,6 +130,9 @@ export interface EventManagerSaveState {
 // ── System ────────────────────────────────────────────────────────────────────
 
 export class EventManagerSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _personality: DMPersonality = { ...DEFAULT_PERSONALITY };
   private _definitions = new Map<string, ManagedEventDefinition>();
   private _scheduledEvents: ScheduledEvent[] = [];
@@ -140,13 +144,6 @@ export class EventManagerSystem {
 
   // ── Callbacks ──────────────────────────────────────────────────────────────
 
-  /**
-   * Invoked each time an event is fired.
-   * Receives the event definition and any context payload.
-   */
-  public onEventTriggered:
-    | ((eventId: string, def: ManagedEventDefinition, context?: Record<string, unknown>) => void)
-    | null = null;
 
   /**
    * Invoked when `resolveEvent()` is called to explicitly close an active
@@ -298,7 +295,7 @@ export class EventManagerSystem {
 
       this._recordFiring(def.id, now);
       fired.push({ ...def });
-      this.onEventTriggered?.(def.id, { ...def }, entry.context);
+      this.events?.emit("worldEvent:triggered", { eventId: def.id, def: { ...def }, context: entry.context });
     }
 
     return fired;
@@ -324,7 +321,7 @@ export class EventManagerSystem {
 
     const now = this._now();
     this._recordFiring(def.id, now);
-    this.onEventTriggered?.(def.id, { ...def }, context);
+    this.events?.emit("worldEvent:triggered", { eventId: def.id, def: { ...def }, context });
     return true;
   }
 
@@ -380,7 +377,7 @@ export class EventManagerSystem {
 
     const now = this._now();
     this._recordFiring(chosen.id, now);
-    this.onEventTriggered?.(chosen.id, { ...chosen }, context);
+    this.events?.emit("worldEvent:triggered", { eventId: chosen.id, def: { ...chosen }, context });
     return { ...chosen };
   }
 

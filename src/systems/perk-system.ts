@@ -27,6 +27,7 @@
 
 import type { Player } from "../entities/player";
 import type { SkillProgressionSystem } from "./skill-progression-system";
+import type { GameEventBus } from "./event-bus";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -325,14 +326,15 @@ export const PERK_DEFINITIONS: readonly PerkDefinition[] = [
 // ── PerkSystem ────────────────────────────────────────────────────────────────
 
 export class PerkSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private readonly _player: Player;
   private readonly _skillSystem: SkillProgressionSystem;
   private readonly _perks: Map<string, PerkDefinition>;
   private readonly _unlockedIds: Set<string> = new Set();
   private _perkPoints: number = 0;
 
-  /** Fired after a perk is successfully unlocked. */
-  public onPerkUnlocked: ((perkId: string, perkName: string) => void) | null = null;
 
   constructor(player: Player, skillSystem: SkillProgressionSystem) {
     this._player = player;
@@ -397,7 +399,7 @@ export class PerkSystem {
     this._unlockedIds.add(perkId);
     this._perkPoints--;
     perk.apply(this._player);
-    this.onPerkUnlocked?.(perkId, perk.name);
+    this.events?.emit("perk:unlocked", { perkId, perkName: perk.name });
     return true;
   }
 

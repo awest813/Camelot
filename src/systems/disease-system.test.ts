@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { DiseaseSystem, BUILT_IN_DISEASES } from "./disease-system";
 import type { DiseaseDefinition } from "./disease-system";
+import { listen } from "../testing/listen";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -107,7 +108,7 @@ describe("DiseaseSystem — contractDisease", () => {
 
   it("fires onDiseaseContracted callback", () => {
     const cb = vi.fn();
-    sys.onDiseaseContracted = cb;
+    listen(sys, "disease:contracted", (p) => cb(p.diseaseId));
     sys.contractDisease("rust_chancre", alwaysContract);
     expect(cb).toHaveBeenCalledOnce();
     expect(cb).toHaveBeenCalledWith("rust_chancre");
@@ -115,7 +116,7 @@ describe("DiseaseSystem — contractDisease", () => {
 
   it("does not fire onDiseaseContracted if already infected", () => {
     const cb = vi.fn();
-    sys.onDiseaseContracted = cb;
+    listen(sys, "disease:contracted", (p) => cb(p.diseaseId));
     sys.contractDisease("rust_chancre", alwaysContract);
     sys.contractDisease("rust_chancre", alwaysContract); // duplicate
     expect(cb).toHaveBeenCalledOnce();
@@ -158,7 +159,7 @@ describe("DiseaseSystem — contractDisease", () => {
 
   it("does not fire onDiseaseContracted when resisted", () => {
     const cb = vi.fn();
-    sys.onDiseaseContracted = cb;
+    listen(sys, "disease:contracted", (p) => cb(p.diseaseId));
     sys.diseaseResistanceChance = 1.0;
     sys.contractDisease("rust_chancre", alwaysContract);
     expect(cb).not.toHaveBeenCalled();
@@ -185,7 +186,7 @@ describe("DiseaseSystem — cureDisease", () => {
 
   it("fires onDiseaseCured callback", () => {
     const cb = vi.fn();
-    sys.onDiseaseCured = cb;
+    listen(sys, "disease:cured", (p) => cb(p.diseaseId));
     sys.cureDisease("rust_chancre");
     expect(cb).toHaveBeenCalledOnce();
     expect(cb).toHaveBeenCalledWith("rust_chancre");
@@ -193,7 +194,7 @@ describe("DiseaseSystem — cureDisease", () => {
 
   it("does not fire onDiseaseCured if disease was not active", () => {
     const cb = vi.fn();
-    sys.onDiseaseCured = cb;
+    listen(sys, "disease:cured", (p) => cb(p.diseaseId));
     sys.cureDisease("swamp_rot");
     expect(cb).not.toHaveBeenCalled();
   });
@@ -225,7 +226,7 @@ describe("DiseaseSystem — cureAllDiseases", () => {
 
   it("fires onDiseaseCured once per disease", () => {
     const cb = vi.fn();
-    sys.onDiseaseCured = cb;
+    listen(sys, "disease:cured", (p) => cb(p.diseaseId));
     sys.cureAllDiseases();
     expect(cb).toHaveBeenCalledTimes(3);
   });
@@ -233,7 +234,7 @@ describe("DiseaseSystem — cureAllDiseases", () => {
   it("is a no-op when no diseases are active", () => {
     const sys2 = new DiseaseSystem();
     const cb = vi.fn();
-    sys2.onDiseaseCured = cb;
+    listen(sys2, "disease:cured", (p) => cb(p.diseaseId));
     sys2.cureAllDiseases(); // nothing to cure
     expect(cb).not.toHaveBeenCalled();
   });

@@ -14,6 +14,7 @@
  * Headless: no BabylonJS dependencies — integrates via callbacks.
  * SAVE_VERSION: 21
  */
+import type { GameEventBus } from "./event-bus";
 
 // ── Disease definition ────────────────────────────────────────────────────────
 
@@ -121,22 +122,15 @@ export const BUILT_IN_DISEASES: DiseaseDefinition[] = [
  * ```
  */
 export class DiseaseSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _definitions: Map<string, DiseaseDefinition> = new Map();
   private _activeDiseases: Set<string> = new Set();
 
   // ── Callbacks ──────────────────────────────────────────────────────────────
 
-  /**
-   * Fired when the player successfully contracts a disease.
-   * Receives the disease id.
-   */
-  public onDiseaseContracted: ((diseaseId: string) => void) | null = null;
 
-  /**
-   * Fired when a disease is cured (either individually or via cureAllDiseases).
-   * Receives the disease id.
-   */
-  public onDiseaseCured: ((diseaseId: string) => void) | null = null;
 
   // ── Configuration ──────────────────────────────────────────────────────────
 
@@ -205,7 +199,7 @@ export class DiseaseSystem {
     if (rng() < resistance) return false;
 
     this._activeDiseases.add(diseaseId);
-    this.onDiseaseContracted?.(diseaseId);
+    this.events?.emit("disease:contracted", { diseaseId });
     return true;
   }
 
@@ -219,7 +213,7 @@ export class DiseaseSystem {
   public cureDisease(diseaseId: string): boolean {
     if (!this._activeDiseases.has(diseaseId)) return false;
     this._activeDiseases.delete(diseaseId);
-    this.onDiseaseCured?.(diseaseId);
+    this.events?.emit("disease:cured", { diseaseId });
     return true;
   }
 
@@ -230,7 +224,7 @@ export class DiseaseSystem {
   public cureAllDiseases(): void {
     for (const id of Array.from(this._activeDiseases)) {
       this._activeDiseases.delete(id);
-      this.onDiseaseCured?.(id);
+      this.events?.emit("disease:cured", { diseaseId: id });
     }
   }
 

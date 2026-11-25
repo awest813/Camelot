@@ -9,6 +9,7 @@
  * Headless: no BabylonJS dependencies — integrates via callbacks.
  * SAVE_VERSION: 20
  */
+import type { GameEventBus } from "./event-bus";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -68,6 +69,9 @@ export interface SwimmingPlayer {
  * ```
  */
 export class SwimmingSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _isSubmerged: boolean = false;
   private _maxBreath: number = DEFAULT_MAX_BREATH;
   private _currentBreath: number = DEFAULT_MAX_BREATH;
@@ -76,11 +80,7 @@ export class SwimmingSystem {
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
 
-  /** Fired when the player enters water (becomes submerged). */
-  public onEnterWater: (() => void) | null = null;
 
-  /** Fired when the player exits water (surfaces or leaves the body of water). */
-  public onExitWater: (() => void) | null = null;
 
   /**
    * Fired each frame while submerged, with the current breath ratio [0, 1].
@@ -88,17 +88,7 @@ export class SwimmingSystem {
    */
   public onBreathChange: ((ratio: number) => void) | null = null;
 
-  /**
-   * Fired once when breath drops below {@link BREATH_LOW_THRESHOLD} (20 %).
-   * Resets on the next surfacing so it can fire again next submersion.
-   */
-  public onBreathLow: (() => void) | null = null;
 
-  /**
-   * Fired each frame when the player is out of breath and taking drowning damage.
-   * Receives the damage amount applied this frame.
-   */
-  public onDrowning: ((damage: number) => void) | null = null;
 
   // ── Configuration ──────────────────────────────────────────────────────────
 
@@ -160,7 +150,7 @@ export class SwimmingSystem {
     if (this._isSubmerged) return;
     this._isSubmerged = true;
     this._breathLowFired = false;
-    this.onEnterWater?.();
+    this.events?.emit("swim:entered", {});
   }
 
   /**
@@ -172,7 +162,7 @@ export class SwimmingSystem {
     this._isSubmerged = false;
     this._currentBreath = this._maxBreath;
     this._breathLowFired = false;
-    this.onExitWater?.();
+    this.events?.emit("swim:exited", {});
     this.onBreathChange?.(1);
   }
 
@@ -203,7 +193,7 @@ export class SwimmingSystem {
         // Fire low-breath warning once per submersion
         if (ratio <= BREATH_LOW_THRESHOLD && !this._breathLowFired) {
           this._breathLowFired = true;
-          this.onBreathLow?.();
+          this.events?.emit("swim:breathLow", {});
         }
       }
 
@@ -211,7 +201,7 @@ export class SwimmingSystem {
       if (remainingDt > 0 && this._currentBreath <= 0) {
         const damage = DROWNING_DAMAGE_RATE * remainingDt;
         player.health = Math.max(0, player.health - damage);
-        this.onDrowning?.(damage);
+        this.events?.emit("swim:drowning", { damage });
       }
     }
   }

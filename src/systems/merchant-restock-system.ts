@@ -35,6 +35,7 @@
 
 import type { Item } from "./inventory-system";
 import type { BarterSystem } from "./barter-system";
+import type { GameEventBus } from "./event-bus";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -74,13 +75,11 @@ export interface MerchantRestockSaveState {
 // ── System ────────────────────────────────────────────────────────────────────
 
 export class MerchantRestockSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _entries: Map<string, RestockEntry> = new Map();
 
-  /**
-   * Fired after a merchant is restocked.
-   * @param merchantId  The id of the merchant that just restocked.
-   */
-  public onRestock: ((merchantId: string) => void) | null = null;
 
   // ── Registration ───────────────────────────────────────────────────────────
 
@@ -147,7 +146,7 @@ export class MerchantRestockSystem {
 
       // Mutate the live merchant record inside BarterSystem
       this._restockMerchant(entry, barterSystem);
-      this.onRestock?.(entry.merchantId);
+      this.events?.emit("merchant:restocked", { merchantId: entry.merchantId });
     }
   }
 

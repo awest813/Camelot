@@ -1269,7 +1269,7 @@ with the rendering and UI tracks in parallel.
 **Where they stand** (2026-11-25; the guardrail counts come from
 `tools/check-guardrails.mjs`, sizes from `tools/check-bundle.mjs`):
 
-- `game.ts`: 2,202 lines. Not there yet.
+- `game.ts`: 2,160 lines. Not there yet.
 - Unseeded `Math.random`: **0** (target met). Each remaining call went to
   one of three places in `core/rng/rng.ts`:
   - visual-only variation (flame phases, lightning timing, noise
@@ -1278,7 +1278,19 @@ with the rendering and UI tracks in parallel.
     ids) to `freshEntropy()` / `freshId()`, which use crypto;
   - the dungeon generator's unseeded fallback to a freshly seeded `Rng`.
   The ratchet now holds it at 0.
-- Callback properties in `game.ts`: 60.
+- Callback properties in `game.ts`: 60 → 45. Ten systems now report on
+  the event bus they are given (`system.events = bus`) instead of through
+  `onX` slots:
+  - swimming, diseases, the world event manager, mark/recall, merchant
+    restocks, active effects, perks, zone respawns, weather and fame;
+  - the events are typed in `GameEvents`. Three were emitted untyped
+    (`as any`) before: `weather:changed`, `fame:changed` and
+    `zone:respawned`.
+
+  `features/notices` turns them into messages; it uses the service for
+  disease and merchant names and the weather label. The two handlers
+  that act are plain bus subscriptions: recall moves the player, and
+  drowning registers damage. Tests listen through `testing/listen.ts`.
 - Main JS chunk: 1,038 KB loaded up front, since the editors left
   (Phase 9). Target 900 KB.
 - Model payload: 13 MB on disk, 1.8 MB of it character LODs. Target met.

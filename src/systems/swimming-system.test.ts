@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SwimmingSystem } from "./swimming-system";
 import type { SwimmingPlayer } from "./swimming-system";
+import { listen } from "../testing/listen";
 
 // ── Fixture helpers ───────────────────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ describe("SwimmingSystem — enterWater / exitWater", () => {
   it("enterWater fires onEnterWater callback", () => {
     const sys = new SwimmingSystem();
     const cb = vi.fn();
-    sys.onEnterWater = cb;
+    listen(sys, "swim:entered", (_p) => cb());
     sys.enterWater();
     expect(cb).toHaveBeenCalledOnce();
   });
@@ -68,7 +69,7 @@ describe("SwimmingSystem — enterWater / exitWater", () => {
   it("exitWater fires onExitWater callback", () => {
     const sys = new SwimmingSystem();
     const cb = vi.fn();
-    sys.onExitWater = cb;
+    listen(sys, "swim:exited", (_p) => cb());
     sys.enterWater();
     sys.exitWater();
     expect(cb).toHaveBeenCalledOnce();
@@ -77,7 +78,7 @@ describe("SwimmingSystem — enterWater / exitWater", () => {
   it("enterWater is idempotent — callback fires only once", () => {
     const sys = new SwimmingSystem();
     const cb = vi.fn();
-    sys.onEnterWater = cb;
+    listen(sys, "swim:entered", (_p) => cb());
     sys.enterWater();
     sys.enterWater(); // duplicate
     expect(cb).toHaveBeenCalledOnce();
@@ -86,7 +87,7 @@ describe("SwimmingSystem — enterWater / exitWater", () => {
   it("exitWater is idempotent — callback fires only once", () => {
     const sys = new SwimmingSystem();
     const cb = vi.fn();
-    sys.onExitWater = cb;
+    listen(sys, "swim:exited", (_p) => cb());
     sys.enterWater();
     sys.exitWater();
     sys.exitWater(); // duplicate
@@ -157,7 +158,7 @@ describe("SwimmingSystem — low breath warning", () => {
   it("fires onBreathLow once when breath drops below 20 %", () => {
     const sys = new SwimmingSystem();
     const cb = vi.fn();
-    sys.onBreathLow = cb;
+    listen(sys, "swim:breathLow", (_p) => cb());
     sys.enterWater();
     const player = makePlayer();
     // Drain to exactly 0 — threshold (20 %) will be crossed
@@ -168,7 +169,7 @@ describe("SwimmingSystem — low breath warning", () => {
   it("onBreathLow does not fire again in the same submersion", () => {
     const sys = new SwimmingSystem();
     const cb = vi.fn();
-    sys.onBreathLow = cb;
+    listen(sys, "swim:breathLow", (_p) => cb());
     sys.enterWater();
     const player = makePlayer();
     sys.update(sys.maxBreath * 0.9, player); // first tick past threshold
@@ -179,7 +180,7 @@ describe("SwimmingSystem — low breath warning", () => {
   it("onBreathLow fires again on the next submersion", () => {
     const sys = new SwimmingSystem();
     const cb = vi.fn();
-    sys.onBreathLow = cb;
+    listen(sys, "swim:breathLow", (_p) => cb());
     const player = makePlayer();
 
     // First submersion
@@ -208,7 +209,7 @@ describe("SwimmingSystem — drowning damage", () => {
   it("fires onDrowning callback with damage amount", () => {
     const sys = new SwimmingSystem();
     const cb = vi.fn();
-    sys.onDrowning = cb;
+    listen(sys, "swim:drowning", (p) => cb(p.damage));
     sys.enterWater();
     const player = makePlayer();
     sys.update(sys.maxBreath + 0.1, player); // go past breath = 0
@@ -240,7 +241,7 @@ describe("SwimmingSystem — water breathing", () => {
     const sys = new SwimmingSystem();
     sys.hasWaterBreathing = true;
     const cb = vi.fn();
-    sys.onBreathLow = cb;
+    listen(sys, "swim:breathLow", (_p) => cb());
     sys.enterWater();
     const player = makePlayer();
     sys.update(100, player);

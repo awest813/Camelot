@@ -14,6 +14,7 @@
  * Headless: no BabylonJS dependencies — integrates via callbacks.
  * SAVE_VERSION: 24
  */
+import type { GameEventBus } from "./event-bus";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -63,24 +64,16 @@ export interface MarkRecallSaveState {
  * ```
  */
 export class MarkRecallSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _hasMarked: boolean = false;
   private _position: MarkPosition | null = null;
   private _cellId: string | null = null;
 
   // ── Callbacks ────────────────────────────────────────────────────────────
 
-  /**
-   * Fired when the player successfully casts Mark.
-   * Receives the stored position and optional cell id.
-   */
-  public onMark: ((position: Readonly<MarkPosition>, cellId: string | null) => void) | null = null;
 
-  /**
-   * Fired when the player successfully casts Recall.
-   * Receives the recalled position and optional cell id.
-   * The game layer should use these values to teleport the player.
-   */
-  public onRecall: ((position: Readonly<MarkPosition>, cellId: string | null) => void) | null = null;
 
   /**
    * Fired when the mark is explicitly cleared via {@link clearMark}.
@@ -128,7 +121,7 @@ export class MarkRecallSystem {
     this._position = { ...position };
     this._cellId = cellId ?? null;
     this._hasMarked = true;
-    this.onMark?.(this.markedPosition!, this._cellId);
+    this.events?.emit("mark:set", { position: this.markedPosition!, cellId: this._cellId });
   }
 
   /**
@@ -147,7 +140,7 @@ export class MarkRecallSystem {
       position: { ...this._position },
       cellId: this._cellId,
     };
-    this.onRecall?.(result.position, result.cellId);
+    this.events?.emit("mark:recalled", { position: result.position, cellId: result.cellId });
     return result;
   }
 

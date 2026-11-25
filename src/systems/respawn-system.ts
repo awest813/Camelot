@@ -29,6 +29,7 @@
  * };
  * ```
  */
+import type { GameEventBus } from "./event-bus";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -70,16 +71,11 @@ export interface RespawnSaveState {
 // ── System ────────────────────────────────────────────────────────────────────
 
 export class RespawnSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _zones: Map<string, RespawnZone> = new Map();
 
-  /**
-   * Fired when a zone's respawn window has elapsed.
-   * The zone is reset to `pendingRespawn = false` before this callback fires.
-   * Implementors should re-spawn enemies, refill containers, etc.
-   *
-   * @param zoneId  The identifier of the zone that has respawned.
-   */
-  public onZoneRespawn: ((zoneId: string) => void) | null = null;
 
   // ── Registration ───────────────────────────────────────────────────────────
 
@@ -163,7 +159,7 @@ export class RespawnSystem {
       const elapsedMinutes = currentGameTimeMinutes - zone.lastClearedAt;
       if (elapsedMinutes >= zone.respawnAfterHours * 60) {
         zone.pendingRespawn = false;
-        this.onZoneRespawn?.(zone.zoneId);
+        this.events?.emit("zone:respawned", { zoneId: zone.zoneId });
       }
     }
   }

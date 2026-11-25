@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PerkSystem, PERK_DEFINITIONS } from "./perk-system";
+import { listen } from "../testing/listen";
 
 // ── Minimal stubs ─────────────────────────────────────────────────────────────
 
@@ -145,7 +146,7 @@ describe("PerkSystem — unlock", () => {
     const sys = new PerkSystem(player, makeSkillSystem({ blade: 25 }));
     sys.addPerkPoints(1);
     const cb = vi.fn();
-    sys.onPerkUnlocked = cb;
+    listen(sys, "perk:unlocked", (p) => cb(p.perkId, p.perkName));
     sys.unlock("blade_finesse");
     expect(cb).toHaveBeenCalledWith("blade_finesse", "Blade Finesse");
   });

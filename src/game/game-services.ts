@@ -20,6 +20,7 @@ import { RoutinesFeature } from "../features/routines/routines-feature";
 import { IndoorsFeature } from "../features/indoors/indoors-feature";
 import { MountsFeature, MountHostKey } from "../features/mounts/mounts-feature";
 import { WorldEventsFeature } from "../features/world-events/world-events-feature";
+import { NoticesFeature } from "../features/notices/notices-feature";
 import { VillageJobsFeature } from "../features/village-jobs/jobs-feature";
 import { spawnDragon } from "../world/dragon-lair";
 import { TravelHostKey } from "../features/fast-travel/fast-travel-feature";
@@ -464,6 +465,12 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
 
       const worldEvents = new WorldEventsFeature();
       k.install(worldEvents);
+      // What systems report on the bus, told to the player.
+      k.install(new NoticesFeature({
+        disease: (id) => game.diseaseSystem.getDefinition(id)?.name ?? id,
+        merchant: (id) => game.barterSystem.getMerchant(id)?.name ?? id,
+        weather: () => game.weatherSystem.label,
+      }));
       game.saveSystem.setDynamicWorldEventSystem(worldEvents.dynamic);
       // Persist flavor-event cooldowns so reloading can't reroll one-shots.
       game.saveSystem.setTravelEventSystem(worldEvents.travel);

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MarkRecallSystem } from "./mark-recall-system";
 import type { MarkPosition, MarkRecallSaveState } from "./mark-recall-system";
+import { listen } from "../testing/listen";
 
 // ── Fixture helpers ───────────────────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ describe("MarkRecallSystem — mark()", () => {
   it("fires onMark callback with position and cellId", () => {
     const sys = new MarkRecallSystem();
     const cb = vi.fn();
-    sys.onMark = cb;
+    listen(sys, "mark:set", (p) => cb(p.position, p.cellId));
     sys.mark({ x: 1, y: 2, z: 3 }, "cell_balmora");
     expect(cb).toHaveBeenCalledOnce();
     expect(cb).toHaveBeenCalledWith({ x: 1, y: 2, z: 3 }, "cell_balmora");
@@ -70,7 +71,7 @@ describe("MarkRecallSystem — mark()", () => {
   it("fires onMark with null cellId when none provided", () => {
     const sys = new MarkRecallSystem();
     const cb = vi.fn();
-    sys.onMark = cb;
+    listen(sys, "mark:set", (p) => cb(p.position, p.cellId));
     sys.mark(makePos());
     expect(cb).toHaveBeenCalledWith(expect.any(Object), null);
   });
@@ -86,7 +87,7 @@ describe("MarkRecallSystem — mark()", () => {
   it("overwrite fires onMark again", () => {
     const sys = new MarkRecallSystem();
     const cb = vi.fn();
-    sys.onMark = cb;
+    listen(sys, "mark:set", (p) => cb(p.position, p.cellId));
     sys.mark(makePos());
     sys.mark(makePos(50, 0, 50));
     expect(cb).toHaveBeenCalledTimes(2);
@@ -119,7 +120,7 @@ describe("MarkRecallSystem — recall()", () => {
   it("fires onRecall callback with position and cellId", () => {
     const sys = new MarkRecallSystem();
     const cb = vi.fn();
-    sys.onRecall = cb;
+    listen(sys, "mark:recalled", (p) => cb(p.position, p.cellId));
     sys.mark({ x: 2, y: 0, z: 4 }, "cell_sadrith_mora");
     sys.recall();
     expect(cb).toHaveBeenCalledOnce();
@@ -136,7 +137,7 @@ describe("MarkRecallSystem — recall()", () => {
   it("can recall multiple times to the same mark", () => {
     const sys = new MarkRecallSystem();
     const cb = vi.fn();
-    sys.onRecall = cb;
+    listen(sys, "mark:recalled", (p) => cb(p.position, p.cellId));
     sys.mark(makePos());
     sys.recall();
     sys.recall();
@@ -295,8 +296,8 @@ describe("MarkRecallSystem — getSaveState() / restoreFromSave()", () => {
     const sys = new MarkRecallSystem();
     const markCb = vi.fn();
     const recallCb = vi.fn();
-    sys.onMark = markCb;
-    sys.onRecall = recallCb;
+    listen(sys, "mark:set", (p) => markCb(p.position, p.cellId));
+    listen(sys, "mark:recalled", (p) => recallCb(p.position, p.cellId));
     sys.restoreFromSave({ hasMarked: true, position: { x: 1, y: 2, z: 3 }, cellId: null });
     expect(markCb).not.toHaveBeenCalled();
     expect(recallCb).not.toHaveBeenCalled();
@@ -365,7 +366,7 @@ describe("MarkRecallSystem — full workflow", () => {
   it("onMark fires with latest position when overwriting", () => {
     const positions: MarkPosition[] = [];
     const sys = new MarkRecallSystem();
-    sys.onMark = (pos) => positions.push({ ...pos });
+    listen(sys, "mark:set", (p) => positions.push({ ...p.position }));
     sys.mark({ x: 1, y: 0, z: 1 });
     sys.mark({ x: 2, y: 0, z: 2 });
     sys.mark({ x: 3, y: 0, z: 3 });

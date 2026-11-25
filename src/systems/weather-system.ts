@@ -3,6 +3,7 @@ import type { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import type { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { unseededRandom } from "../core/rng/rng";
+import type { GameEventBus } from "./event-bus";
 
 // ── Weather state types ───────────────────────────────────────────────────────
 
@@ -83,6 +84,9 @@ export interface WeatherSaveState {
  * and works fully headlessly when scene/lights are omitted (useful for tests).
  */
 export class WeatherSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   /**
    * Where this system's random rolls come from.  The game gives it a named
    * stream of the kernel's seeded RNG, so a seed replays a session; tests
@@ -116,18 +120,6 @@ export class WeatherSystem {
   private readonly _sunBase: number;
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
-  /**
-   * Called at the **start** of a weather transition — i.e. when the new
-   * weather state is decided and `state` is updated, but before the visual
-   * interpolation finishes (transition progress is reset to 0 at this point).
-   *
-   * This early-fire design lets listeners react immediately — for example to
-   * start playing rain sounds or triggering cinematic events — without waiting
-   * for the full `transitionDuration` to elapse.  If you need to react only
-   * after the visual transition is complete, poll `fogDensity` or compare
-   * `state` against your expected value after `transitionDuration` seconds.
-   */
-  public onWeatherChange: ((newState: WeatherState) => void) | null = null;
 
   /**
    * @param initialState  Starting weather state.
@@ -298,7 +290,7 @@ export class WeatherSystem {
     this._state              = next;
     this._transitionProgress = 0;
     this._nextChangeIn       = this._randomDuration();
-    this.onWeatherChange?.(next);
+    this.events?.emit("weather:changed", { state: next });
   }
 
   private _applyVisuals(t: number): void {

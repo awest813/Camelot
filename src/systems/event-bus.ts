@@ -1,5 +1,9 @@
 import type { Item } from "./inventory-system";
 import type { NPC } from "../entities/npc";
+import type { ManagedEventDefinition } from "./event-manager-system";
+import type { MarkPosition } from "./mark-recall-system";
+import type { ActiveEffect } from "./active-effects-system";
+import type { WeatherState } from "./weather-system";
 
 // ── Typed event catalogue ────────────────────────────────────────────────────
 
@@ -81,6 +85,30 @@ export interface GameEvents {
    * the entity store gives NPCs ids (Phase 3).
    */
   "npc:atBed": { npc: NPC };
+
+  // ── Reported by systems on the bus they are given (`system.events`) ──────
+  "swim:entered": Record<string, never>;
+  "swim:exited": Record<string, never>;
+  /** Breath fell below the warning threshold (once per dive). */
+  "swim:breathLow": Record<string, never>;
+  /** Out of breath: damage this tick. */
+  "swim:drowning": { damage: number };
+  "disease:contracted": { diseaseId: string };
+  "disease:cured": { diseaseId: string };
+  /** A managed world event fired (a copy of its definition, and any context). */
+  "worldEvent:triggered": { eventId: string; def: ManagedEventDefinition; context?: Record<string, unknown> };
+  "mark:set": { position: Readonly<MarkPosition>; cellId: string | null };
+  "mark:recalled": { position: Readonly<MarkPosition>; cellId: string | null };
+  "merchant:restocked": { merchantId: string };
+  "effect:expired": { effect: ActiveEffect };
+  "perk:unlocked": { perkId: string; perkName: string };
+  "zone:respawned": { zoneId: string };
+  /**
+   * The weather turned: fired at the start of the transition (the new state
+   * is decided; the visuals ease toward it over `transitionDuration`).
+   */
+  "weather:changed": { state: WeatherState };
+  "fame:changed": { fame: number; infamy: number };
 }
 
 export type GameEventType = keyof GameEvents;

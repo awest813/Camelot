@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { WeatherSystem, WEATHER_STATES } from "./weather-system";
 import type { WeatherState } from "./weather-system";
+import { listen } from "../testing/listen";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ describe("WeatherSystem", () => {
   it("forceWeather fires onWeatherChange callback", () => {
     const sys = makeSystem("clear");
     const events: WeatherState[] = [];
-    sys.onWeatherChange = (s) => events.push(s);
+    listen(sys, "weather:changed", (p) => ((s) => events.push(s))(p.state));
     sys.forceWeather("rain");
     expect(events).toEqual(["rain"]);
   });
@@ -95,7 +96,7 @@ describe("WeatherSystem", () => {
     sys.maxWeatherDuration = 1;
     // Drain the timer; the system should transition to a new state
     const events: WeatherState[] = [];
-    sys.onWeatherChange = (s) => events.push(s);
+    listen(sys, "weather:changed", (p) => ((s) => events.push(s))(p.state));
     sys.update(sys.nextChangeIn + 1);
     // The transition fired, which means nextChangeIn was reset to ~1 s
     expect(events.length).toBeGreaterThanOrEqual(1);

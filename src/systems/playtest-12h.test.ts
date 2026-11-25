@@ -46,6 +46,7 @@ import { InventorySystem } from "./inventory-system";
 import { BarterSystem } from "./barter-system";
 import type { Item } from "./inventory-system";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { listen } from "../testing/listen";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -440,8 +441,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
     it("merchant restock timer is ticking (no restock yet at 3 hours in)", () => {
       // 72-hour restock interval — no restock should fire after only 3 in-game hours
       let restocked = false;
-      w.restock.onRestock = () => { restocked = true; };
-
+      listen(w.restock, "merchant:restocked", () => { restocked = true; });
       // Advance 3 game-hours of clock (3 * 60 = 180 game-minutes)
       const currentTime = w.time.gameTime;
       w.restock.update(currentTime + 3 * 60, w.barter);
@@ -568,8 +568,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
 
     it("activating Nord's Fury registers active effects", () => {
       const effects: string[] = [];
-      w.effects.onEffectExpired = () => {};
-
+      listen(w.effects, "effect:expired", () => {});
       const gameTimeMinutes = 15 * 60;
       w.race.activatePower(gameTimeMinutes, w.effects);
 

@@ -7,6 +7,7 @@ import {
 } from "./merchant-restock-system";
 import type { BarterSystem } from "./barter-system";
 import type { Item } from "./inventory-system";
+import { listen } from "../testing/listen";
 
 // ── Minimal mocks ─────────────────────────────────────────────────────────────
 
@@ -95,7 +96,7 @@ describe("MerchantRestockSystem", () => {
 
   it("does not restock before the interval elapses", () => {
     const cb = vi.fn();
-    mrs.onRestock = cb;
+    listen(mrs, "merchant:restocked", (p) => cb(p.merchantId));
     mrs.registerMerchant("m", [POTION], 500, 72, 0);
     mrs.update(72 * 60 - 1, barter as unknown as BarterSystem);
     expect(cb).not.toHaveBeenCalled();
@@ -105,7 +106,7 @@ describe("MerchantRestockSystem", () => {
 
   it("fires onRestock exactly at the interval boundary", () => {
     const cb = vi.fn();
-    mrs.onRestock = cb;
+    listen(mrs, "merchant:restocked", (p) => cb(p.merchantId));
     mrs.registerMerchant("m", [POTION], 500, 72, 0);
     mrs.update(72 * 60, barter as unknown as BarterSystem);
     expect(cb).toHaveBeenCalledWith("m");
@@ -113,7 +114,7 @@ describe("MerchantRestockSystem", () => {
 
   it("fires onRestock well past the interval", () => {
     const cb = vi.fn();
-    mrs.onRestock = cb;
+    listen(mrs, "merchant:restocked", (p) => cb(p.merchantId));
     mrs.registerMerchant("m", [POTION], 500, 72, 0);
     mrs.update(999999, barter as unknown as BarterSystem);
     expect(cb).toHaveBeenCalledTimes(1); // fires once regardless of elapsed cycles
@@ -145,7 +146,7 @@ describe("MerchantRestockSystem", () => {
 
   it("fires onRestock for multiple merchants in the same tick", () => {
     const cb = vi.fn();
-    mrs.onRestock = cb;
+    listen(mrs, "merchant:restocked", (p) => cb(p.merchantId));
     const b1 = makeBarterSystem();
     const b2 = makeBarterSystem();
     mrs.registerMerchant("m1", [POTION], 500, 24, 0);

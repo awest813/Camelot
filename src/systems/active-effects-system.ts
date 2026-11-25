@@ -36,6 +36,7 @@
  * this.activeEffectsSystem.update(deltaTime, this.player);
  * ```
  */
+import type { GameEventBus } from "./event-bus";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -105,13 +106,11 @@ export interface AffectablePlayer {
 // ── System ─────────────────────────────────────────────────────────────────────
 
 export class ActiveEffectsSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _effects: Map<string, ActiveEffect> = new Map();
 
-  /**
-   * Fired when an effect's duration reaches zero.
-   * @param effect A snapshot of the expired effect.
-   */
-  public onEffectExpired: ((effect: ActiveEffect) => void) | null = null;
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -205,7 +204,7 @@ export class ActiveEffectsSystem {
 
     for (const e of expired) {
       this._effects.delete(e.id);
-      this.onEffectExpired?.(e);
+      this.events?.emit("effect:expired", { effect: e });
     }
   }
 

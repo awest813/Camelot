@@ -5,6 +5,7 @@ import {
   MIN_RESPAWN_HOURS,
   MAX_RESPAWN_HOURS,
 } from "./respawn-system";
+import { listen } from "../testing/listen";
 
 describe("RespawnSystem", () => {
   let rs: RespawnSystem;
@@ -92,7 +93,7 @@ describe("RespawnSystem", () => {
 
   it("update does not fire callback before window elapses", () => {
     const cb = vi.fn();
-    rs.onZoneRespawn = cb;
+    listen(rs, "zone:respawned", (p) => cb(p.zoneId));
     rs.registerZone("zone_a", 72);
     rs.markCleared("zone_a", 0);
     rs.update(60 * 71); // 71 hours < 72 hours
@@ -101,7 +102,7 @@ describe("RespawnSystem", () => {
 
   it("update fires onZoneRespawn when window elapses", () => {
     const cb = vi.fn();
-    rs.onZoneRespawn = cb;
+    listen(rs, "zone:respawned", (p) => cb(p.zoneId));
     rs.registerZone("zone_a", 72);
     rs.markCleared("zone_a", 0);
     rs.update(72 * 60 + 1);
@@ -117,7 +118,7 @@ describe("RespawnSystem", () => {
 
   it("update fires callback for multiple zones in the same tick", () => {
     const cb = vi.fn();
-    rs.onZoneRespawn = cb;
+    listen(rs, "zone:respawned", (p) => cb(p.zoneId));
     rs.registerZone("zone_a", 24);
     rs.registerZone("zone_b", 48);
     rs.markCleared("zone_a", 0);
@@ -128,7 +129,7 @@ describe("RespawnSystem", () => {
 
   it("update does not fire again after respawn (no double-fire)", () => {
     const cb = vi.fn();
-    rs.onZoneRespawn = cb;
+    listen(rs, "zone:respawned", (p) => cb(p.zoneId));
     rs.registerZone("zone_a", 24);
     rs.markCleared("zone_a", 0);
     rs.update(24 * 60 + 1);
@@ -138,7 +139,7 @@ describe("RespawnSystem", () => {
 
   it("update ignores zones that have never been cleared", () => {
     const cb = vi.fn();
-    rs.onZoneRespawn = cb;
+    listen(rs, "zone:respawned", (p) => cb(p.zoneId));
     rs.registerZone("zone_a", 1);
     rs.update(999999);
     expect(cb).not.toHaveBeenCalled();

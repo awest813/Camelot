@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { FameSystem, FAME_MAX } from "./fame-system";
+import { listen } from "../testing/listen";
 
 describe("FameSystem", () => {
   let fs: FameSystem;
@@ -47,7 +48,7 @@ describe("FameSystem", () => {
 
   it("addFame fires onFameChange callback", () => {
     const cb = vi.fn();
-    fs.onFameChange = cb;
+    listen(fs, "fame:changed", (p) => cb(p.fame, p.infamy));
     fs.addFame(10);
     expect(cb).toHaveBeenCalledWith(10, 0);
   });
@@ -71,7 +72,7 @@ describe("FameSystem", () => {
 
   it("addInfamy fires onFameChange callback", () => {
     const cb = vi.fn();
-    fs.onFameChange = cb;
+    listen(fs, "fame:changed", (p) => cb(p.fame, p.infamy));
     fs.addInfamy(20);
     expect(cb).toHaveBeenCalledWith(0, 20);
   });
