@@ -1,8 +1,8 @@
 /**
  * The composition root: the services the game provides to its features
  * (the "hosts" each feature asks for), and the features installed in order.
- * Moved out of game.ts (engine overhaul, Phase 1); the game hands over the
- * few private parts the wiring needs as an explicit `GameInternals`.
+ * Moved out of game.ts (engine overhaul, Phase 1); it uses the game's own
+ * parts (the underscore members) directly.
  */
 import type { Game } from "../game";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -44,41 +44,10 @@ import type { Item } from "../systems/inventory-system";
 import { FollowersFeature } from "../features/followers/followers-feature";
 import { ShoutsFeature, ShoutHostKey } from "../features/shouts/shouts-feature";
 import { SettingsHostKey } from "../features/settings/settings-feature";
-
-/** The game's private parts the wiring needs, nothing more. */
-export interface GameInternals {
-  readonly achievements: Game["_achievements"];
-  readonly barterUI: Game["_barterUI"];
-  readonly character: Game["_character"];
-  readonly chunks: Game["_chunks"];
-  readonly containerUI: Game["_containerUI"];
-  readonly crafting: Game["_crafting"];
-  readonly currentDialogueNpcName: Game["_currentDialogueNpcName"];
-  readonly fastTravel: Game["_fastTravel"];
-  readonly focus: Game["_focus"];
-  readonly deathCamera: Game["_deathCamera"];
-  inCharacterCreation: Game["_inCharacterCreation"];
-  readonly npcVisuals: Game["_npcVisuals"];
-  readonly pack: Game["_pack"];
-  readonly progression: Game["_progression"];
-  readonly roster: Game["_roster"];
-  readonly settings: Game["_settings"];
-  spellMaking: Game["_spellMaking"];
-  readonly survival: Game["_survival"];
-  readonly thief: Game["_thief"];
-  readonly tips: Game["_tips"];
-  readonly trade: Game["_trade"];
-  despawnNpc: Game["_despawnNpc"];
-  grantDynamicWorldEventReward: Game["_grantDynamicWorldEventReward"];
-  grantPickpocketItem: Game["_grantPickpocketItem"];
-  isCombatInputBlocked: Game["_isCombatInputBlocked"];
-  isPlayerInCombat: Game["_isPlayerInCombat"];
-  presentCell: Game["_presentCell"];
-  restoreGameplayInput: Game["_restoreGameplayInput"];
-  spawnArchetypeNpc: Game["_spawnArchetypeNpc"];
-  suspendGameplayInput: Game["_suspendGameplayInput"];
-  updateDynamicWorldEventsOnHourChange: Game["_updateDynamicWorldEventsOnHourChange"];
-}
+import { presentCell } from "./cells";
+import { grantDynamicWorldEventReward, grantPickpocketItem, updateDynamicWorldEventsOnHourChange } from "./rewards";
+import { despawnNpc } from "./npcs";
+import { isCombatInputBlocked, suspendGameplayInput, restoreGameplayInput, isPlayerInCombat } from "./play-focus";
 
 /**
  * Provide the services features use and install the features.  Services
@@ -105,7 +74,7 @@ export function seedGameRandomness(game: Game): void {
   wire(game.alchemySystem, "alchemy");
 }
 
-export function installGameFeatures(game: Game, gi: GameInternals): void {
+export function installGameFeatures(game: Game): void {
       const k = game.kernel;
       // First, so features can own their part of the save as they install.
       k.services.provide(SavesKey, { register: (codec) => game.saveSystem.registerCodec(codec) });
@@ -119,18 +88,18 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
       });
       k.services.provide(FeedbackKey, {
         notify: (text, ms) => game.ui.showNotification(text, ms ?? 3000),
-        grant: (reward) => gi.grantDynamicWorldEventReward(reward),
+        grant: (reward) => grantDynamicWorldEventReward(game, reward),
         addFame: (n) => game.fameSystem.addFame(n),
         markDirty: () => game.saveSystem.markDirty(),
       });
       k.services.provide(ActorsKey, {
-        residents: (chunkKey) => gi.chunks.record(chunkKey)?.npcs ?? [],
+        residents: (chunkKey) => game._chunks.record(chunkKey)?.npcs ?? [],
         spawnArchetype: (chunkKey, archetype, x, z) => {
-          const record = gi.chunks.record(chunkKey);
-          return record ? gi.spawnArchetypeNpc(archetype, record, x, z) : null;
+          const record = game._chunks.record(chunkKey);
+          return record ? game._spawnArchetypeNpc(archetype, record, x, z) : null;
         },
-        despawn: (npc) => gi.despawnNpc(npc),
-        isTalkingTo: (npc) => npc.isInDialogue || npc.key === gi.currentDialogueNpcName,
+        despawn: (npc) => despawnNpc(game, npc),
+        isTalkingTo: (npc) => npc.isInDialogue || npc.key === game._currentDialogueNpcName,
         byName: (name) => game.scheduleSystem.npcs.find((n) => n.key === name),
         all: () => game.scheduleSystem.npcs,
         hostiles: () => actors.bodies([Aggressive], [Dead]),
@@ -143,13 +112,13 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
       k.services.provide(TravelHostKey, {
         position: () => game.player.camera.position,
         teleport: (to) => { game.player.camera.position.copyFrom(to); },
-        inCombat: () => gi.isPlayerInCombat(),
+        inCombat: () => isPlayerInCombat(game),
         sneaking: () => game.stealthSystem.isCrouching,
         encumbered: () => game.player.isEncumbered,
         isInterior: (id) => game.cellManager.getCellDefinition(id)?.type === "interior",
         indoors: () => game.cellManager.isInterior,
         // Entered quietly (the trip has its own message), so present the cell here.
-        enterCell: (id, at) => { if (game.cellManager.enterCellById(id, at, true)) gi.presentCell(id); },
+        enterCell: (id, at) => { if (game.cellManager.enterCellById(id, at, true)) presentCell(game, id); },
         fade: (onBlack, onDone) => game.ui.playScreenFadeSequence({
           fadeOutMs: 400, holdMs: 120, fadeInMs: 450, onBlack, onComplete: onDone,
         }),
@@ -157,7 +126,7 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
           game.timeSystem.advanceHours(hours);
           game.respawnSystem.update(game.timeSystem.elapsedGameTime);
           game.merchantRestockSystem.update(game.timeSystem.elapsedGameTime, game.barterSystem);
-          gi.updateDynamicWorldEventsOnHourChange();
+          updateDynamicWorldEventsOnHourChange(game);
           return game.timeSystem.timeString;
         },
         arrivalEvent: (at) => game.travelEventSystem.rollEvent({
@@ -171,7 +140,7 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
         hasMark: () => game.markRecallSystem.hasMarked,
         recall: () => !!game.markRecallSystem.recall(),
       });
-      k.install(gi.fastTravel);
+      k.install(game._fastTravel);
       k.services.provide(DeathHostKey, {
         health: () => game.player.health,
         maxHealth: () => game.player.maxHealth,
@@ -181,9 +150,9 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
         closeScreens: () => {
           if (game.dialogueSystem.isInDialogue) game.dialogueSystem.endDialogue();
           if (game.inventorySystem.isOpen) game.inventorySystem.toggleInventory();
-          if (gi.containerUI.isVisible) gi.containerUI.onClose?.();
-          if (gi.barterUI.isVisible) gi.barterUI.onClose?.();
-          gi.restoreGameplayInput();
+          if (game._containerUI.isVisible) game._containerUI.onClose?.();
+          if (game._barterUI.isVisible) game._barterUI.onClose?.();
+          restoreGameplayInput(game);
         },
         purgeEffects: () => {
           for (const effect of game.activeEffectsSystem.activeEffects) game.activeEffectsSystem.removeEffect(effect.id);
@@ -198,8 +167,8 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
             }
           }
         },
-        fall: () => { gi.focus.take("fallen"); gi.deathCamera.fall(); },
-        rise: () => { gi.deathCamera.rise(); gi.focus.give("fallen"); },
+        fall: () => { game._focus.take("fallen"); game._deathCamera.fall(); },
+        rise: () => { game._deathCamera.rise(); game._focus.give("fallen"); },
       });
       k.install(new DeathFeature());
       k.services.provide(ThiefHostKey, {
@@ -212,9 +181,9 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
           const npc = game.scheduleSystem.npcs.find((n) => n.key === npcId);
           game.crimeSystem.commitCrime("theft", npc?.factionId ?? "village_guard", game.timeSystem.elapsedGameTime);
         },
-        receive: (itemId) => gi.grantPickpocketItem(itemId),
+        receive: (itemId) => grantPickpocketItem(game, itemId),
       });
-      k.install(gi.thief);
+      k.install(game._thief);
       k.services.provide(TradeHostKey, {
         get barter() { return game.barterSystem; },
         get shops() { return game.shopSystem; },
@@ -226,7 +195,7 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
           return fame * (npcName ? game.persuasionSystem.getMerchantPriceMultiplier(npcName) : 1.0);
         },
       });
-      k.install(gi.trade);
+      k.install(game._trade);
       k.services.provide(SpoilsHostKey, {
         level: () => game.player.level,
         roll: (tableId, level) => game.lootTableSystem.rollTable(tableId, undefined, { playerLevel: level }).items.map((d) => ({
@@ -258,16 +227,16 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
           game.diseaseSystem.diseaseResistanceChance = t.diseaseImmune ? 1.0 : 0;
         },
         beginCreation: () => {
-          gi.inCharacterCreation = true;
+          game._inCharacterCreation = true;
           game.isPaused = true;
           game.ui.toggleCrosshair(false);
-          gi.focus.take("creation");
+          game._focus.take("creation");
         },
         endCreation: () => {
-          gi.inCharacterCreation = false;
+          game._inCharacterCreation = false;
           game.isPaused = false;
           game.ui.toggleCrosshair(true);
-          gi.focus.give("creation");
+          game._focus.give("creation");
         },
         ask: () => {
           const creator = new CharacterCreationUI();
@@ -287,12 +256,12 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
         },
         welcome: (skipTips) => {
           if (skipTips !== null) persistSkipOnboardingTips(skipTips);
-          gi.tips.start();
-          gi.achievements?.unlock("ACH_TAKE_UP_THE_SWORD");
+          game._tips.start();
+          game._achievements?.unlock("ACH_TAKE_UP_THE_SWORD");
           game.editors?.started();
         },
       });
-      k.install(gi.character);
+      k.install(game._character);
       k.services.provide(ProgressionHostKey, {
         get attributes() { return game.attributeSystem; },
         get classes() { return game.classSystem; },
@@ -300,10 +269,10 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
         syncMaxStats: syncMax,
         levelReached: () => game.trainerSystem.onCharacterLevelUp(),
         offerAttributes: () => {
-          if (game.isPaused || game.ui.isAttributePanelOpen || gi.isCombatInputBlocked()) return;
+          if (game.isPaused || game.ui.isAttributePanelOpen || isCombatInputBlocked(game)) return;
           game.ui.toggleAttributePanel(true);
           game.ui.refreshAttributePanel(game.attributeSystem);
-          gi.suspendGameplayInput();
+          suspendGameplayInput(game);
         },
         sheet: () => {
           const sb = game.birthsignSystem.getStatBonuses();
@@ -329,7 +298,7 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
         },
         setSheetOpen: (open) => game.ui.setCharacterSheetOpen(open),
       });
-      k.install(gi.progression);
+      k.install(game._progression);
       k.services.provide(SettingsHostKey, {
         tier: () => game.graphics.tier,
         applyTier: (tier) => { game.lodSystem?.setQuality(tier); location.reload(); },
@@ -339,7 +308,7 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
         toggleFullscreen: getDesktopBridge() ? () => { void getDesktopBridge()?.toggleFullscreen(); } : null,
         paused: () => game.isPaused,
       });
-      k.install(gi.settings);
+      k.install(game._settings);
       k.services.provide(DialogueHostKey, {
         get trainers() { return game.trainerSystem; },
         skillName: (id) => game.skillProgressionSystem.getSkill(id as never)?.name ?? id,
@@ -361,33 +330,33 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
         },
         setXpMultiplier: (m) => { game.skillProgressionSystem.globalXpMultiplier = m; },
       });
-      k.install(gi.survival);
+      k.install(game._survival);
       k.services.provide(OnboardingHostKey, {
         // Space must never skip a tip while a menu, dialog or the editor is open.
         // Every panel is in the modal registry, which the input block asks.
-        screenFree: () => !gi.isCombatInputBlocked(),
+        screenFree: () => !isCombatInputBlocked(game),
       });
       k.install(new OnboardingFeature());
-      game.saveSystem.setFastTravelSystem(gi.fastTravel.places);
-      const record = (chunkKey: string) => gi.chunks.record(chunkKey);
+      game.saveSystem.setFastTravelSystem(game._fastTravel.places);
+      const record = (chunkKey: string) => game._chunks.record(chunkKey);
       k.services.provide(SiteBuilderKey, {
         get scene() { return game.scene; },
         isLive: (chunkKey) => !!record(chunkKey),
         placeBuilding: (chunkKey, kind, origin) => {
           const r = record(chunkKey);
-          if (r) gi.chunks.placeBuilding(chunkKey, r, kind, origin);
+          if (r) game._chunks.placeBuilding(chunkKey, r, kind, origin);
         },
         placeProp: (chunkKey, key, x, z, rot) => {
           const r = record(chunkKey);
-          if (r) gi.chunks.placeProp(chunkKey, r, key, { x: 0, z: 0, rot: 0 }, x, z, rot);
+          if (r) game._chunks.placeProp(chunkKey, r, key, { x: 0, z: 0, rot: 0 }, x, z, rot);
         },
         placeSmithy: (chunkKey, x, z, rot) => {
           const r = record(chunkKey);
-          if (r) gi.chunks.placeSmithy(chunkKey, r, x, z, rot);
+          if (r) game._chunks.placeSmithy(chunkKey, r, x, z, rot);
         },
         ownStructure: (chunkKey, mesh) => {
           const r = record(chunkKey);
-          if (r) gi.chunks.track(chunkKey, r, mesh, "structure");
+          if (r) game._chunks.track(chunkKey, r, mesh, "structure");
           else mesh.dispose();
         },
         own: (chunkKey, mesh) => {
@@ -396,9 +365,9 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
           else mesh.dispose();
         },
         addKeepOut: (fp) => {
-          return gi.chunks.addKeepOut(fp);
+          return game._chunks.addKeepOut(fp);
         },
-        nightFlame: (name, x, y, z) => gi.chunks.nightFlame(name, x, y, z),
+        nightFlame: (name, x, y, z) => game._chunks.nightFlame(name, x, y, z),
         placeAsset: (chunkKey, key, at) => {
           if (!record(chunkKey)) return;
           game.fantasyAssets.getInstance(key, (root) => {
@@ -408,10 +377,10 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
             root.position.set(at.x, at.y ?? 0, at.z);
             setInstanceYaw(root, at.yaw);
             if (at.scale !== undefined) setInstanceScale(root, at.scale);
-            gi.chunks.track(chunkKey, r, root, at.tier ?? "prop");
+            game._chunks.track(chunkKey, r, root, at.tier ?? "prop");
           });
         },
-        spawnDragon: (chunkKey, x, z, yaw) => spawnDragon({ scene: game.scene, chunks: gi.chunks, roster: gi.roster, assets: game.fantasyAssets, visuals: gi.npcVisuals }, chunkKey, x, z, yaw),
+        spawnDragon: (chunkKey, x, z, yaw) => spawnDragon({ scene: game.scene, chunks: game._chunks, roster: game._roster, assets: game.fantasyAssets, visuals: game._npcVisuals }, chunkKey, x, z, yaw),
       });
       k.services.provide(InventoryKey, {
         count: (id) => game.inventorySystem.items.reduce((n, i) => (i.id === id ? n + i.quantity : n), 0),
@@ -428,11 +397,11 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
         behaviorOf: (npc) => game.scheduleSystem.behaviorOf(npc),
       });
       k.services.provide(BuildingsKey, {
-        nearBuilding: (x, z, margin) => gi.chunks.nearBuilding(x, z, margin),
+        nearBuilding: (x, z, margin) => game._chunks.nearBuilding(x, z, margin),
       });
       k.services.provide(ModalKey, {
-        suspendGameplay: () => gi.suspendGameplayInput(),
-        restoreGameplay: () => gi.restoreGameplayInput(),
+        suspendGameplay: () => suspendGameplayInput(game),
+        restoreGameplay: () => restoreGameplayInput(game),
       });
 
       k.services.provide(WorldStateKey, {
@@ -485,14 +454,14 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
         death: (m) => game.animationSystem.playDeath(m),
         release: (mesh) => game.animationSystem.unregisterMesh(mesh),
       });
-      k.services.provide(GameplayKey, { canAct: () => !gi.isCombatInputBlocked() });
+      k.services.provide(GameplayKey, { canAct: () => !isCombatInputBlocked(game) });
       k.services.provide(SkillsKey, {
         level: (id) => game.skillProgressionSystem?.getSkill(id)?.level ?? 0,
         gainXP: (id, base) => game.skillProgressionSystem?.gainXP(id, base * (game.classSystem?.xpMultiplierFor(id) ?? 1)),
       });
-      k.install(gi.crafting);
-      gi.spellMaking = new SpellMakingFeature(game.spellSystem);
-      k.install(gi.spellMaking);
+      k.install(game._crafting);
+      game._spellMaking = new SpellMakingFeature(game.spellSystem);
+      k.install(game._spellMaking);
       k.services.provide(LawKey, {
         get crime() { return game.crimeSystem; },
         get persuasion() { return game.persuasionSystem; },
@@ -504,8 +473,8 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
       });
       k.install(new ArrestFeature());
       k.services.provide(PurseKey, {
-        gold: () => gi.pack.gold(),
-        spend: (amount) => gi.pack.spendGold(amount),
+        gold: () => game._pack.gold(),
+        spend: (amount) => game._pack.spendGold(amount),
       });
       const pets = new PetsFeature(game.scene);
       k.install(pets);
@@ -552,7 +521,7 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
       k.services.provide(MountHostKey, {
         canAct: () => !game.isPaused && !game.dialogueSystem.isInDialogue,
         setMoveSpeedMultiplier: (m) => { (game.player as unknown as { moveSpeedMultiplier?: number }).moveSpeedMultiplier = m; },
-        unlockAchievement: (id) => { gi.achievements?.unlock(id as never); },
+        unlockAchievement: (id) => { game._achievements?.unlock(id as never); },
         give: (item) => { game.inventorySystem.addItem(item); },
       });
       const mounts = new MountsFeature();

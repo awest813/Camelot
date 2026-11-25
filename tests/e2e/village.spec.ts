@@ -131,7 +131,7 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     const inn = g.scheduleSystem.npcs.find((n: any) => /^Innkeeper_/.test(n.mesh.name)
       && Math.hypot(n.mesh.position.x - g.player.camera.position.x, n.mesh.position.z - g.player.camera.position.z) < 25);
     g._currentDialogueNpcName = inn.mesh.name;
-    g._handleDialogueHostEvent("jobs:ask");
+    g.eventBus.emit("dialogue:action", { eventId: "jobs:ask", npcName: g._currentDialogueNpcName });
     // Not yet: the window waits for the conversation to close…
     const waited = !g.jobs.window.isVisible;
     g.eventBus.emit("dialogue:closed", {});

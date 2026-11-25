@@ -1269,7 +1269,24 @@ with the rendering and UI tracks in parallel.
 **Where they stand** (2026-11-25; the guardrail counts come from
 `tools/check-guardrails.mjs`, sizes from `tools/check-bundle.mjs`):
 
-- `game.ts`: 2,135 lines. Not there yet.
+- `game.ts`: 2,135 → **64 lines** (target ≤ 500, met). It is the
+  bootstrap now: the constructor, `init()` (the event bus and kernel, the
+  early reactions, then six start-up steps), `update()`, `togglePause()`.
+  - What the game holds (systems, panels, feature handles, its own
+    parts) is `GameState` (`src/game/game-state.ts`), the base class.
+  - The start-up is six modules in `src/game/` (`setup-scene`,
+    `setup-core`, `setup-gameplay`, `setup-world`,
+    `setup-progression`, `setup-wiring`). The rest of the old methods
+    are modules by concern: `cells`, `framework-bridge`, `rewards`,
+    `npcs`, `play-focus`, `input-wiring`, `help-overlay`, `game-loop`,
+    `reactions`.
+  - The underscore members are the root's own parts, shared with those
+    modules. `GameInternals` and its 40-line getter list are gone.
+  - Honestly measured, this moved the code: the composition root
+    (`game.ts` plus `src/game/`) is about 3,360 lines, against about
+    3,165 before (new modules carry their own headers and imports).
+    It is now a guardrail of its own (`composition-root-lines`), and
+    shrinking it means turning those modules into features.
 - Unseeded `Math.random`: **0** (target met). Each remaining call went to
   one of three places in `core/rng/rng.ts`:
   - visual-only variation (flame phases, lightning timing, noise

@@ -203,7 +203,7 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
     g.fastTravelUI.onTravel("start_village");
     host.inCombat = inCombat;
     return {
-      why: { combat: g._isPlayerInCombat(), crouch: g.stealthSystem.isCrouching, enc: g.player.isEncumbered },
+      why: { combat: g.scheduleSystem.npcs.some((n: any) => n.isAggressive && !n.isDead), crouch: g.stealthSystem.isCrouching, enc: g.player.isEncumbered },
       open: g.fastTravelUI.isVisible,
       timePassed: g.timeSystem.elapsedGameTime >= before,
       places: g.fastTravelSystem.discoveredLocations.map((l: { id: string }) => l.id),

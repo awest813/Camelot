@@ -17,6 +17,8 @@
  *  a note when it goes down, so the baseline can be tightened with --update):
  *   - game-ts-lines           size of src/game.ts (the overhaul shrinks it)
  *   - unseeded-random         Math.random() calls outside the RNG allowlist
+ *   - composition-root-lines  game.ts plus src/game/ (not tests): what is left to
+ *                             become features
  *   - callback-properties     `x.onY = ` wiring in the composition root (src/game.ts
  *                             and src/game/), to become events and services
  *   - babylon-gui-files       src/ files importing @babylonjs/gui (to become Preact)
@@ -45,7 +47,7 @@ const SLACK = { "game-ts-lines": 40 };
  * Where pointer lock may change: the PlayFocus wiring in game.ts, and the
  * dialogue / inventory systems' fallbacks for when they run without a game.
  */
-const POINTER_LOCK_ALLOWLIST = ["src/game.ts", "src/systems/dialogue-system.ts", "src/systems/inventory-system.ts"];
+const POINTER_LOCK_ALLOWLIST = ["src/game/game-state.ts", "src/systems/dialogue-system.ts", "src/systems/inventory-system.ts"];
 
 /** Files whose `.mesh.name` reads are not NPC identity (the editor's own entities). */
 const MESH_NAME_ALLOWLIST = ["src/systems/map-editor-system.ts"];
@@ -101,6 +103,8 @@ export function measure() {
   const gameLines = game ? game.text.split("\n").length : 0;
   // The composition root: game.ts and src/game/ (wiring moved there still counts).
   const root = files.filter((f) => f.path === "src/game.ts" || (f.path.startsWith("src/game/") && !/\.test\.tsx?$/.test(f.path)));
+  // All of it, not only game.ts: moving code into src/game/ is not removing it.
+  const rootLines = root.reduce((n, f) => n + f.text.split("\n").length, 0);
   const callbackProps = root.reduce((n, f) =>
     n + (stripComments(f.text).match(/^\s*(?:this\.|game\.|gi\.)?\w+(?:\.\w+)*\.on[A-Z]\w*\s*=(?!=)/gm) ?? []).length, 0);
 
@@ -108,6 +112,7 @@ export function measure() {
     violations,
     counts: {
       "game-ts-lines": gameLines,
+      "composition-root-lines": rootLines,
       "unseeded-random": unseededRandom,
       "callback-properties": callbackProps,
       "babylon-gui-files": babylonGuiFiles,

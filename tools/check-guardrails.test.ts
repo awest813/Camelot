@@ -12,9 +12,10 @@ describe("architecture guardrails", () => {
 
   it("counts the ratcheted metrics", () => {
     const { counts } = measure();
-    for (const key of ["game-ts-lines", "unseeded-random", "callback-properties", "babylon-gui-files"]) {
+    for (const key of ["game-ts-lines", "composition-root-lines", "unseeded-random", "callback-properties", "babylon-gui-files"]) {
       expect(typeof counts[key]).toBe("number");
     }
-    expect(counts["game-ts-lines"]).toBeGreaterThan(100);
+    expect(counts["game-ts-lines"]).toBeGreaterThan(10);
+    expect(counts["composition-root-lines"]).toBeGreaterThan(counts["game-ts-lines"]);
   });
 });

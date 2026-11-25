@@ -68,7 +68,7 @@ test("forge stations, smith dialogue, and condition-aware barter", async ({ page
   await page.evaluate(() => {
     const g = (window as any).__camelotGame;
     g.player.camera.position.set(0, 6, 0); // back to the starting forge
-    g._handleDialogueHostEvent("smithing:open");
+    g.eventBus.emit("dialogue:action", { eventId: "smithing:open", npcName: g._currentDialogueNpcName });
     g.eventBus.emit("dialogue:closed", {});
   });
   await expect(forge).toBeVisible();
@@ -91,7 +91,7 @@ test("forge stations, smith dialogue, and condition-aware barter", async ({ page
     // Shops keep hours: move the clock to 10:00.
     const h = g.timeSystem.hour;
     g.timeSystem.advanceHours((24 + 10 - h) % 24);
-    g._handleDialogueHostEvent("barter:open", { merchantId: "merchant_armor_01" });
+    g.eventBus.emit("dialogue:action", { eventId: "barter:open", npcName: g._currentDialogueNpcName, payload: { merchantId: "merchant_armor_01" } });
     g.eventBus.emit("dialogue:closed", {});
     return { wornId: worn.instanceId as string, condition: g.smithing.getItemCondition(worn) as number };
   });
