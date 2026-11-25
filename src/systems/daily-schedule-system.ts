@@ -50,8 +50,6 @@ export class DailyScheduleSystem {
 
   // ── Callbacks ──────────────────────────────────────────────────────────────
 
-
-
   // ── Constructor ────────────────────────────────────────────────────────────
 
   constructor(scheduleSystem: ScheduleSystem, timeSystem: TimeSystem) {

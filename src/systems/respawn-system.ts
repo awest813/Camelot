@@ -76,7 +76,6 @@ export class RespawnSystem {
 
   private _zones: Map<string, RespawnZone> = new Map();
 
-
   // ── Registration ───────────────────────────────────────────────────────────
 
   /**

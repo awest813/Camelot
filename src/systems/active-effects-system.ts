@@ -111,7 +111,6 @@ export class ActiveEffectsSystem {
 
   private _effects: Map<string, ActiveEffect> = new Map();
 
-
   // ── Public API ─────────────────────────────────────────────────────────────
 
   /**

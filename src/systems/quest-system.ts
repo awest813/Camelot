@@ -69,7 +69,6 @@ export class QuestSystem {
   private _engine: (() => QuestGraphEngine | null) | null = null;
   public isLogOpen: boolean = false;
 
-
   constructor(ui: UIManager) {
     this._ui = ui;
   }

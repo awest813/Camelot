@@ -1269,7 +1269,7 @@ with the rendering and UI tracks in parallel.
 **Where they stand** (2026-11-25; the guardrail counts come from
 `tools/check-guardrails.mjs`, sizes from `tools/check-bundle.mjs`):
 
-- `game.ts`: 2,143 lines. Not there yet.
+- `game.ts`: 2,140 lines. Not there yet.
 - Unseeded `Math.random`: **0** (target met). Each remaining call went to
   one of three places in `core/rng/rng.ts`:
   - visual-only variation (flame phases, lightning timing, noise
@@ -1278,7 +1278,7 @@ with the rendering and UI tracks in parallel.
     ids) to `freshEntropy()` / `freshId()`, which use crypto;
   - the dungeon generator's unseeded fallback to a freshly seeded `Rng`.
   The ratchet now holds it at 0.
-- Callback properties in `game.ts`: 60 → 38. Sixteen systems now report on
+- Callback properties in `game.ts`: 60 → 32. Nineteen systems now report on
   the event bus they are given (`system.events = bus`) instead of through
   `onX` slots:
   - swimming, diseases, the world event manager, mark/recall, merchant
@@ -1303,6 +1303,11 @@ with the rendering and UI tracks in parallel.
   the events in `SAVE_WORTHY` (skill level-ups, perks, restocks, NPC sleep
   and wake), instead of each handler doing it. Two systems are made
   before the bus, so they get it right after it is created.
+  The third batch was combat. Hits, blocks, blows taken and the player's
+  arrows or spells hurting a hostile are reported as `combat:*` and
+  `projectile:playerHit`. The crafting feature subscribes for gear wear
+  itself. Status effects, block XP, the hit sound and the disease chance
+  are bus subscriptions in `game.ts` until those systems are features.
 - Main JS chunk: 1,038 KB loaded up front, since the editors left
   (Phase 9). Target 900 KB.
 - Model payload: 13 MB on disk, 1.8 MB of it character LODs. Target met.

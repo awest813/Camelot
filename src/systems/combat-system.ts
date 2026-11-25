@@ -189,6 +189,7 @@ import {
   type WeaponProfile,
 } from "./combat-shared";
 import { unseededRandom } from "../core/rng/rng";
+import type { GameEventBus } from "./event-bus";
 
 export {
   applyDamageWithResistance,
@@ -299,6 +300,9 @@ const COLOR_FLEE        = new Color3(0.6, 0.0, 0.8);   // purple — panicked fl
 const MAX_CONCURRENT_ATTACKERS = 2;
 
 export class CombatSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   /**
    * Where this system's random rolls come from.  The game gives it a named
    * stream of the kernel's seeded RNG, so a seed replays a session; tests
@@ -372,15 +376,6 @@ export class CombatSystem {
 
   /** Fired whenever the player's attack damages an NPC (assault/crime ingestion). */
   public onNpcDamaged: ((npc: NPC, damage: number) => void) | null = null;
-
-  /** Fired when the player's melee weapon lands a blow (true for power attacks) — drives weapon wear. */
-  public onWeaponHit: ((powerAttack: boolean) => void) | null = null;
-
-  /** Fired whenever the player takes damage from an NPC. */
-  public onPlayerHit: (() => void) | null = null;
-
-  /** Fired whenever the player successfully blocks an NPC attack. */
-  public onBlockSuccess: (() => void) | null = null;
 
   /** Scales damage NPCs deal to the player (easy 0.6 · normal 1.0 · hard 1.5). */
   public difficultyMultiplier: number = 1.0;
@@ -886,7 +881,7 @@ export class CombatSystem {
 
       npc.takeDamage(meleeDmg);
       this.onNpcDamaged?.(npc, meleeDmg);
-      this.onWeaponHit?.(false);
+      this.events?.emit("combat:weaponHit", { powerAttack: false });
       this._ui.applyHitStop(isFinisher ? 160 : isCrit ? 120 : 60);
       this._ui.shakeCamera(isFinisher ? 0.7 : isCrit ? 0.6 : 0.25);
 
@@ -1075,7 +1070,7 @@ export class CombatSystem {
           : applyDamageWithResistance(rawDmg, npc, "physical", weaponProfile.armorPenFraction);
         npc.takeDamage(finalDmg);
         this.onNpcDamaged?.(npc, finalDmg);
-        this.onWeaponHit?.(true);
+        this.events?.emit("combat:weaponHit", { powerAttack: true });
 
         this._ui.applyHitStop(isExecute ? 200 : 140);
         this._ui.shakeCamera(isExecute ? 0.85 : 0.65);
@@ -1975,7 +1970,7 @@ export class CombatSystem {
         this._ui.showNotification(`Blocked! ${dmg} damage taken.`, 1500);
         this._ui.showHitFlash("rgba(80, 120, 200, 0.35)");
       }
-      if (this.onBlockSuccess) this.onBlockSuccess();
+      this.events?.emit("combat:blocked", {});
 
       // Block counter: chance to stagger the attacker (Oblivion-style shield bash feel).
       // Perfect block ALWAYS staggers.
@@ -2010,7 +2005,7 @@ export class CombatSystem {
       (this.player as unknown as { notifyDamageTaken?: () => void }).notifyDamageTaken?.();
       // Disease / hit SFX only on real damage — perfect blocks and zero-damage
       // outcomes must not roll disease or play the hurt cue.
-      if (this.onPlayerHit) this.onPlayerHit();
+      this.events?.emit("combat:playerStruck", {});
     }
   }
 

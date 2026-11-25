@@ -4,6 +4,7 @@ import type { ManagedEventDefinition } from "./event-manager-system";
 import type { MarkPosition } from "./mark-recall-system";
 import type { ActiveEffect } from "./active-effects-system";
 import type { WeatherState } from "./weather-system";
+import type { NpcBoltStatusEffect } from "./projectile-system";
 
 // ── Typed event catalogue ────────────────────────────────────────────────────
 
@@ -114,6 +115,16 @@ export interface GameEvents {
   /** A resident's schedule turned to sleep, or from it (the daily schedule). */
   "npc:slept": { npc: NPC };
   "npc:woke": { npc: NPC };
+  /** The player's weapon connected (a power attack or not). */
+  "combat:weaponHit": { powerAttack: boolean };
+  /** A melee blow got through to the player. */
+  "combat:playerStruck": Record<string, never>;
+  /** The player blocked a blow. */
+  "combat:blocked": Record<string, never>;
+  /** An arrow or a spell of the player's hurt a hostile (combat alerts it). */
+  "combat:hostileHit": { npc: NPC; damage: number };
+  /** A hostile arrow or bolt hit the player; apply `statusEffect` when there is one. */
+  "projectile:playerHit": { damage: number; sourceName: string; statusEffect: NpcBoltStatusEffect | null };
 }
 
 export type GameEventType = keyof GameEvents;

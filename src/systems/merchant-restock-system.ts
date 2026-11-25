@@ -80,7 +80,6 @@ export class MerchantRestockSystem {
 
   private _entries: Map<string, RestockEntry> = new Map();
 
-
   // ── Registration ───────────────────────────────────────────────────────────
 
   /**

@@ -335,7 +335,6 @@ export class PerkSystem {
   private readonly _unlockedIds: Set<string> = new Set();
   private _perkPoints: number = 0;
 
-
   constructor(player: Player, skillSystem: SkillProgressionSystem) {
     this._player = player;
     this._skillSystem = skillSystem;

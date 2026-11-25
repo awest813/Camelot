@@ -86,7 +86,6 @@ export class SkillProgressionSystem {
 
   private _skills: Map<ProgressionSkillId, ProgressionSkill>;
 
-
   constructor() {
     this._skills = new Map<ProgressionSkillId, ProgressionSkill>();
     const definitions: Array<{ id: ProgressionSkillId; name: string }> = [

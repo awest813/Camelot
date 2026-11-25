@@ -882,17 +882,17 @@ export class Game {
     // Lets ranged/magic NPCs fire arrows and bolts at the player.
     this.combatSystem.setProjectileSystem(this.projectileSystem);
     // Bolt-riding status effects (burn, freeze, …) land on the player.
-    this.projectileSystem.onPlayerDamaged = (_dmg, _sourceName, effect) => {
-      if (effect) this.combatSystem.applyPlayerStatusEffect(effect);
-      this.smithing.onPlayerStruck();
-    };
+    // Combat reports (hits, blocks, blows taken) go on the bus; gear wear
+    // listens in the crafting feature.
+    this.projectileSystem.events = this.eventBus;
+    this.spellSystem.events = this.eventBus;
+    this.combatSystem.events = this.eventBus;
+    this.eventBus.on("projectile:playerHit", ({ statusEffect }) => {
+      if (statusEffect) this.combatSystem.applyPlayerStatusEffect(statusEffect);
+    });
     this.projectileSystem.isPlayerDodging = () => this.combatSystem.isDodging;
-    this.projectileSystem.onHostileHit = (npc, damage) => {
-      this.combatSystem.notifyHostileHit(npc, damage);
-    };
-    this.spellSystem.onHostileHit = (npc, damage) => {
-      this.combatSystem.notifyHostileHit(npc, damage);
-    };
+    // An arrow or spell that hurts a hostile alerts it, as a blow would.
+    this.eventBus.on("combat:hostileHit", ({ npc, damage }) => this.combatSystem.notifyHostileHit(npc, damage));
     this.projectileSystem.setScalingSystems({
       skillSystem: this.skillProgressionSystem,
       attributeSystem: this.attributeSystem,
@@ -1227,21 +1227,18 @@ export class Game {
         if (npc.isDead || !this._isSettlementNpc(npc)) return;
         this.eventBus.emit("player:assault", { npcId: npc.key, factionId: npc.factionId ?? "village_guard" });
     };
-    this.combatSystem.onWeaponHit = (powerAttack) => this.smithing.onWeaponHit(powerAttack);
-    this.combatSystem.onPlayerHit = () => {
+    this.eventBus.on("combat:playerStruck", () => {
         this.audioSystem.playPlayerHit();
-        this.smithing.onPlayerStruck();
         // Small chance to contract a random disease on each hit (Oblivion-style).
         // ~5 % base chance per strike; resistance is factored inside contractDisease().
         const contagion = this.kernel.rng.stream("disease");
         if (contagion.chance(0.05)) {
             this.diseaseSystem.contractDisease(contagion.pick(["rust_chancre", "swamp_rot", "witbane", "collywobbles", "yellow_tick"]));
         }
-    };
-    this.combatSystem.onBlockSuccess = () => {
-        this.smithing.onBlock();
+    });
+    this.eventBus.on("combat:blocked", () => {
         this.skillProgressionSystem.gainXP("block", 5 * this.classSystem.xpMultiplierFor("block"));
-    };
+    });
     this.interactionSystem.onLootPickup = (id) => {
         this._quests.apply("pickup", id);
         this.saveSystem.markDirty();

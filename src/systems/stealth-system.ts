@@ -93,7 +93,6 @@ export class StealthSystem {
   /** Current transient noise level [0-1].  Decays automatically each update. */
   private _noiseLevel: number = 0;
 
-
   /**
    * Fired when an NPC's detection crosses 50 upward — suspicion without full
    * detection.  The game layer typically routes the NPC into INVESTIGATE with

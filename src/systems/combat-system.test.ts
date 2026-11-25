@@ -4,6 +4,7 @@ import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Ray } from '@babylonjs/core/Culling/ray';
 import { SkillProgressionSystem } from './skill-progression-system';
 import { AttributeSystem } from './attribute-system';
+import { listen } from "../testing/listen";
 
 // Mock BabylonJS core features to avoid complex initialization
 vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
@@ -996,8 +997,7 @@ describe('CombatSystem', () => {
 
     it('onBlockSuccess callback fires when a hit is successfully blocked', () => {
         const onBlockSuccess = vi.fn();
-        combatSystem.onBlockSuccess = onBlockSuccess;
-
+        listen(combatSystem, "combat:blocked", (_p) => onBlockSuccess());
         mockNpcs[0].aiState = 'ATTACK';
         mockNpcs[0].attackRange = 2;
         mockNpcs[0].attackWindup = 0.2;
@@ -1014,8 +1014,7 @@ describe('CombatSystem', () => {
 
     it('onBlockSuccess does not fire when hit lands without blocking', () => {
         const onBlockSuccess = vi.fn();
-        combatSystem.onBlockSuccess = onBlockSuccess;
-
+        listen(combatSystem, "combat:blocked", (_p) => onBlockSuccess());
         mockNpcs[0].aiState = 'ATTACK';
         mockNpcs[0].attackRange = 2;
         mockNpcs[0].attackWindup = 0.2;
@@ -2143,7 +2142,7 @@ describe('CombatSystem', () => {
 
     it('player DoT ticks do not fire onPlayerHit (disease / hit-SFX hook)', () => {
         const onPlayerHit = vi.fn();
-        combatSystem.onPlayerHit = onPlayerHit;
+        listen(combatSystem, "combat:playerStruck", (_p) => onPlayerHit());
         (combatSystem as any)._playerStatusEffects = [{
             type: 'burn',
             damagePerTick: 4,
@@ -2160,7 +2159,7 @@ describe('CombatSystem', () => {
 
     it('perfect block with zero damage does not fire onPlayerHit', () => {
         const onPlayerHit = vi.fn();
-        combatSystem.onPlayerHit = onPlayerHit;
+        listen(combatSystem, "combat:playerStruck", (_p) => onPlayerHit());
         mockNpcs[0].aiState = 'ATTACK';
         mockNpcs[0].attackRange = 2;
         mockNpcs[0].attackWindup = 0.2;

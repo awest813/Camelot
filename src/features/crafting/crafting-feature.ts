@@ -9,7 +9,9 @@
  *
  * Inputs:   services feedback, modal, gameplay, player, skills; events
  *           `dialogue:action` ("smithing:open"), `dialogue:closed`,
- *           `chunk:unloaded`.
+ *           `chunk:unloaded`, and the combat reports that wear gear
+ *           (`combat:weaponHit`, `combat:playerStruck`, `combat:blocked`,
+ *           `projectile:playerHit`).
  * Outputs:  the `crafting` service.
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
@@ -117,6 +119,13 @@ export class CraftingFeature implements Feature {
     const feedback = () => s.get(FeedbackKey);
     const modal = () => s.get(ModalKey);
     const canAct = () => s.get(GameplayKey).canAct();
+
+    // Gear wear: the weapon on each hit, armour on each blow taken, the
+    // shield on each block.
+    ctx.on("combat:weaponHit", ({ powerAttack }) => this.smithing.onWeaponHit(powerAttack));
+    ctx.on("combat:playerStruck", () => this.smithing.onPlayerStruck());
+    ctx.on("projectile:playerHit", () => this.smithing.onPlayerStruck());
+    ctx.on("combat:blocked", () => this.smithing.onBlock());
 
     this.alchemyPanel.onCraft = (ids) => {
       this.alchemy.craftPotion(ids);

@@ -73,8 +73,6 @@ export class MarkRecallSystem {
 
   // ── Callbacks ────────────────────────────────────────────────────────────
 
-
-
   /**
    * Fired when the mark is explicitly cleared via {@link clearMark}.
    */

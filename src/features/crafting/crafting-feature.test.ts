@@ -124,3 +124,19 @@ describe("CraftingFeature (headless, through the kernel)", () => {
     t.k.uninstall("crafting");
   });
 });
+
+describe("CraftingFeature: gear wear from the combat reports", () => {
+  it("wears the weapon on a hit, armour on a blow, the shield on a block", () => {
+    const { k, feature } = setup();
+    const hit = vi.spyOn(feature.smithing, "onWeaponHit");
+    const struck = vi.spyOn(feature.smithing, "onPlayerStruck");
+    const block = vi.spyOn(feature.smithing, "onBlock");
+    k.events.emit("combat:weaponHit", { powerAttack: true });
+    k.events.emit("combat:playerStruck", {});
+    k.events.emit("projectile:playerHit", { damage: 3, sourceName: "Bandit", statusEffect: null });
+    k.events.emit("combat:blocked", {});
+    expect(hit).toHaveBeenCalledWith(true);
+    expect(struck).toHaveBeenCalledTimes(2);
+    expect(block).toHaveBeenCalledOnce();
+  });
+});

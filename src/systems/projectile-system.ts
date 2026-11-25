@@ -14,6 +14,7 @@ import type { SkillProgressionSystem } from "./skill-progression-system";
 import type { AttributeSystem } from "./attribute-system";
 import { ObjectPool } from "./object-pool";
 import { unseededRandom } from "../core/rng/rng";
+import type { GameEventBus } from "./event-bus";
 
 const ARROW_SPEED          = 40;
 const BASE_ARROW_DAMAGE    = 15;
@@ -154,6 +155,9 @@ const MAGIC_BOLT_COLORS: Record<string, string> = {
  *   Releases below BOW_MIN_DRAW are silently cancelled.
  */
 export class ProjectileSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   /**
    * Where this system's random rolls come from.  The game gives it a named
    * stream of the kernel's seeded RNG, so a seed replays a session; tests
@@ -203,12 +207,6 @@ export class ProjectileSystem {
 
   /** Same contract as {@link CombatSystem.onNPCDeath} — fired when an arrow kill lands. */
   public onNPCDeath: ((npcName: string, xpReward: number, npc: NPC) => void) | null = null;
-
-  /**
-   * Fired when a player arrow damages an NPC (game wires this to
-   * CombatSystem.notifyHostileHit for assault crime + pack aggro).
-   */
-  public onHostileHit: ((npc: NPC, damage: number) => void) | null = null;
 
   /**
    * When true, hostile arrows/bolts are consumed without damaging the player
@@ -483,15 +481,6 @@ export class ProjectileSystem {
     return true;
   }
 
-  /**
-   * Fired when a hostile arrow damages the player (game layer hooks).
-   * `statusEffect`, when present, should be applied to the player via
-   * CombatSystem.applyPlayerStatusEffect.
-   */
-  public onPlayerDamaged:
-    | ((damage: number, sourceName: string, statusEffect: NpcBoltStatusEffect | null) => void)
-    | null = null;
-
   // ── Shared spawn ──────────────────────────────────────────────────────────
 
   /**
@@ -529,8 +518,6 @@ export class ProjectileSystem {
     mesh.lookAt(mesh.position.add(direction));
     mesh.setEnabled(true);
     mesh.isVisible = true;
-
-
 
     const launchSpeed = ARROW_SPEED * arrowProfile.speedMultiplier;
     aggregate.body.applyImpulse(direction.scale(launchSpeed * 0.1), mesh.position);
@@ -652,7 +639,7 @@ export class ProjectileSystem {
 
           npc.takeDamage(finalDamage);
           this._skillSystem?.gainXP("marksman", SKILL_XP_MARKSMAN_HIT);
-          this.onHostileHit?.(npc, finalDamage);
+          this.events?.emit("combat:hostileHit", { npc, damage: finalDamage });
 
           // Daedric arrows are wreathed in Oblivion flame — victims burn.
           if (this.equippedArrowType === "daedric") {
@@ -721,7 +708,7 @@ export class ProjectileSystem {
             arrow.magicType ? "rgba(180, 120, 255, 0.35)" : "rgba(200, 0, 0, 0.4)");
           this._ui.shakeCamera(0.4);
           this._ui.applyHitStop(60);
-          this.onPlayerDamaged?.(dmg, arrow.sourceName, arrow.statusEffect);
+          this.events?.emit("projectile:playerHit", { damage: dmg, sourceName: arrow.sourceName, statusEffect: arrow.statusEffect });
           hit = true;
           }
         }

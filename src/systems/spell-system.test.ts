@@ -3,6 +3,7 @@ import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { Scene } from "@babylonjs/core/scene";
 import { SpellSystem, DEFAULT_SPELLS } from "./spell-system";
 import type { SpellDefinition } from "./spell-system";
+import { listen } from "../testing/listen";
 
 // ── Minimal stubs ─────────────────────────────────────────────────────────────
 
@@ -297,7 +298,7 @@ describe("SpellSystem", () => {
 
   it("fires onHostileHit when a damaging spell lands", () => {
     const onHostile = vi.fn();
-    sys.onHostileHit = onHostile;
+    listen(sys, "combat:hostileHit", (p) => onHostile(p.npc, p.damage));
     sys.learnSpell("flames");
     sys.equipSpell("flames");
     sys.castSpell();

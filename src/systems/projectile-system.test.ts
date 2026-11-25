@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ProjectileSystem } from "./projectile-system";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { AIState } from "../entities/npc";
+import { listen } from "../testing/listen";
 
 // ── Babylon mocks ─────────────────────────────────────────────────────────────
 
@@ -438,7 +439,7 @@ describe("ProjectileSystem", () => {
     mockPlayer.health = 100;
     mockNpc.mesh.position = new Vector3(0, 0, 50); // bystander far away
     const onDamaged = vi.fn();
-    projectileSystem.onPlayerDamaged = onDamaged;
+    listen(projectileSystem, "projectile:playerHit", (p) => onDamaged(p.damage, p.sourceName, p.statusEffect));
     projectileSystem.fireNpcArrow(
       new Vector3(0, 0, 0.5), new Vector3(0, 0, -1), 7, { sourceName: "Bandit Archer" });
     projectileSystem.update(0.016);
@@ -454,7 +455,7 @@ describe("ProjectileSystem", () => {
     mockPlayer.health = 100;
     mockNpc.mesh.position = new Vector3(0, 0, 50);
     const onDamaged = vi.fn();
-    projectileSystem.onPlayerDamaged = onDamaged;
+    listen(projectileSystem, "projectile:playerHit", (p) => onDamaged(p.damage, p.sourceName, p.statusEffect));
     projectileSystem.isPlayerDodging = () => true;
     projectileSystem.fireNpcArrow(
       new Vector3(0, 0, 0.5), new Vector3(0, 0, -1), 7, { sourceName: "Bandit Archer" });
@@ -472,7 +473,7 @@ describe("ProjectileSystem", () => {
   it("onHostileHit fires when a player arrow damages an NPC", () => {
     mockNpc.mesh.position = new Vector3(0, 0, 0.8);
     const onHostile = vi.fn();
-    projectileSystem.onHostileHit = onHostile;
+    listen(projectileSystem, "combat:hostileHit", (p) => onHostile(p.npc, p.damage));
     projectileSystem.fireArrow();
     projectileSystem.update(0.016);
     projectileSystem.update(0.016);
@@ -578,7 +579,7 @@ describe("ProjectileSystem", () => {
     mockPlayer.health = 100;
     mockNpc.mesh.position = new Vector3(0, 0, 50); // bystander far away
     const onDamaged = vi.fn();
-    projectileSystem.onPlayerDamaged = onDamaged;
+    listen(projectileSystem, "projectile:playerHit", (p) => onDamaged(p.damage, p.sourceName, p.statusEffect));
     const effect = { type: "burn" as const, damagePerTick: 2, tickInterval: 1, duration: 4 };
     projectileSystem.fireNpcArrow(
       new Vector3(0, 0, 0.5), new Vector3(0, 0, -1), 5,

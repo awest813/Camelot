@@ -80,15 +80,11 @@ export class SwimmingSystem {
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
 
-
-
   /**
    * Fired each frame while submerged, with the current breath ratio [0, 1].
    * Use this to drive a HUD breath indicator.
    */
   public onBreathChange: ((ratio: number) => void) | null = null;
-
-
 
   // ── Configuration ──────────────────────────────────────────────────────────
 

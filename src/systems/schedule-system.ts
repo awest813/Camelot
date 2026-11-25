@@ -132,7 +132,6 @@ export class ScheduleSystem {
   public nav: NavPaths | null = null;
   private _routes: WeakMap<NPC, Route> = new WeakMap();
 
-
   // Scratch vectors for performance optimization
   private _direction: Vector3 = new Vector3();
   private _velocity: Vector3 = new Vector3();
@@ -262,7 +261,6 @@ export class ScheduleSystem {
   private _getScheduledBehavior(npc: NPC): ScheduleBehaviorType | null {
     return scheduledBehaviorAt(npc.scheduleBlocks, this.currentHour);
   }
-
 
   private _applyScheduledBehavior(
     npc: NPC,

@@ -144,7 +144,6 @@ export class EventManagerSystem {
 
   // ── Callbacks ──────────────────────────────────────────────────────────────
 
-
   /**
    * Invoked when `resolveEvent()` is called to explicitly close an active
    * event.

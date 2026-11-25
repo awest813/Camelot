@@ -55,7 +55,6 @@ export class FameSystem {
   private _fame:   number = 0;
   private _infamy: number = 0;
 
-
   // ── Accessors ──────────────────────────────────────────────────────────────
 
   public get fame():   number { return this._fame;   }
