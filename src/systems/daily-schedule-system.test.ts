@@ -4,6 +4,7 @@ import { ScheduleSystem } from "./schedule-system";
 import { TimeSystem } from "./time-system";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { NPC, ScheduleBlock } from "../entities/npc";
+import { listen } from "../testing/listen";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -134,8 +135,7 @@ describe("DailyScheduleSystem — callbacks", () => {
     schedule.addNPC(npc);
 
     const sleepSpy = vi.fn();
-    daily.onNPCSleep = sleepSpy;
-
+    listen(daily, "npc:slept", (p) => sleepSpy(p.npc));
     (daily as any)._syncHour(22);
     expect(sleepSpy).toHaveBeenCalledOnce();
     expect(sleepSpy).toHaveBeenCalledWith(npc);
@@ -153,8 +153,7 @@ describe("DailyScheduleSystem — callbacks", () => {
     expect(npc.isAsleep).toBe(true);
 
     const wakeSpy = vi.fn();
-    daily.onNPCWake = wakeSpy;
-
+    listen(daily, "npc:woke", (p) => wakeSpy(p.npc));
     (daily as any)._syncHour(8);
     expect(wakeSpy).toHaveBeenCalledOnce();
     expect(wakeSpy).toHaveBeenCalledWith(npc);
@@ -170,8 +169,7 @@ describe("DailyScheduleSystem — callbacks", () => {
     schedule.addNPC(npc);
 
     const sleepSpy = vi.fn();
-    daily.onNPCSleep = sleepSpy;
-
+    listen(daily, "npc:slept", (p) => sleepSpy(p.npc));
     (daily as any)._syncHour(22);
     (daily as any)._syncHour(23); // still in sleep block
     (daily as any)._syncHour(0);  // midnight, still sleeping

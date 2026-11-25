@@ -1,6 +1,7 @@
 import type { NPC, ScheduleBehaviorType } from "../entities/npc";
 import { scheduledBehaviorAt, type ScheduleSystem } from "./schedule-system";
 import type { TimeSystem } from "./time-system";
+import type { GameEventBus } from "./event-bus";
 
 /**
  * DailyScheduleSystem — Connects TimeSystem to ScheduleSystem for automatic
@@ -13,7 +14,7 @@ import type { TimeSystem } from "./time-system";
  *     `Asleep` actor tag, `npc.isAsleep`); the interaction system won't let
  *     the player talk to it.  It wakes when the block ends.  (This used to
  *     blank the NPC's mesh metadata, hiding it from interaction entirely.)
- *   - Fires `onNPCSleep` / `onNPCWake` callbacks for UI notifications.
+ *   - Reports `npc:slept` / `npc:woke` on its event bus (`events`).
  *   - Provides `getSaveState` / `restoreFromSave` (SAVE_VERSION 18).
  *
  * Wire-up example (game.ts):
@@ -23,10 +24,8 @@ import type { TimeSystem } from "./time-system";
  *   this.timeSystem,
  * );
  *
- * this.dailyScheduleSystem.onNPCSleep = (npc) =>
- *   this.ui.showNotification(`${npc.displayName} has gone to sleep.`, 2000);
- * this.dailyScheduleSystem.onNPCWake = (npc) =>
- *   this.ui.showNotification(`${npc.displayName} has woken up.`, 2000);
+ * this.dailyScheduleSystem.events = this.eventBus;
+ * this.eventBus.on("npc:woke", ({ npc }) => …);
  * ```
  */
 
@@ -40,6 +39,9 @@ export interface DailyScheduleSaveState {
 // ── System ────────────────────────────────────────────────────────────────────
 
 export class DailyScheduleSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _scheduleSystem: ScheduleSystem;
   private _timeSystem: TimeSystem;
 
@@ -48,11 +50,7 @@ export class DailyScheduleSystem {
 
   // ── Callbacks ──────────────────────────────────────────────────────────────
 
-  /** Fired when an NPC transitions into a sleep schedule block. */
-  public onNPCSleep: ((npc: NPC) => void) | null = null;
 
-  /** Fired when an NPC transitions out of a sleep schedule block. */
-  public onNPCWake: ((npc: NPC) => void) | null = null;
 
   // ── Constructor ────────────────────────────────────────────────────────────
 
@@ -148,11 +146,11 @@ export class DailyScheduleSystem {
       if (isSleeping && !wasSleeping) {
         this._sleepingNpcs.add(npc);
         npc.isAsleep = true;
-        this.onNPCSleep?.(npc);
+        this.events?.emit("npc:slept", { npc });
       } else if (!isSleeping && wasSleeping) {
         this._sleepingNpcs.delete(npc);
         npc.isAsleep = false;
-        this.onNPCWake?.(npc);
+        this.events?.emit("npc:woke", { npc });
       }
     }
   }

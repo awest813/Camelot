@@ -1,5 +1,6 @@
 import { Player } from "../entities/player";
 import { UIManager } from "../ui/ui-manager";
+import type { GameEventBus } from "./event-bus";
 
 export interface Item {
   id: string;
@@ -20,13 +21,14 @@ export interface Item {
 }
 
 export class InventorySystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   public items: Item[] = [];
   /** Who has the player's input (the game's PlayFocus); the inventory holds it while open. */
   public focus: { take(holder: "menu"): void; give(holder: "menu"): void } | null = null;
   public maxCapacity: number = 20;
   public isOpen: boolean = false;
-  /** Fired once each time the inventory panel is opened (after pointer lock is released). */
-  public onOpen: (() => void) | null = null;
   public _player: Player;
   public _ui: UIManager;
   public _canvas: HTMLCanvasElement;
@@ -159,7 +161,7 @@ export class InventorySystem {
         this._player.camera.detachControl();
       }
       this._updateUI();
-      this.onOpen?.();
+      this.events?.emit("inventory:opened", {});
     } else {
       this._ui.toggleInventory(false);
       if (this.focus) this.focus.give("menu");

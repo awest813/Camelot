@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { StealthSystem } from "./stealth-system";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { AIState } from "../entities/npc";
+import { listen } from "../testing/listen";
 
 describe("StealthSystem", () => {
   let stealthSystem: StealthSystem;
@@ -79,22 +80,21 @@ describe("StealthSystem", () => {
 
   it("fires onDetected and sets NPC to ALERT when detection reaches 100", () => {
     const onDetected = vi.fn();
-    stealthSystem.onDetected = onDetected;
-
+    listen(stealthSystem, "stealth:detected", (p) => onDetected(p));
     // NPC is 5 units away — within walking hearing range (7 units).
     // Hearing-only detection rate = 40 units/sec → needs 2.5 sec.
     // We use 3 updates × 1.0s = 3 seconds to safely exceed 100.
     stealthSystem.update(1.0);
     stealthSystem.update(1.0);
     stealthSystem.update(1.0);
-    expect(onDetected).toHaveBeenCalledWith(mockNpc);
+    expect(onDetected).toHaveBeenCalledWith({ npcName: mockNpc.key, displayName: mockNpc.displayName });
     expect(mockNpc.aiState).toBe(AIState.ALERT);
     expect(mockNpc.isAggressive).toBe(true);
   });
 
   it("a townsperson noticing the player keeps detection but does not turn hostile", () => {
     const onDetected = vi.fn();
-    stealthSystem.onDetected = onDetected;
+    listen(stealthSystem, "stealth:detected", (p) => onDetected(p));
     (mockNpc as unknown as { hostileOnSight: boolean }).hostileOnSight = false;
     for (let i = 0; i < 60; i++) stealthSystem.update(1.0);
     expect(stealthSystem.getDetectionLevel(mockNpc)).toBe(100);
@@ -104,8 +104,7 @@ describe("StealthSystem", () => {
 
   it("does not fire onDetected twice for the same detection event", () => {
     const onDetected = vi.fn();
-    stealthSystem.onDetected = onDetected;
-
+    listen(stealthSystem, "stealth:detected", (p) => onDetected(p));
     stealthSystem.update(1.0);
     stealthSystem.update(1.0);
     stealthSystem.update(1.0); // now detected

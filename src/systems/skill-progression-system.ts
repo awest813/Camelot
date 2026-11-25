@@ -26,6 +26,7 @@
  * const bonus = this.skillProgressionSystem.multiplier("blade");
  * ```
  */
+import type { GameEventBus } from "./event-bus";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -80,14 +81,11 @@ export interface SkillProgressionSaveState {
 // ── System ────────────────────────────────────────────────────────────────────
 
 export class SkillProgressionSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _skills: Map<ProgressionSkillId, ProgressionSkill>;
 
-  /**
-   * Fired whenever a skill levels up.
-   * @param skillId  The skill that leveled up.
-   * @param newLevel The new level (1–100).
-   */
-  public onSkillLevelUp: ((skillId: ProgressionSkillId, newLevel: number) => void) | null = null;
 
   constructor() {
     this._skills = new Map<ProgressionSkillId, ProgressionSkill>();
@@ -125,7 +123,7 @@ export class SkillProgressionSystem {
   /**
    * Award XP to a skill.  If XP reaches the threshold the skill levels up
    * (potentially multiple times if a large amount is granted at once) and
-   * `onSkillLevelUp` is fired for each level gained.
+   * `skill:levelUp` is reported for each level gained.
    *
    * @param skillId  The skill receiving XP.
    * @param amount   XP to add (clamped to a minimum of 0).
@@ -141,7 +139,7 @@ export class SkillProgressionSystem {
       skill.xp      -= skill.xpToNext;
       skill.level   += 1;
       skill.xpToNext = xpToNext(skill.level);
-      this.onSkillLevelUp?.(skill.id, skill.level);
+      this.events?.emit("skill:levelUp", { skillId: skill.id, skillName: skill.name, newLevel: skill.level });
     }
 
     // Prevent XP overflow at max level

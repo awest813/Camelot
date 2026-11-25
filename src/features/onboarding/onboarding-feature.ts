@@ -63,6 +63,7 @@ export class OnboardingFeature implements Feature {
       if (t.isActive && t.currentStep?.id === step) t.advance();
     };
     ctx.on("questlog:opened", () => did("quests"));
+    ctx.on("inventory:opened", () => did("inventory"));
     ctx.on("pickpocket:opened", () => did("sneak"));
 
     ctx.provide(OnboardingKey, {

@@ -5,6 +5,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import { NPC, AIState } from "../entities/npc";
 import { Player } from "../entities/player";
 import { UIManager } from "../ui/ui-manager";
+import type { GameEventBus } from "./event-bus";
 
 export type MovementMode = "crouching" | "walking" | "running";
 
@@ -63,6 +64,9 @@ const PARTIAL_DETECTION_THRESHOLD = 50;
  *   6. Set `shadowFactor` each frame to reflect how well-lit the player's position is.
  */
 export class StealthSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _player: Player;
   private _npcs: NPC[];
   private _ui: UIManager;
@@ -89,8 +93,6 @@ export class StealthSystem {
   /** Current transient noise level [0-1].  Decays automatically each update. */
   private _noiseLevel: number = 0;
 
-  /** Fired once when an NPC's detection level first reaches 100. */
-  public onDetected: ((npc: NPC) => void) | null = null;
 
   /**
    * Fired when an NPC's detection crosses 50 upward — suspicion without full
@@ -234,7 +236,7 @@ export class StealthSystem {
         if (!wasFullyDetected && next >= 100 && (npc.hostileOnSight !== false || npc.provoked)) {
           npc.aiState = AIState.ALERT;
           npc.isAggressive = true;
-          this.onDetected?.(npc);
+          this.events?.emit("stealth:detected", { npcName: npc.key, displayName: npc.displayName });
         }
       } else {
         const prev = this._detectionLevels.get(npc) ?? 0;

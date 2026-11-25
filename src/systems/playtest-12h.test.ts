@@ -296,10 +296,10 @@ describe("Playtest — new game to 12 gameplay hours", () => {
       w.cls.chooseClass("warrior", w.attrs, w.skills);
       w.playerLevel.attachToClassSystem(w.cls);
       w.playerLevel.attachToAttributeSystem(w.attrs);
-      w.skills.onSkillLevelUp = (skillId, newLevel) => {
-        w.playerLevel.handleSkillLevelUp(skillId);
+      listen(w.skills, "skill:levelUp", ({ skillId, newLevel }) => {
+        w.playerLevel.handleSkillLevelUp(skillId as never);
         w.ui.showNotification(`${skillId} increased to ${newLevel}`, 3000);
-      };
+      });
     });
 
     it("blade XP accumulates from melee combat hits", () => {

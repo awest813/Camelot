@@ -1,6 +1,7 @@
 import { UIManager } from "../ui/ui-manager";
 import type { QuestGraphEngine } from "../framework/quests/quest-graph-engine";
 import type { QuestRuntimeState, QuestTriggerType } from "../framework/quests/quest-types";
+import type { GameEventBus } from "./event-bus";
 
 /**
  * The quest log.  It shows two kinds of quest:
@@ -59,14 +60,15 @@ const OBJECTIVE_TYPE: Record<QuestTriggerType, ObjectiveType> = {
 };
 
 export class QuestSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   /** Entries owned by features (not framework quests). */
   private _own: Quest[] = [];
   private _ui: UIManager;
   private _engine: (() => QuestGraphEngine | null) | null = null;
   public isLogOpen: boolean = false;
 
-  /** Fired once each time the quest log is opened. */
-  public onOpen: (() => void) | null = null;
 
   constructor(ui: UIManager) {
     this._ui = ui;
@@ -145,7 +147,7 @@ export class QuestSystem {
     this._ui.toggleQuestLog(this.isLogOpen);
     if (this.isLogOpen) {
       this._ui.updateQuestLog(this.getQuests());
-      this.onOpen?.();
+      this.events?.emit("questlog:opened", {});
     }
   }
 

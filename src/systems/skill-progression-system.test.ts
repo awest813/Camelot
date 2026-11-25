@@ -4,6 +4,7 @@ import {
   SKILL_MAX_LEVEL,
   type ProgressionSkillId,
 } from "./skill-progression-system";
+import { listen } from "../testing/listen";
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ describe("SkillProgressionSystem", () => {
 
   it("fires onSkillLevelUp callback on level-up", () => {
     const spy = vi.fn();
-    sps.onSkillLevelUp = spy;
+    listen(sps, "skill:levelUp", (p) => spy(p.skillId as never, p.newLevel));
     const xpNeeded = sps.getSkill("sneak")!.xpToNext;
     sps.gainXP("sneak", xpNeeded);
     expect(spy).toHaveBeenCalledWith("sneak", 1);
@@ -69,7 +70,7 @@ describe("SkillProgressionSystem", () => {
 
   it("can level up multiple times in a single gainXP call", () => {
     const spy = vi.fn();
-    sps.onSkillLevelUp = spy;
+    listen(sps, "skill:levelUp", (p) => spy(p.skillId as never, p.newLevel));
     // Enough XP for at least 3 levels
     const xp1 = sps.getSkill("alchemy")!.xpToNext;
     const xp2 = 50 + 1 * 12; // xpToNext(1)

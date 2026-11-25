@@ -102,6 +102,8 @@ export class ProgressionFeature implements Feature {
       host().setSheetOpen(false);
       modal().restoreGameplay();
     };
+    // Skill level-ups count toward the character level (major skills).
+    ctx.on("skill:levelUp", ({ skillId }) => this.levels.handleSkillLevelUp(skillId as never));
     ctx.provide(ProgressionKey, {
       levels: this.levels,
       levelUp: this.levelUp,

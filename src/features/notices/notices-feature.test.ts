@@ -5,6 +5,7 @@ import { SwimmingSystem } from "../../systems/swimming-system";
 import { PerkSystem } from "../../systems/perk-system";
 import { FeedbackKey } from "../services";
 import { NoticesFeature } from "./notices-feature";
+import { SaveTriggersFeature, SAVE_WORTHY } from "./save-triggers-feature";
 
 function setup() {
   const events = new GameEventBus();
@@ -33,7 +34,6 @@ describe("notices: what systems report, told to the player", () => {
       "Old Bram has restocked their wares.", "Perk unlocked: Keen Eye!", "Weather: Light rain",
       "Barrow has respawned — new dangers await!",
     ]);
-    expect(dirty(), "a restock and a perk are worth saving").toBe(2);
   });
 
   it("a system given the bus reports through it", () => {
@@ -43,5 +43,20 @@ describe("notices: what systems report, told to the player", () => {
     swim.enterWater();
     expect(said).toEqual(["Entered water."]);
     expect(PerkSystem.prototype).not.toHaveProperty("onPerkUnlocked");
+  });
+});
+
+describe("save triggers", () => {
+  it("events that change the game state mark the save dirty", () => {
+    const events = new GameEventBus();
+    const k = new Kernel({ events });
+    let dirty = 0;
+    k.services.provide(FeedbackKey, { notify: () => {}, grant: () => {}, addFame: () => {}, markDirty: () => { dirty++; } });
+    k.install(new SaveTriggersFeature());
+    events.emit("perk:unlocked", { perkId: "p", perkName: "P" });
+    events.emit("merchant:restocked", { merchantId: "m" });
+    events.emit("swim:entered", {});
+    expect(dirty).toBe(2);
+    expect(SAVE_WORTHY).toContain("skill:levelUp");
   });
 });

@@ -48,7 +48,7 @@ export interface GameEvents {
   /** A spell healed the player. */
   "spell:heal": { spellId: string; amount: number };
   /** The stealth system detected the player. */
-  "stealth:detected": { npcName: string };
+  "stealth:detected": { npcName: string; displayName: string };
   "pickpocket:opened": { npcName: string };
   /** The player's inventory changed. */
   "inventory:changed": { item: Item; delta: number };
@@ -109,6 +109,11 @@ export interface GameEvents {
    */
   "weather:changed": { state: WeatherState };
   "fame:changed": { fame: number; infamy: number };
+  "skill:levelUp": { skillId: string; skillName: string; newLevel: number };
+  "inventory:opened": Record<string, never>;
+  /** A resident's schedule turned to sleep, or from it (the daily schedule). */
+  "npc:slept": { npc: NPC };
+  "npc:woke": { npc: NPC };
 }
 
 export type GameEventType = keyof GameEvents;

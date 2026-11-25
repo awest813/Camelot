@@ -3,6 +3,7 @@ import { NPC, AIState, ScheduleBehaviorType, type ScheduleBlock } from "../entit
 import { actors } from "../entities/actors";
 import type { LodTier } from "../core/ecs/actors";
 import { unseededRandom } from "../core/rng/rng";
+import type { GameEventBus } from "./event-bus";
 
 /** How far a "wander" destination is picked from the NPC's home position. */
 const WANDER_RADIUS = 8;
@@ -97,6 +98,9 @@ interface StuckTracker {
 }
 
 export class ScheduleSystem {
+  /** Where this system reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   /**
    * Where this system's random rolls come from.  The game gives it a named
    * stream of the kernel's seeded RNG, so a seed replays a session; tests
@@ -128,8 +132,6 @@ export class ScheduleSystem {
   public nav: NavPaths | null = null;
   private _routes: WeakMap<NPC, Route> = new WeakMap();
 
-  /** Fired each update while a sleeping NPC stands at its bed spot (home). */
-  public onSleepArrive: ((npc: NPC) => void) | null = null;
 
   // Scratch vectors for performance optimization
   private _direction: Vector3 = new Vector3();
@@ -285,7 +287,7 @@ export class ScheduleSystem {
    */
   private _applySleepBehavior(npc: NPC, deltaTime: number): void {
     const target = npc.homePosition ?? npc.spawnPosition;
-    if (this._moveTowardTarget(npc, target, deltaTime, 0.5)) this.onSleepArrive?.(npc);
+    if (this._moveTowardTarget(npc, target, deltaTime, 0.5)) this.events?.emit("npc:atBed", { npc });
     npc.aiState = AIState.IDLE;
   }
 

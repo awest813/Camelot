@@ -21,6 +21,7 @@ import { IndoorsFeature } from "../features/indoors/indoors-feature";
 import { MountsFeature, MountHostKey } from "../features/mounts/mounts-feature";
 import { WorldEventsFeature } from "../features/world-events/world-events-feature";
 import { NoticesFeature } from "../features/notices/notices-feature";
+import { SaveTriggersFeature } from "../features/notices/save-triggers-feature";
 import { VillageJobsFeature } from "../features/village-jobs/jobs-feature";
 import { spawnDragon } from "../world/dragon-lair";
 import { TravelHostKey } from "../features/fast-travel/fast-travel-feature";
@@ -465,6 +466,7 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
 
       const worldEvents = new WorldEventsFeature();
       k.install(worldEvents);
+      k.install(new SaveTriggersFeature());
       // What systems report on the bus, told to the player.
       k.install(new NoticesFeature({
         disease: (id) => game.diseaseSystem.getDefinition(id)?.name ?? id,

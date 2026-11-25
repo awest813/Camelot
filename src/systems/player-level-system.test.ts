@@ -10,6 +10,7 @@ import { AttributeSystem } from "./attribute-system";
 import { SkillProgressionSystem } from "./skill-progression-system";
 import type { AttributeName } from "./attribute-system";
 import type { ProgressionSkillId } from "./skill-progression-system";
+import { listen } from "../testing/listen";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -25,8 +26,7 @@ function makeSystem() {
   pls.attachToAttributeSystem(attrs);
 
   // Wire skill level-up handler
-  skills.onSkillLevelUp = (skillId) => pls.handleSkillLevelUp(skillId);
-
+  listen(skills, "skill:levelUp", (p) => pls.handleSkillLevelUp(p.skillId as never));
   return { pls, cls, attrs, skills };
 }
 
@@ -276,8 +276,7 @@ describe("PlayerLevelSystem — confirmLevelUp", () => {
     const cls2 = new ClassSystem();
     cls2.chooseClass("warrior");
     plsNoAttr.attachToClassSystem(cls2);
-    skills.onSkillLevelUp = (s) => plsNoAttr.handleSkillLevelUp(s);
-
+    listen(skills, "skill:levelUp", (p) => plsNoAttr.handleSkillLevelUp(p.skillId as never));
     levelSkillNTimes(skills, "blade", 4);
     levelSkillNTimes(skills, "block", 4);
     levelSkillNTimes(skills, "marksman", 2);

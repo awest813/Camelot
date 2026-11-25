@@ -635,9 +635,6 @@ export class Game {
     if (mirroredSaves) this.saveSystem.setStorage(mirroredSaves);
     this.saveSystem.setCombatSystem(this.combatSystem);
     this.questSystem        = new QuestSystem(this.ui);
-    this.questSystem.onOpen = () => {
-      this.eventBus.emit("questlog:opened", {});
-    };
     this.saveSystem.setQuestSystem(this.questSystem);
     this.saveSystem.onAfterLoad = () => {
       this._cleanupCollectedLoot();
@@ -663,7 +660,6 @@ export class Game {
     this._camera.add({ id: "dialogue", get active() { return framing.phase !== "idle"; }, update: (dt) => framing.update(dt) });
     this._camera.add(this._deathCamera);
     this.inventorySystem.focus = this._focus;
-    this.inventorySystem.onOpen = () => this._tips.did("inventory");
     this.skillTreeSystem    = new SkillTreeSystem(this.player, this.ui);
     this.ui.onSkillPurchase = (treeIdx, skillIdx) => this.skillTreeSystem.purchaseSkill(treeIdx, skillIdx);
     this.saveSystem.setSkillTreeSystem(this.skillTreeSystem);
@@ -737,6 +733,9 @@ export class Game {
 
     // ── v3 system wiring ──────────────────────────────────────────────────────
     this.eventBus        = new GameEventBus();
+    // Systems made before the bus report on it too.
+    this.questSystem.events = this.eventBus;
+    this.inventorySystem.events = this.eventBus;
     this.kernel          = new Kernel({ events: this.eventBus });
     this._achievements = new AchievementSystem();
     this._achievements.onUnlocked = (definition) => {
@@ -874,15 +873,7 @@ export class Game {
 
     // ── v8 system wiring (Oblivion depth: skill progression, fast travel, level scaling) ──
     this.skillProgressionSystem = new SkillProgressionSystem();
-    this.skillProgressionSystem.onSkillLevelUp = (skillId, newLevel) => {
-      const skill = this.skillProgressionSystem.getSkill(skillId);
-      const name  = skill?.name ?? skillId;
-      this.ui.showNotification(`${name} skill increased to ${newLevel}!`, 2500);
-      this.eventBus.emit("skill:levelUp" as any, { skillId, newLevel });
-      // Notify PlayerLevelSystem so it can track major-skill level-ups.
-      this.kernel.services.get(ProgressionKey).skillRaised(skillId);
-      this.saveSystem.markDirty();
-    };
+    this.skillProgressionSystem.events = this.eventBus;
     this.saveSystem.setSkillProgressionSystem(this.skillProgressionSystem);
     this.combatSystem.setScalingSystems({
       skillSystem: this.skillProgressionSystem,
@@ -994,15 +985,10 @@ export class Game {
       this.timeSystem,
     );
     // No toasts: a village going to bed would post a dozen of them.
-    this.dailyScheduleSystem.onNPCSleep = () => {
-      this.saveSystem.markDirty();
-    };
-    this.dailyScheduleSystem.onNPCWake = () => {
-      this.saveSystem.markDirty();
-    };
+    this.dailyScheduleSystem.events = this.eventBus;
     // Villagers who reach their door at bedtime go inside until morning.
     // (The indoors feature takes them inside.)
-    this.scheduleSystem.onSleepArrive = (npc) => this.eventBus.emit("npc:atBed", { npc });
+    this.scheduleSystem.events = this.eventBus;
     this.saveSystem.setDailyScheduleSystem(this.dailyScheduleSystem);
 
     // ── v20: Swimming system ───────────────────────────────────────────────
@@ -1191,10 +1177,7 @@ export class Game {
     // Guard crime challenge is wired in the v9 block above.
 
     // Stealth detection notification
-    this.stealthSystem.onDetected = (detectedBy) => {
-      this.ui.showNotification(`${detectedBy.displayName} spotted you!`, 2000);
-      this.eventBus.emit("stealth:detected", { npcName: detectedBy.key });
-    };
+    this.stealthSystem.events = this.eventBus;
 
     // The starting area: the guard, a forge, a chest, the Old Cave, weapons on the ground.
     seedStartingArea({

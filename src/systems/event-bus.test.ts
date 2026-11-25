@@ -98,9 +98,9 @@ describe("GameEventBus", () => {
     const bus = new GameEventBus();
     const cb = vi.fn(() => bus.off("stealth:detected", cb));
     bus.on("stealth:detected", cb);
-    expect(() => bus.emit("stealth:detected", { npcName: "Guard" })).not.toThrow();
+    expect(() => bus.emit("stealth:detected", { npcName: "Guard", displayName: "Guard" })).not.toThrow();
     expect(cb).toHaveBeenCalledTimes(1);
-    bus.emit("stealth:detected", { npcName: "Guard" });
+    bus.emit("stealth:detected", { npcName: "Guard", displayName: "Guard" });
     expect(cb).toHaveBeenCalledTimes(1); // not called again
   });
 
