@@ -205,9 +205,6 @@ export class ProjectileSystem {
    */
   public stealthSystem: StealthSystem | null = null;
 
-  /** Same contract as {@link CombatSystem.onNPCDeath} — fired when an arrow kill lands. */
-  public onNPCDeath: ((npcName: string, xpReward: number, npc: NPC) => void) | null = null;
-
   /**
    * When true, hostile arrows/bolts are consumed without damaging the player
    * (dodge-roll i-frames). Wired from CombatSystem.isDodging in game.ts.
@@ -678,9 +675,7 @@ export class ProjectileSystem {
 
           if (npc.isDead) {
             this._ui.showNotification(`${npc.displayName} defeated!`);
-            if (this.onNPCDeath) {
-              this.onNPCDeath(npc.key, npc.xpReward, npc);
-            }
+            this.events?.emit("npc:killed", { npcName: npc.key, xp: npc.xpReward, npc });
           }
 
           hit = true;

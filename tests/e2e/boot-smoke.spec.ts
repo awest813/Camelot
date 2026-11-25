@@ -237,7 +237,7 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
     const g = (window as any).__camelotGame;
     const mark = g.scheduleSystem.npcs.find((n: any) => !n.isDead && !n.isAggressive && g.pickpocketSystem.getNpcInventory(n.mesh.name)?.length);
     if (!mark) return "no mark";
-    g.interactionSystem.onPickpocketNpc(mark);
+    g.eventBus.emit("interact:pickpocket", { npc: mark });
     return g.pickpocketUI.isVisible ? "open" : "closed";
   })).toBe("open");
   await page.keyboard.press("Escape");
@@ -252,7 +252,7 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
     const before = loot();
     const table = victim.lootTableId;
     victim.lootTableId = "boss_loot";
-    g.combatSystem.onNPCDeath(victim.mesh.name, 1, victim);
+    g.eventBus.emit("npc:killed", { npcName: victim.mesh.name, xp: 1, npc: victim });
     victim.lootTableId = table;
     return loot() > before;
   }), "the kill dropped loot").toBe(true);

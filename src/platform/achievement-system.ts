@@ -22,10 +22,10 @@ const KNOWN_IDS = new Set(ACHIEVEMENTS.map((entry) => entry.id));
  * Steamworks (or the offline achievement file) stays in step.
  */
 export class AchievementSystem {
-  private readonly _unlocked = new Set<string>();
+  /** Where this reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
 
-  /** Fires only the first time an achievement is unlocked this session. */
-  public onUnlocked: ((definition: AchievementDefinition) => void) | null = null;
+  private readonly _unlocked = new Set<string>();
 
   constructor() {
     this._load();
@@ -51,12 +51,13 @@ export class AchievementSystem {
     if (!definition || this._unlocked.has(id)) return false;
     this._unlocked.add(id);
     this._persist();
-    this.onUnlocked?.(definition);
+    this.events?.emit("achievement:unlocked", { definition });
     return true;
   }
 
   /** Subscribe to gameplay events that map directly onto achievements. */
   public bind(bus: GameEventBus): void {
+    this.events = bus;
     bus.on("player:kill", ({ npcName }) => {
       this.unlock("ACH_FIRST_BLOOD");
       if (/dragon/i.test(npcName)) this.unlock("ACH_DRAGONSLAYER");

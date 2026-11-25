@@ -2210,7 +2210,7 @@ describe('CombatSystem', () => {
 
     it('notifyHostileHit fires onNpcDamaged and transitions to CHASE with pack aggro', () => {
         const onNpcDamaged = vi.fn();
-        combatSystem.onNpcDamaged = onNpcDamaged;
+        listen(combatSystem, "combat:npcDamaged", (p) => onNpcDamaged(p.npc, p.damage));
         mockNpcs[0].aiState = 'IDLE';
         mockNpcs[0].factionId = 'bandits';
         mockNpcs[0].isDead = false;

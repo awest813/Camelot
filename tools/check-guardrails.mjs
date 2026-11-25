@@ -17,7 +17,8 @@
  *  a note when it goes down, so the baseline can be tightened with --update):
  *   - game-ts-lines           size of src/game.ts (the overhaul shrinks it)
  *   - unseeded-random         Math.random() calls outside the RNG allowlist
- *   - callback-properties     `this.x.onY = ` wiring in src/game.ts (to become events)
+ *   - callback-properties     `x.onY = ` wiring in the composition root (src/game.ts
+ *                             and src/game/), to become events and services
  *   - babylon-gui-files       src/ files importing @babylonjs/gui (to become Preact)
  *
  * Usage:
@@ -98,7 +99,10 @@ export function measure() {
 
   const game = files.find((f) => f.path === "src/game.ts");
   const gameLines = game ? game.text.split("\n").length : 0;
-  const callbackProps = game ? (stripComments(game.text).match(/^\s*this\.[\w.]+\.on[A-Z]\w*\s*=(?!=)/gm) ?? []).length : 0;
+  // The composition root: game.ts and src/game/ (wiring moved there still counts).
+  const root = files.filter((f) => f.path === "src/game.ts" || (f.path.startsWith("src/game/") && !/\.test\.tsx?$/.test(f.path)));
+  const callbackProps = root.reduce((n, f) =>
+    n + (stripComments(f.text).match(/^\s*(?:this\.|game\.|gi\.)?\w+(?:\.\w+)*\.on[A-Z]\w*\s*=(?!=)/gm) ?? []).length, 0);
 
   return {
     violations,

@@ -5,6 +5,12 @@ import type { MarkPosition } from "./mark-recall-system";
 import type { ActiveEffect } from "./active-effects-system";
 import type { WeatherState } from "./weather-system";
 import type { NpcBoltStatusEffect } from "./projectile-system";
+import type { BiomeType } from "../world/world-manager";
+import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import type { AchievementDefinition } from "../platform/achievement-system";
+import type { ConsumableUseSource, QuickSlotKey } from "./quickslot-system";
+import type { ProgressionSkillId } from "./skill-progression-system";
+import type { AttributeName } from "./attribute-system";
 
 // ── Typed event catalogue ────────────────────────────────────────────────────
 
@@ -43,7 +49,7 @@ export interface GameEvents {
   /** The player committed a crime witnessed by an NPC. */
   "crime:committed": { crimeType: string; factionId: string; bounty: number };
   /** The player cast a spell. */
-  "spell:cast": { spellId: string; spellName: string; magickaCost: number };
+  "spell:cast": { spellId: string; spellName: string; magickaCost: number; damage?: number; heal?: number };
   /** A spell hit an NPC. */
   "spell:hit": { spellId: string; npcName: string; damage: number };
   /** A spell healed the player. */
@@ -74,9 +80,13 @@ export interface GameEvents {
   /** An NPC left the world (despawned or its chunk unloaded); drop references. */
   "npc:released": { npcName: string };
   /** A world chunk unloaded (its content and NPCs are gone). */
-  "chunk:unloaded": { chunkKey: string };
+  "chunk:unloaded": { chunkKey: string; cx?: number; cz?: number };
+  /** A world chunk finished loading (its ground and vegetation are in). */
+  "chunk:loaded": { chunkKey: string; cx: number; cz: number; biome: BiomeType };
   /** A dialogue choice fired a host action (e.g. "jobs:ask"), with the speaker. */
   "dialogue:action": { eventId: string; npcName: string | null; payload?: Record<string, unknown> };
+  /** The player started talking to an NPC (by its key). */
+  "dialogue:started": { npcName: string };
   /** A conversation ended and the dialogue UI is gone. */
   "dialogue:closed": Record<string, never>;
   /** The quest log was opened. */
@@ -125,6 +135,41 @@ export interface GameEvents {
   "combat:hostileHit": { npc: NPC; damage: number };
   /** A hostile arrow or bolt hit the player; apply `statusEffect` when there is one. */
   "projectile:playerHit": { damage: number; sourceName: string; statusEffect: NpcBoltStatusEffect | null };
+  /** An NPC died to the player's blow, arrow or spell (the XP it was worth). */
+  "npc:killed": { npcName: string; xp: number; npc: NPC };
+  /** The player's attack hurt an NPC (crime and assault checks). */
+  "combat:npcDamaged": { npc: NPC; damage: number };
+  /** An NPC half-noticed the player (it comes to look). */
+  "stealth:noticed": { npc: NPC; playerPos: Vector3 };
+  "equipment:changed": Record<string, never>;
+  /** About to write a save (prune what should not be kept). */
+  "save:beforeSave": Record<string, never>;
+  "loot:pickedUp": { itemId: string };
+  /** The player chose to pickpocket this NPC (instead of talking). */
+  "interact:pickpocket": { npc: NPC };
+  "portal:entered": { portalId: string };
+  "achievement:unlocked": { definition: AchievementDefinition };
+  /** A consumable was used (from a quick slot or the inventory). */
+  "item:consumed": { item: Item; source: ConsumableUseSource };
+  "trainer:trained": { trainerId: string; skillId: ProgressionSkillId; newLevel: number; goldSpent: number };
+  /** The player's combat (XP) level rose; `player:levelUp` is the character level. */
+  "player:combatLevelUp": { newLevel: number };
+  /** A quick-slot key asked to be assigned (pick a consumable for it). */
+  "quickslot:assign": { key: QuickSlotKey; itemId: string | null };
+  /** A structure brought an NPC into the world, or took one out. */
+  "npc:spawned": { npc: NPC };
+  "npc:removed": { npc: NPC };
+
+  // ── The player's choices in the HUD panels (UIManager) ──────────────────
+  "ui:skillPurchase": { treeIndex: number; skillIndex: number };
+  "ui:inventoryItemClick": { item: Item };
+  "ui:inventoryClosed": Record<string, never>;
+  "ui:waitConfirm": { hours: number };
+  "ui:attributeSpend": { name: AttributeName };
+  /** A panel closed from inside it; the game closes it through its registry. */
+  "ui:panelClosed": { id: "wait" | "attributes" | "quest-log" | "skill-tree" | "inventory" };
+  /** A heavy hit asks for a moment of slow motion. */
+  "ui:hitStop": { durationMs: number };
 }
 
 export type GameEventType = keyof GameEvents;

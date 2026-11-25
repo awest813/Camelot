@@ -518,6 +518,36 @@ export class Game {
     this.init();
   }
 
+  /**
+   * The game's reactions that must come before the features' own (they are
+   * subscribed first): after a load, the world is cleaned up and the cell
+   * rebuilt before features reset; after a conversation, the barter purse
+   * is synced before features act on it; a loaded chunk opens its scope
+   * before anything is put in it.
+   */
+  private _wireEarlyReactions(): void {
+    const bus = this.eventBus;
+    bus.on("save:loaded", () => {
+      this._cleanupCollectedLoot();
+      this._hydrateCellAfterLoad();
+      // Saved equipment bypasses equip() — re-sync the weapon archetype.
+      this._syncWeaponArchetype();
+      // Don't re-announce the bandit bounty if it's already live/finished.
+      if (this.frameworkRuntime.questEngine.getQuestStatus("quest_bandit_bounty") !== "inactive") {
+        this._banditQuestStarted = true;
+      }
+    });
+    bus.on("dialogue:closed", () => { this.barterSystem.playerGold = this._pack.gold(); });
+    bus.on("chunk:loaded", ({ chunkKey, cx, cz, biome }) => {
+      this._chunks.open(chunkKey);
+      // What goes where lives in the world-sites feature (villages, camps,
+      // inns, homesteads, the dragon, wild nature).
+      this.worldSites.populate(chunkKey, cx, cz, biome);
+      // New ground and walls: the navmesh rebuilds (debounced, in a worker).
+      this.navigationSystem.requestRebuild();
+    });
+  }
+
   private _toggleHelpOverlay(): void {
     if (!this._helpOverlayEl) {
       const panel = document.createElement("div");
@@ -546,6 +576,10 @@ export class Game {
 
 
   init(): void {
+    // The event bus first: systems report on it as they are made.
+    this.eventBus = new GameEventBus();
+    this.kernel = new Kernel({ events: this.eventBus });
+    this._wireEarlyReactions();
     // Apply the tier's hardware scaling level before the first render.
     this.engine.setHardwareScalingLevel(this.graphics.performance.hardwareScalingLevel);
     this._adaptiveRes = new AdaptiveResolution({
@@ -619,38 +653,25 @@ export class Game {
     this.combatSystem       = new CombatSystem(this.scene, this.player, this.scheduleSystem.npcs, this.ui, this.navigationSystem);
     this.dialogueSystem     = new DialogueSystem(this.scene, this.player, this.scheduleSystem.npcs, this.canvas);
     this.inventorySystem    = new InventorySystem(this.player, this.ui, this.canvas);
+    this.inventorySystem.events = this.eventBus;
     this.equipmentSystem    = new EquipmentSystem(this.player, this.inventorySystem, this.ui);
     // Equipped weapon drives the combat weapon archetype (sword/bow/staff/...).
-    this.equipmentSystem.onEquipmentChanged = () => {
+    this.equipmentSystem.events = this.eventBus;
+    // Gear changed: the weapon archetype follows; equipped gear is saved state.
+    // (Wear tracking listens in the crafting feature.)
+    this.eventBus.on("equipment:changed", () => {
       this._syncWeaponArchetype();
-      // New gear starts pristine; swapping pieces changes the wear penalty.
-      this.smithing?.trackEquippedGear();
-      this.smithing?.refreshPenalties();
-      // Equipped gear is persistent state — keep the dirty-gated autosave aware.
       this.saveSystem.markDirty();
-    };
+    });
     this._syncWeaponArchetype();
     this.saveSystem         = new SaveSystem(this.player, this.inventorySystem, this.equipmentSystem, this.ui);
     const mirroredSaves = desktopMirroredSaveStore();
     if (mirroredSaves) this.saveSystem.setStorage(mirroredSaves);
     this.saveSystem.setCombatSystem(this.combatSystem);
     this.questSystem        = new QuestSystem(this.ui);
+    this.questSystem.events = this.eventBus;
     this.saveSystem.setQuestSystem(this.questSystem);
-    this.saveSystem.onAfterLoad = () => {
-      this._cleanupCollectedLoot();
-      this._hydrateCellAfterLoad();
-      // Saved equipment bypasses equip() — re-sync the weapon archetype.
-      this._syncWeaponArchetype();
-      // Features reset their transient state (e.g. a raid in progress).
-      this.eventBus.emit("save:loaded", {});
-      // Restored condition values change the wear penalty on the player.
-      this.smithing?.trackEquippedGear();
-      this.smithing?.refreshPenalties();
-      // Don't re-announce the bandit bounty if it's already live/finished.
-      if (this.frameworkRuntime.questEngine.getQuestStatus("quest_bandit_bounty") !== "inactive") {
-        this._banditQuestStarted = true;
-      }
-    };
+    this.saveSystem.events = this.eventBus;
     this.interactionSystem  = new InteractionSystem(this.scene, this.player, this.inventorySystem, this.dialogueSystem, this.ui);
     this.interactionSystem.cellManager = this.cellManager;
     this.dialogueSystem.focus = this._focus;
@@ -661,7 +682,8 @@ export class Game {
     this._camera.add(this._deathCamera);
     this.inventorySystem.focus = this._focus;
     this.skillTreeSystem    = new SkillTreeSystem(this.player, this.ui);
-    this.ui.onSkillPurchase = (treeIdx, skillIdx) => this.skillTreeSystem.purchaseSkill(treeIdx, skillIdx);
+    this.ui.events = this.eventBus;
+    this.eventBus.on("ui:skillPurchase", ({ treeIndex, skillIndex }) => this.skillTreeSystem.purchaseSkill(treeIndex, skillIndex));
     this.saveSystem.setSkillTreeSystem(this.skillTreeSystem);
     this.audioSystem        = new AudioSystem();
     // The base content plus the starter quests (one quest engine for all).
@@ -703,9 +725,8 @@ export class Game {
     this.projectileSystem.stealthSystem = this.stealthSystem;
     this.barterSystem    = new BarterSystem(this.inventorySystem, this.ui);
     this.shopSystem      = new ShopSystem();
-    this.barterSystem.onTransaction = () => {
-      this._pack.setGold(this.barterSystem.playerGold);
-    };
+    this.barterSystem.events = this.eventBus;
+    this.eventBus.on("barter:transaction", () => this._pack.setGold(this.barterSystem.playerGold));
     this.frameworkRuntime.setDialogueHostHooks({
       onDialogueHostEvent: (eventId, payload) => this._handleDialogueHostEvent(eventId, payload),
       onDialogueConsumeItem: (itemId, quantity) => this._pack.consume(itemId, quantity),
@@ -727,22 +748,18 @@ export class Game {
     this.interactionSystem.pickpocketSystem = this.pickpocketSystem;
     this.interactionSystem.sneakLevelProvider = () =>
       this.skillProgressionSystem.getSkill("sneak")?.level ?? 0;
-    this.interactionSystem.onPickpocketNpc = (npc) => this.kernel.services.get(PickpocketKey).open(npc);
+    this.interactionSystem.events = this.eventBus;
+    this.eventBus.on("interact:pickpocket", ({ npc }) => this.kernel.services.get(PickpocketKey).open(npc));
     // Seed the starting cast (structure/archetype spawns register on arrival).
     for (const npc of this.scheduleSystem.npcs) this._thief.registerNpc(npc);
 
     // ── v3 system wiring ──────────────────────────────────────────────────────
-    this.eventBus        = new GameEventBus();
-    // Systems made before the bus report on it too.
-    this.questSystem.events = this.eventBus;
-    this.inventorySystem.events = this.eventBus;
-    this.kernel          = new Kernel({ events: this.eventBus });
     this._achievements = new AchievementSystem();
-    this._achievements.onUnlocked = (definition) => {
+    this.eventBus.on("achievement:unlocked", ({ definition }) => {
       this.ui.showNotification(`Achievement unlocked: ${definition.name}`, 4000);
       const bridge = getDesktopBridge();
       if (bridge) void bridge.unlockAchievement(definition.id);
-    };
+    });
     this._achievements.bind(this.eventBus);
     void this._achievements.syncWithDesktop();
     this.lootTableSystem = new LootTableSystem();
@@ -789,7 +806,7 @@ export class Game {
     this.saveSystem.setEnchantingSystem(this.enchantingSystem);
     this._installFeatures();
     // Forget condition for gear that left the world (dropped, or wiped by a shop restock).
-    this.saveSystem.onBeforeSave = () => {
+    this.eventBus.on("save:beforeSave", () => {
       this.smithing.pruneConditions([
         ...this.inventorySystem.items,
         ...this.equipmentSystem.getEquipped().values(),
@@ -797,7 +814,7 @@ export class Game {
         // Sold gear keeps its wear while it sits in a shop (no free repair by buyback).
         ...[...(this.barterSystem?.merchants.values() ?? [])].flatMap((m) => m.inventory),
       ]);
-    };
+    });
     // Worn gear trades for less, and barter rows show each piece's condition.
     this.barterSystem.itemValueMultiplier = (item) => this.smithing.getValueMultiplier(item);
     this._barterUI.itemTag = (item) => {
@@ -828,7 +845,8 @@ export class Game {
     this.quickSlotSystem = new QuickSlotSystem(this.inventorySystem, this.player, this.ui);
     // Seed slot 7 with the starter health potion (if the player has one)
     this.quickSlotSystem.bindSlot("7", "potion_hp_01");
-    this.quickSlotSystem.onItemConsumed = (item, source) => {
+    this.quickSlotSystem.events = this.eventBus;
+    this.eventBus.on("item:consumed", ({ item, source }) => {
       // Food restores hunger via the survival system (potions restore stats
       // directly inside QuickSlotSystem).
       const nutrition = item.stats?.nutrition;
@@ -838,10 +856,10 @@ export class Game {
       }
       this.eventBus.emit("player:consumeItem" as any, { itemId: item.id, source });
       this.saveSystem.markDirty();
-    };
+    });
     this.saveSystem.setQuickSlotSystem(this.quickSlotSystem);
 
-    this.ui.onInventoryItemClick = (item) => {
+    this.eventBus.on("ui:inventoryItemClick", ({ item }) => {
       if (this._tryAssignQuickSlotFromClick(item)) return;
       if (this.smithing.tryUseRepairItem(item)) {
         this.saveSystem.markDirty();
@@ -852,14 +870,14 @@ export class Game {
         return;
       }
       this.equipmentSystem.handleItemClick(item);
-    };
+    });
     this.ui.isConsumableItem = isConsumableItem;
 
     // ── v7 system wiring (QoL: Wait + Compass) ────────────────────────────────
     this.waitSystem = new WaitSystem();
     this.saveSystem.setWaitSystem(this.waitSystem);
     // Wire the Wait Dialog confirm callback
-    this.ui.onWaitConfirm = (hours) => {
+    this.eventBus.on("ui:waitConfirm", ({ hours }) => {
       const result = this.waitSystem.wait(hours, this.timeSystem, this.player);
       if (result.ok) {
         // Waiting counts as light sleep — resting at an inn restores more.
@@ -867,9 +885,9 @@ export class Game {
         this.ui.showNotification(result.message, 2800);
         this.saveSystem.markDirty();
       }
-    };
+    });
     // Panels the player closes from inside go through the modal registry.
-    this.ui.onPanelClosed = (id) => this._modals.close(id);
+    this.eventBus.on("ui:panelClosed", ({ id }) => this._modals.close(id));
 
     // ── v8 system wiring (Oblivion depth: skill progression, fast travel, level scaling) ──
     this.skillProgressionSystem = new SkillProgressionSystem();
@@ -899,46 +917,32 @@ export class Game {
     });
 
     // Auto-discover locations when the player enters a new cell (portals use fade + tryTransition)
-    this.cellManager.onCellChanged = (cellId, cellName) => {
-      this._onCellEntered(cellId, cellName);
-    };
-    this.interactionSystem.onPortalTransition = (portalId) => this._beginPortalTransition(portalId);
+    this.cellManager.events = this.eventBus;
+    this.eventBus.on("cell:changed", ({ cellId, cellName }) => this._onCellEntered(cellId, cellName));
+    this.eventBus.on("portal:entered", ({ portalId }) => this._beginPortalTransition(portalId));
 
     this.levelScalingSystem = new LevelScalingSystem();
     // Scale newly spawned structure NPCs and register them for cleanup
-    this.world.structures.onNPCSpawn = (npc) => this._roster.add(npc);
+    this.world.structures.events = this.eventBus;
+    this.eventBus.on("npc:spawned", ({ npc }) => this._roster.add(npc));
     // The structure disposes its own NPCs.
-    this.world.structures.onNPCRemove = (npc) => this._roster.remove(npc, { dispose: false });
+    this.eventBus.on("npc:removed", ({ npc }) => this._roster.remove(npc, { dispose: false }));
 
     /** Unified world-state persistence: check if an item belongs to the player or was already taken. */
-    this.world.structures.onCheckLootCollected = (itemId) => {
-      // Check inventory
-      for (const item of this.inventorySystem.items) {
-          if (item.id === itemId) return true;
-      }
-      // Check equipment
-      for (const item of this.equipmentSystem.getEquipped().values()) {
-          if (item.id === itemId) return true;
-      }
-      return false;
-    };
+    // One-off loot the player already holds is not placed again.
+    this.world.structures.isLootCollected = (itemId) =>
+      this.inventorySystem.items.some((item) => item.id === itemId)
+      || [...this.equipmentSystem.getEquipped().values()].some((item) => item.id === itemId);
 
     // Wire skill XP into spell cast and potion craft callbacks
-    this.spellSystem.onSpellCast = (spell, result) => {
-      // Spell school XP
-      if (result.damage && result.damage > 0) {
+    // Spell school XP.
+    this.eventBus.on("spell:cast", ({ damage, heal }) => {
+      if (damage && damage > 0) {
         this.skillProgressionSystem.gainXP("destruction", 10 * this.classSystem.xpMultiplierFor("destruction"));
-      } else if (result.heal && result.heal > 0) {
+      } else if (heal && heal > 0) {
         this.skillProgressionSystem.gainXP("restoration", 10 * this.classSystem.xpMultiplierFor("restoration"));
       }
-      this.eventBus.emit("spell:cast", { spellId: spell.id, spellName: spell.name, magickaCost: spell.magickaCost });
-      if (result.hitNpc && result.damage) {
-        this.eventBus.emit("spell:hit", { spellId: spell.id, npcName: result.hitNpc, damage: result.damage });
-      }
-      if (result.heal) {
-        this.eventBus.emit("spell:heal", { spellId: spell.id, amount: result.heal });
-      }
-    };
+    });
 
     // ── v9 system wiring (Oblivion parity: fame, active effects, jail) ─────────
     this.fameSystem = new FameSystem();
@@ -1044,24 +1048,15 @@ export class Game {
       });
 
       // ── Chunk content (placement rules: world-sites feature) ──────────────
-      this.world.onChunkLoaded = (cx, cz, biome) => {
-        const chunkKey = `${cx},${cz}`;
-        this._chunks.open(chunkKey);
-        // What goes where lives in the world-sites feature (villages, camps,
-        // inns, homesteads, the dragon, wild nature).
-        this.worldSites.populate(chunkKey, cx, cz, biome);
-        // New ground and walls: the navmesh rebuilds (debounced, in a worker).
-        this.navigationSystem.requestRebuild();
-      };
+    this.world.events = this.eventBus;
 
       // Dispose chunk-scoped CDN props and NPCs when their chunk unloads so
       // revisiting an area never accumulates duplicate props or entities.
-      this.world.onChunkUnloaded = (cx, cz) => {
-        const key = `${cx},${cz}`;
-        this.eventBus.emit("chunk:unloaded", { chunkKey: key });
-        this._chunks.close(key);
-        this.navigationSystem.requestRebuild();
-      };
+    // After the features' own chunk:unloaded handlers (registered earlier).
+    this.eventBus.on("chunk:unloaded", ({ chunkKey }) => {
+      this._chunks.close(chunkKey);
+      this.navigationSystem.requestRebuild();
+    });
     }
 
     // ── v24: Mark & Recall ────────────────────────────────────────────────
@@ -1072,14 +1067,15 @@ export class Game {
 
     // ── v24: Trainer System ───────────────────────────────────────────────
     this.trainerSystem = new TrainerSystem();
-    this.trainerSystem.onTrainingComplete = (_trainerId, skillId, newLevel, goldSpent) => {
+    this.trainerSystem.events = this.eventBus;
+    this.eventBus.on("trainer:trained", ({ skillId, newLevel, goldSpent }) => {
       // Gold sufficiency is pre-validated by TrainerSystem.train() via canTrain();
       // this callback only fires on a successful, already-approved session.
       this.skillProgressionSystem.setSkillLevel(skillId, newLevel);
       this._pack.spendGold(goldSpent);
       this.ui.showNotification(`${skillId} raised to ${newLevel}!  (−${goldSpent}g)`, 3000);
       this.saveSystem.markDirty();
-    };
+    });
     this.saveSystem.setTrainerSystem(this.trainerSystem);
 
     // ── v27: Perk System ──────────────────────────────────────────────────
@@ -1098,7 +1094,8 @@ export class Game {
 
     // Suspicion (partial detection) routes NPCs to investigate where the
     // player was seen/heard — full detection still triggers ALERT.
-    this.stealthSystem.onPartialDetection = (npc, playerPos) => {
+    this.stealthSystem.events = this.eventBus;
+    this.eventBus.on("stealth:noticed", ({ npc, playerPos }) => {
       if (npc.isDead || npc.isAggressive) return;
       if (!npc.lastKnownPlayerPos) npc.lastKnownPlayerPos = playerPos.clone();
       else npc.lastKnownPlayerPos.copyFrom(playerPos);
@@ -1109,7 +1106,7 @@ export class Game {
         // which would flag the suspicious NPC as hostile.
         this.combatSystem.paintNpcInvestigating(npc);
       }
-    };
+    });
 
     // ── Active Effects HUD ──────────────────────────────────────────────────
     this.activeEffectHUD = new ActiveEffectHUD();
@@ -1119,16 +1116,17 @@ export class Game {
     this.quickSlotHUD = new QuickSlotHUD();
     // Quick-slot assign mode: clicking a HUD slot opens the inventory; the
     // next consumable clicked there is bound to that slot.
-    this.quickSlotHUD.onAssign = (key, _currentItemId) => {
+    this.quickSlotHUD.events = this.eventBus;
+    this.eventBus.on("quickslot:assign", ({ key }) => {
       if (this.isPaused || this.mapEditorActive || this.dialogueSystem.isInDialogue) return;
       this._quickSlotAssignKey = key;
       this.ui.showNotification(`Pick a consumable in your inventory for slot ${key}.`, 3000);
       if (!this.inventorySystem.isOpen) {
         this.inventorySystem.toggleInventory();
       }
-    };
+    });
     // Leaving the inventory cancels a pending quick-slot assignment.
-    this.ui.onInventoryClosed = () => { this._quickSlotAssignKey = null; };
+    this.eventBus.on("ui:inventoryClosed", () => { this._quickSlotAssignKey = null; });
     this.quickSlotHUD.show();
     this.quickSlotHUD.update(this.quickSlotSystem);
 
@@ -1141,7 +1139,7 @@ export class Game {
 
     void this.kernel.services.get(CharacterKey).create();
 
-    this.ui.onAttributeSpend = (name) => {
+    this.eventBus.on("ui:attributeSpend", ({ name }) => {
       const spent = this.attributeSystem.spendPoint(name);
       if (spent) {
         this.saveSystem.markDirty();
@@ -1154,30 +1152,30 @@ export class Game {
         // Refresh the attribute panel display
         this.ui.refreshAttributePanel(this.attributeSystem);
       }
-    };
+    });
 
     // Hit-stop effect wired to FixedStepLoop
-    this.ui.onHitStopRequested = (durationMs) => {
+    this.eventBus.on("ui:hitStop", ({ durationMs }) => {
       this._gameplayLoop.timeScale = 0.05; // heavy slow-mo
       setTimeout(() => {
         this._gameplayLoop.timeScale = 1.0;
       }, durationMs);
-    };
+    });
 
     // Level-up awards attribute points
-    this.player.onLevelUp = (_newLevel) => {
+    this.player.events = this.eventBus;
+    this.eventBus.on("player:combatLevelUp", () => {
       // Combat XP level-up — no notification (spam). Character level-up
       // fires via onLevelUpComplete and shows the meaningful notification.
       this.attributeSystem.awardLevelUpPoints(1);
       this.saveSystem.markDirty();
       // Sync magic damage bonus after level-up attribute award
       this.spellSystem.magicDamageBonus = this.attributeSystem.magicDamageBonus;
-    };
+    });
 
     // Guard crime challenge is wired in the v9 block above.
 
     // Stealth detection notification
-    this.stealthSystem.events = this.eventBus;
 
     // The starting area: the guard, a forge, a chest, the Old Cave, weapons on the ground.
     seedStartingArea({
@@ -1200,7 +1198,7 @@ export class Game {
     this.canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
     // Wire quest event callbacks
-    this.combatSystem.onNPCDeath = (name, xp, npc) => {
+    this.eventBus.on("npc:killed", ({ npcName: name, xp, npc }) => {
         const npcName = /dragon/i.test(npc.key) ? npc.key : name;
         const p = npc.mesh.position;
         this.eventBus.emit("player:kill", {
@@ -1220,13 +1218,13 @@ export class Game {
         this.ui.showNotification(`+${xp} XP`, 2000);
         this.audioSystem.playNPCDeath();
 
-    };
-    this.projectileSystem.onNPCDeath = this.combatSystem.onNPCDeath;
+    });
+    // (Arrow and spell kills report npc:killed too.)
     // Striking a peaceful settler is an assault (the arrest feature books it).
-    this.combatSystem.onNpcDamaged = (npc) => {
-        if (npc.isDead || !this._isSettlementNpc(npc)) return;
-        this.eventBus.emit("player:assault", { npcId: npc.key, factionId: npc.factionId ?? "village_guard" });
-    };
+    this.eventBus.on("combat:npcDamaged", ({ npc }) => {
+      if (npc.isDead || !this._isSettlementNpc(npc)) return;
+      this.eventBus.emit("player:assault", { npcId: npc.key, factionId: npc.factionId ?? "village_guard" });
+    });
     this.eventBus.on("combat:playerStruck", () => {
         this.audioSystem.playPlayerHit();
         // Small chance to contract a random disease on each hit (Oblivion-style).
@@ -1239,23 +1237,20 @@ export class Game {
     this.eventBus.on("combat:blocked", () => {
         this.skillProgressionSystem.gainXP("block", 5 * this.classSystem.xpMultiplierFor("block"));
     });
-    this.interactionSystem.onLootPickup = (id) => {
+    this.eventBus.on("loot:pickedUp", ({ itemId: id }) => {
         this._quests.apply("pickup", id);
         this.saveSystem.markDirty();
         this._tips.did("interact");
-    };
-    this.dialogueSystem.onTalkStart  = (name)  => {
-        this._quests.apply("talk", this._quests.targetId(name));
+    });
+    this.dialogueSystem.events = this.eventBus;
+    this.eventBus.on("dialogue:started", ({ npcName }) => {
+        this._quests.apply("talk", this._quests.targetId(npcName));
         // Speechcraft XP each time dialogue is initiated
         this.skillProgressionSystem.gainXP("speechcraft", 8 * this.classSystem.xpMultiplierFor("speechcraft"));
         this._tips.did("interact");
-    };
-    this.dialogueSystem.onDialogueClosed = () => {
-      this.barterSystem.playerGold = this._pack.gold();
-      // Features waiting on the conversation (e.g. the job window) act now.
-      this.eventBus.emit("dialogue:closed", {});
-      this._currentDialogueNpcName = null;
-    };
+    });
+    // After the features' dialogue:closed handlers: forget who we spoke to.
+    this.eventBus.on("dialogue:closed", () => { this._currentDialogueNpcName = null; });
 
     // Quest XP and fame callbacks are wired in the v9 block above.
     // Note: player.onLevelUp is wired above in the v2 system wiring block

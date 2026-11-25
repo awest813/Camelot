@@ -279,7 +279,7 @@ const SKILL_XP_SPELL_RESTORATION = 6;
  *     (nullable to support headless tests).
  *   - `castSpell()` checks magicka and cooldown, applies damage/heal with the same
  *     resistance rules as melee and magic projectiles (`applyDamageWithResistance`),
- *     then fires the optional `onSpellCast` hook for audio/VFX.
+ *     then reports `spell:cast` (and `spell:hit` / `spell:heal`) on its bus.
  *
  * Usage:
  *   1. Construct with player, npc list, and ui.
@@ -306,11 +306,6 @@ export class SpellSystem {
   /** Base magic damage bonus contributed by the AttributeSystem. */
   public magicDamageBonus: number = 0;
 
-  /**
-   * Fired when a spell is successfully cast.
-   * Hook to play audio, spawn a visual projectile / particle burst, etc.
-   */
-  public onSpellCast: ((spell: SpellDefinition, result: SpellCastResult) => void) | null = null;
 
   constructor(player: Player, npcs: NPC[], ui: UIManager, scene: Scene | null = null) {
     this._player = player;
@@ -407,7 +402,7 @@ export class SpellSystem {
    * - Checks magicka and cooldown preconditions.
    * - Applies effects (damage NPCs in range, heal player, etc.).
    * - Notifies the UI.
-   * - Fires `onSpellCast` hook.
+   * - Reports `spell:cast`, `spell:hit`, `spell:heal`.
    */
   public castSpell(): SpellCastResult {
     const spell = this.equippedSpell;
@@ -447,7 +442,9 @@ export class SpellSystem {
           : `${spell.name} cast`;
     this._ui.showNotification(msg, 1500);
 
-    this.onSpellCast?.(spell, result);
+    this.events?.emit("spell:cast", { spellId: spell.id, spellName: spell.name, magickaCost: spell.magickaCost, damage: result.damage, heal: result.heal });
+    if (result.hitNpc && result.damage) this.events?.emit("spell:hit", { spellId: spell.id, npcName: result.hitNpc, damage: result.damage });
+    if (result.heal) this.events?.emit("spell:heal", { spellId: spell.id, amount: result.heal });
     return result;
   }
 

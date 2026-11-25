@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { DialogueSystem, type DialogueChoiceOption } from "./dialogue-system";
+import { listen } from "../testing/listen";
 
 
 vi.mock("@babylonjs/core/scene", () => ({
@@ -116,10 +117,10 @@ describe("DialogueSystem", () => {
     expect(sys.choices.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("fires onTalkStart with the NPC mesh name", () => {
+  it("reports dialogue:started with the NPC key", () => {
     const npc = makeNpc("Innkeeper");
     const handler = vi.fn();
-    sys.onTalkStart = handler;
+    listen(sys, "dialogue:started", ({ npcName }) => handler(npcName));
     sys.startDialogue(npc);
     expect(handler).toHaveBeenCalledWith("Innkeeper");
   });
@@ -141,7 +142,7 @@ describe("DialogueSystem", () => {
   it("endDialogue fires onDialogueClosed", () => {
     const npc = makeNpc();
     const closed = vi.fn();
-    sys.onDialogueClosed = closed;
+    listen(sys, "dialogue:closed", (_p) => closed());
     sys.startDialogue(npc);
     sys.endDialogue();
     expect(closed).toHaveBeenCalledOnce();
@@ -209,7 +210,7 @@ describe("DialogueSystem", () => {
     sys.startDialogue(npc);
     sys.endDialogue();
     const closed = vi.fn();
-    sys.onDialogueClosed = closed;
+    listen(sys, "dialogue:closed", (_p) => closed());
     // Handler is gone, so Escape won't re-fire endDialogue
     const evt = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
     window.dispatchEvent(evt);

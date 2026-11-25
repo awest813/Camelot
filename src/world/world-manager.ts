@@ -19,6 +19,7 @@ import type { Chunk, ChunkAdapter, ChunkSource, Vec2Like } from "../systems/chun
 import { ProceduralTextureManager } from "../systems/procedural-texture-manager";
 import type { TextureConfig } from "../systems/graphics-system";
 import type { LodSystem } from "../systems/lod-system";
+import type { GameEventBus } from "../systems/event-bus";
 
 export type WorldChunkData = {
   biome: BiomeType;
@@ -34,6 +35,9 @@ type LoadQueueEntry = {
 };
 
 export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<WorldChunkData> {
+  /** Where this reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private scene: Scene;
   /** World-unit side-length of each terrain chunk. */
   public readonly chunkSize: number = 50;
@@ -69,18 +73,6 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       }
     }
   }
-
-  /**
-   * Fires immediately after a chunk finishes being built and registered.
-   * Receives the chunk grid coordinates and its biome type.
-   */
-  public onChunkLoaded: ((cx: number, cz: number, biome: BiomeType) => void) | null = null;
-
-  /**
-   * Fires immediately after a chunk is removed from the scene (distance-based unload).
-   * Does **not** fire during `dispose()` — use that for full teardown scenarios.
-   */
-  public onChunkUnloaded: ((cx: number, cz: number) => void) | null = null;
 
   private readonly biomeMaterials: Map<BiomeType, StandardMaterial> = new Map();
   private treeTrunkMaterial?: StandardMaterial;
@@ -389,7 +381,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
 
     // Dispose structure meshes, physics, and loot for this chunk
     this.structures.disposeChunk(cx, cz);
-    this.onChunkUnloaded?.(cx, cz);
+    this.events?.emit("chunk:unloaded", { chunkKey: `${cx},${cz}`, cx, cz });
   }
 
   /**
@@ -435,8 +427,6 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     }
     this.structures.setVisible(visible);
   }
-
-
 
   private _loadChunk(x: number, z: number): void {
     const key = `${x},${z}`;
@@ -536,7 +526,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
     // — not where a settlement stands.
     if (!clearing) this.structures.trySpawnForChunk(x, z, biome, this.chunkSize);
 
-    this.onChunkLoaded?.(x, z, biome);
+    this.events?.emit("chunk:loaded", { chunkKey: `${x},${z}`, cx: x, cz: z, biome });
   }
 
   /** Returns per-biome diffuse and specular colours for richer, more saturated terrain. */

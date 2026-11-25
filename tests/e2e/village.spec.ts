@@ -272,7 +272,7 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     const gold = g._pack.gold();
     for (const r of (window as any).__raiders) {
       r.takeDamage(1e6);
-      g.combatSystem.onNPCDeath(r.mesh.name, r.xpReward, r);
+      g.eventBus.emit("npc:killed", { npcName: r.mesh.name, xp: r.xpReward, npc: r });
     }
     return { paid: g._pack.gold() - gold, active: !!g.raids.rules.active };
   });

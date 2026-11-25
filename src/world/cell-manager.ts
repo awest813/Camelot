@@ -6,6 +6,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Player } from "../entities/player";
 import { cosmeticRng } from "../core/rng/rng";
+import type { GameEventBus } from "../systems/event-bus";
 
 export type CellType = "exterior" | "interior";
 
@@ -56,6 +57,9 @@ export interface CellSaveState {
  *   6. `onCellChanged` fires so the UI can update the location name.
  */
 export class CellManager {
+  /** Where this reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _scene: Scene;
   private _player: Player;
 
@@ -65,9 +69,6 @@ export class CellManager {
   private _visitedCellIds: Set<string> = new Set(["exterior"]);
   private _activeCellMeshes: Mesh[] = [];
   private _isTransitioning: boolean = false;
-
-  /** Fired after each successful cell transition with (cellId, cellName). */
-  public onCellChanged: ((cellId: string, cellName: string) => void) | null = null;
 
   constructor(scene: Scene, player: Player) {
     this._scene  = scene;
@@ -226,7 +227,7 @@ export class CellManager {
     this._visitedCellIds.add(targetDef.id);
 
     this._isTransitioning = false;
-    this.onCellChanged?.(targetDef.id, targetDef.name);
+    this.events?.emit("cell:changed", { cellId: targetDef.id, cellName: targetDef.name });
     return true;
   }
 
@@ -382,7 +383,7 @@ export class CellManager {
     this._isTransitioning = false;
 
     if (!silent) {
-      this.onCellChanged?.(targetDef.id, targetDef.name);
+      this.events?.emit("cell:changed", { cellId: targetDef.id, cellName: targetDef.name });
     }
     return true;
   }

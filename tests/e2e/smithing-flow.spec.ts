@@ -69,7 +69,7 @@ test("forge stations, smith dialogue, and condition-aware barter", async ({ page
     const g = (window as any).__camelotGame;
     g.player.camera.position.set(0, 6, 0); // back to the starting forge
     g._handleDialogueHostEvent("smithing:open");
-    g.dialogueSystem.onDialogueClosed?.();
+    g.eventBus.emit("dialogue:closed", {});
   });
   await expect(forge).toBeVisible();
   await expect(forge).toHaveAttribute("data-active-station", "forge");
@@ -92,7 +92,7 @@ test("forge stations, smith dialogue, and condition-aware barter", async ({ page
     const h = g.timeSystem.hour;
     g.timeSystem.advanceHours((24 + 10 - h) % 24);
     g._handleDialogueHostEvent("barter:open", { merchantId: "merchant_armor_01" });
-    g.dialogueSystem.onDialogueClosed?.();
+    g.eventBus.emit("dialogue:closed", {});
     return { wornId: worn.instanceId as string, condition: g.smithing.getItemCondition(worn) as number };
   });
   expect(ids.condition).toBe(60);

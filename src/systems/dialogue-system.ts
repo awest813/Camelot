@@ -6,6 +6,7 @@ import { DialogueSession } from "../framework/dialogue/dialogue-engine";
 import { DialogueNodeView } from "../framework/dialogue/dialogue-types";
 import { DialogueBoxPanel } from "../ui/dialogue-box";
 import { DialogueCamera } from "./dialogue-camera";
+import type { GameEventBus } from "./event-bus";
 
 /** Speaker's face, relative to the NPC capsule centre (1 m above its feet). */
 const NPC_FACE_OFFSET_Y = 0.62;
@@ -26,6 +27,9 @@ export function displayNameOf(meshName: string): string {
 }
 
 export class DialogueSystem {
+  /** Where this reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   public scene: Scene;
   public player: Player;
   public npcs: NPC[];
@@ -52,10 +56,6 @@ export class DialogueSystem {
   // Scratch vectors for performance optimization
   private readonly _face: Vector3 = new Vector3();
 
-  /** Fired with the NPC's mesh name when a conversation begins. */
-  public onTalkStart: ((npcName: string) => void) | null = null;
-  /** Fired after dialogue UI and cinematic camera are torn down (pointer lock restored). */
-  public onDialogueClosed: (() => void) | null = null;
   /**
    * Who has the player's input (the game's PlayFocus).  When set, a
    * conversation holds it instead of locking the pointer itself.
@@ -87,7 +87,7 @@ export class DialogueSystem {
     this._activeNpc = npc;
     npc.isInDialogue = true;
     this._activeSession = null;
-    if (this.onTalkStart) this.onTalkStart(npc.key);
+    this.events?.emit("dialogue:started", { npcName: npc.key });
 
     // Frame the speaker with the player's own camera (no cut, so the post
     // pipeline and fog stay as they are): turn to the face and zoom in.
@@ -324,6 +324,6 @@ export class DialogueSystem {
       }
     }
 
-    if (this.onDialogueClosed) this.onDialogueClosed();
+    this.events?.emit("dialogue:closed", {});
   }
 }

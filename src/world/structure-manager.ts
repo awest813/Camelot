@@ -16,6 +16,7 @@ import type { WorldSeed } from "./world-seed";
 import type { ProceduralTextureManager } from "../systems/procedural-texture-manager";
 import type { LodSystem } from "../systems/lod-system";
 import { STRUCTURES, type Rolled, type StructureMaterial, type StructureSpec } from "../content/structures";
+import type { GameEventBus } from "../systems/event-bus";
 
 interface StructureSpawn {
   meshes: Mesh[];
@@ -33,6 +34,9 @@ interface StructureSpawn {
  * always produces the same structure.
  */
 export class StructureManager {
+  /** Where this reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _scene: Scene;
   /** Maps chunk key ("cx,cz") to the structure spawned there. */
   private _chunkStructures: Map<string, StructureSpawn> = new Map();
@@ -46,13 +50,9 @@ export class StructureManager {
    */
   private readonly _sharedMaterials: Map<string, StandardMaterial> = new Map();
 
-  /** Called for each NPC spawned as part of a structure so the caller can
-   *  register it with ScheduleSystem / CombatSystem. */
-  public onNPCSpawn: ((npc: NPC) => void) | null = null;
-  /** Called when an NPC needs to be removed from external systems. */
-  public onNPCRemove: ((npc: NPC) => void) | null = null;
   /** Fired with a loot item ID; return true if the item was already collected. */
-  public onCheckLootCollected: ((itemId: string) => boolean) | null = null;
+  /** Query: has the player already taken this one-off loot (so it is not placed again)? */
+  public isLootCollected: ((itemId: string) => boolean) | null = null;
 
   /**
    * Optional world seed — used for seeded placement and randomisation.
@@ -175,7 +175,7 @@ export class StructureManager {
       for (const l of spawn.lights) l.dispose();
       for (const npc of spawn.npcs) {
         if (npc.mesh) this.lodSystem?.unregister(npc.mesh);
-        this.onNPCRemove?.(npc);
+        this.events?.emit("npc:removed", { npc });
         npc.mesh.dispose();
       }
     }
@@ -228,7 +228,7 @@ export class StructureManager {
         if (npc.isDead) {
             // Corpses are disposed with their chunk — we rely on RespawnSystem
             // (or future persistence) to know they shouldn't return yet.
-            this.onNPCRemove?.(npc);
+            this.events?.emit("npc:removed", { npc });
             npc.mesh.dispose();
             continue;
         }
@@ -241,7 +241,7 @@ export class StructureManager {
             continue;
         }
 
-        this.onNPCRemove?.(npc);
+        this.events?.emit("npc:removed", { npc });
         npc.mesh.dispose();
     }
 
@@ -308,7 +308,7 @@ export class StructureManager {
         this._addStandingStone(named(part.stone), at(part.dx, 0, part.dz), num(part.height), meshes, bodies);
       } else if ("relic" in part) {
         const id = named(part.relic);
-        if (!this.onCheckLootCollected || !this.onCheckLootCollected(id)) {
+        if (!this.isLootCollected?.(id)) {
           loot.push(new Loot(this._scene, at(part.dx, part.y, part.dz), { id, stackable: false, quantity: 1, ...part.item, stats: { ...part.item.stats } }));
         }
       } else {
@@ -317,7 +317,7 @@ export class StructureManager {
         npc.attackDamage = part.attackDamage;
         npc.xpReward = part.xpReward;
         npc.patrolPoints = part.patrol.map(([dx, dz]) => at(dx, 2, dz));
-        if (this.onNPCSpawn) this.onNPCSpawn(npc);
+        this.events?.emit("npc:spawned", { npc });
         npcs.push(npc);
       }
     }
@@ -571,7 +571,7 @@ export class StructureManager {
     this._shadow(chest);
 
     const lootId = `chest_gold_${cx}_${cz}_${slot}`;
-    if (!this.onCheckLootCollected || !this.onCheckLootCollected(lootId)) {
+    if (!this.isLootCollected?.(lootId)) {
       const coins = new Loot(this._scene, new Vector3(position.x + 0.6, 1.0, position.z), {
         id: lootId,
         name: "Gold Coins",

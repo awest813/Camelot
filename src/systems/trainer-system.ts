@@ -19,6 +19,7 @@
  */
 
 import type { ProgressionSkillId } from "./skill-progression-system";
+import type { GameEventBus } from "./event-bus";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -203,6 +204,9 @@ const DEFAULT_MAX_SESSIONS_PER_LEVEL = 5;
  * ```
  */
 export class TrainerSystem {
+  /** Where this reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _trainers: Map<string, TrainerDefinition> = new Map();
   private _sessionsThisLevel: number = 0;
 
@@ -214,17 +218,6 @@ export class TrainerSystem {
   public maxSessionsPerLevel: number = DEFAULT_MAX_SESSIONS_PER_LEVEL;
 
   // ── Callbacks ────────────────────────────────────────────────────────────
-
-  /**
-   * Fired after a successful training session.
-   * @param trainerId  The id of the trainer used.
-   * @param skillId    The skill that was raised.
-   * @param newLevel   The skill's new level (old level + 1).
-   * @param goldSpent  Gold deducted for this session.
-   */
-  public onTrainingComplete:
-    | ((trainerId: string, skillId: ProgressionSkillId, newLevel: number, goldSpent: number) => void)
-    | null = null;
 
   // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -371,7 +364,7 @@ export class TrainerSystem {
     const newLevel = currentSkillLevel + 1;
 
     this._sessionsThisLevel += 1;
-    this.onTrainingComplete?.(trainerId, def.skillId, newLevel, goldSpent);
+    this.events?.emit("trainer:trained", { trainerId, skillId: def.skillId, newLevel, goldSpent });
 
     return { success: true, newLevel, goldSpent };
   }

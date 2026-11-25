@@ -284,16 +284,14 @@ describe("SpellSystem", () => {
 
   // ── onSpellCast hook ───────────────────────────────────────────────────────
 
-  it("fires onSpellCast hook on successful cast", () => {
+  it("reports spell:cast on a successful cast", () => {
     const hook = vi.fn();
-    sys.onSpellCast = hook;
+    listen(sys, "spell:cast", hook);
     sys.learnSpell("flames");
     sys.equipSpell("flames");
-    sys.castSpell();
+    expect(sys.castSpell().success).toBe(true);
     expect(hook).toHaveBeenCalledTimes(1);
-    const [spell, result] = hook.mock.calls[0];
-    expect(spell.id).toBe("flames");
-    expect(result.success).toBe(true);
+    expect(hook.mock.calls[0][0]).toMatchObject({ spellId: "flames" });
   });
 
   it("fires onHostileHit when a damaging spell lands", () => {

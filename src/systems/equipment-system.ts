@@ -1,17 +1,18 @@
 import { Player } from "../entities/player";
 import { Item, InventorySystem } from "./inventory-system";
 import { UIManager } from "../ui/ui-manager";
+import type { GameEventBus } from "./event-bus";
 
 export type EquipSlot = "mainHand" | "offHand" | "head" | "chest" | "legs" | "feet";
 
 export class EquipmentSystem {
+  /** Where this reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _slots: Map<EquipSlot, Item> = new Map();
   private _player: Player;
   private _inventory: InventorySystem;
   private _ui: UIManager;
-
-  /** Fired after any equip/unequip so the game layer can sync derived state (e.g. weapon archetype). */
-  public onEquipmentChanged: (() => void) | null = null;
 
   constructor(player: Player, inventory: InventorySystem, ui: UIManager) {
     this._player = player;
@@ -51,7 +52,7 @@ export class EquipmentSystem {
 
     this._refreshUI();
     this._ui.showNotification(`Equipped ${item.name}`);
-    this.onEquipmentChanged?.();
+    this.events?.emit("equipment:changed", {});
   }
 
   public unequip(slot: EquipSlot): void {
@@ -64,7 +65,7 @@ export class EquipmentSystem {
 
     this._refreshUI();
     this._ui.showNotification(`Unequipped ${item.name}`);
-    this.onEquipmentChanged?.();
+    this.events?.emit("equipment:changed", {});
   }
 
   public getEquipped(): Map<EquipSlot, Item> {

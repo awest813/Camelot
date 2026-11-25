@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { QuickSlotSystem, QUICK_SLOT_KEYS, isConsumableItem } from "./quickslot-system";
 import type { QuickSlotKey } from "./quickslot-system";
 import type { Item } from "./inventory-system";
+import { listen } from "../testing/listen";
 
 // ── Minimal stubs ─────────────────────────────────────────────────────────────
 
@@ -202,8 +203,7 @@ describe("QuickSlotSystem", () => {
       sys.bindSlot("0", "potion_hp_01");
 
       const events: Array<{ id: string; source: QuickSlotKey | "inventory" }> = [];
-      sys.onItemConsumed = (item, source) => events.push({ id: item.id, source });
-
+      listen(sys, "item:consumed", (p) => ((item, source) => events.push({ id: item.id, source }))(p.item, p.source));
       sys.useSlot("0");
       expect(events).toEqual([{ id: "potion_hp_01", source: "0" }]);
     });
@@ -215,7 +215,7 @@ describe("QuickSlotSystem", () => {
       const inv = makeInventory([makeHealPotion("potion_hp_01", 2)]);
       const sys = new QuickSlotSystem(inv, player, makeUI());
       const events: Array<{ id: string; source: string }> = [];
-      sys.onItemConsumed = (item, source) => events.push({ id: item.id, source });
+      listen(sys, "item:consumed", (p) => ((item, source) => events.push({ id: item.id, source }))(p.item, p.source));
       const row = inv.items[0];
       expect(sys.tryConsumeFromInventoryRow(row)).toBe(true);
       expect(player.health).toBe(80);

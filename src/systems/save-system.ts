@@ -46,6 +46,7 @@ import type { StealthSystem } from "./stealth-system";
 import type { CombatSystem } from "./combat-system";
 import { SAVE_STORAGE_KEY } from "../platform/constants";
 import type { SaveStore } from "../platform/save-store";
+import type { GameEventBus } from "./event-bus";
 
 const SAVE_KEY = SAVE_STORAGE_KEY;
 // v29: stealth crouch state + player combat status effects.
@@ -259,6 +260,9 @@ export interface SaveData {
 }
 
 export class SaveSystem {
+  /** Where this reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _player: Player;
   private _inventory: InventorySystem;
   private _equipment: EquipmentSystem;
@@ -352,11 +356,6 @@ export class SaveSystem {
   private _autosaveDirty = false;
   /** Optional store. The default reads localStorage at call time so tests can stub it. */
   private _store: SaveStore | null = null;
-
-  /** Called after a successful load so Game can clean up world state (e.g. remove already-collected loot). */
-  public onAfterLoad: (() => void) | null = null;
-  /** Called at the start of every save (manual or autosave) so Game can tidy state first. */
-  public onBeforeSave: (() => void) | null = null;
 
   constructor(player: Player, inventory: InventorySystem, equipment: EquipmentSystem, ui: UIManager) {
     this._player = player;
@@ -537,7 +536,7 @@ export class SaveSystem {
   }
 
   public save(silent = false): void {
-    this.onBeforeSave?.();
+    this.events?.emit("save:beforeSave", {});
     const equipmentEntries: EquipmentEntry[] = [];
     for (const [slot, item] of this._equipment.getEquipped()) {
       equipmentEntries.push({ slot, item });
@@ -771,7 +770,7 @@ export class SaveSystem {
     this._ui.showNotification("Game Loaded!", 2500);
 
     // Let Game clean up world objects that are now in inventory/equipment
-    this.onAfterLoad?.();
+    this.events?.emit("save:loaded", {});
 
     return true;
   }

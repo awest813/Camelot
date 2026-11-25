@@ -94,13 +94,6 @@ export class StealthSystem {
   private _noiseLevel: number = 0;
 
   /**
-   * Fired when an NPC's detection crosses 50 upward — suspicion without full
-   * detection.  The game layer typically routes the NPC into INVESTIGATE with
-   * the player's position as the search target.
-   */
-  public onPartialDetection: ((npc: NPC, playerPos: Vector3) => void) | null = null;
-
-  /**
    * Scene is optional for headless tests; without one, sight checks skip raycast
    * occlusion and treat an in-cone target as visible.
    */
@@ -226,7 +219,7 @@ export class StealthSystem {
         this._detectionLevels.set(npc, next);
 
         if (prev < PARTIAL_DETECTION_THRESHOLD && next >= PARTIAL_DETECTION_THRESHOLD && next < 100) {
-          this.onPartialDetection?.(npc, this._player.camera.position.clone());
+          this.events?.emit("stealth:noticed", { npc, playerPos: this._player.camera.position.clone() });
         }
 
         // Being seen only turns hostile-on-sight NPCs (or provoked ones);

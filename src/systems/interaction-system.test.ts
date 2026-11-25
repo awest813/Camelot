@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { InteractionSystem } from "./interaction-system";
+import { listen } from "../testing/listen";
 
 describe("InteractionSystem", () => {
   let system: InteractionSystem;
@@ -120,7 +121,7 @@ describe("InteractionSystem", () => {
       tryTransition,
       portals: new Map([["door1", {}]]),
     } as any;
-    system.onPortalTransition = onPortalTransition;
+    listen(system, "portal:entered", (p) => onPortalTransition(p.portalId));
     const portal = { id: "door1", labelText: "Enter" };
     player.raycastForward.mockReturnValue({
       pickedMesh: { metadata: { type: "portal", portal } },
@@ -137,7 +138,7 @@ describe("InteractionSystem", () => {
       tryTransition: vi.fn(),
       portals: new Map([["door1", {}]]),
     } as any;
-    system.onPortalTransition = onPortalTransition;
+    listen(system, "portal:entered", (p) => onPortalTransition(p.portalId));
     ui.isScreenFadeActive = true;
     const portal = { id: "door1", labelText: "Enter" };
     player.raycastForward.mockReturnValue({

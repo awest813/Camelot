@@ -2,6 +2,7 @@ import type { QuickSlotSystem, QuickSlotKey } from "../systems/quickslot-system"
 import { QUICK_SLOT_KEYS } from "../systems/quickslot-system";
 import type { Item } from "../systems/inventory-system";
 import { getItemIcon } from "./icon-utils";
+import type { GameEventBus } from "../systems/event-bus";
 
 // ── QuickSlotHUD ──────────────────────────────────────────────────────────────
 
@@ -46,14 +47,10 @@ interface SlotSnapshot {
  * ```
  */
 export class QuickSlotHUD {
-  public isVisible: boolean = false;
+  /** Where this reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
 
-  /**
-   * Fired when the player clicks a slot cell.
-   * Arguments are the key ("7" | "8" | "9" | "0") and the currently-bound
-   * item ID (or null if empty).  The game layer should open an item-picker.
-   */
-  public onAssign: ((key: QuickSlotKey, itemId: string | null) => void) | null = null;
+  public isVisible: boolean = false;
 
   private _root:          HTMLDivElement | null = null;
   private _cellEls:       Map<QuickSlotKey, HTMLDivElement> = new Map();
@@ -124,13 +121,13 @@ export class QuickSlotHUD {
       cell.setAttribute("aria-label", `Quick slot ${key}`);
       cell.addEventListener("click", () => {
         const currentId = this._lastSnapshots.get(key)?.itemId ?? null;
-        this.onAssign?.(key, currentId);
+        this.events?.emit("quickslot:assign", { key, itemId: currentId });
       });
       cell.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           const currentId = this._lastSnapshots.get(key)?.itemId ?? null;
-          this.onAssign?.(key, currentId);
+          this.events?.emit("quickslot:assign", { key, itemId: currentId });
         }
       });
 

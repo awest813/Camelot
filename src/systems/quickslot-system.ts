@@ -1,6 +1,7 @@
 import type { InventorySystem, Item } from "./inventory-system";
 import type { UIManager } from "../ui/ui-manager";
 import type { Player } from "../entities/player";
+import type { GameEventBus } from "./event-bus";
 
 // ── Quick-slot key type ───────────────────────────────────────────────────────
 
@@ -49,9 +50,7 @@ export interface QuickSlotSaveState {
  * Wire-up example (game.ts):
  * ```ts
  * this.quickSlotSystem = new QuickSlotSystem(this.inventorySystem, this.player, this.ui);
- * this.quickSlotSystem.onItemConsumed = (item, source) => {
-   *   this.eventBus.emit("player:consumeItem", { itemId: item.id, source });
- * };
+ * this.quickSlotSystem.events = this.eventBus; // reports item:consumed
  * // Bind a starter health potion to slot 7
  * this.quickSlotSystem.bindSlot("7", "potion_hp_01");
  * // In keyboard handler:
@@ -59,6 +58,9 @@ export interface QuickSlotSaveState {
  * ```
  */
 export class QuickSlotSystem {
+  /** Where this reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _slots: Record<QuickSlotKey, string | null> = {
     "1": null, "2": null, "3": null, "4": null, "5": null,
     "6": null, "7": null, "8": null, "9": null, "0": null,
@@ -67,9 +69,6 @@ export class QuickSlotSystem {
   private readonly _inventory: InventorySystem;
   private readonly _player: Player;
   private readonly _ui: UIManager;
-
-  /** Fired after an item is successfully consumed. Useful for event bus integration. */
-  public onItemConsumed: ((item: Item, source: ConsumableUseSource) => void) | null = null;
 
   constructor(inventory: InventorySystem, player: Player, ui: UIManager) {
     this._inventory = inventory;
@@ -174,7 +173,7 @@ export class QuickSlotSystem {
     this._applyStatRestore("stamina", "stamina", "maxStamina", "Stamina", item);
     this._inventory.removeItem(item.id, 1);
     this._ui.showHealFlash();
-    this.onItemConsumed?.(item, source);
+    this.events?.emit("item:consumed", { item, source });
   }
 
   private _isConsumable(item: Item): boolean {

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SaveSystem, SaveData } from './save-system';
 import { Item } from './inventory-system';
+import { listen } from "../testing/listen";
 
 describe('SaveSystem', () => {
     let saveSystem: SaveSystem;
@@ -92,7 +93,7 @@ describe('SaveSystem', () => {
     });
 
     it('runs onBeforeSave before serialising, so its changes land in the save', () => {
-        saveSystem.onBeforeSave = () => { mockInventory.items[0].instanceId = 'tidied'; };
+        listen(saveSystem, "save:beforeSave", (_p) => (() => { mockInventory.items[0].instanceId = 'tidied'; })());
         saveSystem.save();
         const data: SaveData = JSON.parse(localStorageMock['camelot_save']);
         expect(data.inventory[0].instanceId).toBe('tidied');

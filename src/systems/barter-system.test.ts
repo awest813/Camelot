@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { InventorySystem } from "./inventory-system";
 import { BarterSystem } from "./barter-system";
+import { listen } from "../testing/listen";
 
 describe("BarterSystem", () => {
   let barter: BarterSystem;
@@ -260,14 +261,14 @@ describe("BarterSystem", () => {
 
   it("fires onTransaction callback on buy", () => {
     const spy = vi.fn();
-    barter.onTransaction = spy;
+    listen(barter, "barter:transaction", (p) => spy(p.type, p.itemName, p.gold));
     barter.buyItem("merch_01", "potion_hp");
     expect(spy).toHaveBeenCalledWith("buy", "Health Potion", expect.any(Number));
   });
 
   it("fires onTransaction callback on sell", () => {
     const spy = vi.fn();
-    barter.onTransaction = spy;
+    listen(barter, "barter:transaction", (p) => spy(p.type, p.itemName, p.gold));
     mockInventory.items = [{ ...sampleItem }];
     barter.sellItem("merch_01", "sword");
     expect(spy).toHaveBeenCalledWith("sell", "Iron Sword", expect.any(Number));

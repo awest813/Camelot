@@ -4,6 +4,7 @@ import { ACHIEVEMENTS, AchievementSystem } from "./achievement-system";
 import { ACHIEVEMENT_STORAGE_KEY, GAME_VERSION } from "./constants";
 import { GameEventBus } from "../systems/event-bus";
 import packageJson from "../../package.json";
+import { listen } from "../testing/listen";
 
 describe("AchievementSystem", () => {
   afterEach(() => {
@@ -30,8 +31,7 @@ describe("AchievementSystem", () => {
   it("unlocks once, persists, and ignores unknown ids", () => {
     const system = new AchievementSystem();
     const seen: string[] = [];
-    system.onUnlocked = (definition) => seen.push(definition.id);
-
+    listen(system, "achievement:unlocked", (p) => ((definition) => seen.push(definition.id))(p.definition));
     expect(system.unlock("ACH_FIRST_BLOOD")).toBe(true);
     expect(system.unlock("ACH_FIRST_BLOOD")).toBe(false);
     expect(system.unlock("NOT_A_REAL_ACHIEVEMENT")).toBe(false);
@@ -68,7 +68,7 @@ describe("AchievementSystem", () => {
   it("unions desktop unlocks without a second toast", async () => {
     const system = new AchievementSystem();
     const toasted: string[] = [];
-    system.onUnlocked = (definition) => toasted.push(definition.id);
+    listen(system, "achievement:unlocked", (p) => ((definition) => toasted.push(definition.id))(p.definition));
     window.camelotDesktop = {
       readSave: vi.fn(async () => null),
       writeSave: vi.fn(async () => undefined),

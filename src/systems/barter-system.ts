@@ -1,6 +1,7 @@
 import { Item } from "./inventory-system";
 import { InventorySystem } from "./inventory-system";
 import { UIManager } from "../ui/ui-manager";
+import type { GameEventBus } from "./event-bus";
 
 export interface MerchantDef {
   id: string;
@@ -39,6 +40,9 @@ export interface BarterSaveState {
  *   4. `closeBarter()` — clean up active session.
  */
 export class BarterSystem {
+  /** Where this reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   private _inventory: InventorySystem;
   private _ui: UIManager;
 
@@ -57,9 +61,6 @@ export class BarterSystem {
 
   /** Player's current gold. */
   public playerGold: number = 100;
-
-  /** Fired after each transaction. */
-  public onTransaction: ((type: "buy" | "sell", itemName: string, goldAmount: number) => void) | null = null;
 
   /** Merchant-specific trust/loyalty from repeated business. */
   private _merchantRapport: Map<string, number> = new Map();
@@ -195,7 +196,7 @@ export class BarterSystem {
       return false;
     }
 
-    this.onTransaction?.("buy", item.name, price);
+    this.events?.emit("barter:transaction", { type: "buy", itemName: item.name, gold: price });
     this._adjustRapport(merchantId, 1);
     this._ui.showNotification(`Bought ${item.name} for ${price}g`, 1800);
     return true;
@@ -235,7 +236,7 @@ export class BarterSystem {
       merchant.inventory.push({ ...inventoryItem, quantity: 1 });
     }
 
-    this.onTransaction?.("sell", inventoryItem.name, sellPrice);
+    this.events?.emit("barter:transaction", { type: "sell", itemName: inventoryItem.name, gold: sellPrice });
     this._adjustRapport(merchantId, 1);
     this._ui.showNotification(`Sold ${inventoryItem.name} for ${sellPrice}g`, 1800);
     return true;

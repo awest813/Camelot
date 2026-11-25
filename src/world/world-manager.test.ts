@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WorldManager, BiomeType } from './world-manager';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
+import { listen } from "../testing/listen";
 
 // ── Hoisted mocks (available inside vi.mock factory closures) ─────────────────
 
@@ -416,8 +417,7 @@ describe('WorldManager chunk callbacks', () => {
   it('onChunkLoaded fires once for each newly loaded chunk', async () => {
     const wm = new WorldManager(mockScene);
     const loaded: Array<{ cx: number; cz: number }> = [];
-    wm.onChunkLoaded = (cx, cz) => loaded.push({ cx, cz });
-
+    listen(wm, "chunk:loaded", (p) => loaded.push({ cx: p.cx, cz: p.cz }));
     await advanceFrames(wm, 10 + 25);
 
     expect(loaded.length).toBe(25);
@@ -426,8 +426,7 @@ describe('WorldManager chunk callbacks', () => {
   it('onChunkLoaded callback receives correct cx/cz coordinates', async () => {
     const wm = new WorldManager(mockScene);
     const loaded: Array<{ cx: number; cz: number; biome: string }> = [];
-    wm.onChunkLoaded = (cx, cz, biome) => loaded.push({ cx, cz, biome });
-
+    listen(wm, "chunk:loaded", (p) => ((cx, cz, biome) => loaded.push({ cx, cz, biome }))(p.cx, p.cz, p.biome));
     // Load all chunks around origin
     await advanceFrames(wm, 10 + 25);
 
@@ -440,8 +439,7 @@ describe('WorldManager chunk callbacks', () => {
   it('onChunkLoaded reports the same biome as getBiome', () => {
     const wm = new WorldManager(mockScene);
     const loaded: Array<{ cx: number; cz: number; biome: string }> = [];
-    wm.onChunkLoaded = (cx, cz, biome) => loaded.push({ cx, cz, biome });
-
+    listen(wm, "chunk:loaded", (p) => ((cx, cz, biome) => loaded.push({ cx, cz, biome }))(p.cx, p.cz, p.biome));
     advanceFrames(wm, 10 + 25);
 
     for (const entry of loaded) {
@@ -452,8 +450,7 @@ describe('WorldManager chunk callbacks', () => {
   it('onChunkLoaded does not fire for a chunk that was already loaded', async () => {
     const wm = new WorldManager(mockScene);
     let callCount = 0;
-    wm.onChunkLoaded = () => { callCount++; };
-
+    listen(wm, "chunk:loaded", () => { callCount++; });
     // Load all 25 origin chunks
     await advanceFrames(wm, 10 + 25);
     const afterFirst = callCount;
@@ -467,8 +464,7 @@ describe('WorldManager chunk callbacks', () => {
   it('onChunkLoaded does not fire for stale queue entries that are skipped', async () => {
     const wm = new WorldManager(mockScene);
     let callCount = 0;
-    wm.onChunkLoaded = () => { callCount++; };
-
+    listen(wm, "chunk:loaded", () => { callCount++; });
     // Update only at far position — origin chunks are never in the active set.
     // Mounts are budgeted, so pump frames until the 5×5 active area drains.
     const farPos = new Vector3(100 * 50, 0, 100 * 50);
@@ -481,8 +477,7 @@ describe('WorldManager chunk callbacks', () => {
   it('onChunkUnloaded fires for each chunk that is distance-unloaded', async () => {
     const wm = new WorldManager(mockScene);
     const unloaded: Array<{ cx: number; cz: number }> = [];
-    wm.onChunkUnloaded = (cx, cz) => unloaded.push({ cx, cz });
-
+    listen(wm, "chunk:unloaded", (p) => ((cx, cz) => unloaded.push({ cx, cz }))(p.cx!, p.cz!));
     // Load all 25 origin chunks
     await advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
     expect(wm.loadedChunkCount).toBe(25);
@@ -498,8 +493,7 @@ describe('WorldManager chunk callbacks', () => {
   it('onChunkUnloaded receives correct cx/cz for unloaded chunks', async () => {
     const wm = new WorldManager(mockScene);
     const unloaded: Array<{ cx: number; cz: number }> = [];
-    wm.onChunkUnloaded = (cx, cz) => unloaded.push({ cx, cz });
-
+    listen(wm, "chunk:unloaded", (p) => ((cx, cz) => unloaded.push({ cx, cz }))(p.cx!, p.cz!));
     await advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
 
     // Move far away; origin chunks at (0,0) should be unloaded
@@ -514,8 +508,7 @@ describe('WorldManager chunk callbacks', () => {
   it('onChunkUnloaded does not fire during dispose()', async () => {
     const wm = new WorldManager(mockScene);
     let unloadCount = 0;
-    wm.onChunkUnloaded = () => { unloadCount++; };
-
+    listen(wm, "chunk:unloaded", () => { unloadCount++; });
     await advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
     expect(wm.loadedChunkCount).toBe(25);
 
@@ -526,19 +519,18 @@ describe('WorldManager chunk callbacks', () => {
     expect(wm.loadedChunkCount).toBe(0);
   });
 
-  it('onChunkLoaded and onChunkUnloaded can be reassigned at runtime', async () => {
+  it('chunk:loaded / chunk:unloaded listeners can be removed at runtime', async () => {
     const wm = new WorldManager(mockScene);
     let loadCount = 0;
     let unloadCount = 0;
 
-    wm.onChunkLoaded = () => { loadCount++; };
-    wm.onChunkUnloaded = () => { unloadCount++; };
-
+    listen(wm, "chunk:loaded", () => { loadCount++; });
+    const stopUnloads = listen(wm, "chunk:unloaded", () => { unloadCount++; });
     await advanceFrames(wm, 10 + 25, new Vector3(0, 0, 0));
     expect(loadCount).toBe(25);
 
-    // Clear callback and trigger unloads — should not increment
-    wm.onChunkUnloaded = null;
+    // Stop listening and trigger unloads — should not increment
+    stopUnloads();
     await advanceFrames(wm, 10, new Vector3(300, 0, 300));
     expect(unloadCount).toBe(0);
   });

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { CellManager } from "./cell-manager";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { listen } from "../testing/listen";
 
 // ── Babylon mocks ─────────────────────────────────────────────────────────────
 
@@ -134,8 +135,7 @@ describe("CellManager", () => {
 
   it("tryTransition fires onCellChanged callback", () => {
     const spy = vi.fn();
-    cellManager.onCellChanged = spy;
-
+    listen(cellManager, "cell:changed", (p) => spy(p.cellId, p.cellName));
     cellManager.registerCell({ id: "inn_01", name: "The Prancing Pony", type: "interior", spawnPosition: new Vector3() });
     cellManager.spawnPortal("p5", new Vector3(), "inn_01", new Vector3());
     cellManager.tryTransition("p5");
@@ -203,7 +203,7 @@ describe("CellManager", () => {
     });
     const dest = new Vector3(1, 2, 3);
     const spy = vi.fn();
-    cellManager.onCellChanged = spy;
+    listen(cellManager, "cell:changed", (p) => spy(p.cellId, p.cellName));
     const ok = cellManager.enterCellById("hall_01", dest);
     expect(ok).toBe(true);
     expect(cellManager.currentCellId).toBe("hall_01");
@@ -217,7 +217,7 @@ describe("CellManager", () => {
   it("enterCellById with silent skips onCellChanged", () => {
     cellManager.registerCell({ id: "quiet_01", name: "Quiet", type: "interior", spawnPosition: new Vector3(), build: () => [] });
     const spy = vi.fn();
-    cellManager.onCellChanged = spy;
+    listen(cellManager, "cell:changed", (p) => spy(p.cellId, p.cellName));
     cellManager.enterCellById("quiet_01", new Vector3(), true);
     expect(spy).not.toHaveBeenCalled();
   });

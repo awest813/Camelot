@@ -1269,7 +1269,7 @@ with the rendering and UI tracks in parallel.
 **Where they stand** (2026-11-25; the guardrail counts come from
 `tools/check-guardrails.mjs`, sizes from `tools/check-bundle.mjs`):
 
-- `game.ts`: 2,140 lines. Not there yet.
+- `game.ts`: 2,135 lines. Not there yet.
 - Unseeded `Math.random`: **0** (target met). Each remaining call went to
   one of three places in `core/rng/rng.ts`:
   - visual-only variation (flame phases, lightning timing, noise
@@ -1278,36 +1278,30 @@ with the rendering and UI tracks in parallel.
     ids) to `freshEntropy()` / `freshId()`, which use crypto;
   - the dungeon generator's unseeded fallback to a freshly seeded `Rng`.
   The ratchet now holds it at 0.
-- Callback properties in `game.ts`: 60 → 32. Nineteen systems now report on
-  the event bus they are given (`system.events = bus`) instead of through
-  `onX` slots:
-  - swimming, diseases, the world event manager, mark/recall, merchant
-    restocks, active effects, perks, zone respawns, weather and fame;
-  - the events are typed in `GameEvents`. Three were emitted untyped
-    (`as any`) before: `weather:changed`, `fame:changed` and
-    `zone:respawned`.
-
-  `features/notices` turns them into messages; it uses the service for
-  disease and merchant names and the weather label. The two handlers
-  that act are plain bus subscriptions: recall moves the player, and
-  drowning registers damage. Tests listen through `testing/listen.ts`.
-  The second batch:
-  - the quest log and the inventory report being opened; onboarding
-    listens, as it already did for the quest log;
-  - skill level-ups, which the progression feature now subscribes to
-    itself;
-  - stealth detection, which carries the display name;
-  - the daily schedule's sleep and wake, and NPCs reaching their beds.
-
-  `features/notices/save-triggers-feature.ts` marks the save dirty after
-  the events in `SAVE_WORTHY` (skill level-ups, perks, restocks, NPC sleep
-  and wake), instead of each handler doing it. Two systems are made
-  before the bus, so they get it right after it is created.
-  The third batch was combat. Hits, blocks, blows taken and the player's
-  arrows or spells hurting a hostile are reported as `combat:*` and
-  `projectile:playerHit`. The crafting feature subscribes for gear wear
-  itself. Status effects, block XP, the hit sound and the disease chance
-  are bus subscriptions in `game.ts` until those systems are features.
+- Callback properties: **0** (target met). The guardrail now counts the
+  whole composition root (`game.ts` and `src/game/`), so moving wiring
+  into a helper file would not hide it.
+  - **Systems:** every system the game wires reports on the event bus it
+    is given (`system.events = bus`). That is 33 systems, including the
+    UI manager, the world, structures, cells, save, dialogue, combat,
+    projectiles, spells, interaction, barter, trainers, quick slots and
+    achievements. Every event is typed in `GameEvents`.
+  - **Features** subscribe themselves:
+    - `notices`: messages;
+    - `save-triggers`: dirty saves;
+    - `crafting`: gear wear, and refreshing gear after a load or an
+      equipment change;
+    - `progression`: skill level-ups;
+    - `onboarding`: panels opened.
+  - **The game's remaining reactions** are bus subscriptions. The ones
+    that must come before the features' (after a load, a conversation
+    ending, a chunk loading) are subscribed first, in
+    `_wireEarlyReactions()`. The ones that must come after (forgetting
+    the speaker, closing a chunk's scope) are subscribed after the
+    features are installed, so the old order holds.
+  - **Queries are not events.** Whether one-off loot was already taken
+    is an injected query (`structures.isLootCollected`).
+  - `testing/listen.ts` is how tests listen.
 - Main JS chunk: 1,038 KB loaded up front, since the editors left
   (Phase 9). Target 900 KB.
 - Model payload: 13 MB on disk, 1.8 MB of it character LODs. Target met.

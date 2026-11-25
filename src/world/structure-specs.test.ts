@@ -5,6 +5,7 @@ import { StructureManager } from "./structure-manager";
 import { LegacyStructureManager } from "./__fixtures__/legacy-structure-manager";
 import type { NPC } from "../entities/npc";
 import type { BiomeType } from "./world-manager";
+import { listen } from "../testing/listen";
 
 // No physics engine in tests: colliders are stand-ins that remember their mesh.
 vi.mock("@babylonjs/core/Physics/v2/physicsAggregate", () => ({
@@ -43,9 +44,15 @@ function build(Manager: typeof StructureManager | typeof LegacyStructureManager,
   const sm = new Manager(scene);
   const npcs: NPC[] = [];
   const fires: string[] = [];
-  sm.onNPCSpawn = (npc) => { npcs.push(npc); };
+  if (sm instanceof StructureManager) {
+    listen(sm, "npc:spawned", ({ npc }) => { npcs.push(npc); });
+    sm.isLootCollected = (id) => collected.has(id);
+  } else {
+    // The legacy fixture keeps its original callbacks.
+    sm.onNPCSpawn = (npc) => { npcs.push(npc); };
+    sm.onCheckLootCollected = (id) => collected.has(id);
+  }
   sm.onFire = ({ flame, kind }) => { fires.push(`${kind}:${flame.name}`); };
-  sm.onCheckLootCollected = (id) => collected.has(id);
   sm.trySpawnForChunk(cx, cz, biome, 50);
   const out = dump(scene, npcs, fires);
   scene.getEngine().dispose();

@@ -20,6 +20,7 @@ import { QuestLogView } from "./quest-log-panel";
 import { PauseMenuView, type PauseActions } from "./pause-menu";
 import { SkillTreeView } from "./skill-tree-panel";
 import { InventoryPanelView } from "./inventory-panel";
+import type { GameEventBus } from "../systems/event-bus";
 
 /** Cardinal labels for the compass strip, clockwise from north. */
 const COMPASS_DIRECTIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
@@ -37,6 +38,9 @@ const hasRotatableCamera = (camera: unknown): camera is RotatableCamera => {
 };
 
 export class UIManager {
+  /** Where this reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   public scene: Scene;
   /** The HUD's elements (see hud-dom.ts). */
   public readonly hud = new HudDom();
@@ -57,8 +61,6 @@ export class UIManager {
 
   private _equippedIds: Set<string> = new Set();
 
-  /** Called when the player clicks an inventory item slot. Set by Game to hook into EquipmentSystem. */
-  public onInventoryItemClick: ((item: Item) => void) | null = null;
   /** Extra detail line(s) appended to an inventory item's hover text (e.g. gear condition). */
   public itemDetailSuffix: ((item: Item) => string) | null = null;
 
@@ -113,7 +115,6 @@ export class UIManager {
   private _cameraTrauma: number = 0;
   private _initialCameraRotation: Vector3 | null = null;
   private _cameraShakeObs: Observer<Scene> | null = null;
-  public onHitStopRequested: ((durationMs: number) => void) | null = null;
 
   /** Full-screen fade for cell loads and scripted cuts. */
   private _fadeAlpha = 0;
@@ -124,9 +125,6 @@ export class UIManager {
   private readonly _skillTree = new SkillTreeView();
   public isSkillTreeOpen = false;
 
-  /** Called when the player clicks a skill upgrade button. Set by Game. */
-  public onSkillPurchase: ((treeIndex: number, skillIndex: number) => void) | null = null;
-
   public isDebugVisible: boolean = false;
   private _lastStealthHudLabel: "Hidden" | "Caution" | "Detected" | null | undefined = undefined;
 
@@ -135,22 +133,10 @@ export class UIManager {
   private readonly _attributePanel = new AttributePanelView();
   public isAttributePanelOpen: boolean = false;
 
-  /** Called when the player clicks a "+1" attribute button.  Set by Game. */
-  public onAttributeSpend: ((name: AttributeName) => void) | null = null;
-
   // ── Wait Dialog ───────────────────────────────────────────────────────────
   /** The Wait dialog (a Preact panel; see wait-dialog.tsx). */
   private readonly _waitDialog = new WaitDialogPanel();
   public isWaitDialogOpen: boolean = false;
-  /**
-   * The player closed one of these panels from inside it (its ✕, Escape,
-   * Cancel or Wait).  The game
-   * closes it through its modal registry, which also gives control back.
-   * Without a handler the panel just closes.
-   */
-  public onPanelClosed: ((id: "wait" | "attributes" | "quest-log" | "skill-tree" | "inventory") => void) | null = null;
-  /** Called with the chosen hour count when the player confirms the wait. */
-  public onWaitConfirm: ((hours: number) => void) | null = null;
 
   private _lastCompassIndex: number = -1;
 
@@ -231,7 +217,7 @@ export class UIManager {
     this.isSkillTreeOpen = visible;
     if (visible) {
       this._skillTree.open({
-        onBuy: (t, sk) => this.onSkillPurchase?.(t, sk),
+        onBuy: (t, sk) => this.events?.emit("ui:skillPurchase", { treeIndex: t, skillIndex: sk }),
         onClose: () => this._closedByPlayer("skill-tree", () => this.toggleSkillTree(false)),
       });
     } else {
@@ -252,22 +238,18 @@ export class UIManager {
     this._skillTree.refresh({ trees, skillPoints, prereqMet });
   }
 
-
-  /** Fired once when the inventory panel transitions from open to closed. */
-  public onInventoryClosed: (() => void) | null = null;
-
   public toggleInventory(visible: boolean): void {
     const wasOpen = this._inventory.isOpen;
     if (visible) {
       this._inventory.open({
-        onItem: (item) => this.onInventoryItemClick?.(item),
+        onItem: (item) => this.events?.emit("ui:inventoryItemClick", { item }),
         onClose: () => this._closedByPlayer("inventory", () => this.toggleInventory(false)),
       });
     } else {
       this._inventory.close();
     }
     this._syncCrosshairVisibility();
-    if (!visible && wasOpen) this.onInventoryClosed?.();
+    if (!visible && wasOpen) this.events?.emit("ui:inventoryClosed", {});
   }
 
   public togglePauseMenu(visible: boolean): void {
@@ -290,9 +272,9 @@ export class UIManager {
     this._syncCrosshairVisibility();
   }
 
-  /** A panel closed from inside: the game's registry closes it, else `fallback`. */
+  /** A panel closed from inside: the game's registry closes it (`ui:panelClosed`), else `fallback`. */
   private _closedByPlayer(id: "wait" | "attributes" | "quest-log" | "skill-tree" | "inventory", fallback: () => void): void {
-    if (this.onPanelClosed) this.onPanelClosed(id);
+    if (this.events && this.events.listenerCount("ui:panelClosed") > 0) this.events.emit("ui:panelClosed", { id });
     else fallback();
   }
 
@@ -369,12 +351,9 @@ export class UIManager {
     this.hud.setText(this.hud.interaction, text);
   }
 
-
   public showNotification(text: string, duration: number = 3000): void {
     this.hud.notify(text, duration);
   }
-
-
 
   public updateHealth(current: number, max: number): void {
     this.hud.setBar(this.hud.health, current, max);
@@ -499,7 +478,7 @@ export class UIManager {
    * @param durationMs Milliseconds to freeze/slow time.
    */
   public applyHitStop(durationMs: number = 80): void {
-    this.onHitStopRequested?.(durationMs);
+    this.events?.emit("ui:hitStop", { durationMs });
   }
 
   /** Flash a translucent color overlay to signal being hit or dealing damage. */
@@ -534,7 +513,6 @@ export class UIManager {
   }
 
   // ── Debug / Performance Overlay ───────────────────────────────────────────
-
 
   /**
    * Toggle the performance/debug overlay (F3).
@@ -587,7 +565,6 @@ export class UIManager {
 
   // ── Stealth HUD ───────────────────────────────────────────────────────────
 
-
   /** Update the stealth eye indicator. Pass null to hide it. */
   public updateStealthHUD(label: "Hidden" | "Caution" | "Detected" | null): void {
     if (label === this._lastStealthHudLabel) return;
@@ -596,7 +573,6 @@ export class UIManager {
   }
 
   // ── Clock HUD ─────────────────────────────────────────────────────────────
-
 
   /** Update the in-game clock display (under the compass). */
   public updateClock(timeString: string): void {
@@ -619,7 +595,7 @@ export class UIManager {
     this.isAttributePanelOpen = visible;
     if (visible) {
       this._attributePanel.open({
-        onSpend: (name) => this.onAttributeSpend?.(name),
+        onSpend: (name) => this.events?.emit("ui:attributeSpend", { name }),
         onClose: () => this._closedByPlayer("attributes", () => this.toggleAttributePanel(false)),
       });
     } else {
@@ -633,17 +609,14 @@ export class UIManager {
     this._attributePanel.refresh(attributes);
   }
 
-
   // ── Wait Dialog ───────────────────────────────────────────────────────────
-
-
 
   public toggleWaitDialog(visible: boolean): void {
     this.isWaitDialogOpen = visible;
     if (visible) {
       this._waitDialog.open({
         onWait: (hours) => {
-          this.onWaitConfirm?.(hours);
+          this.events?.emit("ui:waitConfirm", { hours });
           this._closedByPlayer("wait", () => this.toggleWaitDialog(false));
         },
         onCancel: () => this._closedByPlayer("wait", () => this.toggleWaitDialog(false)),
@@ -654,9 +627,7 @@ export class UIManager {
     this._syncCrosshairVisibility();
   }
 
-
   // ── Compass HUD ───────────────────────────────────────────────────────────
-
 
   /**
    * Update the compass strip from the camera's Y-axis rotation.

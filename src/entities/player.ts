@@ -9,8 +9,12 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 // camera's first collision query (checkCollisions below) throws inside the render
 // loop and Babylon never queues another frame — the game freezes on first step.
 import "@babylonjs/core/Collisions/collisionCoordinator";
+import type { GameEventBus } from "../systems/event-bus";
 
 export class Player {
+  /** Where this reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   public camera: UniversalCamera;
   public scene: Scene;
   private canvas: HTMLCanvasElement;
@@ -100,9 +104,6 @@ export class Player {
    */
   public baseSpeed: number = 0.5;
 
-  /** Fired with the new level whenever the player levels up. */
-  public onLevelUp: ((newLevel: number) => void) | null = null;
-
   constructor(scene: Scene, canvas: HTMLCanvasElement) {
     this.scene = scene;
     this.canvas = canvas;
@@ -177,7 +178,7 @@ export class Player {
           this.maxMagicka += 10;
           this.maxStamina += 10;
           this.skillPoints++;
-          this.onLevelUp?.(this.level);
+          this.events?.emit("player:combatLevelUp", { newLevel: this.level });
       }
   }
 

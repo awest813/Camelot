@@ -371,12 +371,6 @@ export class CombatSystem {
   private static readonly _OFFSET_Y1 = new Vector3(0, 1, 0);
   private static readonly _OFFSET_Y2 = new Vector3(0, 2, 0);
 
-  /** Fired with the NPC's mesh name, XP reward, and the NPC reference whenever an NPC dies. */
-  public onNPCDeath: ((npcName: string, xpReward: number, npc: NPC) => void) | null = null;
-
-  /** Fired whenever the player's attack damages an NPC (assault/crime ingestion). */
-  public onNpcDamaged: ((npc: NPC, damage: number) => void) | null = null;
-
   /** Scales damage NPCs deal to the player (easy 0.6 · normal 1.0 · hard 1.5). */
   public difficultyMultiplier: number = 1.0;
 
@@ -592,7 +586,7 @@ export class CombatSystem {
    * (melee, arrow, spell). Fires assault/crime hooks and forces chase + pack aggro.
    */
   public notifyHostileHit(npc: NPC, damage: number): void {
-    this.onNpcDamaged?.(npc, damage);
+    this.events?.emit("combat:npcDamaged", { npc, damage });
     if (!npc.isDead && npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
       this._transitionTo(npc, AIState.CHASE);
     }
@@ -713,7 +707,7 @@ export class CombatSystem {
         );
         const finalDmg = applyDamageWithResistance(rawDmg, npc, "fire");
         npc.takeDamage(finalDmg);
-        this.onNpcDamaged?.(npc, finalDmg);
+        this.events?.emit("combat:npcDamaged", { npc, damage: finalDmg });
         this._ui.applyHitStop(100);
         this._ui.shakeCamera(0.4);
 
@@ -736,7 +730,7 @@ export class CombatSystem {
 
         if (npc.isDead) {
           this._ui.showNotification(`${npc.displayName} defeated!`);
-          if (this.onNPCDeath) this.onNPCDeath(npc.key, npc.xpReward, npc);
+          this.events?.emit("npc:killed", { npcName: npc.key, xp: npc.xpReward, npc });
         } else if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
           this._transitionTo(npc, AIState.CHASE);
         }
@@ -880,7 +874,7 @@ export class CombatSystem {
       const meleeDmg = applyDamageWithResistance(rawMeleeDmg, npc, "physical", weaponProfile.armorPenFraction);
 
       npc.takeDamage(meleeDmg);
-      this.onNpcDamaged?.(npc, meleeDmg);
+      this.events?.emit("combat:npcDamaged", { npc, damage: meleeDmg });
       this.events?.emit("combat:weaponHit", { powerAttack: false });
       this._ui.applyHitStop(isFinisher ? 160 : isCrit ? 120 : 60);
       this._ui.shakeCamera(isFinisher ? 0.7 : isCrit ? 0.6 : 0.25);
@@ -947,7 +941,7 @@ export class CombatSystem {
       if (npc.isDead) {
         this._ui.showNotification(`${npc.displayName} defeated!`);
         this._grantAdrenaline();
-        if (this.onNPCDeath) this.onNPCDeath(npc.key, npc.xpReward, npc);
+        this.events?.emit("npc:killed", { npcName: npc.key, xp: npc.xpReward, npc });
       } else {
         // A direct hit skips the ALERT window — immediately give chase.
         // Don't re-transition if already chasing/attacking (would reset path).
@@ -1069,7 +1063,7 @@ export class CombatSystem {
           ? npc.health
           : applyDamageWithResistance(rawDmg, npc, "physical", weaponProfile.armorPenFraction);
         npc.takeDamage(finalDmg);
-        this.onNpcDamaged?.(npc, finalDmg);
+        this.events?.emit("combat:npcDamaged", { npc, damage: finalDmg });
         this.events?.emit("combat:weaponHit", { powerAttack: true });
 
         this._ui.applyHitStop(isExecute ? 200 : 140);
@@ -1151,7 +1145,7 @@ export class CombatSystem {
         if (npc.isDead) {
           this._ui.showNotification(`${npc.displayName} defeated!`);
           this._grantAdrenaline();
-          if (this.onNPCDeath) this.onNPCDeath(npc.key, npc.xpReward, npc);
+          this.events?.emit("npc:killed", { npcName: npc.key, xp: npc.xpReward, npc });
         } else if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
           this._transitionTo(npc, AIState.CHASE);
         }
@@ -1238,7 +1232,7 @@ export class CombatSystem {
 
           if (npc.isDead) {
             this._ui.showNotification(`${npc.displayName} defeated!`);
-            if (this.onNPCDeath) this.onNPCDeath(npc.key, npc.xpReward, npc);
+            this.events?.emit("npc:killed", { npcName: npc.key, xp: npc.xpReward, npc });
           } else if (npc.aiState !== AIState.CHASE && npc.aiState !== AIState.ATTACK) {
             this._transitionTo(npc, AIState.CHASE);
           }
@@ -1333,7 +1327,7 @@ export class CombatSystem {
       // 1. Tick DoTs
       npc.tickStatusEffects(deltaTime);
       if (npc.isDead) {
-        if (this.onNPCDeath) this.onNPCDeath(npc.key, npc.xpReward, npc);
+        this.events?.emit("npc:killed", { npcName: npc.key, xp: npc.xpReward, npc });
         continue;
       }
 

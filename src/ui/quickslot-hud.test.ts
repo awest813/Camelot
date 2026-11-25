@@ -4,6 +4,7 @@ import { QuickSlotHUD } from "./quickslot-hud";
 import type { QuickSlotSystem, QuickSlotKey } from "../systems/quickslot-system";
 import { QUICK_SLOT_KEYS } from "../systems/quickslot-system";
 import type { Item } from "../systems/inventory-system";
+import { listen } from "../testing/listen";
 
 // ── Fixtures ───────────────────────────────────────────────────────────────────
 
@@ -316,7 +317,7 @@ describe("QuickSlotHUD", () => {
   describe("onAssign callback", () => {
     it("fires with the key when an empty slot cell is clicked", () => {
       const spy = vi.fn();
-      hud.onAssign = spy;
+      listen(hud, "quickslot:assign", (p) => spy(p.key, p.itemId));
       hud.show();
       hud.update(makeSystem());
       const cell = document.querySelector('[data-key="7"]') as HTMLElement;
@@ -327,7 +328,7 @@ describe("QuickSlotHUD", () => {
 
     it("fires with the bound item ID when a filled slot is clicked", () => {
       const spy = vi.fn();
-      hud.onAssign = spy;
+      listen(hud, "quickslot:assign", (p) => spy(p.key, p.itemId));
       hud.show();
       hud.update(makeSystem({ "9": makeItem({ id: "elixir_01", name: "Elixir" }) }));
       const cell = document.querySelector('[data-key="9"]') as HTMLElement;
@@ -337,7 +338,7 @@ describe("QuickSlotHUD", () => {
 
     it("fires on Enter keydown", () => {
       const spy = vi.fn();
-      hud.onAssign = spy;
+      listen(hud, "quickslot:assign", (p) => spy(p.key, p.itemId));
       hud.show();
       hud.update(makeSystem());
       const cell = document.querySelector('[data-key="8"]') as HTMLElement;
@@ -347,7 +348,7 @@ describe("QuickSlotHUD", () => {
 
     it("fires on Space keydown", () => {
       const spy = vi.fn();
-      hud.onAssign = spy;
+      listen(hud, "quickslot:assign", (p) => spy(p.key, p.itemId));
       hud.show();
       hud.update(makeSystem());
       const cell = document.querySelector('[data-key="0"]') as HTMLElement;
@@ -355,8 +356,8 @@ describe("QuickSlotHUD", () => {
       expect(spy).toHaveBeenCalledOnce();
     });
 
-    it("does not throw when onAssign is null", () => {
-      hud.onAssign = null;
+    it("does not throw without an event bus", () => {
+      hud.events = null;
       hud.show();
       hud.update(makeSystem());
       const cell = document.querySelector('[data-key="7"]') as HTMLElement;

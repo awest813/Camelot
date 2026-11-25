@@ -9,16 +9,17 @@ import type { PickpocketSystem } from "./pickpocket-system";
 import type { ContainerSystem } from "./container-system";
 import { UIManager } from "../ui/ui-manager";
 import type { CellManager } from "../world/cell-manager";
+import type { GameEventBus } from "./event-bus";
 
 export class InteractionSystem {
+  /** Where this reports what happened (the game's event bus). */
+  public events: GameEventBus | null = null;
+
   public scene: Scene;
   public player: Player;
   public inventorySystem: InventorySystem;
   public dialogueSystem: DialogueSystem;
   public ui: UIManager;
-
-  /** Fired with the item's id when loot is successfully picked up. */
-  public onLootPickup: ((itemId: string) => void) | null = null;
 
   /** Set to true while the game is paused or a UI overlay owns focus. */
   public isBlocked: boolean = false;
@@ -33,20 +34,13 @@ export class InteractionSystem {
    * Optional pickpocket integration (set by the game layer).
    * When `pickpocketSystem` is present and the player is crouching undetected
    * behind a living, non-hostile NPC, the prompt offers pickpocketing and E
-   * fires `onPickpocketNpc` instead of opening dialogue.
+   * reports `interact:pickpocket` instead of opening dialogue.
    */
   public stealthSystem: StealthSystem | null = null;
   public pickpocketSystem: PickpocketSystem | null = null;
   /** Player's current Sneak level, used for the displayed success chance. */
   public sneakLevelProvider: (() => number) | null = null;
-  /** Fired with the targeted NPC when the player presses E on a pickpocket prompt. */
-  public onPickpocketNpc: ((npc: NPC) => void) | null = null;
 
-  /**
-   * Runs a map/interior transition with optional screen fade. When null,
-   * `cellManager.tryTransition` is used directly.
-   */
-  public onPortalTransition: ((portalId: string) => void) | null = null;
 
   // Throttle raycast: only run every N frames
   private _frameCounter: number = 0;
@@ -142,8 +136,8 @@ export class InteractionSystem {
           }
           // Asleep by their schedule: no talking (or pickpocketing) until they wake.
           if (metadata.npc.isAsleep) return;
-          if (this._pickpocketPromptFor(metadata.npc) && this.onPickpocketNpc) {
-              this.onPickpocketNpc(metadata.npc);
+          if (this._pickpocketPromptFor(metadata.npc) && this.events) {
+              this.events.emit("interact:pickpocket", { npc: metadata.npc });
               return;
           }
           this.dialogueSystem.startDialogue(metadata.npc);
@@ -154,7 +148,7 @@ export class InteractionSystem {
           const loot = metadata.loot;
           if (this.inventorySystem.addItem(loot.item)) {
               loot.dispose();
-              if (this.onLootPickup) this.onLootPickup(loot.item.id);
+              this.events?.emit("loot:pickedUp", { itemId: loot.item.id });
           }
       } else if (metadata.type === 'container' && metadata.container && this.containerSystem) {
           // No lockpick skill exists yet — locked chests report their difficulty.
@@ -162,8 +156,8 @@ export class InteractionSystem {
       } else if (metadata.type === 'portal' && metadata.portal && this.cellManager) {
           if (this.cellManager.isTransitioning || this.ui.isScreenFadeActive) return;
           const portalId = metadata.portal.id as string;
-          if (this.onPortalTransition) {
-              this.onPortalTransition(portalId);
+          if (this.events) {
+              this.events.emit("portal:entered", { portalId });
           } else {
               this.cellManager.tryTransition(portalId);
           }

@@ -126,6 +126,10 @@ export class CraftingFeature implements Feature {
     ctx.on("combat:playerStruck", () => this.smithing.onPlayerStruck());
     ctx.on("projectile:playerHit", () => this.smithing.onPlayerStruck());
     ctx.on("combat:blocked", () => this.smithing.onBlock());
+    // New or restored gear: track its condition and the wear penalty.
+    const refreshGear = () => { this.smithing.trackEquippedGear(); this.smithing.refreshPenalties(); };
+    ctx.on("equipment:changed", refreshGear);
+    ctx.on("save:loaded", refreshGear);
 
     this.alchemyPanel.onCraft = (ids) => {
       this.alchemy.craftPotion(ids);

@@ -7,6 +7,7 @@ import type {
   TrainerDefinition,
   TrainerSaveState,
 } from "./trainer-system";
+import { listen } from "../testing/listen";
 
 // ── Fixture helpers ───────────────────────────────────────────────────────────
 
@@ -225,7 +226,7 @@ describe("TrainerSystem — train()", () => {
     const sys = new TrainerSystem();
     sys.registerTrainer(makeTrainer({ id: "t", skillId: "sneak", maxLevel: 100, baseCost: 20, costPerLevel: 2 }));
     const cb = vi.fn();
-    sys.onTrainingComplete = cb;
+    listen(sys, "trainer:trained", (p) => cb(p.trainerId, p.skillId, p.newLevel, p.goldSpent));
     sys.train("t", 15, 500);
     expect(cb).toHaveBeenCalledOnce();
     expect(cb).toHaveBeenCalledWith("t", "sneak", 16, 20 + 15 * 2);
@@ -260,7 +261,7 @@ describe("TrainerSystem — train()", () => {
   it("does not fire callback on failure", () => {
     const sys = new TrainerSystem();
     const cb = vi.fn();
-    sys.onTrainingComplete = cb;
+    listen(sys, "trainer:trained", (p) => cb(p.trainerId, p.skillId, p.newLevel, p.goldSpent));
     sys.train("ghost", 5, 1000);
     expect(cb).not.toHaveBeenCalled();
   });
@@ -367,7 +368,7 @@ describe("TrainerSystem — getSaveState() / restoreFromSave()", () => {
   it("restoreFromSave does NOT fire callbacks", () => {
     const sys = new TrainerSystem();
     const cb = vi.fn();
-    sys.onTrainingComplete = cb;
+    listen(sys, "trainer:trained", (p) => cb(p.trainerId, p.skillId, p.newLevel, p.goldSpent));
     sys.restoreFromSave({ sessionsThisLevel: 3, maxSessionsPerLevel: 5 });
     expect(cb).not.toHaveBeenCalled();
   });
@@ -414,7 +415,7 @@ describe("TrainerSystem — built-in trainer sanity", () => {
   it("training with blade master raises blade skill", () => {
     const sys = new TrainerSystem();
     const cb = vi.fn();
-    sys.onTrainingComplete = cb;
+    listen(sys, "trainer:trained", (p) => cb(p.trainerId, p.skillId, p.newLevel, p.goldSpent));
     sys.train("trainer_blade_master", 10, 10000);
     expect(cb).toHaveBeenCalledWith("trainer_blade_master", "blade", 11, expect.any(Number));
   });

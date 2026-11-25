@@ -536,7 +536,7 @@ export function installGameFeatures(game: Game, gi: GameInternals): void {
           game.combatSystem.notifyHostileHit(npc, damage);
           if (npc.isDead) {
             game.ui.showNotification(`${npc.displayName} defeated!`);
-            game.combatSystem.onNPCDeath?.(npc.key, npc.xpReward, npc);
+            game.eventBus.emit("npc:killed", { npcName: npc.key, xp: npc.xpReward, npc });
           }
         },
         setAttackSpeedMultiplier: (m) => { game.combatSystem.externalAttackSpeedMultiplier = m; },
