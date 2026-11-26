@@ -1,3 +1,4 @@
+import { isNightHour } from "./game-hours";
 export interface TimeSnapshot {
   /** In-game minutes since midnight (0 – <1440). */
   gameTime: number;
@@ -104,8 +105,7 @@ export class TimeSystem {
   }
 
   public get isDaytime(): boolean {
-    const h = this.hour;
-    return h >= 6 && h < 20;
+    return !isNightHour(this.hour);
   }
 
   public get isNight(): boolean {

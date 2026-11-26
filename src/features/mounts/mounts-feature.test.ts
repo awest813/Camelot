@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { Kernel } from "../../core/kernel";
-import { FeedbackKey, ModalKey, PurseKey } from "../services";
+import { FeedbackKey, ModalKey, PurseKey, SavesKey } from "../services";
+import type { SaveCodec } from "../../systems/save-system";
 import { MountsFeature, MountsKey, MountHostKey } from "./mounts-feature";
 import type { Item } from "../../systems/inventory-system";
 
@@ -12,6 +13,8 @@ function setup(opts: { gold?: number } = {}) {
   const notes: string[] = [];
   const given: Item[] = [];
   const modal = { suspendGameplay: vi.fn(), restoreGameplay: vi.fn() };
+  const codecs = new Map<string, SaveCodec>();
+  k.services.provide(SavesKey, { register: (c) => { codecs.set(c.key, c); return () => codecs.delete(c.key); } });
   k.services.provide(FeedbackKey, { notify: (t) => { notes.push(t); }, grant: vi.fn(), addFame: vi.fn(), markDirty: vi.fn() });
   k.services.provide(ModalKey, modal);
   k.services.provide(PurseKey, {
@@ -27,7 +30,7 @@ function setup(opts: { gold?: number } = {}) {
   const feature = new MountsFeature();
   k.install(feature);
   return {
-    k, feature, notes, given, modal, mounts: k.services.get(MountsKey),
+    k, feature, notes, given, modal, codecs, mounts: k.services.get(MountsKey),
     gold: () => gold, speed: () => speed, block: () => { canAct = false; },
   };
 }
@@ -65,6 +68,22 @@ describe("MountsFeature (headless, through the kernel)", () => {
     t.mounts.toggleMount();
     expect(t.mounts.horses.isMounted).toBe(false);
     expect(t.speed()).toBe(1);
+    t.k.uninstall("mounts");
+  });
+
+  it("loading a save puts the speed back: mounted in the save rides, on foot walks", () => {
+    const t = setup({ gold: 800 });
+    expect(t.mounts.horses.purchaseHorse("Stable Master", "bay_mare", 800)).toBeGreaterThan(0);
+    const codec = t.codecs.get("horse")!;
+    const onFoot = JSON.parse(JSON.stringify(codec.save()));
+    t.mounts.toggleMount();
+    const riding = JSON.parse(JSON.stringify(codec.save()));
+    expect(t.speed()).toBe(1.8);
+    codec.load(onFoot);
+    expect(t.mounts.horses.isMounted).toBe(false);
+    expect(t.speed(), "a save made on foot walks").toBe(1);
+    codec.load(riding);
+    expect(t.speed(), "a save made riding rides").toBe(1.8);
     t.k.uninstall("mounts");
   });
 

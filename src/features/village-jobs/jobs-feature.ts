@@ -6,7 +6,7 @@
  *
  * Inputs:   events `quest:progressed`, `dialogue:action` ("jobs:ask"),
  *           `dialogue:closed`, `save:loaded`; services player, feedback,
- *           inventory, quests, quest-log, modal, village-world.
+ *           inventory, quests, modal, village-world.
  * Outputs:  the `jobs` service (open a board's window, rules for saving).
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
@@ -16,7 +16,7 @@ import { createServiceKey } from "../../core/kernel";
 import { JOB_TEMPLATES, VillageJobBoard, radiantTemplateOf, type ActiveJob, type JobContext } from "../../systems/village-jobs";
 import { deliverEvent, reportEvent } from "../../framework/quests/radiant";
 import { JobBoardUI } from "../../ui/job-board-ui";
-import { FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, QuestsKey, VillagesKey, type FeedbackService, type InventoryService, type ModalService, type PlayerService, type QuestLogService, type QuestsService, type VillagesService, ownSave, ownTransient } from "../services";
+import { FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestsKey, VillagesKey, type FeedbackService, type InventoryService, type ModalService, type PlayerService, type QuestsService, type VillagesService, ownSave, ownTransient, JobsKey } from "../services";
 
 export interface JobBoardRef {
   boardId: string;
@@ -34,13 +34,12 @@ export interface JobsService {
   questIdOf(boardId: string): string;
 }
 
-export const JobsKey = createServiceKey<JobsService>("jobs");
+export { JobsKey };
 
 interface JobDeps {
   readonly player: PlayerService;
   readonly feedback: FeedbackService;
   readonly inventory: InventoryService;
-  readonly questLog: QuestLogService;
   readonly quests: QuestsService;
   readonly modal: ModalService;
   readonly villages: VillagesService;
@@ -67,7 +66,6 @@ export class VillageJobsFeature implements Feature {
       get player() { return s.get(PlayerKey); },
       get feedback() { return s.get(FeedbackKey); },
       get inventory() { return s.get(InventoryKey); },
-      get questLog() { return s.get(QuestLogKey); },
       get quests() { return s.get(QuestsKey); },
       get modal() { return s.get(ModalKey); },
       get villages() { return s.get(VillagesKey); },
@@ -104,8 +102,7 @@ export class VillageJobsFeature implements Feature {
       if (board) this.open(board);
     });
     // After a load: a job from an older save (before jobs were quests) gets
-    // its quest, carrying its kills over; the log's own job entries from then
-    // are dropped (the quests show instead).
+    // its quest, carrying its kills over.
     ownTransient(ctx, "jobs taken before they were quests", () => this._migrateOldJobs());
 
     this._wireWindow();
@@ -193,7 +190,7 @@ export class VillageJobsFeature implements Feature {
     this._deps?.quests.engine.startRadiant(job.templateId, this._questId(job.boardId), { place: job.placeName });
   }
 
-  /** Jobs from older saves: give them their quest; drop the log's own job entries. */
+  /** Jobs from older saves: give them their quest. */
   private _migrateOldJobs(): void {
     const deps = this._deps;
     if (!deps) return;
@@ -207,7 +204,5 @@ export class VillageJobsFeature implements Feature {
       const t = VillageJobBoard.template(job.templateId);
       if (t?.kind === "bounty" && kills > 0) engine.applyEvent({ type: "kill", targetId: t.target, amount: kills }, questId);
     }
-    // remove() only takes the log's own entries; the engine's quests stay.
-    for (const q of deps.questLog.quests()) if (q.id.startsWith("job_")) deps.questLog.remove(q.id);
   }
 }

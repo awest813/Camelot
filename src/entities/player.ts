@@ -103,6 +103,8 @@ export class Player {
    * effective camera speed from this base plus any active modifiers.
    */
   public baseSpeed: number = 0.5;
+  /** Riding and similar: scales movement on top of the base (1 on foot). */
+  public speedMultiplier: number = 1;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement) {
     this.scene = scene;
@@ -137,7 +139,7 @@ export class Player {
       // This is computed every frame so that it reacts immediately to inventory
       // changes without requiring the caller to manage camera.speed directly.
       const encumbranceFactor = this.isEncumbered ? 0.5 : 1.0;
-      this.camera.speed = this.baseSpeed * encumbranceFactor;
+      this.camera.speed = this.baseSpeed * encumbranceFactor * this.speedMultiplier;
   }
 
   /** Delay health recovery after receiving combat damage. */

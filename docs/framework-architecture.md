@@ -63,30 +63,16 @@ Camelot now separates RPG domain logic from rendering/runtime concerns.
 4. Quest and inventory/faction state produce save snapshot.
 5. Save engine serializes snapshot with current schema version.
 
-## Babylon Adapter Layer (`src/adapters/babylon/`)
+## Babylon Input Adapter (`src/adapters/babylon/babylon-input-adapter.ts`)
 
-The adapter layer provides an explicit boundary between the headless core
-(entities, systems, framework) and the Babylon.js runtime.  Each adapter
-encapsulates a single Babylon-specific concern:
+`BabylonInputAdapter` maps keyboard and mouse events to named `InputAction`s,
+with contexts (gameplay / editor), rebinding at runtime, modifier-key guards
+and headless simulation for tests.  Gameplay and features bind actions
+through it; nothing listens to raw keys for gameplay.
 
-| Adapter | Purpose |
-|---|---|
-| `BabylonInputAdapter` | Maps keyboard/mouse events to named `InputAction`s. Supports headless simulation for testing, rebinding at runtime, and modifier-key guards. |
-| `BabylonCharacterControllerAdapter` | Pure-TypeScript first-person movement state (position, velocity, crouch, sprint, swim, mount, jump, gravity). Babylon reads the state each frame and applies it to the camera/physics body. |
-| `BabylonSceneHost` | Scene-level visual configuration (lighting, sky, fog, shadows, post-processing) stored as pure data. Can be validated and snapshot/restored without a live engine. |
-
-All adapters are **incrementally adoptable** — `game.ts` can delegate to them
-at any pace without a rewrite.
-
-### Barrel Import
-
-```ts
-import {
-  BabylonInputAdapter,
-  BabylonCharacterControllerAdapter,
-  BabylonSceneHost,
-} from "./adapters/babylon";
-```
+(The other adapters once planned here, a character controller and a scene
+host, were never adopted; the game's camera, physics and environment code
+own those concerns, and the unused adapters were removed.)
 
 ## Offscreen Simulation (`src/systems/offscreen-simulation-system.ts`)
 
@@ -105,5 +91,4 @@ This is a **headless core** system with zero Babylon dependencies.
 - Add richer dialogue conditions/effects (skill checks, random branches).
 - Add quest graph validation diagnostics and authoring tools.
 - Add mod schema validator + manifest generation script.
-- Extract remaining inline Babylon code from `game.ts` into adapter classes.
 - Wire `OffscreenSimulationSystem` into `WorldManager` chunk lifecycle.

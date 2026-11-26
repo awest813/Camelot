@@ -38,6 +38,7 @@
  * });
  * ```
  */
+import { isNightHour } from "./game-hours";
 import { unseededRandom } from "../core/rng/rng";
 
 // ── Reward ────────────────────────────────────────────────────────────────────
@@ -416,10 +417,8 @@ export class DynamicWorldEventSystem {
       chance *= t.weatherBoostMultiplier ?? 1.5;
     }
 
-    // Night multiplier (18:00-06:00). Supports monotonic total game hours.
-    const hour = this._clockHour(ctx.gameTimeHours);
-    const isNight = hour >= 18 || hour < 6;
-    if (isNight && t.nightMultiplier !== undefined) {
+    // Night multiplier (the clock's night). Supports monotonic total game hours.
+    if (isNightHour(this._clockHour(ctx.gameTimeHours)) && t.nightMultiplier !== undefined) {
       chance *= t.nightMultiplier;
     }
 

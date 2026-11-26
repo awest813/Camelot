@@ -13,7 +13,7 @@ import { Loot } from "../entities/loot";
 import { VillageRaidFeature } from "../features/village-raids/raid-feature";
 import { actors } from "../entities/actors";
 import { Aggressive, Dead, Engaged } from "../core/ecs/actors";
-import { undeclaredFeatures, ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey, QuestLogKey, QuestsKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
+import { undeclaredFeatures, ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey, QuestsKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
 import { VillagesFeature } from "../features/villages/villages-feature";
 import { WorldSitesFeature } from "../features/world-sites/world-sites-feature";
 import { RoutinesFeature } from "../features/routines/routines-feature";
@@ -389,7 +389,6 @@ export function installGameFeatures(game: Game): void {
         remove: (id, amount) => game.inventorySystem.removeQuantity(id, amount),
       });
       k.services.provide(QuestsKey, { get engine() { return game.frameworkRuntime.questEngine; }, apply: (t, id, n) => game._quests.apply(t, id, n) });
-      k.services.provide(QuestLogKey, { quests: () => game.questSystem.getQuests(), remove: (id) => game.questSystem.remove(id) });
       k.services.provide(ScheduleKey, {
         behaviorOf: (npc) => game.scheduleSystem.behaviorOf(npc),
       });
@@ -517,7 +516,7 @@ export function installGameFeatures(game: Game): void {
 
       k.services.provide(MountHostKey, {
         canAct: () => !game.isPaused && !game.dialogueSystem.isInDialogue,
-        setMoveSpeedMultiplier: (m) => { (game.player as unknown as { moveSpeedMultiplier?: number }).moveSpeedMultiplier = m; },
+        setMoveSpeedMultiplier: (m) => { game.player.speedMultiplier = Math.max(0, m); },
         unlockAchievement: (id) => { game._achievements?.unlock(id as never); },
         give: (item) => { game.inventorySystem.addItem(item); },
       });

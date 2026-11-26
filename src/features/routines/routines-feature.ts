@@ -21,7 +21,7 @@ import { createServiceKey } from "../../core/kernel";
 import type { NPC } from "../../entities/npc";
 import { teleportNpc } from "../../entities/npc-teleport";
 import { scheduledSpot } from "../../systems/schedule-system";
-import { IndoorsKey } from "../indoors/indoors-feature";
+import { IndoorsKey, RoutinesKey } from "../services";
 import { ActorsKey, ClockKey, declareStateless } from "../services";
 
 /** A clock jump at least this long (game hours) is time passing off-screen. */
@@ -34,7 +34,7 @@ export interface RoutinesService {
   place(npc: NPC): boolean;
 }
 
-export const RoutinesKey = createServiceKey<RoutinesService>("routines");
+export { RoutinesKey };
 
 export class RoutinesFeature implements Feature {
   public readonly id = "routines";

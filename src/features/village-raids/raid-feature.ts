@@ -21,12 +21,12 @@ import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { VillageRaidSystem, raiderCount } from "../../systems/village-raids";
 import type { VillagePlan } from "../../world/village-settlement";
-import { IndoorsKey, type IndoorsService } from "../indoors/indoors-feature";
+import type { IndoorsService } from "../indoors/indoors-feature";
 import { defendEvent, type RadiantTemplate } from "../../framework/quests/radiant";
 
 /** Hold name used to keep sheltering townsfolk inside. */
 const SHELTER_HOLD = "raid";
-import { ActorsKey, ClockKey, FeedbackKey, PlayerKey, QuestsKey, VillagesKey, type ActorsService, type FeedbackService, type GameClockService, type PlayerService, type QuestsService, type VillagesService, ownSave, ownTransient } from "../services";
+import { ActorsKey, IndoorsKey, ClockKey, FeedbackKey, PlayerKey, QuestsKey, VillagesKey, type ActorsService, type FeedbackService, type GameClockService, type PlayerService, type QuestsService, type VillagesService, ownSave, ownTransient } from "../services";
 
 /** The raid quest: beat every raider; gold and XP per raider. */
 export const RAID_TEMPLATE: RadiantTemplate = {

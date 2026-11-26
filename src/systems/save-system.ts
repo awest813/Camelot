@@ -541,19 +541,9 @@ export class SaveSystem {
       equipmentEntries.push({ slot, item });
     }
 
-    const questSaveStates: QuestSaveState[] = this._quests
-      ? this._quests.getOwnQuests().map(q => ({
-          id: q.id,
-          isCompleted: q.isCompleted,
-          isActive: q.isActive,
-          isFailed: q.isFailed ?? false,
-          objectives: q.objectives.map(o => ({
-            id: o.id,
-            current: o.current,
-            completed: o.completed,
-          })),
-        }))
-      : [];
+    // The quest log keeps nothing of its own (the engine's snapshot holds the
+    // quests); the legacy section stays in the format, empty.
+    const questSaveStates: QuestSaveState[] = [];
 
     const data: SaveData = {
       version: SAVE_VERSION,

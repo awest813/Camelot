@@ -1,3 +1,4 @@
+import { isNightHour } from "./game-hours";
 /**
  * VillageRaidSystem — bandits occasionally raid the village the player is in.
  *
@@ -45,10 +46,6 @@ export interface VillageRaidSaveState {
 /** How many raiders come, by player level (2 … 5). */
 export function raiderCount(playerLevel: number): number {
   return Math.max(2, Math.min(5, 2 + Math.floor(playerLevel / 3)));
-}
-
-export function isNightHour(hour: number): boolean {
-  return hour >= 20 || hour < 5;
 }
 
 export class VillageRaidSystem {

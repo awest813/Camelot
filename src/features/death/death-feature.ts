@@ -15,7 +15,7 @@ import type { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { FeedbackKey, PurseKey, ownTransient } from "../services";
-import { TravelKey } from "../fast-travel/fast-travel-feature";
+import { TravelKey } from "../services";
 
 /** Seconds between falling and waking. */
 export const REVIVE_DELAY = 4;

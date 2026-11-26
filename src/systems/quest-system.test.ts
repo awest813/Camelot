@@ -1,13 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { QuestSystem, Quest } from './quest-system';
+import { QuestSystem } from './quest-system';
 import { QuestGraphEngine } from '../framework/quests/quest-graph-engine';
-
-const job = (overrides: Partial<Quest> = {}): Quest => ({
-    id: 'job', name: 'Wolf Bounty', description: 'Cull wolves.',
-    isCompleted: false, isActive: true,
-    objectives: [{ id: 'o', type: 'kill', description: 'Kill 2 wolves', targetId: '__job__Wolf', required: 2, current: 0, completed: false }],
-    ...overrides,
-});
 
 const engineWith = () => new QuestGraphEngine([
     {
@@ -55,23 +48,6 @@ describe('QuestSystem (the quest log)', () => {
         expect(qs.getActiveQuests()).toEqual([]);
     });
 
-    it('owned entries are added quietly and removed once', () => {
-        qs.addQuest(job(), true);
-        expect(ui.showNotification).not.toHaveBeenCalled();
-        expect(qs.remove('job')).toBe(true);
-        expect(qs.remove('job')).toBe(false);
-    });
-
-    it('addQuest announces unless silent; the log lists engine quests before owned ones', () => {
-        const engine = engineWith();
-        qs.setFramework(() => engine);
-        engine.activateQuest('quest_kill_guard');
-        qs.addQuest(job());
-        expect(ui.showNotification).toHaveBeenCalledWith('New Quest: Wolf Bounty', 3000);
-        expect(qs.getQuests().map((q) => q.id)).toEqual(['quest_kill_guard', 'job']);
-        expect(qs.getOwnQuests().map((q) => q.id), 'only owned entries are saved by the log').toEqual(['job']);
-    });
-
     it('toggleQuestLog opens with every quest and redraws on refresh; closes on second press', () => {
         const engine = engineWith();
         qs.setFramework(() => engine);
@@ -87,12 +63,11 @@ describe('QuestSystem (the quest log)', () => {
         expect(ui.updateQuestLog, 'no redraw while closed').toHaveBeenCalledTimes(2);
     });
 
-    it('restoreState restores owned entries, including failure', () => {
-        qs.addQuest(job(), true);
-        qs.restoreState([{ id: 'job', isCompleted: false, isActive: false, isFailed: true, objectives: [{ id: 'o', current: 1, completed: false }] }]);
-        expect(qs.getQuests()[0]).toMatchObject({ isFailed: true, isActive: false });
-        expect(qs.getQuests()[0].objectives[0].current).toBe(1);
-        expect(() => qs.restoreState([{ id: 'unknown', isCompleted: false, isActive: true, objectives: [] }])).not.toThrow();
+    it('restoreState drops legacy entries the engine does not own (old job entries)', () => {
+        const engine = engineWith();
+        qs.setFramework(() => engine);
+        expect(() => qs.restoreState([{ id: 'job_inn_1_0', isCompleted: false, isActive: true, objectives: [] }])).not.toThrow();
+        expect(qs.getQuests()).toEqual([]);
     });
 
     it('carries old-save progress for quests the engine now owns into the engine', () => {

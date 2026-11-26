@@ -9,7 +9,6 @@
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { NPC } from "../entities/npc";
 import type { ProgressionSkillId } from "../systems/skill-progression-system";
-import type { Quest } from "../systems/quest-system";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { BiomeType } from "../world/world-manager";
@@ -19,6 +18,10 @@ import type { FantasyAssetKey } from "../systems/fantasy-asset-loader";
 import { createServiceKey, type FeatureContext } from "../core/kernel";
 import type { SaveCodec } from "../systems/save-system";
 import type { QuestGraphEngine } from "../framework/quests/quest-graph-engine";
+import type { IndoorsService } from "./indoors/indoors-feature";
+import type { JobsService } from "./village-jobs/jobs-feature";
+import type { RoutinesService } from "./routines/routines-feature";
+import type { TravelService } from "./fast-travel/fast-travel-feature";
 
 export interface GameClockService {
   /** Hour of day, 0–23 (fractional). */
@@ -140,17 +143,6 @@ export interface InventoryService {
   remove(itemId: string, amount: number): boolean;
 }
 
-/**
- * The quest log: a view of the quest engine's quests, plus entries kept
- * from older saves.  Quests change through the engine (`QuestsService`).
- */
-export interface QuestLogService {
-  /** The quests in the log (read-only). */
-  quests(): readonly Quest[];
-  /** Drop an entry kept from an older save (engine quests stay). */
-  remove(questId: string): boolean;
-}
-
 /** Full-screen windows: pause gameplay input while one is open. */
 export interface ModalService {
   suspendGameplay(): void;
@@ -209,7 +201,6 @@ export const WorldInfoKey = createServiceKey<WorldInfoService>("world-info");
 export const FastTravelKey = createServiceKey<FastTravelService>("fast-travel");
 export const SiteBuilderKey = createServiceKey<SiteBuilderService>("site-builder");
 export const InventoryKey = createServiceKey<InventoryService>("inventory");
-export const QuestLogKey = createServiceKey<QuestLogService>("quest-log");
 
 /** The quest engine (the framework's) and the way quest events reach it. */
 export interface QuestsService {
@@ -301,3 +292,9 @@ export function ownTransient(ctx: FeatureContext, what: string, reset?: () => vo
 export function declareStateless(ctx: FeatureContext, why: string): void {
   declare(ctx, { kind: "stateless", why });
 }
+
+/** Services one feature provides and another uses (keys here, so features never import each other). */
+export const IndoorsKey = createServiceKey<IndoorsService>("indoors");
+export const JobsKey = createServiceKey<JobsService>("jobs");
+export const RoutinesKey = createServiceKey<RoutinesService>("routines");
+export const TravelKey = createServiceKey<TravelService>("travel");

@@ -15,7 +15,7 @@ import { createServiceKey } from "../../core/kernel";
 import type { Rng } from "../../core/rng/rng";
 import { FastTravelSystem } from "../../systems/fast-travel-system";
 import { FastTravelUI, type FastTravelOptionView } from "../../ui/fast-travel-ui";
-import { FastTravelKey, FeedbackKey, GameplayKey, ModalKey, declareStateless } from "../services";
+import { FastTravelKey, FeedbackKey, GameplayKey, ModalKey, declareStateless, TravelKey } from "../services";
 
 /** The menu row id for "Recall to Mark". */
 export const RECALL_ID = "__recall";
@@ -55,7 +55,7 @@ export interface TravelService {
 }
 
 export const TravelHostKey = createServiceKey<TravelHostService>("travel-host");
-export const TravelKey = createServiceKey<TravelService>("travel");
+export { TravelKey };
 
 export class FastTravelFeature implements Feature {
   public readonly id = "fast-travel";

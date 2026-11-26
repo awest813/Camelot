@@ -1,3 +1,4 @@
+import { hoursSince } from "./game-hours";
 /**
  * FollowerSystem — Skyrim-style human companion system.
  *
@@ -711,7 +712,7 @@ export class FollowerSystem {
 
     // Cooldown gate
     if (this._abilityLastUsedAtHours !== null) {
-      const elapsed = this._hoursDelta(this._abilityLastUsedAtHours, gameTimeHours);
+      const elapsed = hoursSince(this._abilityLastUsedAtHours, gameTimeHours);
       if (elapsed < ability.cooldownHours) return null;
     }
 
@@ -735,7 +736,7 @@ export class FollowerSystem {
     const tmpl   = this._templates.get(this._activeFollower.templateId);
     const role   = tmpl?.combatRole ?? "warrior";
     const cd     = ROLE_ABILITIES[role].cooldownHours;
-    const elapsed = this._hoursDelta(this._abilityLastUsedAtHours, gameTimeHours);
+    const elapsed = hoursSince(this._abilityLastUsedAtHours, gameTimeHours);
     return Math.max(0, cd - elapsed);
   }
 
@@ -794,7 +795,7 @@ export class FollowerSystem {
       // Cooldown gate
       const last = this._comboLastUsedAtHours.get(combo.comboId) ?? null;
       if (last !== null) {
-        const elapsed = this._hoursDelta(last, gameTimeHours);
+        const elapsed = hoursSince(last, gameTimeHours);
         if (elapsed < combo.cooldownHours) continue;
       }
 
@@ -879,12 +880,4 @@ export class FollowerSystem {
 
   // ── Private helpers ───────────────────────────────────────────────────────────
 
-  /**
-   * Compute elapsed in-game hours from `from` to `to`, wrapping correctly
-   * across midnight (24-hour boundary).
-   */
-  private _hoursDelta(from: number, to: number): number {
-    if (to >= from) return to - from;
-    return 24 - from + to; // wrapped past midnight
-  }
 }

@@ -13,6 +13,7 @@
  * Headless: no BabylonJS dependencies — NPC spawning and UI are handled
  * by callbacks that the game layer wires to its own AI and encounter systems.
  */
+import { hoursSince } from "./game-hours";
 import { unseededRandom } from "../core/rng/rng";
 
 // ── Template ──────────────────────────────────────────────────────────────────
@@ -328,7 +329,7 @@ export class EncounterSystem {
 
     // Cooldown
     if (t.cooldownHours > 0 && record.lastTriggeredAt !== null) {
-      const elapsed = this._hoursDelta(record.lastTriggeredAt, ctx.gameTimeHours);
+      const elapsed = hoursSince(record.lastTriggeredAt, ctx.gameTimeHours);
       if (elapsed < t.cooldownHours) return false;
     }
 
@@ -351,12 +352,4 @@ export class EncounterSystem {
     };
   }
 
-  /**
-   * Compute elapsed in-game hours from `from` to `to`, wrapping correctly
-   * across midnight (24-hour boundary).
-   */
-  private _hoursDelta(from: number, to: number): number {
-    if (to >= from) return to - from;
-    return 24 - from + to;
-  }
 }

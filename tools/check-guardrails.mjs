@@ -12,6 +12,9 @@
  *   - npc-identity            no `.mesh.name` for identity (Phase 3): NPCs have `key`
  *                             (stable, saved), `actorId` (runtime) and `displayName`.
  *                             The map editor's own entities are allowlisted.
+ *   - feature-imports-feature a feature (src/features/<name>/) must not import another
+ *                             feature's code; shared service keys live in
+ *                             features/services.ts.  Type-only imports are fine.
  *
  *  Ratchets (error when a count goes UP from tools/guardrails-baseline.json;
  *  a note when it goes down, so the baseline can be tightened with --update):
@@ -45,7 +48,7 @@ const BASELINE = join(ROOT, "tools", "guardrails-baseline.json");
 const SLACK = { "game-ts-lines": 40 };
 
 /**
- * Where pointer lock may change: the PlayFocus wiring in game.ts, and the
+ * Where pointer lock may change: the PlayFocus wiring (src/game/game-state.ts), and the
  * dialogue / inventory systems' fallbacks for when they run without a game.
  */
 const POINTER_LOCK_ALLOWLIST = ["src/game/game-state.ts", "src/systems/dialogue-system.ts", "src/systems/inventory-system.ts"];
@@ -53,7 +56,7 @@ const POINTER_LOCK_ALLOWLIST = ["src/game/game-state.ts", "src/systems/dialogue-
 /** Files whose `.mesh.name` reads are not NPC identity (the editor's own entities). */
 const MESH_NAME_ALLOWLIST = ["src/systems/map-editor-system.ts"];
 
-/** Files allowed to call Math.random (the future RNG module lives here). */
+/** Files allowed to call Math.random (the RNG module, which seeds everything else). */
 const RANDOM_ALLOWLIST = [/^src\/core\/rng\//];
 
 function walk(dir, out = []) {
@@ -89,6 +92,12 @@ export function measure() {
     }
     if (/\b(requestPointerLock|exitPointerLock)\s*\(/.test(code) && !POINTER_LOCK_ALLOWLIST.includes(f.path)) {
       violations.push({ rule: "pointer-lock-owner", file: f.path });
+    }
+    const feature = /^src\/features\/([^/]+)\//.exec(f.path)?.[1];
+    if (feature) {
+      for (const m of code.matchAll(/^\s*import\s+(type\s+)?[^;]*?from\s+["']\.\.\/(?!\.\.\/)([^/"']+)\/[^"']*["']/gm)) {
+        if (!m[1] && m[2] !== feature) violations.push({ rule: "feature-imports-feature", file: f.path, detail: `imports ../${m[2]}/` });
+      }
     }
     if (/\.mesh\.name\b/.test(code) && !MESH_NAME_ALLOWLIST.includes(f.path)) {
       violations.push({ rule: "npc-identity", file: f.path });
@@ -140,7 +149,7 @@ function main() {
 
   let failed = false;
   for (const v of report.violations) {
-    console.error(`✖ ${v.rule}: ${v.file}`);
+    console.error(`✖ ${v.rule}: ${v.file}${v.detail ? ` (${v.detail})` : ""}`);
     failed = true;
   }
   for (const [key, now] of Object.entries(report.counts)) {

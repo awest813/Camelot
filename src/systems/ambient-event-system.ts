@@ -1,3 +1,4 @@
+import { hoursSince, inHourRange } from "./game-hours";
 /**
  * AmbientEventSystem — Environmental storytelling for Camelot.
  *
@@ -285,7 +286,7 @@ export class AmbientEventSystem {
     // Cooldown check
     const cooldown = def.cooldownHours ?? 0;
     if (cooldown > 0 && record.lastFiredAt !== null) {
-      const elapsed = this._hoursDelta(record.lastFiredAt, ctx.gameTimeHours);
+      const elapsed = hoursSince(record.lastFiredAt, ctx.gameTimeHours);
       if (elapsed < cooldown) return false;
     }
 
@@ -296,7 +297,7 @@ export class AmbientEventSystem {
     // Time range
     if (cond.timeRange !== undefined) {
       const { minHour, maxHour } = cond.timeRange;
-      if (!this._inHourRange(ctx.gameTimeHours, minHour, maxHour)) return false;
+      if (!inHourRange(ctx.gameTimeHours, minHour, maxHour)) return false;
     }
 
     // Weather
@@ -341,24 +342,5 @@ export class AmbientEventSystem {
     }
   }
 
-  /**
-   * Compute elapsed in-game hours from `from` to `to`, wrapping correctly
-   * across midnight (24-hour boundary).
-   */
-  private _hoursDelta(from: number, to: number): number {
-    if (to >= from) return to - from;
-    return 24 - from + to; // wrapped past midnight
-  }
 
-  /**
-   * Returns true if `hour` falls within [minHour, maxHour).
-   * Supports wrap-around windows that cross midnight, e.g. [22, 4) = night.
-   */
-  private _inHourRange(hour: number, minHour: number, maxHour: number): boolean {
-    if (minHour <= maxHour) {
-      return hour >= minHour && hour < maxHour;
-    }
-    // Wrap-around window (e.g. 22 → 4)
-    return hour >= minHour || hour < maxHour;
-  }
 }

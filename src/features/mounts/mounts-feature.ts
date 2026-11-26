@@ -79,8 +79,15 @@ export class MountsFeature implements Feature {
   }
 
   public install(ctx: FeatureContext): void {
-    ownSave(ctx, { key: "horse", save: () => this.horses.getSaveState(), load: (data) => { if (data) this.horses.restoreFromSave(data as never); } });
     const s = ctx.kernel.services;
+    ownSave(ctx, {
+      key: "horse",
+      save: () => this.horses.getSaveState(),
+      load: (data) => {
+        if (data) this.horses.restoreFromSave(data as never); // a mounted save re-mounts (onMount sets the speed)
+        if (!this.horses.isMounted) s.get(MountHostKey).setMoveSpeedMultiplier(1); // on foot in the save: walk
+      },
+    });
     const host = () => s.get(MountHostKey);
     const feedback = () => s.get(FeedbackKey);
     const modal = () => s.get(ModalKey);

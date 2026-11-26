@@ -16,7 +16,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { NPC } from "../../entities/npc";
 import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
-import { BuildingsKey, ScheduleKey, ownTransient } from "../services";
+import { BuildingsKey, ScheduleKey, ownTransient, IndoorsKey } from "../services";
 
 /** A sleeper this close (m) to a building at its bed spot goes inside. */
 export const DOOR_REACH = 2.5;
@@ -31,7 +31,7 @@ export interface IndoorsService {
   releaseHolds(holder: string): void;
 }
 
-export const IndoorsKey = createServiceKey<IndoorsService>("indoors");
+export { IndoorsKey };
 
 interface Inside {
   membership: number;

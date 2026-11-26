@@ -11,6 +11,7 @@
  * Headless: no BabylonJS dependencies — all state is supplied by the caller
  * via a lightweight `TravelContext`.
  */
+import { hoursSince } from "./game-hours";
 import { unseededRandom } from "../core/rng/rng";
 
 // ── Conditions ────────────────────────────────────────────────────────────────
@@ -321,7 +322,7 @@ export class TravelEventSystem {
     // Cooldown check
     const cooldown = def.cooldownHours ?? 0;
     if (cooldown > 0 && record.lastFiredAt !== null) {
-      const elapsed = this._hoursDelta(record.lastFiredAt, ctx.gameTimeHours);
+      const elapsed = hoursSince(record.lastFiredAt, ctx.gameTimeHours);
       if (elapsed < cooldown) return false;
     }
 
@@ -399,11 +400,4 @@ export class TravelEventSystem {
     }
   }
 
-  /**
-   * Compute elapsed in-game hours from `from` to `to`, wrapping correctly
-   * across midnight (24-hour boundary).
-   */
-  private _hoursDelta(from: number, to: number): number {
-    return (to - from + 24) % 24;
-  }
 }

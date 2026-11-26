@@ -29,13 +29,11 @@ import { toWorld } from "../../world/village-buildings";
 import { buildVillageWell, WELL_RADIUS } from "../../world/village-well";
 import { createNoticeMaterials } from "../../rendering/notice-texture";
 import { getQuaterniusBasePath } from "../../systems/fantasy-asset-loader";
-import { ActorsKey, FastTravelKey, FeedbackKey, PlayerKey, SiteBuilderKey, VillagesKey, WorldInfoKey, type SiteBuilderService, declareStateless } from "../services";
+import { ActorsKey, JobsKey, RoutinesKey, FastTravelKey, FeedbackKey, PlayerKey, SiteBuilderKey, VillagesKey, WorldInfoKey, type SiteBuilderService, declareStateless } from "../services";
 
 export { VillagesKey } from "../services";
 export type { VillagesService } from "../services";
-import { JobsKey } from "../village-jobs/jobs-feature";
 import { markNavObstacle } from "../../systems/navmesh-build";
-import { RoutinesKey } from "../routines/routines-feature";
 
 
 

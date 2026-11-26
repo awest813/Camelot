@@ -4,17 +4,14 @@ import type { QuestRuntimeState, QuestTriggerType } from "../framework/quests/qu
 import type { GameEventBus } from "./event-bus";
 
 /**
- * The quest log.  It shows two kinds of quest:
+ * The quest log: a view of the framework quest engine.  Every started
+ * quest (story quests, and radiant ones such as village jobs and raids)
+ * shows as an entry built from the engine on each read.  Kills, pickups and
+ * talks go to the engine (see `QuestBridge`), not to the log.
  *
- *   - framework quests (the one quest engine: graph, triggers, save), once
- *     started.  Their entries are views built from the engine on every read.
- *   - entries a feature owns and drives itself (a village job): added with
- *     `addQuest`, moved with `setProgress`, completed with `finish`.  Game
- *     events (kills, pickups, talks) never touch them.
- *
- * Kills, pickups and talks go to the framework engine (see `QuestBridge`);
- * the log no longer matches them itself.  (Engine overhaul, Phase 4: one
- * quest engine.)
+ * The log also reads the legacy `quests` section of older saves and carries
+ * its progress into the engine (`restoreState`).  (Engine overhaul, Phase 4:
+ * one quest engine.)
  */
 
 export type ObjectiveType = "kill" | "fetch" | "talk" | "custom";
@@ -63,8 +60,6 @@ export class QuestSystem {
   /** Where this system reports what happened (the game's event bus). */
   public events: GameEventBus | null = null;
 
-  /** Entries owned by features (not framework quests). */
-  private _own: Quest[] = [];
   private _ui: UIManager;
   private _engine: (() => QuestGraphEngine | null) | null = null;
   public isLogOpen: boolean = false;
@@ -79,22 +74,9 @@ export class QuestSystem {
     this.refresh();
   }
 
-  /** Add a feature-owned entry; its owner drives it. */
-  public addQuest(quest: Quest, silent = false): void {
-    quest.isFailed ??= false;
-    this._own.push(quest);
-    if (!silent) this._ui.showNotification(`New Quest: ${quest.name}`, 3000);
-    this.refresh();
-  }
-
-  /** Every quest in the log: started framework quests, then owned entries. */
+  /** Every quest in the log: the engine's started quests. */
   public getQuests(): Quest[] {
-    return [...this._frameworkViews(), ...this._own];
-  }
-
-  /** The feature-owned entries only (what the legacy save section holds). */
-  public getOwnQuests(): readonly Quest[] {
-    return this._own;
+    return this._frameworkViews();
   }
 
   public getActiveQuests(): Quest[] {
@@ -107,15 +89,6 @@ export class QuestSystem {
 
   public getFailedQuests(): Quest[] {
     return this.getQuests().filter(q => q.isFailed);
-  }
-
-  /** Take an owned entry out of the log (one kept from an older save). */
-  public remove(questId: string): boolean {
-    const i = this._own.findIndex(q => q.id === questId);
-    if (i < 0) return false;
-    this._own.splice(i, 1);
-    this.refresh();
-    return true;
   }
 
   public toggleQuestLog(): void {
@@ -133,31 +106,15 @@ export class QuestSystem {
   }
 
   /**
-   * Restore saved progress (used by SaveSystem).  Owned entries take their
-   * saved state.  A saved entry that is now a framework quest (the starter
-   * quests, in saves from before the merge) is carried over into the
-   * engine; the framework snapshot, restored after this, wins when it has
-   * the quest.
+   * Restore the legacy `quests` save section (older saves).  An entry for
+   * a quest the engine now owns (the starter quests, from before the merge)
+   * is carried into the engine; the framework snapshot, restored after this,
+   * wins when it has the quest.  Anything else (old job entries) is dropped:
+   * those are radiant quests now.
    */
   public restoreState(savedQuests: QuestSaveState[]): void {
     const engine = this._engine?.() ?? null;
-    for (const saved of savedQuests) {
-      const quest = this._own.find(q => q.id === saved.id);
-      if (quest) {
-        quest.isCompleted = saved.isCompleted;
-        quest.isActive = saved.isActive && !saved.isFailed;
-        quest.isFailed = saved.isFailed ?? false;
-        for (const savedObj of saved.objectives) {
-          const obj = quest.objectives.find(o => o.id === savedObj.id);
-          if (obj) {
-            obj.current = savedObj.current;
-            obj.completed = savedObj.completed;
-          }
-        }
-        continue;
-      }
-      if (engine) migrateIntoEngine(engine, saved);
-    }
+    if (engine) for (const saved of savedQuests) migrateIntoEngine(engine, saved);
     this.refresh();
   }
 

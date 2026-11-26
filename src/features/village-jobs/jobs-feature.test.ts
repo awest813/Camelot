@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Kernel } from "../../core/kernel";
-import { FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, QuestsKey, VillagesKey } from "../services";
+import { FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestsKey, VillagesKey } from "../services";
 import { VillageJobsFeature, JobsKey } from "./jobs-feature";
 import { VillageJobBoard } from "../../systems/village-jobs";
 import { QuestSystem } from "../../systems/quest-system";
@@ -27,7 +27,6 @@ function setup(boardId: string) {
     count: (id) => bag[id] ?? 0,
     remove: (id, n) => { if ((bag[id] ?? 0) < n) return false; bag[id] -= n; return true; },
   });
-  k.services.provide(QuestLogKey, { quests: () => log.getQuests(), remove: (id) => log.remove(id) });
   k.services.provide(ModalKey, modal);
   k.services.provide(VillagesKey, {
     currentVillage: () => null, loadedVillage: () => null, planFor: () => null, clearingAt: () => null,
@@ -103,12 +102,11 @@ describe("VillageJobsFeature (headless, through the kernel)", () => {
     t.k.uninstall("village-jobs");
   });
 
-  it("a job from an older save gets its quest (kills carried over); the log's old entry goes", () => {
+  it("a job from an older save gets its quest, kills carried over", () => {
     const board = boardOffering("bounty_dead");
     const t = setup(board);
-    // An old save: the job with its own kill count, and a log entry the jobs owned.
+    // An old save: the job with its own kill count.
     t.jobs.rules.restoreFromSave({ active: [{ boardId: board, placeName: "Ashford", templateId: "bounty_dead", progress: 2 }], completed: {}, declined: {} });
-    t.log.addQuest({ id: `job_${board}`, name: "old", description: "", objectives: [], isCompleted: false, isActive: true }, true);
     t.k.events.emit("save:loaded", {});
     const id = t.jobs.questIdOf(board);
     expect(t.engine.getQuestState(id)!.nodes.hunt.progress).toBe(2);
