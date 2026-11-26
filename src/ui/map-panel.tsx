@@ -10,7 +10,34 @@ import type { BiomeType } from "../world/world-manager";
 import { ModalDialog } from "./preact/modal-dialog";
 import { PanelHost } from "./preact/panel-host";
 
-export interface MapPlace { id: string; name: string; x: number; z: number }
+export interface MapPlace {
+  id: string; name: string; x: number; z: number;
+  /** "village", or a landmark's site kind ("obelisk", "bandit-camp", …). */
+  kind?: string;
+  /** A camp or roost cleared: drawn faded. */
+  cleared?: boolean;
+}
+
+/** Each kind of place's mark (14×14 SVG paths, drawn in ink) and its legend label. */
+export const PLACE_MARKS: Record<string, { label: string; path: string }> = {
+  village: { label: "Village", path: "M7 1 L13 7 L7 13 L1 7 Z" },
+  "forest-inn": { label: "Inn", path: "M2 7 L7 2 L12 7 L12 13 L2 13 Z M9 9 L12 9 L12 11 L9 11 Z" },
+  homestead: { label: "Homestead", path: "M2 7 L7 2 L12 7 L12 13 L2 13 Z" },
+  "haunted-house": { label: "Manor", path: "M2 13 L2 5 L4 5 L4 3 L6 3 L6 5 L8 5 L8 3 L10 3 L10 5 L12 5 L12 13 Z" },
+  obelisk: { label: "Obelisk", path: "M6 1 L8 1 L9.5 13 L4.5 13 Z" },
+  graveyard: { label: "Graveyard", path: "M6 1 L8 1 L8 4 L11 4 L11 6 L8 6 L8 13 L6 13 L6 6 L3 6 L3 4 L6 4 Z" },
+  "bandit-camp": { label: "Bandit camp", path: "M2 1 L13 12 L12 13 L1 2 Z M12 1 L13 2 L2 13 L1 12 Z" },
+  dragon: { label: "Dragon roost", path: "M7 4 L13 1 L10 7 L13 8 L7 13 L1 8 L4 7 L1 1 Z" },
+};
+const markOf = (kind: string | undefined) => PLACE_MARKS[kind ?? "village"] ?? PLACE_MARKS.village;
+
+function PlaceMark({ kind, className }: { kind?: string; className: string }) {
+  return (
+    <svg class={className} viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
+      <path d={markOf(kind).path} fill-rule="evenodd" />
+    </svg>
+  );
+}
 
 /** What the map reads (the world, the player, the places known). */
 export interface MapSource {
@@ -40,20 +67,39 @@ export function project(at: { x: number; z: number }, centre: { x: number; z: nu
 
 const INK = "rgba(52, 34, 18, 0.55)";
 
+/** Where a label sits beside its mark, or null: no free spot (the list at the side still names it). */
+export type LabelSpot = { side: "right" | "left"; dy: number } | null;
+
 /**
- * Where each label goes so none sits on another: top to bottom, a label that
- * would overlap one already placed moves down a line (its mark stays put).
- * Widths are estimated from the name; the result is a vertical offset per id.
+ * Place each label beside its mark so none covers another label or a mark:
+ * to the right, then a line above or below, then the same on the left.  A
+ * label with no free spot is left off.  Widths are estimated from the name.
  */
-export function labelOffsets(marks: ReadonlyArray<{ id: string; name: string; px: number; py: number }>, line = 16): Map<string, number> {
-  const out = new Map<string, number>();
-  const boxes: Array<{ x0: number; x1: number; y: number }> = [];
+export function labelSpots(
+  marks: ReadonlyArray<{ id: string; name: string; px: number; py: number }>,
+  others: ReadonlyArray<{ px: number; py: number }> = [],
+  line = 16,
+): Map<string, LabelSpot> {
+  type Box = { x0: number; x1: number; y0: number; y1: number };
+  const hits = (a: Box, b: Box) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+  const taken: Box[] = [...marks, ...others].map((m) => ({ x0: m.px - 8, x1: m.px + 8, y0: m.py - 8, y1: m.py + 8 }));
+  const out = new Map<string, LabelSpot>();
+  const tries: Array<{ side: "right" | "left"; dy: number }> = [
+    { side: "right", dy: 0 }, { side: "right", dy: -line }, { side: "right", dy: line },
+    { side: "left", dy: 0 }, { side: "left", dy: -line }, { side: "left", dy: line },
+  ];
   for (const m of [...marks].sort((a, b) => a.py - b.py || a.px - b.px)) {
-    const x0 = m.px, x1 = m.px + 14 + m.name.length * 7.5;
-    let dy = 0;
-    while (boxes.some((b) => x0 < b.x1 && b.x0 < x1 && Math.abs(b.y - (m.py + dy)) < line)) dy += line;
-    boxes.push({ x0, x1, y: m.py + dy });
-    out.set(m.id, dy);
+    const w = m.name.length * 7.5;
+    let spot: LabelSpot = null;
+    for (const t of tries) {
+      const x0 = t.side === "right" ? m.px + 11 : m.px - 11 - w;
+      const box = { x0, x1: x0 + w, y0: m.py + t.dy - line / 2 + 1, y1: m.py + t.dy + line / 2 - 1 };
+      if (taken.some((b) => hits(box, b))) continue;
+      taken.push(box);
+      spot = t;
+      break;
+    }
+    out.set(m.id, spot);
   }
   return out;
 }
@@ -149,8 +195,10 @@ export function MapPanel(p: { source: MapSource; onClose(): void; size?: { w: nu
   const mine = at(me);
   const places = src.places();
   const shown = places.map((pl) => ({ ...pl, ...at(pl) })).filter((q) => q.px >= -40 && q.px <= W + 40 && q.py >= -20 && q.py <= H + 20);
-  const nudge = labelOffsets(shown);
+  const spots = labelSpots(shown, [at(me)]);
   const biomesShown = (Object.keys(BIOME_WASH) as BiomeType[]);
+  // The legend lists the kinds of place known so far, in the marks' order.
+  const kindsKnown = Object.keys(PLACE_MARKS).filter((k) => places.some((pl) => (pl.kind ?? "village") === k));
 
   return (
     <ModalDialog id="map-title" title="Map of the Realm" className="craft-panel map-panel" panelClassName="map-panel__panel" onClose={p.onClose}>
@@ -171,12 +219,16 @@ export function MapPanel(p: { source: MapSource; onClose(): void; size?: { w: nu
         >
           <canvas ref={canvas} class="map-panel__canvas" width={W} height={H} aria-hidden="true" />
           {shown.map((q) => {
-            const dy = nudge.get(q.id) ?? 0;
+            const spot = spots.get(q.id) ?? null;
             return (
-              <button key={q.id} type="button" class="map-panel__place" style={{ left: `${q.px}px`, top: `${q.py}px` }}
-                onClick={() => setCentre({ x: q.x, z: q.z })} aria-label={`${q.name} (centre the map here)`}>
-                <span class="map-panel__place-mark" aria-hidden="true">◆</span>
-                <span class="map-panel__place-name" style={dy ? { transform: `translateY(${dy}px)` } : undefined}>{q.name}</span>
+              <button key={q.id} type="button" class={`map-panel__place${q.cleared ? " is-cleared" : ""}`} style={{ left: `${q.px}px`, top: `${q.py}px` }}
+                title={spot ? undefined : q.name}
+                onClick={() => setCentre({ x: q.x, z: q.z })}
+                aria-label={`${q.name}, ${markOf(q.kind).label.toLowerCase()}${q.cleared ? ", cleared" : ""} (centre the map here)`}>
+                <PlaceMark kind={q.kind} className="map-panel__place-mark" />
+                {spot && (
+                  <span class={`map-panel__place-name map-panel__place-name--${spot.side}`} style={spot.dy ? { marginTop: `${spot.dy}px` } : undefined}>{q.name}</span>
+                )}
               </button>
             );
           })}
@@ -197,7 +249,9 @@ export function MapPanel(p: { source: MapSource; onClose(): void; size?: { w: nu
             <ul class="map-panel__places">
               {places.map((pl) => (
                 <li key={pl.id}>
-                  <button type="button" class="map-panel__places-btn" onClick={() => setCentre({ x: pl.x, z: pl.z })}>{pl.name}</button>
+                  <button type="button" class={`map-panel__places-btn${pl.cleared ? " is-cleared" : ""}`} onClick={() => setCentre({ x: pl.x, z: pl.z })}>
+                    <PlaceMark kind={pl.kind} className="map-panel__places-icon" />{pl.name}{pl.cleared ? " (cleared)" : ""}
+                  </button>
                 </li>
               ))}
             </ul>
@@ -208,7 +262,9 @@ export function MapPanel(p: { source: MapSource; onClose(): void; size?: { w: nu
               <li key={b}><span class="map-panel__swatch" style={{ backgroundImage: `linear-gradient(${BIOME_WASH[b]}, ${BIOME_WASH[b]})` }} />{BIOME_LABEL[b]}</li>
             ))}
             <li><span class="map-panel__swatch map-panel__swatch--pond" />Water</li>
-            <li><span class="map-panel__legend-mark">◆</span>A place known</li>
+            {kindsKnown.map((k) => (
+              <li key={k}><span class="map-panel__legend-mark"><PlaceMark kind={k} className="map-panel__legend-icon" /></span>{PLACE_MARKS[k].label}</li>
+            ))}
             <li><span class="map-panel__legend-mark map-panel__legend-mark--me">▲</span>You</li>
           </ul>
           <p class="map-panel__hint">Wheel to zoom · drag to pan · M or Esc to close</p>

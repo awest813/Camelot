@@ -1583,7 +1583,11 @@ Left as decisions:
 - A labelled reward is one notice ("Cleared: X (+60 XP, +75 gold)") instead
   of three; NPC names shown to the player drop their ids
   ("Bandit Archer_10003" read as "Bandit Archer").
-- Map labels that would overlap move down a line.
+- The map draws each kind of place with its own mark (village, inn,
+  homestead, manor, obelisk, graveyard, bandit camp, dragon roost; cleared
+  ones faded), and the legend lists the kinds known. Labels go beside
+  their mark where nothing else is (right, a line up or down, then left);
+  one with no room is left off the sheet (the list at the side has it).
 - **Camp clearances on the job board.** A board with a bandit camp still
   standing within four chunks can offer "Clear the Camp", naming the camp
   and which way it lies ("Crowwick Bandit Camp, west of Craigagel Cross").

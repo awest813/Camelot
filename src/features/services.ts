@@ -221,6 +221,8 @@ export interface LandmarksService {
   nearest?(kind: string, x: number, z: number, chunks: number): { id: string; name: string; x: number; z: number } | null;
   /** Discover a landmark without walking there (a job marks it on the map). */
   mark?(id: string): boolean;
+  /** Whether a landmark has been cleared in this world. */
+  isCleared?(id: string): boolean;
 }
 export const LandmarksKey = createServiceKey<LandmarksService>("landmarks");
 export const SiteBuilderKey = createServiceKey<SiteBuilderService>("site-builder");

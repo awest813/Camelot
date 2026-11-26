@@ -91,6 +91,7 @@ export class LandmarksFeature implements Feature {
         }
         return best && { id: best.id, name: best.name, x: best.x, z: best.z };
       },
+      isCleared: (id) => this._cleared.has(id),
       mark: (id) => {
         const m = /_(-?\d+)_(-?\d+)$/.exec(id);
         const lm = m ? landmarksOf(Number(m[1]), Number(m[2])).find((l) => l.id === id) : undefined;

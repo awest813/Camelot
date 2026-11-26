@@ -82,8 +82,14 @@ export interface PlacedLandmark {
   clear?: { xp: number; gold: number; foes: readonly unknown[] };
 }
 
-const NAME_HEADS = ["Ash", "Crow", "Elder", "Gallow", "Hollow", "Mire", "Thorn", "Wolf", "Raven", "Stone", "Briar", "Cold", "Hart", "Wych", "Grey", "Marrow"] as const;
-const NAME_TAILS = ["ford", "mere", "barrow", "fell", "wick", "combe", "hithe", "stead"] as const;
+const NAME_HEADS = [
+  "Ash", "Crow", "Elder", "Gallow", "Hollow", "Mire", "Thorn", "Wolf", "Raven", "Stone", "Briar", "Cold", "Hart", "Wych", "Grey", "Marrow",
+  "Bram", "Cinder", "Dun", "Fern", "Gorse", "Holm", "Kettle", "Lark", "Moss", "Nettle", "Oak", "Rook", "Sedge", "Tarn", "Wold", "Yew",
+] as const;
+const NAME_TAILS = [
+  "ford", "mere", "barrow", "fell", "wick", "combe", "hithe", "stead",
+  "ley", "wood", "dale", "holt", "moor", "brook", "thorpe", "worth",
+] as const;
 
 /** A landmark's name: a place name from the chunk and kind (fixed per world), then the kind. */
 export function landmarkName(cx: number, cz: number, kind: string): string {
@@ -94,7 +100,7 @@ export function landmarkName(cx: number, cz: number, kind: string): string {
   h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
   h = Math.imul(h ^ (h >>> 12), 0x297a2d39);
   h = (h ^ (h >>> 15)) >>> 0;
-  return `${NAME_HEADS[h % NAME_HEADS.length]}${NAME_TAILS[(h >>> 8) % NAME_TAILS.length]} ${kind}`;
+  return `${NAME_HEADS[h % NAME_HEADS.length]}${NAME_TAILS[(h >>> 12) % NAME_TAILS.length]} ${kind}`;
 }
 
 /** Scattered wild props per biome: [asset, chance]; the slots follow the list index. */

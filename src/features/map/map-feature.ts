@@ -2,14 +2,15 @@
  * The map as a kernel feature (M): a chart of the land around the player
  * with the places discovered.  The panel loads on first use.
  *
- * Inputs:   services world-info, player, fast-travel, gameplay, modal.
+ * Inputs:   services world-info, player, fast-travel, gameplay, modal,
+ *           landmarks (which have been cleared).
  * Outputs:  the `map` service (toggle it, whether it is open).
  */
 import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { LazyPanel } from "../../ui/lazy-panel";
 import type { MapPanelView, MapSource } from "../../ui/map-panel";
-import { FastTravelKey, GameplayKey, ModalKey, PlayerKey, WorldInfoKey, declareStateless } from "../services";
+import { FastTravelKey, GameplayKey, LandmarksKey, ModalKey, PlayerKey, WorldInfoKey, declareStateless } from "../services";
 
 export interface MapService {
   /** M: open the map over play, or close it. */
@@ -38,7 +39,11 @@ export class MapFeature implements Feature {
         const at = p.position();
         return { x: at.x, z: at.z, heading: p.heading?.() ?? 0 };
       },
-      places: () => s.tryGet(FastTravelKey)?.places?.() ?? [],
+      places: () => (s.tryGet(FastTravelKey)?.places?.() ?? []).map((p) => {
+        // Landmark ids are "site_<kind>_<cx>_<cz>"; anything else is a village.
+        const kind = p.id.startsWith("site_") ? p.id.split("_")[1] : "village";
+        return { ...p, kind, cleared: s.tryGet(LandmarksKey)?.isCleared?.(p.id) ?? false };
+      }),
     };
     const close = () => {
       this.panel.close();

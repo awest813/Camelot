@@ -73,15 +73,28 @@ describe("MapFeature (headless, through the kernel)", () => {
 });
 
 describe("map labels", () => {
-  it("move down a line when they would sit on another; apart, they stay", async () => {
-    const { labelOffsets } = await import("../../ui/map-panel");
-    const out = labelOffsets([
+  it("go beside their mark where nothing else is, and are left off with no room", async () => {
+    const { labelSpots } = await import("../../ui/map-panel");
+    const out = labelSpots([
       { id: "a", name: "Ashcombe Roost", px: 100, py: 100 },
       { id: "b", name: "Ashcombe Manor", px: 102, py: 104 },
       { id: "c", name: "Far Away", px: 400, py: 100 },
     ]);
-    expect(out.get("a")).toBe(0);
-    expect(out.get("b")).toBe(16);
-    expect(out.get("c")).toBe(0);
+    expect(out.get("a")).toEqual({ side: "right", dy: 0 });
+    expect(out.get("b"), "a's label is taken: the next line").toEqual({ side: "right", dy: 16 });
+    expect(out.get("c")).toEqual({ side: "right", dy: 0 });
+    // Seven marks on one spot: the six spots fill, the seventh goes without.
+    const crowd = Array.from({ length: 7 }, (_, i) => ({ id: `p${i}`, name: "Place", px: 300, py: 300 + i * 0.1 }));
+    const spots = labelSpots(crowd);
+    expect([...spots.values()].filter((v) => v === null)).toHaveLength(1);
+  });
+});
+
+describe("map marks", () => {
+  it("every landmark kind the world builds has a mark, and villages theirs", async () => {
+    const { PLACE_MARKS } = await import("../../ui/map-panel");
+    const { WILD_SITES } = await import("../../content/sites");
+    for (const spec of WILD_SITES) if (spec.landmark) expect(PLACE_MARKS[spec.id], spec.id).toBeDefined();
+    expect(PLACE_MARKS.village).toBeDefined();
   });
 });
