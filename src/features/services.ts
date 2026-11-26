@@ -140,15 +140,14 @@ export interface InventoryService {
   remove(itemId: string, amount: number): boolean;
 }
 
-/** The quest log (legacy QuestSystem list until Phase 4 unifies quests). */
+/**
+ * The quest log: a view of the quest engine's quests, plus entries kept
+ * from older saves.  Quests change through the engine (`QuestsService`).
+ */
 export interface QuestLogService {
-  /** The quests in the log (read them; change them through the methods). */
+  /** The quests in the log (read-only). */
   quests(): readonly Quest[];
-  add(quest: Quest): void;
-  /** Set a managed quest's objective progress. */
-  setProgress(questId: string, objectiveId: string, current: number): void;
-  /** Complete a quest quietly (its owner paid out). */
-  finish(questId: string): boolean;
+  /** Drop an entry kept from an older save (engine quests stay). */
   remove(questId: string): boolean;
 }
 

@@ -27,10 +27,7 @@ function setup(boardId: string) {
     count: (id) => bag[id] ?? 0,
     remove: (id, n) => { if ((bag[id] ?? 0) < n) return false; bag[id] -= n; return true; },
   });
-  k.services.provide(QuestLogKey, {
-    quests: () => log.getQuests(), add: (q) => log.addQuest(q, true),
-    setProgress: (id, o, n) => log.setProgress(id, o, n), finish: (id) => log.finish(id), remove: (id) => log.remove(id),
-  });
+  k.services.provide(QuestLogKey, { quests: () => log.getQuests(), remove: (id) => log.remove(id) });
   k.services.provide(ModalKey, modal);
   k.services.provide(VillagesKey, {
     currentVillage: () => null, loadedVillage: () => null, planFor: () => null, clearingAt: () => null,

@@ -444,7 +444,8 @@ state, scope and save codec.
 **Exit status:** `game.ts` is 2,367 lines, under the 2,500 target. Not done
 yet: most features still register their save state through `saveSystem`
 setters instead of owning a save codec. That moves to the entity store
-(Phase 3), where saves are per-feature anyway.
+(Phase 3), where saves are per-feature anyway. (Later: Phase 5 put every part of the save behind a codec; the setters
+each register one, and features own theirs with `ownSave`.)
 - `src/world/dragon-lair.ts` (the tundra dragon boss and its body) and
   `src/game/weapon-archetype.ts` (which archetype a weapon fights as).
 - `src/game/player-pack.ts`: gold (one coin stack, mirrored into the
@@ -749,17 +750,15 @@ components.
 | NPC AI | Done: one model. A behaviour tree (`systems/ai/npc-goals.ts`, on the primitives in `behaviour-tree.ts`) picks each NPC's goal from what it perceives: flee first, then per goal the reasons to change it. A steering layer (`npc-steering.ts`) moves the body: paths for chasing and walking home, direct steering for fleeing, kiting and strafing. The combat system gathers the perception, applies the goal's transition and runs the attack itself. The tree is pure and tested on its own (every transition). |
 | Streaming | Done: `ChunkManager` plus `WorldManager` as its adapter. |
 | Jobs, raids | Jobs done: each job (bounty or supply run) is a framework radiant quest (`framework/quests/radiant.ts`), started from its board template with the village as a var. The engine counts bounty kills, saves the instance (template + vars) in its snapshot, and the quest bridge pays on hand-in; the feature keeps only the board's offers and hand-in rules. Old saves' jobs get their quest on load, kills carried over. Raids done too: each raid is a radiant "defend" quest ("Raid on <village>"), its size and per-raider rewards from the instance; the engine counts the raiders down, the bridge pays, and leaving (or a load mid-raid) fails it. Bounties are the jobs' kill template. |
-- The quest log has an API; features no longer change quest objects
-  directly. The quest-log service has `setProgress`, `finish` and
-  `remove`, and `quests()` is read-only. A `managed` quest belongs to a
-  feature: kill, pickup and talk events don't move it, and only `finish`
-  completes it (quietly, because the owner pays).
-  - Village jobs use this. They used to write objective counts directly,
-    mark the quest complete, and splice quests out of the log's array.
-  - Jobs had a "never mark the objective complete" workaround, so a
-    stray kill event couldn't close the job before it was paid. A
-    managed quest can't be closed that way, so the workaround is gone.
-  - This was the prerequisite for making the log a view over one engine.
+- The quest log is a view; features no longer change quest objects.
+  - First the quest-log service got `setProgress`, `finish` and `remove`,
+    and a feature-owned ("managed") entry that only its owner could move.
+    That ended the jobs' direct writes to objective counts and their
+    "never mark the objective complete" workaround.
+  - Since jobs and raids became radiant quests in the engine, nothing
+    needs owned entries: the service is `quests()` (read-only) and
+    `remove()` (for entries kept from older saves); quests change through
+    the engine's `QuestsService`.
 
 ### Phase 5 — Persistence (1–2 weeks)
 
@@ -795,8 +794,8 @@ one replay runs in CI.
   - `ownSave(ctx, codec)`: it owns a part of the save. Ten features do.
   - `ownTransient(ctx, what, reset?)`: it keeps state on purpose that a
     load resets, with an optional reset that runs once everything saved
-    is back. Four features do: raids (a raid in progress), jobs (their
-    quest-log entries), death (a fall in progress, where a load now gets
+    is back. Four features do: raids (a raid in progress), jobs (a job
+    from an older save gets its quest), death (a fall in progress, where a load now gets
     the player straight up), and indoors (who is inside; its wake check
     re-derives it).
   - `declareStateless(ctx, why)`: nothing of its own to keep, with the

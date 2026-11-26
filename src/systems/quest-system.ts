@@ -109,30 +109,7 @@ export class QuestSystem {
     return this.getQuests().filter(q => q.isFailed);
   }
 
-  /** Set an owned entry's objective progress (clamped to what it needs). */
-  public setProgress(questId: string, objectiveId: string, current: number): void {
-    const obj = this._own.find(q => q.id === questId)?.objectives.find(o => o.id === objectiveId);
-    if (!obj) return;
-    obj.current = Math.max(0, Math.min(obj.required, current));
-    obj.completed = obj.current >= obj.required;
-    this.refresh();
-  }
-
-  /**
-   * Complete an owned entry quietly, its owner having already paid out (no
-   * toast, no XP).  Its objectives show as done.
-   */
-  public finish(questId: string): boolean {
-    const quest = this._own.find(q => q.id === questId);
-    if (!quest || quest.isCompleted || quest.isFailed) return false;
-    quest.isCompleted = true;
-    quest.isActive = false;
-    for (const o of quest.objectives) { o.current = o.required; o.completed = true; }
-    this.refresh();
-    return true;
-  }
-
-  /** Take an owned entry out of the log (an abandoned job). */
+  /** Take an owned entry out of the log (one kept from an older save). */
   public remove(questId: string): boolean {
     const i = this._own.findIndex(q => q.id === questId);
     if (i < 0) return false;

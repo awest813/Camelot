@@ -55,15 +55,9 @@ describe('QuestSystem (the quest log)', () => {
         expect(qs.getActiveQuests()).toEqual([]);
     });
 
-    it('owned entries are driven by their owner, never by events', () => {
+    it('owned entries are added quietly and removed once', () => {
         qs.addQuest(job(), true);
         expect(ui.showNotification).not.toHaveBeenCalled();
-        qs.setProgress('job', 'o', 5);
-        expect(qs.getQuests()[0].objectives[0]).toMatchObject({ current: 2, completed: true });
-        expect(qs.getQuests()[0].isCompleted, 'only finish completes it').toBe(false);
-        expect(qs.finish('job')).toBe(true);
-        expect(qs.getCompletedQuests()).toHaveLength(1);
-        expect(qs.finish('job'), 'once').toBe(false);
         expect(qs.remove('job')).toBe(true);
         expect(qs.remove('job')).toBe(false);
     });
