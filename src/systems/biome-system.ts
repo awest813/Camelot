@@ -10,6 +10,7 @@
  * lightweight shape descriptors; the game layer wires position updates and
  * callback responses.
  */
+import { unseededRandom } from "../core/rng/rng";
 
 // ── Re-exported shape types (mirrors RegionSystem for consistency) ─────────────
 
@@ -216,7 +217,7 @@ export class BiomeSystem {
    * @param rng     - Optional random number generator (default: `Math.random`).
    *                  Must return a value in [0, 1).
    */
-  public sampleEncounterTable(biomeId: string, rng: () => number = Math.random): string | null {
+  public sampleEncounterTable(biomeId: string, rng: () => number = unseededRandom): string | null {
     const groups = this.getEncounterGroups(biomeId);
     if (groups.length === 0) return null;
 

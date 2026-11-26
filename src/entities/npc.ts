@@ -1,3 +1,4 @@
+import { simClock } from "../core/sim-clock";
 import { Scene } from "@babylonjs/core/scene";
 import { actors } from "./actors";
 import { Aggressive, Asleep, Dead, Engaged, Guard, HitReact, HostileOnSight, InDialogue, Provoked, Staggered, Telegraphing, Unblockable, type ActorId } from "../core/ecs/actors";
@@ -486,11 +487,11 @@ export class NPC {
     if (this.mesh.isDisposed()) return;
     const mat = this.mesh.material as StandardMaterial;
     mat.diffuseColor = Color3.Red();
-    setTimeout(() => {
+    simClock.after(150, () => {
       if (!this.isDead && !this.mesh.isDisposed()) {
         mat.diffuseColor = this._baseColor.clone();
       }
-    }, 150);
+    });
   }
 
   private _die(): void {

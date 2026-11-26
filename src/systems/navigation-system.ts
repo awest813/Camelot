@@ -1,3 +1,4 @@
+import { asyncWork } from "../core/async-work";
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
@@ -66,8 +67,8 @@ export class NavigationSystem {
   /** Load Recast on this thread (queries and loading built navmeshes need it). */
   public load(): Promise<void> {
     this._loading ??= (async () => {
-      const { default: Recast } = await import("recast-detour");
-      this._recast = (await loadRecast(Recast)) as RecastModule;
+      const { default: Recast } = await asyncWork.ordered(import("recast-detour"));
+      this._recast = (await asyncWork.ordered(loadRecast(Recast))) as RecastModule;
       this._plugin = new RecastJSPlugin(this._recast);
       if (this._pendingData) this._apply(this._pendingData);
     })().catch((e) => {
@@ -151,7 +152,18 @@ export class NavigationSystem {
       });
       return;
     }
+    // The reply lands through asyncWork, so replays see it on the same frame.
+    void asyncWork.ordered(new Promise<NavBuildReply>((resolve) => this._replies.set(id, resolve))).then((reply) => this._onReply(reply));
     worker.postMessage({ id, geometry } satisfies NavBuildRequest, [geometry.positions.buffer, geometry.indices.buffer]);
+  }
+
+  private readonly _replies = new Map<number, (reply: NavBuildReply) => void>();
+
+  private _onReply(reply: NavBuildReply): void {
+    if (reply.id !== this._buildId) return; // a newer build is on its way
+    if ("error" in reply) { console.warn("[Nav] navmesh build failed:", reply.error); return; }
+    if (this._plugin) this._apply(reply.data);
+    else this._pendingData = reply.data;
   }
 
   private _ensureWorker(): Worker | null {
@@ -159,11 +171,9 @@ export class NavigationSystem {
     try {
       this._worker = new Worker(new URL("./navmesh.worker.ts", import.meta.url), { type: "module" });
       this._worker.onmessage = (e: MessageEvent<NavBuildReply>) => {
-        const reply = e.data;
-        if (reply.id !== this._buildId) return; // a newer build is on its way
-        if ("error" in reply) { console.warn("[Nav] navmesh build failed:", reply.error); return; }
-        if (this._plugin) this._apply(reply.data);
-        else this._pendingData = reply.data;
+        const resolve = this._replies.get(e.data.id);
+        this._replies.delete(e.data.id);
+        resolve?.(e.data);
       };
     } catch (e) {
       console.warn("[Nav] navmesh worker unavailable; building on the main thread.", e);

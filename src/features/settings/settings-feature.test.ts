@@ -22,9 +22,9 @@ function setup(paused = false) {
 }
 
 describe("SettingsFeature (headless, through the kernel)", () => {
-  it("difficulty, audio and look sensitivity apply at once", () => {
+  it("difficulty, audio and look sensitivity apply at once", async () => {
     const t = setup();
-    const d = t.svc.dialog;
+    const d = await t.svc.dialog.get();
     d.onDifficultySelect!("hard");
     expect(t.damage()).toBe(1.5);
     expect(t.svc.difficulty).toBe("hard");
@@ -36,21 +36,23 @@ describe("SettingsFeature (headless, through the kernel)", () => {
     t.k.uninstall("settings");
   });
 
-  it("the gear button opens settings over play, and closing hands play back", () => {
+  it("the gear button opens settings over play (loading it), and closing hands play back", async () => {
     const t = setup();
+    expect(t.svc.dialog.current, "not loaded at start").toBeNull();
     (document.querySelector(".graphics-settings-btn") as HTMLButtonElement).click();
+    const d = await t.svc.dialog.get();
     expect(t.svc.dialog.isVisible).toBe(true);
     expect(t.modal.suspendGameplay).toHaveBeenCalledOnce();
-    t.svc.dialog.onClose!();
+    d.onClose!();
     expect(t.modal.restoreGameplay).toHaveBeenCalledOnce();
     t.k.uninstall("settings");
     expect(document.querySelector(".graphics-settings-btn"), "the button goes with the feature").toBeNull();
   });
 
-  it("closed from the pause menu, it leaves the pause menu up", () => {
+  it("closed from the pause menu, it leaves the pause menu up", async () => {
     const t = setup(true);
     t.svc.open();
-    t.svc.dialog.onClose!();
+    (await t.svc.dialog.get()).onClose!();
     expect(t.modal.restoreGameplay).not.toHaveBeenCalled();
     t.k.uninstall("settings");
   });

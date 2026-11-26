@@ -22,6 +22,7 @@
  * and saves (items are serialized whole).
  */
 
+import { unseededRandom } from "../core/rng/rng";
 import {
   CraftingSystem,
   ITEM_QUALITY_LABELS,
@@ -263,7 +264,7 @@ export class SmithingController {
     this.crafting = crafting;
     this.condition = condition;
     this._deps = deps;
-    this._random = deps.random ?? Math.random;
+    this._random = deps.random ?? unseededRandom;
 
     for (const recipe of SMITHING_RECIPES) {
       if (!crafting.getRecipe(recipe.id)) crafting.addRecipe(recipe);

@@ -10,7 +10,8 @@
  */
 import type { Feature, FeatureContext, ServiceRegistry } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
-import { GraphicsSettingsUI, type CameraSensitivity, type Difficulty } from "../../ui/graphics-settings-ui";
+import type { GraphicsSettingsUI, CameraSensitivity, Difficulty } from "../../ui/graphics-settings-ui";
+import { LazyPanel } from "../../ui/lazy-panel";
 import { CreditsUI } from "../../ui/credits-ui";
 import { persistGraphicsTier, type QualityTier } from "../../systems/graphics-system";
 import { FeedbackKey, GameplayKey, ModalKey, declareStateless } from "../services";
@@ -33,7 +34,8 @@ export interface SettingsHostService {
 }
 
 export interface SettingsService {
-  readonly dialog: GraphicsSettingsUI;
+  /** The settings dialog (loaded the first time it opens). */
+  readonly dialog: LazyPanel<GraphicsSettingsUI>;
   readonly credits: CreditsUI;
   readonly difficulty: Difficulty;
   /** Open the settings dialog (from the pause menu, or the gear button in play). */
@@ -48,7 +50,14 @@ const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
 export class SettingsFeature implements Feature {
   public readonly id = "settings";
-  public readonly dialog = new GraphicsSettingsUI();
+  /** Loaded the first time it opens (out of the start-up bundle). */
+  public readonly dialog = new LazyPanel<GraphicsSettingsUI>(async () => {
+    const { GraphicsSettingsUI } = await import("../../ui/graphics-settings-ui");
+    const d = new GraphicsSettingsUI();
+    this._wire?.(d);
+    return d;
+  });
+  private _wire: ((d: GraphicsSettingsUI) => void) | null = null;
   public readonly credits = new CreditsUI();
   private _difficulty: Difficulty = "normal";
   private _sensitivity: CameraSensitivity = "standard";
@@ -61,42 +70,44 @@ export class SettingsFeature implements Feature {
     this._s = s;
     const host = () => s.get(SettingsHostKey);
     const notify = (t: string, ms: number) => s.get(FeedbackKey).notify(t, ms);
-    const d = this.dialog;
-
-    d.onTierSelect = (tier) => {
-      persistGraphicsTier(tier);
-      host().applyTier(tier);
-    };
-    d.onDifficultySelect = (difficulty) => {
-      this._difficulty = difficulty;
-      host().setDamageTaken(DIFFICULTY_DAMAGE[difficulty]);
-      notify(`Difficulty: ${cap(difficulty)}`, 2400);
-    };
-    d.onAudioMuteToggle = (muted) => {
-      const audio = host().audio;
-      if (audio.isMuted !== muted) audio.toggleMute();
-      notify(muted ? "Audio muted" : "Audio unmuted", 1500);
-    };
-    d.onVolumeChange = (volume) => {
-      host().audio.setMasterVolume(volume);
-      notify(`Master volume: ${Math.round(volume * 100)}%`, 1500);
-    };
-    d.onCameraSensitivityChange = (sens) => {
-      this._sensitivity = sens;
-      host().setLookSensibility(LOOK_SENSIBILITY[sens]);
-      notify(`Look Sensitivity: ${cap(sens)}`, 1500);
-    };
     // Back to play (or to the pause menu it was opened from).
     const back = () => { if (!host().paused()) s.get(ModalKey).restoreGameplay(); };
-    d.onClose = back;
     this.credits.onClose = back;
-    const full = host().toggleFullscreen;
-    if (full) d.onToggleFullscreen = full;
+    this._wire = (d) => {
+      d.onTierSelect = (tier) => {
+        persistGraphicsTier(tier);
+        host().applyTier(tier);
+      };
+      d.onDifficultySelect = (difficulty) => {
+        this._difficulty = difficulty;
+        host().setDamageTaken(DIFFICULTY_DAMAGE[difficulty]);
+        notify(`Difficulty: ${cap(difficulty)}`, 2400);
+      };
+      d.onAudioMuteToggle = (muted) => {
+        const audio = host().audio;
+        if (audio.isMuted !== muted) audio.toggleMute();
+        notify(muted ? "Audio muted" : "Audio unmuted", 1500);
+      };
+      d.onVolumeChange = (volume) => {
+        host().audio.setMasterVolume(volume);
+        notify(`Master volume: ${Math.round(volume * 100)}%`, 1500);
+      };
+      d.onCameraSensitivityChange = (sens) => {
+        this._sensitivity = sens;
+        host().setLookSensibility(LOOK_SENSIBILITY[sens]);
+        notify(`Look Sensitivity: ${cap(sens)}`, 1500);
+      };
+      d.onClose = back;
+      const full = host().toggleFullscreen;
+      if (full) d.onToggleFullscreen = full;
+    };
+    const loaded = this.dialog.current;
+    if (loaded) this._wire(loaded);
 
     // eslint-disable-next-line @typescript-eslint/no-this-alias -- getter below
     const self = this;
     ctx.provide(SettingsKey, {
-      dialog: d,
+      dialog: this.dialog,
       credits: this.credits,
       get difficulty() { return self._difficulty; },
       open: () => this._open(),
@@ -107,8 +118,12 @@ export class SettingsFeature implements Feature {
     ctx.scope.add(() => {
       this._button?.remove();
       this._button = null;
-      d.onTierSelect = d.onDifficultySelect = d.onAudioMuteToggle = null;
-      d.onVolumeChange = d.onCameraSensitivityChange = d.onClose = null;
+      const d = this.dialog.current;
+      if (d) {
+        d.onTierSelect = d.onDifficultySelect = d.onAudioMuteToggle = null;
+        d.onVolumeChange = d.onCameraSensitivityChange = d.onClose = null;
+      }
+      this._wire = null;
       this.credits.onClose = null;
       this._s = null;
     });
@@ -117,7 +132,7 @@ export class SettingsFeature implements Feature {
   private _open(): void {
     const host = this._s?.get(SettingsHostKey);
     if (!host) return;
-    this.dialog.show(host.tier(), this._difficulty, host.audio.isMuted, host.audio.masterVolume, this._sensitivity);
+    void this.dialog.get().then((d) => d.show(host.tier(), this._difficulty, host.audio.isMuted, host.audio.masterVolume, this._sensitivity));
   }
 
   /** A gear button (⚙) that is always on screen, so settings need no key. */

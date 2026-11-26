@@ -13,6 +13,7 @@
  * Headless: no BabylonJS dependencies — NPC spawning and UI are handled
  * by callbacks that the game layer wires to its own AI and encounter systems.
  */
+import { unseededRandom } from "../core/rng/rng";
 
 // ── Template ──────────────────────────────────────────────────────────────────
 
@@ -197,7 +198,7 @@ export class EncounterSystem {
   public triggerEncounter(
     templateId: string,
     context: EncounterContext,
-    rng: () => number = Math.random,
+    rng: () => number = unseededRandom,
   ): EncounterResult | null {
     const record = this._templates.get(templateId);
     if (!record) return null;
@@ -228,7 +229,7 @@ export class EncounterSystem {
   public update(
     context: EncounterContext,
     activeBiomeIds: string[] = [],
-    rng: () => number = Math.random,
+    rng: () => number = unseededRandom,
   ): EncounterResult[] {
     const fired: EncounterResult[] = [];
     for (const record of this._templates.values()) {

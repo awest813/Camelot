@@ -27,6 +27,7 @@
  * remains unavailable; callers should always code a procedural fallback.
  */
 
+import { asyncWork } from "../core/async-work";
 import { Scene } from "@babylonjs/core/scene";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
@@ -534,7 +535,7 @@ export class FantasyAssetLoader {
     // Split into folder + file so relative URIs inside the model (external
     // textures such as ../_textures/<pack>/*.jpg) resolve against the folder.
     const slash = url.lastIndexOf("/") + 1;
-    SceneLoader.ImportMeshAsync("", url.slice(0, slash), url.slice(slash), this._scene)
+    asyncWork.ordered(SceneLoader.ImportMeshAsync("", url.slice(0, slash), url.slice(slash), this._scene))
       .then((result) => {
         if (result.meshes.length === 0) {
           this._markFailed(key, entry);

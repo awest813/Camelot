@@ -14,6 +14,10 @@ import {
 } from "./ChunkUtils";
 
 export class ChunkManager<TData> {
+  /** A counter, not the clock: "least recently touched" is the same on every run (replays). */
+  private _touchSeq = 0;
+  private _touch(): number { return ++this._touchSeq; }
+
   private readonly chunks = new Map<string, Chunk<TData>>();
   private readonly activeKeys = new Set<string>();
   private readonly preloadKeys = new Set<string>();
@@ -110,7 +114,7 @@ export class ChunkManager<TData> {
 
     for (const chunk of this.chunks.values()) {
       if (nextPreloadKeys.has(chunk.key)) {
-        chunk.lastTouched = Date.now();
+        chunk.lastTouched = this._touch();
       }
     }
 
@@ -209,7 +213,7 @@ export class ChunkManager<TData> {
       isLoaded: false,
       isLoading: false,
       isMounted: false,
-      lastTouched: Date.now(),
+      lastTouched: this._touch(),
     };
 
     this.chunks.set(key, chunk);
@@ -252,7 +256,7 @@ export class ChunkManager<TData> {
     try {
       chunk.data = await this.source.loadChunk(chunk.coords, controller.signal);
       chunk.isLoaded = true;
-      chunk.lastTouched = Date.now();
+      chunk.lastTouched = this._touch();
       this.emit("loaded", chunk);
 
       if (this.activeKeys.has(chunk.key) && !chunk.isMounted) {

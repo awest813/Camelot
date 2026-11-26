@@ -136,7 +136,7 @@ export function installGameFeatures(game: Game): void {
           playerLevel: game.playerLevelSystem.characterLevel,
           getFlag: (flag) => game.frameworkRuntime.getFlag(flag),
           setFlag: (flag, value) => game.frameworkRuntime.setFlag(flag, value),
-        })?.notification ?? null,
+        }, () => k.rng.stream("travel-events").next())?.notification ?? null,
         hasMark: () => game.markRecallSystem.hasMarked,
         recall: () => !!game.markRecallSystem.recall(),
       });

@@ -104,6 +104,11 @@ export class GraphicsSettingsUI {
     if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
   }
 
+  /** Close it (the same as `hide`; panels close this way). */
+  public close(): void {
+    this.hide();
+  }
+
   public hide(): void {
     if (this._root) this._root.style.display = "none";
     this.isVisible = false;

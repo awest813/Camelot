@@ -292,7 +292,8 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
   // The gear button opens the settings; Escape closes them, play resumes.
   // (The canvas holds the pointer lock, so click the button itself.)
   await page.evaluate(() => (document.querySelector(".graphics-settings-btn") as HTMLButtonElement).click());
-  expect(await page.evaluate(() => (window as any).__camelotGame.graphicsSettingsUI.isVisible), "settings open").toBe(true);
+  // (The dialog loads on first use.)
+  await expect.poll(() => page.evaluate(() => (window as any).__camelotGame.graphicsSettingsUI.isVisible), { message: "settings open" }).toBe(true);
   // Interface size 150%: the HUD grows, the 3D view keeps its resolution.
   const scaled = await page.evaluate(() => {
     const eng = (window as any).__camelotGame.scene.getEngine();

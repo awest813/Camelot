@@ -16,6 +16,7 @@
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
  */
+import type { Rng } from "../../core/rng/rng";
 import type { Feature, FeatureContext, ServiceRegistry } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { AlchemySystem } from "../../systems/alchemy-system";
@@ -75,6 +76,8 @@ export class CraftingFeature implements Feature {
   /** Smithies, armorer inns and the starting forge; steel work needs one in reach. */
   public readonly forges = new ForgeRegistry();
   private _s: ServiceRegistry | null = null;
+  /** Which worn piece takes the wear (seeded, so replays match). */
+  private _rng: Rng | null = null;
   private _forgeAfterTalk = false;
 
   constructor(deps: CraftingDeps) {
@@ -89,6 +92,7 @@ export class CraftingFeature implements Feature {
       getArmorerSkill: () => this._s?.tryGet(SkillsKey)?.level("armorer") ?? 0,
       gainArmorerXp: (amount) => this._s?.tryGet(SkillsKey)?.gainXP("armorer", amount),
       notify: (message, ms) => this._s?.tryGet(FeedbackKey)?.notify(message, ms),
+      random: () => this._rng?.next() ?? 0.5,
     });
     this.forgePanel.materialLabel = (id) => SMITHING_MATERIAL_ITEMS[id]?.name ?? id;
 
@@ -116,6 +120,7 @@ export class CraftingFeature implements Feature {
     } });
     const s = ctx.kernel.services;
     this._s = s;
+    this._rng = ctx.kernel.rng.stream("armor-wear");
     const feedback = () => s.get(FeedbackKey);
     const modal = () => s.get(ModalKey);
     const canAct = () => s.get(GameplayKey).canAct();

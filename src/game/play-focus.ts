@@ -32,7 +32,7 @@ export function registerModals(g: Game): void {
     { id: "stable", isOpen: () => g.stableUI.isVisible, close: () => g.stableUI.close() },
     { id: "saddlebag", isOpen: () => g.saddlebagUI.isVisible, close: () => g.saddlebagUI.close() },
     { id: "credits", isOpen: () => !!g._creditsUI?.isVisible, close: () => { g._creditsUI!.hide(); g._creditsUI!.onClose?.(); } },
-    { id: "graphics", isOpen: () => g.graphicsSettingsUI.isVisible, close: () => { g.graphicsSettingsUI.hide(); g.graphicsSettingsUI.onClose?.(); } },
+    { id: "graphics", isOpen: () => g.graphicsSettingsUI.isVisible, close: () => { const d = g.graphicsSettingsUI.current; d?.hide(); d?.onClose?.(); } },
     ...(g.editors?.windows() ?? []),
     { id: "wait", isOpen: () => g.ui.isWaitDialogOpen, close: () => { g.ui.toggleWaitDialog(false); restore(); } },
   );

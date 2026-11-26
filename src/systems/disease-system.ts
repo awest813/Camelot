@@ -14,6 +14,7 @@
  * Headless: no BabylonJS dependencies — integrates via callbacks.
  * SAVE_VERSION: 21
  */
+import { unseededRandom } from "../core/rng/rng";
 import type { GameEventBus } from "./event-bus";
 
 // ── Disease definition ────────────────────────────────────────────────────────
@@ -189,7 +190,7 @@ export class DiseaseSystem {
    * @returns `true` if the disease was contracted, `false` if resisted or
    *          the disease id is unknown.
    */
-  public contractDisease(diseaseId: string, rng: () => number = Math.random): boolean {
+  public contractDisease(diseaseId: string, rng: () => number = unseededRandom): boolean {
     if (!this._definitions.has(diseaseId)) return false;
     if (this._activeDiseases.has(diseaseId)) return false;
 

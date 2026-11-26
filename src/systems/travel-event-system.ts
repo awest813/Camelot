@@ -11,6 +11,7 @@
  * Headless: no BabylonJS dependencies — all state is supplied by the caller
  * via a lightweight `TravelContext`.
  */
+import { unseededRandom } from "../core/rng/rng";
 
 // ── Conditions ────────────────────────────────────────────────────────────────
 
@@ -231,7 +232,7 @@ export class TravelEventSystem {
    */
   public rollEvent(
     context: TravelContext,
-    rng: () => number = Math.random,
+    rng: () => number = unseededRandom,
   ): TravelEventOutcome | null {
     const eligible = this._getEligibleRecords(context);
     if (eligible.length === 0) return null;

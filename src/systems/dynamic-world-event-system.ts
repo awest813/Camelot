@@ -38,6 +38,7 @@
  * });
  * ```
  */
+import { unseededRandom } from "../core/rng/rng";
 
 // ── Reward ────────────────────────────────────────────────────────────────────
 
@@ -251,7 +252,7 @@ export class DynamicWorldEventSystem {
   public triggerEvent(
     templateId: string,
     context: DynamicEventContext,
-    rng: () => number = Math.random,
+    rng: () => number = unseededRandom,
   ): DynamicEventResult | null {
     const record = this._templates.get(templateId);
     if (!record) return null;
@@ -280,7 +281,7 @@ export class DynamicWorldEventSystem {
    */
   public update(
     context: DynamicEventContext,
-    rng: () => number = Math.random,
+    rng: () => number = unseededRandom,
   ): DynamicEventResult[] {
     const fired: DynamicEventResult[] = [];
 

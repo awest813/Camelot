@@ -119,7 +119,18 @@ export class App {
     // before Game constructs SaveSystem.
     await hydrateDesktopSave();
 
-    new MainScene(this.scene, this.canvas, this.engine, this._options.editors);
+    // Replays (`?replay=record|play`): the replay drives the frames, so it is
+    // set up before the game and the render loop never starts.
+    const replayMode = new URLSearchParams(location.search).get("replay");
+    const replay = replayMode === "record" || replayMode === "play"
+      ? await import("./replay/game-replay").then((m) => new m.GameReplay(replayMode, this.engine as Engine, this.scene, this.canvas, replayMode === "play" ? m.readStoredLog() : null))
+      : null;
+
+    const main = new MainScene(this.scene, this.canvas, this.engine, this._options.editors);
+    if (replay) {
+      replay.game = main.game;
+      (window as unknown as { __camelotReplay?: unknown }).__camelotReplay = replay;
+    }
 
     // Dev-only handle for in-browser debugging and the visual-shots e2e spec.
     if (import.meta.env.DEV) {
@@ -127,7 +138,7 @@ export class App {
     }
 
     this._config();
-    this._renderer();
+    if (!replay) this._renderer();
   }
 
   async _setPhysics(): Promise<void> {

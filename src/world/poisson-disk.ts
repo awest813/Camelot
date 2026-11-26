@@ -10,6 +10,7 @@
  *   Bridson, R. (2007). "Fast Poisson Disk Sampling in Arbitrary Dimensions".
  *   SIGGRAPH Sketches.
  */
+import { unseededRandom } from "../core/rng/rng";
 
 export interface PoissonPoint {
   x: number;
@@ -69,7 +70,7 @@ export function generatePoissonPoints(
   }
 
   const k = options.k ?? 30;
-  const prng = options.prng ?? Math.random;
+  const prng = options.prng ?? unseededRandom;
   const densityFilter = options.densityFilter;
 
   // Grid cell size such that each grid cell contains at most one point (r / sqrt(2))

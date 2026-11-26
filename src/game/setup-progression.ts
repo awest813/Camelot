@@ -4,6 +4,7 @@
  * Part of the composition root: a stretch of the game's start-up, moved out
  * of game.ts.
  */
+import { simClock } from "../core/sim-clock";
 import type { Game } from "../game";
 import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import { AIState } from "../entities/npc";
@@ -117,9 +118,7 @@ export function setupProgressionAndStart(g: Game): void {
   // Hit-stop effect wired to FixedStepLoop
   g.eventBus.on("ui:hitStop", ({ durationMs }) => {
     g._gameplayLoop.timeScale = 0.05; // heavy slow-mo
-    setTimeout(() => {
-      g._gameplayLoop.timeScale = 1.0;
-    }, durationMs);
+    simClock.after(durationMs, () => { g._gameplayLoop.timeScale = 1.0; });
   });
 
   // Level-up awards attribute points

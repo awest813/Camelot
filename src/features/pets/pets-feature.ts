@@ -11,6 +11,7 @@
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
  */
+import { simClock } from "../../core/sim-clock";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
@@ -81,11 +82,11 @@ export class PetsFeature implements Feature {
       if (mesh) {
         body?.body.setMotionType(PhysicsMotionType.STATIC);
         anim().death(mesh);
-        setTimeout(() => {
+        simClock.after(3000, () => {
           anim().release(mesh);
           body?.dispose();
           mesh.dispose();
-        }, 3000);
+        });
       }
     };
     this.pets.onPetLevelUp = (pet, newLevel) => {

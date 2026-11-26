@@ -10,6 +10,7 @@
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
  */
+import { simClock } from "../../core/sim-clock";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Feature, FeatureContext, ServiceRegistry } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
@@ -71,7 +72,7 @@ export class ArrestFeature implements Feature {
       if (civilian) crime.commitCrime("murder", factionId ?? "village_guard", s.get(LawKey).now());
     });
     ctx.on("player:assault", ({ factionId }) => {
-      const now = performance.now();
+      const now = simClock.now();
       if (now - lastAssault < ASSAULT_DEBOUNCE_MS) return;
       lastAssault = now;
       crime.commitCrime("assault", factionId, s.get(LawKey).now());

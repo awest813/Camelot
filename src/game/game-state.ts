@@ -208,7 +208,7 @@ export class GameState {
   public get saddlebagUI(): LazyPanel<SaddlebagUI> { return this.mounts.saddlebag; }
   public uiAnimator: UIAnimator = new UIAnimator();
   public readonly _settings = new SettingsFeature();
-  public get graphicsSettingsUI(): GraphicsSettingsUI { return this._settings.dialog; }
+  public get graphicsSettingsUI(): LazyPanel<GraphicsSettingsUI> { return this._settings.dialog; }
 
   // v2 systems (Oblivion-lite)
   public attributeSystem: AttributeSystem;

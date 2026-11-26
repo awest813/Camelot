@@ -817,9 +817,7 @@ one replay runs in CI.
     raider down. It sends the log through JSON, replays it, and requires
     the same state: rewards, notifications, despawns and raid history.
     The same inputs under another seed must diverge.
-  - Not covered yet: the whole game. Gameplay randomness is now seeded
-    (next item). What remains is the frame loop and input adapter
-    driving the kernel, so the recorder can sit on the input adapter.
+  - The whole game replays too (`src/replay/game-replay.ts`, below).
 - Gameplay randomness is seeded. Nine systems take a
   `random: () => number` (default `unseededRandom`, for tests and
   standalone use): combat, projectiles, schedules, weather, leveled lists,
@@ -836,8 +834,50 @@ one replay runs in CI.
 - Round-trip over all codecs: met (see above).
 - Old fixtures migrate: met. The v29 fixture loads, including starter
   quests moving into the quest engine.
-- One replay runs in CI: met at kernel scope. A whole-game replay waits
-  on the remaining unseeded randomness.
+- One replay runs in CI: met, at kernel scope and for the whole game.
+
+**Whole-game replays** (`src/replay/game-replay.ts`, e2e
+`game-replay.spec.ts`):
+- `?replay=record` records a session in the browser: the character made
+  at the start, then every input with the frame it lands on. `?replay=play`
+  plays a log (from localStorage `camelot_replay_log`) on a fresh page.
+  The page's handle is `window.__camelotReplay`: `stop()` gives the log,
+  `digest()` the state, `done` resolves when a playback ends. The replay
+  module loads only in these modes.
+- In both modes the game runs deterministically:
+  - Frames are a fixed 16 ms step. The replay drives them instead of the
+    render loop; physics, Babylon animations and the game's clock all take
+    that step.
+  - Real-time timers and clocks in gameplay go through `core/sim-clock.ts`
+    (hit-stop, the arrest debounce, pet clean-up, the hit flash). Chunk
+    eviction orders chunks by a counter instead of `Date.now()`.
+  - Async results that change the game go through `core/async-work.ts`:
+    navmesh builds from the worker, Recast, character and prop models,
+    lazy panels. Between frames they are released in the order the work
+    began, once nothing is in flight, so every run sees them on the same
+    frame and in the same order.
+  - Input is caught before the game sees it (keys, pointer, mouse, wheel)
+    and dispatched at the next frame boundary, which is exactly how the
+    replay dispatches it. Form controls keep their own events; their value
+    changes are logged. Pointer lock is logged as the engine's flag.
+  - Panel animations are off (they end on the wall clock and some hand
+    input back to play when they do).
+- Making it pass found unseeded gameplay rolls that the ratchet missed,
+  because they were `rng = Math.random` defaults, not calls. They were
+  hourly world events (a 30-gold cache showed up in one run only),
+  fast-travel arrival events, the disease resistance roll and which armor
+  piece takes wear. Each now has a kernel stream ("world-events",
+  "travel-events", "disease", "armor-wear"). The ratchet now counts any
+  `Math.random` reference, and it stays at 0.
+- The e2e test records about 270 frames of real Playwright input: walking,
+  strafing, sprinting, jumping, three swings, a mouse move, and the
+  inventory opened and closed. It plays the log on a fresh page and
+  requires the same digest: player position, rotation and stats, gold,
+  the clock, the bag, quest states, every NPC's position, health and AI
+  state, and the RNG streams. A log with the strafe removed must end
+  elsewhere.
+- To stay under the 900 KB entry budget, the settings dialog now loads on
+  first use (a `LazyPanel`).
 
 ### Phase 6 — World and navigation (3 weeks)
 

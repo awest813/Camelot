@@ -163,6 +163,7 @@ export class WorldEventsFeature implements Feature {
       this.ambient.onEventTriggered = null;
     });
 
+    const roll = ctx.kernel.rng.stream("world-events");
     ctx.on("time:hour", ({ hour, elapsedHours }) => {
       const world = s.get(WorldStateKey);
       const player = s.get(PlayerKey);
@@ -171,7 +172,7 @@ export class WorldEventsFeature implements Feature {
         playerLevel: player.level(),
         activeFactionIds: world.hasBounty() ? ["bandits"] : [],
         weatherId: world.weather() as never,
-      });
+      }, () => roll.next());
       const p = player.position();
       this.ambient.update({
         gameTimeHours: elapsedHours % 24,

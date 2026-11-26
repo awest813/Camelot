@@ -3,6 +3,8 @@
  * bundle).  Until then it is closed: `isVisible` is false and `close()` does
  * nothing.  `get()` loads it (once) and gives the ready panel.
  */
+import { asyncWork } from "../core/async-work";
+
 export interface ClosablePanel {
   readonly isVisible: boolean;
   close(): void;
@@ -30,7 +32,7 @@ export class LazyPanel<T extends ClosablePanel> {
 
   /** The panel, loading it the first time. */
   public get(): Promise<T> {
-    this._loading ??= this._load().then((p) => (this._panel = p));
+    this._loading ??= asyncWork.ordered(this._load()).then((p) => (this._panel = p));
     return this._loading;
   }
 }

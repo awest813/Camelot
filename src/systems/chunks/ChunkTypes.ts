@@ -12,6 +12,7 @@ export interface Chunk<TData = unknown> {
   isLoaded: boolean;
   isLoading: boolean;
   isMounted: boolean;
+  /** When it was last needed (a sequence number: higher is more recent). */
   lastTouched: number;
   error?: unknown;
 }

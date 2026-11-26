@@ -5,9 +5,8 @@
  * from the kernel's seeded streams, the replay ends in the same state, so
  * a bug report can carry the log and a test can re-run it.
  *
- * Scope today: what drives the kernel (features and their services).  The
- * whole game joins once its remaining unseeded randomness and its frame
- * loop go through the kernel too.
+ * This is the kernel-scope replay (features and their services, headless).
+ * The whole game in the browser replays through src/replay/game-replay.ts.
  *
  * Engine overhaul, Phase 5.
  */

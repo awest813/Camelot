@@ -18,6 +18,7 @@
  * (`visibility = 0`) but stays pickable, so interaction, combat raycasts and
  * physics are untouched.
  */
+import { asyncWork } from "../core/async-work";
 import type { Scene } from "@babylonjs/core/scene";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import type { AssetContainer } from "@babylonjs/core/assetContainer";
@@ -510,7 +511,7 @@ export class CharacterModelLibrary {
   /** The shared Universal Animation Library clip container (loaded once). */
   private _loadUalClips(): Promise<AssetContainer | null> {
     if (!this._ualClips) {
-      this._ualClips = SceneLoader.LoadAssetContainerAsync(`${this._quaterniusBase}animations/`, UAL_CLIPS_FILE, this._scene)
+      this._ualClips = asyncWork.ordered(SceneLoader.LoadAssetContainerAsync(`${this._quaterniusBase}animations/`, UAL_CLIPS_FILE, this._scene))
         .catch((err) => {
           console.warn("[character-models] failed to load UAL clips", err);
           return null;
@@ -525,7 +526,7 @@ export class CharacterModelLibrary {
   }
 
   private _loadManifest(): Promise<ModelManifest | null> {
-    this._manifest ??= fetch(`${this._modelRoot}manifest.json`)
+    this._manifest ??= asyncWork.ordered(fetch(`${this._modelRoot}manifest.json`))
       .then((r) => (r.ok ? (r.json() as Promise<ModelManifest>) : null))
       .catch(() => null);
     return this._manifest;
@@ -537,7 +538,7 @@ export class CharacterModelLibrary {
       const file = manifest?.models[e.key]?.lod1?.file;
       if (!file) return null;
       const slash = file.lastIndexOf("/");
-      return SceneLoader.LoadAssetContainerAsync(this._modelRoot + file.slice(0, slash + 1), file.slice(slash + 1), this._scene)
+      return asyncWork.ordered(SceneLoader.LoadAssetContainerAsync(this._modelRoot + file.slice(0, slash + 1), file.slice(slash + 1), this._scene))
         .then((c) => { optimizeCharacterContainer(c, this._scene); return c; });
     }).catch((err) => {
       console.warn(`[character-models] no LOD for ${e.key}`, err);
@@ -612,7 +613,7 @@ export class CharacterModelLibrary {
     const key = (root + file).slice(this._modelRoot.length);
     const e: LibraryEntry = { key, lod: null, container: null, failed: false, scale: 1, promise: Promise.resolve(null) };
     if (isQuaterniusHuman(id)) void this._loadUalClips();
-    e.promise = SceneLoader.LoadAssetContainerAsync(root, file, this._scene)
+    e.promise = asyncWork.ordered(SceneLoader.LoadAssetContainerAsync(root, file, this._scene))
       .then((container) => {
         optimizeCharacterContainer(container, this._scene);
         buildShadowProxies(container, this._scene);

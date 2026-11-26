@@ -1,3 +1,4 @@
+import { unseededRandom } from "../../core/rng/rng";
 import {
   DialogueAdvanceResult,
   DialogueChoice,
@@ -257,7 +258,7 @@ export class DialogueSession {
       case "random_chance": {
         let hit = this._rolls.get(condition);
         if (hit === undefined) {
-          const roll = this._context.random ?? Math.random;
+          const roll = this._context.random ?? unseededRandom;
           hit = roll() < Math.max(0, Math.min(1, condition.chance));
           this._rolls.set(condition, hit);
         }

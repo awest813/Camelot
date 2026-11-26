@@ -16,7 +16,8 @@
  *  Ratchets (error when a count goes UP from tools/guardrails-baseline.json;
  *  a note when it goes down, so the baseline can be tightened with --update):
  *   - game-ts-lines           size of src/game.ts (the overhaul shrinks it)
- *   - unseeded-random         Math.random() calls outside the RNG allowlist
+ *   - unseeded-random         Math.random outside the RNG allowlist (calls, and
+ *                             references such as a default `rng = Math.random`)
  *   - composition-root-lines  game.ts plus src/game/ (not tests): what is left to
  *                             become features
  *   - callback-properties     `x.onY = ` wiring in the composition root (src/game.ts
@@ -93,7 +94,7 @@ export function measure() {
       violations.push({ rule: "npc-identity", file: f.path });
     }
     if (!RANDOM_ALLOWLIST.some((re) => re.test(f.path))) {
-      const n = (code.match(/Math\.random\s*\(/g) ?? []).length;
+      const n = (code.match(/Math\.random\b/g) ?? []).length;
       if (n) { unseededRandom += n; randomByFile[f.path] = n; }
     }
     if (/from\s+["']@babylonjs\/gui/.test(code)) babylonGuiFiles++;

@@ -1,3 +1,4 @@
+import { unseededRandom } from "../core/rng/rng";
 import type { GameEventBus } from "./event-bus";
 // ─── Event Manager System ────────────────────────────────────────────────────
 // A headless "Dungeon Master" that owns, schedules, and fires managed world
@@ -271,7 +272,7 @@ export class EventManagerSystem {
    *
    * Returns an array of the definitions that were actually fired this tick.
    */
-  public tick(rng: () => number = Math.random): ManagedEventDefinition[] {
+  public tick(rng: () => number = unseededRandom): ManagedEventDefinition[] {
     const now = this._now();
     const due: ScheduledEvent[] = [];
     const remaining: ScheduledEvent[] = [];
@@ -312,7 +313,7 @@ export class EventManagerSystem {
   public triggerEvent(
     eventId: string,
     context?: Record<string, unknown>,
-    rng: () => number = Math.random,
+    rng: () => number = unseededRandom,
   ): boolean {
     const def = this._definitions.get(eventId);
     if (!def) return false;
@@ -344,7 +345,7 @@ export class EventManagerSystem {
    * Returns the fired definition or `null` if nothing was eligible / selected.
    */
   public rollEvent(
-    rng: () => number = Math.random,
+    rng: () => number = unseededRandom,
     context?: Record<string, unknown>,
   ): ManagedEventDefinition | null {
     const eligible = Array.from(this._definitions.values()).filter((def) =>
