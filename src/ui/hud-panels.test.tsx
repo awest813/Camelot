@@ -110,13 +110,14 @@ describe("InventoryPanelView", () => {
     ] as never[];
     const clicked: string[] = [];
     const view = new InventoryPanelView(() => ({
-      items, equippedIds: new Set(["sword"]), stats: "Stats:\nHP: 10 / 10", equipment: ["Main Hand: Iron Sword"],
+      items, equippedIds: new Set(["sword"]), stats: [{ label: "Health", value: "10 / 10", fill: 1, kind: "health" }], equipment: ["Main Hand: Iron Sword", "Head: --"],
       isConsumable: (i) => (i as { id: string }).id === "potion", detail: () => "",
     }));
     view.open({ onItem: (i) => clicked.push((i as { id: string }).id), onClose: () => {} });
     expect(document.querySelectorAll(".inventory__grid li")).toHaveLength(20);
     const slots = Array.from(document.querySelectorAll<HTMLButtonElement>("button.inventory__slot"));
-    expect(slots.map((b) => b.textContent?.replace(/^\S+ /, ""))).toEqual(["Iron Sword", "Potion (3)", "Rock"]);
+    expect(slots.map((b) => b.querySelector(".inventory__name")?.textContent)).toEqual(["Iron Sword", "Potion", "Rock"]);
+    expect(slots.map((b) => b.querySelector(".inventory__qty")?.textContent ?? null)).toEqual([null, "3", null]);
     expect(slots[0].classList.contains("is-equipped")).toBe(true);
     slots[0].dispatchEvent(new FocusEvent("focus"));
     await Promise.resolve();
@@ -125,7 +126,10 @@ describe("InventoryPanelView", () => {
     expect(document.querySelector(".inventory__hint")?.textContent).toBe("[Click to Unequip]");
     for (const b of slots) b.click();
     expect(clicked, "the rock does nothing").toEqual(["sword", "potion"]);
-    expect(document.querySelector(".inventory__stats")!.textContent).toBe("Stats:\nHP: 10 / 10");
+    expect(document.querySelector(".inventory__stat--health dd")!.textContent).toBe("10 / 10");
+    expect(document.querySelector<HTMLElement>(".inventory__stat--health .inventory__stat-bar > span")!.style.width).toBe("100%");
+    const equip = Array.from(document.querySelectorAll(".inventory__equip")).map((e) => [e.querySelector("dt")!.textContent, e.querySelector("dd")!.textContent, e.classList.contains("is-empty")]);
+    expect(equip).toEqual([["Main Hand", "Iron Sword", false], ["Head", "—", true]]);
     expect(view.isOpen).toBe(true);
     view.close();
     expect(view.isOpen).toBe(false);

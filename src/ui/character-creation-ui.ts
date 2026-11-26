@@ -7,6 +7,7 @@ import { WorldSeed, type WorldType, type BiomeScale, type StructureDensity } fro
 import type { BiomeType } from "../world/world-manager";
 import type { UIAnimator } from "./ui-animator";
 import { freshEntropy } from "../core/rng/rng";
+import { previewAttributes } from "./character-preview";
 
 export interface CharacterCreationResult {
   name: string;
@@ -269,6 +270,33 @@ export class CharacterCreationUI {
       layout.className = "character-create__layout";
       panel.appendChild(layout);
 
+      // The ledger (left page): the chapters, the hero so far, and the
+      // attributes the choices add up to.
+      const ledger = document.createElement("aside");
+      ledger.className = "character-create__ledger";
+      ledger.setAttribute("aria-label", "Your character so far");
+      layout.appendChild(ledger);
+      ledger.appendChild(stepPills);
+      stepPills.querySelectorAll<HTMLElement>(".character-create__step-pill").forEach((pill, i) => {
+        pill.dataset.numeral = ["I", "II", "III", "IV", "V", "VI"][i];
+      });
+
+      const heroHeading = document.createElement("h3");
+      heroHeading.className = "character-create__ledger-heading";
+      heroHeading.textContent = "The Hero";
+      ledger.appendChild(heroHeading);
+      const heroList = document.createElement("dl");
+      heroList.className = "character-create__hero";
+      ledger.appendChild(heroList);
+
+      const attrHeading = document.createElement("h3");
+      attrHeading.className = "character-create__ledger-heading";
+      attrHeading.textContent = "Attributes";
+      ledger.appendChild(attrHeading);
+      const attrList = document.createElement("ul");
+      attrList.className = "character-create__attributes";
+      ledger.appendChild(attrList);
+
       const mainCol = document.createElement("div");
       mainCol.className = "character-create__main";
       layout.appendChild(mainCol);
@@ -337,6 +365,52 @@ export class CharacterCreationUI {
 
       this._stepContainer = cards;
 
+      /** Redraw the ledger from the choices so far. */
+      const updateLedger = () => {
+        heroList.replaceChildren();
+        const rows: Array<[string, string | null]> = [
+          ["Name", enteredName.trim() || null],
+          ["Race", selectedRace?.name ?? null],
+          ["Birthsign", selectedBirthsign?.name ?? null],
+          ["Class", selectedClass?.name ?? null],
+        ];
+        for (const [label, value] of rows) {
+          const dt = document.createElement("dt");
+          dt.textContent = label;
+          const dd = document.createElement("dd");
+          dd.textContent = value ?? "—";
+          dd.classList.toggle("is-unset", value === null);
+          heroList.append(dt, dd);
+        }
+        attrList.replaceChildren();
+        for (const a of previewAttributes(selectedRace, selectedBirthsign, selectedClass)) {
+          const li = document.createElement("li");
+          li.className = "character-create__attribute";
+          if (a.delta > 0) li.classList.add("is-raised");
+          if (a.delta < 0) li.classList.add("is-lowered");
+          li.title = a.sources.join(", ") || "Base";
+          const name = document.createElement("span");
+          name.className = "character-create__attribute-name";
+          name.textContent = a.name[0].toUpperCase() + a.name.slice(1);
+          const bar = document.createElement("span");
+          bar.className = "character-create__attribute-bar";
+          bar.setAttribute("aria-hidden", "true");
+          const fill = document.createElement("span");
+          fill.style.width = `${a.value}%`;
+          bar.appendChild(fill);
+          const value = document.createElement("span");
+          value.className = "character-create__attribute-value";
+          value.textContent = String(a.value);
+          if (a.delta !== 0) {
+            const delta = document.createElement("small");
+            delta.textContent = ` ${a.delta > 0 ? "+" : ""}${a.delta}`;
+            value.appendChild(delta);
+          }
+          li.append(name, bar, value);
+          attrList.appendChild(li);
+        }
+      };
+
       const clearCards = () => {
         while (cards.firstChild) cards.removeChild(cards.firstChild);
       };
@@ -369,9 +443,12 @@ export class CharacterCreationUI {
       };
 
       const setAllStepPills = (active: CreationStep) => {
+        updateLedger();
         const steps: CreationStep[] = ["welcome", "world", "name", "race", "birthsign", "class"];
         const pills = [welcomePill, worldStep, nameStep, raceStep, birthsignStep, classStep];
+        const at = steps.indexOf(active);
         steps.forEach((s, i) => {
+          pills[i].classList.toggle("is-done", i < at);
           if (s === active) {
             pills[i].classList.add("is-active");
             pills[i].setAttribute("aria-current", "step");
@@ -969,7 +1046,7 @@ export class CharacterCreationUI {
         setTimeout(() => nameInput.focus(), 10);
 
         nameInput.addEventListener("input", () => {
-          enteredName = nameInput.value;
+          enteredName = nameInput.value; updateLedger();
           setBtnDisabled(continueButton, enteredName.trim().length === 0, "Please enter a name to continue.");
         });
 
@@ -1011,7 +1088,7 @@ export class CharacterCreationUI {
             btn.title = tag;
             btn.textContent = name;
             btn.addEventListener("click", () => {
-              enteredName = name;
+              enteredName = name; updateLedger();
               nameInput.value = name;
               setBtnDisabled(continueButton, false);
             });
@@ -1053,7 +1130,7 @@ export class CharacterCreationUI {
           const pool = getSuggestionsForCategory(selectedNameCategory);
           if (pool.length > 0) {
             const pick = pool[freshEntropy() % pool.length];
-            enteredName = pick.name;
+            enteredName = pick.name; updateLedger();
             nameInput.value = pick.name;
             setBtnDisabled(continueButton, false);
           }
@@ -1103,7 +1180,7 @@ export class CharacterCreationUI {
           card.appendChild(cardTag);
 
           card.addEventListener("click", () => {
-            selectedRace = race;
+            selectedRace = race; updateLedger();
             setDetails(race);
             markSelectedCard(card);
           });
@@ -1149,7 +1226,7 @@ export class CharacterCreationUI {
           card.appendChild(cardTag);
 
           card.addEventListener("click", () => {
-            selectedBirthsign = sign;
+            selectedBirthsign = sign; updateLedger();
             setDetails(sign);
             markSelectedCard(card);
           });
@@ -1195,7 +1272,7 @@ export class CharacterCreationUI {
           card.appendChild(cardTag);
 
           card.addEventListener("click", () => {
-            selectedClass = cls;
+            selectedClass = cls; updateLedger();
             setDetails(cls);
             markSelectedCard(card);
           });

@@ -1,0 +1,1052 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   Tome: the game's premium menu style.
+
+   A bound book: dark tooled-leather covers with gilt rules, parchment pages
+   inked in brown-black, Cinzel for titles and EB Garamond for reading text,
+   a wine-red ribbon for what is chosen.  Loaded after main.css and
+   polish.css; screens opt in by class (the character creator first, then
+   the pause menu and the panels).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@font-face {
+  font-family: "EB Garamond";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("../assets/fonts/eb-garamond.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "EB Garamond";
+  font-style: italic;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("../assets/fonts/eb-garamond-italic.woff2") format("woff2");
+}
+
+:root {
+  --tome-font-display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --tome-font-book: "EB Garamond", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+
+  /* Covers */
+  --tome-leather: #2a1a10;
+  --tome-leather-deep: #150d07;
+  --tome-leather-text: #eadbb8;
+  --tome-leather-dim: #b49f78;
+
+  /* Gilt */
+  --tome-gilt: #c99a3e;
+  --tome-gilt-bright: #f1d08a;
+  --tome-gilt-dim: #8a6a2c;
+
+  /* Pages */
+  --tome-parchment: #ecdcb6;
+  --tome-parchment-deep: #dcc597;
+  --tome-ink: #2b1b0e;
+  --tome-ink-soft: #5b4128;
+  --tome-rule: rgba(91, 65, 40, 0.35);
+
+  /* The ribbon (what is chosen) */
+  --tome-wine: #7d2117;
+  --tome-wine-bright: #a5341f;
+
+  --tome-raise: #2f6a2a;
+  --tome-lower: #8c2a1c;
+
+  /* Parchment grain (inline, no fetch) */
+  --tome-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .32 0 0 0 0 .22 0 0 0 0 .1 0 0 0 .14 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  --tome-parchment-bg:
+    radial-gradient(ellipse at 50% 40%, rgba(255, 248, 226, 0.55), transparent 62%),
+    radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(120, 84, 40, 0.28) 100%),
+    var(--tome-grain),
+    linear-gradient(180deg, var(--tome-parchment), var(--tome-parchment-deep));
+  --tome-leather-bg:
+    radial-gradient(ellipse at 30% 20%, rgba(120, 72, 36, 0.35), transparent 60%),
+    var(--tome-grain),
+    linear-gradient(160deg, var(--tome-leather), var(--tome-leather-deep));
+}
+
+/* ── Shared pieces ─────────────────────────────────────────────────────── */
+
+/* A gilt rule with a lozenge in the middle, under titles. */
+.tome-rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--tome-gilt);
+}
+.tome-rule::before,
+.tome-rule::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, currentColor 30%, currentColor 70%, transparent);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Character creator
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.character-create {
+  background:
+    radial-gradient(ellipse at 50% 35%, rgba(255, 170, 70, 0.12), transparent 55%),
+    radial-gradient(ellipse at center, rgba(10, 6, 3, 0.78), rgba(3, 2, 1, 0.97) 75%);
+  padding: clamp(8px, 2.5vw, 32px);
+}
+
+/* The book: leather covers, gilt double rule, corner fittings. */
+.character-create .character-create__panel {
+  position: relative;
+  width: min(1320px, 100%);
+  max-height: calc(100vh - 32px);
+  padding: 26px 30px 22px;
+  border-radius: 6px;
+  border: 1px solid var(--tome-gilt-dim);
+  background: var(--tome-leather-bg);
+  backdrop-filter: none;
+  box-shadow:
+    0 0 0 4px var(--tome-leather-deep),
+    0 0 0 5px var(--tome-gilt-dim),
+    0 30px 80px rgba(0, 0, 0, 0.75),
+    inset 0 0 0 6px rgba(0, 0, 0, 0.25),
+    inset 0 0 0 7px rgba(201, 154, 62, 0.45),
+    inset 0 0 60px rgba(0, 0, 0, 0.55);
+  color: var(--tome-leather-text);
+  font-family: var(--tome-font-book);
+  scrollbar-color: var(--tome-gilt-dim) var(--tome-leather-deep);
+  /* The book never scrolls; its pages do (the foot stays in view). */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.character-create .character-create__panel::before {
+  /* the old top shine: now a gilt fillet across the head of the cover */
+  height: 2px;
+  margin: -26px -30px 22px;
+  border-radius: 0;
+  background: linear-gradient(90deg, transparent, var(--tome-gilt) 20%, var(--tome-gilt-bright) 50%, var(--tome-gilt) 80%, transparent);
+}
+
+.character-create .character-create__title {
+  font-family: var(--tome-font-display);
+  font-weight: 700;
+  font-size: clamp(26px, 3vw, 38px);
+  letter-spacing: 0.08em;
+  text-align: center;
+  color: var(--tome-gilt-bright);
+  background: linear-gradient(180deg, #fff1c8 0%, var(--tome-gilt-bright) 40%, var(--tome-gilt) 75%, #8a5d1c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.6)) drop-shadow(0 0 14px rgba(241, 208, 138, 0.18));
+}
+.character-create .character-create__title::after {
+  /* the lozenge rule under the title */
+  content: "◆";
+  display: block;
+  margin: 8px auto 0;
+  width: min(420px, 70%);
+  font-size: 9px;
+  line-height: 1;
+  color: var(--tome-gilt);
+  -webkit-text-fill-color: var(--tome-gilt);
+  background: linear-gradient(90deg, transparent, var(--tome-gilt) 25%, transparent 46%, transparent 54%, var(--tome-gilt) 75%, transparent) center / 100% 1px no-repeat;
+}
+
+.character-create .character-create__subtitle {
+  margin: 10px auto 18px;
+  max-width: 720px;
+  text-align: center;
+  font-style: italic;
+  font-size: 18px;
+  color: var(--tome-leather-dim);
+}
+
+/* Three columns: the ledger (left page), the choices, the details plate. */
+.character-create .character-create__layout {
+  grid-template-columns: minmax(220px, 250px) minmax(0, 1fr) minmax(260px, 320px);
+  gap: 0;
+  align-items: stretch;
+  border-radius: 3px;
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.character-create__ledger,
+.character-create .character-create__main,
+.character-create .character-create__details {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.character-create .character-create__main,
+.character-create .character-create__details {
+  scrollbar-color: rgba(91, 65, 40, 0.55) transparent;
+}
+
+/* ── The ledger ─────────────────────────────────────────────────────────── */
+
+.character-create__ledger {
+  padding: 18px 16px 20px;
+  background:
+    linear-gradient(90deg, transparent 92%, rgba(0, 0, 0, 0.35)),
+    var(--tome-leather-bg);
+  border-right: 1px solid rgba(201, 154, 62, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.character-create .character-create__steps {
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 6px;
+}
+.character-create .character-create__step-pill {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px 7px 8px;
+  border: 0;
+  border-radius: 2px;
+  background: none;
+  font-family: var(--tome-font-display);
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  color: var(--tome-leather-dim);
+}
+.character-create .character-create__step-pill::before {
+  content: attr(data-numeral);
+  flex: 0 0 26px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--tome-gilt-dim);
+}
+.character-create .character-create__step-pill.is-done {
+  color: var(--tome-leather-text);
+}
+.character-create .character-create__step-pill.is-done::after {
+  content: "✓";
+  margin-left: auto;
+  color: var(--tome-gilt);
+  font-family: var(--tome-font-book);
+}
+.character-create .character-create__step-pill.is-active {
+  color: #fff3d6;
+  background: linear-gradient(90deg, var(--tome-wine), rgba(125, 33, 23, 0.25));
+  box-shadow: inset 3px 0 0 var(--tome-gilt-bright);
+}
+.character-create .character-create__step-pill.is-active::before {
+  color: var(--tome-gilt-bright);
+}
+
+.character-create__ledger-heading {
+  margin: 8px 0 0;
+  font-family: var(--tome-font-display);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--tome-gilt);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.character-create__ledger-heading::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(201, 154, 62, 0.6), transparent);
+}
+
+.character-create__hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 12px;
+  margin: 0;
+  font-size: 16px;
+}
+.character-create__hero dt {
+  color: var(--tome-leather-dim);
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+}
+.character-create__hero dd {
+  margin: 0;
+  color: var(--tome-leather-text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.character-create__hero dd.is-unset {
+  color: rgba(180, 159, 120, 0.55);
+  font-weight: 400;
+}
+
+.character-create__attributes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+.character-create__attribute {
+  display: grid;
+  grid-template-columns: 84px 1fr 46px;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  color: var(--tome-leather-text);
+}
+.character-create__attribute-name {
+  font-variant: small-caps;
+  letter-spacing: 0.03em;
+}
+.character-create__attribute-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 1px;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(201, 154, 62, 0.25);
+  overflow: hidden;
+}
+.character-create__attribute-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, var(--tome-gilt-dim), var(--tome-gilt));
+  transition: width var(--transition-smooth, 220ms) ease;
+}
+.character-create__attribute.is-raised .character-create__attribute-bar > span {
+  background: linear-gradient(90deg, var(--tome-gilt), var(--tome-gilt-bright));
+}
+.character-create__attribute.is-lowered .character-create__attribute-bar > span {
+  background: linear-gradient(90deg, #5a2a1c, #94402a);
+}
+.character-create__attribute-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.character-create__attribute-value small {
+  font-size: 12px;
+  font-weight: 500;
+}
+.character-create__attribute.is-raised small { color: #9fd38a; }
+.character-create__attribute.is-lowered small { color: #f09a84; }
+
+/* ── The page (choices) ─────────────────────────────────────────────────── */
+
+.character-create .character-create__main {
+  padding: 22px 22px 18px;
+  background: var(--tome-parchment-bg);
+  color: var(--tome-ink);
+  box-shadow: inset 18px 0 24px -18px rgba(60, 36, 14, 0.55);
+  min-height: 0;
+}
+
+.character-create .character-create__intro,
+.character-create .character-create__intro p {
+  color: var(--tome-ink);
+  font-size: 18px;
+  line-height: 1.55;
+}
+.character-create .character-create__intro p:first-of-type::first-letter {
+  /* an illuminated initial */
+  float: left;
+  margin: 4px 8px 0 0;
+  padding: 2px 8px;
+  font-family: var(--tome-font-display);
+  font-size: 46px;
+  line-height: 1;
+  color: var(--tome-gilt-bright);
+  background: var(--tome-wine);
+  border: 1px solid var(--tome-gilt);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.25);
+}
+
+.character-create .character-create__emblem {
+  float: right;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  margin: 0 0 10px 16px;
+  border-radius: 50%;
+  font-size: 38px;
+  color: var(--tome-gilt-bright);
+  background: radial-gradient(circle at 35% 30%, #4a2c18, var(--tome-leather-deep));
+  box-shadow: 0 0 0 3px var(--tome-gilt-dim), 0 0 0 5px rgba(255, 240, 200, 0.5), 0 4px 10px rgba(0, 0, 0, 0.35);
+}
+
+.character-create .character-create__cards {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+/* A choice: a parchment plate with an inked frame and a medallion. */
+.character-create .character-create__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 10px 12px;
+  border-radius: 3px;
+  border: 1px solid rgba(91, 65, 40, 0.55);
+  background:
+    linear-gradient(180deg, rgba(255, 250, 235, 0.55), rgba(236, 220, 182, 0.25)),
+    rgba(244, 233, 206, 0.6);
+  box-shadow: inset 0 0 0 3px rgba(255, 250, 235, 0.45), inset 0 0 0 4px rgba(91, 65, 40, 0.18), 0 1px 2px rgba(60, 36, 14, 0.25);
+  color: var(--tome-ink);
+  font-family: var(--tome-font-book);
+  cursor: pointer;
+  transition: transform var(--transition-fast, 100ms) ease, box-shadow var(--transition-normal, 150ms) ease, border-color var(--transition-normal, 150ms) ease;
+}
+.character-create .character-create__card:hover {
+  transform: translateY(-2px);
+  border-color: var(--tome-gilt-dim);
+  box-shadow: inset 0 0 0 3px rgba(255, 250, 235, 0.55), inset 0 0 0 4px rgba(138, 106, 44, 0.35), 0 6px 14px rgba(60, 36, 14, 0.3);
+}
+.character-create .character-create__card:focus-visible {
+  outline: 2px solid var(--tome-wine-bright);
+  outline-offset: 2px;
+}
+.character-create .character-create__card.is-selected {
+  border-color: var(--tome-wine);
+  background:
+    linear-gradient(180deg, rgba(255, 246, 222, 0.85), rgba(240, 222, 178, 0.6)),
+    rgba(244, 233, 206, 0.9);
+  box-shadow: inset 0 0 0 3px rgba(255, 250, 235, 0.6), inset 0 0 0 4px var(--tome-gilt), 0 6px 16px rgba(60, 36, 14, 0.35);
+}
+.character-create .character-create__card.is-selected::after {
+  /* the ribbon marker */
+  content: "";
+  position: absolute;
+  top: -1px;
+  right: 12px;
+  width: 14px;
+  height: 26px;
+  background: linear-gradient(180deg, var(--tome-wine-bright), var(--tome-wine));
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 74%, 0 100%);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.3);
+}
+
+.character-create .character-create__card-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  font-size: 22px;
+  color: var(--tome-gilt-bright);
+  background: radial-gradient(circle at 35% 30%, #4a2c18, var(--tome-leather-deep));
+  box-shadow: 0 0 0 2px var(--tome-gilt-dim), 0 0 0 3px rgba(255, 240, 200, 0.5), 0 2px 4px rgba(0, 0, 0, 0.35);
+}
+.character-create .character-create__card.is-selected .character-create__card-icon {
+  box-shadow: 0 0 0 2px var(--tome-gilt-bright), 0 0 0 3px rgba(255, 240, 200, 0.7), 0 0 12px rgba(201, 154, 62, 0.55);
+}
+.character-create .character-create__card strong,
+.character-create .character-create__card > span:not([class]) {
+  font-family: var(--tome-font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--tome-ink);
+}
+.character-create .character-create__tag {
+  font-variant: small-caps;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  color: var(--tome-ink-soft);
+}
+
+/* ── The details plate ──────────────────────────────────────────────────── */
+
+.character-create .character-create__details {
+  padding: 22px 20px;
+  border: 0;
+  border-left: 1px solid var(--tome-rule);
+  border-radius: 0;
+  margin: 0;
+  align-self: stretch;
+  background:
+    linear-gradient(90deg, rgba(60, 36, 14, 0.12), transparent 18px),
+    var(--tome-parchment-bg);
+  color: var(--tome-ink);
+}
+.character-create .character-create__details-title {
+  margin: 0 0 8px;
+  font-family: var(--tome-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--tome-wine);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--tome-rule);
+}
+.character-create .character-create__details-body {
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--tome-ink);
+}
+.character-create .character-create__meta {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  font-size: 15.5px;
+  line-height: 1.4;
+  color: var(--tome-ink-soft);
+}
+.character-create .character-create__meta li {
+  position: relative;
+  padding-left: 16px;
+}
+.character-create .character-create__meta li::before {
+  content: "❧";
+  position: absolute;
+  left: 0;
+  color: var(--tome-wine);
+  font-size: 12px;
+  top: 2px;
+}
+
+/* ── Forms on the page (world, name) ────────────────────────────────────── */
+
+.character-create .character-create__world-label,
+.character-create .character-create__world-section-label,
+.character-create .character-create__suggest-label {
+  font-family: var(--tome-font-display);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--tome-ink-soft);
+}
+.character-create .character-create__world-seed-input,
+.character-create .character-create__name-input,
+.character-create .character-create__world-select {
+  border-radius: 2px;
+  border: 0;
+  border-bottom: 2px solid rgba(91, 65, 40, 0.6);
+  background: rgba(255, 250, 235, 0.55);
+  color: var(--tome-ink);
+  font-family: var(--tome-font-book);
+  font-size: 19px;
+  padding: 8px 10px;
+}
+.character-create .character-create__world-seed-input::placeholder,
+.character-create .character-create__name-input::placeholder {
+  color: rgba(91, 65, 40, 0.6);
+  font-style: italic;
+}
+.character-create .character-create__world-seed-input:focus-visible,
+.character-create .character-create__name-input:focus-visible,
+.character-create .character-create__world-select:focus-visible {
+  outline: none;
+  border-bottom-color: var(--tome-wine);
+  background: rgba(255, 250, 235, 0.85);
+}
+.character-create .character-create__name-input {
+  font-family: var(--tome-font-display);
+  font-size: 24px;
+  letter-spacing: 0.04em;
+}
+
+.character-create .character-create__world-random-btn,
+.character-create .character-create__name-random-btn,
+.character-create .character-create__name-cat-btn,
+.character-create .character-create__suggest-btn,
+.character-create .character-create__advanced-toggle {
+  border-radius: 2px;
+  border: 1px solid rgba(91, 65, 40, 0.5);
+  background: rgba(255, 250, 235, 0.45);
+  color: var(--tome-ink);
+  font-family: var(--tome-font-book);
+  font-size: 15px;
+}
+.character-create .character-create__world-random-btn:hover,
+.character-create .character-create__name-random-btn:hover,
+.character-create .character-create__name-cat-btn:hover,
+.character-create .character-create__suggest-btn:hover,
+.character-create .character-create__advanced-toggle:hover {
+  border-color: var(--tome-wine);
+  background: rgba(255, 250, 235, 0.8);
+}
+.character-create .character-create__name-cat-btn.is-active,
+.character-create .character-create__name-cat-btn[aria-pressed="true"] {
+  background: var(--tome-wine);
+  border-color: var(--tome-wine);
+  color: #fff3d6;
+}
+
+.character-create .character-create__world-type-card,
+.character-create .character-create__biome-tile {
+  border-radius: 3px;
+  border: 1px solid rgba(91, 65, 40, 0.5);
+  background: rgba(255, 250, 235, 0.45);
+  color: var(--tome-ink);
+}
+.character-create .character-create__world-type-card.is-selected,
+.character-create .character-create__biome-tile.is-selected {
+  border-color: var(--tome-wine);
+  box-shadow: inset 0 0 0 1px var(--tome-gilt);
+  background: rgba(255, 246, 222, 0.9);
+}
+
+.character-create .character-create__checkbox-row {
+  padding: 10px 14px;
+  border: 1px dashed rgba(91, 65, 40, 0.45);
+  border-radius: 2px;
+  background: rgba(255, 250, 235, 0.4);
+  color: var(--tome-ink-soft);
+  font-size: 16px;
+}
+.character-create .character-create__checkbox-row:hover {
+  background: rgba(255, 250, 235, 0.7);
+}
+.character-create .character-create__checkbox-row input {
+  accent-color: var(--tome-wine);
+}
+
+/* ── The foot: Back and Continue ────────────────────────────────────────── */
+
+.character-create .character-create__actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.character-create .character-create__button {
+  min-width: 150px;
+  padding: 10px 26px;
+  border-radius: 2px;
+  border: 1px solid var(--tome-gilt);
+  background: linear-gradient(180deg, var(--tome-wine-bright), var(--tome-wine) 60%, #561510);
+  color: #fff3d6;
+  font-family: var(--tome-font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 220, 170, 0.35), 0 3px 10px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+.character-create .character-create__button:hover:enabled:not([aria-disabled="true"]) {
+  filter: brightness(1.12);
+  border-color: var(--tome-gilt-bright);
+}
+.character-create .character-create__button--secondary {
+  background: linear-gradient(180deg, #3a2516, var(--tome-leather-deep));
+  border-color: var(--tome-gilt-dim);
+  color: var(--tome-leather-text);
+}
+.character-create .character-create__button[aria-disabled="true"] {
+  opacity: 0.45;
+  filter: saturate(0.5);
+  cursor: not-allowed;
+}
+
+/* ── Narrow screens: the pages stack ────────────────────────────────────── */
+
+@media (max-width: 980px) {
+  .character-create .character-create__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .character-create__ledger {
+    border-right: 0;
+    border-bottom: 1px solid rgba(201, 154, 62, 0.35);
+  }
+  .character-create .character-create__steps {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .character-create .character-create__details {
+    border-left: 0;
+    border-top: 1px solid var(--tome-rule);
+  }
+  .character-create .character-create__panel {
+    padding: 18px 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .character-create .character-create__card,
+  .character-create__attribute-bar > span {
+    transition: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Menus: every dialog (the shared ModalDialog and the settings dialog) gets
+   the tome's binding: tooled leather, a gilt double rule, a Cinzel title over
+   a lozenge rule, a seal for the close button, book type.  Panel contents
+   keep light text on dark.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.graphics-settings {
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(255, 170, 70, 0.08), transparent 55%),
+    radial-gradient(ellipse at center, rgba(8, 5, 2, 0.62), rgba(3, 2, 1, 0.88) 80%);
+}
+
+.graphics-settings .graphics-settings__panel {
+  position: relative;
+  border-radius: 4px;
+  border: 1px solid var(--tome-gilt-dim);
+  background: var(--tome-leather-bg);
+  box-shadow:
+    0 0 0 3px var(--tome-leather-deep),
+    0 0 0 4px rgba(201, 154, 62, 0.55),
+    0 26px 70px rgba(0, 0, 0, 0.75),
+    inset 0 0 0 5px rgba(0, 0, 0, 0.22),
+    inset 0 0 0 6px rgba(201, 154, 62, 0.35),
+    inset 0 0 50px rgba(0, 0, 0, 0.5);
+  color: var(--tome-leather-text);
+  font-family: var(--tome-font-book);
+  font-size: 16px;
+}
+
+.graphics-settings .graphics-settings__header {
+  flex-wrap: wrap;
+  justify-content: center;
+  padding-inline: 34px;
+}
+/* the lozenge rule, on its own line under the title */
+.graphics-settings .graphics-settings__header::after {
+  content: "◆";
+  flex: 0 0 84%;
+  margin-top: 10px;
+  text-align: center;
+  font-size: 8px;
+  line-height: 1;
+  color: var(--tome-gilt);
+  background: linear-gradient(90deg, transparent, var(--tome-gilt) 25%, transparent 46%, transparent 54%, var(--tome-gilt) 75%, transparent) center / 100% 1px no-repeat;
+}
+.graphics-settings .graphics-settings__title {
+  font-family: var(--tome-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+  background: linear-gradient(180deg, #fff1c8 0%, var(--tome-gilt-bright) 45%, var(--tome-gilt) 80%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.6));
+}
+
+/* The close button: a small wax seal in the corner. */
+.graphics-settings .graphics-settings__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 13px;
+  color: #ffe9c2;
+  background: radial-gradient(circle at 35% 30%, var(--tome-wine-bright), var(--tome-wine) 60%, #4c120c);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(201, 154, 62, 0.45), 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.graphics-settings .graphics-settings__close:hover,
+.graphics-settings .graphics-settings__close:focus-visible {
+  color: #fff;
+  background: radial-gradient(circle at 35% 30%, #c4462c, var(--tome-wine-bright) 60%, #5c1a10);
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 0 0 2px var(--tome-gilt-bright), 0 0 10px rgba(241, 208, 138, 0.4);
+}
+
+/* Panel buttons and rows in book type, with gilt edges. */
+.graphics-settings .craft-panel__btn {
+  font-family: var(--tome-font-book);
+  font-size: 16px;
+  border-radius: 2px;
+  border: 1px solid rgba(201, 154, 62, 0.45);
+  background: linear-gradient(180deg, #3a2516, var(--tome-leather-deep));
+  color: var(--tome-leather-text);
+}
+.graphics-settings .craft-panel__btn:hover:enabled {
+  border-color: var(--tome-gilt-bright);
+  background: linear-gradient(180deg, #4a2f1b, #20140b);
+}
+.graphics-settings .craft-panel__btn--primary {
+  border-color: var(--tome-gilt);
+  background: linear-gradient(180deg, var(--tome-wine-bright), var(--tome-wine) 60%, #561510);
+  color: #fff3d6;
+}
+.graphics-settings .craft-panel__section {
+  border-radius: 2px;
+  border-color: rgba(201, 154, 62, 0.28);
+  background: rgba(0, 0, 0, 0.22);
+}
+.graphics-settings .craft-panel__section-title {
+  font-family: var(--tome-font-display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: var(--tome-gilt);
+}
+.graphics-settings .craft-panel__row {
+  font-family: var(--tome-font-book);
+  border-radius: 2px;
+}
+.graphics-settings .craft-panel__row-name {
+  font-size: 15px;
+}
+
+/* ── The pause menu: a title card ───────────────────────────────────────── */
+
+.pause-menu .pause-menu__panel {
+  width: min(380px, calc(100vw - 32px));
+  padding: 34px 36px 30px;
+}
+.pause-menu .graphics-settings__title {
+  font-size: 30px;
+  letter-spacing: 0.22em;
+}
+.pause-menu .pause-menu__subtitle {
+  margin: 4px 0 18px;
+  font-family: var(--tome-font-book);
+  font-style: italic;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--tome-leather-dim);
+}
+.pause-menu .pause-menu__items {
+  gap: 2px;
+}
+/* Menu lines, not boxes: an engraved label, gilt lozenges on the one in hand. */
+.pause-menu .pause-menu__item {
+  position: relative;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-family: var(--tome-font-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tome-leather-text);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+  transition: color var(--transition-fast, 100ms) ease, letter-spacing var(--transition-normal, 150ms) ease;
+}
+.pause-menu .pause-menu__item::before,
+.pause-menu .pause-menu__item::after {
+  content: "◆";
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  font-size: 9px;
+  color: var(--tome-gilt-bright);
+  opacity: 0;
+  transition: opacity var(--transition-fast, 100ms) ease;
+}
+.pause-menu .pause-menu__item::before { left: 14%; }
+.pause-menu .pause-menu__item::after { right: 14%; }
+.pause-menu .pause-menu__item:hover,
+.pause-menu .pause-menu__item:focus-visible {
+  color: var(--tome-gilt-bright);
+  background: linear-gradient(90deg, transparent, rgba(125, 33, 23, 0.55), transparent);
+  outline: none;
+}
+.pause-menu .pause-menu__item:hover::before,
+.pause-menu .pause-menu__item:hover::after,
+.pause-menu .pause-menu__item:focus-visible::before,
+.pause-menu .pause-menu__item:focus-visible::after {
+  opacity: 1;
+}
+/* Groups: play / saves / files / options / leave. */
+.pause-menu .pause-menu__item:nth-child(2),
+.pause-menu .pause-menu__item:nth-child(4),
+.pause-menu .pause-menu__item:nth-child(6),
+.pause-menu .pause-menu__item:last-child {
+  margin-top: 10px;
+}
+.pause-menu .pause-menu__item:last-child {
+  color: #e7a48f;
+}
+
+/* ── The inventory: tooled slots, a parchment card, a character ledger ─── */
+
+.inventory .inventory__panel {
+  width: min(860px, calc(100vw - 32px));
+}
+.inventory .inventory__layout {
+  grid-template-columns: minmax(0, 3fr) minmax(250px, 2fr);
+  gap: 18px;
+}
+.inventory .inventory__grid {
+  gap: 8px;
+  align-content: start;
+}
+.inventory .inventory__slot {
+  position: relative;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 84px;
+  padding: 10px 6px 8px;
+  border-radius: 3px;
+  border: 1px solid rgba(201, 154, 62, 0.28);
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(120, 80, 40, 0.28), transparent 70%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.55));
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+  color: var(--tome-leather-text);
+  font-family: var(--tome-font-book);
+  transition: border-color var(--transition-fast, 100ms) ease, box-shadow var(--transition-normal, 150ms) ease;
+}
+.inventory .inventory__slot:hover,
+.inventory .inventory__slot:focus-visible {
+  outline: none;
+  border-color: var(--tome-gilt-bright);
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(241, 208, 138, 0.2), transparent 70%),
+    linear-gradient(180deg, rgba(40, 24, 10, 0.6), rgba(0, 0, 0, 0.6));
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(241, 208, 138, 0.35), 0 0 14px rgba(201, 154, 62, 0.25);
+}
+.inventory .inventory__slot.is-equipped {
+  border: 1px solid var(--tome-gilt);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6), inset 0 0 0 2px rgba(201, 154, 62, 0.35);
+}
+.inventory .inventory__slot.is-equipped::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 8px;
+  width: 10px;
+  height: 18px;
+  background: linear-gradient(180deg, var(--tome-wine-bright), var(--tome-wine));
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
+}
+.inventory .inventory__slot.is-empty {
+  opacity: 1;
+  border-color: rgba(201, 154, 62, 0.12);
+  background: rgba(0, 0, 0, 0.3);
+}
+.inventory__glyph {
+  font-size: 26px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.6));
+}
+.inventory__name {
+  font-size: 14px;
+  line-height: 1.15;
+  text-align: center;
+}
+.inventory__qty {
+  position: absolute;
+  right: 5px;
+  bottom: 4px;
+  min-width: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--tome-leather-deep);
+  background: linear-gradient(180deg, var(--tome-gilt-bright), var(--tome-gilt));
+}
+
+.inventory .inventory__side {
+  gap: 8px;
+  color: var(--tome-leather-text);
+  font-family: var(--tome-font-book);
+  font-size: 16px;
+}
+.inventory .inventory__detail {
+  min-height: 128px;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--tome-parchment-bg);
+  color: var(--tome-ink);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(201, 154, 62, 0.35), 0 6px 14px rgba(0, 0, 0, 0.4);
+}
+.inventory .inventory__detail-name {
+  margin: 0 0 4px;
+  font-family: var(--tome-font-display);
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  color: var(--tome-wine);
+}
+.inventory__detail-text {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.inventory__detail.is-empty .inventory__detail-text {
+  font-style: italic;
+  color: var(--tome-ink-soft);
+}
+.inventory__detail-meta {
+  margin: 6px 0 0;
+  font-size: 14px;
+  font-variant: small-caps;
+  letter-spacing: 0.03em;
+  color: var(--tome-ink-soft);
+}
+.inventory .inventory__hint {
+  margin: 6px 0 0;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--tome-raise);
+}
+
+.inventory .inventory__stats,
+.inventory .inventory__equipment dl {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  white-space: normal;
+}
+.inventory__stat,
+.inventory__equip {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  column-gap: 10px;
+}
+.inventory__stat dt,
+.inventory__equip dt {
+  font-variant: small-caps;
+  letter-spacing: 0.03em;
+  color: var(--tome-leather-dim);
+}
+.inventory__stat dd,
+.inventory__equip dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.inventory__equip.is-empty dd {
+  color: rgba(180, 159, 120, 0.55);
+  font-weight: 400;
+}
+.inventory__stat-bar {
+  grid-column: 1 / -1;
+  height: 4px;
+  margin-top: 1px;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(201, 154, 62, 0.2);
+}
+.inventory__stat-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--tome-gilt);
+}
+.inventory__stat--health .inventory__stat-bar > span { background: linear-gradient(90deg, #7c1c14, #c2392a); }
+.inventory__stat--magicka .inventory__stat-bar > span { background: linear-gradient(90deg, #1d3a7a, #3f6fd0); }
+.inventory__stat--stamina .inventory__stat-bar > span { background: linear-gradient(90deg, #275a22, #4f9c3e); }
+.inventory__stat--xp .inventory__stat-bar > span { background: linear-gradient(90deg, var(--tome-gilt-dim), var(--tome-gilt-bright)); }

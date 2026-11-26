@@ -14,11 +14,20 @@ import { PanelHost } from "./preact/panel-host";
 /** Slots shown (the grid is four across). */
 export const INVENTORY_SLOTS = 20;
 
+/** One line of the character's stats: "Health 240 / 240", with a bar when it is a pool. */
+export interface InventoryStat {
+  label: string;
+  value: string;
+  /** 0..1 for health, magicka, stamina and experience. */
+  fill?: number;
+  /** Which pool the bar is (its colour). */
+  kind?: "health" | "magicka" | "stamina" | "xp";
+}
+
 export interface InventoryState {
   items: readonly Item[];
   equippedIds: ReadonlySet<string>;
-  /** The stats block ("Stats:\nHP: …"). */
-  stats: string;
+  stats: readonly InventoryStat[];
   /** "Main Hand: Iron Sword" … */
   equipment: readonly string[];
   /** True when clicking the item uses it (potions, food). */
@@ -45,7 +54,6 @@ export function InventoryPanel(p: { state: InventoryState; onItem(item: Item): v
         <ul class="inventory__grid" aria-label="Items">
           {items.map((item) => {
             const usable = s.isConsumable(item) || !!item.slot;
-            const label = `${getItemIcon(item)} ${item.name}${item.quantity > 1 ? ` (${item.quantity})` : ""}`;
             return (
               <li key={item.instanceId ?? item.id}>
                 <button type="button" class={`inventory__slot${s.equippedIds.has(item.id) ? " is-equipped" : ""}`}
@@ -53,7 +61,9 @@ export function InventoryPanel(p: { state: InventoryState; onItem(item: Item): v
                   onMouseEnter={() => setShown(item)} onFocus={() => setShown(item)}
                   onMouseLeave={() => setShown((cur) => (cur === item ? null : cur))}
                   onClick={() => { if (usable) p.onItem(item); }}>
-                  {label}
+                  <span class="inventory__glyph" aria-hidden="true">{getItemIcon(item)}</span>
+                  <span class="inventory__name">{item.name}</span>
+                  {item.quantity > 1 && <span class="inventory__qty">{item.quantity}</span>}
                 </button>
               </li>
             );
@@ -63,20 +73,44 @@ export function InventoryPanel(p: { state: InventoryState; onItem(item: Item): v
           ))}
         </ul>
         <aside class="inventory__side">
-          <div class="inventory__detail" aria-live="polite">
-            {current && (
+          <div class={`inventory__detail${current ? "" : " is-empty"}`} aria-live="polite">
+            {current ? (
               <>
                 <h3 class="inventory__detail-name">{current.name}</h3>
-                <p>{current.description}</p>
-                <p>Qty: {current.quantity}{s.detail(current)}</p>
+                <p class="inventory__detail-text">{current.description}</p>
+                <p class="inventory__detail-meta">Quantity {current.quantity}{s.detail(current)}</p>
                 {itemHint(s, current) && <p class="inventory__hint">{itemHint(s, current)}</p>}
               </>
+            ) : (
+              <p class="inventory__detail-text">Point at an item to read of it.</p>
             )}
           </div>
-          <pre class="inventory__stats">{s.stats}</pre>
+          <h3 class="craft-panel__section-title">Character</h3>
+          <dl class="inventory__stats">
+            {s.stats.map((st) => (
+              <div key={st.label} class={`inventory__stat${st.kind ? ` inventory__stat--${st.kind}` : ""}`}>
+                <dt>{st.label}</dt>
+                <dd>{st.value}</dd>
+                {st.fill !== undefined && (
+                  <span class="inventory__stat-bar" aria-hidden="true"><span style={{ width: `${Math.round(Math.max(0, Math.min(1, st.fill)) * 100)}%` }} /></span>
+                )}
+              </div>
+            ))}
+          </dl>
           <div class="inventory__equipment">
-            <h3 class="craft-panel__section-title">Equipment</h3>
-            <ul>{s.equipment.map((line) => <li key={line}>{line}</li>)}</ul>
+            <h3 class="craft-panel__section-title">Equipped</h3>
+            <dl>
+              {s.equipment.map((line) => {
+                const at = line.indexOf(": ");
+                const slot = at < 0 ? line : line.slice(0, at), what = at < 0 ? "" : line.slice(at + 2);
+                const empty = !what || what === "--";
+                return (
+                  <div key={slot} class={`inventory__equip${empty ? " is-empty" : ""}`}>
+                    <dt>{slot}</dt><dd>{empty ? "—" : what}</dd>
+                  </div>
+                );
+              })}
+            </dl>
           </div>
         </aside>
       </div>

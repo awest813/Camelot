@@ -19,7 +19,7 @@ import { AttributePanelView } from "./attribute-panel";
 import { QuestLogView } from "./quest-log-panel";
 import { PauseMenuView, type PauseActions } from "./pause-menu";
 import { SkillTreeView } from "./skill-tree-panel";
-import { InventoryPanelView } from "./inventory-panel";
+import { InventoryPanelView, type InventoryStat } from "./inventory-panel";
 import type { GameEventBus } from "../systems/event-bus";
 
 /** Cardinal labels for the compass strip, clockwise from north. */
@@ -50,14 +50,15 @@ export class UIManager {
   private readonly _inventory = new InventoryPanelView(() => ({
     items: this._inventoryItems,
     equippedIds: this._equippedIds,
-    stats: this._lastStatsText ?? "Stats:\nHP: --\nMP: --\nSP: --",
+    stats: this._stats,
     equipment: this._equipmentLines,
     isConsumable: (item) => !!this.isConsumableItem?.(item),
     detail: (item) => this.itemDetailSuffix?.(item) ?? "",
   }));
   private _inventoryItems: Item[] = [];
   private _equipmentLines: string[] = ["Main Hand", "Off Hand", "Head", "Chest", "Legs", "Feet"].map((slot) => `${slot}: --`);
-  private _lastStatsText: string | null = null;
+  private _stats: InventoryStat[] = [];
+  private _lastStatsKey = "";
 
   private _equippedIds: Set<string> = new Set();
 
@@ -317,11 +318,22 @@ export class UIManager {
   }
 
   public updateStats(player: Player, characterLevel: number): void {
-    const text =
-      `Stats:\nCharacter Lv: ${characterLevel}  Combat Lv: ${player.level}\nXP: ${Math.floor(player.experience)} / ${player.experienceToNextLevel}\n` +
-      `HP: ${Math.floor(player.health)} / ${player.maxHealth}\nMP: ${Math.floor(player.magicka)} / ${player.maxMagicka}\nSP: ${Math.floor(player.stamina)} / ${player.maxStamina}\nDMG Bonus: +${player.bonusDamage}\nArmor: ${player.bonusArmor}`;
-    if (this._lastStatsText === text) return;
-    this._lastStatsText = text;
+    const pool = (label: string, now: number, max: number, kind: InventoryStat["kind"]): InventoryStat =>
+      ({ label, value: `${Math.floor(now)} / ${max}`, fill: max > 0 ? now / max : 0, kind });
+    const stats: InventoryStat[] = [
+      { label: "Level", value: `${characterLevel}` },
+      { label: "Combat level", value: `${player.level}` },
+      pool("Health", player.health, player.maxHealth, "health"),
+      pool("Magicka", player.magicka, player.maxMagicka, "magicka"),
+      pool("Stamina", player.stamina, player.maxStamina, "stamina"),
+      pool("Experience", player.experience, player.experienceToNextLevel, "xp"),
+      { label: "Damage bonus", value: `+${player.bonusDamage}` },
+      { label: "Armor", value: `${player.bonusArmor}` },
+    ];
+    const key = stats.map((s) => s.value).join("|");
+    if (this._lastStatsKey === key) return;
+    this._lastStatsKey = key;
+    this._stats = stats;
     this._inventory.render();
   }
 

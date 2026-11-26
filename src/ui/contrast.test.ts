@@ -8,7 +8,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const css = readFileSync(resolve(__dirname, "../css/main.css"), "utf8");
+const css = readFileSync(resolve(__dirname, "../css/main.css"), "utf8")
+  + readFileSync(resolve(__dirname, "../css/tome.css"), "utf8");
 
 type RGBA = [number, number, number, number];
 
@@ -27,7 +28,7 @@ function parse(color: string): RGBA {
   throw new Error(`unparsed colour ${color}`);
 }
 
-/** A `--panel-*` token's value from :root (following one var() hop). */
+/** A `--panel-*` or `--tome-*` token's value from :root (following one var() hop). */
 function token(name: string): string {
   const m = new RegExp(`${name}:\\s*([^;]+);`).exec(css);
   if (!m) throw new Error(`no ${name}`);
@@ -65,6 +66,14 @@ describe("UI text contrast (WCAG AA, 4.5:1)", () => {
     ["notification", "#E8C656", "rgba(14, 10, 4, 0.96)"],
     ["compass", "#F2E8D8", "rgba(6, 4, 2, 0.72)"],
     ["debug overlay", "#88FF88", "rgba(0, 0, 0, 0.7)"],
+    // The tome (menus and the character creator): ink on parchment, gilt and type on leather.
+    ["tome ink on parchment", token("--tome-ink"), token("--tome-parchment-deep")],
+    ["tome soft ink on parchment", token("--tome-ink-soft"), token("--tome-parchment-deep")],
+    ["tome wine heading on parchment", token("--tome-wine"), token("--tome-parchment-deep")],
+    ["tome text on leather", token("--tome-leather-text"), token("--tome-leather")],
+    ["tome dim text on leather", token("--tome-leather-dim"), token("--tome-leather")],
+    ["tome gilt on leather", token("--tome-gilt"), token("--tome-leather")],
+    ["tome button text on wine", "#fff3d6", token("--tome-wine")],
   ];
   for (const [what, fg, bg] of pairs) {
     it(`${what}: ${fg} on ${bg}`, () => {

@@ -35,7 +35,7 @@ export const ATTRIBUTE_NAMES: AttributeName[] = [
   "luck",
 ];
 
-const DEFAULT_ATTRIBUTES: AttributeSet = {
+export const DEFAULT_ATTRIBUTES: Readonly<AttributeSet> = {
   strength: 40,
   endurance: 40,
   intelligence: 40,

@@ -33,7 +33,7 @@ export function PauseMenu({ actions }: { actions: PauseActions }) {
   ];
   return (
     <ModalDialog id="pause-title" title="Camelot" closeLabel="Resume" className="craft-panel pause-menu" panelClassName="pause-menu__panel" onClose={actions.resume}>
-      <p class="pause-menu__subtitle">—  Paused  [Esc]  —</p>
+      <p class="pause-menu__subtitle">The tale waits for you. (Esc to resume)</p>
       <nav class="pause-menu__items" aria-label="Pause menu">
         {items.map(([label, run]) => (
           <button key={label} type="button" class="craft-panel__btn pause-menu__item" onClick={run}>{label}</button>
