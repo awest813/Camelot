@@ -1613,11 +1613,16 @@
   backdrop-filter: blur(6px) saturate(0.7);
   color: var(--tome-leather-text);
   font-family: var(--tome-font-book);
-  animation: title-screen-in 900ms ease-out both;
+}
+/* The backdrop is there at once (the loading cover fades off it); the plate
+   and the footer rise in after the cover has gone. */
+.title-screen__plate,
+.title-screen__foot {
+  animation: title-screen-in 800ms ease-out 350ms both;
 }
 @keyframes title-screen-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
 }
 
 .title-screen__plate {
@@ -1767,9 +1772,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .title-screen { animation: none; }
+  .title-screen__plate, .title-screen__foot { animation: none; }
 }
-:root.reduce-motion .title-screen { animation: none; }
+:root.reduce-motion :is(.title-screen__plate, .title-screen__foot) { animation: none; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    The map: a parchment chart in the dialog's binding, with the places
@@ -2043,4 +2048,9 @@
 :is(.character-sheet-ui, .crafting-ui, .barter-ui, .container-ui, .fast-travel, .stable, .saddlebag, .spell-making, .level-up, .graphics-settings)
   :is(.character-sheet-ui__close, .crafting-ui__close, .barter-ui__close, .container-ui__close, .fast-travel__close-btn, .spell-making__close-btn, .stable__close-btn, .saddlebag__close-btn, .graphics-settings__close):focus-visible {
   outline: none !important;
+}
+
+/* While the title is up, nothing of play shows behind it. */
+body.is-title :is(.hud, .quickslot-hud, .active-effect-hud, .onboarding-tip, #display-fps, .graphics-settings-btn) {
+  visibility: hidden;
 }

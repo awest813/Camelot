@@ -30,9 +30,11 @@ describe("TitleFeature", () => {
     expect(t.calls).toEqual(["hold"]);
     expect(t.labels(), "no save: no Continue; no Quit in the browser").toEqual(["New Game", "Settings", "Credits"]);
     expect(document.activeElement, "the first line has focus").toBe(t.items()[0]);
+    expect(document.body.classList.contains("is-title"), "the HUD hides behind the cover").toBe(true);
     t.items()[0].click();
     expect(t.calls).toEqual(["hold", "release", "new"]);
     expect(document.querySelector(".title-screen")).toBeNull();
+    expect(document.body.classList.contains("is-title")).toBe(false);
     t.k.uninstall("title");
   });
 

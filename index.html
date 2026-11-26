@@ -16,6 +16,24 @@
 </head>
 
 <body>
+    <!-- Shown from first paint until the title opens (ui/boot-cover.ts). -->
+    <div id="boot-cover" role="status" aria-live="polite">
+        <div class="boot-cover__name">Camelot</div>
+        <div class="boot-cover__line">The tale is being set down<span class="boot-cover__dots" aria-hidden="true"></span></div>
+    </div>
+    <style>
+        #boot-cover { position: fixed; inset: 0; z-index: 9000; display: grid; place-content: center; gap: 18px;
+            text-align: center; background: radial-gradient(ellipse at center, #140c06, #030201 78%); color: #c9b48a;
+            transition: opacity 350ms ease-out; }
+        #boot-cover.is-gone { opacity: 0; pointer-events: none; }
+        .boot-cover__name { font: 600 clamp(40px, 8vw, 84px)/1 "Cinzel", Georgia, serif; letter-spacing: 0.08em;
+            text-transform: uppercase; color: #d8bf86; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.8); }
+        .boot-cover__line { font: italic 18px/1.4 "EB Garamond", Georgia, serif; color: rgba(201, 180, 138, 0.75); }
+        .boot-cover__dots::after { content: ""; display: inline-block; width: 1.2em; text-align: left;
+            animation: boot-dots 1.6s steps(4, end) infinite; }
+        @keyframes boot-dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+        @media (prefers-reduced-motion: reduce) { #boot-cover { transition: none; } .boot-cover__dots::after { animation: none; content: "..."; } }
+    </style>
     <script type="module" src="/src/main.ts"></script>
 </body>
 

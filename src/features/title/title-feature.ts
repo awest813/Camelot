@@ -10,6 +10,7 @@ import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { TitleHostKey, declareStateless } from "../services";
 import { TitleScreenView } from "../../ui/title-screen";
+import { dismissBootCover } from "../../ui/boot-cover";
 
 export interface TitleService {
   /** Open the title (or, when the host says so, go straight to a new game). */
@@ -34,6 +35,7 @@ export class TitleFeature implements Feature {
     const view = this.view;
     ctx.provide(TitleKey, {
       show: () => {
+        dismissBootCover();
         const h = host();
         if (h.skip()) { h.newGame(); return; }
         h.hold(true);

@@ -91,12 +91,15 @@ export class TitleScreenView {
 
   public open(props: TitleScreenProps): void {
     this._open = true;
+    // The cover hides the HUD behind it (it would show through the fade-in).
+    if (typeof document !== "undefined") document.body.classList.add("is-title");
     this._host.show(<TitleScreen {...props} />);
   }
 
   public close(): void {
     if (!this._open) return;
     this._open = false;
+    if (typeof document !== "undefined") document.body.classList.remove("is-title");
     this._host.hide();
   }
 }

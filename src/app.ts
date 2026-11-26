@@ -16,6 +16,7 @@ import MainScene from "./playground/main-scene";
 import { hydrateDesktopSave } from "./platform/desktop-bridge";
 import { applyPrefs, loadPrefs } from "./ui/accessibility";
 import type { EditorFactory } from "./game/editor-plugin";
+import { dismissBootCover } from "./ui/boot-cover";
 
 export interface AppOptions {
   /** The editor app plugs its suite into the game (see game/editor-plugin.ts). */
@@ -212,6 +213,7 @@ export class App {
   }
 
   private _showFatalError(message: string): void {
+    dismissBootCover();
     const errorBanner = document.createElement("div");
     errorBanner.className = "app-fatal-error";
     errorBanner.setAttribute("role", "alert");
