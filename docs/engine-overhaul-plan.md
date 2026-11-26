@@ -1322,6 +1322,30 @@ with the rendering and UI tracks in parallel.
 - Main JS chunk: 1,038 KB loaded up front, since the editors left
   (Phase 9). Target 900 KB.
 - Model payload: 13 MB on disk, 1.8 MB of it character LODs. Target met.
+- **Village draw calls: 486 → 245 per frame** (target ≤ 250, met). These
+  are the perf-budget seed's village at the high tier, averaged over
+  frames.
+  - **Where the draws were:** about two thirds in the shadow pass (three
+    cascades redrawing the casters), the rest in the main pass.
+  - **Cascaded shadows refresh every other frame,** as the single map
+    already did. Babylon recomputes the cascade matrices only when the
+    map renders, so map and matrices stay consistent and shadows trail
+    by a frame at most.
+  - **Fewer casters:** building floors, windows, shutters, doors and
+    corner posts no longer cast shadows (flat or thin; each was a draw
+    per cascade). The minimum caster size per cascade rose to 0.2 / 1 /
+    2 / 2.5 m. The shadow distance is 90 m (it was 150).
+  - **One shadow draw per character:** each model gets a shadow-only
+    proxy (its skinned parts merged: positions, indices and skin; layer
+    mask 0, so the camera never draws it, and the shadow pass doesn't
+    check layers). Small rig parts (eyes, eyebrows) cast nothing and are
+    left out of the LOD.
+  - **Tried and dropped:** baking each village's building parts per
+    material. It added draws, because instancing already shares one
+    draw per part across every chunk, and a bake per chunk multiplies
+    them.
+  - Budgets re-baselined (village 282 with the usual 15 % headroom). A
+    screenshot shows a village's building and character shadows intact.
 
 ## Risks
 

@@ -58,7 +58,7 @@ export function createSunShadows(
     const csm = new CascadedShadowGenerator(gfx.shadow.mapSize, sun);
     csm.numCascades = cascades;
     csm.lambda = 0.82;
-    csm.shadowMaxZ = 150;
+    csm.shadowMaxZ = 90;
     csm.stabilizeCascades = true;
     csm.cascadeBlendPercentage = 0.08;
     csm.depthClamp = true;
@@ -69,6 +69,12 @@ export function createSunShadows(
     // Shadows never go fully black — the sky still lights them.
     csm.darkness = 0.12;
     cullCascadeCasters(csm);
+    // Every other frame, like the single map below: the cascade matrices are
+    // recomputed only when the map renders, so map and matrices stay
+    // consistent and shadows trail the camera by one frame at most.  The
+    // caster pass is the larger half of a village's draw calls.
+    const csmMap = csm.getShadowMap();
+    if (csmMap) csmMap.refreshRate = 2;
     return csm;
   }
 
@@ -95,7 +101,7 @@ export function createSunShadows(
  * far cascades cover tens of metres per texel row; a lantern's or a barrel's
  * shadow there is a few texels at most, so it is left out.
  */
-const CASCADE_MIN_CASTER_RADIUS = [0, 0.45, 1.1, 2.0];
+const CASCADE_MIN_CASTER_RADIUS = [0.2, 1.0, 2.0, 2.5];
 
 /**
  * Per-cascade caster lists: only casters whose bounds overlap a cascade's

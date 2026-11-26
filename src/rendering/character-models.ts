@@ -24,6 +24,7 @@ import type { AssetContainer } from "@babylonjs/core/assetContainer";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -401,11 +402,80 @@ export function optimizeCharacterContainer(container: AssetContainer, scene: Sce
   }
 }
 
+/**
+ * A rig's parts smaller than this share of its largest part (bounding
+ * radius) cast no shadow: eyes and eyebrows sit inside the body's
+ * silhouette, and each part is a draw per shadow cascade.
+ */
+export const MIN_SHADOW_PART_SHARE = 0.2;
+/** The parts of a rig (or of its LOD) that cast shadows. */
+export function shadowParts(parts: AbstractMesh[]): AbstractMesh[] {
+  const drawn = parts.filter((m) => m.getTotalVertices() > 0);
+  const largest = Math.max(0, ...drawn.map((m) => m.getBoundingInfo().boundingSphere.radius));
+  return drawn.filter((m) => m.getBoundingInfo().boundingSphere.radius >= largest * MIN_SHADOW_PART_SHARE);
+}
+
 /** The last name segment: "<tag>|<lod>|Body" → "Body". */
 const baseName = (name: string): string => name.slice(name.lastIndexOf("|") + 1);
 
 /** public/model/manifest.json (tools/build-character-lods.mjs): which models have a LOD. */
 interface ModelManifest { models: Record<string, { lod1?: { file: string } }> }
+
+/** Marks a rig's shadow-only proxy (see buildShadowProxies). */
+const SHADOW_PROXY = "shadowProxy";
+
+/**
+ * One shadow caster per skeleton: the model's skinned parts merged into a
+ * single mesh (positions, indices and skin only) that the camera never
+ * draws (layer mask 0; the shadow pass doesn't check layers) but the
+ * shadow map does.  A rig casts in one draw per cascade instead of one per
+ * part.  Built on the template, so every rig clones it with its skeleton.
+ */
+export function buildShadowProxies(container: AssetContainer, scene: Scene): void {
+  const bySkeleton = new Map<unknown, Mesh[]>();
+  for (const m of container.meshes) {
+    if (!(m instanceof Mesh) || !m.skeleton || m.getTotalVertices() === 0) continue;
+    const list = bySkeleton.get(m.skeleton) ?? [];
+    list.push(m);
+    bySkeleton.set(m.skeleton, list);
+  }
+  for (const parts of bySkeleton.values()) {
+    if (parts.length < 2) continue;
+    const kinds = [VertexBuffer.PositionKind, VertexBuffer.MatricesIndicesKind, VertexBuffer.MatricesWeightsKind];
+    const extra = parts.every((p) => p.isVerticesDataPresent(VertexBuffer.MatricesIndicesExtraKind));
+    if (extra) kinds.push(VertexBuffer.MatricesIndicesExtraKind, VertexBuffer.MatricesWeightsExtraKind);
+    const data: Record<string, number[]> = Object.fromEntries(kinds.map((k) => [k, [] as number[]]));
+    const indices: number[] = [];
+    let base = 0;
+    for (const p of parts) {
+      const n = p.getTotalVertices();
+      for (const k of kinds) {
+        const d = p.getVerticesData(k);
+        if (!d) return; // a part without skin data: leave this skeleton alone
+        for (let i = 0; i < d.length; i++) data[k].push(d[i]);
+      }
+      const idx = p.getIndices() ?? [];
+      for (let i = 0; i < idx.length; i++) indices.push(idx[i] + base);
+      base += n;
+    }
+    const proxy = new Mesh(`${parts[0].name}_${SHADOW_PROXY}`, scene);
+    for (const k of kinds) proxy.setVerticesData(k, data[k], false);
+    proxy.setIndices(indices);
+    scene.removeMesh(proxy);
+    proxy.parent = parts[0].parent;
+    proxy.position.copyFrom(parts[0].position);
+    if (parts[0].rotationQuaternion) proxy.rotationQuaternion = parts[0].rotationQuaternion.clone();
+    proxy.scaling.copyFrom(parts[0].scaling);
+    proxy.skeleton = parts[0].skeleton;
+    proxy.numBoneInfluencers = parts[0].numBoneInfluencers;
+    proxy.layerMask = 0;
+    proxy.isPickable = false;
+    proxy.metadata = { [SHADOW_PROXY]: true };
+    container.meshes.push(proxy);
+  }
+}
+
+const isShadowProxy = (m: AbstractMesh): boolean => !!(m.metadata as Record<string, unknown> | null)?.[SHADOW_PROXY];
 
 interface LibraryEntry {
   /** The model's path under public/model ("kaykit/Knight.glb"), the manifest's key. */
@@ -513,7 +583,6 @@ export class CharacterModelLibrary {
         m.isPickable = false;
         m.receiveShadows = true;
         m.setEnabled(false);
-        this._shadows?.addShadowCaster(m, false);
         out.push(m);
       }
     }
@@ -522,7 +591,12 @@ export class CharacterModelLibrary {
     // kept meshes have moved out from under it.
     for (const root of inst.rootNodes) if (!kept.has(root)) root.dispose(false, false);
     for (const k of inst.skeletons) k.dispose();
-    return out.length > 0 ? out : null;
+    // At LOD distance eyes and eyebrows are below a pixel: leave them out
+    // (each is a draw).  The full model's shadow proxy keeps casting.
+    const visible = new Set(shadowParts(out));
+    for (const m of out) if (!visible.has(m)) m.dispose(false, false);
+    const lod = out.filter((m) => visible.has(m));
+    return lod.length > 0 ? lod : null;
   }
 
   public preload(ids: readonly CharacterModelId[] = CHARACTER_MODELS_PRELOAD): void {
@@ -541,6 +615,7 @@ export class CharacterModelLibrary {
     e.promise = SceneLoader.LoadAssetContainerAsync(root, file, this._scene)
       .then((container) => {
         optimizeCharacterContainer(container, this._scene);
+        buildShadowProxies(container, this._scene);
         // Measure standing height from the bind pose.
         let minY = Infinity, maxY = -Infinity;
         for (const m of container.meshes) {
@@ -622,8 +697,19 @@ export class CharacterModelLibrary {
       m.isPickable = false;
       m.receiveShadows = true;
       m.alwaysSelectAsActiveMesh = false;
-      this._shadows?.addShadowCaster(m, false);
     }
+    // Casters: the shadow proxy for the skinned parts (one draw), and the
+    // other parts big enough to show (weapons, shields).
+    const proxies = meshes.filter(isShadowProxy);
+    const skinnedCovered = proxies.length > 0;
+    for (const m of proxies) this._shadows?.addShadowCaster(m, false);
+    for (const m of shadowParts(meshes.filter((m) => !isShadowProxy(m)))) {
+      if (!(skinnedCovered && m.skeleton)) this._shadows?.addShadowCaster(m, false);
+    }
+    // The proxy is not part of the drawn rig (detail switching, hit flash).
+    const drawn = meshes.filter((m) => !isShadowProxy(m));
+    meshes.length = 0;
+    meshes.push(...drawn);
 
     // The capsule keeps physics + picking but no longer draws; decorative
     // primitive accessories (helmets, staffs…) are superseded by the model.

@@ -4,34 +4,34 @@
   "floor": 0.5,
   "budgets": {
     "start": {
-      "drawCalls": 201,
-      "activeMeshes": 103,
-      "meshes": 633,
-      "materials": 126,
-      "textures": 163
+      "drawCalls": 136,
+      "activeMeshes": 102,
+      "meshes": 673,
+      "materials": 136,
+      "textures": 166
     },
     "village": {
-      "drawCalls": 612,
-      "activeMeshes": 478,
-      "meshes": 2378,
-      "materials": 252,
-      "textures": 357
+      "drawCalls": 282,
+      "activeMeshes": 471,
+      "meshes": 2486,
+      "materials": 281,
+      "textures": 364
     }
   },
   "floors": {
     "start": {
-      "drawCalls": 87,
+      "drawCalls": 59,
       "activeMeshes": 44,
-      "meshes": 275,
-      "materials": 54,
-      "textures": 70
+      "meshes": 292,
+      "materials": 59,
+      "textures": 72
     },
     "village": {
-      "drawCalls": 266,
-      "activeMeshes": 207,
-      "meshes": 1033,
-      "materials": 109,
-      "textures": 155
+      "drawCalls": 122,
+      "activeMeshes": 204,
+      "meshes": 1080,
+      "materials": 122,
+      "textures": 158
     }
   }
 }

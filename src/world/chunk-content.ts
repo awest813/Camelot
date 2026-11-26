@@ -179,13 +179,13 @@ export class ChunkContent {
    * and drawn to its tier's distance.  A root that finished loading after its
    * chunk went (or came back) is dropped instead of leaking.
    */
-  public track(chunkKey: string, record: ChunkRecord, root: AbstractMesh, tier: PropTier): void {
+  public track(chunkKey: string, record: ChunkRecord, root: AbstractMesh, tier: PropTier, castShadow = true): void {
     if (this._records.get(chunkKey) !== record) {
       root.dispose();
       return;
     }
     const shadows = this._d.shadows();
-    shadows?.addShadowCaster(root, true);
+    if (castShadow) shadows?.addShadowCaster(root, true);
     this._d.lod.registerHierarchy(root, DRAW_DISTANCE[tier]);
     // Materials and textures belong to the shared asset template: keep them.
     record.own(root, () => {
@@ -224,12 +224,16 @@ export class ChunkContent {
         // Walls stop the player (and block NPC sight lines for stealth and
         // crime witnesses); the doorway stays open, roofs and panels don't collide.
         const solid = part.key.startsWith("vWall") || part.key.startsWith("vCorner");
+        // Floors lie on the ground; windows, shutters and doors are flat on
+        // the walls and corner posts are thin: their shadows hardly show,
+        // and each is a draw per shadow cascade.
+        const casts = !/^v(Floor|Window|Shutters|Door|Corner)/.test(part.key);
         root.isPickable = false;
         for (const m of root.getChildMeshes(false)) {
           m.isPickable = false;
           m.checkCollisions = solid;
         }
-        this.track(chunkKey, record, root, "structure");
+        this.track(chunkKey, record, root, "structure", casts);
       });
     }
   }
