@@ -13,13 +13,14 @@ import { ArrestKey } from "../features/arrest/arrest-feature";
 import type { Item } from "../systems/inventory-system";
 import { isCombatInputBlocked, restoreGameplayInput, togglePanel } from "./play-focus";
 import { toggleHelpOverlay } from "./help-overlay";
+import { MapKey } from "../features/map/map-feature";
 
 /** Panel toggles that may be pressed again from inside their open DOM dialog. */
 const DIALOG_TOGGLE_ACTIONS: ReadonlySet<InputAction> = new Set<InputAction>([
   "toggleInventory", "toggleQuestLog", "toggleSkillTree", "toggleAttributePanel",
   "toggleAlchemy", "toggleEnchanting", "toggleSmithing", "toggleSpellMaking", "toggleFastTravel",
   "toggleWaitDialog", "togglePetPanel", "toggleFollowerPanel", "toggleShoutMenu",
-  "stableOrSaddlebag", "favoritesMenu",
+  "stableOrSaddlebag", "favoritesMenu", "toggleMap",
 ]);
 
 export function wireInputAdapter(g: Game): void {
@@ -120,6 +121,7 @@ export function wireInputAdapter(g: Game): void {
   });
   adapter.onAction("save", () => { if (!g.isPaused) g.saveSystem.save(); });
   adapter.onAction("load", () => { if (!g.isPaused) g.saveSystem.load(); });
+  adapter.onAction("toggleMap", () => g.kernel.services.get(MapKey).toggle());
   adapter.onAction("toggleMute", () => {
     g.audioSystem.toggleMute();
     g.ui.showNotification(g.audioSystem.isMuted ? "Audio muted" : "Audio unmuted", 1500);

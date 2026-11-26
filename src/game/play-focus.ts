@@ -6,6 +6,7 @@
 import type { Game } from "../game";
 import { ProgressionKey } from "../features/progression/progression-feature";
 import { PickpocketKey } from "../features/pickpocket/pickpocket-feature";
+import { MapKey } from "../features/map/map-feature";
 
 /** Every panel that takes over the screen, in Escape order. */
 export function registerModals(g: Game): void {
@@ -27,6 +28,7 @@ export function registerModals(g: Game): void {
     { id: "fast-travel", isOpen: () => g.fastTravelUI.isVisible, close: () => g.fastTravelUI.close() },
     { id: "pets", isOpen: () => g.petUI.isVisible, close: () => g.pets.togglePanel() },
     { id: "followers", isOpen: () => g.followerUI.isVisible, close: () => g.followers.togglePanel() },
+    { id: "map", isOpen: () => g.kernel.services.get(MapKey).isOpen, close: () => g.kernel.services.get(MapKey).toggle() },
     { id: "shouts", isOpen: () => g.shoutUI.isVisible, close: () => g.shouts.togglePanel() },
     { id: "pickpocket", isOpen: () => g.pickpocketUI.isVisible, close: () => g.kernel.services.get(PickpocketKey).close() },
     { id: "stable", isOpen: () => g.stableUI.isVisible, close: () => g.stableUI.close() },

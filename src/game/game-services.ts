@@ -49,6 +49,7 @@ import { despawnNpc } from "./npcs";
 import { isCombatInputBlocked, suspendGameplayInput, restoreGameplayInput } from "./play-focus";
 import { TitleFeature } from "../features/title/title-feature";
 import { WorldSeedFeature } from "../features/world-seed/world-seed-feature";
+import { MapFeature } from "../features/map/map-feature";
 
 /**
  * Provide the services features use and install the features.  Services
@@ -80,13 +81,9 @@ export function installGameFeatures(game: Game): void {
       // First, so features can own their part of the save as they install.
       k.services.provide(SavesKey, { register: (codec) => game.saveSystem.registerCodec(codec) });
       k.services.provide(ClockKey, { hour: () => game.timeSystem.hour, elapsedHours: () => game.timeSystem.elapsedGameHours });
-      k.services.provide(PlayerKey, { position: () => game.player.camera.position, level: () => game.playerLevelSystem.characterLevel });
-      k.services.provide(FeedbackKey, {
-        notify: (text, ms) => game.ui.showNotification(text, ms ?? 3000),
-        grant: (reward) => grantDynamicWorldEventReward(game, reward),
-        addFame: (n) => game.fameSystem.addFame(n),
-        markDirty: () => game.saveSystem.markDirty(),
-      });
+      k.services.provide(PlayerKey, { position: () => game.player.camera.position, level: () => game.playerLevelSystem.characterLevel, heading: () => game.player.camera.rotation.y });
+      k.services.provide(FeedbackKey, { notify: (text, ms) => game.ui.showNotification(text, ms ?? 3000), grant: (reward) => grantDynamicWorldEventReward(game, reward),
+        addFame: (n) => game.fameSystem.addFame(n), markDirty: () => game.saveSystem.markDirty() });
       k.services.provide(ActorsKey, {
         residents: (chunkKey) => game._chunks.record(chunkKey)?.npcs ?? [],
         spawnArchetype: (chunkKey, archetype, x, z) => {
@@ -319,6 +316,7 @@ export function installGameFeatures(game: Game): void {
         skip: () => /[?&]replay=/.test(location.search),
       });
       k.install(new TitleFeature());
+      k.install(new MapFeature());
       k.services.provide(DialogueHostKey, {
         get trainers() { return game.trainerSystem; },
         skillName: (id) => game.skillProgressionSystem.getSkill(id as never)?.name ?? id,
@@ -342,8 +340,7 @@ export function installGameFeatures(game: Game): void {
       });
       k.install(game._survival);
       k.services.provide(OnboardingHostKey, {
-        // Space must never skip a tip while a menu, dialog or the editor is open.
-        // Every panel is in the modal registry, which the input block asks.
+        // Space never skips a tip while a menu, dialog or the editor is open (the input block asks the modal registry).
         screenFree: () => !isCombatInputBlocked(game),
       });
       k.install(new OnboardingFeature());
@@ -402,8 +399,7 @@ export function installGameFeatures(game: Game): void {
       k.services.provide(ModalKey, { suspendGameplay: () => suspendGameplayInput(game), restoreGameplay: () => restoreGameplayInput(game) });
 
       k.services.provide(WorldStateKey, {
-        weather: () => game.weatherSystem.state,
-        hasBounty: () => game.crimeSystem.getTotalBounty() > 0,
+        weather: () => game.weatherSystem.state, hasBounty: () => game.crimeSystem.getTotalBounty() > 0,
         biomeAt: (x, z) => game.world.getBiome(Math.floor(x / game.world.chunkSize), Math.floor(z / game.world.chunkSize)),
       });
       const lootRng = k.rng.stream("loot-drops");

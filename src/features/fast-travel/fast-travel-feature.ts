@@ -79,6 +79,7 @@ export class FastTravelFeature implements Feature {
     ctx.provide(FastTravelKey, {
       isDiscovered: (id) => this.places.isDiscovered(id),
       discover: (id, name, at) => this.places.discoverLocation(id, name, at),
+      places: () => this.places.discoveredLocations.map((l) => ({ id: l.id, name: l.name, x: l.position.x, z: l.position.z })),
     });
     ctx.provide(TravelKey, {
       places: this.places,

@@ -35,6 +35,8 @@ export interface PlayerService {
   /** Where the player stands (`y` is eye height, when known). */
   position(): { x: number; y?: number; z: number };
   level(): number;
+  /** Which way the player faces (radians; 0 is north, +z), when known. */
+  heading?(): number;
 }
 
 export interface FeedbackService {
@@ -98,6 +100,8 @@ export interface FastTravelService {
   isDiscovered(id: string): boolean;
   /** Returns true when newly discovered. */
   discover(id: string, name: string, at: { x: number; y: number; z: number }): boolean;
+  /** The places discovered so far (for the map). */
+  places?(): ReadonlyArray<{ id: string; name: string; x: number; z: number }>;
 }
 
 /** A keep-out footprint (oriented box, half sizes incl. margin) NPCs path around. */

@@ -101,6 +101,7 @@ export type InputAction =
   | "save"
   | "load"
   | "toggleMute"
+  | "toggleMap"
   | "toggleDebugOverlay"
   | "screenshot"
   | "helpOverlay"
@@ -241,9 +242,10 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   { key: "F4", action: "togglePOV", shift: false },
   { key: "F5", action: "save", shift: false, contexts: BOTH },   // shift:false → Shift+F5 = Bundle Merge Assistant
   { key: "F9", action: "load", shift: false, contexts: BOTH },   // shift:false → Shift+F9 = Faction Creator (never load a save!)
-  // M = Mute (shift:false so Shift+M = Mark; ctrlOrMeta:false so Ctrl+M = Scene
-  // Notes, Ctrl+Shift+M = Mod Manifest)
-  { key: "m", action: "toggleMute", caseInsensitive: true, ctrlOrMeta: false, shift: false, contexts: BOTH },
+  // M = the map (shift:false so Shift+M = Mark; ctrlOrMeta:false so Ctrl+M =
+  // Scene Notes, Ctrl+Shift+M = Mod Manifest).  F7 = mute (Shift+F7 is the editor's).
+  { key: "m", action: "toggleMap", caseInsensitive: true, ctrlOrMeta: false, shift: false },
+  { key: "F7", action: "toggleMute", shift: false, contexts: BOTH },
   { key: "PrintScreen", action: "screenshot", caseInsensitive: true, contexts: BOTH },
 ];
 

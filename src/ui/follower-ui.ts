@@ -212,10 +212,10 @@ export class FollowerUI {
     });
 
     const nameEl = document.createElement("span");
-    Object.assign(nameEl.style, { color: C.TITLE, fontSize: "11px", fontWeight: "bold" });
+    Object.assign(nameEl.style, { color: C.TITLE, fontSize: "14px", fontWeight: "bold" });
 
     const commandEl = document.createElement("span");
-    Object.assign(commandEl.style, { color: C.DIM, fontSize: "10px", fontStyle: "italic" });
+    Object.assign(commandEl.style, { color: C.DIM, fontSize: "13px", fontStyle: "italic" });
 
     nameRow.append(nameEl, commandEl);
 
@@ -239,7 +239,7 @@ export class FollowerUI {
     hpOuter.appendChild(hpFill);
 
     const hpText = document.createElement("span");
-    Object.assign(hpText.style, { color: C.DIM, fontSize: "9px" });
+    Object.assign(hpText.style, { color: C.DIM, fontSize: "12px" });
 
     info.append(nameRow, hpOuter, hpText);
     root.append(icon, info);
@@ -282,7 +282,7 @@ export class FollowerUI {
       padding:        "18px",
       zIndex:         "1600",
       minWidth:       "420px",
-      maxWidth:       "520px",
+      maxWidth:       "580px",
       maxHeight:      "85vh",
       overflowY:      "auto",
       fontFamily:     C.BODY,
@@ -315,7 +315,7 @@ export class FollowerUI {
 
     // ── Hint ─────────────────────────────────────────────────────────────────
     const hint = document.createElement("p");
-    Object.assign(hint.style, { margin: "0", fontSize: "10px", color: C.DIM });
+    Object.assign(hint.style, { margin: "0", fontSize: "13px", color: C.DIM });
     hint.textContent = "[G] or [Esc] to close  ·  Only one follower may be active at a time";
 
     // ── Active follower section ──────────────────────────────────────────────
@@ -327,7 +327,7 @@ export class FollowerUI {
     // ── Available followers list ─────────────────────────────────────────────
     const listTitle = document.createElement("h4");
     Object.assign(listTitle.style, {
-      margin: "4px 0", color: C.TITLE, fontSize: "12px", letterSpacing: "0.5px",
+      margin: "4px 0", color: C.TITLE, fontSize: "15px", letterSpacing: "0.5px",
     });
     listTitle.textContent = "AVAILABLE FOLLOWERS";
 
@@ -364,7 +364,7 @@ export class FollowerUI {
     } else {
       const empty = document.createElement("p");
       Object.assign(empty.style, {
-        color: C.DIM, fontSize: "11px", margin: "0", fontStyle: "italic",
+        color: C.DIM, fontSize: "14px", margin: "0", fontStyle: "italic",
       });
       empty.textContent = "No follower currently active.";
       active.appendChild(empty);
@@ -374,7 +374,7 @@ export class FollowerUI {
     list.innerHTML = "";
     if (this._templates.length === 0) {
       const empty = document.createElement("p");
-      Object.assign(empty.style, { color: C.DIM, fontSize: "11px", textAlign: "center" });
+      Object.assign(empty.style, { color: C.DIM, fontSize: "14px", textAlign: "center" });
       empty.textContent = "No followers registered.";
       list.appendChild(empty);
       return;
@@ -418,12 +418,12 @@ export class FollowerUI {
 
     const nameEl = document.createElement("div");
     Object.assign(nameEl.style, {
-      color: follower.isAlive ? C.TITLE : C.DIM, fontSize: "14px", fontWeight: "bold",
+      color: follower.isAlive ? C.TITLE : C.DIM, fontSize: "16px", fontWeight: "bold",
     });
     nameEl.textContent = follower.name + (follower.isAlive ? "" : " (deceased)");
 
     const subEl = document.createElement("div");
-    Object.assign(subEl.style, { color: C.DIM, fontSize: "10px" });
+    Object.assign(subEl.style, { color: C.DIM, fontSize: "13px" });
     subEl.textContent = tmpl
       ? `${_capitalise(tmpl.combatRole)}  ·  Level ${follower.level}`
       : `Level ${follower.level}`;
@@ -432,7 +432,7 @@ export class FollowerUI {
 
     const badge = document.createElement("span");
     Object.assign(badge.style, {
-      background: C.BORDER, color: "#FFF8DC", fontSize: "9px",
+      background: C.BORDER, color: "#FFF8DC", fontSize: "12px",
       padding: "2px 6px", borderRadius: "3px", fontFamily: C.MONO,
     });
     badge.textContent = "ACTIVE";
@@ -443,7 +443,7 @@ export class FollowerUI {
     const stats = document.createElement("div");
     Object.assign(stats.style, {
       display: "grid", gridTemplateColumns: "1fr 1fr",
-      gap: "4px 12px", fontSize: "10px", color: C.DIM,
+      gap: "4px 12px", fontSize: "13px", color: C.DIM,
     });
     stats.innerHTML = `
       <span>HP</span><span style="color:${C.TEXT}">${Math.ceil(follower.health)} / ${follower.maxHealth}</span>
@@ -463,21 +463,21 @@ export class FollowerUI {
       const followBtn = document.createElement("button");
       followBtn.type = "button";
       followBtn.setAttribute("aria-disabled", follower.command === "follow" ? "true" : "false");
-      _styleButton(followBtn, "Follow", { fontSize: "10px", padding: "3px 8px" });
+      _styleButton(followBtn, "Follow", { fontSize: "13px", padding: "3px 8px" });
       followBtn.setAttribute("aria-label", "Command follower to follow");
       followBtn.addEventListener("click", () => { if (followBtn.getAttribute("aria-disabled") !== "true") this.onCommand?.("follow"); });
 
       const waitBtn = document.createElement("button");
       waitBtn.type = "button";
       waitBtn.setAttribute("aria-disabled", follower.command === "wait" ? "true" : "false");
-      _styleButton(waitBtn, "Wait", { fontSize: "10px", padding: "3px 8px" });
+      _styleButton(waitBtn, "Wait", { fontSize: "13px", padding: "3px 8px" });
       waitBtn.setAttribute("aria-label", "Command follower to wait");
       waitBtn.addEventListener("click", () => { if (waitBtn.getAttribute("aria-disabled") !== "true") this.onCommand?.("wait"); });
 
       const tradeBtn = document.createElement("button");
       tradeBtn.type = "button";
       tradeBtn.setAttribute("aria-disabled", follower.command === "trade" ? "true" : "false");
-      _styleButton(tradeBtn, "Trade", { fontSize: "10px", padding: "3px 8px" });
+      _styleButton(tradeBtn, "Trade", { fontSize: "13px", padding: "3px 8px" });
       tradeBtn.setAttribute("aria-label", "Open trade with follower");
       tradeBtn.addEventListener("click", () => { if (tradeBtn.getAttribute("aria-disabled") !== "true") this.onCommand?.("trade"); });
 
@@ -536,17 +536,17 @@ export class FollowerUI {
 
     const nameEl = document.createElement("div");
     Object.assign(nameEl.style, {
-      color: isDeceased ? C.DIM : C.TITLE, fontSize: "12px", fontWeight: "bold",
+      color: isDeceased ? C.DIM : C.TITLE, fontSize: "15px", fontWeight: "bold",
     });
     nameEl.textContent = tmpl.name + (isDeceased ? " (deceased)" : "");
 
     const subEl = document.createElement("div");
-    Object.assign(subEl.style, { color: C.DIM, fontSize: "11px" });
+    Object.assign(subEl.style, { color: C.DIM, fontSize: "14px" });
     subEl.textContent = `${_capitalise(tmpl.combatRole)}  ·  Level ${tmpl.level}`;
 
     const descEl = document.createElement("div");
     Object.assign(descEl.style, {
-      color: C.DIM, fontSize: "11px", marginTop: "2px", fontStyle: "italic",
+      color: C.DIM, fontSize: "14px", marginTop: "2px", fontStyle: "italic",
     });
     descEl.textContent = tmpl.description;
 
@@ -557,12 +557,12 @@ export class FollowerUI {
 
     if (tmpl.hireCost > 0) {
       const costLabel = document.createElement("div");
-      Object.assign(costLabel.style, { color: C.DIM, fontSize: "10px" });
+      Object.assign(costLabel.style, { color: C.DIM, fontSize: "13px" });
       costLabel.textContent = "Hire Cost";
 
       const costValue = document.createElement("div");
       Object.assign(costValue.style, {
-        color: canAfford ? C.TEXT : C.STATUS_ERROR, fontSize: "11px", fontWeight: "bold",
+        color: canAfford ? C.TEXT : C.STATUS_ERROR, fontSize: "14px", fontWeight: "bold",
       });
       costValue.textContent = `${tmpl.hireCost} 🪙`;
 
@@ -570,7 +570,7 @@ export class FollowerUI {
     } else {
       const freeLabel = document.createElement("div");
       Object.assign(freeLabel.style, {
-        color: C.STATUS_OK, fontSize: "11px", fontWeight: "bold",
+        color: C.STATUS_OK, fontSize: "14px", fontWeight: "bold",
       });
       freeLabel.textContent = "Free";
       costBlock.appendChild(freeLabel);
@@ -582,7 +582,7 @@ export class FollowerUI {
     const stats = document.createElement("div");
     Object.assign(stats.style, {
       display: "grid", gridTemplateColumns: "1fr 1fr",
-      gap: "2px 10px", fontSize: "11px", color: C.DIM,
+      gap: "2px 10px", fontSize: "14px", color: C.DIM,
     });
     // Built as nodes (the values are data, so no HTML parsing).
     const statRow = (label: string, value: string) => {
@@ -621,7 +621,7 @@ export class FollowerUI {
     } else {
       const deceasedLabel = document.createElement("span");
       Object.assign(deceasedLabel.style, {
-        color: C.STATUS_ERROR, fontSize: "10px", fontStyle: "italic",
+        color: C.STATUS_ERROR, fontSize: "13px", fontStyle: "italic",
       });
       deceasedLabel.textContent = "Cannot be rehired";
       actionRow.appendChild(deceasedLabel);
@@ -650,7 +650,7 @@ function _buildBar(
 
   if (label) {
     const lbl = document.createElement("span");
-    Object.assign(lbl.style, { color: C.DIM, fontSize: "11px", minWidth: "14px" });
+    Object.assign(lbl.style, { color: C.DIM, fontSize: "14px", minWidth: "14px" });
     lbl.textContent = label;
     wrapper.appendChild(lbl);
   }
@@ -685,7 +685,7 @@ function _styleButton(
     borderRadius:  "4px",
     padding:       "4px 10px",
     cursor:        "pointer",
-    fontSize:      "11px",
+    fontSize:      "14px",
     fontFamily:    C.BODY,
     ...overrides,
   });

@@ -42,7 +42,7 @@ function styleButton(btn: HTMLButtonElement, label: string): void {
   btn.type = "button";
   Object.assign(btn.style, {
     background: C.BTN_BG, color: C.TEXT, border: `1px solid ${C.BORDER}`,
-    borderRadius: "6px", fontSize: "12px", fontWeight: "600", padding: "5px 12px", cursor: "pointer",
+    borderRadius: "6px", fontSize: "15px", fontWeight: "600", padding: "5px 12px", cursor: "pointer",
     transition: "background 0.15s, border-color 0.15s, color 0.15s",
   });
   btn.textContent = label;
@@ -93,7 +93,7 @@ export class PickpocketUI {
 
     if (items.length === 0) {
       const empty = document.createElement("li");
-      Object.assign(empty.style, { color: C.DIM, fontSize: "13px", listStyle: "none" });
+      Object.assign(empty.style, { color: C.DIM, fontSize: "16px", listStyle: "none" });
       empty.textContent = "Nothing worth taking.";
       this._listEl.appendChild(empty);
       return;
@@ -118,7 +118,7 @@ export class PickpocketUI {
       li.setAttribute("data-item-id", item.id);
 
       const nameEl = document.createElement("span");
-      Object.assign(nameEl.style, { color: C.TEXT, fontSize: "13px", fontWeight: "500" });
+      Object.assign(nameEl.style, { color: C.TEXT, fontSize: "16px", fontWeight: "500" });
       const icon = getItemIcon({ id: item.id, name: item.name });
       nameEl.textContent = `${icon} ${item.name}`;
       li.appendChild(nameEl);
@@ -160,7 +160,7 @@ export class PickpocketUI {
     root.className = "pickpocket-ui";
     Object.assign(root.style, {
       position: "fixed", zIndex: "1200", left: "50%", top: "50%",
-      transform: "translate(-50%, -50%)", minWidth: "340px", maxWidth: "440px",
+      transform: "translate(-50%, -50%)", minWidth: "340px", maxWidth: "500px",
       background: C.BG, border: `1px solid ${C.BORDER}`, borderRadius: "10px",
       boxShadow: "0 20px 60px rgba(0, 0, 0, 0.85), 0 0 0 100vmax rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 230, 180, 0.1)",
       backdropFilter: "blur(4px)",
@@ -198,7 +198,7 @@ export class PickpocketUI {
     root.appendChild(list);
 
     const hint = document.createElement("p");
-    Object.assign(hint.style, { margin: "0", fontSize: "10px", color: C.DIM });
+    Object.assign(hint.style, { margin: "0", fontSize: "13px", color: C.DIM });
     hint.textContent = "[Esc] to close  ·  Getting caught is a crime";
     root.appendChild(hint);
 

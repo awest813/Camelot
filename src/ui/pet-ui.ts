@@ -174,10 +174,10 @@ export class PetUI {
     });
 
     const nameEl = document.createElement("span");
-    Object.assign(nameEl.style, { color: C.TITLE, fontSize: "11px", fontWeight: "bold" });
+    Object.assign(nameEl.style, { color: C.TITLE, fontSize: "14px", fontWeight: "bold" });
 
     const levelEl = document.createElement("span");
-    Object.assign(levelEl.style, { color: C.DIM, fontSize: "10px" });
+    Object.assign(levelEl.style, { color: C.DIM, fontSize: "13px" });
 
     nameRow.append(nameEl, levelEl);
 
@@ -201,7 +201,7 @@ export class PetUI {
     hpOuter.appendChild(hpFill);
 
     const hpText = document.createElement("span");
-    Object.assign(hpText.style, { color: C.DIM, fontSize: "9px" });
+    Object.assign(hpText.style, { color: C.DIM, fontSize: "12px" });
 
     info.append(nameRow, hpOuter, hpText);
     root.append(icon, info);
@@ -244,7 +244,7 @@ export class PetUI {
       padding:        "18px",
       zIndex:         "1600",
       minWidth:       "340px",
-      maxWidth:       "420px",
+      maxWidth:       "480px",
       maxHeight:      "80vh",
       overflowY:      "auto",
       fontFamily:     C.BODY,
@@ -260,7 +260,7 @@ export class PetUI {
     const title = document.createElement("h3");
     title.id = "pet-panel-title";
     Object.assign(title.style, {
-      margin: "0", fontFamily: C.FONT, color: C.TITLE, fontSize: "15px", letterSpacing: "1px",
+      margin: "0", fontFamily: C.FONT, color: C.TITLE, fontSize: "17px", letterSpacing: "1px",
     });
     title.textContent = "COMPANIONS";
 
@@ -277,7 +277,7 @@ export class PetUI {
 
     // ── Hint ─────────────────────────────────────────────────────────────────
     const hint = document.createElement("p");
-    Object.assign(hint.style, { margin: "0", fontSize: "10px", color: C.DIM });
+    Object.assign(hint.style, { margin: "0", fontSize: "13px", color: C.DIM });
     hint.textContent = "[P] or [Esc] to close  ·  Only one companion may be active at a time";
 
     // ── Pet list ─────────────────────────────────────────────────────────────
@@ -307,7 +307,7 @@ export class PetUI {
 
     if (this._pets.length === 0) {
       const empty = document.createElement("p");
-      Object.assign(empty.style, { color: C.DIM, fontSize: "12px", textAlign: "center" });
+      Object.assign(empty.style, { color: C.DIM, fontSize: "15px", textAlign: "center" });
       empty.textContent = "You have no companions yet.";
       list.appendChild(empty);
       return;
@@ -347,12 +347,12 @@ export class PetUI {
 
     const nameEl = document.createElement("div");
     Object.assign(nameEl.style, {
-      color: pet.isDead ? C.DIM : C.TITLE, fontSize: "13px", fontWeight: "bold",
+      color: pet.isDead ? C.DIM : C.TITLE, fontSize: "16px", fontWeight: "bold",
     });
     nameEl.textContent = `${pet.name}${pet.isDead ? " (deceased)" : ""}`;
 
     const subEl = document.createElement("div");
-    Object.assign(subEl.style, { color: C.DIM, fontSize: "10px" });
+    Object.assign(subEl.style, { color: C.DIM, fontSize: "13px" });
     subEl.textContent = `${_capitalise(pet.species)}  ·  Level ${pet.level}`;
 
     nameBlock.append(nameEl, subEl);
@@ -360,7 +360,7 @@ export class PetUI {
     if (isActive) {
       const badge = document.createElement("span");
       Object.assign(badge.style, {
-        background: C.BORDER, color: "#FFF8DC", fontSize: "9px",
+        background: C.BORDER, color: "#FFF8DC", fontSize: "12px",
         padding: "2px 5px", borderRadius: "3px", fontFamily: C.MONO,
       });
       badge.textContent = "ACTIVE";
@@ -373,7 +373,7 @@ export class PetUI {
     const stats = document.createElement("div");
     Object.assign(stats.style, {
       display: "grid", gridTemplateColumns: "1fr 1fr",
-      gap: "4px 12px", fontSize: "10px", color: C.DIM,
+      gap: "4px 12px", fontSize: "13px", color: C.DIM,
     });
     stats.innerHTML = `
       <span>HP</span><span style="color:${C.TEXT}">${Math.ceil(pet.health)} / ${pet.maxHealth}</span>
@@ -450,7 +450,7 @@ function _buildBar(
 
   if (label) {
     const lbl = document.createElement("span");
-    Object.assign(lbl.style, { color: C.DIM, fontSize: "11px", minWidth: "14px" });
+    Object.assign(lbl.style, { color: C.DIM, fontSize: "14px", minWidth: "14px" });
     lbl.textContent = label;
     wrapper.appendChild(lbl);
   }
@@ -485,7 +485,7 @@ function _styleButton(
     borderRadius:  "4px",
     padding:       "4px 10px",
     cursor:        "pointer",
-    fontSize:      "11px",
+    fontSize:      "14px",
     fontFamily:    C.BODY,
     ...overrides,
   });

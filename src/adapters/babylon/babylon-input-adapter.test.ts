@@ -195,7 +195,7 @@ describe("BabylonInputAdapter", () => {
     // Unmodified chords still fire
     expect(adapter.handleKeyEvent("F5", "down")).toBe("save");
     expect(adapter.handleKeyEvent("F8", "down")).toBe("favoritesMenu");
-    expect(adapter.handleKeyEvent("m", "down")).toBe("toggleMute");
+    expect(adapter.handleKeyEvent("m", "down")).toBe("toggleMap");
     expect(adapter.handleKeyEvent("z", "down")).toBe("cycleSpell");
     expect(adapter.handleKeyEvent("y", "down")).toBe("toggleFastTravel");
   });
@@ -214,10 +214,12 @@ describe("BabylonInputAdapter", () => {
     expect(adapter.handleKeyEvent("O", "down")).toBe("mountDismount");
   });
 
-  it("default bindings route Shift+M to markPosition, M to mute", () => {
+  it("default bindings route Shift+M to markPosition, M to the map, F7 to mute", () => {
     const adapter = new BabylonInputAdapter();
     expect(adapter.handleKeyEvent("M", "down", { shift: true })).toBe("markPosition");
-    expect(adapter.handleKeyEvent("m", "down")).toBe("toggleMute");
+    expect(adapter.handleKeyEvent("m", "down")).toBe("toggleMap");
+    expect(adapter.handleKeyEvent("F7", "down")).toBe("toggleMute");
+    expect(adapter.handleKeyEvent("F7", "down", { shift: true }), "Shift+F7 stays the editor's").toBeNull();
   });
 
   it("returns null when no binding matches", () => {

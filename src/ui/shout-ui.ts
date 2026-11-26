@@ -187,13 +187,13 @@ export class ShoutUI {
     icon.textContent = "🜂";
 
     const name = document.createElement("span");
-    Object.assign(name.style, { color: C.TITLE, fontSize: "11px", fontWeight: "bold", flex: "1" });
+    Object.assign(name.style, { color: C.TITLE, fontSize: "14px", fontWeight: "bold", flex: "1" });
 
     const pips = document.createElement("span");
-    Object.assign(pips.style, { color: C.DIM, fontSize: "10px", fontFamily: C.MONO });
+    Object.assign(pips.style, { color: C.DIM, fontSize: "13px", fontFamily: C.MONO });
 
     const state = document.createElement("span");
-    Object.assign(state.style, { fontSize: "10px", fontFamily: C.MONO, fontWeight: "bold" });
+    Object.assign(state.style, { fontSize: "13px", fontFamily: C.MONO, fontWeight: "bold" });
 
     root.append(icon, name, pips, state);
     document.body.appendChild(root);
@@ -233,7 +233,7 @@ export class ShoutUI {
       padding:        "18px",
       zIndex:         "1600",
       minWidth:       "360px",
-      maxWidth:       "460px",
+      maxWidth:       "520px",
       maxHeight:      "80vh",
       overflowY:      "auto",
       fontFamily:     C.BODY,
@@ -249,7 +249,7 @@ export class ShoutUI {
     const title = document.createElement("h3");
     title.id = "shout-panel-title";
     Object.assign(title.style, {
-      margin: "0", fontFamily: C.FONT, color: C.TITLE, fontSize: "15px", letterSpacing: "1px",
+      margin: "0", fontFamily: C.FONT, color: C.TITLE, fontSize: "17px", letterSpacing: "1px",
     });
     title.textContent = "SHOUTS";
 
@@ -266,14 +266,14 @@ export class ShoutUI {
 
     // ── Soul counter ────────────────────────────────────────────────────────
     const souls = document.createElement("p");
-    Object.assign(souls.style, { margin: "0", fontSize: "11px", color: C.TEXT });
+    Object.assign(souls.style, { margin: "0", fontSize: "14px", color: C.TEXT });
     const soulsLabel = document.createElement("span");
     soulsLabel.setAttribute("aria-label", "Dragon souls");
     souls.append(soulsLabel);
 
     // ── Hint ────────────────────────────────────────────────────────────────
     const hint = document.createElement("p");
-    Object.assign(hint.style, { margin: "0", fontSize: "10px", color: C.DIM });
+    Object.assign(hint.style, { margin: "0", fontSize: "13px", color: C.DIM });
     hint.textContent = "[N] or [Esc] to close  ·  Shift+N to shout  ·  Slay dragons to absorb souls";
 
     // ── Shout list ──────────────────────────────────────────────────────────
@@ -305,7 +305,7 @@ export class ShoutUI {
 
     if (this._views.length === 0) {
       const empty = document.createElement("p");
-      Object.assign(empty.style, { color: C.DIM, fontSize: "12px", textAlign: "center" });
+      Object.assign(empty.style, { color: C.DIM, fontSize: "15px", textAlign: "center" });
       empty.textContent = "No shouts are known to you yet.";
       list.appendChild(empty);
       return;
@@ -343,7 +343,7 @@ export class ShoutUI {
     icon.textContent = "🜂";
 
     const nameEl = document.createElement("div");
-    Object.assign(nameEl.style, { flex: "1", color: C.TITLE, fontSize: "13px", fontWeight: "bold" });
+    Object.assign(nameEl.style, { flex: "1", color: C.TITLE, fontSize: "16px", fontWeight: "bold" });
     nameEl.textContent = def.name;
 
     topRow.append(icon, nameEl);
@@ -351,7 +351,7 @@ export class ShoutUI {
     if (isEquipped) {
       const badge = document.createElement("span");
       Object.assign(badge.style, {
-        background: C.BORDER, color: "#FFF8DC", fontSize: "9px",
+        background: C.BORDER, color: "#FFF8DC", fontSize: "12px",
         padding: "2px 5px", borderRadius: "3px", fontFamily: C.MONO,
       });
       badge.textContent = "EQUIPPED";
@@ -360,7 +360,7 @@ export class ShoutUI {
 
     // ── Description ─────────────────────────────────────────────────────────
     const descEl = document.createElement("div");
-    Object.assign(descEl.style, { color: C.DIM, fontSize: "10px", fontStyle: "italic" });
+    Object.assign(descEl.style, { color: C.DIM, fontSize: "13px", fontStyle: "italic" });
     descEl.textContent = def.description;
 
     // ── Words row ───────────────────────────────────────────────────────────
@@ -370,7 +370,7 @@ export class ShoutUI {
     def.words.forEach((word, i) => {
       const chip = document.createElement("span");
       Object.assign(chip.style, {
-        fontSize: "10px", fontFamily: C.MONO,
+        fontSize: "13px", fontFamily: C.MONO,
         padding: "2px 6px", borderRadius: "3px",
         border: `1px solid ${unlocked[i] ? C.TITLE : learned[i] ? C.BORDER : "rgba(120, 100, 70, 0.4)"}`,
         color: unlocked[i] ? C.TITLE : learned[i] ? C.TEXT : C.LOCKED,
@@ -388,7 +388,7 @@ export class ShoutUI {
 
     // ── Tier effect preview ─────────────────────────────────────────────────
     const effectEl = document.createElement("div");
-    Object.assign(effectEl.style, { color: C.TEXT, fontSize: "10px" });
+    Object.assign(effectEl.style, { color: C.TEXT, fontSize: "13px" });
     const tierDef = tier > 0 ? def.tiers[tier - 1] : undefined;
     if (tierDef) {
       effectEl.textContent = tierDef.description;
@@ -413,7 +413,7 @@ export class ShoutUI {
       const nextWord = def.words[nextIndex];
       if (!nextLearned) {
         const learnHint = document.createElement("span");
-        Object.assign(learnHint.style, { color: C.LOCKED, fontSize: "11px", fontStyle: "italic" });
+        Object.assign(learnHint.style, { color: C.LOCKED, fontSize: "14px", fontStyle: "italic" });
         learnHint.textContent = "Next word awaits at a Word Wall…";
         actionRow.appendChild(learnHint);
       } else if (!nextUnlocked) {
@@ -479,7 +479,7 @@ function _styleButton(
     borderRadius:  "4px",
     padding:       "4px 10px",
     cursor:        "pointer",
-    fontSize:      "11px",
+    fontSize:      "14px",
     fontFamily:    C.BODY,
     ...overrides,
   });

@@ -1510,11 +1510,7 @@
     inset 0 0 50px rgba(0, 0, 0, 0.5) !important;
 }
 
-/* Their inline type sizes were set for Inter; the book face reads small, so
-   the panels scale up a touch. */
-:is(.pet-ui, .follower-ui, .shout-ui, .pickpocket-ui) {
-  zoom: 1.14;
-}
+/* (Their type sizes are set in each file, sized for the book face.) */
 :is(.pet-ui, .follower-ui, .shout-ui, .pickpocket-ui) button[aria-label^="Close"] {
   font-size: 13px !important;
 }
@@ -1791,3 +1787,185 @@
   .title-screen { animation: none; }
 }
 :root.reduce-motion .title-screen { animation: none; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The map: a parchment chart in the dialog's binding, with the places
+   known and a legend on a leather side strip.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.map-panel .map-panel__panel {
+  width: auto;
+  max-width: calc(100vw - 32px);
+}
+.map-panel__layout {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+.map-panel__sheet {
+  position: relative;
+  flex: 0 0 auto;
+  max-width: calc(100vw - 340px);
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--tome-parchment-bg);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 0 0 3px var(--tome-leather-deep),
+    0 0 0 4px rgba(201, 154, 62, 0.55),
+    inset 0 0 40px rgba(110, 72, 32, 0.45);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.map-panel__sheet:active { cursor: grabbing; }
+.map-panel__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  mix-blend-mode: multiply;
+}
+.map-panel__place {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  translate: -7px -50%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tome-ink);
+  font-family: var(--tome-font-book);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  text-shadow: 0 0 3px rgba(240, 225, 190, 0.95), 0 0 6px rgba(240, 225, 190, 0.8);
+}
+.map-panel__place-mark {
+  font-size: 12px;
+  color: var(--tome-wine);
+}
+.map-panel__place:hover .map-panel__place-name,
+.map-panel__place:focus-visible .map-panel__place-name {
+  color: var(--tome-wine);
+  text-decoration: underline;
+}
+/* You: a red arrow on a pale disc, above every other mark. */
+.map-panel__me {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 246, 222, 0.92);
+  box-shadow: 0 0 0 2px var(--tome-wine), 0 2px 6px rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  line-height: 1;
+  color: var(--tome-wine-bright);
+  pointer-events: none;
+}
+.map-panel__rose {
+  position: absolute;
+  right: 14px;
+  top: 12px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(52, 34, 18, 0.55);
+  box-shadow: inset 0 0 0 4px rgba(240, 225, 190, 0.5), inset 0 0 0 5px rgba(52, 34, 18, 0.35);
+  font-family: var(--tome-font-display);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--tome-wine);
+  pointer-events: none;
+}
+.map-panel__rose::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -9px;
+  translate: -50% 0;
+  border: 6px solid transparent;
+  border-bottom: 10px solid var(--tome-wine);
+}
+.map-panel__side {
+  width: 230px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: var(--tome-font-book);
+  font-size: 16px;
+}
+.map-panel__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.map-panel__places,
+.map-panel__legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+}
+.map-panel__places-btn {
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--tome-leather-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.map-panel__places-btn::before {
+  content: "◆ ";
+  font-size: 10px;
+  color: var(--tome-gilt);
+}
+.map-panel__places-btn:hover,
+.map-panel__places-btn:focus-visible {
+  color: var(--tome-gilt-bright);
+  outline: none;
+}
+.map-panel__legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--tome-leather-text);
+}
+.map-panel__swatch {
+  width: 22px;
+  height: 14px;
+  border-radius: 1px;
+  background-color: var(--tome-parchment);
+  background-blend-mode: multiply;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.map-panel__swatch--pond { background: rgba(58, 92, 120, 0.8); }
+.map-panel__legend-mark {
+  width: 22px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--tome-gilt);
+}
+.map-panel__legend-mark--me { color: #e07a5f; }
+.map-panel__empty,
+.map-panel__hint {
+  margin: 0;
+  font-style: italic;
+  color: var(--tome-leather-dim);
+}
+.map-panel__hint { margin-top: 6px; font-size: 14px; }
+
+@media (max-width: 980px) {
+  .map-panel__layout { flex-direction: column; }
+  .map-panel__sheet { max-width: calc(100vw - 64px); }
+  .map-panel__side { width: 100%; }
+}
