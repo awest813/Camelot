@@ -156,7 +156,7 @@ export class PetUI {
       border:      `1px solid ${C.BORDER}`,
       borderRadius:"6px",
       padding:     "5px 8px",
-      zIndex:      "900",
+      zIndex: "20" /* a HUD chip: under every panel */,
       pointerEvents:"none",
       fontFamily:  C.FONT,
       minWidth:    "160px",
@@ -243,7 +243,7 @@ export class PetUI {
       backdropFilter: "blur(4px)",
       padding:        "18px",
       zIndex:         "1600",
-      minWidth:       "340px",
+      minWidth:       "min(340px, calc(100vw - 56px))",
       maxWidth:       "480px",
       maxHeight:      "80vh",
       overflowY:      "auto",
@@ -278,7 +278,7 @@ export class PetUI {
     // ── Hint ─────────────────────────────────────────────────────────────────
     const hint = document.createElement("p");
     Object.assign(hint.style, { margin: "0", fontSize: "13px", color: C.DIM });
-    hint.textContent = "[P] or [Esc] to close  ·  Only one companion may be active at a time";
+    hint.textContent = "P or Esc to close  ·  Only one companion may be active at a time";
 
     // ── Pet list ─────────────────────────────────────────────────────────────
     const listEl = document.createElement("div");

@@ -158,9 +158,11 @@ export class MountsFeature implements Feature {
         else this.horses.mountHorse(owned[0].id);
       },
       toggleStableOrSaddlebag: () => {
+        // Closing comes first: the open window itself counts as "can't act".
+        if (this.saddlebag.isVisible) { this.saddlebag.close(); return; }
+        if (this.stable.isVisible) { this.stable.close(); return; }
         if (!host().canAct()) return;
         if (this.horses.isMounted) {
-          if (this.saddlebag.isVisible) { this.saddlebag.close(); return; }
           const horse = this.horses.currentHorse!;
           const bag = this.horses.getSaddlebag(horse.id) ?? [];
           void this.saddlebag.get().then((panel) => {
@@ -169,7 +171,6 @@ export class MountsFeature implements Feature {
           });
           return;
         }
-        if (this.stable.isVisible) { this.stable.close(); return; }
         const stable = this.horses.getStableNPC(STABLE_MASTER);
         if (!stable) {
           feedback().notify("No stable nearby.", 1500);

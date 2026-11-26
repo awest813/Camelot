@@ -209,8 +209,7 @@ export class CharacterSheetUI {
 
     const hintEl = document.createElement("p");
     hintEl.className = "character-sheet-ui__hint";
-    hintEl.textContent = "Press Tab or Esc to close.";
-    hintEl.style.cssText = "margin:0;font-size:11px;color:#998877;";
+    hintEl.textContent = "Tab or Esc to close";
     header.appendChild(hintEl);
 
     // ── Scrollable body ───────────────────────────────────────────────────────
@@ -278,11 +277,14 @@ export class CharacterSheetUI {
     root.appendChild(closeBtn);
 
     root.addEventListener("keydown", (e: KeyboardEvent) => {
-      // Plain Tab closes too ("Press Tab or Esc to close"). The game's Tab toggle
+      // Plain Tab closes too ("Tab or Esc to close"). The game's Tab toggle
       // listens on the canvas, which loses focus to this dialog on open, so the
-      // sheet must own its close key. Shift+Tab still cycles focus (perk buttons).
+      // sheet must own its close key — but only while focus is on the sheet
+      // itself (as it is on open): once the player has moved into the perk
+      // buttons (Shift+Tab, or a click), Tab moves between them.
       const isCloseTab =
-        e.key === "Tab" && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && !e.repeat;
+        e.key === "Tab" && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && !e.repeat
+        && (document.activeElement === root || !root.contains(document.activeElement));
       if (e.key === "Escape" || isCloseTab) {
         e.preventDefault();
         e.stopPropagation();

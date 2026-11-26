@@ -128,7 +128,7 @@ export class SpellMakingUI {
 
     const subtitle = document.createElement("p");
     subtitle.className = "spell-making__subtitle";
-    subtitle.textContent = "Combine up to two effects and forge a custom spell. Press X or Esc to close.";
+    subtitle.textContent = "Combine up to two effects and forge a custom spell. X or Esc to close.";
     titleWrap.appendChild(subtitle);
 
     const closeBtn = document.createElement("button");

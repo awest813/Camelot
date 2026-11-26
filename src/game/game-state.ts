@@ -463,7 +463,8 @@ export class GameState {
     unlockPointer: () => { if (typeof document !== "undefined") document.exitPointerLock(); },
     attachCamera: () => this.player.camera.attachControl(this.canvas, true),
     detachCamera: () => this.player.camera.detachControl(),
-    setInteractionBlocked: (b) => { if (this.interactionSystem) this.interactionSystem.isBlocked = b; },
+    setInteractionBlocked: (b) => { if (this.interactionSystem) this.interactionSystem.isBlocked = b; }, focusGame: () => this.canvas.focus({ preventScroll: true }),
+    onHeldChange: (held) => document.body.classList.toggle("is-input-held", held),
   });
   /** The camera stack: the player's view unless a shot (dialogue framing, the death fall) runs. */
   public readonly _camera = new CameraDirector();

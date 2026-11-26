@@ -194,7 +194,7 @@ export class FollowerUI {
       border:      `1px solid ${C.BORDER}`,
       borderRadius:"6px",
       padding:     "5px 8px",
-      zIndex:      "900",
+      zIndex: "20" /* a HUD chip: under every panel */,
       pointerEvents:"none",
       fontFamily:  C.FONT,
       minWidth:    "180px",
@@ -281,7 +281,7 @@ export class FollowerUI {
       backdropFilter: "blur(4px)",
       padding:        "18px",
       zIndex:         "1600",
-      minWidth:       "420px",
+      minWidth:       "min(420px, calc(100vw - 56px))",
       maxWidth:       "580px",
       maxHeight:      "85vh",
       overflowY:      "auto",
@@ -316,7 +316,7 @@ export class FollowerUI {
     // ── Hint ─────────────────────────────────────────────────────────────────
     const hint = document.createElement("p");
     Object.assign(hint.style, { margin: "0", fontSize: "13px", color: C.DIM });
-    hint.textContent = "[G] or [Esc] to close  ·  Only one follower may be active at a time";
+    hint.textContent = "G or Esc to close  ·  Only one follower may be active at a time";
 
     // ── Active follower section ──────────────────────────────────────────────
     const activeBlock = document.createElement("div");

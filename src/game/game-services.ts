@@ -509,10 +509,9 @@ export function installGameFeatures(game: Game): void {
       pets.pets.grantPet("pet_wolf");
 
       k.services.provide(MountHostKey, {
-        canAct: () => !game.isPaused && !game.dialogueSystem.isInDialogue,
+        canAct: () => !isCombatInputBlocked(game), // not over another menu either
         setMoveSpeedMultiplier: (m) => { game.player.speedMultiplier = Math.max(0, m); },
-        unlockAchievement: (id) => { game._achievements?.unlock(id as never); },
-        give: (item) => { game.inventorySystem.addItem(item); },
+        unlockAchievement: (id) => { game._achievements?.unlock(id as never); }, give: (item) => { game.inventorySystem.addItem(item); },
       });
       const mounts = new MountsFeature();
       k.install(mounts);

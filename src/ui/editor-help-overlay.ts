@@ -10,7 +10,7 @@ const BASE_CONTROLS: readonly string[] = [
   "N: Shouts (Thu'um) · Shift+N: Shout! · Slay dragons for souls & Words of Power",
   "C: Crouch (sneak) · E while undetected: Pickpocket · P: Pets · G: Followers",
   "O: Mount / Dismount · Shift+O: Stable (buy horse) or Saddlebag (if mounted)",
-  "7/8/9/0: Quick Slots · F4: Toggle POV · F5/F9: Save/Load · F3: Debug Overlay",
+  "1–0: Quick Slots · F4: Toggle POV · F5/F9: Save/Load · F3: Debug Overlay",
   "PrintScreen: Screenshot",
 ];
 

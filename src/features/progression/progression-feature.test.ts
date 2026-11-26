@@ -22,20 +22,36 @@ function setup() {
     offerAttributes: vi.fn(), sheet: () => ({ name: "Gawain" }) as never, setSheetOpen: vi.fn(),
   });
   k.services.provide(ModalKey, modal);
-  k.services.provide(GameplayKey, { canAct: () => true });
+  let free = true;
+  k.services.provide(GameplayKey, { canAct: () => free });
   k.services.provide(FeedbackKey, { notify: (t) => { notes.push(t); }, grant: vi.fn(), addFame: vi.fn(), markDirty: vi.fn() });
   const f = new ProgressionFeature();
   k.install(f);
   const levels: number[] = [];
   k.events.on("player:levelUp", ({ newLevel }) => levels.push(newLevel));
-  return { k, f, notes, modal, reached, levels, classes, points: () => points, svc: k.services.get(ProgressionKey) };
+  return { k, f, notes, modal, reached, levels, classes, points: () => points, svc: k.services.get(ProgressionKey), busy: (b: boolean) => { free = !b; } };
 }
 
 describe("ProgressionFeature (headless, through the kernel)", () => {
+  it("a level-up earned inside a menu waits until the menu closes (never stacks on it)", () => {
+    const t = setup();
+    t.busy(true); // e.g. the alchemy panel is open
+    const major = t.classes.chosenClass!.majorSkills[0];
+    for (let i = 0; i < 10; i++) t.svc.skillRaised(major);
+    t.k.phases.run("ui", 1 / 60);
+    expect(t.svc.levelUp.isVisible).toBe(false);
+    expect(t.modal.suspendGameplay).not.toHaveBeenCalled();
+    t.busy(false);
+    t.k.phases.run("ui", 1 / 60);
+    expect(t.svc.levelUp.isVisible).toBe(true);
+    expect(t.modal.suspendGameplay).toHaveBeenCalledOnce();
+  });
+
   it("ten major-skill raises open the level-up; confirming it levels up (no soft-lock)", () => {
     const t = setup();
     const major = t.classes.chosenClass!.majorSkills[0];
     for (let i = 0; i < 10; i++) t.svc.skillRaised(major);
+    t.k.phases.run("ui", 1 / 60);
     expect(t.svc.levelUp.isVisible).toBe(true);
     expect(t.modal.suspendGameplay).toHaveBeenCalledOnce();
 

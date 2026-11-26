@@ -232,7 +232,9 @@ export class CharacterCreationUI {
 
       const stepPills = document.createElement("div");
       stepPills.className = "character-create__steps";
-      stepPills.setAttribute("role", "tablist");
+      // The steps as an ordered list; the current one has aria-current="step".
+      stepPills.setAttribute("role", "list");
+      stepPills.setAttribute("aria-label", "Steps");
       panel.appendChild(stepPills);
 
       const welcomePill = document.createElement("span");
@@ -279,6 +281,7 @@ export class CharacterCreationUI {
       ledger.appendChild(stepPills);
       stepPills.querySelectorAll<HTMLElement>(".character-create__step-pill").forEach((pill, i) => {
         pill.dataset.numeral = ["I", "II", "III", "IV", "V", "VI"][i];
+        pill.setAttribute("role", "listitem");
       });
 
       const heroHeading = document.createElement("h3");

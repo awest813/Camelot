@@ -176,7 +176,7 @@ export class ShoutUI {
       border:        `1px solid ${C.BORDER}`,
       borderRadius:  "6px",
       padding:       "5px 8px",
-      zIndex:        "900",
+      zIndex: "20" /* a HUD chip: under every panel */,
       pointerEvents: "none",
       fontFamily:    C.FONT,
       minWidth:      "150px",
@@ -232,7 +232,7 @@ export class ShoutUI {
       backdropFilter: "blur(4px)",
       padding:        "18px",
       zIndex:         "1600",
-      minWidth:       "360px",
+      minWidth:       "min(360px, calc(100vw - 56px))",
       maxWidth:       "520px",
       maxHeight:      "80vh",
       overflowY:      "auto",
@@ -274,7 +274,7 @@ export class ShoutUI {
     // ── Hint ────────────────────────────────────────────────────────────────
     const hint = document.createElement("p");
     Object.assign(hint.style, { margin: "0", fontSize: "13px", color: C.DIM });
-    hint.textContent = "[N] or [Esc] to close  ·  Shift+N to shout  ·  Slay dragons to absorb souls";
+    hint.textContent = "N or Esc to close  ·  Shift+N to shout  ·  Slay dragons to absorb souls";
 
     // ── Shout list ──────────────────────────────────────────────────────────
     const listEl = document.createElement("div");

@@ -40,6 +40,14 @@ export function queryDialogTabStops(container: HTMLElement): HTMLElement[] {
 }
 
 /**
+ * Open sessions, innermost last.  Only the innermost traps Tab: with a
+ * dialog over a dialog (Settings over the pause menu or the title), the
+ * outer trap would otherwise pull focus back to the inner one's first
+ * control on every Tab.
+ */
+const openSessions: object[] = [];
+
+/**
  * Begin a focus session for an open dialog.
  * SSR-safe: returns a no-op session when `document` is absent.
  */
@@ -61,8 +69,11 @@ export function manageDialogFocus(container: HTMLElement): DialogFocusSession {
     }
   }
 
+  const self = {};
+  openSessions.push(self);
   const onKeyDown = (e: KeyboardEvent): void => {
     if (e.key !== "Tab") return;
+    if (openSessions[openSessions.length - 1] !== self) return; // a dialog above has the trap
     const stops = queryDialogTabStops(container);
     if (stops.length === 0) {
       e.preventDefault();
@@ -90,6 +101,8 @@ export function manageDialogFocus(container: HTMLElement): DialogFocusSession {
       if (released) return;
       released = true;
       doc.removeEventListener("keydown", onKeyDown, true);
+      const at = openSessions.indexOf(self);
+      if (at >= 0) openSessions.splice(at, 1);
       try {
         previous?.focus?.({ preventScroll: true });
       } catch {

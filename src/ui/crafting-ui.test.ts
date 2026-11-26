@@ -460,11 +460,19 @@ describe("CraftingUI", () => {
       expect(list?.getAttribute("role")).toBe("list");
     });
 
-    it("recipe rows have role=listitem", () => {
+    it("recipe rows are keyboard buttons: Tab reaches them, Enter picks one and focus stays on it", () => {
       ui.show();
       ui.update(sys, FULL_MATS, 15);
-      const rows = document.querySelectorAll(".crafting-ui__recipe-row");
-      rows.forEach((r) => expect(r.getAttribute("role")).toBe("listitem"));
+      const rows = Array.from(document.querySelectorAll<HTMLElement>(".crafting-ui__recipe-row"));
+      rows.forEach((r) => {
+        expect(r.getAttribute("role")).toBe("button");
+        expect(r.tabIndex).toBe(0);
+      });
+      const id = rows[1].dataset.recipeId!;
+      rows[1].dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      const picked = document.querySelector<HTMLElement>(`.crafting-ui__recipe-row[data-recipe-id="${id}"]`)!;
+      expect(picked.getAttribute("aria-pressed")).toBe("true");
+      expect(document.activeElement, "focus stays on the picked row after the list redraws").toBe(picked);
     });
 
     it("detail pane has aria-live=polite", () => {

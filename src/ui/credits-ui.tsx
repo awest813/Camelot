@@ -40,7 +40,7 @@ export const CREDITS_SECTIONS: readonly CreditsSection[] = [
   {
     heading: "Type",
     lines: [
-      "Cinzel and Inter — SIL Open Font License 1.1.",
+      "Cinzel, EB Garamond and Inter — SIL Open Font License 1.1.",
     ],
   },
 ];

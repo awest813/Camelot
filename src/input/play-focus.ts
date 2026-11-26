@@ -18,6 +18,10 @@ export interface PlayFocusDeps {
   detachCamera(): void;
   /** World interaction (E prompts, picks) on or off. */
   setInteractionBlocked(blocked: boolean): void;
+  /** Keyboard focus back to the game view (keys only reach it while it has focus). */
+  focusGame?(): void;
+  /** Whether anything holds input now (the page marks it, e.g. to hide play-only buttons). */
+  onHeldChange?(held: boolean): void;
 }
 
 export class PlayFocus {
@@ -37,6 +41,7 @@ export class PlayFocus {
   /** Take input away from play. */
   public take(holder: FocusHolder): void {
     this._holders.add(holder);
+    this._d.onHeldChange?.(true);
     this._d.setInteractionBlocked(true);
     this._safe(() => this._d.unlockPointer());
     this._d.detachCamera();
@@ -50,8 +55,10 @@ export class PlayFocus {
       return;
     }
     this._d.setInteractionBlocked(false);
+    this._d.onHeldChange?.(false);
     this._safe(() => this._d.lockPointer());
     this._d.attachCamera();
+    this._safe(() => this._d.focusGame?.());
   }
 
   /** Pointer lock throws in headless runs and before a user gesture; that's fine. */

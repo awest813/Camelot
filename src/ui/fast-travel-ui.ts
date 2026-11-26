@@ -83,7 +83,7 @@ export class FastTravelUI {
 
     const subtitle = document.createElement("p");
     subtitle.className = "fast-travel__subtitle";
-    subtitle.textContent = "Select a discovered location. Travel time advances the in-game clock. Press Y or Esc to close.";
+    subtitle.textContent = "Select a discovered location. Travel time advances the in-game clock. Y or Esc to close.";
     titleWrap.appendChild(subtitle);
 
     const closeBtn = document.createElement("button");

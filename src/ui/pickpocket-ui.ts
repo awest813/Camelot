@@ -160,12 +160,12 @@ export class PickpocketUI {
     root.className = "pickpocket-ui";
     Object.assign(root.style, {
       position: "fixed", zIndex: "1200", left: "50%", top: "50%",
-      transform: "translate(-50%, -50%)", minWidth: "340px", maxWidth: "500px",
+      transform: "translate(-50%, -50%)", minWidth: "min(340px, calc(100vw - 56px))", maxWidth: "min(500px, calc(100vw - 24px))",
       background: C.BG, border: `1px solid ${C.BORDER}`, borderRadius: "10px",
       boxShadow: "0 20px 60px rgba(0, 0, 0, 0.85), 0 0 0 100vmax rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 230, 180, 0.1)",
       backdropFilter: "blur(4px)",
       padding: "16px 18px", display: "none", flexDirection: "column", gap: "10px",
-      fontFamily: "Inter, 'Segoe UI', Roboto, sans-serif",
+      fontFamily: "'EB Garamond', Georgia, serif",
     });
     root.setAttribute("role", "dialog");
     root.setAttribute("aria-modal", "true");
@@ -199,7 +199,7 @@ export class PickpocketUI {
 
     const hint = document.createElement("p");
     Object.assign(hint.style, { margin: "0", fontSize: "13px", color: C.DIM });
-    hint.textContent = "[Esc] to close  ·  Getting caught is a crime";
+    hint.textContent = "Esc to close  ·  Getting caught is a crime";
     root.appendChild(hint);
 
     root.addEventListener("keydown", (e) => {

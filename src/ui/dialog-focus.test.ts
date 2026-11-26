@@ -122,3 +122,31 @@ describe("dialog-focus", () => {
     session.release();
   });
 });
+
+describe("manageDialogFocus: a dialog over a dialog", () => {
+  it("only the innermost traps Tab, so the inner dialog can be tabbed through", () => {
+    document.body.innerHTML = "";
+    const outer = document.createElement("div");
+    outer.innerHTML = "<button>o1</button><button>o2</button>";
+    const inner = document.createElement("div");
+    inner.innerHTML = "<button>i1</button><button>i2</button><button>i3</button>";
+    document.body.append(outer, inner);
+    const a = manageDialogFocus(outer);
+    const b = manageDialogFocus(inner);
+    const [i1, i2] = Array.from(inner.querySelectorAll("button"));
+    i1.focus();
+    const tab = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    i1.dispatchEvent(tab);
+    expect(tab.defaultPrevented, "the outer trap leaves a Tab inside the inner dialog alone").toBe(false);
+    i2.focus();
+    b.release();
+    // With the inner one gone, the outer traps again.
+    const o2 = outer.querySelectorAll("button")[1];
+    o2.focus();
+    const wrap = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    o2.dispatchEvent(wrap);
+    expect(wrap.defaultPrevented).toBe(true);
+    expect(document.activeElement?.textContent).toBe("o1");
+    a.release();
+  });
+});

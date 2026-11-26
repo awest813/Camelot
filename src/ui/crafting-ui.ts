@@ -342,7 +342,10 @@ export class CraftingUI {
         "crafting-ui__recipe-row" +
         (canCraft ? " can-craft" : " cannot-craft") +
         (isSelected ? " is-selected" : "");
-      item.setAttribute("role", "listitem");
+      // A button to keyboards and screen readers (Tab to it, Enter or Space picks it).
+      item.setAttribute("role", "button");
+      item.tabIndex = 0;
+      item.setAttribute("aria-pressed", String(isSelected));
       item.setAttribute("data-recipe-id", recipe.id);
 
       const nameEl = document.createElement("span");
@@ -372,6 +375,14 @@ export class CraftingUI {
         this._selectedId = recipe.id;
         this._renderList(recipes, system, materials, skill, stationId);
         this._refreshDetail(system, materials, skill, stationId);
+        // The list was rebuilt: keep focus on the row just picked.
+        Array.from(this._root?.querySelectorAll<HTMLElement>(".crafting-ui__recipe-row") ?? [])
+          .find((row) => row.dataset.recipeId === recipe.id)?.focus({ preventScroll: true });
+      });
+      item.addEventListener("keydown", (e: KeyboardEvent) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        item.click();
       });
 
       this._listEl.appendChild(item);

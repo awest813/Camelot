@@ -67,10 +67,20 @@ export class ProgressionFeature implements Feature {
 
     this.levels.attachToClassSystem(host().classes);
     this.levels.attachToAttributeSystem(host().attributes);
-    this.levels.onLevelUpReady = (bonuses) => {
-      modal().suspendGameplay();
-      this.levelUp.open(this.levels.characterLevel + 1, bonuses);
-    };
+    // A level-up can come from anywhere (a skill raised in a menu, in a
+    // conversation): the dialog waits until nothing else has the screen, so it
+    // never stacks on another menu (both would hand input back on close).
+    let pending: Parameters<NonNullable<typeof this.levels.onLevelUpReady>>[0] | null = null;
+    this.levels.onLevelUpReady = (bonuses) => { pending = bonuses; };
+    ctx.system({
+      id: "progression.level-up-when-free", phase: "ui", update: () => {
+        if (!pending || this.levelUp.isVisible || !s.get(GameplayKey).canAct()) return;
+        const bonuses = pending;
+        pending = null;
+        modal().suspendGameplay();
+        this.levelUp.open(this.levels.characterLevel + 1, bonuses);
+      },
+    });
     this.levelUp.onConfirm = (primary, second, third) => {
       this.levels.confirmLevelUp(primary, second, third);
       modal().restoreGameplay();

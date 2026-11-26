@@ -245,7 +245,7 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   // M = the map (shift:false so Shift+M = Mark; ctrlOrMeta:false so Ctrl+M =
   // Scene Notes, Ctrl+Shift+M = Mod Manifest).  F7 = mute (Shift+F7 is the editor's).
   { key: "m", action: "toggleMap", caseInsensitive: true, ctrlOrMeta: false, shift: false },
-  { key: "F7", action: "toggleMute", shift: false, contexts: BOTH },
+  { key: "F7", action: "toggleMute", shift: false }, // play only: F7 in the map editor is its validation panel
   { key: "PrintScreen", action: "screenshot", caseInsensitive: true, contexts: BOTH },
 ];
 

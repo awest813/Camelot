@@ -1,7 +1,6 @@
 
 /* Polish styles for Camelot */
 
-
 .active-effect-hud__pill.is-expiring {
   animation: active-effect-pulse 1s infinite ease-in-out !important;
   border-color: rgba(255, 100, 100, 0.6) !important;
@@ -11,7 +10,6 @@
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.7; transform: scale(0.98); }
 }
-
 
 .level-up__attr-btn.is-selected {
   border-color: #D4A017 !important;
@@ -393,13 +391,6 @@
   font-weight: 700;
   color: #fff4d6;
 }
-
-.stable__row-price {
-  color: #ffd700;
-  font-weight: 700;
-  font-size: 13px;
-}
-
 .stable__row-stats,
 .stable__row-meta {
   color: #a89880;
@@ -574,14 +565,6 @@
   align-items: center;
   gap: 6px;
 }
-
-.saddlebag__item-qty {
-  color: #a89880;
-  font-size: 0.82rem;
-  margin-left: 6px;
-  font-weight: normal;
-}
-
 .saddlebag__row-remove,
 .saddlebag__item-btn {
   padding: 5px 12px;
@@ -722,9 +705,6 @@
 .fast-travel button:focus-visible,
 .stable button:focus-visible,
 .saddlebag button:focus-visible,
-.wait-ui button:focus-visible,
-.wait-ui input:focus-visible,
-.graphics-settings button:focus-visible,
 .level-up button:focus-visible,
 .spell-making button:focus-visible,
 .spell-making input:focus-visible,
@@ -743,8 +723,6 @@
 .graphics-settings__panel {
   max-height: 88vh;
   overflow-y: auto;
-  border-color: rgba(212, 160, 23, 0.45) !important;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 24px rgba(212, 160, 23, 0.12) !important;
 }
 
 .graphics-settings__title {
