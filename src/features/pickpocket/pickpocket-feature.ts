@@ -115,7 +115,7 @@ export class PickpocketFeature implements Feature {
           return;
         }
         this._target = npcId;
-        this.panel.show(npcId);
+        this.panel.show(npc.displayName);
         this._refresh(npcId);
         s.get(ModalKey).suspendGameplay();
         ctx.kernel.events.emit("pickpocket:opened", { npcName: npcId });

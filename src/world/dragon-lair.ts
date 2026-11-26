@@ -29,6 +29,7 @@ export function spawnDragon(d: DragonLairDeps, chunkKey: string, x: number, z: n
   if (!record) return null;
   const [cx, cz] = chunkKey.split(",").map(Number);
   const dragon = new NPC(d.scene, new Vector3(x, 2, z), `DragonBoss_${cx}_${cz}`);
+  dragon.shownName = "Dragon";
   dragon.maxHealth = dragon.health = DRAGON.health;
   dragon.attackDamage = DRAGON.attackDamage;
   dragon.aggroRange = DRAGON.aggroRange;

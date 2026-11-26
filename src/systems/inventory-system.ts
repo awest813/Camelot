@@ -51,7 +51,8 @@ export class InventorySystem {
     this._player.carryWeight = this.totalWeight;
   }
 
-  public addItem(newItem: Item): boolean {
+  /** Add an item; `quiet` skips the "Added …" notice (the caller says it another way). */
+  public addItem(newItem: Item, opts?: { quiet?: boolean }): boolean {
     if (newItem.quantity <= 0) {
       this._ui.showNotification("Invalid item quantity.", 2000);
       return false;
@@ -64,7 +65,7 @@ export class InventorySystem {
         existingItem.quantity += newItem.quantity;
         this._syncCarryWeight();
         this._updateUI();
-        this._ui.showNotification(`Added ${newItem.quantity}x ${newItem.name}`);
+        if (!opts?.quiet) this._ui.showNotification(`Added ${newItem.quantity}x ${newItem.name}`);
         return true;
       }
     }
@@ -78,7 +79,7 @@ export class InventorySystem {
     this.items.push({ ...newItem });
     this._syncCarryWeight();
     this._updateUI();
-    this._ui.showNotification(`Added ${newItem.name}`);
+    if (!opts?.quiet) this._ui.showNotification(`Added ${newItem.name}`);
     return true;
   }
 

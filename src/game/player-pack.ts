@@ -29,7 +29,7 @@ export function goldCoins(quantity: number): Item {
 
 export interface PackInventory {
   items: Item[];
-  addItem(item: Item): boolean;
+  addItem(item: Item, opts?: { quiet?: boolean }): boolean;
   removeItem(itemId: string, amount?: number): boolean;
 }
 
@@ -53,9 +53,9 @@ export class PlayerPack {
     return this._inv().removeItem(GOLD_ITEM_ID, amount);
   }
 
-  public addGold(amount: number): void {
+  public addGold(amount: number, opts?: { quiet?: boolean }): void {
     if (amount <= 0) return;
-    this._inv().addItem(goldCoins(amount));
+    this._inv().addItem(goldCoins(amount), opts);
   }
 
   /** Make the gold stack equal `target` (barter keeps its own running total). */

@@ -61,7 +61,11 @@ export interface SiteSpec {
    * the map and for fast travel) for `xp`.  `kind` names it ("Graveyard");
    * fast travel arrives at `arrive` (offsets that turn with the site).
    */
-  landmark?: { kind: string; xp: number; radius: number; arrive: { dx: number; dz: number } };
+  landmark?: {
+    kind: string; xp: number; radius: number; arrive: { dx: number; dz: number };
+    /** Killing everyone the site spawned clears it, once, for this. */
+    clear?: { xp: number; gold: number };
+  };
 }
 
 /** A landmark a chunk built, in world coordinates. */
@@ -74,6 +78,8 @@ export interface PlacedLandmark {
   x: number;
   z: number;
   arrive: { x: number; z: number };
+  /** For a site that can be cleared: the reward, and who must fall (as spawned). */
+  clear?: { xp: number; gold: number; foes: readonly unknown[] };
 }
 
 const NAME_HEADS = ["Ash", "Crow", "Elder", "Gallow", "Hollow", "Mire", "Thorn", "Wolf", "Raven", "Stone", "Briar", "Cold", "Hart", "Wych", "Grey", "Marrow"] as const;
@@ -135,10 +141,12 @@ export function buildWildChunk(c: SiteContext, scatter: WildScatter, specs: read
     const p = spot(spec.at.x, spec.at.z, spec.at.spread);
     const origin = { ...p, rot: spec.rot ? r(spec.rot.slot) * Math.PI * 2 : 0 };
     const variant = spec.variants ? wrap(c.cx + c.cz, spec.variants) : 0;
+    const spawned: unknown[] = [];
     for (const part of spec.parts) {
       if (part.when?.variant && !part.when.variant.includes(variant)) continue;
       if (part.when?.roll && r(part.when.roll.slot) >= part.when.roll.chance) continue;
-      buildPart(c, part, origin, variant, r);
+      const actor = buildPart(c, part, origin, variant, r);
+      if (actor) spawned.push(actor);
     }
     const lm = spec.landmark;
     if (lm) {
@@ -146,6 +154,7 @@ export function buildWildChunk(c: SiteContext, scatter: WildScatter, specs: read
       landmarks.push({
         id: `site_${spec.id}_${c.cx}_${c.cz}`, name: landmarkName(c.cx, c.cz, lm.kind), kind: lm.kind,
         xp: lm.xp, radius: lm.radius, x: origin.x, z: origin.z, arrive: { x: arrive.x, z: arrive.z },
+        ...(lm.clear && spawned.length > 0 ? { clear: { ...lm.clear, foes: spawned } } : {}),
       });
     }
   }
@@ -154,7 +163,7 @@ export function buildWildChunk(c: SiteContext, scatter: WildScatter, specs: read
 
 function buildPart(
   c: SiteContext, part: SitePart, o: { x: number; z: number; rot: number }, variant: number, r: (slot: number) => number,
-): void {
+): unknown {
   const { site, chunkKey } = c;
   if ("building" in part) {
     const w = toWorld({ x: part.dx, z: part.dz }, o);
@@ -171,7 +180,7 @@ function buildPart(
     }
   } else if ("npc" in part) {
     const archetype = typeof part.npc === "string" ? part.npc : part.npc[variant];
-    c.spawn(archetype, o.x + part.dx, o.z + part.dz);
+    return c.spawn(archetype, o.x + part.dx, o.z + part.dz);
   } else if ("smithy" in part) {
     const w = toWorld({ x: part.dx, z: part.dz }, o);
     site.placeSmithy(chunkKey, w.x, w.z, o.rot);
@@ -183,6 +192,7 @@ function buildPart(
       ...(part.tier ? { tier: part.tier } : {}),
     });
   } else {
-    site.spawnDragon(chunkKey, o.x, o.z, r(part.yaw) * Math.PI * 2);
+    return site.spawnDragon(chunkKey, o.x, o.z, r(part.yaw) * Math.PI * 2);
   }
+  return null;
 }

@@ -68,4 +68,19 @@ describe("data-driven wild sites", () => {
     expect(landmarkName(3, 4, "Graveyard"), "the same chunk names the same").toBe(landmarkName(3, 4, "Graveyard"));
     expect(new Set(all.map((l) => l.name.split(" ")[0])).size, "names vary").toBeGreaterThan(40);
   });
+
+  it("a bandit camp's landmark lists everyone it spawned as the foes to clear it", () => {
+    for (let cx = -60; cx < 60; cx++) for (let cz = -30; cz < 30; cz++) {
+      const t = recorder();
+      let n = 0;
+      const spawn = () => ({ n: n++ });
+      const camp = buildWildChunk({ site: t.site, spawn, chunkKey: "k", cx, cz, biome: "desert", size: 50 }, { ...WILD_SCATTER, pool: {} }, WILD_SITES)
+        .find((l) => l.kind === "Bandit Camp");
+      if (!camp) continue;
+      expect(camp.clear?.foes).toHaveLength(4);
+      expect(camp.clear).toMatchObject({ xp: 60, gold: 75 });
+      return;
+    }
+    throw new Error("no bandit camp in the sample");
+  });
 });

@@ -11,19 +11,12 @@ export function grantDynamicWorldEventReward(g: Game, reward: DynamicEventReward
   const xp = Math.max(0, Math.floor(reward.xp ?? 0));
   const gold = Math.max(0, Math.floor(reward.gold ?? 0));
 
-  if (xp > 0) {
-    g.player.addExperience(xp);
-    g.ui.showNotification(`+${xp} XP`, 1800);
-  }
-
-  if (gold > 0) {
-    g._pack.addGold(gold);
-    g.ui.showNotification(`+${gold} gold`, 1800);
-  }
-
-  if (reward.label) {
-    g.ui.showNotification(reward.label, 2500);
-  }
+  if (xp > 0) g.player.addExperience(xp);
+  if (gold > 0) g._pack.addGold(gold, { quiet: true });
+  // One notice for the whole reward: "Cleared: X (+60 XP, +75 gold)".
+  const gains = [xp > 0 ? `+${xp} XP` : "", gold > 0 ? `+${gold} gold` : ""].filter(Boolean).join(", ");
+  if (reward.label) g.ui.showNotification(gains ? `${reward.label} (${gains})` : reward.label, 3000);
+  else if (gains) g.ui.showNotification(gains, 1800);
 
   if (xp > 0 || gold > 0) {
     g.saveSystem.markDirty();

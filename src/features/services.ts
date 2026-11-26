@@ -124,7 +124,7 @@ export interface SiteBuilderService {
     x: number; y?: number; z: number; yaw: number; scale?: number; tier?: "structure" | "scene" | "prop";
   }): void;
   /** The tundra dragon boss (NPC + body), owned by the chunk. */
-  spawnDragon(chunkKey: string, x: number, z: number, yaw: number): void;
+  spawnDragon(chunkKey: string, x: number, z: number, yaw: number): NPC | null;
   placeSmithy(chunkKey: string, x: number, z: number, rot: number): void;
   /** Own a mesh in the chunk: shadows and distance culling ("structure" tier). */
   ownStructure(chunkKey: string, mesh: AbstractMesh): void;

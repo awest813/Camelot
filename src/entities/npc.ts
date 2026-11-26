@@ -95,6 +95,12 @@ export interface ScheduleBlock {
   anchorPosition?: Vector3;
 }
 
+/** A key's readable form: no trailing `_12` / `_3_-4` ids, underscores and joined words spaced. */
+export function readableName(key: string): string {
+  const name = key.replace(/(_-?\d+)+$/, "").replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").trim();
+  return name || key;
+}
+
 export class NPC {
   public mesh: Mesh;
   public physicsAggregate: PhysicsAggregate;
@@ -390,8 +396,14 @@ export class NPC {
    * key on it.  Runtime lookups can use `actorId` instead.
    */
   public readonly key: string;
-  /** The name shown to the player. */
-  public get displayName(): string { return this.key; }
+  /** The name shown to the player, when it isn't the key's readable form. */
+  public shownName: string | null = null;
+  /**
+   * The name shown to the player: `shownName`, else the key without its
+   * serial or chunk suffix ("Bandit Archer_10003" → "Bandit Archer",
+   * "RuinGuard_3_-4" → "Ruin Guard").
+   */
+  public get displayName(): string { return this.shownName ?? readableName(this.key); }
 
   constructor(scene: Scene, position: Vector3, name: string) {
     this.key = name;

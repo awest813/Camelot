@@ -29,7 +29,7 @@ function setup(opts: { pond?: boolean; village?: boolean; biome?: BiomeType } = 
     placeProp: (_c, key, x, z) => { placed.push({ kind: "prop", key, x, z }); },
     placeAsset: (_c, key, at) => { placed.push({ kind: "asset", key, x: at.x, z: at.z }); },
     placeSmithy: (_c, x, z) => { placed.push({ kind: "smithy", x, z }); },
-    spawnDragon: (_c, x, z) => { placed.push({ kind: "dragon", x, z }); },
+    spawnDragon: (_c, x, z) => { placed.push({ kind: "dragon", x, z }); return null; },
     ownStructure: () => undefined, own: () => undefined,
     addKeepOut: () => () => undefined, nightFlame: () => null,
   });

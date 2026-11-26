@@ -69,7 +69,7 @@ export const WILD_SITES: readonly SiteSpec[] = [
   },
   {
     id: "dragon", biomes: ["tundra"], roll: { slot: 9, chance: 0.05 }, at: { x: 10, z: 11, spread: 0.6 },
-    landmark: { kind: "Roost", xp: 40, radius: 40, arrive: { dx: 0, dz: 30 } },
+    landmark: { kind: "Roost", xp: 40, radius: 40, arrive: { dx: 0, dz: 30 }, clear: { xp: 150, gold: 200 } },
     parts: [{ dragon: true, yaw: 12 }],
   },
   {
@@ -109,7 +109,7 @@ export const WILD_SITES: readonly SiteSpec[] = [
   {
     // Palisade, banners, stolen goods, and its garrison.
     id: "bandit-camp", biomes: ["desert"], roll: { slot: 40, chance: 0.048 }, at: { x: 41, z: 42, spread: 0.62 },
-    landmark: { kind: "Bandit Camp", xp: 25, radius: 22, arrive: { dx: 0, dz: 12 } },
+    landmark: { kind: "Bandit Camp", xp: 25, radius: 22, arrive: { dx: 0, dz: 12 }, clear: { xp: 60, gold: 75 } },
     rot: { slot: 43 },
     parts: [
       { ring: "vFence", radius: CAMP_RADIUS, count: 24, gap: 0.4 },
