@@ -35,6 +35,8 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { GraphicsSystem, PostProcessConfig } from "../systems/graphics-system";
 import type { AtmosphereState } from "./atmosphere";
+import type { SunRaysPostProcess } from "./sun-rays";
+import { shaderLanguageFor } from "./shader-language";
 
 // ── Shadows ───────────────────────────────────────────────────────────────────
 
@@ -138,6 +140,15 @@ export function cullCascadeCasters(csm: CascadedShadowGenerator): void {
   };
 }
 
+/** `camelot_sun_rays=screen` uses the screen-space sun rays on WebGL too (screenshots, tests). */
+function forcedScreenRays(): boolean {
+  try {
+    return typeof localStorage !== "undefined" && localStorage.getItem("camelot_sun_rays") === "screen";
+  } catch {
+    return false;
+  }
+}
+
 function isWebGL2OrBetter(scene: Scene): boolean {
   const engine = scene.getEngine() as { isWebGPU?: boolean; webGLVersion?: number };
   return !!engine.isWebGPU || (engine.webGLVersion ?? 1) >= 2;
@@ -171,6 +182,8 @@ export interface PostFxHandle {
   pipeline: DefaultRenderingPipeline | null;
   ssao: SSAO2RenderingPipeline | null;
   godRays: VolumetricLightScatteringPostProcess | null;
+  /** The screen-space sun rays (WebGPU, or forced): see sun-rays.ts. */
+  sunRays: SunRaysPostProcess | null;
   lensFlare: LensFlareSystem | null;
   /** Per-frame: move the sun emitters and fade flare/rays with the sky. */
   update(state: AtmosphereState, cloudiness: number): void;
@@ -229,6 +242,9 @@ export function createPostFx(
   let pipeline: DefaultRenderingPipeline | null = null;
   let ssao: SSAO2RenderingPipeline | null = null;
   let godRays: VolumetricLightScatteringPostProcess | null = null;
+  let sunRays: SunRaysPostProcess | null = null;
+  const towardSun = new Vector3(0, 1, 0);
+  let disposed = false;
   let lensFlare: LensFlareSystem | null = null;
   let sunMesh: Mesh | null = null;
   let flareTextures: RawTexture[] = [];
@@ -314,13 +330,24 @@ export function createPostFx(
   // God rays are created on the first live frame: building the scattering
   // pass while the game is still paused behind character creation produced
   // transient framebuffer feedback-loop errors alongside SSAO's prepass.
-  // Not on WebGPU yet: Babylon's scattering pass has no WGSL, and running
-  // its GLSL there means fetching the converters from Babylon's CDN.
-  let godRaysPending = postEnabled && fx.godRays && !!sunMesh && !engine.isWebGPU;
+  // On WebGPU it is the screen-space pass in sun-rays.ts: Babylon's
+  // scattering pass has no WGSL, and running its GLSL there means fetching
+  // the converters from Babylon's CDN.
+  let godRaysPending = postEnabled && fx.godRays && !!sunMesh;
+  const screenRays = engine.isWebGPU || forcedScreenRays();
   let liveFrames = 0;
   const createGodRays = (): void => {
     godRaysPending = false;
     if (!sunMesh) return;
+    if (screenRays) {
+      // Loaded here (WebGPU only, or forced): not part of the start-up code.
+      void import("./sun-rays").then(({ SunRaysPostProcess }) => {
+        if (disposed) return;
+        sunRays = new SunRaysPostProcess(camera, scene, () => towardSun, shaderLanguageFor(scene));
+        handle.sunRays = sunRays;
+      }).catch((err) => console.warn("[render-pipeline] sun rays unavailable", err));
+      return;
+    }
     try {
       godRays = new VolumetricLightScatteringPostProcess(
         "godRays", { postProcessRatio: 1.0, passRatio: 0.5 }, camera, sunMesh, 64,
@@ -367,6 +394,7 @@ export function createPostFx(
     pipeline,
     ssao,
     godRays,
+    sunRays,
     lensFlare,
     outdoors: true,
     update(state: AtmosphereState, cloudiness: number): void {
@@ -376,8 +404,10 @@ export function createPostFx(
         sunMesh.setEnabled(false);
         if (lensFlare) lensFlare.isEnabled = false;
         if (godRays) godRays.exposure = 0;
+        if (sunRays) sunRays.exposure = 0;
         return;
       }
+      towardSun.set(state.sunDir[0], state.sunDir[1], state.sunDir[2]);
       sunMesh.position.set(
         state.sunDir[0] * SUN_EMITTER_DISTANCE,
         state.sunDir[1] * SUN_EMITTER_DISTANCE,
@@ -394,6 +424,10 @@ export function createPostFx(
           f.color.set(b.r * vis, b.g * vis, b.b * vis);
         });
       }
+      if (sunRays) {
+        const low = 1 - Math.max(0, Math.min(1, state.sunElevation / 0.9));
+        sunRays.exposure = (0.1 + 0.15 * low) * vis;
+      }
       if (godRays) {
         // Low sun → longer, warmer shafts.
         const low = 1 - Math.max(0, Math.min(1, state.sunElevation / 0.9));
@@ -404,7 +438,9 @@ export function createPostFx(
     },
     dispose(): void {
       lensFlare?.dispose();
+      disposed = true;
       godRays?.dispose(camera);
+      sunRays?.dispose(camera);
       ssao?.dispose();
       pipeline?.dispose();
       sunMesh?.dispose();

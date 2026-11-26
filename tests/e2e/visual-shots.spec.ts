@@ -38,11 +38,13 @@ test("capture world screenshots", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") errors.push(m.text()); });
-  await page.addInitScript((tier) => {
+  await page.addInitScript(([tier, extra]) => {
     localStorage.clear();
     if (tier) localStorage.setItem("camelot_graphics_tier", tier);
     localStorage.setItem("camelot_adaptive_res", "0");
-  }, process.env.VISUAL_TIER ?? "high");
+    // VISUAL_STORAGE='{"key":"value"}': extra settings before boot.
+    for (const [k, v] of Object.entries(JSON.parse(extra || "{}"))) localStorage.setItem(k, String(v));
+  }, [process.env.VISUAL_TIER ?? "high", process.env.VISUAL_STORAGE ?? ""] as const);
   await page.goto("/", { waitUntil: "domcontentloaded", timeout: 60_000 });
   await completeCharacterCreation(page);
   await expect(page.locator("#display-fps")).toContainText(/fps/, { timeout: 60_000 });

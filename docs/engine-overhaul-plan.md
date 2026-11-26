@@ -1031,8 +1031,23 @@ from a CDN at runtime.
 - WebGPU is the default where supported: yes, with WebGL2 as fallback.
 - Nothing fetched from a CDN at runtime: yes; boot-smoke and the shader
   harness check it.
-- Not done yet from the bullet list: god rays on WebGPU (waiting on WGSL
-  for Babylon's scattering pass).
+- **God rays on WebGPU:** done (`rendering/sun-rays.ts`), with this the
+  whole Phase 7 bullet list is done.
+  - **The pass:** screen-space sun rays in GLSL and WGSL. It blurs the
+    bright parts of the frame toward the sun's position on screen, so
+    whatever stands in front of the sun breaks the rays up. It needs no
+    extra geometry pass (an occlusion pass would have cost about 150
+    draws).
+  - **Where it runs:** on WebGPU; WebGL keeps Babylon's occlusion-based
+    scattering pass. `camelot_sun_rays=screen` forces it on WebGL. It is
+    loaded when it is first made, so it is not start-up code.
+  - **Tests:**
+    - the WGSL is validated by naga in the shader harness (now six
+      pieces);
+    - `sun-rays.spec.ts` checks on WebGL that dark bars in front of a
+      bright sky brighten with the rays (5 → 39), with no change at zero
+      exposure and none with the sun behind the camera;
+    - a forced in-game screenshot shows the streaks.
 - **Thin-instanced vegetation: measured, not done.** A chunk's vegetation
   costs about 3 ms to build: 2.3 ms generating it, most of that the
   procedural tree geometry, and 0.6 ms merging about 9 meshes. Thin
@@ -1334,6 +1349,11 @@ with the rendering and UI tracks in parallel.
     character), gamepad support (on the first `gamepadconnected`), and
     the stable and saddlebag windows (`ui/lazy-panel.ts`: closed until
     their first use).
+- Feature logic testable headless: **all features** (target met). Every
+  kernel feature in `src/features/` (26) has tests that install it into a
+  real `Kernel` with fake services, and `src/testing/headless/` runs a
+  village day. The editor suite is the editor app's (`editor-smoke`).
+- Save codecs with round-trip tests: all (met in Phase 5).
 - Duplicate subsystems: **0** (target met). Quests, inventory and
   streaming were done in Phase 4, and NPC AI is one model. The daily
   schedule layer folded into `ScheduleSystem` (see the Phase 4 status

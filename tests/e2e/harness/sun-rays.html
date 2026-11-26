@@ -1,0 +1,74 @@
+<!doctype html>
+<!--
+  The sun-rays post-process on a WebGL2 engine: a bright sky plane behind
+  dark bars, the sun straight ahead.  Used by tests/e2e/sun-rays.spec.ts.
+-->
+<html><head><meta charset="utf-8"><title>Sun rays</title></head>
+<body style="margin:0"><canvas id="c" width="320" height="180"></canvas>
+<script type="module">
+import { Engine } from "@babylonjs/core/Engines/engine";
+import { Scene } from "@babylonjs/core/scene";
+import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { SunRaysPostProcess } from "/src/rendering/sun-rays.ts";
+import { shaderLanguageFor } from "/src/rendering/shader-language.ts";
+
+const canvas = document.getElementById("c");
+const engine = new Engine(canvas, false, { preserveDrawingBuffer: true });
+const scene = new Scene(engine);
+scene.clearColor = new Color4(0, 0, 0, 1);
+const cam = new FreeCamera("cam", new Vector3(0, 0, 0), scene);
+cam.setTarget(new Vector3(0, 0, 1));
+const unlit = (name, c) => { const m = new StandardMaterial(name, scene); m.disableLighting = true; m.emissiveColor = c; return m; };
+const sky = MeshBuilder.CreatePlane("sky", { size: 400 }, scene);
+sky.position.z = 100;
+sky.material = unlit("skyMat", new Color3(1, 1, 1));
+const dark = unlit("bar", new Color3(0.02, 0.02, 0.02));
+for (let i = -6; i <= 6; i += 2) {
+  const bar = MeshBuilder.CreateBox(`bar${i}`, { width: 0.9, height: 40, depth: 0.2 }, scene);
+  bar.position.set(i, 0, 20);
+  bar.material = dark;
+}
+let toward = new Vector3(0, 0.001, 1);
+const rays = new SunRaysPostProcess(cam, scene, () => toward, shaderLanguageFor(scene));
+rays.threshold = 0.5;
+
+const probe = document.createElement("canvas");
+probe.width = canvas.width; probe.height = canvas.height;
+const ctx = probe.getContext("2d", { willReadFrequently: true });
+/** Mean luminance (0–255) over the bars' pixels and over the gaps'. */
+function measure() {
+  ctx.drawImage(canvas, 0, 0);
+  const d = ctx.getImageData(0, canvas.height / 2 - 20, canvas.width, 40).data;
+  let bars = 0, nb = 0, gaps = 0, ng = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const l = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+    // The bars (and the gaps) are told apart by the plain frame below.
+    if (window.__barMask?.[(i / 4) % canvas.width]) { bars += l; nb++; } else { gaps += l; ng++; }
+  }
+  return { bars: bars / nb, gaps: gaps / ng };
+}
+const frames = (n) => new Promise((r) => { let k = 0; const o = scene.onAfterRenderObservable.add(() => { if (++k >= n) { scene.onAfterRenderObservable.remove(o); r(); } }); });
+engine.runRenderLoop(() => scene.render());
+
+window.__run = async () => {
+  await scene.whenReadyAsync();
+  // Plain frame: which columns are bars.
+  rays.exposure = 0;
+  await frames(4);
+  ctx.drawImage(canvas, 0, 0);
+  const row = ctx.getImageData(0, canvas.height / 2, canvas.width, 1).data;
+  window.__barMask = Array.from({ length: canvas.width }, (_, x) => row[x * 4] < 60);
+  const off = measure();
+  rays.exposure = 0.3;
+  await frames(4);
+  const on = measure();
+  toward = new Vector3(0, 0.001, -1); // behind the camera
+  await frames(4);
+  const behind = measure();
+  return { off, on, behind, barColumns: window.__barMask.filter(Boolean).length };
+};
+</script></body></html>

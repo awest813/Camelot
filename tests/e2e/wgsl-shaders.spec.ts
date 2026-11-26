@@ -26,10 +26,10 @@ test.use({
   },
 });
 
-const PIECES = ["sky", "horizon", "water", "terrain", "wind"];
+const PIECES = ["sky", "horizon", "water", "terrain", "wind", "sunRays"];
 
 for (const renderer of ["webgpu", "webgl"] as const) {
-  test(`the five custom shaders compile on ${renderer}`, async ({ page, baseURL }) => {
+  test(`the six custom shaders compile on ${renderer}`, async ({ page, baseURL }) => {
     test.setTimeout(120_000);
     const origin = new URL(baseURL!).origin;
     const outside: string[] = [];
