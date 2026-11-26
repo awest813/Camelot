@@ -1126,68 +1126,6 @@ body::before {
   font-style: italic;
 }
 
-/* ── Spell Making ─────────────────────────────────────────────────────────── */
-
-.spell-making {
-  position: fixed;
-  inset: 0;
-  z-index: 24;
-  background: radial-gradient(circle at top, rgba(26, 16, 8, 0.95), rgba(8, 5, 2, 0.97));
-  display: grid;
-  place-items: center;
-  padding: 20px;
-}
-
-.spell-making__panel {
-  width: min(780px, 96vw);
-  max-height: calc(100vh - 40px);
-  overflow: auto;
-  border-radius: 12px;
-  border: 1px solid rgba(214, 156, 73, 0.45);
-  background: rgba(18, 12, 7, 0.97);
-  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 226, 172, 0.08);
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.spell-making__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 14px;
-}
-
-.spell-making__title {
-  margin: 0;
-  color: #e9b86f;
-  font-size: 22px;
-  text-shadow: 0 0 20px rgba(233, 184, 111, 0.28);
-}
-
-.spell-making__subtitle {
-  margin: 4px 0 0;
-  color: #b89b75;
-  font-size: 13px;
-}
-
-.spell-making__close-btn {
-  border: 1px solid rgba(214, 156, 73, 0.5);
-  border-radius: 7px;
-  background: rgba(36, 24, 12, 0.95);
-  color: #f0d2a5;
-  width: 34px;
-  height: 30px;
-  cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast);
-}
-
-.spell-making__close-btn:hover {
-  background: rgba(60, 40, 18, 0.95);
-  border-color: rgba(233, 184, 111, 0.8);
-}
-
 .spell-making__close-btn:focus-visible {
   outline: 2px solid rgba(233, 184, 111, 0.8);
   outline-offset: 2px;
@@ -1221,20 +1159,6 @@ body::before {
   gap: 8px;
 }
 
-.spell-making__field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.spell-making__label {
-  font-size: 11px;
-  color: #9f8a6f;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-}
-
 .spell-making__input,
 .spell-making__select {
   border: 1px solid rgba(214, 156, 73, 0.28);
@@ -1258,28 +1182,8 @@ body::before {
   outline-offset: 1px;
 }
 
-.spell-making__check {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #cdb089;
-  font-size: 13px;
-}
-
 .spell-making__check input {
   accent-color: #d69c49;
-}
-
-.spell-making__cost {
-  margin: 0;
-  color: #dfc18d;
-  font-size: 13px;
-}
-
-.spell-making__status {
-  margin: 0;
-  color: #a79377;
-  font-size: 13px;
 }
 
 .spell-making__status--ok {
@@ -1290,23 +1194,6 @@ body::before {
   color: var(--status-error);
 }
 
-.spell-making__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.spell-making__btn {
-  border: 1px solid rgba(214, 156, 73, 0.5);
-  border-radius: 8px;
-  background: rgba(36, 24, 12, 0.95);
-  color: #edd7b6;
-  padding: 8px 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast), filter var(--transition-fast);
-}
-
 .spell-making__btn:hover:enabled {
   background: rgba(60, 40, 18, 0.95);
   border-color: rgba(233, 184, 111, 0.8);
@@ -1315,11 +1202,6 @@ body::before {
 .spell-making__btn:focus-visible {
   outline: 2px solid rgba(233, 184, 111, 0.8);
   outline-offset: 2px;
-}
-
-.spell-making__btn--primary {
-  background: linear-gradient(180deg, rgba(133, 84, 30, 0.94), rgba(96, 56, 18, 0.98));
-  border-color: rgba(233, 184, 111, 0.72);
 }
 
 .spell-making__btn--primary:hover:enabled {
@@ -1336,78 +1218,12 @@ body::before {
   display: none !important;
 }
 
-/* ── Guard Encounter ──────────────────────────────────────────────────────── */
-
-.guard-encounter {
-  position: fixed;
-  inset: 0;
-  z-index: 26;
-  background: radial-gradient(circle at top, rgba(22, 8, 8, 0.95), rgba(8, 2, 2, 0.97));
-  display: grid;
-  place-items: center;
-  padding: 20px;
-}
-
-.guard-encounter__panel {
-  width: min(560px, 96vw);
-  border-radius: 12px;
-  border: 1px solid rgba(214, 92, 92, 0.45);
-  background: rgba(24, 10, 10, 0.96);
-  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.guard-encounter__title {
-  margin: 0;
-  color: #ef9f9f;
-  font-size: 20px;
-}
-
-.guard-encounter__line {
-  margin: 0;
-  color: #f2d7d7;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.guard-encounter__meta {
-  margin: 0;
-  color: #bf9f9f;
-  font-size: 13px;
-}
-
-.guard-encounter__status {
-  margin: 0;
-  color: #b48d8d;
-  font-size: 13px;
-}
-
 .guard-encounter__status--ok {
   color: var(--status-ok);
 }
 
 .guard-encounter__status--error {
   color: var(--status-error);
-}
-
-.guard-encounter__actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.guard-encounter__btn {
-  border: 1px solid rgba(214, 92, 92, 0.45);
-  border-radius: 8px;
-  background: rgba(40, 16, 16, 0.95);
-  color: #f0caca;
-  padding: 8px 10px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast), filter var(--transition-fast);
 }
 
 .guard-encounter__btn:hover:enabled {
@@ -1417,17 +1233,6 @@ body::before {
 .guard-encounter__btn:focus-visible {
   outline: 2px solid rgba(214, 92, 92, 0.75);
   outline-offset: 2px;
-}
-
-.guard-encounter__btn--primary {
-  border-color: rgba(123, 214, 163, 0.6);
-  background: linear-gradient(180deg, rgba(32, 88, 61, 0.94), rgba(18, 58, 40, 0.97));
-  color: #d7f4e4;
-}
-
-.guard-encounter__btn--danger {
-  border-color: rgba(226, 103, 103, 0.7);
-  background: linear-gradient(180deg, rgba(124, 40, 40, 0.95), rgba(86, 24, 24, 0.98));
 }
 
 .guard-encounter__btn:disabled,
@@ -4980,6 +4785,9 @@ body::before {
   color: #eee0c0;
   font-family: Inter, "Segoe UI", Roboto, sans-serif;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .guard-encounter__title {
@@ -4995,6 +4803,7 @@ body::before {
   font-style: italic;
   color: #f8f0dc;
   margin: 0 0 10px;
+  font-weight: 600;
 }
 
 .guard-encounter__meta {
@@ -5077,6 +4886,10 @@ body::before {
   box-sizing: border-box;
   scrollbar-width: thin;
   scrollbar-color: rgba(212, 160, 23, 0.4) rgba(10, 8, 4, 0.5);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .spell-making__header {
@@ -5086,6 +4899,7 @@ body::before {
   margin-bottom: 14px;
   padding-bottom: 10px;
   border-bottom: 1px solid rgba(212, 160, 23, 0.25);
+  gap: 14px;
 }
 
 .spell-making__title {
@@ -5093,6 +4907,7 @@ body::before {
   font-size: 1.4rem;
   color: #f8f0dc;
   margin: 0 0 4px;
+  text-shadow: 0 0 20px rgba(233, 184, 111, 0.28);
 }
 
 .spell-making__subtitle {
@@ -5130,6 +4945,8 @@ body::before {
   font-size: 0.82rem;
   color: #d8c8a8;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .spell-making__input {
@@ -5182,6 +4999,9 @@ body::before {
   font-weight: 600;
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast);
+  border: 1px solid rgba(214, 156, 73, 0.5);
+  background: rgba(36, 24, 12, 0.95);
+  color: #edd7b6;
 }
 
 .spell-making__btn--primary {

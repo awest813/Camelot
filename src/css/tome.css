@@ -2037,3 +2037,10 @@
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }
+
+/* The wax-seal close buttons keep their round gilt ring on focus (the older
+   square focus outline in polish.css is for the panels' other buttons). */
+:is(.character-sheet-ui, .crafting-ui, .barter-ui, .container-ui, .fast-travel, .stable, .saddlebag, .spell-making, .level-up, .graphics-settings)
+  :is(.character-sheet-ui__close, .crafting-ui__close, .barter-ui__close, .container-ui__close, .fast-travel__close-btn, .spell-making__close-btn, .stable__close-btn, .saddlebag__close-btn, .graphics-settings__close):focus-visible {
+  outline: none !important;
+}
