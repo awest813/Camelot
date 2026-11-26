@@ -116,3 +116,17 @@ describe("FrameworkRuntime — skillLevelProvider", () => {
     expect(walkAway.isAvailable).toBe(true);
   });
 });
+
+describe("FrameworkRuntime — radiant templates", () => {
+  it("keeps the game's radiant templates when mods rebuild the engines", async () => {
+    const manifest = { mods: [] };
+    const runtime = new FrameworkRuntime(frameworkBaseContent, {
+      fetchImpl: (async () => ({ ok: true, status: 200, json: async () => manifest })) as unknown as typeof fetch,
+    });
+    const before = runtime.questEngine;
+    runtime.questEngine.registerRadiantTemplate({ id: "t", kind: "kill", name: "T", description: "", objective: "", targetId: "Wolf", required: 1 });
+    await runtime.loadModsFromManifest("/mods.json");
+    expect(runtime.questEngine).not.toBe(before);
+    expect(runtime.questEngine.startRadiant("t", "q1")).toBe(true);
+  });
+});

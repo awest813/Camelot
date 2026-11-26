@@ -1,21 +1,22 @@
 /**
- * Village jobs as a kernel feature: the job board rules, the job window,
- * and mirroring jobs into the quest log.
+ * Village jobs as a kernel feature: the job board rules and the job window.
+ * Each job taken is a radiant quest in the quest engine (templates from
+ * `radiantTemplateOf`): the engine counts bounty kills, the log shows it, the
+ * save keeps it, and the quest bridge pays for it on hand-in.
  *
- * Inputs:   events `player:kill`, `dialogue:action` ("jobs:ask"),
- *           `dialogue:closed`, `questlog:opened`, `save:loaded`;
- *           services player, feedback, inventory, quest-log, modal,
- *           village-world.
+ * Inputs:   events `quest:progressed`, `dialogue:action` ("jobs:ask"),
+ *           `dialogue:closed`, `save:loaded`; services player, feedback,
+ *           inventory, quests, quest-log, modal, village-world.
  * Outputs:  the `jobs` service (open a board's window, rules for saving).
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
  */
 import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
-import { VillageJobBoard, type JobContext } from "../../systems/village-jobs";
+import { JOB_TEMPLATES, VillageJobBoard, radiantTemplateOf, type ActiveJob, type JobContext } from "../../systems/village-jobs";
+import { deliverEvent, reportEvent } from "../../framework/quests/radiant";
 import { JobBoardUI } from "../../ui/job-board-ui";
-import type { Quest } from "../../systems/quest-system";
-import { FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, VillagesKey, type FeedbackService, type InventoryService, type ModalService, type PlayerService, type QuestLogService, type VillagesService, ownSave, ownTransient } from "../services";
+import { FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, QuestsKey, VillagesKey, type FeedbackService, type InventoryService, type ModalService, type PlayerService, type QuestLogService, type QuestsService, type VillagesService, ownSave, ownTransient } from "../services";
 
 export interface JobBoardRef {
   boardId: string;
@@ -29,7 +30,7 @@ export interface JobsService {
   readonly window: JobBoardUI;
   /** Open (or refresh) a board's window. */
   open(board: JobBoardRef): void;
-  /** Quest-log id of a board's current job. */
+  /** Quest id of a board's current job. */
   questIdOf(boardId: string): string;
 }
 
@@ -40,6 +41,7 @@ interface JobDeps {
   readonly feedback: FeedbackService;
   readonly inventory: InventoryService;
   readonly questLog: QuestLogService;
+  readonly quests: QuestsService;
   readonly modal: ModalService;
   readonly villages: VillagesService;
 }
@@ -66,6 +68,7 @@ export class VillageJobsFeature implements Feature {
       get feedback() { return s.get(FeedbackKey); },
       get inventory() { return s.get(InventoryKey); },
       get questLog() { return s.get(QuestLogKey); },
+      get quests() { return s.get(QuestsKey); },
       get modal() { return s.get(ModalKey); },
       get villages() { return s.get(VillagesKey); },
     };
@@ -78,19 +81,19 @@ export class VillageJobsFeature implements Feature {
       questIdOf: (boardId) => this._questId(boardId),
     });
 
-    // Bounty kills advance jobs (prefix match on the NPC's name).
-    ctx.on("player:kill", ({ npcId }) => this.rules.onKill(npcId));
-    this.rules.onProgress = (job, template) => {
-      this._syncQuest(job.boardId);
-      const left = template.required - job.progress;
-      deps.feedback.notify(
-        left > 0 ? `${template.title}: ${job.progress}/${template.required}`
-                 : `${template.title}: done — return to ${job.placeName} for your pay.`,
-        2600,
-      );
+    // Jobs are radiant quests: their templates live in the quest engine, and
+    // a job's bounty kills are its quest's first step.
+    const engine = () => deps.quests.engine;
+    for (const t of JOB_TEMPLATES) engine().registerRadiantTemplate(radiantTemplateOf(t));
+    this.rules.progress = (job) => engine().getQuestState(this._questId(job.boardId))?.nodes.hunt?.progress ?? job.progress;
+    ctx.on("quest:progressed", ({ questId, nodeId, progress, required }) => {
+      const job = this.rules.getActive().find((j) => this._questId(j.boardId) === questId);
+      if (!job || nodeId !== "hunt") return;
+      const t = VillageJobBoard.template(job.templateId)!;
+      deps.feedback.notify(progress < required ? `${t.title}: ${progress}/${required}` : `${t.title}: done — return to ${job.placeName} for your pay.`, 2600);
       deps.feedback.markDirty();
-    };
-    ctx.scope.add(() => { this.rules.onProgress = null; });
+      this._refreshWindow();
+    });
 
     ctx.on("dialogue:action", ({ eventId, npcName }) => {
       if (eventId === "jobs:ask" && npcName) this._pending = deps.villages.innBoardOf(npcName);
@@ -100,13 +103,10 @@ export class VillageJobsFeature implements Feature {
       this._pending = null;
       if (board) this.open(board);
     });
-    ctx.on("questlog:opened", () => this._syncAll());
-    // The quest-log entries mirror the saved jobs: drop the ones the loaded
-    // state no longer has, then mirror it back.
-    ownTransient(ctx, "the quest-log entries for active jobs", () => {
-      this._pruneStale();
-      this._syncAll();
-    });
+    // After a load: a job from an older save (before jobs were quests) gets
+    // its quest, carrying its kills over; the log's own job entries from then
+    // are dropped (the quests show instead).
+    ownTransient(ctx, "jobs taken before they were quests", () => this._migrateOldJobs());
 
     this._wireWindow();
     // The feature owns its window: uninstalling removes it from the page.
@@ -130,20 +130,21 @@ export class VillageJobsFeature implements Feature {
     deps.modal.suspendGameplay();
   }
 
+  private _refreshWindow(): void {
+    const b = this._active;
+    if (b && this.window.isVisible) this.window.render(b.placeName, this.rules.view(b.boardId, b.placeName, this._context()));
+  }
+
   private _wireWindow(): void {
     const refresh = () => {
-      const b = this._active;
-      if (b && this.rules.activeAt(b.boardId)) this._syncQuest(b.boardId);
-      if (b && this.window.isVisible) {
-        this.window.render(b.placeName, this.rules.view(b.boardId, b.placeName, this._context()));
-      }
+      this._refreshWindow();
       this._deps?.feedback.markDirty();
     };
     this.window.onAccept = () => {
       const b = this._active, deps = this._deps;
       if (!b || !deps) return;
       const job = this.rules.accept(b.boardId, b.placeName, deps.player.level());
-      this._syncQuest(job.boardId);
+      this._startQuest(job);
       const t = VillageJobBoard.template(job.templateId);
       if (t) deps.feedback.notify(`New job: ${t.title}`, 2600);
       refresh();
@@ -154,15 +155,15 @@ export class VillageJobsFeature implements Feature {
       const questId = this._questId(b.boardId); // before handIn bumps the count
       const done = this.rules.handIn(b.boardId, this._context());
       if (!done) { refresh(); return; }
-      deps.questLog.finish(questId);
-      deps.feedback.addFame(5);
-      deps.feedback.grant({ gold: done.rewardGold, xp: done.rewardXp, label: `Job done: ${done.template.title}` });
+      // The quest's last step: the engine completes it and the bridge pays.
+      if (done.template.kind === "bounty") deps.quests.apply("custom", reportEvent(questId));
+      else deps.quests.apply("custom", deliverEvent(questId), done.template.required);
       refresh();
     };
     this.window.onDecline = () => {
-      const b = this._active;
-      if (!b) return;
-      this._removeQuest(b.boardId);
+      const b = this._active, deps = this._deps;
+      if (!b || !deps) return;
+      if (this.rules.activeAt(b.boardId)) deps.quests.engine.removeQuest(this._questId(b.boardId));
       this.rules.decline(b.boardId);
       refresh();
     };
@@ -187,61 +188,26 @@ export class VillageJobsFeature implements Feature {
     return n === 0 ? `job_${boardId}` : `job_${boardId}_${n}`;
   }
 
-  private _syncAll(): void {
-    for (const job of this.rules.getActive()) this._syncQuest(job.boardId);
+  /** Start a job's radiant quest (once). */
+  private _startQuest(job: ActiveJob): void {
+    this._deps?.quests.engine.startRadiant(job.templateId, this._questId(job.boardId), { place: job.placeName });
   }
 
-  /** Mirror an active job into the quest log (created on first sync). */
-  private _syncQuest(boardId: string): void {
+  /** Jobs from older saves: give them their quest; drop the log's own job entries. */
+  private _migrateOldJobs(): void {
     const deps = this._deps;
-    const job = this.rules.activeAt(boardId);
-    if (!deps || !job) return;
-    const template = VillageJobBoard.template(job.templateId);
-    if (!template) return;
-    const id = this._questId(boardId);
-    let quest = deps.questLog.quests().find((q) => q.id === id);
-    if (!quest) {
-      quest = {
-        managed: true,
-        id,
-        name: `${template.title} (${job.placeName})`,
-        description: VillageJobBoard.describe(template, job.placeName),
-        isCompleted: false,
-        isActive: true,
-        reward: `${template.rewardGold} gold`,
-        objectives: [{
-          id: `${id}_obj`,
-          type: template.kind === "bounty" ? "kill" : "fetch",
-          targetId: `__job__${template.target}`,
-          description: template.kind === "bounty"
-            ? `Kill ${template.required} (${template.target.replace(/([a-z])([A-Z])/g, "$1 $2")})`
-            : `Bring ${template.required} × ${template.target.replace(/_/g, " ")}`,
-          required: template.required,
-          current: 0,
-          completed: false,
-        }],
-      } as Quest;
-      deps.questLog.add(quest);
+    if (!deps) return;
+    const engine = deps.quests.engine;
+    for (const job of this.rules.getActive()) {
+      const questId = this._questId(job.boardId);
+      if (engine.getQuestDefinition(questId)) continue;
+      // `progress` is the count the old save stored (no quest to read yet).
+      const kills = job.progress;
+      this._startQuest(job);
+      const t = VillageJobBoard.template(job.templateId);
+      if (t?.kind === "bounty" && kills > 0) engine.applyEvent({ type: "kill", targetId: t.target, amount: kills }, questId);
     }
-    // Supply runs count what's in the bag; bounties count kills.  The quest
-    // is managed, so only the hand-in completes it.
-    const have = template.kind === "supply" ? deps.inventory.count(template.target) : job.progress;
-    deps.questLog.setProgress(id, quest.objectives[0].id, have);
-  }
-
-  /** Drop an abandoned job's quest-log entry. */
-  private _removeQuest(boardId: string): void {
-    const log = this._deps?.questLog;
-    const id = this._questId(boardId);
-    if (log?.quests().some((q) => q.id === id && !q.isCompleted)) log.remove(id);
-  }
-
-  /** Drop quest-log entries for jobs that are no longer active. */
-  private _pruneStale(): void {
-    const log = this._deps?.questLog;
-    if (!log) return;
-    const live = new Set(this.rules.getActive().map((j) => this._questId(j.boardId)));
-    const stale = log.quests().filter((q) => q.id.startsWith("job_") && !q.isCompleted && !live.has(q.id));
-    for (const q of stale) log.remove(q.id);
+    // remove() only takes the log's own entries; the engine's quests stay.
+    for (const q of deps.questLog.quests()) if (q.id.startsWith("job_")) deps.questLog.remove(q.id);
   }
 }

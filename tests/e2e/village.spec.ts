@@ -138,19 +138,20 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     const opened = waited && g.jobs.window.isVisible;
     click("Accept");
     const active = g.jobs.rules.getActive()[0];
-    const quest = g.questSystem.getQuests().find((q: any) => q.id === g.jobs.questIdOf(active.boardId));
+    const questId = g.jobs.questIdOf(active.boardId);
+    const questOf = () => g.questSystem.getQuests().find((q: any) => q.id === questId);
     const t = g.jobs.rules.constructor.template(active.templateId);
     const handInEnabledEarly = !document.querySelector<HTMLButtonElement>(".job-board__btn--primary")!.disabled;
     // Fulfil it (supply: stock the bag; bounty: fake the kills) and collect.
     if (t.kind === "supply") {
       g.inventorySystem.addItem({ id: t.target, name: t.target, description: "", stackable: true, quantity: t.required, weight: 0 });
     } else {
-      for (let i = 0; i < t.required; i++) g.jobs.rules.onKill(`${t.target}_${i}`);
+      for (let i = 0; i < t.required; i++) g._quests.apply("kill", g._quests.targetId(`${t.target}_${i}`));
     }
-    // Quest events go to the quest engine; a done-but-unpaid job (an entry
-    // the job board owns) must stay open until it's handed in.
+    // The job is a radiant quest: done-but-unpaid, it stays open until it's handed in.
     g._quests.apply("kill", "Nobody");
-    const openBeforeHandIn = !!quest && !quest.isCompleted && quest.isActive;
+    const before = questOf();
+    const openBeforeHandIn = !!before && !before.isCompleted && before.isActive;
     g.saveSystem.save(true);
     const saved = JSON.parse(localStorage.getItem("camelot_save")!).villageJobs;
     const goldBefore = g._pack.gold();
@@ -159,9 +160,9 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     click("Close");
     return {
       opened, handInEnabledEarly, closed: !g.jobs.window.isVisible, openBeforeHandIn,
-      template: t.id, place: active.placeName, questName: quest?.name,
+      template: t.id, place: active.placeName, questName: before?.name,
       savedActive: saved.active.length, paid: g._pack.gold() - goldBefore,
-      reward: t.rewardGold, questDone: quest?.isCompleted, left: g.jobs.rules.getActive().length,
+      reward: t.rewardGold, questDone: questOf()?.isCompleted, left: g.jobs.rules.getActive().length,
     };
   });
   expect(job.opened, "the job window opens").toBe(true);

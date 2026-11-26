@@ -226,7 +226,10 @@ export class FrameworkRuntime {
   private _rebuildEngines(inventoryCapacity: number): void {
     const bundle = this.contentRegistry.toBundle();
     this._dialogueEngine = new DialogueEngine(bundle.dialogues);
+    // Radiant templates come from the game, not the content: keep them.
+    const radiant = this._questEngine?.getRadiantTemplates() ?? [];
     this._questEngine = new QuestGraphEngine(bundle.quests);
+    for (const t of radiant) this._questEngine.registerRadiantTemplate(t);
     this._inventoryEngine = new InventoryEngine(bundle.items, inventoryCapacity);
     this._factionEngine = new FactionEngine(bundle.factions);
   }

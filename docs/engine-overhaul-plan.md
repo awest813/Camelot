@@ -748,7 +748,7 @@ components.
 | Schedules | Done: one `ScheduleSystem`, driven by the named definitions (`NpcScheduleSystem` data). It follows the clock itself (`followClock`, `setHour`): the hour sets behaviours and the `Asleep` tag (`npc:slept` / `npc:woke`), and its `sleep` part keeps the old `dailySchedule` save key. `DailyScheduleSystem` is gone; its 20 tests run against the schedule system. |
 | NPC AI | One model, the combat state machine. The behaviour-tree goal layer is not built. |
 | Streaming | Done: `ChunkManager` plus `WorldManager` as its adapter. |
-| Jobs, raids | Open. They are features with their own rules and quest-log entries; nothing for them is left in `game.ts`. Making them framework "radiant" templates is still to do. |
+| Jobs, raids | Jobs done: each job (bounty or supply run) is a framework radiant quest (`framework/quests/radiant.ts`), started from its board template with the village as a var. The engine counts bounty kills, saves the instance (template + vars) in its snapshot, and the quest bridge pays on hand-in; the feature keeps only the board's offers and hand-in rules. Old saves' jobs get their quest on load, kills carried over. Raids: still the feature's own rules. |
 - The quest log has an API; features no longer change quest objects
   directly. The quest-log service has `setProgress`, `finish` and
   `remove`, and `quests()` is read-only. A `managed` quest belongs to a

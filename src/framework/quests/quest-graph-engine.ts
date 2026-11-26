@@ -9,11 +9,16 @@ import {
   QuestStatus,
   QuestValidationIssue,
   QuestValidationReport,
+  QuestNodeProgress,
 } from "./quest-types";
+import { radiantDefinition, type RadiantInstance, type RadiantTemplate } from "./radiant";
 
 export class QuestGraphEngine {
   private _definitions: Map<string, QuestDefinition> = new Map();
   private _states: Map<string, QuestRuntimeState> = new Map();
+  private readonly _radiantTemplates = new Map<string, RadiantTemplate>();
+  /** Radiant quests started, by quest id: their template and vars. */
+  private readonly _radiant = new Map<string, RadiantInstance>();
 
   constructor(definitions: QuestDefinition[] = []) {
     for (const definition of definitions) {
@@ -92,16 +97,23 @@ export class QuestGraphEngine {
     };
   }
 
-  public applyEvent(event: QuestEvent): QuestEventResult[] {
+  /**
+   * Feed an event to the active quests (only to `onlyQuestId` when given,
+   * e.g. progress carried over from an old save).  A result is returned for
+   * each quest the event moved: a node progressed, completed or activated.
+   */
+  public applyEvent(event: QuestEvent, onlyQuestId?: string): QuestEventResult[] {
     const results: QuestEventResult[] = [];
 
     for (const [questId, definition] of this._definitions.entries()) {
+      if (onlyQuestId !== undefined && questId !== onlyQuestId) continue;
       const state = this._states.get(questId);
       if (!state || state.status !== "active") continue;
 
       const activatedNodeIds: string[] = [];
       const completedNodeIds: string[] = [];
       const skippedNodeIds: string[] = [];
+      const progressed: QuestNodeProgress[] = [];
       const delta = Math.max(1, Math.floor(event.amount ?? 1));
 
       for (const node of definition.nodes) {
@@ -110,6 +122,7 @@ export class QuestGraphEngine {
         if (node.triggerType !== event.type || node.targetId !== event.targetId) continue;
 
         nodeState.progress = Math.min(node.requiredCount, nodeState.progress + delta);
+        progressed.push({ nodeId: node.id, progress: nodeState.progress, required: node.requiredCount });
         if (nodeState.progress >= node.requiredCount) {
           nodeState.completed = true;
           nodeState.active = false;
@@ -131,6 +144,10 @@ export class QuestGraphEngine {
       }
 
       if (completedNodeIds.length === 0 && activatedNodeIds.length === 0) {
+        // Progress only: report it, but nothing completes or opens.
+        if (progressed.length > 0) {
+          results.push({ questId, activatedNodeIds: [], completedNodeIds: [], questCompleted: false, xpReward: 0, questFailed: false, skippedNodeIds: [], progressed });
+        }
         continue;
       }
 
@@ -146,10 +163,50 @@ export class QuestGraphEngine {
         xpReward: questCompleted ? definition.xpReward ?? 0 : 0,
         questFailed: false,
         skippedNodeIds: Array.from(new Set(skippedNodeIds)),
+        progressed,
       });
     }
 
     return results;
+  }
+
+  // ── Radiant quests (see radiant.ts) ──────────────────────────────────────
+
+  public registerRadiantTemplate(template: RadiantTemplate): void {
+    this._radiantTemplates.set(template.id, template);
+  }
+
+  public getRadiantTemplates(): RadiantTemplate[] {
+    return [...this._radiantTemplates.values()];
+  }
+
+  public getRadiantTemplate(id: string): RadiantTemplate | undefined {
+    return this._radiantTemplates.get(id);
+  }
+
+  /**
+   * Start a radiant quest: build it from the template with `vars`, register
+   * it under `questId` and activate it.  False when the template is unknown
+   * or the quest already exists.
+   */
+  public startRadiant(templateId: string, questId: string, vars: Record<string, string> = {}): boolean {
+    const template = this._radiantTemplates.get(templateId);
+    if (!template || this._definitions.has(questId)) return false;
+    this.registerQuest(radiantDefinition(template, questId, vars));
+    this._radiant.set(questId, { templateId, vars: { ...vars } });
+    return this.activateQuest(questId);
+  }
+
+  /** The template and vars a radiant quest was made from (undefined for other quests). */
+  public getRadiantInstance(questId: string): RadiantInstance | undefined {
+    return this._radiant.get(questId);
+  }
+
+  /** Drop a quest entirely (an abandoned radiant job). */
+  public removeQuest(questId: string): boolean {
+    this._radiant.delete(questId);
+    this._states.delete(questId);
+    return this._definitions.delete(questId);
   }
 
   public getSnapshot(): QuestSnapshot {
@@ -162,10 +219,19 @@ export class QuestGraphEngine {
         ),
       };
     }
-    return { quests };
+    const radiant = Object.fromEntries([...this._radiant].map(([id, r]) => [id, { templateId: r.templateId, vars: { ...r.vars } }]));
+    return this._radiant.size > 0 ? { quests, radiant } : { quests };
   }
 
   public restoreSnapshot(snapshot: QuestSnapshot): void {
+    // Radiant quests are rebuilt from their templates first, so their saved
+    // state has a quest to go to.
+    for (const [questId, r] of Object.entries(snapshot.radiant ?? {})) {
+      const template = this._radiantTemplates.get(r.templateId);
+      if (!template) continue;
+      this.registerQuest(radiantDefinition(template, questId, r.vars));
+      this._radiant.set(questId, { templateId: r.templateId, vars: { ...r.vars } });
+    }
     for (const [questId, savedState] of Object.entries(snapshot.quests)) {
       if (!this._definitions.has(questId)) continue;
       this._states.set(questId, {

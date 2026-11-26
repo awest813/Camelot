@@ -18,6 +18,7 @@ import type { VillagePlan } from "../world/village-settlement";
 import type { FantasyAssetKey } from "../systems/fantasy-asset-loader";
 import { createServiceKey, type FeatureContext } from "../core/kernel";
 import type { SaveCodec } from "../systems/save-system";
+import type { QuestGraphEngine } from "../framework/quests/quest-graph-engine";
 
 export interface GameClockService {
   /** Hour of day, 0–23 (fractional). */
@@ -210,6 +211,15 @@ export const FastTravelKey = createServiceKey<FastTravelService>("fast-travel");
 export const SiteBuilderKey = createServiceKey<SiteBuilderService>("site-builder");
 export const InventoryKey = createServiceKey<InventoryService>("inventory");
 export const QuestLogKey = createServiceKey<QuestLogService>("quest-log");
+
+/** The quest engine (the framework's) and the way quest events reach it. */
+export interface QuestsService {
+  /** Radiant templates, starting and removing radiant quests, quest state. */
+  readonly engine: QuestGraphEngine;
+  /** Feed a quest event; the quests it completes are paid out. */
+  apply(type: "kill" | "pickup" | "talk" | "custom", targetId: string, amount?: number): void;
+}
+export const QuestsKey = createServiceKey<QuestsService>("quests");
 export const WorldStateKey = createServiceKey<WorldStateService>("world-state");
 export const AnimationKey = createServiceKey<AnimationService>("animation");
 export const SkillsKey = createServiceKey<SkillsService>("skills");

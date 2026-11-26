@@ -43,6 +43,8 @@ export interface QuestDefinition {
   rewardGold?: number;
   /** Inventory items granted when the quest completes. */
   rewardItems?: Array<{ itemId: string; quantity?: number }>;
+  /** Fame for finishing it (the host's default when absent). */
+  fameReward?: number;
 }
 
 export interface QuestNodeState {
@@ -70,10 +72,20 @@ export interface QuestEventResult {
   questFailed: boolean;
   /** Nodes skipped by exclusive-group resolution in this update. */
   skippedNodeIds: string[];
+  /** Nodes whose progress moved in this update (finished or not), with their counts. */
+  progressed?: QuestNodeProgress[];
+}
+
+export interface QuestNodeProgress {
+  nodeId: string;
+  progress: number;
+  required: number;
 }
 
 export interface QuestSnapshot {
   quests: Record<string, QuestRuntimeState>;
+  /** Radiant quest instances (template and vars), rebuilt before their state on restore. */
+  radiant?: Record<string, { templateId: string; vars: Record<string, string> }>;
 }
 
 export type QuestValidationIssueType = "dead_end" | "unreachable" | "cycle" | "not_found";

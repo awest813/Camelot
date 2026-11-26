@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { VillageJobBoard, JOB_TEMPLATES, type JobContext } from "./village-jobs";
+import { VillageJobBoard, JOB_TEMPLATES, radiantTemplateOf, type JobContext } from "./village-jobs";
+import { QuestGraphEngine } from "../framework/quests/quest-graph-engine";
 
 function ctx(bag: Record<string, number>, level = 1): JobContext {
   return {
@@ -41,23 +42,32 @@ describe("VillageJobBoard", () => {
     expect(board.activeAt(id)?.templateId).toBe("bounty_bandits");
   });
 
-  it("bounties count matching kills, then pay out when you return", () => {
+  it("bounties: the job's quest counts the kills; the board pays once they are in", () => {
     const id = boardOffering("bounty_bandits");
     board.ask(id, "Camcross", ctx({}));
-    let progressed = 0;
-    board.onProgress = () => { progressed++; };
-    board.onKill("Bandit_123");
-    board.onKill("Wolf_9");            // ignored
-    board.onKill("Bandit Chief_44");   // prefix match
+    // In the game the job is a radiant quest; its first step counts kills.
+    const engine = new QuestGraphEngine();
+    for (const t of JOB_TEMPLATES) engine.registerRadiantTemplate(radiantTemplateOf(t));
+    engine.startRadiant("bounty_bandits", "job", { place: "Camcross" });
+    board.progress = () => engine.getQuestState("job")!.nodes.hunt.progress;
+    engine.applyEvent({ type: "kill", targetId: "Bandit" });
+    engine.applyEvent({ type: "kill", targetId: "Wolf" });   // not a bandit
     expect(board.ask(id, "Camcross", ctx({})).type).toBe("progress");
-    board.onKill("Bandit Archer_7");
-    board.onKill("Bandit_8");          // beyond the requirement: not counted
-    expect(progressed).toBe(3);
+    expect(board.view(id, "Camcross", ctx({})).canHandIn).toBe(false);
+    engine.applyEvent({ type: "kill", targetId: "Bandit", amount: 5 }); // capped at the requirement
+    expect(board.getActive()[0].progress).toBe(3);
     const done = board.ask(id, "Camcross", ctx({}));
     expect(done.type).toBe("completed");
     if (done.type === "completed") expect(done.rewardGold).toBe(120);
     expect(board.activeAt(id)).toBeUndefined();
     expect(board.completedAt(id)).toBe(1);
+  });
+
+  it("each template is a radiant quest template", () => {
+    const bounty = radiantTemplateOf(VillageJobBoard.template("bounty_dead")!);
+    expect(bounty).toMatchObject({ kind: "kill", targetId: "RuinGuard", required: 3, name: "The Restless Dead ({place})", objective: "Kill 3 (Ruin Guard)", fameReward: 5 });
+    const supply = radiantTemplateOf(VillageJobBoard.template("supply_iron")!);
+    expect(supply).toMatchObject({ kind: "deliver", targetId: "iron_ingot", objective: "Bring 4 × iron ingot" });
   });
 
   it("supply runs take the goods and pay on the spot; short deliveries take nothing", () => {
@@ -120,7 +130,7 @@ describe("VillageJobBoard", () => {
   it("round-trips through its save state and drops unknown templates", () => {
     const id = boardOffering("bounty_dead");
     board.ask(id, "Ashford", ctx({}));
-    board.onKill("RuinGuard_1_2");
+    board.progress = () => 1; // one kill so far (the quest engine's count in the game)
     const saved = board.getSaveState();
     saved.active.push({ boardId: "ghost", placeName: "?", templateId: "nope", progress: 0 });
     const copy = new VillageJobBoard();

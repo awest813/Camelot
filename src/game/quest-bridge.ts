@@ -41,20 +41,15 @@ export class QuestBridge {
     const updates = fw.applyQuestEvent({ type, targetId, amount });
     if (updates.length > 0) this._d.refreshLog();
     for (const update of updates) {
+      for (const p of update.progressed ?? []) this._d.events().emit("quest:progressed", { questId: update.questId, ...p });
       if (!update.questCompleted) continue;
       const def = fw.questEngine.getQuestDefinition(update.questId);
       this._d.events().emit("quest:completed", { questId: update.questId, xpReward: update.xpReward });
       this._d.notify(`Quest Complete: ${def?.name ?? update.questId}!`, 4000);
-      this._d.addFame(QUEST_FAME);
-      if (update.xpReward > 0) {
-        this._d.addXp(update.xpReward);
-        this._d.notify(`+${update.xpReward} XP`, 2000);
-      }
+      this._d.addFame(def?.fameReward ?? QUEST_FAME);
+      if (update.xpReward > 0) { this._d.addXp(update.xpReward); this._d.notify(`+${update.xpReward} XP`, 2000); }
       const gold = Math.max(0, Math.floor(def?.rewardGold ?? 0));
-      if (gold > 0) {
-        this._d.pack.addGold(gold);
-        this._d.notify(`Quest reward: +${gold} gold`, 2400);
-      }
+      if (gold > 0) { this._d.pack.addGold(gold); this._d.notify(`Quest reward: +${gold} gold`, 2400); }
       for (const reward of def?.rewardItems ?? []) {
         const quantity = Math.max(1, Math.floor(reward.quantity ?? 1));
         const item = fw.contentRegistry.getItemDefinition(reward.itemId);

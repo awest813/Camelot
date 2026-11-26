@@ -13,7 +13,7 @@ import { Loot } from "../entities/loot";
 import { VillageRaidFeature } from "../features/village-raids/raid-feature";
 import { actors } from "../entities/actors";
 import { Aggressive, Dead, Engaged } from "../core/ecs/actors";
-import { undeclaredFeatures, ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey, QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
+import { undeclaredFeatures, ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey, QuestLogKey, QuestsKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
 import { VillagesFeature } from "../features/villages/villages-feature";
 import { WorldSitesFeature } from "../features/world-sites/world-sites-feature";
 import { RoutinesFeature } from "../features/routines/routines-feature";
@@ -388,6 +388,7 @@ export function installGameFeatures(game: Game): void {
         count: (id) => game.inventorySystem.items.reduce((n, i) => (i.id === id ? n + i.quantity : n), 0),
         remove: (id, amount) => game.inventorySystem.removeQuantity(id, amount),
       });
+      k.services.provide(QuestsKey, { get engine() { return game.frameworkRuntime.questEngine; }, apply: (t, id, n) => game._quests.apply(t, id, n) });
       k.services.provide(QuestLogKey, {
         quests: () => game.questSystem.getQuests(),
         add: (quest) => game.questSystem.addQuest(quest, true),

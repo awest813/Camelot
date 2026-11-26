@@ -7,11 +7,14 @@
  *  • supply runs — bring N of an item (iron, leather, healing potions),
  *    handed over and paid on the spot.
  *
- * Pure state + rules (no Babylon / UI): the game feeds it kills and asks,
- * and turns the returned results into notifications, quest-log entries and
- * rewards.  The offered job is deterministic per board and per number of jobs
- * already finished there, so a reload offers the same work.
+ * Pure state + rules (no Babylon / UI): which job each board offers (the
+ * same per board and per number of jobs finished there, so a reload offers
+ * the same work), the jobs taken, and hand-ins.  Each job taken is a radiant
+ * quest in the quest engine (see `radiantTemplateOf`), which counts bounty
+ * kills, shows it in the log, saves it and pays for it; the board reads a
+ * job's progress through `progress`.
  */
+import type { RadiantTemplate } from "../framework/quests/radiant";
 
 export type JobKind = "bounty" | "supply";
 
@@ -67,7 +70,26 @@ export interface ActiveJob {
   boardId: string;
   placeName: string;
   templateId: string;
+  /** Bounty kills (read through `VillageJobBoard.progress`; older saves stored it here). */
   progress: number;
+}
+
+/** A job template as a radiant quest template (kills, or a delivery). */
+export function radiantTemplateOf(t: JobTemplate): RadiantTemplate {
+  const label = t.target.replace(/([a-z])([A-Z])/g, "$1 $2");
+  return {
+    id: t.id,
+    kind: t.kind === "bounty" ? "kill" : "deliver",
+    name: `${t.title} ({place})`,
+    description: t.description,
+    objective: t.kind === "bounty" ? `Kill ${t.required} (${label})` : `Bring ${t.required} × ${t.target.replace(/_/g, " ")}`,
+    report: "Return to {place} for your pay",
+    targetId: t.target,
+    required: t.required,
+    rewardGold: t.rewardGold,
+    xpReward: t.rewardXp,
+    fameReward: 5,
+  };
 }
 
 export interface JobContext {
@@ -113,8 +135,8 @@ export class VillageJobBoard {
   private readonly _completed = new Map<string, number>();
   private readonly _declined = new Map<string, number>();
 
-  /** Fired when a bounty kill advances a job (for quest-log sync and toasts). */
-  public onProgress: ((job: ActiveJob, template: JobTemplate) => void) | null = null;
+  /** A job's bounty kills so far (the game reads them from the quest engine). */
+  public progress: (job: ActiveJob) => number = (job) => job.progress;
 
   public static template(id: string): JobTemplate | undefined {
     return JOB_TEMPLATES.find((t) => t.id === id);
@@ -133,7 +155,7 @@ export class VillageJobBoard {
   }
 
   public getActive(): ActiveJob[] {
-    return [...this._active.values()];
+    return [...this._active.values()].map((j) => ({ ...j, progress: this.progress(j) }));
   }
 
   public activeAt(boardId: string): ActiveJob | undefined {
@@ -165,10 +187,10 @@ export class VillageJobBoard {
       job.progress = Math.min(have, template.required);
       return { type: "progress", job, template, text: `You have ${have} of ${template.required}.` };
     }
-    if (job.progress >= template.required) return this._complete(job, template);
+    if (this.progress(job) >= template.required) return this._complete(job, template);
     return {
       type: "progress", job, template,
-      text: `${template.required - job.progress} still to go.`,
+      text: `${template.required - this.progress(job)} still to go.`,
     };
   }
 
@@ -179,7 +201,7 @@ export class VillageJobBoard {
     const place = job?.placeName ?? placeName;
     const progress = template.kind === "supply"
       ? Math.min(ctx.countItem(template.target), template.required)
-      : job?.progress ?? 0;
+      : job ? this.progress(job) : 0;
     return {
       template,
       job,
@@ -207,7 +229,7 @@ export class VillageJobBoard {
     if (template.kind === "supply") {
       if (ctx.countItem(template.target) < template.required) return null;
       if (!ctx.removeItem(template.target, template.required)) return null;
-    } else if (job.progress < template.required) {
+    } else if (this.progress(job) < template.required) {
       return null;
     }
     return this._complete(job, template) as Extract<AskResult, { type: "completed" }>;
@@ -222,17 +244,6 @@ export class VillageJobBoard {
     this._declined.set(boardId, (this._declined.get(boardId) ?? 0) + 1);
   }
 
-  /** Count a kill toward any bounty whose prefix matches the NPC's name. */
-  public onKill(npcName: string): void {
-    for (const job of this._active.values()) {
-      const t = VillageJobBoard.template(job.templateId);
-      if (!t || t.kind !== "bounty" || job.progress >= t.required) continue;
-      if (!npcName.startsWith(t.target)) continue;
-      job.progress += 1;
-      this.onProgress?.(job, t);
-    }
-  }
-
   private _complete(job: ActiveJob, template: JobTemplate): AskResult {
     this._active.delete(job.boardId);
     this._completed.set(job.boardId, (this._completed.get(job.boardId) ?? 0) + 1);
@@ -245,7 +256,7 @@ export class VillageJobBoard {
 
   public getSaveState(): VillageJobsSaveState {
     return {
-      active: this.getActive().map((j) => ({ ...j })),
+      active: this.getActive(),
       completed: Object.fromEntries(this._completed),
       declined: Object.fromEntries(this._declined),
     };

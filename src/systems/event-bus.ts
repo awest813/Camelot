@@ -40,6 +40,8 @@ export interface GameEvents {
   "quest:activated": { questId: string };
   /** A quest was fully completed. */
   "quest:completed": { questId: string; xpReward: number };
+  /** A step of a quest moved (e.g. a kill counted toward a bounty). */
+  "quest:progressed": { questId: string; nodeId: string; progress: number; required: number };
   /** The player transitioned to a different cell. */
   "cell:changed": { cellId: string; cellName: string };
   /** An NPC entered combat with the player. */
