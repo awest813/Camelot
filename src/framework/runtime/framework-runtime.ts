@@ -223,14 +223,33 @@ export class FrameworkRuntime {
     };
   }
 
+  /**
+   * Build the engines from the content registry.  On a rebuild (mods
+   * merged in after start-up) the running state carries over: started
+   * quests, radiant templates and instances, the inventory and the
+   * standings.  (Before, a mod manifest that resolved after the game began
+   * reset them, e.g. the starter quests went back to inactive.)
+   */
   private _rebuildEngines(inventoryCapacity: number): void {
     const bundle = this.contentRegistry.toBundle();
+    const old = this._questEngine
+      ? {
+          radiant: this._questEngine.getRadiantTemplates(),
+          quests: this._questEngine.getSnapshot(),
+          inventory: this._inventoryEngine.getSnapshot(),
+          factions: this._factionEngine.getSnapshot(),
+        }
+      : null;
     this._dialogueEngine = new DialogueEngine(bundle.dialogues);
-    // Radiant templates come from the game, not the content: keep them.
-    const radiant = this._questEngine?.getRadiantTemplates() ?? [];
     this._questEngine = new QuestGraphEngine(bundle.quests);
-    for (const t of radiant) this._questEngine.registerRadiantTemplate(t);
     this._inventoryEngine = new InventoryEngine(bundle.items, inventoryCapacity);
     this._factionEngine = new FactionEngine(bundle.factions);
+    if (!old) return;
+    // Radiant templates come from the game, not the content: keep them first,
+    // so the snapshot's radiant quests can be rebuilt from them.
+    for (const t of old.radiant) this._questEngine.registerRadiantTemplate(t);
+    this._questEngine.restoreSnapshot(old.quests);
+    this._inventoryEngine.restoreSnapshot(old.inventory);
+    this._factionEngine.restoreSnapshot(old.factions);
   }
 }

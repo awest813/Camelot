@@ -381,7 +381,7 @@ export class UIManager {
 
   public updateXP(current: number, max: number, xpLevel: number, characterLevel: number): void {
     this.hud.setBar(this.hud.xp, current, max);
-    this.hud.setText(this.hud.level, `CL ${characterLevel}\nLv.${xpLevel}`);
+    this.hud.setText(this.hud.level, `Level ${characterLevel}\nCombat ${xpLevel}`);
   }
 
   /**

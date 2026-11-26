@@ -76,9 +76,9 @@ export class HudDom {
       el("span", "hud-bar__label", track).textContent = label;
       return fill;
     };
-    this.magicka = bar("MP", "Magicka", "mp");
-    this.health = bar("HP", "Health", "hp");
-    this.stamina = bar("SP", "Stamina", "sp");
+    this.magicka = bar("Magicka", "Magicka", "mp");
+    this.health = bar("Health", "Health", "hp");
+    this.stamina = bar("Stamina", "Stamina", "sp");
 
     this.notifications = el("div", "hud-notifications", this.root);
     this.notifications.setAttribute("role", "log");

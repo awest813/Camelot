@@ -130,3 +130,21 @@ describe("FrameworkRuntime — radiant templates", () => {
     expect(runtime.questEngine.startRadiant("t", "q1")).toBe(true);
   });
 });
+
+describe("FrameworkRuntime — state across a mod rebuild", () => {
+  it("keeps started quests, the inventory and standings when mods are merged in", async () => {
+    const runtime = new FrameworkRuntime(frameworkBaseContent, {
+      fetchImpl: (async () => ({ ok: true, status: 200, json: async () => ({ mods: [] }) })) as unknown as typeof fetch,
+    });
+    const questId = frameworkBaseContent.quests[0].id;
+    runtime.questEngine.activateQuest(questId);
+    const factions = runtime.getSaveSnapshot().factionState;
+    const before = runtime.getSaveSnapshot();
+    expect(before.questState).toMatchObject({ quests: { [questId]: { status: "active" } } });
+    await runtime.loadModsFromManifest("/mods.json");
+    const after = runtime.getSaveSnapshot();
+    expect(runtime.questEngine.getQuestStatus(questId), "the started quest stays started").toBe("active");
+    expect(after.inventoryState).toEqual(before.inventoryState);
+    expect(after.factionState).toEqual(factions);
+  });
+});

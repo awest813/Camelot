@@ -15,12 +15,13 @@ import type { Pet, PetTemplate } from "../systems/pet-system";
 import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 
 // ── Design tokens (mirrors UIManager) ─────────────────────────────────────
+/** The tome palette (src/css/tome.css), for a panel styled inline. */
 const C = {
-  BG:       "rgba(6, 4, 2, 0.95)",
-  BORDER:   "#6B4F12",
-  TITLE:    "#D4A017",
-  TEXT:     "#EEE0C0",
-  DIM:      "#998877",
+  BG:       "rgba(30, 19, 11, 0.97)",
+  BORDER:   "#8A6A2C",
+  TITLE:    "#F1D08A",
+  TEXT:     "#EADBB8",
+  DIM:      "#B49F78",
   HP_FILL:  "#CC1A1A",
   HP_BG:    "rgba(60, 4, 4, 0.7)",
   XP_FILL:  "#D4A017",
@@ -28,11 +29,11 @@ const C = {
   MOOD_OK:  "#5EC45E",
   MOOD_LOW: "#CC9910",
   MOOD_BAD: "#CC1A1A",
-  BTN_BG:   "rgba(28, 20, 6, 0.95)",
-  BTN_HVR:  "rgba(80, 56, 10, 0.98)",
+  BTN_BG:   "rgba(42, 26, 16, 0.96)",
+  BTN_HVR:  "rgba(74, 47, 27, 0.98)",
   FONT:     "'Cinzel', 'Times New Roman', Georgia, serif",
   /** Body/button face — Cinzel is all-caps display type, unreadable for prose. */
-  BODY:     "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
+  BODY:     "'EB Garamond', Georgia, serif",
   MONO:     "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
 };
 

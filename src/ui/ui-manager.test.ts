@@ -125,7 +125,7 @@ describe('UIManager', () => {
             uiManager.updateHealth(80, 100);
             expect(hp.classList.contains('hud-bar--low')).toBe(false);
             uiManager.updateXP(5, 10, 3, 7);
-            expect(uiManager.hud.level.textContent).toBe('CL 7\nLv.3');
+            expect(uiManager.hud.level.textContent).toBe('Level 7\nCombat 3');
         });
 
         it('stacks notifications (at most six) and drops each after its time', () => {

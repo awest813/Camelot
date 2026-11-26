@@ -28,13 +28,14 @@ export interface PickpocketItemView {
   chance: number;
 }
 
+/** The tome palette (src/css/tome.css), for a panel styled inline. */
 const C = {
-  BG:     "rgba(6, 4, 2, 0.96)",
-  BORDER: "#6B4F12",
-  TITLE:  "#D4A017",
-  TEXT:   "#EEE0C0",
-  DIM:    "#998877",
-  BTN_BG: "rgba(28, 20, 6, 0.95)",
+  BG:     "rgba(30, 19, 11, 0.97)",
+  BORDER: "#8A6A2C",
+  TITLE:  "#F1D08A",
+  TEXT:   "#EADBB8",
+  DIM:    "#B49F78",
+  BTN_BG: "rgba(42, 26, 16, 0.96)",
 };
 
 function styleButton(btn: HTMLButtonElement, label: string): void {

@@ -1050,3 +1050,471 @@
 .inventory__stat--magicka .inventory__stat-bar > span { background: linear-gradient(90deg, #1d3a7a, #3f6fd0); }
 .inventory__stat--stamina .inventory__stat-bar > span { background: linear-gradient(90deg, #275a22, #4f9c3e); }
 .inventory__stat--xp .inventory__stat-bar > span { background: linear-gradient(90deg, var(--tome-gilt-dim), var(--tome-gilt-bright)); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The HUD: the same book, worn lightly over the world.  Leather and gilt
+   for frames, Cinzel for labels, EB Garamond for words; nothing heavier
+   than it needs to be (it is always on screen).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.hud {
+  --hud-frame: linear-gradient(180deg, rgba(42, 26, 16, 0.92), rgba(18, 11, 6, 0.94));
+  --hud-edge: rgba(201, 154, 62, 0.6);
+}
+
+/* ── Vitals: three slim bars with gilt end-caps and quarter ticks ─────────── */
+
+.hud .hud-bars {
+  bottom: 16px;
+  gap: 22px;
+}
+.hud .hud-bar {
+  width: 200px;
+  height: 14px;
+  border: 0;
+  border-radius: 1px;
+  overflow: visible;
+  background: rgba(8, 5, 2, 0.82);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.75),
+    0 0 0 2px var(--hud-edge),
+    0 2px 8px rgba(0, 0, 0, 0.55);
+}
+.hud .hud-bar--hp { --fill: #b3241a; --fill-hi: #e04a34; }
+.hud .hud-bar--mp { --fill: #2147a6; --fill-hi: #4d7ce0; }
+.hud .hud-bar--sp { --fill: #2c6b25; --fill-hi: #5aa847; }
+.hud .hud-bar__fill {
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 45%, rgba(0, 0, 0, 0.25)),
+    linear-gradient(90deg, var(--fill), var(--fill-hi));
+}
+.hud .hud-bar::after {
+  /* quarter ticks */
+  inset: 0;
+  border-radius: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(25% - 1px), rgba(0, 0, 0, 0.45) calc(25% - 1px) 25%);
+}
+.hud .hud-bar::before {
+  /* gilt lozenge end-caps */
+  content: "◆";
+  position: absolute;
+  left: -9px;
+  top: 50%;
+  translate: 0 -52%;
+  z-index: 1;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--tome-gilt-bright);
+  text-shadow: 0 0 2px #000, 0 1px 1px #000;
+}
+.hud .hud-bar__label {
+  left: 50%;
+  top: auto;
+  bottom: calc(100% + 4px);
+  transform: translateX(-50%);
+  font-family: var(--tome-font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: var(--tome-leather-text);
+  text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.8);
+}
+
+/* ── Experience: a gilt thread with the level beside it ─────────────────── */
+
+.hud .hud-xp {
+  bottom: 56px;
+  width: 664px;
+  height: 22px;
+  gap: 8px;
+}
+.hud .hud-xp__level {
+  width: auto;
+  min-width: 52px;
+  font-family: var(--tome-font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 12px;
+  color: var(--tome-gilt-bright);
+  text-shadow: 0 1px 2px #000;
+}
+.hud .hud-xp__track {
+  height: 4px;
+  border: 0;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 0 1px rgba(201, 154, 62, 0.35);
+}
+.hud .hud-xp__fill {
+  border-radius: 0;
+  background: linear-gradient(90deg, var(--tome-gilt-dim), var(--tome-gilt-bright));
+  box-shadow: 0 0 6px rgba(241, 208, 138, 0.45);
+}
+
+/* ── Compass and clock: a leather band at the head of the screen ─────────── */
+
+.hud .hud-compass {
+  top: 8px;
+  width: 300px;
+  height: 30px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--hud-frame);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(201, 154, 62, 0.55),
+    inset 0 -1px 0 rgba(201, 154, 62, 0.55),
+    0 4px 12px rgba(0, 0, 0, 0.45);
+  color: var(--tome-leather-text);
+  font: 600 14px/1 var(--tome-font-display);
+  letter-spacing: 0.14em;
+}
+.hud .hud-compass::after {
+  /* the heading mark */
+  content: "▾";
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  translate: -50% 0;
+  font-size: 11px;
+  color: var(--tome-gilt-bright);
+  text-shadow: 0 1px 2px #000;
+}
+.hud .hud-clock {
+  top: 46px;
+  opacity: 1;
+  font: italic 500 15px/1 var(--tome-font-book);
+  letter-spacing: 0.06em;
+  color: var(--tome-leather-text);
+  text-shadow: 0 1px 2px #000, 0 0 8px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Words over the world ───────────────────────────────────────────────── */
+
+.hud .hud-interaction {
+  font-family: var(--tome-font-book);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #fbf0d6;
+  text-shadow: 0 1px 2px #000, 0 0 10px rgba(0, 0, 0, 0.9);
+}
+.hud .hud-combat-state {
+  font-family: var(--tome-font-display);
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--tome-gilt-bright);
+}
+.hud .hud-damage__number {
+  font-family: var(--tome-font-display);
+  font-weight: 700;
+  text-shadow: 0 0 2px #000, 0 2px 3px #000;
+}
+
+/* Notifications: parchment slips pinned at the right. */
+.hud .hud-notifications {
+  top: 64px;
+  width: 300px;
+  gap: 6px;
+}
+.hud .hud-notification {
+  padding: 7px 14px 8px;
+  border: 0;
+  border-radius: 1px;
+  background: var(--tome-parchment-bg);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(201, 154, 62, 0.45), 0 4px 12px rgba(0, 0, 0, 0.45);
+  color: var(--tome-ink);
+  font-family: var(--tome-font-book);
+  font-size: 16px;
+  font-weight: 600;
+  text-shadow: none;
+}
+
+/* Stealth: a small leather badge. */
+.hud .hud-stealth {
+  left: 16px;
+  bottom: 18px;
+  width: auto;
+  min-width: 96px;
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 13px;
+  background: var(--hud-frame);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), 0 0 0 2px var(--hud-edge);
+  font-family: var(--tome-font-display);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #a8dca0;
+}
+.hud .hud-stealth[data-state="caution"] { color: #f1d08a; }
+.hud .hud-stealth[data-state="detected"] { color: #ff8a70; }
+
+/* ── The hotbar: tooled slots like the inventory's ──────────────────────── */
+
+.quickslot-hud {
+  gap: 6px;
+}
+.quickslot-hud .quickslot-hud__slot {
+  border-radius: 2px;
+  border: 1px solid rgba(201, 154, 62, 0.4);
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(120, 80, 40, 0.3), transparent 70%),
+    linear-gradient(180deg, rgba(24, 15, 8, 0.9), rgba(6, 4, 2, 0.92));
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.65), 0 3px 8px rgba(0, 0, 0, 0.45);
+}
+.quickslot-hud .quickslot-hud__slot:hover,
+.quickslot-hud .quickslot-hud__slot:focus {
+  border-color: var(--tome-gilt-bright);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.65), 0 0 10px rgba(201, 154, 62, 0.35);
+}
+.quickslot-hud .quickslot-hud__slot.is-empty {
+  opacity: 0.8;
+  border-color: rgba(201, 154, 62, 0.22);
+  background: rgba(6, 4, 2, 0.6);
+}
+.quickslot-hud .quickslot-hud__key-label {
+  font-family: var(--tome-font-display);
+  font-size: 10px;
+  color: var(--tome-gilt);
+}
+.quickslot-hud .quickslot-hud__item-name {
+  font-family: var(--tome-font-book);
+  font-size: 12px;
+  color: var(--tome-leather-text);
+}
+.quickslot-hud .quickslot-hud__qty-badge {
+  border-radius: 7px;
+  font-family: var(--tome-font-book);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tome-leather-deep);
+  background: linear-gradient(180deg, var(--tome-gilt-bright), var(--tome-gilt));
+}
+
+/* ── Effect pills: leather, with the effect's colour as a stripe ─────────── */
+
+.active-effect-hud .active-effect-hud__pill {
+  border-radius: 2px;
+  border: 0;
+  background: var(--tome-leather-bg);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.65), 0 0 0 2px rgba(201, 154, 62, 0.4);
+  color: var(--tome-leather-text);
+  font-family: var(--tome-font-book);
+}
+.active-effect-hud .active-effect-hud__pill--heal    { box-shadow: inset 3px 0 0 #4f9c3e, 0 0 0 1px rgba(0, 0, 0, 0.65), 0 0 0 2px rgba(201, 154, 62, 0.4); }
+.active-effect-hud .active-effect-hud__pill--magicka { box-shadow: inset 3px 0 0 #4d7ce0, 0 0 0 1px rgba(0, 0, 0, 0.65), 0 0 0 2px rgba(201, 154, 62, 0.4); }
+.active-effect-hud .active-effect-hud__pill--stamina { box-shadow: inset 3px 0 0 #c9a23e, 0 0 0 1px rgba(0, 0, 0, 0.65), 0 0 0 2px rgba(201, 154, 62, 0.4); }
+.active-effect-hud .active-effect-hud__pill--fortify { box-shadow: inset 3px 0 0 var(--tome-gilt-bright), 0 0 0 1px rgba(0, 0, 0, 0.65), 0 0 0 2px rgba(201, 154, 62, 0.4); }
+.active-effect-hud .active-effect-hud__pill--harm    { box-shadow: inset 3px 0 0 #d0482f, 0 0 0 1px rgba(0, 0, 0, 0.65), 0 0 0 2px rgba(201, 154, 62, 0.4); }
+
+/* ── The tutorial tip: a leather card with a gilt title ─────────────────── */
+
+.onboarding-tip {
+  padding: 12px 16px 12px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--tome-leather-bg);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), 0 0 0 2px rgba(201, 154, 62, 0.55), 0 14px 36px rgba(0, 0, 0, 0.5);
+  color: var(--tome-leather-text);
+  font-family: var(--tome-font-book);
+  font-size: 16px;
+  line-height: 1.4;
+}
+.onboarding-tip .onboarding-tip__title {
+  font-family: var(--tome-font-display);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  color: var(--tome-gilt-bright);
+}
+.onboarding-tip .onboarding-tip__hint {
+  font-style: italic;
+  font-size: 14px;
+  color: var(--tome-leather-dim);
+}
+
+/* The level, the frame-rate readout and the settings gear, in the same hand. */
+.hud .hud-xp__level {
+  min-width: 70px;
+  text-align: right;
+  font-size: 10px;
+}
+#display-fps {
+  border: 0;
+  border-radius: 2px;
+  background: var(--tome-leather-bg);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), 0 0 0 2px rgba(201, 154, 62, 0.45);
+  color: var(--tome-gilt-bright);
+  font: italic 500 14px/1 var(--tome-font-book);
+}
+.graphics-settings-btn {
+  border-radius: 50%;
+  border: 0;
+  background: radial-gradient(circle at 35% 30%, #4a2c18, var(--tome-leather-deep));
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), 0 0 0 2px rgba(201, 154, 62, 0.55), 0 3px 8px rgba(0, 0, 0, 0.5);
+  color: var(--tome-gilt-bright);
+}
+.graphics-settings-btn:hover,
+.graphics-settings-btn:focus-visible {
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), 0 0 0 2px var(--tome-gilt-bright), 0 0 12px rgba(241, 208, 138, 0.4);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The older hand-built panels (character sheet, forge, barter, containers,
+   fast travel, spell-making, level-up, stable, saddlebag): the same binding
+   as the dialogs, applied to their own class names.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:is(.character-sheet-ui, .barter-ui, .container-ui, .fast-travel__panel, .spell-making__panel, .level-up__panel, .stable__panel, .saddlebag__panel) {
+  border-radius: 4px !important;
+  border: 1px solid var(--tome-gilt-dim) !important;
+  background: var(--tome-leather-bg) !important;
+  box-shadow:
+    0 0 0 3px var(--tome-leather-deep),
+    0 0 0 4px rgba(201, 154, 62, 0.55),
+    0 26px 70px rgba(0, 0, 0, 0.75),
+    inset 0 0 0 5px rgba(0, 0, 0, 0.22),
+    inset 0 0 0 6px rgba(201, 154, 62, 0.35),
+    inset 0 0 50px rgba(0, 0, 0, 0.5) !important;
+  color: var(--tome-leather-text);
+  backdrop-filter: none !important;
+}
+/* The forge is a full-screen sheet: a leather page with a gilt inner rule. */
+.crafting-ui {
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(120, 72, 36, 0.3), transparent 60%),
+    var(--tome-grain),
+    linear-gradient(160deg, rgba(42, 26, 16, 0.97), rgba(18, 11, 6, 0.98)) !important;
+  box-shadow: inset 0 0 0 10px rgba(0, 0, 0, 0.25), inset 0 0 0 11px rgba(201, 154, 62, 0.45);
+  color: var(--tome-leather-text);
+}
+
+/* Book type throughout. */
+:is(.character-sheet-ui, .crafting-ui, .barter-ui, .container-ui, .fast-travel__panel, .spell-making__panel, .level-up__panel, .stable__panel, .saddlebag__panel)
+  :is(p, span, li, div, button, label, td, th, dd, dt, input, select, small, strong) {
+  font-family: var(--tome-font-book);
+}
+
+/* Titles: gilt Cinzel. */
+:is(.character-sheet-ui__title, .crafting-ui__title, .barter-ui__title, .container-ui__title, .fast-travel__title, .spell-making__title, .level-up__title, .saddlebag__title, .stable__title) {
+  font-family: var(--tome-font-display) !important;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-shadow: none;
+  background: linear-gradient(180deg, #fff1c8 0%, var(--tome-gilt-bright) 45%, var(--tome-gilt) 80%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.6));
+}
+:is(.character-sheet-ui__header, .crafting-ui__header, .barter-ui__header, .container-ui__header, .fast-travel__header, .spell-making__header, .level-up__header, .saddlebag__header, .stable__header) {
+  border-bottom-color: rgba(201, 154, 62, 0.35) !important;
+}
+
+/* Close buttons: the wax seal. */
+:is(.character-sheet-ui__close, .crafting-ui__close, .barter-ui__close, .container-ui__close, .fast-travel__close-btn, .spell-making__close-btn, .stable__close-btn, .saddlebag__close-btn, :is(.pet-ui, .follower-ui, .shout-ui, .pickpocket-ui) button[aria-label^="Close"]) {
+  width: 30px !important;
+  height: 30px !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center;
+  border: 0 !important;
+  border-radius: 50% !important;
+  color: #ffe9c2 !important;
+  background: radial-gradient(circle at 35% 30%, var(--tome-wine-bright), var(--tome-wine) 60%, #4c120c) !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(201, 154, 62, 0.45), 0 2px 6px rgba(0, 0, 0, 0.5) !important;
+}
+:is(.character-sheet-ui__close, .crafting-ui__close, .barter-ui__close, .container-ui__close, .fast-travel__close-btn, .spell-making__close-btn, .stable__close-btn, .saddlebag__close-btn, :is(.pet-ui, .follower-ui, .shout-ui, .pickpocket-ui) button[aria-label^="Close"]):is(:hover, :focus-visible) {
+  outline: none !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 0 0 2px var(--tome-gilt-bright), 0 0 10px rgba(241, 208, 138, 0.4) !important;
+}
+
+/* Section boxes inside them: darker inset leather with a faint gilt edge. */
+:is(.character-sheet-ui, .barter-ui, .container-ui, .crafting-ui) :is([class$="__section"], [class$="__card"], [class$="__list"], [class$="__detail"], [class$="__identity"]) {
+  border-radius: 2px !important;
+  border-color: rgba(201, 154, 62, 0.28) !important;
+  background-color: rgba(0, 0, 0, 0.24) !important;
+}
+:is(.character-sheet-ui, .barter-ui, .container-ui, .crafting-ui, .level-up__panel, .spell-making__panel) :is([class$="__section-title"], [class$="__heading"], h3, h4) {
+  font-family: var(--tome-font-display) !important;
+  letter-spacing: 0.12em;
+  color: var(--tome-gilt) !important;
+}
+
+/* ── Fast travel: from its blue theme into the book's ───────────────────── */
+
+.fast-travel {
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(255, 170, 70, 0.08), transparent 55%),
+    radial-gradient(ellipse at center, rgba(8, 5, 2, 0.62), rgba(3, 2, 1, 0.88) 80%) !important;
+}
+.fast-travel__subtitle,
+.fast-travel__status {
+  color: var(--tome-leather-dim) !important;
+  font-style: italic;
+  font-size: 16px !important;
+}
+.fast-travel__row {
+  border-radius: 2px !important;
+  border: 1px solid rgba(201, 154, 62, 0.28) !important;
+  background: rgba(0, 0, 0, 0.25) !important;
+  color: var(--tome-leather-text) !important;
+  font-size: 17px !important;
+}
+.fast-travel__row:hover,
+.fast-travel__row:focus-visible {
+  border-color: var(--tome-gilt) !important;
+  outline: none !important;
+}
+.fast-travel__row.is-selected {
+  border-color: var(--tome-gilt-bright) !important;
+  background: linear-gradient(90deg, rgba(125, 33, 23, 0.55), rgba(0, 0, 0, 0.2)) !important;
+  box-shadow: inset 3px 0 0 var(--tome-gilt-bright) !important;
+}
+.fast-travel__row-eta {
+  color: var(--tome-leather-dim) !important;
+  font-style: italic;
+}
+.fast-travel__btn {
+  border-radius: 2px !important;
+  border: 1px solid rgba(201, 154, 62, 0.45) !important;
+  background: linear-gradient(180deg, #3a2516, var(--tome-leather-deep)) !important;
+  color: var(--tome-leather-text) !important;
+  font-size: 16px !important;
+}
+.fast-travel__btn--primary {
+  border-color: var(--tome-gilt) !important;
+  background: linear-gradient(180deg, var(--tome-wine-bright), var(--tome-wine) 60%, #561510) !important;
+  color: #fff3d6 !important;
+}
+.fast-travel__empty {
+  color: var(--tome-leather-dim) !important;
+}
+
+/* ── Panels built with inline styles (companions, followers, shouts,
+      pickpocket): their palettes are the tome's (see each file's `C`); the
+      frame comes from here. ───────────────────────────────────────────── */
+
+:is(.pet-ui, .follower-ui, .shout-ui, .pickpocket-ui) {
+  border-radius: 4px !important;
+  background: var(--tome-leather-bg) !important;
+  box-shadow:
+    0 0 0 3px var(--tome-leather-deep),
+    0 0 0 4px rgba(201, 154, 62, 0.55),
+    0 26px 70px rgba(0, 0, 0, 0.75),
+    inset 0 0 50px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Their inline type sizes were set for Inter; the book face reads small, so
+   the panels scale up a touch. */
+:is(.pet-ui, .follower-ui, .shout-ui, .pickpocket-ui) {
+  zoom: 1.14;
+}
+:is(.pet-ui, .follower-ui, .shout-ui, .pickpocket-ui) button[aria-label^="Close"] {
+  font-size: 13px !important;
+}
