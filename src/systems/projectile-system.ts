@@ -207,7 +207,7 @@ export class ProjectileSystem {
 
   /**
    * When true, hostile arrows/bolts are consumed without damaging the player
-   * (dodge-roll i-frames). Wired from CombatSystem.isDodging in game.ts.
+   * (dodge-roll i-frames). Wired from CombatSystem.isDodging in game/setup-world.ts.
    */
   public isPlayerDodging: (() => boolean) | null = null;
 

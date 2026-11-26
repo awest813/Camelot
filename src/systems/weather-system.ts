@@ -67,7 +67,7 @@ export interface WeatherSaveState {
  *   - Ambient and directional light intensity
  *   - Smooth visual transitions between states
  *
- * Wire-up in game.ts:
+ * Wire-up (see game/setup-gameplay.ts):
  * ```ts
  * this.weatherSystem = new WeatherSystem(
  *   "clear",

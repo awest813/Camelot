@@ -173,16 +173,9 @@ const CDN_DEMO = CDN + "Demos/weaponsDemo/meshes/";
 /**
  * Base path for self-hosted Quaternius assets.
  * Root-anchored (plus the Vite deployment base) so model URLs keep working
- * when the app is served from a sub-path.  Override via
- * `setQuaterniusBasePath()` for custom CDN hosting.
+ * when the app is served from a sub-path.
  */
-let QUATERNIUS_BASE = `${import.meta.env.BASE_URL ?? "/"}model/quaternius/`;
-
-/** Override the default Quaternius asset base path (e.g. for CDN hosting). */
-export function setQuaterniusBasePath(basePath: string): void {
-  const normalised = basePath.endsWith("/") ? basePath : basePath + "/";
-  QUATERNIUS_BASE = normalised;
-}
+const QUATERNIUS_BASE = `${import.meta.env.BASE_URL ?? "/"}model/quaternius/`;
 
 /** Returns the current Quaternius base path. */
 export function getQuaterniusBasePath(): string {
@@ -217,8 +210,7 @@ const ASSET_URLS: Record<FantasyAssetKey, string> = {
   skull:          CDN      + "skull.babylon",
   snowField:      CDN      + "Demos/Snow_Man_Scene/snowField.glb",
   // ── Quaternius: Fantasy Props Mega Kit (CC0) ──────────────────────────────
-  // NOTE: ASSET_URLS for Quaternius assets use lazy getters (resolved at load
-  // time) so setQuaterniusBasePath() can be called before preload.
+  // (Quaternius URLs are getters, resolved at load time.)
   get qBarrel()      { return qProps()    + "Barrel.glb"; },
   get qCrate()       { return qProps()    + "Crate.glb"; },
   get qChest()       { return qProps()    + "Chest.glb"; },

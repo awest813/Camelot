@@ -39,8 +39,8 @@ export function keepGuiAtCssResolution(
 
 /**
  * A fullscreen GUI texture kept at CSS-pixel resolution.  Only the in-game
- * map editor's panels still draw with Babylon GUI (they move to the editor
- * app in Phase 9); the game's own UI is on the DOM layer.
+ * map editor's panels still draw with Babylon GUI (in the editor app); the
+ * game's own UI is on the DOM layer.
  */
 export function createFullscreenGui(name: string, engine: ScalingEngineLike | null | undefined): AdvancedDynamicTexture {
   const ui = AdvancedDynamicTexture.CreateFullscreenUI(name);

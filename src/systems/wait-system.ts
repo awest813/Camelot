@@ -26,7 +26,7 @@ export interface WaitSaveState {
 /**
  * WaitSystem — Oblivion-style time-skip rest mechanic.
  *
- * Press T (wired in game.ts) to open the Wait dialog.  The player chooses
+ * Press T (the "toggleWaitDialog" action, game/input-wiring.ts) to open the Wait dialog.  The player chooses
  * 1–24 hours; `wait()` then advances the TimeSystem clock and restores
  * Health / Magicka / Stamina proportionally to hours rested.
  *

@@ -100,7 +100,7 @@ export interface KeepOut { x: number; z: number; cos: number; sin: number; hw: n
 /**
  * Places content into a loaded chunk; everything placed is owned by (and
  * disposed with) that chunk.  Calls for a chunk that has since unloaded are
- * ignored.  Becomes the data-driven site builder in Phase 6.
+ * ignored.  Sites are described as data (world/site-specs.ts) and built through it.
  */
 export interface SiteBuilderService {
   readonly scene: Scene;

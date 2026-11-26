@@ -183,8 +183,7 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   { key: "g", action: "toggleFollowerPanel", caseInsensitive: true },
   // N = Shouts menu; Shift+N = activate the equipped shout.  The shift binding
   // must precede the plain binding (same pattern as the O mount/stable pair).
-  // In map-editor mode the adapter is bypassed for "n" (not in
-  // _EDITOR_ADAPTER_KEYS), so the editor's place-entity N keeps working.
+  // Gameplay context only: in the map editor, N is the editor's place-entity key.
   { key: "n", action: "useShout", shift: true, caseInsensitive: true },
   { key: "n", action: "toggleShoutMenu", shift: false, caseInsensitive: true },
 

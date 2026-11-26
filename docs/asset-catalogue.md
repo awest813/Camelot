@@ -210,25 +210,12 @@ retargeted onto any humanoid character skeleton.
 
 ## New Systems for Quaternius Assets
 
-### SkeletalAnimationSystem
+### Skeletal animation
 
-`src/systems/skeletal-animation-system.ts` — Drives BabylonJS AnimationGroup
-clips on rigged GLB models.  Complements the procedural `AnimationSystem`
-(which works on capsule meshes via scaling/rotation keyframes).
-
-```ts
-const skelAnim = new SkeletalAnimationSystem();
-skelAnim.registerCharacter("npc_01", {
-  Idle: scene.getAnimationGroupByName("Idle")!,
-  Walk: scene.getAnimationGroupByName("Walk")!,
-  Run:  scene.getAnimationGroupByName("Run")!,
-  Attack: scene.getAnimationGroupByName("Attack")!,
-  Death: scene.getAnimationGroupByName("Death")!,
-  Hit: scene.getAnimationGroupByName("Hit")!,
-});
-skelAnim.play("npc_01", "Idle", true);
-skelAnim.updateFromAIState("npc_01", "CHASE", false, false, false);
-```
+Rigged GLB models are animated by the `AnimationSystem`
+(`src/systems/animation-system.ts`), which plays their AnimationGroup clips
+(the separate `SkeletalAnimationSystem` was folded into it in the engine
+overhaul, Phase 4).
 
 ### EquipmentVisualSystem
 

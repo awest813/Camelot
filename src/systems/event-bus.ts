@@ -30,22 +30,16 @@ export interface GameEvents {
   };
   /** The player struck a peaceful settler (an assault). */
   "player:assault": { npcId: string; factionId: string };
-  /** An item was picked up (from loot, container, etc.). */
-  "player:pickup": { itemId: string; quantity: number };
   /** The player gained a level. */
   "player:levelUp": { newLevel: number };
   /** The player's HP reached zero. */
   "player:died": Record<string, never>;
-  /** A quest became active. */
-  "quest:activated": { questId: string };
   /** A quest was fully completed. */
   "quest:completed": { questId: string; xpReward: number };
   /** A step of a quest moved (e.g. a kill counted toward a bounty). */
   "quest:progressed": { questId: string; nodeId: string; progress: number; required: number };
   /** The player transitioned to a different cell. */
   "cell:changed": { cellId: string; cellName: string };
-  /** An NPC entered combat with the player. */
-  "npc:aggro": { npcName: string };
   /** A buy or sell transaction completed. */
   "barter:transaction": { type: "buy" | "sell"; itemName: string; gold: number };
   /** The player committed a crime witnessed by an NPC. */
@@ -59,10 +53,6 @@ export interface GameEvents {
   /** The stealth system detected the player. */
   "stealth:detected": { npcName: string; displayName: string };
   "pickpocket:opened": { npcName: string };
-  /** The player's inventory changed. */
-  "inventory:changed": { item: Item; delta: number };
-  /** A loot drop was generated (e.g. from a loot table roll). */
-  "loot:dropped": { tableId: string; items: Item[] };
   /** An NPC's disposition towards the player changed. */
   "disposition:changed": { npcId: string; oldValue: number; newValue: number };
   /** A pet was granted to the player for the first time. */
@@ -93,10 +83,7 @@ export interface GameEvents {
   "dialogue:closed": Record<string, never>;
   /** The quest log was opened. */
   "questlog:opened": Record<string, never>;
-  /**
-   * A sleeping NPC is standing at its bed spot.  Carries the NPC object until
-   * the entity store gives NPCs ids (Phase 3).
-   */
+  /** A sleeping NPC is standing at its bed spot (with the NPC, for the indoors handoff). */
   "npc:atBed": { npc: NPC };
 
   // ── Reported by systems on the bus they are given (`system.events`) ──────
@@ -191,7 +178,7 @@ export type GameEventCallback<T extends GameEventType> = (payload: GameEvents[T]
  * Usage:
  * ```ts
  * const bus = new GameEventBus();
- * bus.on("player:kill", ({ npcName }) => questSystem.onKill(npcName));
+ * bus.on("player:kill", ({ npcName }) => notify(`${npcName} falls.`));
  * bus.emit("player:kill", { npcId: "guard_01", npcName: "Guard", xp: 50 });
  * ```
  */

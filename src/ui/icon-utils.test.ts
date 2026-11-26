@@ -3,9 +3,6 @@ import {
   getItemIcon,
   getAttributeIcon,
   getStatIcon,
-  getSpecializationIcon,
-  getCraftingCategoryIcon,
-  getJournalCategoryIcon,
   getGraphicsTierIcon,
   getDifficultyIcon,
 } from "./icon-utils";
@@ -83,38 +80,6 @@ describe("icon-utils", () => {
       expect(getStatIcon("fame")).toBe("🌟");
       expect(getStatIcon("infamy")).toBe("💀");
       expect(getStatIcon("xp")).toBe("⭐");
-    });
-  });
-
-  describe("getSpecializationIcon()", () => {
-    it("returns combat, magic, and stealth icons", () => {
-      expect(getSpecializationIcon("combat")).toBe("⚔");
-      expect(getSpecializationIcon("magic")).toBe("✦");
-      expect(getSpecializationIcon("stealth")).toBe("🌙");
-      expect(getSpecializationIcon("other")).toBe("✦");
-    });
-  });
-
-  describe("getCraftingCategoryIcon()", () => {
-    it("returns icons for crafting categories", () => {
-      expect(getCraftingCategoryIcon("all")).toBe("✦");
-      expect(getCraftingCategoryIcon("weapon")).toBe("⚔");
-      expect(getCraftingCategoryIcon("armor")).toBe("🛡");
-      expect(getCraftingCategoryIcon("jewelry")).toBe("💍");
-      expect(getCraftingCategoryIcon("misc")).toBe("📦");
-    });
-  });
-
-  describe("getJournalCategoryIcon()", () => {
-    it("returns icons for journal categories", () => {
-      expect(getJournalCategoryIcon("all")).toBe("✦");
-      expect(getJournalCategoryIcon("quest")).toBe("📜");
-      expect(getJournalCategoryIcon("lore")).toBe("📖");
-      expect(getJournalCategoryIcon("note")).toBe("📝");
-      expect(getJournalCategoryIcon("rumor")).toBe("👂");
-      expect(getJournalCategoryIcon("observation")).toBe("👁");
-      expect(getJournalCategoryIcon("misc")).toBe("🗂");
-      expect(getJournalCategoryIcon("favorites")).toBe("⭐");
     });
   });
 

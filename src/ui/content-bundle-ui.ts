@@ -25,7 +25,7 @@ import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
  *   ui.open();
  *   ui.close();
  *
- * Keybinding: Shift+F7 (wired in game.ts).
+ * Keybinding: Shift+F7 (bound by the editor suite, features/editor/editor-suite.ts).
  */
 export class ContentBundleUI {
   /** Called when the user closes the panel. */

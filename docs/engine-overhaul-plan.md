@@ -207,7 +207,9 @@ the feature itself. Recent audits are typical:
 
 - **One UI toolkit for menus and panels: Preact + `@preact/signals`**
   (decided). Panels are Preact components that read game state through
-  signals fed by kernel events.
+  signals fed by kernel events. (As built: Preact without signals. Panels
+  are views redrawn from plain state by their owner, e.g. the UI manager;
+  `@preact/signals` was never added. Recorded in the 2026-11-26 audit.)
   Babylon GUI is kept only for world-space UI such as nameplates and markers.
   Styling comes from one design-token sheet; it's already mostly
   `main.css`.
@@ -240,8 +242,11 @@ the feature itself. Recent audits are typical:
   Also track boot-to-playable time and heap size.
 - **Architecture lint.** Dependency rules such as "framework imports no
   Babylon", "features don't import each other, only kernel events and
-  services" and "no `Math.random` outside the RNG module", enforced with
-  dependency-cruiser and ESLint.
+  services" and "no `Math.random` outside the RNG module". (As built: a
+  dependency-free script, `tools/check-guardrails.mjs`, not
+  dependency-cruiser or ESLint. It enforces these three rules and a few
+  more; "features don't import each other" was added in the 2026-11-26
+  audit.)
 - **Bundle budgets:** main chunk ≤ 900 KB, with Recast, the editors and the
   inspector lazy-loaded.
 
@@ -556,10 +561,14 @@ each register one, and features own theirs with `ownSave`.)
   so mouse-look can't fight it. Cinematics slot in as further shots.
 
 **Phase 2 exit check:** pointer lock is only in the focus wiring (enforced
-by guardrail). No feature listens to raw `keydown`. The remaining
-`keydown` listeners are panels' own keyboard handling inside their dialogs,
-and app-level shortcuts in `app.ts`. They are ported with the panels to
-Preact in Phase 8.
+by guardrail). No feature listens to raw `keydown`. The remaining window
+`keydown` listeners (corrected in the 2026-11-26 audit):
+- `game/setup-wiring.ts`: forwards panel-toggle keys pressed inside a DOM
+  dialog to the input adapter, so the key that opened a panel closes it;
+- `systems/dialogue-system.ts`: the conversation's own keys (capture phase);
+- `editor-main.ts` and `ui/world-builder-ui.ts`: the editor app's own.
+
+Panels' keyboard handling inside their dialogs is their own.
 - Preact is in (`preact` 10, automatic JSX runtime in the TypeScript, Vite,
   Vitest and e2e configs). `src/ui/preact/modal-dialog.tsx` is the shared
   modal: backdrop, header with ✕, focus trap, and ✕ / backdrop / Escape all
@@ -680,7 +689,10 @@ components.
   - `tooltip-ui`, which was also the only user of `@floating-ui/dom`, so
     that dependency is gone too.
 - Still unreachable from `src/app.ts`, but features rather than duplicates.
-  Each is kept, with its tests, until its phase wires it in or drops it:
+  Each is kept, with its tests, until its phase wires it in or drops it.
+  (2026-11-26 audit: Phases 6 and 9 closed without wiring these. They are
+  parked content now, with no owner phase; wiring or deleting each is a
+  product decision, see "Audit" at the end.)
   - Phase 6, world: `offscreen-simulation-system` (the off-screen
     schedules), `region-system`, `biome-system`, `encounter-system`,
     `landmark-system`, `inn-system`, `standing-stone-system`,
@@ -696,8 +708,9 @@ components.
   - Sleep is the `Asleep` actor tag (`npc.isAsleep`). It used to be a
     hack: blanking the NPC's mesh metadata so interaction couldn't see
     it. The interaction prompt now says "X is asleep" and won't start a
-    conversation. The daily schedule system also forgets sleepers that
-    have left the world; before, it kept them forever.
+    conversation. Sleepers that leave the world are forgotten; before, the
+    daily schedule system (since folded into `ScheduleSystem`) kept them
+    forever.
 - Streaming is one lifecycle. `ChunkManager` decides what loads,
   unloads, and when (preload, concurrency, mount budget). `WorldManager`
   is its source and render adapter, and the `onChunkLoaded` /
@@ -800,8 +813,8 @@ one replay runs in CI.
     re-derives it).
   - `declareStateless(ctx, why)`: nothing of its own to keep, with the
     reason (saved by the save system's own parts, derived from the world
-    seed, or a player preference outside the save). The other twelve
-    do. (Raids and jobs both save and declare transient state.)
+    seed, or a player preference outside the save). The other fourteen
+    do (twelve at first; notices and routines came later). (Raids and jobs both save and declare transient state.)
 
   Raids and jobs used to listen for `save:loaded` directly. After
   installing features, the game reports any that declared nothing as a
@@ -1223,7 +1236,7 @@ from a CDN at runtime.
   plain state in `UIManager`, and the view redraws from it. Five public
   GUI fields are gone (`inventoryPanel`, `inventoryGrid`,
   `inventoryDescription`, `statsText`, `equipmentText`). `ui-manager.ts`
-  is down to about 1,400 lines from 2,400.
+  is down to about 1,400 lines from 2,400 (655 after the rest of Phase 8).
 - The conversation box is Preact (`dialogue-box.tsx`): the speaker, the
   line (announced politely to screen readers), and numbered choices as
   buttons, with locked ones disabled and their reason shown. The
@@ -1376,9 +1389,12 @@ with the rendering and UI tracks in parallel.
     ids) to `freshEntropy()` / `freshId()`, which use crypto;
   - the dungeon generator's unseeded fallback to a freshly seeded `Rng`.
   The ratchet now holds it at 0.
-- Callback properties: **0** (target met). The guardrail now counts the
-  whole composition root (`game.ts` and `src/game/`), so moving wiring
-  into a helper file would not hide it.
+- Callback properties: **0** in the composition root (target met). The
+  guardrail counts the whole composition root (`game.ts` and `src/game/`),
+  so moving wiring into a helper file would not hide it. Features still
+  wire their own systems this way (about 190 `x.onY =` assignments in
+  `src/features`, e.g. the editor suite, crafting, followers, pets); the
+  metric does not cover them.
   - **Systems:** every system the game wires reports on the event bus it
     is given (`system.events = bus`). That is 33 systems, including the
     UI manager, the world, structures, cells, save, dialogue, combat,
@@ -1472,7 +1488,57 @@ Recorded 2026-11-22.
 | Question | Decision | Notes |
 |---|---|---|
 | Entity model | **Library: bitECS 0.4** | MPL-2.0 (file-level copyleft; used unmodified, so only a notice in THIRD-PARTY-NOTICES). Non-numeric data goes in side tables. |
-| UI layer | **Preact** (+ `@preact/signals`) | Menus and panels only; Babylon GUI stays for world-space UI. |
+| UI layer | **Preact** (signals planned, not adopted) | Menus and panels only; Babylon GUI stays for world-space UI. |
 | Renderer default | **WebGPU**, WebGL2 fallback | Needs WGSL versions of 5 custom shader pieces first (Phase 7). |
 | In-game editors | **Separate editor app** | Phase 9: a second Vite entry sharing the kernel. |
 | Navigation | **Recast navmesh tiles** | Already a dependency; handles buildings, doorways and interiors, which grid-plus-steering can't; tile builds run in a worker. |
+
+## Audit (2026-11-26)
+
+A read of the whole plan against the code, after every phase was marked
+done. Fixed:
+
+- **Riding did nothing.** The mount host wrote a speed field the player
+  never read (a cast hid it). `Player.speedMultiplier` now scales movement;
+  loading a save made on foot resets it.
+- **The quest log's own entries were dead code.** Nothing added them once
+  jobs became radiant quests. The log is now only a view of the engine;
+  `addQuest`, `getOwnQuests`, `remove` and the quest-log service are gone.
+  Older saves' quest section still migrates into the engine.
+- **Features imported each other** in five places (service keys for
+  indoors, jobs, routines and travel). The keys live in
+  `features/services.ts`, and the guardrail rule `feature-imports-feature`
+  fails on a runtime import across features.
+- **Three definitions of night** (20–6, 20–5, 18–6) and five copies of the
+  clock-face hour helpers are now one module, `systems/game-hours.ts`
+  (night 20:00–06:00, the clock's own).
+- **Dead code removed:** the unused Babylon adapters (controller, physics
+  controller, scene host, barrel), five events no one emitted or heard
+  (`player:pickup`, `quest:activated`, `npc:aggro`, `inventory:changed`,
+  `loot:dropped`), and unused exports (`fromChunkKey`,
+  `setQuaterniusBasePath`, three icon helpers).
+- **Casts that hid nothing** in the combat system are gone (the player and
+  NPC declare those fields).
+- **Stale text:** file headers that said "wired in game.ts", guardrail and
+  input-adapter comments, the asset catalogue and the Yuka evaluation, and
+  the plan statements corrected above.
+
+Left as decisions:
+
+- **Parked systems.** These have no owner phase and nothing runs them:
+  - world: `region`, `biome`, `encounter`, `landmark`, `inn`,
+    `standing-stone`, `dungeon-generator`, `weather-schedule`,
+    `offscreen-simulation`;
+  - editor: `map-annotation`, `map-pack`, `recent-projects`, the
+    standalone editor shell;
+  - other: `journal`, `camera-scripting`, `event-script`,
+    `equipment-visual`.
+
+  Each is either content to wire in or code to delete.
+- **Events with an emitter but no listener** (`crime:committed`,
+  `spell:hit`, `spell:heal`, `disposition:changed`, the pet events,
+  `fame:changed`, `npc:slept` / `npc:woke`) are kept as extension points
+  (achievements, audio, mods).
+- **Feature-level callback properties** (above) and the `as any` casts in
+  `save-system.ts` (codec restores) and `world-manager.ts` (Babylon
+  `freeze` / culling APIs) are typing work for later.

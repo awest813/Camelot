@@ -89,49 +89,6 @@ export function getStatIcon(stat: string): string {
 }
 
 /**
- * Returns a specialization icon.
- */
-export function getSpecializationIcon(spec: string): string {
-  switch (spec.toLowerCase()) {
-    case "combat":  return "⚔";
-    case "magic":   return "✦";
-    case "stealth": return "🌙";
-    default:        return "✦";
-  }
-}
-
-/**
- * Returns a category icon for crafting tabs.
- */
-export function getCraftingCategoryIcon(category: string): string {
-  switch (category.toLowerCase()) {
-    case "all":     return "✦";
-    case "weapon":  return "⚔";
-    case "armor":   return "🛡";
-    case "jewelry": return "💍";
-    case "misc":    return "📦";
-    default:        return "✦";
-  }
-}
-
-/**
- * Returns a category icon for journal browser tabs.
- */
-export function getJournalCategoryIcon(category: string): string {
-  switch (category.toLowerCase()) {
-    case "all":         return "✦";
-    case "quest":       return "📜";
-    case "lore":        return "📖";
-    case "note":        return "📝";
-    case "rumor":       return "👂";
-    case "observation": return "👁";
-    case "misc":        return "🗂";
-    case "favorites":   return "⭐";
-    default:            return "📜";
-  }
-}
-
-/**
  * Returns an icon for graphics quality tier presets.
  */
 export function getGraphicsTierIcon(tier: string): string {

@@ -5,9 +5,9 @@
  * Intentionally headless (no Babylon.js dependencies) so it can be tested
  * in isolation and mirrors the pattern established by HorseSystem.
  *
- * The in-world mesh, physics body, and AI movement are handled in game.ts,
- * which listens to `onPetSummoned` / `onPetDismissed` / `onPetDied` callbacks
- * to create and remove the Babylon scene objects.
+ * The in-world mesh, physics body, and AI movement are handled by the pets
+ * feature (features/pets/pets-feature.ts), which listens to `onPetSummoned` /
+ * `onPetDismissed` / `onPetDied` to create and remove the scene objects.
  *
  * Built-in species:
  *   wolf   — High health, strong attacker, moderate speed

@@ -37,18 +37,18 @@ these are trivially mapped to Babylon.js equivalents.
 | Layer | Tool | Role |
 |-------|------|------|
 | Pathfinding | `recast-detour` + BabylonJS `RecastJSPlugin` | NavMesh build + path queries (`NavigationSystem`) |
-| Behavior trees | (none) | `mistreevous` and its `NpcBehaviorTreeSystem` were removed unused (engine overhaul, Phase 4) |
-| State machines | Custom | The combat system's own state machine; `xstate` and its `NpcAIStateMachine` were removed unused |
+| Goals | Custom | A behaviour tree picks each NPC's goal (`systems/ai/npc-goals.ts` on `behaviour-tree.ts`); `mistreevous` and `xstate` were removed unused (engine overhaul, Phase 4) |
+| Steering | Custom | `NpcSteering` (`systems/ai/npc-steering.ts`): navmesh paths, straight-line fallback, flee/kite/strafe |
 | Combat AI | Custom | Distance bands, cooldowns, threat handoff (`CombatSystem`) |
-| Schedules | Custom | Daily schedule blocks (`NpcScheduleSystem`, `DailyScheduleSystem`) |
+| Schedules | Custom | Daily schedule blocks (`NpcScheduleSystem` data, run by `ScheduleSystem`) |
 | Offscreen | Custom | NPC state while unloaded (`OffscreenSimulationSystem`) |
 
 ### What Is Missing?
 
 1. **Steering behaviors** — NPCs currently move in straight lines toward
    navmesh waypoints.  There is no obstacle avoidance, separation,
-   flocking, or smooth arrival.  Combat NPCs strafe, but it is bespoke
-   logic in `CombatSystem`.
+   flocking, or smooth arrival.  Combat NPCs strafe, kite and flee, but
+   with bespoke rules in `NpcSteering` (`systems/ai/npc-steering.ts`).
 2. **Group coordination** — Patrol groups and follower NPCs lack formation
    movement, alignment, or cohesion.
 3. **Smooth path following** — `NavigationSystem.findPath()` returns raw
@@ -92,9 +92,9 @@ consumes those paths.
 
 ### Low Value — State Machines & Goals
 
-Yuka's FSM and goal system overlap with `xstate` (more powerful FSMs) and
-`mistreevous` (behavior trees, which subsume both FSMs and goals in
-expressiveness).  **Recommendation:** do not adopt Yuka's FSM/goal modules.
+Yuka's FSM and goal system overlap with the game's own goal layer (a
+behaviour tree over the combat states, `systems/ai/npc-goals.ts`).
+**Recommendation:** do not adopt Yuka's FSM/goal modules.
 
 ### Low Value — Fuzzy Logic
 
@@ -198,8 +198,7 @@ would add minimal bundle weight if only the steering module is imported.
 1. Add `yuka` as an **optional** dependency (like `recast-detour`).
 2. Create `YukaSteeringAdapter` in `src/adapters/` as a thin bridge.
 3. Wire `FollowPathBehavior` + `SeparationBehavior` into NPC movement.
-4. Keep `recast-detour` for navmesh, `mistreevous` for behavior trees,
-   and `xstate` for state machines.
+4. Keep `recast-detour` for the navmesh and the game's own goal tree.
 
 This fills the steering gap without duplicating existing capabilities.
 
@@ -211,5 +210,4 @@ This fills the steering gap without duplicating existing capabilities.
 - Yuka documentation: https://mugen87.github.io/yuka/
 - Dive (Yuka shooter demo): https://github.com/Mugen87/dive
 - Existing `NavigationSystem`: `src/systems/navigation-system.ts`
-- Existing `NpcBehaviorTreeSystem`: `src/systems/npc-behavior-tree.ts`
-- Existing `NpcAIStateMachine`: `src/systems/npc-ai-state-machine.ts`
+- NPC goals: `src/systems/ai/npc-goals.ts`; steering: `src/systems/ai/npc-steering.ts`

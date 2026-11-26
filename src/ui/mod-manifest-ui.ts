@@ -10,7 +10,7 @@ import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
  *
  * Actions: Validate, Export JSON ↓, Import JSON ↑, Reset, Close.
  *
- * Keyboard shortcut: Ctrl+Shift+M (wired in game.ts).
+ * Keyboard shortcut: Ctrl+Shift+M (bound by the editor suite, features/editor/editor-suite.ts).
  *
  * Usage:
  *   const ui = new ModManifestUI(modManifestSystem);

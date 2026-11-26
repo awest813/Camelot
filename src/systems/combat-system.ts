@@ -530,7 +530,7 @@ export class CombatSystem {
     }
 
     this.player.stamina -= DODGE_STAMINA_COST;
-    (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
+    this.player
       .notifyResourceSpent?.("stamina");
 
     this._readMoveIntent(this._dodgeDirection, true);
@@ -685,7 +685,7 @@ export class CombatSystem {
       return false;
     }
     this.player.magicka -= magickaCost;
-    (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
+    this.player
       .notifyResourceSpent?.("magicka");
 
     const hit = this.player.raycastForward(STAFF_CHARGE_RANGE);
@@ -768,7 +768,7 @@ export class CombatSystem {
     this._meleeCooldownRemaining = this._scaledMeleeCooldown(
       meleeProfile.cooldown * weaponProfile.cooldownMultiplier
     );
-    (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
+    this.player
       .notifyResourceSpent?.("stamina");
 
     // Consume riposte state before any further checks.
@@ -835,7 +835,7 @@ export class CombatSystem {
       anyHitLanded = true;
 
       // Critical hit: combine base player critChance with weapon's bonus.
-      const baseCritChance = (this.player as unknown as { critChance?: number }).critChance ?? 0;
+      const baseCritChance = this.player.critChance ?? 0;
       const effectiveCritChance = baseCritChance + weaponProfile.critChanceBonus;
       const isCrit = effectiveCritChance > 0 && this.random() < effectiveCritChance;
       const critMultiplier = isCrit ? CRIT_DAMAGE_MULTIPLIER : 1.0;
@@ -1017,14 +1017,14 @@ export class CombatSystem {
     this._meleeCooldownRemaining = this._scaledMeleeCooldown(
       meleeProfile.cooldown * weaponProfile.cooldownMultiplier * 1.5
     ); // longer recovery after a power swing
-    (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
+    this.player
       .notifyResourceSpent?.("stamina");
 
     const hit = this.player.raycastForward(weaponProfile.attackRange);
     if (hit && hit.pickedMesh) {
       const npc = this.npcs.find(n => n.mesh === hit.pickedMesh);
       if (npc && !npc.isDead) {
-        const baseCritChance = (this.player as unknown as { critChance?: number }).critChance ?? 0;
+        const baseCritChance = this.player.critChance ?? 0;
         const effectiveCritChance = baseCritChance + weaponProfile.critChanceBonus;
         const isCrit = effectiveCritChance > 0 && this.random() < effectiveCritChance;
         const critMultiplier = isCrit ? CRIT_DAMAGE_MULTIPLIER : 1.0;
@@ -1163,7 +1163,7 @@ export class CombatSystem {
     }
     this.player.magicka -= magickaCost;
     this._magicCooldownRemaining = this._scaledMagicCooldown(magicProfile.cooldown);
-    (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
+    this.player
       .notifyResourceSpent?.("magicka");
 
     const forward = this.player.getForwardDirection(1);
@@ -1423,8 +1423,8 @@ export class CombatSystem {
 
     // Decide: the goal tree picks what the NPC does next (npc-goals.ts).
     const lastKnown = npc.lastKnownPlayerPos;
-    const fleePct: number = (npc as unknown as { fleesBelowHealthPct?: number }).fleesBelowHealthPct ?? 0;
-    const maxHp: number = (npc as unknown as { maxHealth?: number }).maxHealth ?? 100;
+    const fleePct: number = npc.fleesBelowHealthPct ?? 0;
+    const maxHp: number = npc.maxHealth ?? 100;
     const goal = nextGoal({
       goal: npc.aiState,
       playerNear: distSq <= aggroRangeSq && this._aggroesOnProximity(npc),
@@ -1673,7 +1673,7 @@ export class CombatSystem {
    * Fatigue system.
    */
   private _fatigueFactor(): number {
-    const maxStamina = (this.player as unknown as { maxStamina?: number }).maxStamina ?? 100;
+    const maxStamina = this.player.maxStamina ?? 100;
     if (maxStamina <= 0) return 1.0;
     return Math.max(FATIGUE_DAMAGE_MIN_FACTOR, this.player.stamina / maxStamina);
   }
@@ -1866,7 +1866,7 @@ export class CombatSystem {
       const blockCost = isPerfect ? 0 : this._blockStaminaCost();
       dmg = Math.max(0, Math.round(dmg * (1 - blockReduction)));
       this.player.stamina = Math.max(0, this.player.stamina - blockCost);
-      (this.player as unknown as { notifyResourceSpent?: (resource: "magicka" | "stamina") => void })
+      this.player
         .notifyResourceSpent?.("stamina");
       
       if (isPerfect) {
@@ -1916,7 +1916,7 @@ export class CombatSystem {
 
     this.player.health = Math.max(0, this.player.health - dmg);
     if (dmg > 0) {
-      (this.player as unknown as { notifyDamageTaken?: () => void }).notifyDamageTaken?.();
+      this.player.notifyDamageTaken?.();
       // Disease / hit SFX only on real damage — perfect blocks and zero-damage
       // outcomes must not roll disease or play the hurt cue.
       this.events?.emit("combat:playerStruck", {});
@@ -2016,7 +2016,7 @@ export class CombatSystem {
    * extends the chain instead of cold-starting it. Capped at maxStamina.
    */
   private _grantAdrenaline(): void {
-    const maxSt = (this.player as unknown as { maxStamina?: number }).maxStamina;
+    const maxSt = this.player.maxStamina;
     const cap = typeof maxSt === "number" ? maxSt : this.player.stamina + ADRENALINE_STAMINA_RESTORE;
     const before = this.player.stamina;
     const after = Math.min(cap, before + ADRENALINE_STAMINA_RESTORE);
@@ -2105,7 +2105,7 @@ export class CombatSystem {
         effect.tickTimer += effect.tickInterval;
         if (effect.damagePerTick > 0) {
           this.player.health = Math.max(0, this.player.health - effect.damagePerTick);
-          (this.player as unknown as { notifyDamageTaken?: () => void }).notifyDamageTaken?.();
+          this.player.notifyDamageTaken?.();
           // Do not call onPlayerHit here — that hook rolls disease / hit SFX for
           // weapon strikes. Status ticks already show their own notification.
           this._ui.showNotification(

@@ -22,7 +22,7 @@ const ARCHETYPE_SELECT_OPTIONS = [{ value: "", label: "(choose archetype)" }, ..
  *
  * Actions: Validate, Export JSON ↓, Import JSON ↑, Reset, Close.
  *
- * Keyboard shortcut: Shift+F11 (wired in game.ts).
+ * Keyboard shortcut: Shift+F11 (bound by the editor suite, features/editor/editor-suite.ts).
  *
  * Usage:
  *   const ui = new SpawnCreatorUI(spawnCreatorSystem);

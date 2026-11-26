@@ -4,11 +4,6 @@ export function toChunkKey(coords: Vec2Like): ChunkKey {
   return `${coords.x},${coords.y}`;
 }
 
-export function fromChunkKey(key: ChunkKey): Vec2Like {
-  const [x, y] = key.split(",").map(Number);
-  return { x, y };
-}
-
 export function worldToChunkCoords(
   world: Vec2Like,
   chunkSize: number

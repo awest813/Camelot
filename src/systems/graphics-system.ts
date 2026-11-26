@@ -37,7 +37,7 @@ export interface BloomConfig {
 
 /**
  * Full post-processing pipeline configuration used by
- * `DefaultRenderingPipeline` in game.ts.
+ * `DefaultRenderingPipeline` (rendering/render-pipeline.ts).
  */
 export interface PostProcessConfig {
   bloom: BloomConfig;
@@ -92,7 +92,7 @@ export interface SkyConfig {
 /**
  * Initial scene fog configuration.
  *
- * These values are applied by `_setLight()` in game.ts so the very first
+ * These values are applied by the world environment (rendering/world-environment.ts) so the very first
  * rendered frame is consistent with the WeatherSystem's "clear" state before
  * that system takes over blending.
  */
@@ -238,7 +238,7 @@ export const DEFAULT_FOG: FogConfig = {
 
 /**
  * Default lighting base intensities passed to WeatherSystem.
- * They match the values set on the lights in game.ts `_setLight()`.
+ * They match the values set on the lights in rendering/world-environment.ts.
  */
 export const DEFAULT_LIGHTING: LightingConfig = {
   ambientBase: 0.65,

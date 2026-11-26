@@ -43,7 +43,7 @@ const ALL_TYPES: AssetType[] = ["item", "npc", "quest", "dialogue", "faction", "
  *   │ Action bar: Import Bundle | Export JSON | Close  │
  *   └─────────────────────────────────────────────────┘
  *
- * Keybinding: Shift+F6 (wired in game.ts).
+ * Keybinding: Shift+F6 (bound by the editor suite, features/editor/editor-suite.ts).
  */
 export class AssetBrowserUI {
   /** Called when user closes the panel. */

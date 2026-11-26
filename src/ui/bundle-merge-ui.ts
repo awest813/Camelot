@@ -12,7 +12,7 @@ import type { ContentBundleExport } from "../systems/content-bundle-system";
  *   4. Resolve each        — per-row strategy picker
  *   5. Build + Export      — downloads the merged .bundle.json
  *
- * Keybinding: Shift+F5 (wired in game.ts).
+ * Keybinding: Shift+F5 (bound by the editor suite, features/editor/editor-suite.ts).
  */
 export class BundleMergeUI {
   /** Called when the user closes the panel. */

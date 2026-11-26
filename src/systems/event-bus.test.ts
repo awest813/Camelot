@@ -42,9 +42,9 @@ describe("GameEventBus", () => {
   it("off() unregisters a listener", () => {
     const bus = new GameEventBus();
     const cb = vi.fn();
-    bus.on("quest:activated", cb);
-    bus.off("quest:activated", cb);
-    bus.emit("quest:activated", { questId: "q1" });
+    bus.on("quest:completed", cb);
+    bus.off("quest:completed", cb);
+    bus.emit("quest:completed", { questId: "q1", xpReward: 0 });
     expect(cb).not.toHaveBeenCalled();
   });
 
@@ -86,12 +86,12 @@ describe("GameEventBus", () => {
 
   it("listenerCount reflects registered callbacks", () => {
     const bus = new GameEventBus();
-    expect(bus.listenerCount("npc:aggro")).toBe(0);
+    expect(bus.listenerCount("questlog:opened")).toBe(0);
     const cb = vi.fn();
-    bus.on("npc:aggro", cb);
-    expect(bus.listenerCount("npc:aggro")).toBe(1);
-    bus.off("npc:aggro", cb);
-    expect(bus.listenerCount("npc:aggro")).toBe(0);
+    bus.on("questlog:opened", cb);
+    expect(bus.listenerCount("questlog:opened")).toBe(1);
+    bus.off("questlog:opened", cb);
+    expect(bus.listenerCount("questlog:opened")).toBe(0);
   });
 
   it("listener can safely remove itself during emit", () => {
@@ -104,11 +104,11 @@ describe("GameEventBus", () => {
     expect(cb).toHaveBeenCalledTimes(1); // not called again
   });
 
-  it("inventory:changed event carries item payload", () => {
+  it("ui:inventoryItemClick carries the item", () => {
     const bus = new GameEventBus();
     const cb = vi.fn();
-    bus.on("inventory:changed", cb);
-    bus.emit("inventory:changed", { item: DUMMY_ITEM, delta: 1 });
-    expect(cb).toHaveBeenCalledWith({ item: DUMMY_ITEM, delta: 1 });
+    bus.on("ui:inventoryItemClick", cb);
+    bus.emit("ui:inventoryItemClick", { item: DUMMY_ITEM });
+    expect(cb).toHaveBeenCalledWith({ item: DUMMY_ITEM });
   });
 });
