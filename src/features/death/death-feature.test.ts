@@ -37,7 +37,7 @@ describe("DeathFeature (headless, through the kernel)", () => {
     t.hit(0);
     t.step(0.1);
     expect(t.died).toHaveLength(1);
-    expect(t.notes).toContain("You have fallen...");
+    expect(t.notes, "the veil says it, not a toast").not.toContain("You have fallen...");
     t.step(REVIVE_DELAY - 1);
     expect(t.health(), "still down").toBe(0);
     t.step(1.2);

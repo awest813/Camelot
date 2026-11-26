@@ -2054,3 +2054,60 @@
 body.is-title :is(.hud, .quickslot-hud, .active-effect-hud, .onboarding-tip, #display-fps, .graphics-settings-btn) {
   visibility: hidden;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The fall: the world darkens to a wine-black vignette under the words.
+   ══════════════════════════════════════════════════════════════════════════ */
+.death-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 8000; /* over the HUD, under the title, settings and credits */
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  padding: 16px;
+  text-align: center;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, rgba(40, 6, 4, 0.35), rgba(16, 3, 2, 0.82) 62%, rgba(4, 1, 1, 0.96) 100%);
+  animation: death-veil-in 1600ms ease-in both;
+}
+.death-veil.is-lifting { animation: death-veil-out 700ms ease-out both; }
+.death-veil__title {
+  font-family: var(--tome-font-display);
+  font-weight: 600;
+  font-size: clamp(34px, 7vw, 72px);
+  line-height: 1.05;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #c9584a;
+  text-shadow: 0 0 24px rgba(120, 16, 10, 0.8), 0 2px 6px rgba(0, 0, 0, 0.9);
+  animation: death-veil-words 1400ms ease-out 500ms both;
+}
+.death-veil__rule {
+  width: min(360px, 70vw);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201, 88, 74, 0.7), transparent);
+  animation: death-veil-words 1400ms ease-out 800ms both;
+}
+.death-veil__line {
+  max-width: 30em;
+  font-family: var(--tome-font-book);
+  font-style: italic;
+  font-size: 19px;
+  color: rgba(226, 200, 180, 0.82);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+  animation: death-veil-words 1400ms ease-out 1100ms both;
+}
+@keyframes death-veil-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes death-veil-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes death-veil-words {
+  from { opacity: 0; letter-spacing: 0.2em; filter: blur(3px); }
+  to { opacity: 1; filter: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .death-veil, .death-veil.is-lifting, .death-veil__title, .death-veil__rule, .death-veil__line { animation: none; }
+}
+:root.reduce-motion :is(.death-veil, .death-veil.is-lifting, .death-veil__title, .death-veil__rule, .death-veil__line) { animation: none; }
+body:has(.death-veil:not(.is-lifting)) .hud-crosshair { visibility: hidden; }

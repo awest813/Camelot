@@ -6,6 +6,8 @@
  * The wait runs on the game clock, so it doesn't run out under the pause
  * menu.  Healing above 0 before then cancels it.
  *
+ * The fall shows a veil over the screen (ui/death-veil.ts).
+ *
  * Inputs:   services death-host, purse, feedback, fast-travel places.
  * Outputs:  the `player:died` event.
  *
@@ -16,6 +18,7 @@ import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { FeedbackKey, PurseKey, ownTransient } from "../services";
 import { TravelKey } from "../services";
+import { DeathVeil } from "../../ui/death-veil";
 
 /** Seconds between falling and waking. */
 export const REVIVE_DELAY = 4;
@@ -44,6 +47,7 @@ export const DeathHostKey = createServiceKey<DeathHostService>("death-host");
 
 export class DeathFeature implements Feature {
   public readonly id = "death";
+  public readonly veil = new DeathVeil();
 
   public install(ctx: FeatureContext): void {
     const s = ctx.kernel.services;
@@ -53,6 +57,7 @@ export class DeathFeature implements Feature {
     ownTransient(ctx, "a fall in progress", () => {
       if (!down) return;
       down = false;
+      this.veil.hide();
       s.get(DeathHostKey).rise();
     });
 
@@ -67,16 +72,17 @@ export class DeathFeature implements Feature {
           ctx.kernel.events.emit("player:died", {});
           host.flash();
           host.fall();
-          s.get(FeedbackKey).notify("You have fallen...", 4000);
+          this.veil.show();
           return;
         }
-        if (alive) { down = false; host.rise(); return; } // healed in time
+        if (alive) { down = false; this.veil.hide(); host.rise(); return; } // healed in time
         wake -= dt;
         if (wake > 0) return;
         down = false;
         this._wake(ctx);
       },
     });
+    ctx.scope.add(() => this.veil.hide());
   }
 
   private _wake(ctx: FeatureContext): void {
@@ -84,6 +90,7 @@ export class DeathFeature implements Feature {
     const host = s.get(DeathHostKey);
     const feedback = s.get(FeedbackKey);
     host.setHealth(Math.round(host.maxHealth() * 0.5));
+    this.veil.hide();
     host.rise();
     host.closeScreens();
     host.purgeEffects();
