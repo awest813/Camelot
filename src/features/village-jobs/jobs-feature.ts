@@ -4,19 +4,24 @@
  * `radiantTemplateOf`): the engine counts bounty kills, the log shows it, the
  * save keeps it, and the quest bridge pays for it on hand-in.
  *
+ * A board with a bandit camp still standing within a few chunks can also
+ * offer to clear it: taking the job marks the camp on the map, and the
+ * camp's clearing (landmarks feature) completes the hunt.
+ *
  * Inputs:   events `quest:progressed`, `dialogue:action` ("jobs:ask"),
- *           `dialogue:closed`, `save:loaded`; services player, feedback,
- *           inventory, quests, modal, village-world.
+ *           `dialogue:closed`, `save:loaded`, `landmark:cleared`; services
+ *           player, feedback, inventory, quests, modal, village-world,
+ *           landmarks, world-info.
  * Outputs:  the `jobs` service (open a board's window, rules for saving).
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
  */
 import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
-import { JOB_TEMPLATES, VillageJobBoard, radiantTemplateOf, type ActiveJob, type JobContext } from "../../systems/village-jobs";
-import { deliverEvent, reportEvent } from "../../framework/quests/radiant";
+import { JOB_TEMPLATES, VillageJobBoard, radiantTemplateOf, type ActiveJob, type JobCamp, type JobContext } from "../../systems/village-jobs";
+import { clearedEvent, deliverEvent, reportEvent } from "../../framework/quests/radiant";
 import { JobBoardUI } from "../../ui/job-board-ui";
-import { FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestsKey, VillagesKey, type FeedbackService, type InventoryService, type ModalService, type PlayerService, type QuestsService, type VillagesService, ownSave, ownTransient, JobsKey } from "../services";
+import { FeedbackKey, InventoryKey, LandmarksKey, WorldInfoKey, ModalKey, PlayerKey, QuestsKey, VillagesKey, type FeedbackService, type InventoryService, type ModalService, type PlayerService, type QuestsService, type VillagesService, ownSave, ownTransient, JobsKey } from "../services";
 
 export interface JobBoardRef {
   boardId: string;
@@ -45,6 +50,16 @@ interface JobDeps {
   readonly villages: VillagesService;
 }
 
+/** How far from a board (in chunks) a camp can be and still be its business. */
+const CAMP_REACH_CHUNKS = 4;
+
+const COMPASS = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"] as const;
+/** Which way (dx, dz) points, as a word (north is +z). */
+export function compassWord(dx: number, dz: number): string {
+  const sector = Math.round(Math.atan2(dx, dz) / (Math.PI / 4));
+  return COMPASS[((sector % 8) + 8) % 8];
+}
+
 export class VillageJobsFeature implements Feature {
   public readonly id = "village-jobs";
   public readonly rules = new VillageJobBoard();
@@ -54,6 +69,10 @@ export class VillageJobsFeature implements Feature {
   private _active: JobBoardRef | null = null;
   /** "Any work going?" opens the window once the conversation has closed. */
   private _pending: JobBoardRef | null = null;
+  /** The camp a board could send the player to clear (none until installed). */
+  private _campNear: (boardId: string) => JobCamp | null = () => null;
+  /** Put a landmark on the map. */
+  private _mark: (id: string) => boolean = () => false;
 
   constructor(window: JobBoardUI = new JobBoardUI()) {
     this.window = window;
@@ -92,6 +111,19 @@ export class VillageJobsFeature implements Feature {
       deps.feedback.markDirty();
       this._refreshWindow();
     });
+
+    // A camp a clearance names has fallen: the hunt is done (whoever did it).
+    ctx.on("landmark:cleared", ({ id }) => { deps.quests.apply("custom", clearedEvent(id)); });
+    this._campNear = (boardId) => {
+      const m = /_(-?\d+)_(-?\d+)$/.exec(boardId);
+      const landmarks = s.tryGet(LandmarksKey);
+      if (!m || !landmarks?.nearest) return null;
+      const size = s.get(WorldInfoKey).chunkSize;
+      const bx = Number(m[1]) * size, bz = Number(m[2]) * size;
+      const camp = landmarks.nearest("Bandit Camp", bx, bz, CAMP_REACH_CHUNKS);
+      return camp && { id: camp.id, name: camp.name, direction: compassWord(camp.x - bx, camp.z - bz) };
+    };
+    this._mark = (id) => s.tryGet(LandmarksKey)?.mark?.(id) ?? false;
 
     ctx.on("dialogue:action", ({ eventId, npcName }) => {
       if (eventId === "jobs:ask" && npcName) this._pending = deps.villages.innBoardOf(npcName);
@@ -140,10 +172,14 @@ export class VillageJobsFeature implements Feature {
     this.window.onAccept = () => {
       const b = this._active, deps = this._deps;
       if (!b || !deps) return;
-      const job = this.rules.accept(b.boardId, b.placeName, deps.player.level());
+      const job = this.rules.accept(b.boardId, b.placeName, deps.player.level(), this._campNear(b.boardId));
       this._startQuest(job);
       const t = VillageJobBoard.template(job.templateId);
       if (t) deps.feedback.notify(`New job: ${t.title}`, 2600);
+      if (job.camp) {
+        this._mark(job.camp.id);
+        deps.feedback.notify(`Marked on your map: ${job.camp.name}`, 2600);
+      }
       refresh();
     };
     this.window.onHandIn = () => {
@@ -153,7 +189,7 @@ export class VillageJobsFeature implements Feature {
       const done = this.rules.handIn(b.boardId, this._context());
       if (!done) { refresh(); return; }
       // The quest's last step: the engine completes it and the bridge pays.
-      if (done.template.kind === "bounty") deps.quests.apply("custom", reportEvent(questId));
+      if (done.template.kind !== "supply") deps.quests.apply("custom", reportEvent(questId));
       else deps.quests.apply("custom", deliverEvent(questId), done.template.required);
       refresh();
     };
@@ -176,6 +212,7 @@ export class VillageJobsFeature implements Feature {
       playerLevel: deps.player.level(),
       countItem: (id) => deps.inventory.count(id),
       removeItem: (id, n) => deps.inventory.remove(id, n),
+      campNear: (boardId) => this._campNear(boardId),
     };
   }
 
@@ -187,7 +224,8 @@ export class VillageJobsFeature implements Feature {
 
   /** Start a job's radiant quest (once). */
   private _startQuest(job: ActiveJob): void {
-    this._deps?.quests.engine.startRadiant(job.templateId, this._questId(job.boardId), { place: job.placeName });
+    const camp: Record<string, string> = job.camp ? { camp: job.camp.name, landmark: job.camp.id } : {};
+    this._deps?.quests.engine.startRadiant(job.templateId, this._questId(job.boardId), { place: job.placeName, ...camp });
   }
 
   /** Jobs from older saves: give them their quest. */

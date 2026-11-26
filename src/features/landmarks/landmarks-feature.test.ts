@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { Kernel } from "../../core/kernel";
-import { FastTravelKey, FeedbackKey, LandmarksKey, PlayerKey, SavesKey } from "../services";
+import { FastTravelKey, FeedbackKey, LandmarksKey, PlayerKey, SavesKey, WorldInfoKey } from "../services";
+import { buildWildChunk } from "../../world/site-specs";
+import { WILD_SCATTER, WILD_SITES } from "../../content/sites";
 import type { SaveCodec } from "../../systems/save-system";
 import type { PlacedLandmark } from "../../world/site-specs";
 import { LandmarksFeature } from "./landmarks-feature";
@@ -91,5 +93,23 @@ describe("LandmarksFeature (headless, through the kernel)", () => {
     expect(u.feature.isCleared(camp.id)).toBe(true);
     u.codec().load(undefined);
     expect(u.feature.isCleared(camp.id), "an old save without the part").toBe(false);
+  });
+
+  it("finds the nearest camp still standing, loaded or not, and can mark it on the map", () => {
+    const t = setup();
+    t.k.services.provide(WorldInfoKey, { chunkSize: 50, biome: () => "desert", pondAt: () => false, seed: () => null, setSeed: () => {}, loadedChunks: () => 0 });
+    const lm = t.k.services.get(LandmarksKey);
+    const camp = lm.nearest!("Bandit Camp", 0, 0, 6);
+    expect(camp, "a desert has camps within six chunks").not.toBeNull();
+    // It is what the chunk really builds.
+    const [, cx, cz] = /_(-?\d+)_(-?\d+)$/.exec(camp!.id)!.map(Number);
+    const nop = () => null;
+    const built = buildWildChunk({ site: new Proxy({}, { get: () => nop }) as never, spawn: nop, chunkKey: "", cx, cz, biome: "desert", size: 50 }, { ...WILD_SCATTER, pool: {} }, WILD_SITES);
+    expect(built.find((l) => l.id === camp!.id)?.name).toBe(camp!.name);
+
+    expect(lm.mark!(camp!.id)).toBe(true);
+    expect(t.discovered.get(camp!.id)?.name).toBe(camp!.name);
+    expect(t.grants, "marking is not finding: no experience").toEqual([]);
+    expect(lm.mark!("site_nothing_0_0")).toBe(false);
   });
 });

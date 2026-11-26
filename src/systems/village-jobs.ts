@@ -5,7 +5,9 @@
  *  • bounties — kill N enemies whose name starts with a prefix (bandits,
  *    the restless dead, a dragon for veterans), then return to collect;
  *  • supply runs — bring N of an item (iron, leather, healing potions),
- *    handed over and paid on the spot.
+ *    handed over and paid on the spot;
+ *  • camp clearances — clear a named bandit camp near the board (offered
+ *    only where there is one still standing), then return to collect.
  *
  * Pure state + rules (no Babylon / UI): which job each board offers (the
  * same per board and per number of jobs finished there, so a reload offers
@@ -16,15 +18,15 @@
  */
 import type { RadiantTemplate } from "../framework/quests/radiant";
 
-export type JobKind = "bounty" | "supply";
+export type JobKind = "bounty" | "supply" | "clear";
 
 export interface JobTemplate {
   id: string;
   kind: JobKind;
   title: string;
-  /** `{place}` is replaced with the board's place name. */
+  /** `{place}` is the board's place name; a clearance also has `{camp}` and `{direction}`. */
   description: string;
-  /** Bounty: NPC name prefix to count; supply: item id to deliver. */
+  /** Bounty: NPC name prefix to count; supply: item id to deliver; clear: unused (""). */
   target: string;
   required: number;
   rewardGold: number;
@@ -50,6 +52,11 @@ export const JOB_TEMPLATES: readonly JobTemplate[] = [
     target: "DragonBoss", required: 1, rewardGold: 600, rewardXp: 300, minLevel: 5,
   },
   {
+    id: "clear_camp", kind: "clear", title: "Clear the Camp",
+    description: "Bandits have dug in at {camp}, {direction} of {place}, and the roads are not safe. Clear the camp, every last one of them.",
+    target: "", required: 1, rewardGold: 220, rewardXp: 110,
+  },
+  {
     id: "supply_iron", kind: "supply", title: "Iron for the Forge",
     description: "The smith at {place} is short of iron. Bring four Iron Ingots.",
     target: "iron_ingot", required: 4, rewardGold: 70, rewardXp: 30,
@@ -72,6 +79,15 @@ export interface ActiveJob {
   templateId: string;
   /** Bounty kills (read through `VillageJobBoard.progress`; older saves stored it here). */
   progress: number;
+  /** A clearance's camp (its landmark id, name, and which way it lies from the board). */
+  camp?: JobCamp;
+}
+
+/** A camp a board can send the player to clear. */
+export interface JobCamp {
+  id: string;
+  name: string;
+  direction: string;
 }
 
 /** A job template as a radiant quest template (kills, or a delivery). */
@@ -79,12 +95,13 @@ export function radiantTemplateOf(t: JobTemplate): RadiantTemplate {
   const label = t.target.replace(/([a-z])([A-Z])/g, "$1 $2");
   return {
     id: t.id,
-    kind: t.kind === "bounty" ? "kill" : "deliver",
+    kind: t.kind === "bounty" ? "kill" : t.kind === "clear" ? "clear" : "deliver",
     name: `${t.title} ({place})`,
     description: t.description,
-    objective: t.kind === "bounty" ? `Kill ${t.required} (${label})` : `Bring ${t.required} × ${t.target.replace(/_/g, " ")}`,
+    objective: t.kind === "bounty" ? `Kill ${t.required} (${label})`
+      : t.kind === "clear" ? "Clear {camp}" : `Bring ${t.required} × ${t.target.replace(/_/g, " ")}`,
     report: "Return to {place} for your pay",
-    targetId: t.target,
+    targetId: t.kind === "clear" ? "cleared:{landmark}" : t.target,
     required: t.required,
     rewardGold: t.rewardGold,
     xpReward: t.rewardXp,
@@ -98,6 +115,8 @@ export interface JobContext {
   countItem: (itemId: string) => number;
   /** Remove items (all or nothing); returns false when short. */
   removeItem: (itemId: string, amount: number) => boolean;
+  /** The nearest camp still standing near a board, or null (no clearances offered then). */
+  campNear?: (boardId: string) => JobCamp | null;
 }
 
 export type AskResult =
@@ -142,13 +161,16 @@ export class VillageJobBoard {
     return JOB_TEMPLATES.find((t) => t.id === id);
   }
 
-  public static describe(template: JobTemplate, placeName: string): string {
-    return template.description.replace("{place}", placeName);
+  public static describe(template: JobTemplate, placeName: string, camp?: JobCamp | null): string {
+    return template.description
+      .replace("{place}", placeName)
+      .replace("{camp}", camp?.name ?? "a camp")
+      .replace("{direction}", camp?.direction ?? "out");
   }
 
-  /** The job a board offers next (deterministic per board and jobs done there). */
-  public offerFor(boardId: string, playerLevel: number): JobTemplate {
-    const pool = JOB_TEMPLATES.filter((t) => (t.minLevel ?? 0) <= playerLevel);
+  /** The job a board offers next (deterministic per board and jobs done there); clearances need a camp. */
+  public offerFor(boardId: string, playerLevel: number, hasCamp = false): JobTemplate {
+    const pool = JOB_TEMPLATES.filter((t) => (t.minLevel ?? 0) <= playerLevel && (t.kind !== "clear" || hasCamp));
     const n = this._completed.get(boardId) ?? 0;
     const d = this._declined.get(boardId) ?? 0;
     return pool[hash(`${boardId}#${n}${d ? `~${d}` : ""}`) % pool.length];
@@ -173,10 +195,9 @@ export class VillageJobBoard {
   public ask(boardId: string, placeName: string, ctx: JobContext): AskResult {
     const job = this._active.get(boardId);
     if (!job) {
-      const template = this.offerFor(boardId, ctx.playerLevel);
-      const fresh: ActiveJob = { boardId, placeName, templateId: template.id, progress: 0 };
-      this._active.set(boardId, fresh);
-      return { type: "accepted", job: fresh, template, text: VillageJobBoard.describe(template, placeName) };
+      const fresh = this.accept(boardId, placeName, ctx.playerLevel, ctx.campNear?.(boardId) ?? null);
+      const template = VillageJobBoard.template(fresh.templateId)!;
+      return { type: "accepted", job: fresh, template, text: VillageJobBoard.describe(template, placeName, fresh.camp) };
     }
     const template = VillageJobBoard.template(job.templateId)!;
     if (template.kind === "supply") {
@@ -197,7 +218,8 @@ export class VillageJobBoard {
   /** The board's current state: its active job, or the job it offers. */
   public view(boardId: string, placeName: string, ctx: JobContext): BoardView {
     const job = this._active.get(boardId) ?? null;
-    const template = job ? VillageJobBoard.template(job.templateId)! : this.offerFor(boardId, ctx.playerLevel);
+    const camp = job ? job.camp ?? null : ctx.campNear?.(boardId) ?? null;
+    const template = job ? VillageJobBoard.template(job.templateId)! : this.offerFor(boardId, ctx.playerLevel, !!camp);
     const place = job?.placeName ?? placeName;
     const progress = template.kind === "supply"
       ? Math.min(ctx.countItem(template.target), template.required)
@@ -205,18 +227,18 @@ export class VillageJobBoard {
     return {
       template,
       job,
-      description: VillageJobBoard.describe(template, place),
+      description: VillageJobBoard.describe(template, place, camp),
       progress,
       canHandIn: !!job && progress >= template.required,
     };
   }
 
-  /** Take the board's offered job (no-op if one is already active there). */
-  public accept(boardId: string, placeName: string, playerLevel: number): ActiveJob {
+  /** Take the board's offered job (no-op if one is already active there); `camp` is the one nearby, if any. */
+  public accept(boardId: string, placeName: string, playerLevel: number, camp: JobCamp | null = null): ActiveJob {
     const existing = this._active.get(boardId);
     if (existing) return existing;
-    const template = this.offerFor(boardId, playerLevel);
-    const job: ActiveJob = { boardId, placeName, templateId: template.id, progress: 0 };
+    const template = this.offerFor(boardId, playerLevel, !!camp);
+    const job: ActiveJob = { boardId, placeName, templateId: template.id, progress: 0, ...(template.kind === "clear" && camp ? { camp: { ...camp } } : {}) };
     this._active.set(boardId, job);
     return job;
   }

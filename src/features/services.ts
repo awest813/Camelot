@@ -214,6 +214,13 @@ export const FastTravelKey = createServiceKey<FastTravelService>("fast-travel");
 export interface LandmarksService {
   /** A chunk's landmarks, as built. */
   placed(chunkKey: string, landmarks: readonly PlacedLandmark[]): void;
+  /**
+   * The nearest landmark of `kind` within `chunks` chunks of (x, z) that has
+   * not been cleared, loaded or not (worked out from the world seed).
+   */
+  nearest?(kind: string, x: number, z: number, chunks: number): { id: string; name: string; x: number; z: number } | null;
+  /** Discover a landmark without walking there (a job marks it on the map). */
+  mark?(id: string): boolean;
 }
 export const LandmarksKey = createServiceKey<LandmarksService>("landmarks");
 export const SiteBuilderKey = createServiceKey<SiteBuilderService>("site-builder");

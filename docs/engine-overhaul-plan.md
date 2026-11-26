@@ -1584,3 +1584,11 @@ Left as decisions:
   of three; NPC names shown to the player drop their ids
   ("Bandit Archer_10003" read as "Bandit Archer").
 - Map labels that would overlap move down a line.
+- **Camp clearances on the job board.** A board with a bandit camp still
+  standing within four chunks can offer "Clear the Camp", naming the camp
+  and which way it lies ("Crowwick Bandit Camp, west of Craigagel Cross").
+  Taking it marks the camp on the map; the camp's clearing completes the
+  hunt (a radiant quest of the new kind `clear`, waiting for
+  `cleared:<landmark>`), and the board pays 220 gold and 110 XP. Boards with
+  no camp near offer what they did before. The landmarks service finds camps
+  in chunks not loaded by building their sites dry.

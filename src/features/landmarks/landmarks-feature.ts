@@ -12,14 +12,22 @@
  * ones cleared are this feature's save part ("landmarks").  A cleared camp
  * still fills again when its chunk next loads: the reward does not.
  *
- * Inputs:   services fast-travel, player, feedback; events chunk:unloaded,
- *           npc:killed.
+ * The feature can also find landmarks in chunks not loaded (the nearest
+ * camp still standing, for a job) by building a chunk's sites dry.
+ *
+ * Inputs:   services fast-travel, player, feedback, world-info, villages;
+ *           events chunk:unloaded, npc:killed.
  * Outputs:  the `landmarks` service; events location:discovered,
  *           landmark:cleared.
  */
 import type { Feature, FeatureContext } from "../../core/kernel";
-import type { PlacedLandmark } from "../../world/site-specs";
-import { FastTravelKey, FeedbackKey, LandmarksKey, PlayerKey, ownSave } from "../services";
+import { buildWildChunk, type PlacedLandmark } from "../../world/site-specs";
+import { WILD_SCATTER, WILD_SITES } from "../../content/sites";
+import type { SiteBuilderService } from "../services";
+import { FastTravelKey, FeedbackKey, LandmarksKey, PlayerKey, VillagesKey, WorldInfoKey, ownSave } from "../services";
+
+/** A site builder that builds nothing: what a chunk's landmarks would be, without loading it. */
+const DRY_RUN = new Proxy({}, { get: () => () => null }) as SiteBuilderService;
 
 /** Seconds between looks for landmarks in reach. */
 const LOOK_EVERY = 0.5;
@@ -53,10 +61,40 @@ export class LandmarksFeature implements Feature {
         if (Array.isArray(cleared)) for (const id of cleared) if (typeof id === "string") this._cleared.add(id);
       },
     });
+    /** The landmarks chunk (cx, cz) has, loaded or not (as world-sites would build them). */
+    const landmarksOf = (cx: number, cz: number): PlacedLandmark[] => {
+      const world = s.get(WorldInfoKey);
+      if (world.pondAt(cx, cz) || s.tryGet(VillagesKey)?.planFor(cx, cz)) return [];
+      return buildWildChunk(
+        { site: DRY_RUN, spawn: () => null, chunkKey: "", cx, cz, biome: world.biome(cx, cz), size: world.chunkSize },
+        { ...WILD_SCATTER, pool: {} }, WILD_SITES,
+      );
+    };
+    const discover = (lm: PlacedLandmark): boolean => s.get(FastTravelKey).discover(lm.id, lm.name, { x: lm.arrive.x, y: 2, z: lm.arrive.z });
     ctx.provide(LandmarksKey, {
       placed: (chunkKey, landmarks) => {
         this._loaded.set(chunkKey, landmarks);
         for (const lm of landmarks) if (lm.clear) this._standing.set(lm.id, new Set(lm.clear.foes));
+      },
+      nearest: (kind, x, z, chunks) => {
+        const size = s.get(WorldInfoKey).chunkSize;
+        const ox = Math.round(x / size), oz = Math.round(z / size);
+        let best: PlacedLandmark | null = null, bestD = Infinity;
+        for (let cx = ox - chunks; cx <= ox + chunks; cx++) {
+          for (let cz = oz - chunks; cz <= oz + chunks; cz++) {
+            for (const lm of landmarksOf(cx, cz)) {
+              if (lm.kind !== kind || this._cleared.has(lm.id)) continue;
+              const d = (lm.x - x) ** 2 + (lm.z - z) ** 2;
+              if (d < bestD) { bestD = d; best = lm; }
+            }
+          }
+        }
+        return best && { id: best.id, name: best.name, x: best.x, z: best.z };
+      },
+      mark: (id) => {
+        const m = /_(-?\d+)_(-?\d+)$/.exec(id);
+        const lm = m ? landmarksOf(Number(m[1]), Number(m[2])).find((l) => l.id === id) : undefined;
+        return lm ? discover(lm) : false;
       },
     });
     ctx.on("chunk:unloaded", ({ chunkKey }) => {
@@ -93,7 +131,7 @@ export class LandmarksFeature implements Feature {
           for (const lm of list) {
             const dx = p.x - lm.x, dz = p.z - lm.z;
             if (dx * dx + dz * dz > lm.radius * lm.radius || travel.isDiscovered(lm.id)) continue;
-            travel.discover(lm.id, lm.name, { x: lm.arrive.x, y: 2, z: lm.arrive.z });
+            discover(lm);
             const fb = s.get(FeedbackKey);
             fb.grant({ xp: lm.xp, label: `Discovered: ${lm.name}` });
             ctx.kernel.events.emit("location:discovered", { id: lm.id, name: lm.name });

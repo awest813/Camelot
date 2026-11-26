@@ -10,7 +10,10 @@
  *  - "deliver": bring `required` of item `targetId` (the game takes the
  *    items and sends `deliver:<questId>` with that amount);
  *  - "defend": beat `required` attackers the game tracks itself (a raid's
- *    raiders); it sends `defend:<questId>` for each one down.
+ *    raiders); it sends `defend:<questId>` for each one down;
+ *  - "clear": clear a landmark (`targetId` names its event with a var, e.g.
+ *    `cleared:{landmark}`; the game sends it when the place is cleared),
+ *    then report back as for "kill".
  *
  * The var `required`, when set, overrides the template's count (a raid's
  * size depends on the player's level); with `perCount`, the rewards are per
@@ -22,7 +25,7 @@
  */
 import type { QuestDefinition } from "./quest-types";
 
-export type RadiantKind = "kill" | "deliver" | "defend";
+export type RadiantKind = "kill" | "deliver" | "defend" | "clear";
 
 export interface RadiantTemplate {
   id: string;
@@ -34,7 +37,7 @@ export interface RadiantTemplate {
   objective: string;
   /** Kill quests: the report-back step, e.g. "Return to {place} for your pay". */
   report?: string;
-  /** Kill: the NPC target id; deliver: the item id; defend: unused (""). */
+  /** Kill: the NPC target id; deliver: the item id; clear: the custom event (vars filled); defend: unused (""). */
   targetId: string;
   required: number;
   rewardGold?: number;
@@ -56,6 +59,8 @@ export const reportEvent = (questId: string): string => `report:${questId}`;
 export const deliverEvent = (questId: string): string => `deliver:${questId}`;
 /** The custom event a defend quest counts (one per attacker down). */
 export const defendEvent = (questId: string): string => `defend:${questId}`;
+/** The custom event a landmark's clearing sends (a "clear" quest waits for it). */
+export const clearedEvent = (landmarkId: string): string => `cleared:${landmarkId}`;
 
 function fill(text: string, vars: Record<string, string>): string {
   return text.replace(/\{(\w+)\}/g, (all, key: string) => vars[key] ?? all);
@@ -74,11 +79,14 @@ export function radiantDefinition(template: RadiantTemplate, questId: string, va
     rewardGold: (template.rewardGold ?? 0) * scale,
     fameReward: template.fameReward,
   };
-  if (template.kind === "kill") {
+  if (template.kind === "kill" || template.kind === "clear") {
+    const hunt = template.kind === "kill"
+      ? { triggerType: "kill" as const, targetId: template.targetId, requiredCount: required }
+      : { triggerType: "custom" as const, targetId: fill(template.targetId, vars), requiredCount: 1 };
     return {
       ...base,
       nodes: [
-        { id: "hunt", description: fill(template.objective, vars), triggerType: "kill", targetId: template.targetId, requiredCount: required, nextNodeIds: ["report"] },
+        { id: "hunt", description: fill(template.objective, vars), ...hunt, nextNodeIds: ["report"] },
         { id: "report", description: fill(template.report ?? "Report back for your reward", vars), triggerType: "custom", targetId: reportEvent(questId), requiredCount: 1, prerequisites: ["hunt"] },
       ],
       startNodeIds: ["hunt"],

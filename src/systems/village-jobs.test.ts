@@ -15,10 +15,10 @@ function ctx(bag: Record<string, number>, level = 1): JobContext {
 }
 
 /** Find a board id whose first offer is the given template. */
-function boardOffering(templateId: string, level = 1): string {
+function boardOffering(templateId: string, level = 1, hasCamp = false): string {
   const b = new VillageJobBoard();
   for (let i = 0; i < 2000; i++) {
-    if (b.offerFor(`board_${i}`, level).id === templateId) return `board_${i}`;
+    if (b.offerFor(`board_${i}`, level, hasCamp).id === templateId) return `board_${i}`;
   }
   throw new Error(`no board offers ${templateId}`);
 }
@@ -31,7 +31,10 @@ describe("VillageJobBoard", () => {
     expect(board.offerFor("inn_3_4", 1)).toEqual(board.offerFor("inn_3_4", 1));
     for (let i = 0; i < 300; i++) expect(board.offerFor(`b${i}`, 1).id).not.toBe("bounty_dragon");
     const offered = new Set(Array.from({ length: 300 }, (_, i) => board.offerFor(`b${i}`, 10).id));
-    expect(offered.size).toBe(JOB_TEMPLATES.length);
+    expect(offered.has("clear_camp"), "no camp near: no clearance").toBe(false);
+    expect(offered.size).toBe(JOB_TEMPLATES.length - 1);
+    const withCamp = new Set(Array.from({ length: 300 }, (_, i) => board.offerFor(`b${i}`, 10, true).id));
+    expect(withCamp.size).toBe(JOB_TEMPLATES.length);
   });
 
   it("asking first accepts the job, with the place named", () => {
@@ -137,5 +140,36 @@ describe("VillageJobBoard", () => {
     copy.restoreFromSave(saved);
     expect(copy.activeAt(id)?.progress).toBe(1);
     expect(copy.activeAt("ghost")).toBeUndefined();
+  });
+
+  it("clearances: offered near a camp, name it and its direction; the camp's clearing completes the hunt", () => {
+    const id = boardOffering("clear_camp", 1, true);
+    const camp = { id: "site_bandit-camp_5_6", name: "Ravenwick Bandit Camp", direction: "north-east" };
+    const c = { ...ctx({}), campNear: () => camp };
+    const view = board.view(id, "Millbrook", c);
+    expect(view.template.id).toBe("clear_camp");
+    expect(view.description).toContain("Ravenwick Bandit Camp, north-east of Millbrook");
+    const job = board.accept(id, "Millbrook", 1, camp);
+    expect(job.camp).toEqual(camp);
+    expect(board.view(id, "Millbrook", { ...ctx({}), campNear: () => null }).description, "the job keeps its camp").toContain("Ravenwick");
+
+    const engine = new QuestGraphEngine();
+    engine.registerRadiantTemplate(radiantTemplateOf(VillageJobBoard.template("clear_camp")!));
+    engine.startRadiant("clear_camp", "job_x", { place: "Millbrook", camp: camp.name, landmark: camp.id });
+    expect(engine.getQuestState("job_x")?.nodes.hunt).toBeDefined();
+    board.progress = () => engine.getQuestState("job_x")?.nodes.hunt?.progress ?? 0;
+    engine.applyEvent({ type: "custom", targetId: "cleared:site_other_1_1" });
+    expect(board.handIn(id, c), "another camp: not this job").toBeNull();
+    engine.applyEvent({ type: "custom", targetId: `cleared:${camp.id}` });
+    expect(engine.getQuestDefinition("job_x")?.nodes[0].description).toBe("Clear Ravenwick Bandit Camp");
+    expect(board.handIn(id, c)?.rewardGold).toBe(220);
+  });
+
+  it("saves and restores a clearance's camp", () => {
+    const id = boardOffering("clear_camp", 1, true);
+    board.accept(id, "Millbrook", 1, { id: "c1", name: "Thornfell Bandit Camp", direction: "west" });
+    const b2 = new VillageJobBoard();
+    b2.restoreFromSave(JSON.parse(JSON.stringify(board.getSaveState())));
+    expect(b2.activeAt(id)?.camp).toEqual({ id: "c1", name: "Thornfell Bandit Camp", direction: "west" });
   });
 });

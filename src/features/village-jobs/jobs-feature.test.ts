@@ -1,15 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
 import { Kernel } from "../../core/kernel";
-import { FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestsKey, VillagesKey } from "../services";
+import { FeedbackKey, InventoryKey, LandmarksKey, ModalKey, PlayerKey, QuestsKey, VillagesKey, WorldInfoKey } from "../services";
 import { VillageJobsFeature, JobsKey } from "./jobs-feature";
 import { VillageJobBoard } from "../../systems/village-jobs";
 import { QuestSystem } from "../../systems/quest-system";
 import { provideQuests } from "../../testing/quests";
 
 /** A board id whose first offer is the given template. */
-function boardOffering(templateId: string): string {
+function boardOffering(templateId: string, hasCamp = false): string {
   const b = new VillageJobBoard();
-  for (let i = 0; i < 3000; i++) if (b.offerFor(`inn_${i}_0`, 3).id === templateId) return `inn_${i}_0`;
+  for (let i = 0; i < 3000; i++) if (b.offerFor(`inn_${i}_0`, 3, hasCamp).id === templateId) return `inn_${i}_0`;
   throw new Error(`no board offers ${templateId}`);
 }
 
@@ -116,5 +116,31 @@ describe("VillageJobsFeature (headless, through the kernel)", () => {
     t.k.uninstall("village-jobs");
     expect(document.querySelector(".job-board"), "window removed from the page").toBeNull();
     expect(t.k.services.tryGet(JobsKey)).toBeUndefined();
+  });
+
+  it("a clearance names the nearest camp, marks it on the map, and the camp's clearing completes it", () => {
+    const board = boardOffering("clear_camp", true);
+    const t = setup(board);
+    const marked: string[] = [];
+    t.k.services.provide(WorldInfoKey, { chunkSize: 50, biome: () => "desert", pondAt: () => false, seed: () => null, setSeed: () => {}, loadedChunks: () => 0 });
+    t.k.services.provide(LandmarksKey, {
+      placed: () => {},
+      nearest: (kind, x, z) => (kind === "Bandit Camp" ? { id: "site_bandit-camp_9_2", name: "Thornfell Bandit Camp", x: x + 100, z: z + 100 } : null),
+      mark: (id) => { marked.push(id); return true; },
+    });
+    t.jobs.open({ boardId: board, placeName: "Camcross" });
+    expect(document.querySelector(".job-board")?.textContent).toContain("Thornfell Bandit Camp, north-east of Camcross");
+    t.click("Accept");
+    expect(marked).toEqual(["site_bandit-camp_9_2"]);
+    expect(t.notes).toContain("Marked on your map: Thornfell Bandit Camp");
+    const id = t.jobs.questIdOf(board);
+    expect(t.quest(id)!.objectives[0].description).toBe("Clear Thornfell Bandit Camp");
+    expect(document.querySelector(".job-board__progress")?.textContent).toBe("The camp still stands.");
+
+    t.k.events.emit("landmark:cleared", { id: "site_bandit-camp_9_2", name: "Thornfell Bandit Camp" });
+    expect(t.notes.at(-1)).toBe("Clear the Camp: done — return to Camcross for your pay.");
+    expect(document.querySelector(".job-board__progress")?.textContent).toBe("The camp is cleared. Collect your pay.");
+    t.click("Hand in");
+    expect(t.paid).toEqual([{ questId: id, gold: 220, xp: 110, fame: 5 }]);
   });
 });
