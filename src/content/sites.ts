@@ -46,11 +46,13 @@ const CAMP_RADIUS = 8.5;
 export const WILD_SITES: readonly SiteSpec[] = [
   {
     id: "obelisk", biomes: ["desert", "plains"], roll: { slot: 0, chance: 0.125 }, at: { x: 1, z: 2, spread: 0.7 },
+    landmark: { kind: "Obelisk", xp: 10, radius: 14, arrive: { dx: 0, dz: 5 } },
     parts: [{ asset: "obelisk", yaw: 4, scale: { base: 0.8, slot: 3, range: 0.6 }, tier: "structure" }],
   },
   {
     // A cottage, a villager and a visiting trainer (the armorer keeps a forge).
     id: "homestead", biomes: ["plains"], roll: { slot: 5, chance: 0.083 }, at: { x: 6, z: 7, spread: 0.5 },
+    landmark: { kind: "Homestead", xp: 10, radius: 18, arrive: { dx: 0, dz: 6 } },
     variants: COTTAGE_TRAINERS.length,
     parts: [
       { building: "cottage", dx: 0, dz: -5 },
@@ -67,12 +69,14 @@ export const WILD_SITES: readonly SiteSpec[] = [
   },
   {
     id: "dragon", biomes: ["tundra"], roll: { slot: 9, chance: 0.05 }, at: { x: 10, z: 11, spread: 0.6 },
+    landmark: { kind: "Roost", xp: 40, radius: 40, arrive: { dx: 0, dz: 30 } },
     parts: [{ dragon: true, yaw: 12 }],
   },
   {
     // Proprietor, barkeep, a rotating specialist (arms and armor sellers keep
     // a forge out back), sometimes a guard.  Set back so its door faces the yard.
     id: "forest-inn", biomes: ["forest"], roll: { slot: 13, chance: 0.067 }, at: { x: 14, z: 15, spread: 0.5 },
+    landmark: { kind: "Inn", xp: 10, radius: 20, arrive: { dx: 0, dz: 9 } },
     variants: INN_SPECIALISTS.length,
     parts: [
       { building: "inn", dx: 0, dz: -8 },
@@ -94,15 +98,18 @@ export const WILD_SITES: readonly SiteSpec[] = [
   },
   {
     id: "haunted-house", biomes: ["tundra"], roll: { slot: 17, chance: 0.1 }, at: { x: 18, z: 19, spread: 0.55 },
+    landmark: { kind: "Manor", xp: 20, radius: 18, arrive: { dx: 0, dz: 10 } },
     parts: [{ asset: "hauntedHouse", yaw: 20, scale: 1.2, tier: "structure" }],
   },
   {
     id: "graveyard", biomes: ["plains", "forest"], roll: { slot: 21, chance: 0.1 }, at: { x: 22, z: 23, spread: 0.6 },
+    landmark: { kind: "Graveyard", xp: 15, radius: 18, arrive: { dx: 0, dz: 12 } },
     parts: [{ asset: "graveYardScene", yaw: 24, scale: 1.0, tier: "scene" }],
   },
   {
     // Palisade, banners, stolen goods, and its garrison.
     id: "bandit-camp", biomes: ["desert"], roll: { slot: 40, chance: 0.048 }, at: { x: 41, z: 42, spread: 0.62 },
+    landmark: { kind: "Bandit Camp", xp: 25, radius: 22, arrive: { dx: 0, dz: 12 } },
     rot: { slot: 43 },
     parts: [
       { ring: "vFence", radius: CAMP_RADIUS, count: 24, gap: 0.4 },

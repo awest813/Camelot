@@ -23,6 +23,7 @@ import type { JobsService } from "./village-jobs/jobs-feature";
 import type { RoutinesService } from "./routines/routines-feature";
 import type { TravelService } from "./fast-travel/fast-travel-feature";
 import type { WorldSeed } from "../world/world-seed";
+import type { PlacedLandmark } from "../world/site-specs";
 
 export interface GameClockService {
   /** Hour of day, 0–23 (fractional). */
@@ -209,6 +210,12 @@ export const VillagesKey = createServiceKey<VillagesService>("villages");
 export const ActorsKey = createServiceKey<ActorsService>("actors");
 export const WorldInfoKey = createServiceKey<WorldInfoService>("world-info");
 export const FastTravelKey = createServiceKey<FastTravelService>("fast-travel");
+/** Landmarks built in loaded chunks (landmarks feature; world-sites reports them). */
+export interface LandmarksService {
+  /** A chunk's landmarks, as built. */
+  placed(chunkKey: string, landmarks: readonly PlacedLandmark[]): void;
+}
+export const LandmarksKey = createServiceKey<LandmarksService>("landmarks");
 export const SiteBuilderKey = createServiceKey<SiteBuilderService>("site-builder");
 export const InventoryKey = createServiceKey<InventoryService>("inventory");
 

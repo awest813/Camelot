@@ -119,7 +119,7 @@ export class VillagesFeature implements Feature {
           travel.discover(v.id, v.name, { x: v.arrival.x, y: 2, z: v.arrival.z });
           const fb = s.get(FeedbackKey);
           fb.notify(`Discovered: ${v.name}`, 3200);
-          ctx.kernel.events.emit("location:discovered" as never, { id: v.id, name: v.name } as never);
+          ctx.kernel.events.emit("location:discovered", { id: v.id, name: v.name });
           fb.markDirty();
         }
       },

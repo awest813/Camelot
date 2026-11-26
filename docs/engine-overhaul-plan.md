@@ -1561,3 +1561,19 @@ Left as decisions:
 - e2e: `title-screen.spec.ts` covers a fresh start, New Game, then a reload
   and Continue back to the same seed, name and position. The other specs
   pass the title with `helpers/title.ts`.
+
+## Landmarks (2026-11-26)
+
+- Wild sites worth finding are **landmarks** (`features/landmarks/landmarks-feature.ts`):
+  obelisks, homesteads, forest inns, haunted manors, graveyards, bandit
+  camps and dragon roosts. Walking near one discovers it: it goes on the map
+  and the fast-travel list, with a little experience (10 to 40 by kind).
+- What counts, the reach, the reward and where fast travel arrives are site
+  data (`landmark` on a `SiteSpec` in `content/sites.ts`). `buildWildChunk`
+  returns the landmarks it built, and world-sites hands them to the feature.
+- Names are fixed per world: a place name hashed from the chunk and kind,
+  then the kind ("Briarbarrow Obelisk"). Nothing new is saved: fast travel
+  already keeps the places found.
+- The parked `landmark-system` (discovery and completion rewards) is still
+  unused; this feature covers discovery, and completion has no owner yet.
+- Map labels that would overlap move down a line.

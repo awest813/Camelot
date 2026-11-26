@@ -40,6 +40,24 @@ export function project(at: { x: number; z: number }, centre: { x: number; z: nu
 
 const INK = "rgba(52, 34, 18, 0.55)";
 
+/**
+ * Where each label goes so none sits on another: top to bottom, a label that
+ * would overlap one already placed moves down a line (its mark stays put).
+ * Widths are estimated from the name; the result is a vertical offset per id.
+ */
+export function labelOffsets(marks: ReadonlyArray<{ id: string; name: string; px: number; py: number }>, line = 16): Map<string, number> {
+  const out = new Map<string, number>();
+  const boxes: Array<{ x0: number; x1: number; y: number }> = [];
+  for (const m of [...marks].sort((a, b) => a.py - b.py || a.px - b.px)) {
+    const x0 = m.px, x1 = m.px + 14 + m.name.length * 7.5;
+    let dy = 0;
+    while (boxes.some((b) => x0 < b.x1 && b.x0 < x1 && Math.abs(b.y - (m.py + dy)) < line)) dy += line;
+    boxes.push({ x0, x1, y: m.py + dy });
+    out.set(m.id, dy);
+  }
+  return out;
+}
+
 function drawSheet(canvas: HTMLCanvasElement, src: MapSource, centre: { x: number; z: number }, chunksAcross: number): void {
   const ctx = canvas.getContext("2d");
   if (!ctx) return; // (no canvas in a headless test)
@@ -130,6 +148,8 @@ export function MapPanel(p: { source: MapSource; onClose(): void; size?: { w: nu
   const at = (pt: { x: number; z: number }) => project(pt, centre, mpp, W, H);
   const mine = at(me);
   const places = src.places();
+  const shown = places.map((pl) => ({ ...pl, ...at(pl) })).filter((q) => q.px >= -40 && q.px <= W + 40 && q.py >= -20 && q.py <= H + 20);
+  const nudge = labelOffsets(shown);
   const biomesShown = (Object.keys(BIOME_WASH) as BiomeType[]);
 
   return (
@@ -150,14 +170,13 @@ export function MapPanel(p: { source: MapSource; onClose(): void; size?: { w: nu
           onPointerLeave={() => { drag.current = null; }}
         >
           <canvas ref={canvas} class="map-panel__canvas" width={W} height={H} aria-hidden="true" />
-          {places.map((pl) => {
-            const q = at(pl);
-            if (q.px < -40 || q.px > W + 40 || q.py < -20 || q.py > H + 20) return null;
+          {shown.map((q) => {
+            const dy = nudge.get(q.id) ?? 0;
             return (
-              <button key={pl.id} type="button" class="map-panel__place" style={{ left: `${q.px}px`, top: `${q.py}px` }}
-                onClick={() => setCentre({ x: pl.x, z: pl.z })} aria-label={`${pl.name} (centre the map here)`}>
+              <button key={q.id} type="button" class="map-panel__place" style={{ left: `${q.px}px`, top: `${q.py}px` }}
+                onClick={() => setCentre({ x: q.x, z: q.z })} aria-label={`${q.name} (centre the map here)`}>
                 <span class="map-panel__place-mark" aria-hidden="true">◆</span>
-                <span class="map-panel__place-name">{pl.name}</span>
+                <span class="map-panel__place-name" style={dy ? { transform: `translateY(${dy}px)` } : undefined}>{q.name}</span>
               </button>
             );
           })}

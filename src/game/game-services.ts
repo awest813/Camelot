@@ -16,6 +16,7 @@ import { Aggressive, Dead, Engaged } from "../core/ecs/actors";
 import { undeclaredFeatures, ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey, QuestsKey, TitleHostKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
 import { VillagesFeature } from "../features/villages/villages-feature";
 import { WorldSitesFeature } from "../features/world-sites/world-sites-feature";
+import { LandmarksFeature } from "../features/landmarks/landmarks-feature";
 import { RoutinesFeature } from "../features/routines/routines-feature";
 import { IndoorsFeature } from "../features/indoors/indoors-feature";
 import { MountsFeature, MountHostKey } from "../features/mounts/mounts-feature";
@@ -513,13 +514,12 @@ export function installGameFeatures(game: Game): void {
         setMoveSpeedMultiplier: (m) => { game.player.speedMultiplier = Math.max(0, m); },
         unlockAchievement: (id) => { game._achievements?.unlock(id as never); }, give: (item) => { game.inventorySystem.addItem(item); },
       });
-      const mounts = new MountsFeature();
-      k.install(mounts);
+      const mounts = new MountsFeature(); k.install(mounts);
 
       k.install(new IndoorsFeature());
       k.install(new RoutinesFeature());
       k.install(new VillagesFeature());
-      k.install(new WorldSitesFeature());
+      k.install(new WorldSitesFeature()); k.install(new LandmarksFeature());
 
       const raids = new VillageRaidFeature();
       k.install(raids);

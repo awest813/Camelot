@@ -71,6 +71,8 @@ export interface GameEvents {
   "save:loaded": Record<string, never>;
   /** An NPC left the world (despawned or its chunk unloaded); drop references. */
   "npc:released": { npcName: string };
+  /** A place was discovered (a village or a landmark): on the map and for fast travel. */
+  "location:discovered": { id: string; name: string };
   /** A world chunk unloaded (its content and NPCs are gone). */
   "chunk:unloaded": { chunkKey: string; cx?: number; cz?: number };
   /** A world chunk finished loading (its ground and vegetation are in). */

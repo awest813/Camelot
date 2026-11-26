@@ -9,7 +9,8 @@
  * content (and existing worlds keep theirs).
  *
  * The sites themselves are data (`content/sites.ts`), built by the site
- * builder (`world/site-specs.ts`) through the site-builder service.
+ * builder (`world/site-specs.ts`) through the site-builder service.  The
+ * landmarks a chunk built go to the landmarks feature.
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
  */
@@ -18,7 +19,7 @@ import { createServiceKey } from "../../core/kernel";
 import type { BiomeType } from "../../world/world-manager";
 import { buildWildChunk } from "../../world/site-specs";
 import { WILD_SCATTER, WILD_SITES } from "../../content/sites";
-import { ActorsKey, SiteBuilderKey, VillagesKey, WorldInfoKey, declareStateless } from "../services";
+import { ActorsKey, LandmarksKey, SiteBuilderKey, VillagesKey, WorldInfoKey, declareStateless } from "../services";
 
 export interface WorldSitesService {
   /** Fill a freshly loaded chunk. */
@@ -45,7 +46,8 @@ export class WorldSitesFeature implements Feature {
         if (s.get(VillagesKey).populate(chunkKey, cx, cz)) return;
         const site = s.get(SiteBuilderKey);
         const spawn = (archetype: string, x: number, z: number) => s.get(ActorsKey).spawnArchetype(chunkKey, archetype, x, z);
-        buildWildChunk({ site, spawn, chunkKey, cx, cz, biome, size: world.chunkSize }, WILD_SCATTER, WILD_SITES);
+        const landmarks = buildWildChunk({ site, spawn, chunkKey, cx, cz, biome, size: world.chunkSize }, WILD_SCATTER, WILD_SITES);
+        if (landmarks.length > 0) s.tryGet(LandmarksKey)?.placed(chunkKey, landmarks);
       },
     });
   }

@@ -56,6 +56,39 @@ export interface SiteSpec {
   /** How many variants; the chunk picks one by `(cx + cz) mod n`. */
   variants?: number;
   parts: readonly SitePart[];
+  /**
+   * A place worth finding: walking within `radius` metres discovers it (on
+   * the map and for fast travel) for `xp`.  `kind` names it ("Graveyard");
+   * fast travel arrives at `arrive` (offsets that turn with the site).
+   */
+  landmark?: { kind: string; xp: number; radius: number; arrive: { dx: number; dz: number } };
+}
+
+/** A landmark a chunk built, in world coordinates. */
+export interface PlacedLandmark {
+  id: string;
+  name: string;
+  kind: string;
+  xp: number;
+  radius: number;
+  x: number;
+  z: number;
+  arrive: { x: number; z: number };
+}
+
+const NAME_HEADS = ["Ash", "Crow", "Elder", "Gallow", "Hollow", "Mire", "Thorn", "Wolf", "Raven", "Stone", "Briar", "Cold", "Hart", "Wych", "Grey", "Marrow"] as const;
+const NAME_TAILS = ["ford", "mere", "barrow", "fell", "wick", "combe", "hithe", "stead"] as const;
+
+/** A landmark's name: a place name from the chunk and kind (fixed per world), then the kind. */
+export function landmarkName(cx: number, cz: number, kind: string): string {
+  // An integer hash: the two halves vary independently (chunkRand's slots don't).
+  // The kind takes part, so two landmarks in one chunk get different names.
+  let h = Math.imul(cx | 0, 0x9e3779b1) ^ Math.imul(cz | 0, 0x85ebca77);
+  for (let i = 0; i < kind.length; i++) h = Math.imul(h ^ kind.charCodeAt(i), 0x01000193);
+  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
+  h = Math.imul(h ^ (h >>> 12), 0x297a2d39);
+  h = (h ^ (h >>> 15)) >>> 0;
+  return `${NAME_HEADS[h % NAME_HEADS.length]}${NAME_TAILS[(h >>> 8) % NAME_TAILS.length]} ${kind}`;
 }
 
 /** Scattered wild props per biome: [asset, chance]; the slots follow the list index. */
@@ -81,8 +114,9 @@ export interface SiteContext {
 
 const wrap = (v: number, n: number) => ((v % n) + n) % n;
 
-/** Scatter wild props, then build each spec that rolls in, in order. */
-export function buildWildChunk(c: SiteContext, scatter: WildScatter, specs: readonly SiteSpec[]): void {
+/** Scatter wild props, then build each spec that rolls in, in order; the landmarks built. */
+export function buildWildChunk(c: SiteContext, scatter: WildScatter, specs: readonly SiteSpec[]): PlacedLandmark[] {
+  const landmarks: PlacedLandmark[] = [];
   const r = (slot: number) => chunkRand(c.cx, c.cz, slot);
   const wx = c.cx * c.size, wz = c.cz * c.size;
   const spot = (sx: number, sz: number, spread: number) => ({
@@ -106,7 +140,16 @@ export function buildWildChunk(c: SiteContext, scatter: WildScatter, specs: read
       if (part.when?.roll && r(part.when.roll.slot) >= part.when.roll.chance) continue;
       buildPart(c, part, origin, variant, r);
     }
+    const lm = spec.landmark;
+    if (lm) {
+      const arrive = toWorld({ x: lm.arrive.dx, z: lm.arrive.dz }, origin);
+      landmarks.push({
+        id: `site_${spec.id}_${c.cx}_${c.cz}`, name: landmarkName(c.cx, c.cz, lm.kind), kind: lm.kind,
+        xp: lm.xp, radius: lm.radius, x: origin.x, z: origin.z, arrive: { x: arrive.x, z: arrive.z },
+      });
+    }
   }
+  return landmarks;
 }
 
 function buildPart(

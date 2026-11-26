@@ -71,3 +71,17 @@ describe("MapFeature (headless, through the kernel)", () => {
     u.k.uninstall("map");
   });
 });
+
+describe("map labels", () => {
+  it("move down a line when they would sit on another; apart, they stay", async () => {
+    const { labelOffsets } = await import("../../ui/map-panel");
+    const out = labelOffsets([
+      { id: "a", name: "Ashcombe Roost", px: 100, py: 100 },
+      { id: "b", name: "Ashcombe Manor", px: 102, py: 104 },
+      { id: "c", name: "Far Away", px: 400, py: 100 },
+    ]);
+    expect(out.get("a")).toBe(0);
+    expect(out.get("b")).toBe(16);
+    expect(out.get("c")).toBe(0);
+  });
+});
