@@ -14,6 +14,7 @@ import { SettingsKey } from "../features/settings/settings-feature";
 import { isSettlementNpc } from "./npcs";
 import { forwardDialogToggleKey, openSaveImportPicker, wireInputAdapter } from "./input-wiring";
 import { isCombatInputBlocked, registerModals } from "./play-focus";
+import { loadGamepadOnConnect } from "../systems/gamepad-loader";
 
 export function wireGameplay(g: Game): void {
   // Prevent browser context menu from capturing right-click combat input.
@@ -135,7 +136,7 @@ export function wireGameplay(g: Game): void {
   // Wire decoupled input adapter after all systems are initialized
   registerModals(g);
   wireInputAdapter(g);
-  g._gamepadInput.connect();
+  loadGamepadOnConnect(g._inputAdapter, () => g.player.camera, (pad) => { g._gamepadInput = pad; });
 
   // Game loop logic will go here
   g.scene.onBeforeRenderObservable.add(() => {

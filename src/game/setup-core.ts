@@ -122,7 +122,6 @@ export function setupCoreSystems(g: Game): void {
     modeChanged: () => refreshHelpOverlayIfVisible(g),
   }) ?? null;
 
-
   // ── v2 system wiring ──────────────────────────────────────────────────────
   g.stealthSystem   = new StealthSystem(g.player, g.scheduleSystem.npcs, g.ui, g.scene);
   g.crimeSystem     = new CrimeSystem(g.player, g.scheduleSystem.npcs, g.ui, g.scene);

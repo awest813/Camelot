@@ -12,7 +12,7 @@ import { getDesktopBridge } from "../platform/desktop-bridge";
 import { Loot } from "../entities/loot";
 import { VillageRaidFeature } from "../features/village-raids/raid-feature";
 import { actors } from "../entities/actors";
-import { Aggressive, Dead } from "../core/ecs/actors";
+import { Aggressive, Dead, Engaged } from "../core/ecs/actors";
 import { undeclaredFeatures, ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey, QuestLogKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
 import { VillagesFeature } from "../features/villages/villages-feature";
 import { WorldSitesFeature } from "../features/world-sites/world-sites-feature";
@@ -32,7 +32,6 @@ import { ProgressionHostKey } from "../features/progression/progression-feature"
 import { DialogueServicesFeature, DialogueHostKey } from "../features/dialogue-services/dialogue-services-feature";
 import { SurvivalHostKey } from "../features/survival/survival-feature";
 import { SpellMakingFeature } from "../features/spell-making/spell-making-feature";
-import { CharacterCreationUI } from "../ui/character-creation-ui";
 import { persistSkipOnboardingTips } from "../onboarding-preferences";
 import { OnboardingFeature, OnboardingHostKey } from "../features/onboarding/onboarding-feature";
 import { ArrestFeature, LawKey } from "../features/arrest/arrest-feature";
@@ -47,7 +46,7 @@ import { SettingsHostKey } from "../features/settings/settings-feature";
 import { presentCell } from "./cells";
 import { grantDynamicWorldEventReward, grantPickpocketItem, updateDynamicWorldEventsOnHourChange } from "./rewards";
 import { despawnNpc } from "./npcs";
-import { isCombatInputBlocked, suspendGameplayInput, restoreGameplayInput, isPlayerInCombat } from "./play-focus";
+import { isCombatInputBlocked, suspendGameplayInput, restoreGameplayInput } from "./play-focus";
 
 /**
  * Provide the services features use and install the features.  Services
@@ -112,7 +111,8 @@ export function installGameFeatures(game: Game): void {
       k.services.provide(TravelHostKey, {
         position: () => game.player.camera.position,
         teleport: (to) => { game.player.camera.position.copyFrom(to); },
-        inCombat: () => isPlayerInCombat(game),
+        // Anyone alive in a fighting state (the Engaged tag).
+        inCombat: () => actors.bodies([Engaged], [Dead]).length > 0,
         sneaking: () => game.stealthSystem.isCrouching,
         encumbered: () => game.player.isEncumbered,
         isInterior: (id) => game.cellManager.getCellDefinition(id)?.type === "interior",
@@ -238,7 +238,9 @@ export function installGameFeatures(game: Game): void {
           game.ui.toggleCrosshair(true);
           game._focus.give("creation");
         },
-        ask: () => {
+        // Loaded when a new character is made (a loaded save never needs it).
+        ask: async () => {
+          const { CharacterCreationUI } = await import("../ui/character-creation-ui");
           const creator = new CharacterCreationUI();
           creator.setAnimator(game.uiAnimator);
           return creator.open();

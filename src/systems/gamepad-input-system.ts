@@ -40,6 +40,11 @@ export class GamepadInputSystem {
     this._camera = camera;
   }
 
+  /** Use this gamepad (the one whose arrival loaded this system). */
+  public adopt(index: number): void {
+    if (this._activeGamepadIndex === null) this._activeGamepadIndex = index;
+  }
+
   public connect(): void {
     window.addEventListener("gamepadconnected", (e: GamepadEvent) => {
       if (this._activeGamepadIndex === null) {

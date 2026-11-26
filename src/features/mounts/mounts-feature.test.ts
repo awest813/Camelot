@@ -33,16 +33,17 @@ function setup(opts: { gold?: number } = {}) {
 }
 
 describe("MountsFeature (headless, through the kernel)", () => {
-  it("buy a horse at the stable, ride it, and use the saddlebag", () => {
+  it("buy a horse at the stable, ride it, and use the saddlebag", async () => {
     const t = setup({ gold: 800 });
     t.mounts.toggleMount();
     expect(t.notes.at(-1)).toMatch(/don't own a horse/);
 
     // Shift+O on foot: the stable.
     t.mounts.toggleStableOrSaddlebag();
+    const stable = await t.mounts.stable.get(); // loaded on first use
     expect(t.mounts.stable.isVisible).toBe(true);
     expect(t.modal.suspendGameplay).toHaveBeenCalledOnce();
-    t.mounts.stable.onPurchase!("bay_mare");
+    stable.onPurchase!("bay_mare");
     expect(t.gold()).toBe(300);
     expect(t.mounts.horses.ownedHorses.map((h) => h.id)).toEqual(["bay_mare"]);
     t.mounts.stable.close();
@@ -56,8 +57,9 @@ describe("MountsFeature (headless, through the kernel)", () => {
     const horse = t.mounts.horses.currentHorse!;
     t.mounts.horses.saddlebagAddItem(horse.id, { id: "iron_ingot", name: "Iron Ingot", description: "", stackable: true, quantity: 2, weight: 1 });
     t.mounts.toggleStableOrSaddlebag();
+    const saddlebag = await t.mounts.saddlebag.get();
     expect(t.mounts.saddlebag.isVisible).toBe(true);
-    t.mounts.saddlebag.onRemoveItem!("iron_ingot");
+    saddlebag.onRemoveItem!("iron_ingot");
     expect(t.given[0]).toMatchObject({ id: "iron_ingot", quantity: 1 });
 
     t.mounts.toggleMount();

@@ -2,20 +2,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { UIAnimator } from "./ui-animator";
 
-// ── Mock the motion library ───────────────────────────────────────────────────
-vi.mock("motion", () => {
+// ── Mock the animation helper ─────────────────────────────────────────────────
+vi.mock("./animate", () => {
   const mockAnimation = {
     then: vi.fn((cb: () => void) => {
       cb();
       return mockAnimation;
     }),
   };
-  return { animateMini: vi.fn(() => mockAnimation) };
+  return { animateEl: vi.fn(() => mockAnimation) };
 });
 
-import { animateMini } from "motion";
+import { animateEl } from "./animate";
 import { applyPrefs, loadPrefs } from "./accessibility";
-const mockAnimate = animateMini as ReturnType<typeof vi.fn>;
+const mockAnimate = animateEl as ReturnType<typeof vi.fn>;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 

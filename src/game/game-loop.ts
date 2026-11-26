@@ -156,12 +156,13 @@ export function runFrame(g: Game): void {
   if (scaleLevel) g.engine.setHardwareScalingLevel(scaleLevel);
 
   // Poll gamepad state every frame
-  g._gamepadInput.update(frameDelta);
+  g._gamepadInput?.update(frameDelta);
 
   // Apply gamepad left stick to camera movement (smooth analog)
-  if (g._gamepadInput.isConnected && !isCombatInputBlocked(g)) {
-    const lx = g._gamepadInput.leftStickX;
-    const ly = g._gamepadInput.leftStickY;
+  const pad = g._gamepadInput;
+  if (pad?.isConnected && !isCombatInputBlocked(g)) {
+    const lx = pad.leftStickX;
+    const ly = pad.leftStickY;
     if (Math.abs(lx) > 0.15 || Math.abs(ly) > 0.15) {
       const speed = g.player.camera.speed * frameDelta * 60;
       const forward = g.player.getForwardDirection(1);

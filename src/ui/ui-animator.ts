@@ -1,4 +1,4 @@
-import { animateMini, type DOMKeyframesDefinition } from "motion";
+import { animateEl, type PanelKeyframes } from "./animate";
 import { reducedMotion } from "./accessibility";
 
 // ── Animation constants ───────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ export interface UIAnimatorOptions {
 }
 
 /**
- * UIAnimator — lightweight wrapper around the Motion library that provides
+ * UIAnimator — lightweight wrapper around the Web Animations API (see animate.ts) that provides
  * consistent entrance / exit animations for HTML overlay panels.
  *
  * Usage (runtime):
@@ -55,8 +55,8 @@ export class UIAnimator {
    */
   public panelIn(element: HTMLElement): void {
     if (this._reducedMotion) return;
-    const keyframes: DOMKeyframesDefinition = { opacity: [0, 1], y: [10, 0], scale: [0.97, 1] };
-    animateMini(element, keyframes, { duration: PANEL_IN_DURATION, ease: PANEL_IN_EASE });
+    const keyframes: PanelKeyframes = { opacity: [0, 1], y: [10, 0], scale: [0.97, 1] };
+    animateEl(element, keyframes, { duration: PANEL_IN_DURATION, ease: PANEL_IN_EASE });
   }
 
   /**
@@ -69,8 +69,8 @@ export class UIAnimator {
       done();
       return;
     }
-    const keyframes: DOMKeyframesDefinition = { opacity: [1, 0], y: [0, 6], scale: [1, 0.97] };
-    animateMini(element, keyframes, { duration: PANEL_OUT_DURATION, ease: PANEL_OUT_EASE }).then(done);
+    const keyframes: PanelKeyframes = { opacity: [1, 0], y: [0, 6], scale: [1, 0.97] };
+    animateEl(element, keyframes, { duration: PANEL_OUT_DURATION, ease: PANEL_OUT_EASE }).then(done);
   }
 
   /**
@@ -80,8 +80,8 @@ export class UIAnimator {
     if (this._reducedMotion) return;
     elements.forEach((el, i) => {
       if (!(el instanceof HTMLElement)) return;
-      const keyframes: DOMKeyframesDefinition = { opacity: [0, 1], y: [12, 0], scale: [0.92, 1] };
-      animateMini(el, keyframes, { 
+      const keyframes: PanelKeyframes = { opacity: [0, 1], y: [12, 0], scale: [0.92, 1] };
+      animateEl(el, keyframes, { 
         duration: PANEL_IN_DURATION + 0.1, 
         delay: i * staggerDelay,
         ease: PANEL_IN_EASE 

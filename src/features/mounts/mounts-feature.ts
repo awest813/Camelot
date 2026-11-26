@@ -14,8 +14,10 @@
 import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { HorseSystem } from "../../systems/horse-system";
-import { StableUI } from "../../ui/stable-ui";
-import { SaddlebagUI } from "../../ui/saddlebag-ui";
+import type { StableUI } from "../../ui/stable-ui";
+import type { SaddlebagUI } from "../../ui/saddlebag-ui";
+import { LazyPanel } from "../../ui/lazy-panel";
+import { UIAnimator } from "../../ui/ui-animator";
 import type { Item } from "../../systems/inventory-system";
 import { FeedbackKey, ModalKey, PurseKey, ownSave } from "../services";
 
@@ -30,8 +32,9 @@ export interface MountHostService {
 
 export interface MountsService {
   readonly horses: HorseSystem;
-  readonly stable: StableUI;
-  readonly saddlebag: SaddlebagUI;
+  /** The stable and saddlebag windows (loaded on first use). */
+  readonly stable: LazyPanel<StableUI>;
+  readonly saddlebag: LazyPanel<SaddlebagUI>;
   /** O: mount the first owned horse, or dismount. */
   toggleMount(): void;
   /** Shift+O: the saddlebag while mounted, otherwise the stable. */
@@ -46,8 +49,22 @@ const STABLE_MASTER = "Stable Master";
 export class MountsFeature implements Feature {
   public readonly id = "mounts";
   public readonly horses = new HorseSystem();
-  public readonly stable = new StableUI();
-  public readonly saddlebag = new SaddlebagUI();
+  /** Loaded the first time they open (out of the start-up bundle). */
+  public readonly stable = new LazyPanel<StableUI>(async () => {
+    const { StableUI } = await import("../../ui/stable-ui");
+    const panel = new StableUI();
+    this._wireStable?.(panel);
+    return panel;
+  });
+  public readonly saddlebag = new LazyPanel<SaddlebagUI>(async () => {
+    const { SaddlebagUI } = await import("../../ui/saddlebag-ui");
+    const panel = new SaddlebagUI();
+    panel.setAnimator(new UIAnimator());
+    this._wireSaddlebag?.(panel);
+    return panel;
+  });
+  private _wireStable: ((panel: StableUI) => void) | null = null;
+  private _wireSaddlebag: ((panel: SaddlebagUI) => void) | null = null;
 
   constructor() {
     // Starter horses available at world stables.
@@ -86,33 +103,37 @@ export class MountsFeature implements Feature {
       feedback().markDirty();
     };
 
-    this.stable.onClose = () => modal().restoreGameplay();
-    this.stable.onPurchase = (horseId) => {
-      if (!this.horses.getStableNPC(STABLE_MASTER)) return;
-      const price = this.horses.purchaseHorse(STABLE_MASTER, horseId, purse().gold());
-      if (price === -2) {
-        this.stable.showStatus("You already own this horse.", true);
-      } else if (price < 0) {
-        this.stable.showStatus("Unable to complete the purchase.", true);
-      } else {
-        purse().spend(price);
-        this.stable.markOwned(horseId);
-        this.stable.setPlayerGold(purse().gold());
-        this.stable.showStatus(`You purchased a horse for ${price}g.`);
-      }
+    this._wireStable = (stable) => {
+      stable.onClose = () => modal().restoreGameplay();
+      stable.onPurchase = (horseId) => {
+        if (!this.horses.getStableNPC(STABLE_MASTER)) return;
+        const price = this.horses.purchaseHorse(STABLE_MASTER, horseId, purse().gold());
+        if (price === -2) {
+          stable.showStatus("You already own this horse.", true);
+        } else if (price < 0) {
+          stable.showStatus("Unable to complete the purchase.", true);
+        } else {
+          purse().spend(price);
+          stable.markOwned(horseId);
+          stable.setPlayerGold(purse().gold());
+          stable.showStatus(`You purchased a horse for ${price}g.`);
+        }
+      };
     };
 
-    this.saddlebag.onClose = () => modal().restoreGameplay();
-    this.saddlebag.onRemoveItem = (itemId) => {
-      const horse = this.horses.currentHorse;
-      if (!horse) return;
-      const entry = this.horses.getSaddlebag(horse.id)?.find((i) => i.id === itemId);
-      if (!entry) return;
-      if (this.horses.saddlebagRemoveItem(horse.id, itemId)) {
-        host().give({ ...entry, quantity: 1 });
-        this._refreshSaddlebag();
-        this.saddlebag.showStatus(`Took ${entry.name}.`);
-      }
+    this._wireSaddlebag = (saddlebag) => {
+      saddlebag.onClose = () => modal().restoreGameplay();
+      saddlebag.onRemoveItem = (itemId) => {
+        const horse = this.horses.currentHorse;
+        if (!horse) return;
+        const entry = this.horses.getSaddlebag(horse.id)?.find((i) => i.id === itemId);
+        if (!entry) return;
+        if (this.horses.saddlebagRemoveItem(horse.id, itemId)) {
+          host().give({ ...entry, quantity: 1 });
+          this._refreshSaddlebag();
+          saddlebag.showStatus(`Took ${entry.name}.`);
+        }
+      };
     };
 
     ctx.provide(MountsKey, {
@@ -135,8 +156,10 @@ export class MountsFeature implements Feature {
           if (this.saddlebag.isVisible) { this.saddlebag.close(); return; }
           const horse = this.horses.currentHorse!;
           const bag = this.horses.getSaddlebag(horse.id) ?? [];
-          this.saddlebag.open(horse.name, bag.map(toRow), bag.length, horse.saddlebagCapacity);
-          modal().suspendGameplay();
+          void this.saddlebag.get().then((panel) => {
+            panel.open(horse.name, bag.map(toRow), bag.length, horse.saddlebagCapacity);
+            modal().suspendGameplay();
+          });
           return;
         }
         if (this.stable.isVisible) { this.stable.close(); return; }
@@ -152,8 +175,10 @@ export class MountsFeature implements Feature {
             saddlebagCapacity: h.saddlebagCapacity, price: stable.prices[id] ?? 0, isOwned: h.isOwned,
           };
         });
-        this.stable.open(STABLE_MASTER, offers, purse().gold());
-        modal().suspendGameplay();
+        void this.stable.get().then((panel) => {
+          panel.open(STABLE_MASTER, offers, purse().gold());
+          modal().suspendGameplay();
+        });
       },
     });
 
@@ -170,7 +195,7 @@ export class MountsFeature implements Feature {
     const horse = this.horses.currentHorse;
     if (!horse) return;
     const bag = this.horses.getSaddlebag(horse.id) ?? [];
-    this.saddlebag.refresh(bag.map(toRow), bag.length, horse.saddlebagCapacity);
+    this.saddlebag.current?.refresh(bag.map(toRow), bag.length, horse.saddlebagCapacity);
   }
 }
 

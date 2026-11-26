@@ -4,8 +4,6 @@
  * Part of the composition root (moved out of game.ts).
  */
 import type { Game } from "../game";
-import { actors } from "../entities/actors";
-import { Dead, Engaged } from "../core/ecs/actors";
 import { ProgressionKey } from "../features/progression/progression-feature";
 import { PickpocketKey } from "../features/pickpocket/pickpocket-feature";
 
@@ -71,11 +69,6 @@ export function suspendGameplayInput(g: Game): void {
 /** The menu let go; play has input again unless the pause menu, editor, … still hold it. */
 export function restoreGameplayInput(g: Game): void {
   g._focus.give("menu");
-}
-
-export function isPlayerInCombat(_g: Game): boolean {
-  // Anyone alive in a fighting state (the Engaged tag).
-  return actors.bodies([Engaged], [Dead]).length > 0;
 }
 
 export function togglePause(g: Game): void {

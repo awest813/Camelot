@@ -57,7 +57,6 @@ export function setupGameplaySystems(g: Game): void {
   g.lodSystem.setQuality(g.graphics.tier);
   g.lodSystem.setCamera(g.player.camera);
   g.world.setLodSystem(g.lodSystem);
-  g._gamepadInput.setCamera(g.player.camera);
 
   // Register v3 systems with save
   g.saveSystem.setSpellSystem(g.spellSystem);

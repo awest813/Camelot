@@ -23,6 +23,8 @@ const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const DIST = join(ROOT, "dist");
 const BUDGETS = join(ROOT, "tools", "bundle-budgets.json");
 const HEADROOM = 1.03;
+/** Success metric (docs/engine-overhaul-plan.md): the game's start-up JS at most 900 KB. */
+const ENTRY_TARGET = 900 * 1024;
 
 function files(dir, out = []) {
   if (!existsSync(dir)) return out;
@@ -104,6 +106,8 @@ function main() {
   console.log("✓ no editor code in the game");
   if (process.argv.includes("--update")) {
     const budgets = Object.fromEntries(Object.entries(sizes).map(([k, v]) => [k, Math.ceil(v * HEADROOM)]));
+    // The plan's target for the start-up code is a hard ceiling, not a baseline.
+    budgets["entry-js"] = Math.min(budgets["entry-js"], ENTRY_TARGET);
     writeFileSync(BUDGETS, JSON.stringify({ budgets }, null, 2) + "\n");
     console.log("bundle: budgets updated", Object.fromEntries(Object.entries(budgets).map(([k, v]) => [k, kb(v)])));
     return;

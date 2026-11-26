@@ -26,7 +26,7 @@ import { ScheduleSystem } from "../systems/schedule-system";
 import { CombatSystem } from "../systems/combat-system";
 import { DialogueSystem } from "../systems/dialogue-system";
 import { BabylonInputAdapter } from "../adapters/babylon/babylon-input-adapter";
-import { GamepadInputSystem } from "../systems/gamepad-input-system";
+import type { GamepadInputSystem } from "../systems/gamepad-input-system";
 import { InventorySystem } from "../systems/inventory-system";
 import { EquipmentSystem } from "../systems/equipment-system";
 import { SaveSystem } from "../systems/save-system";
@@ -103,8 +103,9 @@ import type { SpellMakingUI } from "../ui/spell-making-ui";
 import type { GuardEncounterUI } from "../ui/guard-encounter-ui";
 import { ArrestKey } from "../features/arrest/arrest-feature";
 import type { LevelUpUI } from "../ui/level-up-ui";
-import { StableUI } from "../ui/stable-ui";
-import { SaddlebagUI } from "../ui/saddlebag-ui";
+import type { StableUI } from "../ui/stable-ui";
+import type { SaddlebagUI } from "../ui/saddlebag-ui";
+import type { LazyPanel } from "../ui/lazy-panel";
 import { DailyScheduleSystem } from "../systems/daily-schedule-system";
 import { HorseSystem } from "../systems/horse-system";
 import { SwimmingSystem } from "../systems/swimming-system";
@@ -204,8 +205,8 @@ export class GameState {
   public get levelUpUI(): LevelUpUI { return this._progression.levelUp; }
   /** Tab-open HTML overlay — identity, attributes, skills, reputation. */
   public get characterSheetUI(): CharacterSheetUI { return this._progression.sheet; }
-  public get stableUI(): StableUI { return this.mounts.stable; }
-  public get saddlebagUI(): SaddlebagUI { return this.mounts.saddlebag; }
+  public get stableUI(): LazyPanel<StableUI> { return this.mounts.stable; }
+  public get saddlebagUI(): LazyPanel<SaddlebagUI> { return this.mounts.saddlebag; }
   public uiAnimator: UIAnimator = new UIAnimator();
   public readonly _settings = new SettingsFeature();
   public get graphicsSettingsUI(): GraphicsSettingsUI { return this._settings.dialog; }
@@ -488,7 +489,8 @@ export class GameState {
   /** Decoupled input action adapter — maps named actions to key/mouse/gamepad events. */
   public readonly _inputAdapter = new BabylonInputAdapter();
   /** Gamepad input polling system — feeds controller input into the adapter. */
-  public readonly _gamepadInput = new GamepadInputSystem(this._inputAdapter);
+  /** Gamepad support: loaded when the first gamepad connects (see setup-wiring). */
+  public _gamepadInput: GamepadInputSystem | null = null;
   /** Launch achievements. Forwarded to Steamworks when the desktop shell is up. */
   public _achievements: AchievementSystem | null = null;
   public get _creditsUI(): CreditsUI { return this._settings.credits; }

@@ -18,7 +18,6 @@ import type {
   FollowerCombatRole,
   FollowerCommand,
 } from "../systems/follower-system";
-import { sanitizeHtml } from "./dom-utils";
 import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 
 // ── Design tokens (mirrors UIManager) ─────────────────────────────────────
@@ -584,10 +583,18 @@ export class FollowerUI {
       display: "grid", gridTemplateColumns: "1fr 1fr",
       gap: "2px 10px", fontSize: "11px", color: C.DIM,
     });
-    stats.innerHTML = sanitizeHtml(`
-      <span>Carry Weight</span><span style="color:${C.TEXT}">+${tmpl.carryWeightBonus}</span>
-      <span>Home</span><span style="color:${C.TEXT};font-size:11px">${humanizeId(tmpl.homeLocationId)}</span>
-    `);
+    // Built as nodes (the values are data, so no HTML parsing).
+    const statRow = (label: string, value: string) => {
+      const name = document.createElement("span");
+      name.textContent = label;
+      const val = document.createElement("span");
+      val.style.color = C.TEXT;
+      val.textContent = value;
+      stats.append(name, val);
+      return val;
+    };
+    statRow("Carry Weight", `+${tmpl.carryWeightBonus}`);
+    statRow("Home", humanizeId(tmpl.homeLocationId)).style.fontSize = "11px";
 
     // ── Action button ─────────────────────────────────────────────────────────
     const actionRow = document.createElement("div");

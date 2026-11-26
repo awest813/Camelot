@@ -91,12 +91,11 @@ export function setupProgressionAndStart(g: Game): void {
   g.quickSlotHUD.show();
   g.quickSlotHUD.update(g.quickSlotSystem);
 
-  // ── UI animations (Motion library) ─────────────────────────────────────────
+  // ── UI animations (Web Animations; see ui/animate.ts) ──────────────────────
   const uiAnimator = new UIAnimator();
   g.levelUpUI.setAnimator(uiAnimator);
   g.spellMakingUI.setAnimator(uiAnimator);
   g.guardEncounterUI.setAnimator(uiAnimator);
-  g.saddlebagUI.setAnimator(uiAnimator);
 
   void g.kernel.services.get(CharacterKey).create();
 

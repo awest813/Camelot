@@ -180,7 +180,6 @@ export function wireInputAdapter(g: Game): void {
     else hop(g);
   });
 
-
   adapter.onAction("favoritesMenu", () => {
     if (!g.isPaused && !g.dialogueSystem.isInDialogue) {
       g.ui.showNotification("Favorites — assign with quick-slot keys (1-0)", 2500);

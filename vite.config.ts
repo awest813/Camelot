@@ -60,6 +60,7 @@ function chunkModulesReport() {
           imports: out.imports,
           dynamicImports: out.dynamicImports,
           modules: Object.keys(out.modules).map((m: string) => m.replace(process.cwd() + "/", "")),
+          sizes: Object.fromEntries(Object.entries(out.modules).map(([m, info]: [string, any]) => [m.replace(process.cwd() + "/", ""), info.renderedLength])),
         };
       }
       (this as any).emitFile({ type: "asset", fileName: ".vite/chunk-modules.json", source: JSON.stringify(report) });

@@ -1319,8 +1319,21 @@ with the rendering and UI tracks in parallel.
   - **Queries are not events.** Whether one-off loot was already taken
     is an injected query (`structures.isLootCollected`).
   - `testing/listen.ts` is how tests listen.
-- Main JS chunk: 1,038 KB loaded up front, since the editors left
-  (Phase 9). Target 900 KB.
+- **Main JS (the game's start-up code): 1,038 → 897 KB** (target
+  ≤ 900 KB, met; `check-bundle` now holds 900 KB as a hard ceiling).
+  The build's chunk report gained per-module sizes, which showed where
+  it went:
+  - **Dropped dependencies:** `@mathigon/boost` with `@mathigon/euclid`
+    (126 KB unminified) served one element helper and two unused fades;
+    `makeEl` is plain DOM now. `dompurify` (63 KB) sanitized one string
+    that is now built as nodes. `motion` (19 KB) did the panel
+    animations, which now use the Web Animations API (`ui/animate.ts`,
+    with the individual `translate` / `scale` properties so panels keep
+    their own transform).
+  - **Loaded when needed:** character creation (only for a new
+    character), gamepad support (on the first `gamepadconnected`), and
+    the stable and saddlebag windows (`ui/lazy-panel.ts`: closed until
+    their first use).
 - Model payload: 13 MB on disk, 1.8 MB of it character LODs. Target met.
 - **Village draw calls: 486 → 245 per frame** (target ≤ 250, met). These
   are the perf-budget seed's village at the high tier, averaged over
