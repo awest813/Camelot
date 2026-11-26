@@ -122,6 +122,8 @@ export interface SiteContext {
   biome: BiomeType;
   /** Chunk size (m). */
   size: number;
+  /** Whether a landmark's site loads empty (no NPCs or dragon): cleared lately. */
+  quiet?(landmarkId: string): boolean;
 }
 
 const wrap = (v: number, n: number) => ((v % n) + n) % n;
@@ -148,7 +150,10 @@ export function buildWildChunk(c: SiteContext, scatter: WildScatter, specs: read
     const origin = { ...p, rot: spec.rot ? r(spec.rot.slot) * Math.PI * 2 : 0 };
     const variant = spec.variants ? wrap(c.cx + c.cz, spec.variants) : 0;
     const spawned: unknown[] = [];
+    const id = `site_${spec.id}_${c.cx}_${c.cz}`;
+    const empty = !!spec.landmark?.clear && !!c.quiet?.(id);
     for (const part of spec.parts) {
+      if (empty && ("npc" in part || "dragon" in part)) continue;
       if (part.when?.variant && !part.when.variant.includes(variant)) continue;
       if (part.when?.roll && r(part.when.roll.slot) >= part.when.roll.chance) continue;
       const actor = buildPart(c, part, origin, variant, r);
@@ -158,7 +163,7 @@ export function buildWildChunk(c: SiteContext, scatter: WildScatter, specs: read
     if (lm) {
       const arrive = toWorld({ x: lm.arrive.dx, z: lm.arrive.dz }, origin);
       landmarks.push({
-        id: `site_${spec.id}_${c.cx}_${c.cz}`, name: landmarkName(c.cx, c.cz, lm.kind), kind: lm.kind,
+        id, name: landmarkName(c.cx, c.cz, lm.kind), kind: lm.kind,
         xp: lm.xp, radius: lm.radius, x: origin.x, z: origin.z, arrive: { x: arrive.x, z: arrive.z },
         ...(lm.clear && spawned.length > 0 ? { clear: { ...lm.clear, foes: spawned } } : {}),
       });

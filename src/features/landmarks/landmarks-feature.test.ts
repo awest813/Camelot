@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { Kernel } from "../../core/kernel";
-import { FastTravelKey, FeedbackKey, LandmarksKey, PlayerKey, SavesKey, WorldInfoKey } from "../services";
+import { ClockKey, FastTravelKey, FeedbackKey, LandmarksKey, PlayerKey, SavesKey, WorldInfoKey } from "../services";
 import { buildWildChunk } from "../../world/site-specs";
 import { WILD_SCATTER, WILD_SITES } from "../../content/sites";
 import type { SaveCodec } from "../../systems/save-system";
 import type { PlacedLandmark } from "../../world/site-specs";
-import { LandmarksFeature } from "./landmarks-feature";
+import { LandmarksFeature, QUIET_HOURS } from "./landmarks-feature";
 
 const GRAVES: PlacedLandmark = {
   id: "site_graveyard_3_4", name: "Crowmere Graveyard", kind: "Graveyard", xp: 15, radius: 18,
@@ -29,10 +29,15 @@ function setup() {
     discover: (id, name, at) => { const isNew = !discovered.has(id); discovered.set(id, { name, at }); return isNew; },
   });
   k.events.on("location:discovered", ({ name }) => found.push(name));
+  const clock = { hours: 0 };
+  k.services.provide(ClockKey, { hour: () => clock.hours % 24, elapsedHours: () => clock.hours });
   const feature = new LandmarksFeature();
   k.install(feature);
   const step = (seconds: number) => { for (let t = 0; t < seconds; t += 0.1) k.phases.run("sim", 0.1); };
-  return { k, pos, discovered, grants, found, cleared, feature, step, codec: () => codecs.find((c) => c.key === "landmarks")! };
+  return {
+    k, pos, discovered, grants, found, cleared, feature, step, codec: () => codecs.find((c) => c.key === "landmarks")!,
+    get hours() { return clock.hours; }, set hours(h: number) { clock.hours = h; },
+  };
 }
 
 describe("LandmarksFeature (headless, through the kernel)", () => {
@@ -61,7 +66,7 @@ describe("LandmarksFeature (headless, through the kernel)", () => {
     expect(t.discovered.size).toBe(0);
   });
 
-  it("a camp is cleared when everyone it spawned falls, once per world (and the save keeps it)", () => {
+  it("a camp is cleared when everyone it spawned falls: paid the first time, empty for three days", () => {
     const t = setup();
     const chief = { name: "chief" }, archer = { name: "archer" }, stranger = { name: "wolf" };
     const camp: PlacedLandmark = {
@@ -69,30 +74,41 @@ describe("LandmarksFeature (headless, through the kernel)", () => {
       x: 0, z: 500, arrive: { x: 0, z: 512 }, clear: { xp: 60, gold: 75, foes: [chief, archer] },
     };
     const kill = (npc: object) => t.k.events.emit("npc:killed", { npcName: "x", xp: 0, npc } as never);
-    t.k.services.get(LandmarksKey).placed("0,10", [camp]);
+    const lm = t.k.services.get(LandmarksKey);
+    t.hours = 10;
+    lm.placed("0,10", [camp]);
     kill(stranger);
     kill(chief);
     expect(t.cleared, "the archer still stands").toEqual([]);
     kill(archer);
     expect(t.cleared).toEqual(["Ravenwick Bandit Camp"]);
     expect(t.grants.at(-1)).toEqual({ xp: 60, gold: 75, label: "Cleared: Ravenwick Bandit Camp" });
-    expect(t.feature.isCleared(camp.id)).toBe(true);
+    expect(lm.quiet!(camp.id), "it loads empty for a while").toBe(true);
+    t.hours = 10 + QUIET_HOURS - 1;
+    expect(lm.isCleared!(camp.id)).toBe(true);
+    t.hours = 10 + QUIET_HOURS;
+    expect(lm.quiet!(camp.id), "three days on, it fills again").toBe(false);
 
-    // The chunk reloads and the camp fills again: no second reward.
+    // Filled again and cleared again: it counts (a job may want it), no second reward.
     t.k.events.emit("chunk:unloaded", { chunkKey: "0,10" });
     const chief2 = {}, archer2 = {};
-    t.k.services.get(LandmarksKey).placed("0,10", [{ ...camp, clear: { xp: 60, gold: 75, foes: [chief2, archer2] } }]);
+    lm.placed("0,10", [{ ...camp, clear: { xp: 60, gold: 75, foes: [chief2, archer2] } }]);
     kill(chief2); kill(archer2);
-    expect(t.cleared).toHaveLength(1);
+    expect(t.cleared).toHaveLength(2);
+    expect(t.grants).toHaveLength(1);
+    expect(lm.quiet!(camp.id), "quiet again from the second clearing").toBe(true);
 
-    // Saved, and back after a load into a fresh world.
+    // Saved with when it was cleared, and back after a load.
     const saved = t.codec().save();
-    expect(saved).toEqual({ cleared: [camp.id] });
+    expect(saved).toEqual({ cleared: { [camp.id]: 10 + QUIET_HOURS } });
     const u = setup();
+    u.hours = 10 + QUIET_HOURS + 5;
     u.codec().load(saved);
     expect(u.feature.isCleared(camp.id)).toBe(true);
+    u.codec().load({ cleared: [camp.id] });
+    expect(u.feature.isCleared(camp.id), "a list from the first saves: long quiet").toBe(false);
     u.codec().load(undefined);
-    expect(u.feature.isCleared(camp.id), "an old save without the part").toBe(false);
+    expect(u.feature.isCleared(camp.id)).toBe(false);
   });
 
   it("finds the nearest camp still standing, loaded or not, and can mark it on the map", () => {

@@ -46,7 +46,8 @@ export class WorldSitesFeature implements Feature {
         if (s.get(VillagesKey).populate(chunkKey, cx, cz)) return;
         const site = s.get(SiteBuilderKey);
         const spawn = (archetype: string, x: number, z: number) => s.get(ActorsKey).spawnArchetype(chunkKey, archetype, x, z);
-        const landmarks = buildWildChunk({ site, spawn, chunkKey, cx, cz, biome, size: world.chunkSize }, WILD_SCATTER, WILD_SITES);
+        const quiet = (id: string) => s.tryGet(LandmarksKey)?.quiet?.(id) ?? false;
+        const landmarks = buildWildChunk({ site, spawn, chunkKey, cx, cz, biome, size: world.chunkSize, quiet }, WILD_SCATTER, WILD_SITES);
         if (landmarks.length > 0) s.tryGet(LandmarksKey)?.placed(chunkKey, landmarks);
       },
     });

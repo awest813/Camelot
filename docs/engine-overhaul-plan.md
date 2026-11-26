@@ -1577,8 +1577,10 @@ Left as decisions:
 - Bandit camps and dragon roosts can be **cleared**: when everyone the site
   spawned has fallen, it is cleared once per world (+60 XP and 75 gold for
   a camp, +150 XP and 200 gold for a roost). The cleared ids are the
-  feature's save part (`landmarks`). A cleared camp fills again when its
-  chunk reloads, without paying again.
+  feature's save part (`landmarks`, with when each was last cleared). A
+  cleared site loads empty for three game days, then fills again; clearing
+  it again counts (for a job) but pays nothing more. The job board doesn't
+  send the player to a camp that is still empty.
 - The parked `landmark-system` overlaps this feature and is still unused.
 - A labelled reward is one notice ("Cleared: X (+60 XP, +75 gold)") instead
   of three; NPC names shown to the player drop their ids

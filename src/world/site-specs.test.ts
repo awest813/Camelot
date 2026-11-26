@@ -83,4 +83,19 @@ describe("data-driven wild sites", () => {
     }
     throw new Error("no bandit camp in the sample");
   });
+
+  it("a quiet camp loads without its people (the rest of the site stands)", () => {
+    for (let cx = -60; cx < 60; cx++) for (let cz = -30; cz < 30; cz++) {
+      const full = recorder(), empty = recorder();
+      const base = { chunkKey: "k", cx, cz, biome: "desert" as const, size: 50 };
+      const camps = buildWildChunk({ ...base, site: full.site, spawn: full.spawn }, { ...WILD_SCATTER, pool: {} }, WILD_SITES).filter((l) => l.kind === "Bandit Camp");
+      if (camps.length === 0) continue;
+      buildWildChunk({ ...base, site: empty.site, spawn: empty.spawn, quiet: (id) => id === camps[0].id }, { ...WILD_SCATTER, pool: {} }, WILD_SITES);
+      expect(full.calls.filter((c) => c[0] === "npc").length).toBeGreaterThanOrEqual(4);
+      expect(empty.calls.filter((c) => c[0] === "npc")).toHaveLength(full.calls.filter((c) => c[0] === "npc").length - 4);
+      expect(empty.calls.filter((c) => c[0] === "prop").length).toBe(full.calls.filter((c) => c[0] === "prop").length);
+      return;
+    }
+    throw new Error("no bandit camp in the sample");
+  });
 });
