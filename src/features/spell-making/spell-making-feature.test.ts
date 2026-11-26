@@ -25,13 +25,16 @@ function setup(gold: number) {
 const fire: SpellComponent = { effectType: "damage", school: "destruction", magnitude: 10, duration: 0, damageType: "fire" };
 
 describe("SpellMakingFeature (headless, through the kernel)", () => {
-  it("X opens the altar; forging a spell costs its gold", () => {
+  it("X opens the altar (loading it); forging a spell costs its gold", async () => {
     const t = setup(1000);
+    expect(t.svc.panel.current, "not loaded at start").toBeNull();
     t.svc.toggle();
+    const panel = await t.svc.panel.get();
+    await new Promise((r) => setTimeout(r, 0));
     expect(t.svc.panel.isVisible).toBe(true);
     expect(t.modal.suspendGameplay).toHaveBeenCalledOnce();
     const cost = t.f.altar.computeCost([fire]);
-    t.svc.panel.onForge!({ name: "Ember", components: [fire] });
+    panel.onForge!({ name: "Ember", components: [fire] });
     expect(t.gold()).toBe(1000 - cost);
     expect(t.notes.at(-1)).toMatch(/Spell forged: "Ember"/);
     t.svc.toggle();
@@ -39,10 +42,10 @@ describe("SpellMakingFeature (headless, through the kernel)", () => {
     expect(t.modal.restoreGameplay).toHaveBeenCalled();
   });
 
-  it("too poor: nothing forged, no gold taken", () => {
+  it("too poor: nothing forged, no gold taken", async () => {
     const t = setup(0);
     t.svc.toggle();
-    t.svc.panel.onForge!({ name: "Ember", components: [fire] });
+    (await t.svc.panel.get()).onForge!({ name: "Ember", components: [fire] });
     expect(t.gold()).toBe(0);
     expect(t.f.altar.customSpells).toHaveLength(0);
   });

@@ -5,19 +5,24 @@
  * Inputs:   services purse, skills, feedback, modal, gameplay.
  * Outputs:  the `spell-making` service; forged spells join the spell list.
  *
+ * The altar's window loads the first time it opens (out of the start-up
+ * bundle); `panel` is its LazyPanel.
+ *
  * Extracted from game.ts (engine overhaul, Phase 1).
  */
 import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { SpellMakingSystem } from "../../systems/spell-making-system";
-import { SpellMakingUI } from "../../ui/spell-making-ui";
+import type { SpellMakingUI } from "../../ui/spell-making-ui";
+import type { UIAnimator } from "../../ui/ui-animator";
+import { LazyPanel } from "../../ui/lazy-panel";
 import type { SpellSystem } from "../../systems/spell-system";
 import type { BarterSystem } from "../../systems/barter-system";
 import { FeedbackKey, GameplayKey, ModalKey, PurseKey, SkillsKey, ownSave } from "../services";
 
 export interface SpellMakingService {
   readonly altar: SpellMakingSystem;
-  readonly panel: SpellMakingUI;
+  readonly panel: LazyPanel<SpellMakingUI>;
   /** X: open or close the altar. */
   toggle(): void;
 }
@@ -35,11 +40,24 @@ const REASONS: Record<string, string> = {
 export class SpellMakingFeature implements Feature {
   public readonly id = "spell-making";
   public readonly altar: SpellMakingSystem;
-  public readonly panel: SpellMakingUI;
+  public readonly panel = new LazyPanel<SpellMakingUI>(async () => {
+    const { SpellMakingUI } = await import("../../ui/spell-making-ui");
+    const panel = new SpellMakingUI((components) => this.altar.computeCost(components));
+    if (this._animator) panel.setAnimator(this._animator);
+    this._wire?.(panel);
+    return panel;
+  });
+  private _animator: UIAnimator | null = null;
+  private _wire: ((panel: SpellMakingUI) => void) | null = null;
 
   constructor(spells: SpellSystem) {
     this.altar = new SpellMakingSystem(spells);
-    this.panel = new SpellMakingUI((components) => this.altar.computeCost(components));
+  }
+
+  /** The window's open and close animations (applied when it loads). */
+  public setAnimator(animator: UIAnimator): void {
+    this._animator = animator;
+    this.panel.current?.setAnimator(animator);
   }
 
   public install(ctx: FeatureContext): void {
@@ -52,19 +70,22 @@ export class SpellMakingFeature implements Feature {
       s.get(SkillsKey).gainXP("destruction", 20);
       s.get(FeedbackKey).markDirty();
     };
-    this.panel.onForge = ({ name, components }) => {
-      const purse = s.get(PurseKey);
-      // The altar checks (and draws down) a wallet; the real coins go after.
-      const wallet = { playerGold: purse.gold() } as BarterSystem;
-      const result = this.altar.forgeSpell(name, components, wallet);
-      if (!result.ok) {
-        this.panel.showStatus(REASONS[result.reason ?? ""] ?? `Cannot forge spell (${result.reason ?? "unknown"}).`, true);
-        return;
-      }
-      if (result.goldCost && result.goldCost > 0) purse.spend(result.goldCost);
-      this.panel.showStatus(`Forged "${result.spell!.name}" for ${result.goldCost} gold. Press Z to cycle spells.`);
+    this._wire = (panel) => {
+      panel.onForge = ({ name, components }) => {
+        const purse = s.get(PurseKey);
+        // The altar checks (and draws down) a wallet; the real coins go after.
+        const wallet = { playerGold: purse.gold() } as BarterSystem;
+        const result = this.altar.forgeSpell(name, components, wallet);
+        if (!result.ok) {
+          panel.showStatus(REASONS[result.reason ?? ""] ?? `Cannot forge spell (${result.reason ?? "unknown"}).`, true);
+          return;
+        }
+        if (result.goldCost && result.goldCost > 0) purse.spend(result.goldCost);
+        panel.showStatus(`Forged "${result.spell!.name}" for ${result.goldCost} gold. Press Z to cycle spells.`);
+      };
+      panel.onClose = () => modal().restoreGameplay();
     };
-    this.panel.onClose = () => modal().restoreGameplay();
+    if (this.panel.current) this._wire(this.panel.current);
 
     ctx.provide(SpellMakingKey, {
       altar: this.altar,
@@ -72,16 +93,17 @@ export class SpellMakingFeature implements Feature {
       toggle: () => {
         if (this.panel.isVisible) { this.panel.close(); return; }
         if (!s.get(GameplayKey).canAct()) return;
-        this.panel.open();
         modal().suspendGameplay();
+        void this.panel.get().then((panel) => panel.open());
       },
     });
 
     ctx.scope.add(() => {
       this.altar.onSpellForged = null;
-      this.panel.onForge = null;
-      this.panel.onClose = null;
-      if (this.panel.isVisible) this.panel.close();
+      const panel = this.panel.current;
+      if (panel) { panel.onForge = null; panel.onClose = null; }
+      this.panel.close();
+      this._wire = null;
     });
   }
 }

@@ -14,17 +14,22 @@
  *           `projectile:playerHit`).
  * Outputs:  the `crafting` service.
  *
+ * The three windows load the first time they open (out of the start-up
+ * bundle); `alchemyPanel`, `enchantingPanel` and `forgePanel` are their
+ * LazyPanels.
+ *
  * Extracted from game.ts (engine overhaul, Phase 1).
  */
 import type { Rng } from "../../core/rng/rng";
 import type { Feature, FeatureContext, ServiceRegistry } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { AlchemySystem } from "../../systems/alchemy-system";
-import { AlchemyUI } from "../../ui/alchemy-ui";
+import type { AlchemyUI } from "../../ui/alchemy-ui";
 import { EnchantingSystem } from "../../systems/enchanting-system";
-import { EnchantingUI } from "../../ui/enchanting-ui";
+import type { EnchantingUI } from "../../ui/enchanting-ui";
 import { CraftingSystem, type CraftingStationId } from "../../systems/crafting-system";
-import { CraftingUI } from "../../ui/crafting-ui";
+import type { CraftingUI } from "../../ui/crafting-ui";
+import { LazyPanel } from "../../ui/lazy-panel";
 import { ItemConditionSystem } from "../../systems/item-condition-system";
 import {
   ForgeRegistry, SmithingController, SMITHING_MATERIAL_ITEMS, smithingMaterialStack,
@@ -45,13 +50,13 @@ export interface CraftingDeps {
 
 export interface CraftingService {
   readonly alchemy: AlchemySystem;
-  readonly alchemyPanel: AlchemyUI;
+  readonly alchemyPanel: LazyPanel<AlchemyUI>;
   readonly enchanting: EnchantingSystem;
-  readonly enchantingPanel: EnchantingUI;
+  readonly enchantingPanel: LazyPanel<EnchantingUI>;
   readonly recipes: CraftingSystem;
   readonly conditions: ItemConditionSystem;
   readonly smithing: SmithingController;
-  readonly forgePanel: CraftingUI;
+  readonly forgePanel: LazyPanel<CraftingUI>;
   readonly forges: ForgeRegistry;
   /** L: the alchemy workbench. */
   toggleAlchemy(): void;
@@ -66,13 +71,31 @@ export const CraftingKey = createServiceKey<CraftingService>("crafting");
 export class CraftingFeature implements Feature {
   public readonly id = "crafting";
   public readonly alchemy: AlchemySystem;
-  public readonly alchemyPanel: AlchemyUI;
+  public readonly alchemyPanel = new LazyPanel<AlchemyUI>(async () => {
+    const { AlchemyUI } = await import("../../ui/alchemy-ui");
+    const panel = new AlchemyUI(this.alchemy);
+    this._wire?.alchemy(panel);
+    return panel;
+  });
   public readonly enchanting: EnchantingSystem;
-  public readonly enchantingPanel: EnchantingUI;
+  public readonly enchantingPanel = new LazyPanel<EnchantingUI>(async () => {
+    const { EnchantingUI } = await import("../../ui/enchanting-ui");
+    const panel = new EnchantingUI(this.enchanting);
+    this._wire?.enchanting(panel);
+    return panel;
+  });
   public readonly recipes = new CraftingSystem();
   public readonly conditions = new ItemConditionSystem();
   public readonly smithing: SmithingController;
-  public readonly forgePanel = new CraftingUI({ title: "Smithing Forge" });
+  public readonly forgePanel = new LazyPanel<CraftingUI>(async () => {
+    const { CraftingUI } = await import("../../ui/crafting-ui");
+    const panel = new CraftingUI({ title: "Smithing Forge" });
+    panel.materialLabel = (id) => SMITHING_MATERIAL_ITEMS[id]?.name ?? id;
+    this._wire?.forge(panel);
+    return panel;
+  });
+  /** How a panel is hooked up once it has loaded (set on install). */
+  private _wire: { alchemy(p: AlchemyUI): void; enchanting(p: EnchantingUI): void; forge(p: CraftingUI): void } | null = null;
   /** Smithies, armorer inns and the starting forge; steel work needs one in reach. */
   public readonly forges = new ForgeRegistry();
   private _s: ServiceRegistry | null = null;
@@ -82,9 +105,7 @@ export class CraftingFeature implements Feature {
 
   constructor(deps: CraftingDeps) {
     this.alchemy = new AlchemySystem(deps.player, deps.ui);
-    this.alchemyPanel = new AlchemyUI(this.alchemy);
     this.enchanting = new EnchantingSystem(deps.player, deps.inventory, deps.equipment, deps.ui);
-    this.enchantingPanel = new EnchantingUI(this.enchanting);
     this.smithing = new SmithingController(this.recipes, this.conditions, {
       inventory: deps.inventory,
       equipment: deps.equipment,
@@ -94,7 +115,6 @@ export class CraftingFeature implements Feature {
       notify: (message, ms) => this._s?.tryGet(FeedbackKey)?.notify(message, ms),
       random: () => this._rng?.next() ?? 0.5,
     });
-    this.forgePanel.materialLabel = (id) => SMITHING_MATERIAL_ITEMS[id]?.name ?? id;
 
     // Starter kit: a few ingredients, soul gems, and enough to use the forge
     // before the first merchant visit.
@@ -136,52 +156,53 @@ export class CraftingFeature implements Feature {
     ctx.on("equipment:changed", refreshGear);
     ctx.on("save:loaded", refreshGear);
 
-    this.alchemyPanel.onCraft = (ids) => {
-      this.alchemy.craftPotion(ids);
-      this.alchemyPanel.refresh();
-    };
-    this.alchemyPanel.onDrink = (potionId) => {
-      this.alchemy.drinkPotion(potionId);
-      feedback().markDirty();
-    };
     this.alchemy.onPotionCrafted = () => s.get(SkillsKey).gainXP("alchemy", 15);
-    this.enchantingPanel.onEnchant = (itemId, effectId, gem) => {
-      this.enchanting.enchantItem(itemId, effectId, gem);
-      this.enchantingPanel.refresh();
-      feedback().markDirty();
+    // Hooked up when each window first loads (and now, if one already has).
+    this._wire = {
+      alchemy: (p) => {
+        p.onCraft = (ids) => { this.alchemy.craftPotion(ids); p.refresh(); };
+        p.onDrink = (potionId) => { this.alchemy.drinkPotion(potionId); feedback().markDirty(); };
+        p.onClosed = () => modal().restoreGameplay(); // its own ✕
+      },
+      enchanting: (p) => {
+        p.onEnchant = (itemId, effectId, gem) => { this.enchanting.enchantItem(itemId, effectId, gem); p.refresh(); feedback().markDirty(); };
+        p.onClosed = () => modal().restoreGameplay();
+      },
+      forge: (p) => {
+        p.onCraft = (recipeId) => {
+          if (this.smithing.craft(recipeId, this._station()).success) feedback().markDirty();
+          this._refreshForge();
+        };
+        p.onClose = () => modal().restoreGameplay();
+      },
     };
-    this.forgePanel.onCraft = (recipeId) => {
-      if (this.smithing.craft(recipeId, this._station()).success) feedback().markDirty();
-      this._refreshForge();
-    };
-    // The panels' own ✕ buttons.
-    this.alchemyPanel.onClosed = () => modal().restoreGameplay();
-    this.enchantingPanel.onClosed = () => modal().restoreGameplay();
-    this.forgePanel.onClose = () => modal().restoreGameplay();
+    if (this.alchemyPanel.current) this._wire.alchemy(this.alchemyPanel.current);
+    if (this.enchantingPanel.current) this._wire.enchanting(this.enchantingPanel.current);
+    if (this.forgePanel.current) this._wire.forge(this.forgePanel.current);
 
     const toggleAlchemy = () => {
       if (this.alchemyPanel.isVisible) {
-        this.alchemyPanel.toggle(false);
+        this.alchemyPanel.close();
         modal().restoreGameplay();
         return;
       }
       if (!canAct()) return;
-      this.alchemyPanel.toggle(true);
       modal().suspendGameplay();
+      void this.alchemyPanel.get().then((p) => p.toggle(true));
     };
     const toggleEnchanting = () => {
       if (this.enchantingPanel.isVisible) {
-        this.enchantingPanel.toggle(false);
+        this.enchantingPanel.close();
         modal().restoreGameplay();
         return;
       }
       if (!canAct()) return;
-      this.enchantingPanel.toggle(true);
       modal().suspendGameplay();
+      void this.enchantingPanel.get().then((p) => p.toggle(true));
     };
     const toggleSmithing = () => {
       if (this.forgePanel.isVisible) {
-        this.forgePanel.hide();
+        this.forgePanel.close();
         modal().restoreGameplay();
         return;
       }
@@ -216,17 +237,15 @@ export class CraftingFeature implements Feature {
     ctx.on("chunk:unloaded", ({ chunkKey }) => this.forges.removeGroup(chunkKey));
 
     ctx.scope.add(() => {
-      this.alchemyPanel.onCraft = null;
-      this.alchemyPanel.onDrink = null;
-      this.alchemyPanel.onClosed = null;
       this.alchemy.onPotionCrafted = null;
-      this.enchantingPanel.onEnchant = null;
-      this.enchantingPanel.onClosed = null;
-      this.forgePanel.onCraft = null;
-      this.forgePanel.onClose = null;
-      if (this.alchemyPanel.isVisible) this.alchemyPanel.toggle(false);
-      if (this.enchantingPanel.isVisible) this.enchantingPanel.toggle(false);
-      if (this.forgePanel.isVisible) this.forgePanel.hide();
+      const a = this.alchemyPanel.current, e = this.enchantingPanel.current, f = this.forgePanel.current;
+      if (a) { a.onCraft = a.onDrink = null; a.onClosed = null; }
+      if (e) { e.onEnchant = null; e.onClosed = null; }
+      if (f) { f.onCraft = null; f.onClose = null; }
+      this.alchemyPanel.close();
+      this.enchantingPanel.close();
+      this.forgePanel.close();
+      this._wire = null;
       this._s = null;
     });
   }
@@ -240,9 +259,11 @@ export class CraftingFeature implements Feature {
   private _openForge(): void {
     const s = this._s;
     if (!s || this.forgePanel.isVisible) return;
-    this.forgePanel.show();
-    this._refreshForge();
     s.get(ModalKey).suspendGameplay();
+    void this.forgePanel.get().then((panel) => {
+      panel.show();
+      this._refreshForge();
+    });
     if (!this._station()) {
       s.get(FeedbackKey).notify("No forge nearby: field smithing only. Steel work needs a forge.", 3000);
     }
@@ -250,8 +271,9 @@ export class CraftingFeature implements Feature {
 
   /** Re-render the forge from the live inventory and Armorer skill. */
   private _refreshForge(): void {
-    if (!this.forgePanel.isVisible) return;
-    this.forgePanel.update(
+    const panel = this.forgePanel.current;
+    if (!panel?.isVisible) return;
+    panel.update(
       this.recipes,
       this.smithing.getMaterials(),
       this._s?.get(SkillsKey).level("armorer") ?? 0,

@@ -1,23 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
 
-// The workbench and altar panels draw with Babylon GUI; stand them in.
-vi.mock("../../ui/alchemy-ui", () => ({
-  AlchemyUI: class {
-    isVisible = false;
-    onCraft: unknown = null; onDrink: unknown = null; onClosed: unknown = null;
-    toggle(v: boolean) { this.isVisible = v; }
-    refresh() {}
-  },
-}));
-vi.mock("../../ui/enchanting-ui", () => ({
-  EnchantingUI: class {
-    isVisible = false;
-    onEnchant: unknown = null; onClosed: unknown = null;
-    toggle(v: boolean) { this.isVisible = v; }
-    refresh() {}
-  },
-}));
-
 import { Kernel } from "../../core/kernel";
 import { FeedbackKey, GameplayKey, ModalKey, PlayerKey, SkillsKey } from "../services";
 import { CraftingFeature, CraftingKey, type CraftingDeps } from "./crafting-feature";
@@ -56,6 +38,10 @@ function setup() {
   };
 }
 
+/** Let the windows (loaded on first use) finish loading, and whatever opened open. */
+const loaded = (t: { c: { alchemyPanel: { get(): Promise<unknown> }; enchantingPanel: { get(): Promise<unknown> }; forgePanel: { get(): Promise<unknown> } } }) =>
+  Promise.all([t.c.alchemyPanel.get(), t.c.enchantingPanel.get(), t.c.forgePanel.get()]).then(() => new Promise((r) => setTimeout(r, 0)));
+
 describe("CraftingFeature (headless, through the kernel)", () => {
   it("starts the player with a forge kit, ingredients and soul gems", () => {
     const t = setup();
@@ -65,9 +51,10 @@ describe("CraftingFeature (headless, through the kernel)", () => {
     t.k.uninstall("crafting");
   });
 
-  it("Shift+B away from a forge is field smithing; by one, the forge", () => {
+  it("Shift+B away from a forge is field smithing; by one, the forge", async () => {
     const t = setup();
     t.c.toggleSmithing();
+    await loaded(t);
     expect(t.c.forgePanel.isVisible).toBe(true);
     expect(t.notes.at(-1)).toMatch(/No forge nearby/);
     t.c.toggleSmithing();
@@ -78,6 +65,7 @@ describe("CraftingFeature (headless, through the kernel)", () => {
     t.moveTo(10.5, 10);
     const before = t.notes.length;
     t.c.toggleSmithing();
+    await loaded(t);
     expect(t.notes.length, "no field-smithing warning at a forge").toBe(before);
     t.c.toggleSmithing();
 
@@ -87,32 +75,38 @@ describe("CraftingFeature (headless, through the kernel)", () => {
     t.k.uninstall("crafting");
   });
 
-  it("a smith's \"use the forge\" opens it after the conversation", () => {
+  it("a smith's \"use the forge\" opens it after the conversation", async () => {
     const t = setup();
     t.k.events.emit("dialogue:action", { eventId: "smithing:open", npcName: "Smith" });
     expect(t.c.forgePanel.isVisible).toBe(false);
     t.k.events.emit("dialogue:closed", {});
+    await loaded(t);
     expect(t.c.forgePanel.isVisible).toBe(true);
     // Only once.
-    t.c.forgePanel.hide();
+    t.c.forgePanel.close();
     t.k.events.emit("dialogue:closed", {});
+    await loaded(t);
     expect(t.c.forgePanel.isVisible).toBe(false);
     t.k.uninstall("crafting");
   });
 
-  it("L and B toggle their panels; blocked gameplay opens nothing", () => {
+  it("L and B toggle their panels (loaded on first use); blocked gameplay opens nothing", async () => {
     const t = setup();
+    expect(t.c.alchemyPanel.current, "not loaded at start").toBeNull();
     t.c.toggleAlchemy();
+    await loaded(t);
     expect(t.c.alchemyPanel.isVisible).toBe(true);
     t.c.toggleAlchemy();
     expect(t.c.alchemyPanel.isVisible).toBe(false);
     t.c.toggleEnchanting();
+    await loaded(t);
     expect(t.c.enchantingPanel.isVisible).toBe(true);
     t.c.toggleEnchanting();
     t.block();
     t.c.toggleAlchemy();
     t.c.toggleEnchanting();
     t.c.toggleSmithing();
+    await loaded(t);
     expect([t.c.alchemyPanel.isVisible, t.c.enchantingPanel.isVisible, t.c.forgePanel.isVisible]).toEqual([false, false, false]);
     t.k.uninstall("crafting");
   });

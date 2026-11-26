@@ -123,6 +123,11 @@ export class CraftingUI {
   }
 
   /** Hide the panel without destroying its DOM. */
+  /** Close it (the same as hide; panels close this way). */
+  public close(): void {
+    this.hide();
+  }
+
   public hide(): void {
     if (this._root) this._root.style.display = "none";
     this.isVisible = false;

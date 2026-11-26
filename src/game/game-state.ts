@@ -198,7 +198,7 @@ export class GameState {
   /** Fast travel (built with the game: the editor suite reads `fastTravelSystem`). */
   public readonly _fastTravel = new FastTravelFeature();
   public get fastTravelUI(): FastTravelUI { return this._fastTravel.menu; }
-  public get spellMakingUI(): SpellMakingUI { return this._spellMaking.panel; }
+  public get spellMakingUI(): LazyPanel<SpellMakingUI> { return this._spellMaking.panel; }
   public get guardEncounterUI(): GuardEncounterUI { return this.kernel.services.get(ArrestKey).panel; }
   public readonly _progression = new ProgressionFeature();
   public get levelUpUI(): LevelUpUI { return this._progression.levelUp; }
@@ -239,7 +239,7 @@ export class GameState {
   /** Alchemy, enchanting and smithing (built early: see CraftingFeature). */
   public _crafting!: CraftingFeature;
   public get alchemySystem(): AlchemySystem { return this._crafting.alchemy; }
-  public get alchemyUI(): AlchemyUI { return this._crafting.alchemyPanel; }
+  public get alchemyUI(): LazyPanel<AlchemyUI> { return this._crafting.alchemyPanel; }
 
   // Smithing + gear wear (CraftingSystem / ItemConditionSystem, glued by SmithingController)
   public get craftingSystem(): CraftingSystem { return this._crafting.recipes; }
@@ -247,7 +247,7 @@ export class GameState {
   public get smithing(): SmithingController { return this._crafting.smithing; }
   /** World forges (smithies, armorer inns, the starting forge) — steel work needs one in reach. */
   public get forges(): ForgeRegistry { return this._crafting.forges; }
-  public get craftingUI(): CraftingUI { return this._crafting.forgePanel; }
+  public get craftingUI(): LazyPanel<CraftingUI> { return this._crafting.forgePanel; }
   /** Radiant work offered by innkeepers ("Any work going?"). */
   /** The editor suite, when the editor app plugged it in (see game/editor-plugin.ts). */
   public editors: EditorPlugin | null = null;
@@ -285,7 +285,7 @@ export class GameState {
 
   // v5 systems (Oblivion parity: enchanting)
   public get enchantingSystem(): EnchantingSystem { return this._crafting.enchanting; }
-  public get enchantingUI(): EnchantingUI { return this._crafting.enchantingPanel; }
+  public get enchantingUI(): LazyPanel<EnchantingUI> { return this._crafting.enchantingPanel; }
 
   // v4 browser optimisation: LOD culling
   public lodSystem: LodSystem;

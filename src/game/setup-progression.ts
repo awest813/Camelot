@@ -95,7 +95,7 @@ export function setupProgressionAndStart(g: Game): void {
   // ── UI animations (Web Animations; see ui/animate.ts) ──────────────────────
   const uiAnimator = new UIAnimator();
   g.levelUpUI.setAnimator(uiAnimator);
-  g.spellMakingUI.setAnimator(uiAnimator);
+  g._spellMaking.setAnimator(uiAnimator);
   g.guardEncounterUI.setAnimator(uiAnimator);
 
   // The title screen first (it starts a new game, or loads the save).

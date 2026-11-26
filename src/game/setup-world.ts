@@ -91,7 +91,7 @@ export function setupWorldSystems(g: Game): void {
   g.saveSystem.setJailSystem(g.jailSystem);
 
   // ── v10 system wiring (Oblivion depth: spell making, respawn, merchant restock) ──
-  g.spellMakingUI.setAnimator(g.uiAnimator);
+  g._spellMaking.setAnimator(g.uiAnimator);
 
   g.levelUpUI.setAnimator(g.uiAnimator);
 

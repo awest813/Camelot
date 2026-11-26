@@ -97,6 +97,11 @@ export class AlchemyUI {
   constructor(private readonly _system: AlchemySystem) {}
 
   /** Open (with a fresh selection) or close the panel. */
+  /** Close it (as toggle(false); panels close this way). */
+  public close(): void {
+    this.toggle(false);
+  }
+
   public toggle(visible: boolean): void {
     this.isVisible = visible;
     if (visible) this._selected = [];

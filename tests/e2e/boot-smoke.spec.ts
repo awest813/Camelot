@@ -358,7 +358,7 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
     const isOpen = () => page.evaluate((src) => new Function("g", `return ${src}`)((window as any).__camelotGame), open) as Promise<boolean>;
     await page.locator("#renderCanvas").focus();
     await page.keyboard.press(key);
-    expect(await isOpen(), `${key} opens`).toBe(true);
+    await expect.poll(isOpen, { message: `${key} opens (the panel loads on first use)` }).toBe(true);
     await page.keyboard.press(key);
     expect(await isOpen(), `${key} closes`).toBe(false);
   }
@@ -383,7 +383,7 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
     const isOpen = () => page.evaluate((src) => new Function("g", `return ${src}`)((window as any).__camelotGame), open) as Promise<boolean>;
     await page.locator("#renderCanvas").focus();
     await page.keyboard.press(key);
-    expect(await isOpen(), `${key} opens`).toBe(true);
+    await expect.poll(isOpen, { message: `${key} opens (the panel loads on first use)` }).toBe(true);
     await expect(page.locator(title)).toBeVisible();
     await page.keyboard.press("Escape");
     expect(await isOpen(), `Escape closes the ${key} panel`).toBe(false);

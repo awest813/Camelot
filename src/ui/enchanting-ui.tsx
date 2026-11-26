@@ -120,6 +120,11 @@ export class EnchantingUI {
   constructor(private readonly _system: EnchantingSystem) {}
 
   /** Open (with nothing selected) or close the panel. */
+  /** Close it (as toggle(false); panels close this way). */
+  public close(): void {
+    this.toggle(false);
+  }
+
   public toggle(visible: boolean): void {
     this.isVisible = visible;
     if (visible) this._sel = { ...NONE };
