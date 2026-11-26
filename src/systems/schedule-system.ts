@@ -253,6 +253,63 @@ export class ScheduleSystem {
     return this._getScheduledBehavior(npc);
   }
 
+  // ── The clock and sleep (this was the separate DailyScheduleSystem) ──────
+
+  /** NPCs asleep by their schedule (they carry the Asleep tag). */
+  private readonly _sleepers = new Set<NPC>();
+  private _clock: { readonly hour: number } | null = null;
+
+  /**
+   * Follow the game clock: each new hour sets the behaviours and puts NPCs
+   * to bed or wakes them.  Returns this system.
+   */
+  public followClock(clock: { readonly hour: number; onHourChange: ((hour: number) => void) | null }): this {
+    this._clock = clock;
+    clock.onHourChange = (hour) => this.setHour(hour);
+    this.setHour(clock.hour);
+    return this;
+  }
+
+  /**
+   * A new hour: behaviours follow it, and NPCs whose block turned to (or
+   * from) sleep get (or lose) the Asleep tag, reported as `npc:slept` /
+   * `npc:woke`.  Dead NPCs don't sleep; NPCs that left are forgotten.
+   */
+  public setHour(hour: number): void {
+    this.currentHour = hour;
+    const present = new Set(this.npcs);
+    for (const npc of this._sleepers) if (!present.has(npc)) this._sleepers.delete(npc);
+    for (const npc of this.npcs) {
+      if (npc.isDead) continue;
+      const asleep = this._getScheduledBehavior(npc) === "sleep";
+      if (asleep && !this._sleepers.has(npc)) {
+        this._sleepers.add(npc);
+        npc.isAsleep = true;
+        this.events?.emit("npc:slept", { npc });
+      } else if (!asleep && this._sleepers.has(npc)) {
+        this._sleepers.delete(npc);
+        npc.isAsleep = false;
+        this.events?.emit("npc:woke", { npc });
+      }
+    }
+  }
+
+  /** Whether the named NPC is asleep by its schedule. */
+  public isSleeping(npcKey: string): boolean {
+    for (const npc of this._sleepers) if (npc.key === npcKey) return true;
+    return false;
+  }
+
+  /**
+   * The save part for sleep (key "dailySchedule", kept from the old
+   * system).  Sleep is re-derived from the restored clock on load; the
+   * names are recorded for debugging.
+   */
+  public readonly sleep = {
+    getSaveState: (): { sleepingNpcNames: string[] } => ({ sleepingNpcNames: [...this._sleepers].map((n) => n.key) }),
+    restoreFromSave: (_state: unknown): void => this.setHour(this._clock?.hour ?? this.currentHour),
+  };
+
   /**
    * Returns the current scheduled behavior for the NPC based on
    * `this.currentHour` and the NPC's schedule blocks.

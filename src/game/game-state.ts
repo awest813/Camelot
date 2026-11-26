@@ -106,7 +106,6 @@ import type { LevelUpUI } from "../ui/level-up-ui";
 import type { StableUI } from "../ui/stable-ui";
 import type { SaddlebagUI } from "../ui/saddlebag-ui";
 import type { LazyPanel } from "../ui/lazy-panel";
-import { DailyScheduleSystem } from "../systems/daily-schedule-system";
 import { HorseSystem } from "../systems/horse-system";
 import { SwimmingSystem } from "../systems/swimming-system";
 import { DiseaseSystem } from "../systems/disease-system";
@@ -325,7 +324,6 @@ export class GameState {
   public get playerLevelSystem(): PlayerLevelSystem { return this._progression.levels; }
 
   // v18 systems
-  public dailyScheduleSystem: DailyScheduleSystem;
 
   // v19 systems
   public get horseSystem(): HorseSystem { return this.mounts.horses; }

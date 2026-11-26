@@ -745,7 +745,7 @@ components.
 |---|---|
 | Quests | Done: one engine; the log is a view. |
 | Inventory | Done, with "keep" and "retire" swapped (see above). |
-| Schedules | `ScheduleSystem` plus the shared block matcher. The daily layer only keeps the hour in sync and sets the `Asleep` tag. |
+| Schedules | Done: one `ScheduleSystem`, driven by the named definitions (`NpcScheduleSystem` data). It follows the clock itself (`followClock`, `setHour`): the hour sets behaviours and the `Asleep` tag (`npc:slept` / `npc:woke`), and its `sleep` part keeps the old `dailySchedule` save key. `DailyScheduleSystem` is gone; its 20 tests run against the schedule system. |
 | NPC AI | One model, the combat state machine. The behaviour-tree goal layer is not built. |
 | Streaming | Done: `ChunkManager` plus `WorldManager` as its adapter. |
 | Jobs, raids | Open. They are features with their own rules and quest-log entries; nothing for them is left in `game.ts`. Making them framework "radiant" templates is still to do. |
@@ -1334,6 +1334,10 @@ with the rendering and UI tracks in parallel.
     character), gamepad support (on the first `gamepadconnected`), and
     the stable and saddlebag windows (`ui/lazy-panel.ts`: closed until
     their first use).
+- Duplicate subsystems: **0** (target met). Quests, inventory and
+  streaming were done in Phase 4, and NPC AI is one model. The daily
+  schedule layer folded into `ScheduleSystem` (see the Phase 4 status
+  table).
 - Model payload: 13 MB on disk, 1.8 MB of it character LODs. Target met.
 - **Village draw calls: 486 → 245 per frame** (target ≤ 250, met). These
   are the perf-budget seed's village at the high tier, averaged over

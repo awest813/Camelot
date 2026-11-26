@@ -111,7 +111,7 @@ export interface NpcArchetypeDefinition {
    * Values provided here take precedence over role-based defaults.
    */
   aiProfile?: Partial<NpcAIProfile>;
-  /** Named daily-schedule definition id (links to DailyScheduleSystem). */
+  /** Named daily-schedule definition id (NpcScheduleSystem; the ScheduleSystem follows it by the clock). */
   scheduleId?: string;
   /** Item definition IDs the NPC spawns carrying (for inventory integration). */
   startingEquipment?: string[];

@@ -14,7 +14,6 @@ import { ActiveEffectsSystem } from "../systems/active-effects-system";
 import { JailSystem } from "../systems/jail-system";
 import { RespawnSystem } from "../systems/respawn-system";
 import { MerchantRestockSystem } from "../systems/merchant-restock-system";
-import { DailyScheduleSystem } from "../systems/daily-schedule-system";
 import { SwimmingSystem } from "../systems/swimming-system";
 import { DiseaseSystem } from "../systems/disease-system";
 import { EventManagerSystem } from "../systems/event-manager-system";
@@ -115,20 +114,13 @@ export function setupWorldSystems(g: Game): void {
   // ── v12 system wiring (Oblivion depth: skill-based character progression) ──
   g.saveSystem.setPlayerLevelSystem(g.playerLevelSystem);
 
-  // ── v18 DailyScheduleSystem ───────────────────────────────────────────────
-  // Connects TimeSystem → ScheduleSystem so NPC daily behaviours are driven
-  // automatically by the in-game clock.  Also enforces non-interactivity for
-  // sleeping NPCs by clearing their mesh.metadata during sleep windows.
-  g.dailyScheduleSystem = new DailyScheduleSystem(
-    g.scheduleSystem,
-    g.timeSystem,
-  );
-  // No toasts: a village going to bed would post a dozen of them.
-  g.dailyScheduleSystem.events = g.eventBus;
-  // Villagers who reach their door at bedtime go inside until morning.
-  // (The indoors feature takes them inside.)
+  // ── Schedules follow the clock ──────────────────────────────────────────
+  // Each hour sets the NPCs' behaviours and puts them to bed or wakes them
+  // (the Asleep tag; npc:slept / npc:woke, no toasts).  Villagers who reach
+  // their door at bedtime go inside (the indoors feature).
   g.scheduleSystem.events = g.eventBus;
-  g.saveSystem.setDailyScheduleSystem(g.dailyScheduleSystem);
+  g.scheduleSystem.followClock(g.timeSystem);
+  g.saveSystem.setScheduleSleep(g.scheduleSystem.sleep);
 
   // ── v20: Swimming system ───────────────────────────────────────────────
   g.swimSystem = new SwimmingSystem();

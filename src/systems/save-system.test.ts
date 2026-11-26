@@ -151,7 +151,7 @@ describe('SaveSystem', () => {
         for (const r of restored) expect(r.data, r.setter).toEqual({ from: r.setter });
         // Time restores before the daily schedule re-derives who is asleep.
         const order = restored.map((r) => r.setter);
-        expect(order.indexOf('setTimeSystem')).toBeLessThan(order.indexOf('setDailyScheduleSystem'));
+        expect(order.indexOf('setTimeSystem')).toBeLessThan(order.indexOf('setScheduleSleep'));
     });
 
     it('should show a save notification', () => {

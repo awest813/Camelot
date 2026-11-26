@@ -31,7 +31,6 @@ import type { BirthsignSystem } from "./birthsign-system";
 import type { ClassSystem } from "./class-system";
 import type { RaceSystem } from "./race-system";
 import type { PlayerLevelSystem } from "./player-level-system";
-import type { DailyScheduleSystem } from "./daily-schedule-system";
 import type { SwimmingSystem } from "./swimming-system";
 import type { DiseaseSystem } from "./disease-system";
 import type { EventManagerSystem } from "./event-manager-system";
@@ -323,7 +322,6 @@ export class SaveSystem {
   private _playerLevelSystem: PlayerLevelSystem | null = null;
 
   // v18 optional systems
-  private _dailyScheduleSystem: DailyScheduleSystem | null = null;
 
   // v19 optional systems
 
@@ -458,7 +456,8 @@ export class SaveSystem {
 
   // ── v18 system injection ──────────────────────────────────────────────────
 
-  public setDailyScheduleSystem(s: DailyScheduleSystem): void  { this._dailyScheduleSystem = s; this._own("dailySchedule", 240, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
+  /** Who sleeps by their schedule (the schedule system's `sleep` part; re-derived from the clock on load). */
+  public setScheduleSleep(s: { getSaveState(): unknown; restoreFromSave(d: unknown): void }): void { this._own("dailySchedule", 240, () => s.getSaveState(), (d) => s.restoreFromSave(d)); }
 
   // ── v19 system injection ──────────────────────────────────────────────────
 

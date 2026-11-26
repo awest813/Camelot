@@ -1,5 +1,8 @@
+/**
+ * Schedules and the clock: the hour, sleep (the Asleep tag) and its save
+ * part.  (Formerly the separate DailyScheduleSystem.)
+ */
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { DailyScheduleSystem } from "./daily-schedule-system";
 import { ScheduleSystem } from "./schedule-system";
 import { TimeSystem } from "./time-system";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
@@ -48,36 +51,36 @@ function makeSystems(startHour = 8) {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe("DailyScheduleSystem — construction", () => {
+describe("ScheduleSystem follows the clock — construction", () => {
   it("syncs ScheduleSystem.currentHour to TimeSystem.hour on construction", () => {
     const { schedule, time } = makeSystems(14);
-    new DailyScheduleSystem(schedule, time);
+    schedule.followClock(time);
     expect(schedule.currentHour).toBe(14);
   });
 
   it("registers onHourChange on TimeSystem", () => {
     const { schedule, time } = makeSystems(8);
     expect(time.onHourChange).toBeNull();
-    new DailyScheduleSystem(schedule, time);
+    schedule.followClock(time);
     expect(time.onHourChange).not.toBeNull();
   });
 });
 
-describe("DailyScheduleSystem — sleep interactivity", () => {
+describe("ScheduleSystem follows the clock — sleep interactivity", () => {
   let schedule: ScheduleSystem;
   let time: TimeSystem;
-  let daily: DailyScheduleSystem;
+  let daily: ScheduleSystem;
 
   beforeEach(() => {
     ({ schedule, time } = makeSystems(8)); // start at 08:00 (awake)
-    daily = new DailyScheduleSystem(schedule, time);
+    daily = schedule.followClock(time);
   });
 
   it("an NPC without schedule blocks never sleeps", () => {
     const npc = makeNPC("Guard", [], { type: "npc" });
     schedule.addNPC(npc);
     // Force a re-sync at an hour that would be sleep if blocks existed
-    (daily as any)._syncHour(22);
+    daily.setHour(22);
     expect(npc.isAsleep).toBeFalsy();
     expect(npc.mesh.metadata, "interaction metadata is never touched").toEqual({ type: "npc" });
   });
@@ -91,7 +94,7 @@ describe("DailyScheduleSystem — sleep interactivity", () => {
     expect(npc.isAsleep).toBeFalsy();
 
     // Advance to sleep hour
-    (daily as any)._syncHour(22);
+    daily.setHour(22);
     expect(npc.isAsleep).toBe(true);
   });
 
@@ -104,11 +107,11 @@ describe("DailyScheduleSystem — sleep interactivity", () => {
     schedule.addNPC(npc);
 
     // Sleep
-    (daily as any)._syncHour(23);
+    daily.setHour(23);
     expect(npc.isAsleep).toBe(true);
 
     // Wake up
-    (daily as any)._syncHour(8);
+    daily.setHour(8);
     expect(npc.isAsleep).toBe(false);
     expect(npc.mesh.metadata).toEqual(originalMeta);
   });
@@ -119,15 +122,15 @@ describe("DailyScheduleSystem — sleep interactivity", () => {
     ]);
     npc.isDead = true;
     schedule.addNPC(npc);
-    (daily as any)._syncHour(22);
+    daily.setHour(22);
     expect(npc.isAsleep).toBeFalsy();
   });
 });
 
-describe("DailyScheduleSystem — callbacks", () => {
-  it("fires onNPCSleep when NPC enters sleep block", () => {
+describe("ScheduleSystem follows the clock — callbacks", () => {
+  it("reports npc:slept when NPC enters sleep block", () => {
     const { schedule, time } = makeSystems(8);
-    const daily = new DailyScheduleSystem(schedule, time);
+    const daily = schedule.followClock(time);
 
     const npc = makeNPC("Villager", [
       { startHour: 22, endHour: 6, behavior: "sleep" as const },
@@ -136,32 +139,32 @@ describe("DailyScheduleSystem — callbacks", () => {
 
     const sleepSpy = vi.fn();
     listen(daily, "npc:slept", (p) => sleepSpy(p.npc));
-    (daily as any)._syncHour(22);
+    daily.setHour(22);
     expect(sleepSpy).toHaveBeenCalledOnce();
     expect(sleepSpy).toHaveBeenCalledWith(npc);
   });
 
-  it("fires onNPCWake when NPC leaves sleep block", () => {
+  it("reports npc:woke when NPC leaves sleep block", () => {
     const { schedule, time } = makeSystems(22); // start sleeping
     const npc = makeNPC("Villager", [
       { startHour: 22, endHour: 6, behavior: "sleep" as const },
     ]);
     schedule.addNPC(npc);
 
-    const daily = new DailyScheduleSystem(schedule, time);
+    const daily = schedule.followClock(time);
     // NPC should now be sleeping after construction sync
     expect(npc.isAsleep).toBe(true);
 
     const wakeSpy = vi.fn();
     listen(daily, "npc:woke", (p) => wakeSpy(p.npc));
-    (daily as any)._syncHour(8);
+    daily.setHour(8);
     expect(wakeSpy).toHaveBeenCalledOnce();
     expect(wakeSpy).toHaveBeenCalledWith(npc);
   });
 
-  it("does not double-fire onNPCSleep on repeated hour sync within same block", () => {
+  it("does not double-report npc:slept on repeated hour sync within same block", () => {
     const { schedule, time } = makeSystems(8);
-    const daily = new DailyScheduleSystem(schedule, time);
+    const daily = schedule.followClock(time);
 
     const npc = makeNPC("Merchant", [
       { startHour: 22, endHour: 6, behavior: "sleep" as const },
@@ -170,17 +173,17 @@ describe("DailyScheduleSystem — callbacks", () => {
 
     const sleepSpy = vi.fn();
     listen(daily, "npc:slept", (p) => sleepSpy(p.npc));
-    (daily as any)._syncHour(22);
-    (daily as any)._syncHour(23); // still in sleep block
-    (daily as any)._syncHour(0);  // midnight, still sleeping
+    daily.setHour(22);
+    daily.setHour(23); // still in sleep block
+    daily.setHour(0);  // midnight, still sleeping
     expect(sleepSpy).toHaveBeenCalledOnce();
   });
 });
 
-describe("DailyScheduleSystem — onHourChange integration", () => {
+describe("ScheduleSystem follows the clock — onHourChange integration", () => {
   it("syncs ScheduleSystem.currentHour when TimeSystem fires onHourChange", () => {
     const { schedule, time } = makeSystems(8);
-    new DailyScheduleSystem(schedule, time);
+    schedule.followClock(time);
 
     expect(schedule.currentHour).toBe(8);
 
@@ -191,7 +194,7 @@ describe("DailyScheduleSystem — onHourChange integration", () => {
 
   it("transitions NPC into sleep via onHourChange callback", () => {
     const { schedule, time } = makeSystems(8);
-    const daily = new DailyScheduleSystem(schedule, time);
+    const daily = schedule.followClock(time);
 
     const npc = makeNPC("Elder", [
       { startHour: 22, endHour: 6, behavior: "sleep" as const },
@@ -206,14 +209,14 @@ describe("DailyScheduleSystem — onHourChange integration", () => {
   });
 });
 
-describe("DailyScheduleSystem — isSleeping / getActiveBehavior", () => {
+describe("ScheduleSystem follows the clock — isSleeping / getActiveBehavior", () => {
   it("isSleeping returns true for a sleeping NPC", () => {
     const { schedule, time } = makeSystems(22);
     const npc = makeNPC("NightOwl", [
       { startHour: 22, endHour: 6, behavior: "sleep" as const },
     ]);
     schedule.addNPC(npc);
-    const daily = new DailyScheduleSystem(schedule, time);
+    const daily = schedule.followClock(time);
 
     expect(daily.isSleeping("NightOwl")).toBe(true);
   });
@@ -224,7 +227,7 @@ describe("DailyScheduleSystem — isSleeping / getActiveBehavior", () => {
       { startHour: 22, endHour: 6, behavior: "sleep" as const },
     ]);
     schedule.addNPC(npc);
-    const daily = new DailyScheduleSystem(schedule, time);
+    const daily = schedule.followClock(time);
 
     expect(daily.isSleeping("Baker")).toBe(false);
   });
@@ -236,9 +239,9 @@ describe("DailyScheduleSystem — isSleeping / getActiveBehavior", () => {
       { startHour: 22, endHour: 6, behavior: "sleep" as const },
     ]);
     schedule.addNPC(npc);
-    const daily = new DailyScheduleSystem(schedule, time);
+    const daily = schedule.followClock(time);
 
-    expect(daily.getActiveBehavior(npc)).toBe("work");
+    expect(daily.behaviorOf(npc)).toBe("work");
   });
 
   it("getActiveBehavior returns null when no block matches", () => {
@@ -248,20 +251,20 @@ describe("DailyScheduleSystem — isSleeping / getActiveBehavior", () => {
       { startHour: 22, endHour: 6, behavior: "sleep" as const },
     ]);
     schedule.addNPC(npc);
-    const daily = new DailyScheduleSystem(schedule, time);
+    const daily = schedule.followClock(time);
 
-    expect(daily.getActiveBehavior(npc)).toBeNull();
+    expect(daily.behaviorOf(npc)).toBeNull();
   });
 });
 
-describe("DailyScheduleSystem — midnight-wrap block", () => {
+describe("ScheduleSystem follows the clock — midnight-wrap block", () => {
   it("detects sleep block correctly for midnight-wrapping blocks at hour 3", () => {
     const { schedule, time } = makeSystems(3);
     const npc = makeNPC("Innkeeper", [
       { startHour: 22, endHour: 6, behavior: "sleep" as const },
     ]);
     schedule.addNPC(npc);
-    const daily = new DailyScheduleSystem(schedule, time);
+    const daily = schedule.followClock(time);
 
     expect(daily.isSleeping("Innkeeper")).toBe(true);
     expect(npc.isAsleep).toBe(true);
@@ -273,13 +276,13 @@ describe("DailyScheduleSystem — midnight-wrap block", () => {
       { startHour: 22, endHour: 6, behavior: "sleep" as const },
     ]);
     schedule.addNPC(npc);
-    const daily = new DailyScheduleSystem(schedule, time);
+    const daily = schedule.followClock(time);
 
     expect(daily.isSleeping("Innkeeper")).toBe(false);
   });
 });
 
-describe("DailyScheduleSystem — save/restore", () => {
+describe("ScheduleSystem follows the clock — save/restore", () => {
   it("getSaveState returns names of sleeping NPCs", () => {
     const { schedule, time } = makeSystems(22);
     const npc1 = makeNPC("Guard1", [
@@ -288,9 +291,9 @@ describe("DailyScheduleSystem — save/restore", () => {
     const npc2 = makeNPC("Guard2", []); // no schedule
     schedule.addNPC(npc1);
     schedule.addNPC(npc2);
-    const daily = new DailyScheduleSystem(schedule, time);
+    const daily = schedule.followClock(time);
 
-    const state = daily.getSaveState();
+    const state = daily.sleep.getSaveState();
     expect(state.sleepingNpcNames).toContain("Guard1");
     expect(state.sleepingNpcNames).not.toContain("Guard2");
   });
@@ -301,14 +304,14 @@ describe("DailyScheduleSystem — save/restore", () => {
       { startHour: 22, endHour: 6, behavior: "sleep" as const },
     ]);
     schedule.addNPC(npc);
-    const daily = new DailyScheduleSystem(schedule, time);
+    const daily = schedule.followClock(time);
 
     // NPC is sleeping; now simulate a load that already restored TimeSystem to 10:00
     (time as any)._gameTime = 10 * 60;
     (time as any)._lastHour = 10;
 
     // Restore: should re-derive that NPC is now awake
-    daily.restoreFromSave({ sleepingNpcNames: ["Blacksmith"] });
+    daily.sleep.restoreFromSave({ sleepingNpcNames: ["Blacksmith"] });
 
     expect(daily.isSleeping("Blacksmith")).toBe(false);
     expect(npc.isAsleep).toBe(false);
@@ -320,13 +323,13 @@ describe("DailyScheduleSystem — save/restore", () => {
       { startHour: 22, endHour: 6, behavior: "sleep" as const },
     ]);
     schedule.addNPC(npc);
-    const daily = new DailyScheduleSystem(schedule, time);
+    const daily = schedule.followClock(time);
 
     // Simulate restored time = 23:00
     (time as any)._gameTime = 23 * 60;
     (time as any)._lastHour = 23;
 
-    daily.restoreFromSave({ sleepingNpcNames: ["Miller"] });
+    daily.sleep.restoreFromSave({ sleepingNpcNames: ["Miller"] });
 
     expect(daily.isSleeping("Miller")).toBe(true);
     expect(npc.isAsleep).toBe(true);
