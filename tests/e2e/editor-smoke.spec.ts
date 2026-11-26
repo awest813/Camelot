@@ -80,10 +80,10 @@ test("editor and tool chords reach their handlers", async ({ page }) => {
   expect(await g<boolean>("!!g.markRecallSystem.markedPosition"), "and does not mark").toBe(false);
   await page.evaluate(() => (window as any).__camelotGame.editors.modManifestUI.close());
 
-  // In gameplay, plain M still mutes.
+  // In gameplay, F7 mutes (M is the map).
   await canvas.click({ force: true });
   const muted = await g<boolean>("g.audioSystem.isMuted");
-  await page.keyboard.press("m");
+  await page.keyboard.press("F7");
   expect(await g<boolean>("g.audioSystem.isMuted")).toBe(!muted);
 
   // F2: the map editor. T cycles the placement type; Ctrl+M toggles Scene Notes.
