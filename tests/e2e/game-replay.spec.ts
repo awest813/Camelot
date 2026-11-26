@@ -8,6 +8,8 @@
  * and the combat rolls all have to come out the same.
  */
 import { test, expect, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 async function createCharacter(page: Page, seed: string) {
   const root = page.locator(".character-create");
@@ -144,3 +146,44 @@ async function playBack(browser: import("@playwright/test").Browser, log: unknow
   await play.close();
   return out;
 }
+
+test("a session that loads a save (F9) replays from the storage it started with", async ({ browser }) => {
+  test.setTimeout(600_000);
+  const errors: string[] = [];
+  const fixture = JSON.parse(readFileSync(fileURLToPath(new URL("../fixtures/saves/v29-midgame.json", import.meta.url)), "utf8"));
+
+  const rec = await browser.newPage();
+  rec.on("pageerror", (e) => { if (!/pointer\s*lock/i.test(e.message)) errors.push(e.message); });
+  await rec.addInitScript((save) => {
+    localStorage.clear();
+    localStorage.setItem("camelot_save", save);
+  }, JSON.stringify(fixture.save));
+  await rec.goto("/?replay=record", { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await createCharacter(rec, "replay-load");
+  await expect.poll(() => rec.evaluate(() => (window as any).__camelotReplay?.frame ?? 0), { timeout: 60_000 }).toBeGreaterThan(5);
+  await waitFrames(rec, 20);
+  const box = (await rec.locator("#renderCanvas").boundingBox())!;
+  await rec.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await waitFrames(rec, 5);
+  const fresh = await rec.evaluate(() => (window as any).__camelotReplay.digest().gold as number);
+  await rec.keyboard.press("F9");
+  await waitFrames(rec, 20);
+  const loaded = await rec.evaluate(() => (window as any).__camelotReplay.digest().gold as number);
+  await rec.keyboard.down("w"); await waitFrames(rec, 40); await rec.keyboard.up("w");
+  await rec.keyboard.down("a"); await waitFrames(rec, 20); await rec.keyboard.up("a");
+  for (let i = 0; i < 2; i++) { await rec.mouse.down(); await waitFrames(rec, 3); await rec.mouse.up(); await waitFrames(rec, 20); }
+  const recorded = await rec.evaluate(() => {
+    const r = (window as any).__camelotReplay;
+    return { log: r.stop(), digest: r.digest() };
+  });
+  await rec.close();
+  expect(loaded, "F9 loaded the mid-game save (its gold, not the new character's)").not.toBe(fresh);
+  expect(loaded).toBeGreaterThanOrEqual(250);
+  expect(Object.keys(recorded.log.storage), "the log keeps the save it started with").toContain("camelot_save");
+
+  // Playback starts from empty storage: the log brings the save back.
+  const replayed = await playBack(browser, recorded.log, errors);
+  expect(replayed.frame).toBe(recorded.log.frames);
+  expect(digestDiff(recorded.digest, replayed.digest), "the replay ends in the recorded state").toBeNull();
+  expect(errors).toEqual([]);
+});

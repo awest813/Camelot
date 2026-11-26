@@ -4,7 +4,10 @@
  * fresh page to the same state.
  *
  * Open the game with `?replay=record` to record, or `?replay=play` with a
- * log in localStorage (`camelot_replay_log`) to play one back.  Either way
+ * log in localStorage (`camelot_replay_log`) to play one back; without one,
+ * the page asks for a log file (`download()` saves one).  The log keeps the
+ * page's storage as it was at the start (saves, settings), and playback
+ * puts it back first, so a session that loads a save (F9) replays too.  Either way
  * the game runs in deterministic mode:
  *  - frames are a fixed 16 ms step (physics, animation, the game's own
  *    clock), driven here instead of by the render loop;
@@ -86,6 +89,8 @@ export interface GameReplayLog {
   /** Frames the session ran. */
   frames: number;
   inputs: ReplayInput[];
+  /** localStorage when the recording started (saves, settings); playback restores it before the game starts. */
+  storage?: Record<string, string>;
 }
 
 const KEY_EVENTS = ["keydown", "keyup"];
@@ -226,6 +231,8 @@ export class GameReplay {
   private _running = false;
   private _stopped = false;
   private _intercepting = false;
+  /** Record mode: localStorage as the session started. */
+  private readonly _storage: Record<string, string> = {};
 
   constructor(
     public readonly mode: ReplayMode,
@@ -235,7 +242,12 @@ export class GameReplay {
     private readonly _log: GameReplayLog | null = null,
   ) {
     this.done = new Promise((r) => { this._resolveDone = r; });
-    if (mode === "play" && !_log) throw new Error("replay: no log to play");
+    if (mode === "play" && !_log) {
+      askForLog();
+      return;
+    }
+    if (mode === "record") Object.assign(this._storage, readStorage());
+    else if (_log?.storage) restoreStorage(_log.storage);
     // Fixed steps everywhere: the engine's frame time, animations, game timers.
     _engine.getDeltaTime = () => STEP_MS;
     _scene.useConstantAnimationDeltaTime = true;
@@ -252,7 +264,20 @@ export class GameReplay {
   public log(): GameReplayLog {
     if (this._log) return this._log;
     if (!this._choice) throw new Error("replay: the character isn't made yet");
-    return { version: 1, kind: "camelot-game", stepMs: STEP_MS, choice: serializeChoice(this._choice), frames: this.frame, inputs: this._inputs.slice() };
+    return {
+      version: 1, kind: "camelot-game", stepMs: STEP_MS, choice: serializeChoice(this._choice),
+      frames: this.frame, inputs: this._inputs.slice(), storage: { ...this._storage },
+    };
+  }
+
+  /** Save the log as a file (for a bug report). */
+  public download(): void {
+    const blob = new Blob([JSON.stringify(this.log())], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `camelot-replay-${this.frame}f.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   }
 
   /**
@@ -385,6 +410,56 @@ export class GameReplay {
       later({ f: 0, lock: document.pointerLockElement === this._canvas });
     }, { capture: true });
   }
+}
+
+/** localStorage, without the replay log itself. */
+function readStorage(): Record<string, string> {
+  const out: Record<string, string> = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k !== null && k !== REPLAY_LOG_KEY) out[k] = localStorage.getItem(k) ?? "";
+    }
+  } catch { /* no storage: nothing to keep */ }
+  return out;
+}
+
+/** Make localStorage what it was when the log was recorded (keeping the log). */
+function restoreStorage(saved: Record<string, string>): void {
+  try {
+    const log = localStorage.getItem(REPLAY_LOG_KEY);
+    localStorage.clear();
+    if (log !== null) localStorage.setItem(REPLAY_LOG_KEY, log);
+    for (const [k, v] of Object.entries(saved)) localStorage.setItem(k, v);
+  } catch (e) {
+    console.warn("[replay] could not restore the recorded storage", e);
+  }
+}
+
+/** Play mode without a log: ask for a log file, keep it, and start over with it. */
+function askForLog(): void {
+  const box = document.createElement("div");
+  box.className = "replay-pick";
+  box.setAttribute("role", "dialog");
+  box.setAttribute("aria-label", "Choose a replay log");
+  box.style.cssText = "position:fixed;inset:auto 0 0 0;margin:auto;top:0;width:min(420px,90vw);height:fit-content;padding:20px;"
+    + "background:#1b1712;color:#f1e6cf;border:1px solid #8a6d3b;border-radius:8px;font:15px/1.4 Georgia,serif;z-index:10000";
+  const text = document.createElement("p");
+  text.textContent = "Choose a replay log (a camelot-replay-*.json file) to play it back.";
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json,.json";
+  input.setAttribute("aria-label", "Replay log file");
+  input.addEventListener("change", () => {
+    void input.files?.[0]?.text().then((raw) => {
+      const log = JSON.parse(raw) as Partial<GameReplayLog>;
+      if (log.kind !== "camelot-game") { text.textContent = "That file isn't a Camelot replay log."; return; }
+      localStorage.setItem(REPLAY_LOG_KEY, raw);
+      location.reload();
+    });
+  });
+  box.append(text, input);
+  document.body.appendChild(box);
 }
 
 /** `?replay=record` or `?replay=play`, else null. */

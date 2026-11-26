@@ -869,6 +869,14 @@ one replay runs in CI.
   piece takes wear. Each now has a kernel stream ("world-events",
   "travel-events", "disease", "armor-wear"). The ratchet now counts any
   `Math.random` reference, and it stays at 0.
+- The log keeps localStorage as the recording started: saves, settings,
+  the graphics tier. Playback restores it before the game starts, so a
+  session that loads a save (F9) replays too. That makes bug reports from
+  a game in progress possible. `download()` saves the log as a file, and
+  `?replay=play` with no stored log asks for one, keeps it and restarts
+  with it. A second e2e test starts with the checked-in mid-game fixture
+  in storage, makes a character, presses F9, walks and swings, then
+  replays it from empty storage to the same digest.
 - A log can also hold commands: scripted steps run at a frame boundary
   like input, for setting a scene up in a test or a bug report. `spawn`
   puts an NPC (an archetype) a few metres in front of the player. `aim`
