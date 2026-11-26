@@ -122,8 +122,7 @@ export function wireGameplay(g: Game): void {
   const desktop = getDesktopBridge();
   g.ui.setPauseActions({
     resume: () => g.togglePause(),
-    save: () => g.saveSystem.save(),
-    load: () => g.saveSystem.load(),
+    save: () => g.saveSystem.save(), load: () => g.saveSystem.load(),
     // Export the CURRENT state, not the last persisted one.
     exportSave: () => { g.saveSystem.save(true); g.saveSystem.exportToFile(); },
     importSave: () => openSaveImportPicker(g),
@@ -131,6 +130,7 @@ export function wireGameplay(g: Game): void {
     credits: () => g.kernel.services.get(SettingsKey).openCredits(),
     quit: desktop ? () => desktop.quit() : () => window.location.reload(),
     quitLabel: desktop ? "Quit to Desktop" : "Quit to Menu",
+    savedAt: () => g.saveSystem.peekSummary()?.savedAt ?? null,
   });
 
   // Wire decoupled input adapter after all systems are initialized

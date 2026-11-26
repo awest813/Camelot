@@ -2111,3 +2111,57 @@ body.is-title :is(.hud, .quickslot-hud, .active-effect-hud, .onboarding-tip, #di
 }
 :root.reduce-motion :is(.death-veil, .death-veil.is-lifting, .death-veil__title, .death-veil__rule, .death-veil__line) { animation: none; }
 body:has(.death-veil:not(.is-lifting)) .hud-crosshair { visibility: hidden; }
+
+/* The pause menu's note of the last save, and the ask before loading or quitting. */
+.pause-menu .pause-menu__saved {
+  margin: -12px 0 14px;
+  font-family: var(--tome-font-book);
+  font-size: 15px;
+  color: var(--tome-gilt-dim);
+  text-align: center;
+}
+.pause-menu .pause-menu__item:disabled {
+  color: var(--tome-leather-dim);
+  opacity: 0.5;
+  background: none;
+  cursor: default;
+}
+.pause-menu .pause-menu__item:disabled::before,
+.pause-menu .pause-menu__item:disabled::after { opacity: 0; }
+.pause-menu .pause-menu__confirm {
+  display: grid;
+  gap: 10px;
+  padding: 16px 4px 4px;
+  border-top: 1px solid rgba(201, 164, 92, 0.25);
+  text-align: center;
+}
+.pause-menu .pause-menu__confirm-q {
+  margin: 0;
+  font-family: var(--tome-font-display);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--tome-gilt-bright);
+}
+.pause-menu .pause-menu__confirm-note {
+  margin: 0 0 6px;
+  font-family: var(--tome-font-book);
+  font-style: italic;
+  font-size: 16px;
+  color: var(--tome-leather-text);
+}
+.pause-menu .pause-menu__confirm-actions {
+  display: grid;
+  gap: 8px;
+}
+.pause-menu .pause-menu__confirm-btn {
+  font-family: var(--tome-font-display);
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.pause-menu .pause-menu__confirm-btn--primary {
+  border-color: var(--tome-gilt);
+  background: linear-gradient(180deg, rgba(125, 33, 23, 0.85), rgba(80, 18, 12, 0.9));
+  color: var(--tome-gilt-bright);
+}
