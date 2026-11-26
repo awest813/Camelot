@@ -68,8 +68,6 @@ const BLOCK_COUNTER_STAGGER_DURATION = 0.35;
 
 // ─── NPC flee constants ────────────────────────────────────────────────────────
 
-/** NPCs in FLEE state move at this multiple of their normal moveSpeed. */
-const FLEE_SPEED_MULTIPLIER = 1.5;
 /**
  * Squared distance (world units²) beyond which a fleeing NPC is considered safe —
  * it transitions to RETURN/IDLE rather than continuing to run.
@@ -189,6 +187,8 @@ import {
   type WeaponProfile,
 } from "./combat-shared";
 import { unseededRandom } from "../core/rng/rng";
+import { NpcSteering } from "./ai/npc-steering";
+import { nextGoal } from "./ai/npc-goals";
 import type { GameEventBus } from "./event-bus";
 
 export {
@@ -323,14 +323,9 @@ export class CombatSystem {
   /** Optional projectile system — enables NPC arrows / magic bolts. */
   private _projectileSystem: ProjectileSystem | null = null;
 
-  // Scratch vectors — reused every frame to avoid GC pressure
-  private _currentVel: Vector3 = new Vector3();
-  private _dir: Vector3 = new Vector3();
-  private _lateralDir: Vector3 = new Vector3();
-  private _newVel: Vector3 = new Vector3();
-  private _desiredVel: Vector3 = new Vector3();
-  private _blendedVel: Vector3 = new Vector3();
-  private _lookAtTarget: Vector3 = new Vector3();
+  /** Moves NPC bodies toward their goals (paths, strafing, fleeing). */
+  private readonly _steer = new NpcSteering(() => this._nav, () => this.random());
+  // Scratch vector, reused every frame to avoid GC pressure
   private _hitPos: Vector3 = new Vector3();
   private _attackReservations: Set<NPC> = new Set();
   private _topAttackScores = new Float64Array(MAX_CONCURRENT_ATTACKERS);
@@ -1395,7 +1390,7 @@ export class CombatSystem {
         npc.isStaggered = false;
         npc.staggerTimer = 0;
       }
-      this._stopMovement(npc);
+      this._steer.stop(npc);
       return;
     }
 
@@ -1422,164 +1417,89 @@ export class CombatSystem {
       }
     }
 
-    switch (npc.aiState) {
+    // Timers of the current goal run before the decision.
+    if (npc.aiState === AIState.ALERT) npc.alertTimer += deltaTime;
+    if (npc.aiState === AIState.INVESTIGATE) npc.investigateTimer += deltaTime;
 
-      // ── IDLE ──────────────────────────────────────────────────────────────
-      case AIState.IDLE:
-        // Auto-promote to PATROL if patrol points have been assigned
-        if (npc.patrolPoints.length > 0) {
-          npc.aiState = AIState.PATROL; // quiet upgrade, no colour/flag change
-        }
-        if (distSq <= aggroRangeSq && this._aggroesOnProximity(npc)) {
-          this._transitionTo(npc, AIState.ALERT);
-        }
-        break;
-
-      // ── PATROL ────────────────────────────────────────────────────────────
-      case AIState.PATROL:
-        // ScheduleSystem owns movement in this state.
-        if (distSq <= aggroRangeSq && this._aggroesOnProximity(npc)) {
-          this._transitionTo(npc, AIState.ALERT);
-        }
-        break;
-
-      // ── ALERT ─────────────────────────────────────────────────────────────
-      case AIState.ALERT:
-        npc.alertTimer += deltaTime;
-        if (distSq > deaggroRangeSq) {
-          // Player escaped while we were still hesitating — investigate last known position.
-          if (npc.lastKnownPlayerPos !== null) {
-            this._transitionTo(npc, AIState.INVESTIGATE);
-          } else {
-            this._transitionTo(npc, npc.patrolPoints.length > 0 ? AIState.PATROL : AIState.IDLE);
-          }
-        } else if (npc.alertTimer >= npc.alertDuration) {
-          this._transitionTo(npc, AIState.CHASE);
-        }
-        break;
-
-      // ── INVESTIGATE ───────────────────────────────────────────────────────
-      case AIState.INVESTIGATE:
-        // Re-aggro if the player returns while we're searching.
-        if (distSq <= aggroRangeSq && this._aggroesOnProximity(npc)) {
-          this._transitionTo(npc, AIState.ALERT);
-          break;
-        }
-        npc.investigateTimer += deltaTime;
-        if (npc.lastKnownPlayerPos !== null) {
-          this._moveRelativeToTarget(npc, npc.lastKnownPlayerPos, npc.moveSpeed * 0.7, deltaTime);
-          const distToLastKnownSq = Vector3.DistanceSquared(npc.mesh.position, npc.lastKnownPlayerPos);
-          const reachedLastKnown  = distToLastKnownSq < 4.0;
-          if (reachedLastKnown || npc.investigateTimer >= npc.investigateDuration) {
-            this._transitionTo(npc, npc.patrolPoints.length > 0 ? AIState.RETURN : AIState.IDLE);
-          }
-        } else if (npc.investigateTimer >= npc.investigateDuration) {
-          this._transitionTo(npc, npc.patrolPoints.length > 0 ? AIState.RETURN : AIState.IDLE);
-        }
-        break;
-
-      // ── CHASE ─────────────────────────────────────────────────────────────
-      case AIState.CHASE:
-        if (distSq > deaggroRangeSq) {
-          this._transitionTo(npc, AIState.RETURN);
-          break;
-        }
-        if (distSq <= engageSq && this._attackReservations.has(npc)) {
-          this._transitionTo(npc, AIState.ATTACK);
-          break;
-        }
-        this._chasePlayer(npc, playerPos, deltaTime);
-        break;
-
-      // ── ATTACK ────────────────────────────────────────────────────────────
-      case AIState.ATTACK:
-        if (distSq > deaggroRangeSq) {
-          this._transitionTo(npc, AIState.RETURN);
-          break;
-        }
-        if (!this._attackReservations.has(npc)) {
-          this._transitionTo(npc, AIState.CHASE);
-          break;
-        }
-        if (distSq > disengageSq) {
-          this._transitionTo(npc, AIState.CHASE);
-          break;
-        }
-
-        this._faceTarget(npc, playerPos);
-
-        if (npc.isAttackTelegraphing) {
-          this._tickAttackTelegraph(npc, distSq, deltaTime);
-          break;
-        }
-
-        // Distance bands and cooldown discipline
-        if (npc.attackTimer > npc.attackWindup) {
-          this._updateAttackReposition(npc, playerPos, distSq, deltaTime);
-        } else {
-        // Ready to attack or winding up: melee closes aggressively, while
-        // ranged/magic holders keep their standoff distance and shoot.
-        // (Undefined archetype means melee — matches the NPC default.)
-        const isRangedHolder = (npc.npcAttackArchetype ?? "melee") !== "melee";
-        const holdRange = isRangedHolder
-          ? npc.attackRange * 0.82
-          : npc.attackRange * 0.5;
-        const strikeRange = npc.attackRange * npc.dodgeWindowRangeMultiplier;
-        if (distSq > holdRange * holdRange) {
-           this._moveRelativeToTarget(npc, playerPos, npc.moveSpeed, deltaTime);
-        } else if (isRangedHolder && distSq < strikeRange * strikeRange) {
-           // Kiting: a crowded shooter backs off to firing range instead of
-           // standing inside its own melee-strike window.
-           this._retreatFromTarget(npc, playerPos, deltaTime);
-        } else {
-           this._stopMovement(npc);
-        }
-        }
-
-        if (npc.attackTimer <= 0) {
-          this._beginAttackTelegraph(npc);
-        }
-        break;
-
-      // ── RETURN ────────────────────────────────────────────────────────────
-      case AIState.RETURN:
-        // Re-aggro if player wanders close again
-        if (distSq <= aggroRangeSq && this._aggroesOnProximity(npc)) {
-          this._transitionTo(npc, AIState.ALERT);
-          break;
-        }
-        this._returnToSpawn(npc, deltaTime);
-        break;
-
-      // ── FLEE ──────────────────────────────────────────────────────────────
-      case AIState.FLEE:
-        // Stop fleeing once out of danger range — transition to calm state.
-        if (distSq >= FLEE_SAFE_DISTANCE_SQ) {
-          this._transitionTo(npc, npc.patrolPoints.length > 0 ? AIState.RETURN : AIState.IDLE);
-          break;
-        }
-        this._fleeFromPlayer(npc, playerPos, deltaTime);
-        break;
+    // Decide: the goal tree picks what the NPC does next (npc-goals.ts).
+    const lastKnown = npc.lastKnownPlayerPos;
+    const fleePct: number = (npc as unknown as { fleesBelowHealthPct?: number }).fleesBelowHealthPct ?? 0;
+    const maxHp: number = (npc as unknown as { maxHealth?: number }).maxHealth ?? 100;
+    const goal = nextGoal({
+      goal: npc.aiState,
+      playerNear: distSq <= aggroRangeSq && this._aggroesOnProximity(npc),
+      playerEscaped: distSq > deaggroRangeSq,
+      inEngageRange: distSq <= engageSq,
+      beyondDisengageRange: distSq > disengageSq,
+      hasAttackSlot: this._attackReservations.has(npc),
+      safeFromPlayer: distSq >= FLEE_SAFE_DISTANCE_SQ,
+      hasLastKnown: lastKnown != null,
+      atLastKnown: lastKnown != null && Vector3.DistanceSquared(npc.mesh.position, lastKnown) < 4.0,
+      atHome: !!npc.spawnPosition && Vector3.DistanceSquared(npc.mesh.position, npc.spawnPosition) < 4.0,
+      hasPatrol: (npc.patrolPoints?.length ?? 0) > 0,
+      alertElapsed: npc.alertTimer >= npc.alertDuration,
+      investigateElapsed: npc.investigateTimer >= npc.investigateDuration,
+      shouldFlee: fleePct > 0 && npc.health / maxHp < fleePct,
+    });
+    if (goal !== null) {
+      if (npc.aiState === AIState.IDLE && goal === AIState.PATROL) {
+        npc.aiState = AIState.PATROL; // quiet upgrade, no colour/flag change
+      } else {
+        this._transitionTo(npc, goal);
+        if (goal === AIState.FLEE) this._ui.showNotification(`${npc.displayName} flees!`, 1500);
+      }
+      return; // the new goal acts from the next tick
     }
 
-    // ── Flee trigger (checked every tick regardless of state) ────────────────
-    // If an NPC with a non-zero flee threshold just dropped below it, start running.
-    // Checked after the state tick so DoT damage is already applied this frame.
-    const fleePct: number = (npc as unknown as { fleesBelowHealthPct?: number }).fleesBelowHealthPct ?? 0;
-    if (
-      fleePct > 0 &&
-      !npc.isDead &&
-      npc.aiState !== AIState.FLEE &&
-      npc.aiState !== AIState.IDLE &&
-      npc.aiState !== AIState.PATROL &&
-      npc.aiState !== AIState.RETURN
-    ) {
-      const maxHp: number = (npc as unknown as { maxHealth?: number }).maxHealth ?? 100;
-      if (npc.health / maxHp < fleePct) {
-        this._transitionTo(npc, AIState.FLEE);
-        this._ui.showNotification(`${npc.displayName} flees!`, 1500);
+    // Act: steer the body toward the goal.  (Idle and patrol: the schedule
+    // system moves them.)
+    switch (npc.aiState) {
+      case AIState.INVESTIGATE:
+        if (lastKnown != null) this._steer.moveToward(npc, lastKnown, npc.moveSpeed * 0.7, deltaTime);
+        break;
+      case AIState.CHASE:
+        this._steer.chase(npc, playerPos, deltaTime);
+        break;
+      case AIState.ATTACK:
+        this._actAttack(npc, playerPos, distSq, deltaTime);
+        break;
+      case AIState.RETURN:
+        this._steer.returnHome(npc, deltaTime);
+        break;
+      case AIState.FLEE:
+        this._steer.flee(npc, playerPos, deltaTime);
+        break;
+    }
+  }
+
+  /** In reach with an attack slot: face the player, keep the right distance, swing or shoot. */
+  private _actAttack(npc: NPC, playerPos: Vector3, distSq: number, deltaTime: number): void {
+    this._steer.face(npc, playerPos);
+    if (npc.isAttackTelegraphing) {
+      this._tickAttackTelegraph(npc, distSq, deltaTime);
+      return;
+    }
+    // Distance bands and cooldown discipline
+    if (npc.attackTimer > npc.attackWindup) {
+      this._steer.strafe(npc, playerPos, distSq, deltaTime);
+    } else {
+      // Ready to attack or winding up: melee closes aggressively, while
+      // ranged/magic holders keep their standoff distance and shoot.
+      // (Undefined archetype means melee — matches the NPC default.)
+      const isRangedHolder = (npc.npcAttackArchetype ?? "melee") !== "melee";
+      const holdRange = isRangedHolder ? npc.attackRange * 0.82 : npc.attackRange * 0.5;
+      const strikeRange = npc.attackRange * npc.dodgeWindowRangeMultiplier;
+      if (distSq > holdRange * holdRange) {
+        this._steer.moveToward(npc, playerPos, npc.moveSpeed, deltaTime);
+      } else if (isRangedHolder && distSq < strikeRange * strikeRange) {
+        // Kiting: a crowded shooter backs off to firing range instead of
+        // standing inside its own melee-strike window.
+        this._steer.retreat(npc, playerPos, deltaTime);
+      } else {
+        this._steer.stop(npc);
       }
     }
+    if (npc.attackTimer <= 0) this._beginAttackTelegraph(npc);
   }
 
   // ─── State transition ──────────────────────────────────────────────────────
@@ -1627,7 +1547,7 @@ export class CombatSystem {
         npc.isAttackTelegraphing = false;
         npc.attackTelegraphTimer = 0;
         npc.setStateColor(COLOR_ALERT);
-        this._stopMovement(npc);
+        this._steer.stop(npc);
         break;
 
       case AIState.INVESTIGATE:
@@ -1660,7 +1580,7 @@ export class CombatSystem {
         npc.attackTelegraphTimer = 0;
         npc.strafeDirection = 0;
         npc.strafeTimer = 0;
-        this._stopMovement(npc);
+        this._steer.stop(npc);
         npc.setStateColor(COLOR_CHASE); // stay red while attacking
         break;
 
@@ -1695,7 +1615,7 @@ export class CombatSystem {
         npc.strafeTimer = 0;
         npc.lastKnownPlayerPos = null;
         npc.setStateColor(COLOR_IDLE);
-        this._stopMovement(npc);
+        this._steer.stop(npc);
         break;
     }
 
@@ -1872,7 +1792,7 @@ export class CombatSystem {
   private _beginAttackTelegraph(npc: NPC): void {
     npc.isAttackTelegraphing = true;
     npc.attackTelegraphTimer = Math.max(0.12, npc.attackWindup);
-    this._stopMovement(npc);
+    this._steer.stop(npc);
     npc.setStateColor(COLOR_TELEGRAPH);
     // Elites occasionally commit to an unblockable heavy blow.
     npc.isAttackUnblockable =
@@ -1892,7 +1812,7 @@ export class CombatSystem {
 
   private _tickAttackTelegraph(npc: NPC, distSq: number, deltaTime: number): void {
     npc.attackTelegraphTimer -= deltaTime;
-    this._stopMovement(npc);
+    this._steer.stop(npc);
     if (npc.attackTelegraphTimer > 0) return;
 
     npc.isAttackTelegraphing = false;
@@ -2065,214 +1985,6 @@ export class CombatSystem {
       owner: npc,
       statusEffect: npc.attackStatusEffect,
     });
-  }
-
-  private _updateAttackReposition(npc: NPC, playerPos: Vector3, distSq: number, deltaTime: number): void {
-    const standoff = npc.attackRange * 0.82;
-    let radialSpeed = 0;
-
-    // Use squared comparisons to avoid Math.sqrt() where possible
-    if (distSq < (standoff - 0.45) * (standoff - 0.45)) {
-      radialSpeed = -npc.moveSpeed * 0.55;
-    } else if (distSq > (standoff + 0.55) * (standoff + 0.55)) {
-      radialSpeed = npc.moveSpeed * 0.45;
-    }
-
-    npc.strafeTimer = Math.max(0, npc.strafeTimer - deltaTime);
-    if (npc.strafeTimer <= 0) {
-      npc.strafeTimer = 0.3 + this.random() * 0.55;
-      const roll = this.random();
-      if (roll < 0.38) {
-        npc.strafeDirection = -1;
-      } else if (roll < 0.76) {
-        npc.strafeDirection = 1;
-      } else {
-        npc.strafeDirection = 0;
-      }
-    }
-
-    playerPos.subtractToRef(npc.mesh.position, this._dir);
-    this._dir.y = 0;
-    if (this._dir.lengthSquared() <= 0.001) {
-      this._stopMovement(npc);
-      return;
-    }
-
-    this._dir.normalize();
-    this._lateralDir.set(-this._dir.z, 0, this._dir.x);
-    this._dir.scaleToRef(radialSpeed, this._desiredVel);
-    this._lateralDir.scaleInPlace(npc.moveSpeed * npc.strafeSpeedMultiplier * npc.strafeDirection);
-    this._desiredVel.addInPlace(this._lateralDir);
-
-    this._setSmoothedHorizontalVelocity(npc, this._desiredVel, deltaTime);
-  }
-
-  // ─── Movement helpers ──────────────────────────────────────────────────────
-
-  /**
-   * Move an NPC toward its next path waypoint using physics velocity.
-   * If the navmesh is ready a computed path is used; otherwise the NPC heads
-   * directly toward the player (straight-line fallback).
-   * The path is refreshed every pathRefreshInterval seconds or when exhausted.
-   */
-  private _chasePlayer(npc: NPC, playerPos: Vector3, deltaTime: number): void {
-    if (!npc.physicsAggregate?.body) return;
-
-    npc.pathRefreshTimer -= deltaTime;
-    const exhausted   = npc.pathIndex >= npc.currentPath.length;
-    const timedOut    = npc.pathRefreshTimer <= 0;
-
-    if (exhausted || timedOut) {
-      npc.pathRefreshTimer = npc.pathRefreshInterval;
-      if (this._nav?.isReady) {
-        npc.currentPath = this._nav.findPath(npc.mesh.position, playerPos);
-      } else {
-        // Fallback: single direct-line waypoint
-        npc.currentPath = [playerPos.clone()];
-      }
-      npc.pathIndex = 0;
-    }
-
-    this._followPath(npc, npc.moveSpeed, deltaTime);
-  }
-
-  /**
-   * Move an NPC back to its spawn position using pathfinding (or direct line).
-   * Transitions to PATROL/IDLE once close enough to the spawn point.
-   */
-  private _returnToSpawn(npc: NPC, deltaTime: number): void {
-    if (!npc.physicsAggregate?.body) return;
-
-    npc.pathRefreshTimer -= deltaTime;
-    const exhausted = npc.pathIndex >= npc.currentPath.length;
-    const timedOut  = npc.pathRefreshTimer <= 0;
-
-    if (exhausted || timedOut) {
-      npc.pathRefreshTimer = npc.pathRefreshInterval;
-      const target = npc.spawnPosition;
-      if (this._nav?.isReady) {
-        npc.currentPath = this._nav.findPath(npc.mesh.position, target);
-      } else {
-        npc.currentPath = [target.clone()];
-      }
-      npc.pathIndex = 0;
-    }
-
-    this._followPath(npc, npc.moveSpeed * 0.8, deltaTime); // slightly slower on the walk home
-
-    // Arrived at home?
-    if (Vector3.DistanceSquared(npc.mesh.position, npc.spawnPosition) < 4.0) {
-      this._transitionTo(npc, npc.patrolPoints.length > 0 ? AIState.PATROL : AIState.IDLE);
-    }
-  }
-
-  /**
-   * Advance the NPC along its currentPath[] using physics velocity.
-   * Waypoints within 0.5 m are skipped to prevent oscillation.
-   */
-  private _followPath(npc: NPC, speed: number, deltaTime: number): void {
-    if (npc.currentPath.length === 0 || npc.pathIndex >= npc.currentPath.length) return;
-
-    const waypoint = npc.currentPath[npc.pathIndex];
-    waypoint.subtractToRef(npc.mesh.position, this._dir);
-    this._dir.y = 0;
-    const distXZ = this._dir.length();
-
-    if (distXZ < 0.5) {
-      // Close enough — advance to next waypoint
-      npc.pathIndex++;
-      return;
-    }
-
-    this._dir.normalize();
-    this._dir.scaleToRef(speed, this._desiredVel);
-    this._setSmoothedHorizontalVelocity(npc, this._desiredVel, deltaTime);
-
-    this._lookAtTarget.set(waypoint.x, npc.mesh.position.y, waypoint.z);
-    npc.mesh.lookAt(this._lookAtTarget);
-  }
-
-  /** Moves an NPC straight towards or away from a target position without pathfinding. */
-  private _moveRelativeToTarget(npc: NPC, targetPos: Vector3, speed: number, deltaTime: number): void {
-    if (!npc.physicsAggregate?.body) return;
-    targetPos.subtractToRef(npc.mesh.position, this._dir);
-    this._dir.y = 0;
-
-    // Avoid normalization of zero vector
-    if (this._dir.lengthSquared() > 0.001) {
-       this._dir.normalize();
-       this._dir.scaleToRef(speed, this._desiredVel);
-       this._setSmoothedHorizontalVelocity(npc, this._desiredVel, deltaTime);
-    } else {
-       this._stopMovement(npc);
-    }
-  }
-
-  private _setSmoothedHorizontalVelocity(npc: NPC, desiredVelocity: Vector3, deltaTime: number): void {
-    if (!npc.physicsAggregate?.body) return;
-    npc.physicsAggregate.body.getLinearVelocityToRef(this._currentVel);
-
-    const blend = Math.min(1, Math.max(0.02, npc.movementResponsiveness) * Math.max(0.001, deltaTime));
-    this._blendedVel.x = this._currentVel.x + (desiredVelocity.x - this._currentVel.x) * blend;
-    this._blendedVel.z = this._currentVel.z + (desiredVelocity.z - this._currentVel.z) * blend;
-    this._blendedVel.y = this._currentVel.y;
-    npc.physicsAggregate.body.setLinearVelocity(this._blendedVel);
-  }
-
-  /**
-   * Move an NPC directly away from the player at FLEE_SPEED_MULTIPLIER × moveSpeed.
-   * The NPC faces away from the player so it "runs" correctly.
-   */
-  private _fleeFromPlayer(npc: NPC, playerPos: Vector3, deltaTime: number): void {
-    if (!npc.physicsAggregate?.body) return;
-
-    playerPos.subtractToRef(npc.mesh.position, this._dir);
-    this._dir.y = 0;
-    if (this._dir.lengthSquared() <= 0.001) {
-      // If exactly on top of the player, flee in a random lateral direction.
-      this._dir.set(1, 0, 0);
-    }
-    // Reverse direction — run away.
-    this._dir.normalize().scaleInPlace(-1);
-    this._dir.scaleToRef(npc.moveSpeed * FLEE_SPEED_MULTIPLIER, this._desiredVel);
-    this._setSmoothedHorizontalVelocity(npc, this._desiredVel, deltaTime);
-
-    // Face away from player.
-    const lookAway = npc.mesh.position.add(this._dir);
-    this._lookAtTarget.set(lookAway.x, npc.mesh.position.y, lookAway.z);
-    npc.mesh.lookAt(this._lookAtTarget);
-  }
-
-  /**
-   * Kiting step: move directly away from the player at reduced speed while
-   * keeping eyes on them (unlike fleeing, which faces away to run).
-   */
-  private _retreatFromTarget(npc: NPC, targetPos: Vector3, deltaTime: number): void {
-    if (!npc.physicsAggregate?.body) return;
-    npc.mesh.position.subtractToRef(targetPos, this._dir);
-    this._dir.y = 0;
-    if (this._dir.lengthSquared() > 0.001) {
-      this._dir.normalize();
-      this._dir.scaleToRef(npc.moveSpeed * 0.55, this._desiredVel);
-      this._setSmoothedHorizontalVelocity(npc, this._desiredVel, deltaTime);
-    } else {
-      this._stopMovement(npc);
-    }
-    this._faceTarget(npc, targetPos);
-  }
-
-  /** Zero the NPC's horizontal velocity while preserving vertical (gravity). */
-  private _stopMovement(npc: NPC): void {
-    if (!npc.physicsAggregate?.body) return;
-    npc.physicsAggregate.body.getLinearVelocityToRef(this._currentVel);
-    this._newVel.set(0, this._currentVel.y, 0);
-    npc.physicsAggregate.body.setLinearVelocity(this._newVel);
-  }
-
-  /** Rotate the NPC's mesh to face a target position (ignoring Y difference). */
-  private _faceTarget(npc: NPC, target: Vector3): void {
-    this._lookAtTarget.set(target.x, npc.mesh.position.y, target.z);
-    npc.mesh.lookAt(this._lookAtTarget);
   }
 
   // ─── Combo helpers ─────────────────────────────────────────────────────────
