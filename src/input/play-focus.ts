@@ -8,7 +8,7 @@
  * The one place that locks and unlocks the pointer (engine overhaul,
  * Phase 2).
  */
-export type FocusHolder = "menu" | "pause" | "editor" | "creation" | "dialogue" | "fallen";
+export type FocusHolder = "menu" | "pause" | "editor" | "creation" | "dialogue" | "fallen" | "title";
 
 export interface PlayFocusDeps {
   lockPointer(): void;

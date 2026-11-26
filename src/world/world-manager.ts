@@ -198,6 +198,11 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
    * `update()` tick) to avoid biome inconsistencies between already-loaded
    * and future chunks.
    */
+  /** The active world seed (null: the legacy unseeded world). */
+  public get seed(): WorldSeed | null {
+    return this._seed;
+  }
+
   public setSeed(seed: WorldSeed | null): void {
     this._seed = seed;
     this.structures.setSeed(seed);

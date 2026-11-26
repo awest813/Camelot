@@ -13,7 +13,7 @@ import { Loot } from "../entities/loot";
 import { VillageRaidFeature } from "../features/village-raids/raid-feature";
 import { actors } from "../entities/actors";
 import { Aggressive, Dead, Engaged } from "../core/ecs/actors";
-import { undeclaredFeatures, ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey, QuestsKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
+import { undeclaredFeatures, ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey, QuestsKey, TitleHostKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
 import { VillagesFeature } from "../features/villages/villages-feature";
 import { WorldSitesFeature } from "../features/world-sites/world-sites-feature";
 import { RoutinesFeature } from "../features/routines/routines-feature";
@@ -27,7 +27,7 @@ import { spawnDragon } from "../world/dragon-lair";
 import { TravelHostKey } from "../features/fast-travel/fast-travel-feature";
 import { DeathFeature, DeathHostKey } from "../features/death/death-feature";
 import { SpoilsFeature, SpoilsHostKey } from "../features/spoils/spoils-feature";
-import { CharacterHostKey } from "../features/character/character-feature";
+import { CharacterHostKey, CharacterKey } from "../features/character/character-feature";
 import { ProgressionHostKey } from "../features/progression/progression-feature";
 import { DialogueServicesFeature, DialogueHostKey } from "../features/dialogue-services/dialogue-services-feature";
 import { SurvivalHostKey } from "../features/survival/survival-feature";
@@ -42,11 +42,13 @@ import { TradeHostKey } from "../features/trade/trade-feature";
 import type { Item } from "../systems/inventory-system";
 import { FollowersFeature } from "../features/followers/followers-feature";
 import { ShoutsFeature, ShoutHostKey } from "../features/shouts/shouts-feature";
-import { SettingsHostKey } from "../features/settings/settings-feature";
+import { SettingsHostKey, SettingsKey } from "../features/settings/settings-feature";
 import { presentCell } from "./cells";
 import { grantDynamicWorldEventReward, grantPickpocketItem, updateDynamicWorldEventsOnHourChange } from "./rewards";
 import { despawnNpc } from "./npcs";
 import { isCombatInputBlocked, suspendGameplayInput, restoreGameplayInput } from "./play-focus";
+import { TitleFeature } from "../features/title/title-feature";
+import { WorldSeedFeature } from "../features/world-seed/world-seed-feature";
 
 /**
  * Provide the services features use and install the features.  Services
@@ -77,14 +79,8 @@ export function installGameFeatures(game: Game): void {
       const k = game.kernel;
       // First, so features can own their part of the save as they install.
       k.services.provide(SavesKey, { register: (codec) => game.saveSystem.registerCodec(codec) });
-      k.services.provide(ClockKey, {
-        hour: () => game.timeSystem.hour,
-        elapsedHours: () => game.timeSystem.elapsedGameHours,
-      });
-      k.services.provide(PlayerKey, {
-        position: () => game.player.camera.position,
-        level: () => game.playerLevelSystem.characterLevel,
-      });
+      k.services.provide(ClockKey, { hour: () => game.timeSystem.hour, elapsedHours: () => game.timeSystem.elapsedGameHours });
+      k.services.provide(PlayerKey, { position: () => game.player.camera.position, level: () => game.playerLevelSystem.characterLevel });
       k.services.provide(FeedbackKey, {
         notify: (text, ms) => game.ui.showNotification(text, ms ?? 3000),
         grant: (reward) => grantDynamicWorldEventReward(game, reward),
@@ -107,7 +103,9 @@ export function installGameFeatures(game: Game): void {
         get chunkSize() { return game.world.chunkSize; },
         biome: (cx, cz) => game.world.getBiome(cx, cz),
         pondAt: (cx, cz) => !!game.world.pondAt(cx, cz),
+        seed: () => game.world.seed, setSeed: (seed) => game.world.setSeed(seed), loadedChunks: () => game.world.loadedChunkCount,
       });
+      k.install(new WorldSeedFeature());
       k.services.provide(TravelHostKey, {
         position: () => game.player.camera.position,
         teleport: (to) => { game.player.camera.position.copyFrom(to); },
@@ -311,6 +309,16 @@ export function installGameFeatures(game: Game): void {
         paused: () => game.isPaused,
       });
       k.install(game._settings);
+      k.services.provide(TitleHostKey, {
+        savedGame: () => game.saveSystem.peekSummary(),
+        hold: (on) => { game._inCharacterCreation = game.isPaused = on; game.ui.toggleCrosshair(!on); if (on) game._focus.take("title"); else game._focus.give("title"); },
+        continueGame: () => game.saveSystem.load(),
+        newGame: () => void k.services.get(CharacterKey).create(),
+        settings: () => k.services.get(SettingsKey).open(), credits: () => k.services.get(SettingsKey).openCredits(),
+        quit: getDesktopBridge() ? () => getDesktopBridge()?.quit() : null,
+        skip: () => /[?&]replay=/.test(location.search),
+      });
+      k.install(new TitleFeature());
       k.services.provide(DialogueHostKey, {
         get trainers() { return game.trainerSystem; },
         skillName: (id) => game.skillProgressionSystem.getSkill(id as never)?.name ?? id,
@@ -389,16 +397,9 @@ export function installGameFeatures(game: Game): void {
         remove: (id, amount) => game.inventorySystem.removeQuantity(id, amount),
       });
       k.services.provide(QuestsKey, { get engine() { return game.frameworkRuntime.questEngine; }, apply: (t, id, n) => game._quests.apply(t, id, n) });
-      k.services.provide(ScheduleKey, {
-        behaviorOf: (npc) => game.scheduleSystem.behaviorOf(npc),
-      });
-      k.services.provide(BuildingsKey, {
-        nearBuilding: (x, z, margin) => game._chunks.nearBuilding(x, z, margin),
-      });
-      k.services.provide(ModalKey, {
-        suspendGameplay: () => suspendGameplayInput(game),
-        restoreGameplay: () => restoreGameplayInput(game),
-      });
+      k.services.provide(ScheduleKey, { behaviorOf: (npc) => game.scheduleSystem.behaviorOf(npc) });
+      k.services.provide(BuildingsKey, { nearBuilding: (x, z, margin) => game._chunks.nearBuilding(x, z, margin) });
+      k.services.provide(ModalKey, { suspendGameplay: () => suspendGameplayInput(game), restoreGameplay: () => restoreGameplayInput(game) });
 
       k.services.provide(WorldStateKey, {
         weather: () => game.weatherSystem.state,
@@ -468,10 +469,7 @@ export function installGameFeatures(game: Game): void {
         now: () => game.timeSystem.elapsedGameTime,
       });
       k.install(new ArrestFeature());
-      k.services.provide(PurseKey, {
-        gold: () => game._pack.gold(),
-        spend: (amount) => game._pack.spendGold(amount),
-      });
+      k.services.provide(PurseKey, { gold: () => game._pack.gold(), spend: (amount) => game._pack.spendGold(amount) });
       const pets = new PetsFeature(game.scene);
       k.install(pets);
       k.services.provide(ShoutHostKey, {

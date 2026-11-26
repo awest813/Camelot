@@ -764,6 +764,19 @@ export class SaveSystem {
     return true;
   }
 
+  /** The stored save in brief (for a "Continue" line); null when there is none or it can't be read. */
+  public peekSummary(): { name: string; level: number; savedAt: number } | null {
+    try {
+      const raw = this._storage().getItem(SAVE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw) as { timestamp?: number; player?: { name?: string; level?: number } };
+      if (!data.player) return null;
+      return { name: data.player.name?.trim() || "Hero", level: data.player.level ?? 1, savedAt: data.timestamp ?? 0 };
+    } catch {
+      return null;
+    }
+  }
+
   public hasSave(): boolean {
     return this._storage().getItem(SAVE_KEY) !== null;
   }

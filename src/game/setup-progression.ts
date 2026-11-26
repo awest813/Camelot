@@ -11,7 +11,6 @@ import { AIState } from "../entities/npc";
 import { registerStarterMerchants } from "../content/starter-merchants";
 import { seedStartingArea } from "../content/starting-area";
 import { SCHED_GUARD } from "../systems/npc-schedule-system";
-import { CharacterKey } from "../features/character/character-feature";
 import { LeveledListSystem, ALL_BUILT_IN_LEVELED_LISTS } from "../systems/leveled-list-system";
 import { UIAnimator } from "../ui/ui-animator";
 import { MarkRecallSystem } from "../systems/mark-recall-system";
@@ -19,6 +18,7 @@ import { TrainerSystem } from "../systems/trainer-system";
 import { ActiveEffectHUD } from "../ui/active-effect-hud";
 import { QuickSlotHUD } from "../ui/quickslot-hud";
 import { PerkSystem } from "../systems/perk-system";
+import { TitleKey } from "../features/title/title-feature";
 
 export function setupProgressionAndStart(g: Game): void {
   // ── v24: Mark & Recall ────────────────────────────────────────────────
@@ -98,7 +98,8 @@ export function setupProgressionAndStart(g: Game): void {
   g.spellMakingUI.setAnimator(uiAnimator);
   g.guardEncounterUI.setAnimator(uiAnimator);
 
-  void g.kernel.services.get(CharacterKey).create();
+  // The title screen first (it starts a new game, or loads the save).
+  g.kernel.services.get(TitleKey).show();
 
   g.eventBus.on("ui:attributeSpend", ({ name }) => {
     const spent = g.attributeSystem.spendPoint(name);

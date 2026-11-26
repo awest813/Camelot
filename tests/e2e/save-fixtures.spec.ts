@@ -13,6 +13,7 @@
 import { test, expect, Page } from "@playwright/test";
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { passTitle } from "./helpers/title";
 
 const DIR = fileURLToPath(new URL("../fixtures/saves/", import.meta.url));
 
@@ -25,6 +26,7 @@ interface Fixture {
 }
 
 async function createCharacter(page: Page, seed: string) {
+  await passTitle(page);
   const root = page.locator(".character-create");
   await expect(root).toBeVisible({ timeout: 90_000 });
   const next = root.locator(".character-create__actions button", { hasText: /Continue|Begin/i });

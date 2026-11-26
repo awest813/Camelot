@@ -1542,3 +1542,22 @@ Left as decisions:
 - **Feature-level callback properties** (above) and the `as any` casts in
   `save-system.ts` (codec restores) and `world-manager.ts` (Babylon
   `freeze` / culling APIs) are typing work for later.
+
+## Title screen and world in the save (2026-11-26)
+
+- The game opens on a title screen in the tome style
+  (`features/title/title-feature.ts`, `ui/title-screen.tsx`): Continue
+  (when there is a save, with the hero's name, level and when it was
+  saved), New Game, Settings, Credits, and Quit on the desktop. Play is
+  paused and input held behind it; arrow keys and Enter work. Replays skip
+  it. "Quit to Menu" on the pause menu reloads into it.
+- **Saves now keep the world.** A save used to hold neither the world seed
+  nor the random streams, so loading rebuilt the world from the session's
+  seed. The `world` save part (`features/world-seed/world-seed-feature.ts`)
+  keeps both. Continue loads before any chunk exists, so the saved world
+  comes back exactly. A mid-game load (F9) into another world can't
+  rebuild the chunks already standing; it applies the seed to what streams
+  in next and says to Continue from the title.
+- e2e: `title-screen.spec.ts` covers a fresh start, New Game, then a reload
+  and Continue back to the same seed, name and position. The other specs
+  pass the title with `helpers/title.ts`.

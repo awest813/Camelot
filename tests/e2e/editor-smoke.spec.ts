@@ -5,8 +5,10 @@
  * (editor.html, engine overhaul Phase 9); the game page has none.
  */
 import { test, expect, Page } from "@playwright/test";
+import { passTitle } from "./helpers/title";
 
 async function completeCharacterCreation(page: Page) {
+  await passTitle(page);
   const root = page.locator(".character-create");
   await expect(root).toBeVisible({ timeout: 90_000 });
   const next = root.locator(".character-create__actions button", { hasText: /Continue|Begin/i });

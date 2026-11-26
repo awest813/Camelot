@@ -37,7 +37,7 @@ function setup() {
   const live = new Set<string>();
   const opened: unknown[] = [];
 
-  k.services.provide(WorldInfoKey, { chunkSize: 50, biome: () => "plains", pondAt: () => false });
+  k.services.provide(WorldInfoKey, { chunkSize: 50, biome: () => "plains", pondAt: () => false, seed: () => null, setSeed: () => {}, loadedChunks: () => 0 });
   k.services.provide(PlayerKey, { position: () => pos, level: () => 3 });
   k.services.provide(FeedbackKey, { notify: vi.fn(), grant: vi.fn(), addFame: vi.fn(), markDirty: vi.fn() });
   k.services.provide(FastTravelKey, {

@@ -18,6 +18,7 @@
  */
 
 import { test, expect, Page, ConsoleMessage } from "@playwright/test";
+import { passTitle } from "./helpers/title";
 
 /** Errors that are benign in a headless browser and filtered from assertions. */
 function isBenignConsoleError(msg: ConsoleMessage): boolean {
@@ -39,6 +40,7 @@ function isBenignPageError(err: Error): boolean {
 /** Drive the character-creation wizard: Welcome → World → Name → Race → Birthsign → Class. */
 async function completeCharacterCreation(page: Page) {
   // Fail fast if engine init aborts before the wizard mounts (e.g. Game.init throw).
+  await passTitle(page);
   const root = page.locator(".character-create");
   const fatal = page.locator(".app-fatal-error");
   await expect(root.or(fatal)).toBeVisible({ timeout: 90_000 });

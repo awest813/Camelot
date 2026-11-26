@@ -1612,3 +1612,182 @@
   color: var(--tome-ink-soft);
   font-style: italic;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The title screen: the book's cover.  Candle-lit darkness, the name in
+   gilt, a line of verse, and the menu as engraved lines.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.title-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 8500; /* under the settings dialog and the credits */
+  display: grid;
+  grid-template-rows: 1fr auto;
+  place-items: center;
+  padding: clamp(16px, 4vh, 48px) 16px;
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 42%, rgba(255, 176, 80, 0.16), transparent 70%),
+    radial-gradient(ellipse at 50% 120%, rgba(125, 33, 23, 0.35), transparent 55%),
+    radial-gradient(ellipse at center, rgba(14, 8, 4, 0.78), rgba(3, 2, 1, 0.97) 78%),
+    var(--tome-grain);
+  backdrop-filter: blur(6px) saturate(0.7);
+  color: var(--tome-leather-text);
+  font-family: var(--tome-font-book);
+  animation: title-screen-in 900ms ease-out both;
+}
+@keyframes title-screen-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.title-screen__plate {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(640px, 100%);
+  padding: 44px 40px 34px;
+  text-align: center;
+}
+/* A thin gilt frame with lozenge corners around the plate. */
+.title-screen__plate::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(201, 154, 62, 0.45);
+  box-shadow: inset 0 0 0 5px rgba(0, 0, 0, 0.2), inset 0 0 0 6px rgba(201, 154, 62, 0.22);
+  pointer-events: none;
+}
+/* A gilt lozenge set into the head of the frame. */
+.title-screen__plate::after {
+  content: "◆";
+  position: absolute;
+  left: 50%;
+  top: -9px;
+  translate: -50% 0;
+  padding: 0 10px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--tome-gilt-bright);
+  background: radial-gradient(ellipse, rgba(10, 6, 3, 0.95) 40%, transparent 72%);
+  pointer-events: none;
+}
+
+.title-screen__kicker {
+  margin: 0 0 10px;
+  font-family: var(--tome-font-display);
+  font-size: 13px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--tome-gilt);
+}
+.title-screen__name {
+  margin: 0;
+  font-family: var(--tome-font-display);
+  font-weight: 700;
+  font-size: clamp(48px, 9vw, 92px);
+  line-height: 1;
+  letter-spacing: 0.1em;
+  padding-left: 0.1em; /* balance the tracking */
+  background: linear-gradient(180deg, #fff4d2 0%, var(--tome-gilt-bright) 38%, var(--tome-gilt) 70%, #7c5217 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.7)) drop-shadow(0 0 28px rgba(241, 208, 138, 0.22));
+}
+.title-screen__rule {
+  width: min(380px, 80%);
+  margin: 16px 0 14px;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--tome-gilt);
+  background: linear-gradient(90deg, transparent, var(--tome-gilt) 25%, transparent 46%, transparent 54%, var(--tome-gilt) 75%, transparent) center / 100% 1px no-repeat;
+}
+.title-screen__verse {
+  margin: 0 0 28px;
+  font-style: italic;
+  font-size: 19px;
+  line-height: 1.45;
+  color: var(--tome-leather-dim);
+}
+
+.title-screen__menu {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  width: min(360px, 100%);
+}
+.title-screen__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 16px;
+  border: 0;
+  background: none;
+  color: var(--tome-leather-text);
+  font-family: var(--tome-font-book);
+  cursor: pointer;
+  transition: color var(--transition-fast, 100ms) ease;
+}
+.title-screen__label {
+  font-family: var(--tome-font-display);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+.title-screen__item.is-quiet .title-screen__label {
+  font-size: 15px;
+  letter-spacing: 0.24em;
+  color: var(--tome-leather-dim);
+}
+.title-screen__detail {
+  font-style: italic;
+  font-size: 15px;
+  color: var(--tome-leather-dim);
+}
+.title-screen__item::before,
+.title-screen__item::after {
+  content: "◆";
+  position: absolute;
+  top: 50%;
+  translate: 0 -50%;
+  font-size: 10px;
+  color: var(--tome-gilt-bright);
+  opacity: 0;
+  transition: opacity var(--transition-fast, 100ms) ease;
+}
+.title-screen__item::before { left: 4%; }
+.title-screen__item::after { right: 4%; }
+.title-screen__item:hover,
+.title-screen__item:focus-visible {
+  outline: none;
+  background: linear-gradient(90deg, transparent, rgba(125, 33, 23, 0.55), transparent);
+}
+.title-screen__item:hover .title-screen__label,
+.title-screen__item:focus-visible .title-screen__label {
+  color: var(--tome-gilt-bright);
+}
+.title-screen__item:hover::before,
+.title-screen__item:hover::after,
+.title-screen__item:focus-visible::before,
+.title-screen__item:focus-visible::after {
+  opacity: 1;
+}
+.title-screen__foot {
+  margin: 0;
+  font-style: italic;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: rgba(180, 159, 120, 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-screen { animation: none; }
+}
+:root.reduce-motion .title-screen { animation: none; }

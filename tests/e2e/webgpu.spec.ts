@@ -14,6 +14,7 @@
  * Run: WEBGPU_E2E=1 npm run test:e2e -- webgpu
  */
 import { test, expect, Page } from "@playwright/test";
+import { passTitle } from "./helpers/title";
 
 test.skip(!process.env.WEBGPU_E2E, "set WEBGPU_E2E=1 (needs a working WebGPU adapter)");
 
@@ -25,6 +26,7 @@ test.use({
 });
 
 async function completeCharacterCreation(page: Page) {
+  await passTitle(page);
   const root = page.locator(".character-create");
   await expect(root).toBeVisible({ timeout: 120_000 });
   const continueBtn = root.locator(".character-create__actions button", { hasText: /Continue|Begin/i });

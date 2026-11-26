@@ -16,6 +16,7 @@
 import { test, expect, Page } from "@playwright/test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { passTitle } from "./helpers/title";
 
 const BUDGET_FILE = fileURLToPath(new URL("./perf-budgets.json", import.meta.url));
 const SEED = "camelot-perf-1";
@@ -36,6 +37,7 @@ type Metrics = {
 };
 
 async function createCharacterWithSeed(page: Page, seed: string) {
+  await passTitle(page);
   const root = page.locator(".character-create");
   await expect(root).toBeVisible({ timeout: 90_000 });
   const next = root.locator(".character-create__actions button", { hasText: /Continue|Begin/i });

@@ -12,7 +12,7 @@ function setup(opts: { pond?: boolean; village?: boolean; biome?: BiomeType } = 
   const placed: Placed[] = [];
   const spawned: string[] = [];
   const biome = opts.biome ?? "plains";
-  k.services.provide(WorldInfoKey, { chunkSize: 50, biome: () => biome, pondAt: () => !!opts.pond });
+  k.services.provide(WorldInfoKey, { chunkSize: 50, biome: () => biome, pondAt: () => !!opts.pond, seed: () => null, setSeed: () => {}, loadedChunks: () => 0 });
   k.services.provide(VillagesKey, {
     populate: () => !!opts.village,
     planFor: () => null, clearingAt: () => null, loaded: () => new Map(), loadedVillage: () => null,

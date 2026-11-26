@@ -22,6 +22,7 @@ import type { IndoorsService } from "./indoors/indoors-feature";
 import type { JobsService } from "./village-jobs/jobs-feature";
 import type { RoutinesService } from "./routines/routines-feature";
 import type { TravelService } from "./fast-travel/fast-travel-feature";
+import type { WorldSeed } from "../world/world-seed";
 
 export interface GameClockService {
   /** Hour of day, 0–23 (fractional). */
@@ -85,6 +86,11 @@ export interface WorldInfoService {
   readonly chunkSize: number;
   biome(cx: number, cz: number): BiomeType;
   pondAt(cx: number, cz: number): boolean;
+  /** The world seed (null: the legacy unseeded world) and how many chunks are loaded. */
+  seed(): WorldSeed | null;
+  /** Change the seed (only safe while no chunks are loaded). */
+  setSeed(seed: WorldSeed | null): void;
+  loadedChunks(): number;
 }
 
 /** Fast-travel destinations. */
@@ -298,3 +304,22 @@ export const IndoorsKey = createServiceKey<IndoorsService>("indoors");
 export const JobsKey = createServiceKey<JobsService>("jobs");
 export const RoutinesKey = createServiceKey<RoutinesService>("routines");
 export const TravelKey = createServiceKey<TravelService>("travel");
+
+/** What the title screen needs from the game. */
+export interface TitleHostService {
+  /** The save "Continue" would load, in brief; null when there is none. */
+  savedGame(): { name: string; level: number; savedAt: number } | null;
+  /** Pause play and take input while the title is up (false gives them back). */
+  hold(on: boolean): void;
+  /** Load the save and play; false when it could not be loaded. */
+  continueGame(): boolean;
+  /** Start a new game (the character creator). */
+  newGame(): void;
+  settings(): void;
+  credits(): void;
+  /** Leave the game (desktop builds); null in the browser. */
+  quit: (() => void) | null;
+  /** Skip the title (replays start straight at the character creator). */
+  skip(): boolean;
+}
+export const TitleHostKey = createServiceKey<TitleHostService>("title-host");
