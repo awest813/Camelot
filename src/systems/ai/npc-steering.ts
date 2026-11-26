@@ -23,6 +23,16 @@ export class NpcSteering {
 
   constructor(private readonly _nav: () => NavigationSystem | null, private readonly _random: () => number) {}
 
+  /**
+   * A navmesh path to `target`, or a straight line when there is no navmesh
+   * yet or it has no path (a point off the mesh, an island): standing still
+   * would leave the NPC frozen mid-chase.
+   */
+  private _pathTo(npc: NPC, target: Vector3): Vector3[] {
+    const path = this._nav()?.isReady ? this._nav()!.findPath(npc.mesh.position, target) : [];
+    return path.length > 0 ? path : [target.clone()];
+  }
+
   /** Attack footwork: hold the standoff distance and side-step at random. */
   public strafe(npc: NPC, playerPos: Vector3, distSq: number, deltaTime: number): void {
     const standoff = npc.attackRange * 0.82;
@@ -79,12 +89,7 @@ export class NpcSteering {
 
     if (exhausted || timedOut) {
       npc.pathRefreshTimer = npc.pathRefreshInterval;
-      if (this._nav()?.isReady) {
-        npc.currentPath = this._nav()!.findPath(npc.mesh.position, playerPos);
-      } else {
-        // Fallback: single direct-line waypoint
-        npc.currentPath = [playerPos.clone()];
-      }
+      npc.currentPath = this._pathTo(npc, playerPos);
       npc.pathIndex = 0;
     }
 
@@ -102,11 +107,7 @@ export class NpcSteering {
     if (exhausted || timedOut) {
       npc.pathRefreshTimer = npc.pathRefreshInterval;
       const target = npc.spawnPosition;
-      if (this._nav()?.isReady) {
-        npc.currentPath = this._nav()!.findPath(npc.mesh.position, target);
-      } else {
-        npc.currentPath = [target.clone()];
-      }
+      npc.currentPath = this._pathTo(npc, target);
       npc.pathIndex = 0;
     }
 

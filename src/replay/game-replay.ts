@@ -15,7 +15,11 @@
  *    frame boundary, the same way the replay dispatches it;
  *  - panel animations are off (they end on the wall clock).
  * With all random rolls drawn from the seeded kernel streams, the same log
- * gives the same game.  `digest()` reads the state the check compares.
+ * gives the same game.
+ *
+ * Besides input, a log can hold commands: scripted steps such as spawning
+ * an enemy in front of the player (`command("spawn", …)`), run at a frame
+ * boundary like input, so a bug report or a test can set a scene up.  `digest()` reads the state the check compares.
  *
  * The page's handle is `window.__camelotReplay`.
  */
@@ -27,6 +31,34 @@ import { CharacterCreationUI, type CharacterCreationResult } from "../ui/charact
 import { WorldSeed, type WorldGenOptions } from "../world/world-seed";
 import { applyPrefs, loadPrefs } from "../ui/accessibility";
 import type { Game } from "../game";
+import { ActorsKey } from "../features/services";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+
+/** Scripted steps a log can hold (see `GameReplay.command`). */
+export const REPLAY_COMMANDS: Record<string, (g: Game, args: Record<string, unknown>) => void> = {
+  /** `{ archetype, ahead }`: spawn an NPC `ahead` metres in front of the player, facing them. */
+  spawn: (g, args) => {
+    const cam = g.player.camera;
+    const fwd = cam.getForwardRay(1).direction;
+    const len = Math.hypot(fwd.x, fwd.z) || 1;
+    const ahead = Number(args.ahead ?? 6);
+    const x = cam.position.x + (fwd.x / len) * ahead, z = cam.position.z + (fwd.z / len) * ahead;
+    const size = g.world.chunkSize;
+    const chunk = `${Math.floor(x / size)},${Math.floor(z / size)}`;
+    const npc = g.kernel.services.get(ActorsKey).spawnArchetype(chunk, String(args.archetype), x, z);
+    if (!npc) console.warn(`[replay] could not spawn ${String(args.archetype)} in chunk ${chunk}`);
+  },
+  /** `{ height }`: turn the camera to the nearest living hostile (`height` m above its feet; mouse look, scripted). */
+  aim: (g, args) => {
+    const cam = g.player.camera;
+    const target = g.kernel.services.get(ActorsKey).hostiles()
+      .map((n) => ({ n, d: Vector3.DistanceSquared(n.mesh.position, cam.position) }))
+      .sort((a, b) => a.d - b.d)[0]?.n;
+    if (!target) return;
+    const feet = target.mesh.getBoundingInfo().boundingBox.minimumWorld.y;
+    cam.setTarget(new Vector3(target.mesh.position.x, feet + Number(args.height ?? 1.2), target.mesh.position.z));
+  },
+};
 
 export type ReplayMode = "record" | "play";
 
@@ -43,7 +75,8 @@ export interface ReplayChoice extends Omit<CharacterCreationResult, "worldSeed">
 export type ReplayInput =
   | { f: number; target: string; type: string; init: Record<string, unknown> }
   | { f: number; target: string; type: "input" | "change"; value: string; checked?: boolean }
-  | { f: number; lock: boolean };
+  | { f: number; lock: boolean }
+  | { f: number; cmd: string; args: Record<string, unknown> };
 
 export interface GameReplayLog {
   version: 1;
@@ -189,6 +222,7 @@ export class GameReplay {
   private _choice: CharacterCreationResult | null = null;
   private _inputs: ReplayInput[] = [];
   private _queue: Array<() => void> = [];
+  private _checkpoints: Array<() => void> = [];
   private _running = false;
   private _stopped = false;
   private _intercepting = false;
@@ -219,6 +253,28 @@ export class GameReplay {
     if (this._log) return this._log;
     if (!this._choice) throw new Error("replay: the character isn't made yet");
     return { version: 1, kind: "camelot-game", stepMs: STEP_MS, choice: serializeChoice(this._choice), frames: this.frame, inputs: this._inputs.slice() };
+  }
+
+  /**
+   * Record mode: run a scripted step (see REPLAY_COMMANDS) at the next frame
+   * boundary, and log it so the playback runs it on the same frame.
+   */
+  public command(cmd: string, args: Record<string, unknown> = {}): void {
+    if (this.mode !== "record") throw new Error("replay: commands are recorded, not played");
+    if (!REPLAY_COMMANDS[cmd]) throw new Error(`replay: unknown command ${cmd}`);
+    const op = { cmd, args: JSON.parse(JSON.stringify(args)) as Record<string, unknown> };
+    this._queue.push(() => {
+      this._inputs.push({ f: this.frame, ...op });
+      this._dispatch({ f: this.frame, ...op });
+    });
+  }
+
+  /**
+   * The state at the next frame boundary, before that frame's input: what a
+   * playback of the first `frame` frames of the log ends in.
+   */
+  public checkpoint(): Promise<{ frame: number; digest: Record<string, unknown> }> {
+    return new Promise((resolve) => this._checkpoints.push(() => resolve({ frame: this.frame, digest: this.digest() })));
   }
 
   /** Stop stepping (and recording); returns the log. */
@@ -267,6 +323,9 @@ export class GameReplay {
   }
 
   private async _step(): Promise<void> {
+    const checkpoints = this._checkpoints;
+    this._checkpoints = [];
+    for (const take of checkpoints) take();
     if (this.mode === "play") {
       for (const op of this._log!.inputs) if (op.f === this.frame) this._dispatch(op);
     } else {
@@ -282,6 +341,7 @@ export class GameReplay {
 
   private _dispatch(op: ReplayInput): void {
     if ("lock" in op) { this._engine.isPointerLock = op.lock; return; }
+    if ("cmd" in op) { if (this.game) REPLAY_COMMANDS[op.cmd]?.(this.game, op.args); return; }
     const target = resolveTarget(op.target, this._canvas);
     if (!target) { console.warn(`[replay] frame ${op.f}: no element at ${op.target}`); return; }
     if ("value" in op) {

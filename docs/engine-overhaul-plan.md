@@ -869,13 +869,32 @@ one replay runs in CI.
   piece takes wear. Each now has a kernel stream ("world-events",
   "travel-events", "disease", "armor-wear"). The ratchet now counts any
   `Math.random` reference, and it stays at 0.
-- The e2e test records about 270 frames of real Playwright input: walking,
-  strafing, sprinting, jumping, three swings, a mouse move, and the
-  inventory opened and closed. It plays the log on a fresh page and
-  requires the same digest: player position, rotation and stats, gold,
-  the clock, the bag, quest states, every NPC's position, health and AI
-  state, and the RNG streams. A log with the strafe removed must end
-  elsewhere.
+- A log can also hold commands: scripted steps run at a frame boundary
+  like input, for setting a scene up in a test or a bug report. `spawn`
+  puts an NPC (an archetype) a few metres in front of the player. `aim`
+  turns the camera to the nearest hostile; it stands in for mouse look,
+  which needs pointer lock, and headless Chromium has none.
+  `checkpoint()` gives the state at the next frame boundary, which is what
+  a playback of the log's first frames ends in.
+- The e2e test records about 600 frames of real Playwright input:
+  - walking, strafing, sprinting and jumping;
+  - three swings, a mouse move, and the inventory opened and closed;
+  - a fight. A bandit is spawned in front of the player, spots them,
+    chases, attacks, takes a dozen aimed swings and flees badly hurt. Its
+    AI goals, its steering, the hits and the combat rolls all have to
+    come out the same.
+
+  It plays the log on a fresh page and requires the same digest: player
+  position, rotation and stats, gold, the clock, the bag, quest states,
+  every NPC's position, health and AI state, and the RNG streams. It also
+  checks that the bandit lost over 40% of its health. A log with the
+  strafe removed, played to the checkpoint just after it, must differ.
+  The test takes about 6 minutes, mostly software rendering.
+- The fight found a bug: an NPC chasing the player froze when the navmesh
+  had no path to them (for example, a point off the mesh). The chase only
+  fell back to a straight line while the navmesh was loading. Chasing and
+  walking home now head straight for the target whenever there is no
+  path.
 - To stay under the 900 KB entry budget, the settings dialog now loads on
   first use (a `LazyPanel`).
 
