@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { QuestGraphEngine } from "./quest-graph-engine";
-import { deliverEvent, radiantDefinition, reportEvent, type RadiantTemplate } from "./radiant";
+import { defendEvent, deliverEvent, radiantDefinition, reportEvent, type RadiantTemplate } from "./radiant";
 
 const BANDITS: RadiantTemplate = {
   id: "bounty_bandits", kind: "kill", name: "Bandit Trouble ({place})",
@@ -70,5 +70,26 @@ describe("radiant quests", () => {
     expect(loaded.getQuestDefinition("job_inn_1")!.name).toBe("Bandit Trouble (Ashford)");
     expect(loaded.getQuestState("job_inn_1")!.nodes.hunt.progress).toBe(2);
     expect(loaded.getRadiantInstance("job_inn_1")).toEqual({ templateId: "bounty_bandits", vars: { place: "Ashford" } });
+  });
+
+  it("defend quests: the count and rewards come from the instance (a raid's size)", () => {
+    const RAID: RadiantTemplate = {
+      id: "raid", kind: "defend", name: "Raid on {place}", description: "", objective: "Drive off the raiders ({required})",
+      targetId: "", required: 2, rewardGold: 35, xpReward: 25, fameReward: 10, perCount: true,
+    };
+    const def = radiantDefinition(RAID, "raid_1", { place: "Ashford", required: "4" });
+    expect(def.nodes[0]).toMatchObject({ description: "Drive off the raiders (4)", requiredCount: 4, targetId: defendEvent("raid_1") });
+    expect([def.rewardGold, def.xpReward]).toEqual([140, 100]);
+    expect(radiantDefinition(RAID, "raid_2", {}).nodes[0].requiredCount, "the template's count otherwise").toBe(2);
+
+    const e = new QuestGraphEngine();
+    e.registerRadiantTemplate(RAID);
+    e.startRadiant("raid", "raid_1", { place: "Ashford", required: "2" });
+    e.applyEvent({ type: "custom", targetId: defendEvent("raid_1") });
+    const copy = new QuestGraphEngine();
+    copy.registerRadiantTemplate(RAID);
+    copy.restoreSnapshot(e.getSnapshot());
+    expect(copy.getQuestState("raid_1")!.nodes.defend.progress, "the size survives a save").toBe(1);
+    expect(copy.applyEvent({ type: "custom", targetId: defendEvent("raid_1") })[0].questCompleted).toBe(true);
   });
 });

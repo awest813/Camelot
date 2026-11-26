@@ -6,6 +6,7 @@ import { VillageRaidFeature, RaidsKey } from "../features/village-raids/raid-fea
 import { IndoorsKey } from "../features/indoors/indoors-feature";
 import { planVillage, hasVillage } from "../world/village-settlement";
 import type { NPC } from "../entities/npc";
+import { provideQuests } from "../testing/quests";
 
 function firstPlan() {
   for (let r = 3; r < 40; r++) for (let cx = -r; cx <= r; cx++) for (const cz of [-r, r]) {
@@ -28,11 +29,11 @@ function build(seed: string) {
     } as unknown as NPC;
   };
   const townsfolk = [npc("Villager"), npc("Town Guard")];
-  const log = { notes: [] as string[], grants: [] as number[], despawned: [] as string[], spawned: [] as string[] };
+  const log = { notes: [] as string[], despawned: [] as string[], spawned: [] as string[] };
   k.services.provide(ClockKey, { hour: () => 12, elapsedHours: () => 0 });
   k.services.provide(PlayerKey, { position: () => ({ x: plan.center.x, z: plan.center.z }), level: () => 6 });
   k.services.provide(FeedbackKey, {
-    notify: (t) => { log.notes.push(t); }, grant: (r) => { log.grants.push(r.gold ?? 0); }, addFame: () => {}, markDirty: () => {},
+    notify: (t) => { log.notes.push(t); }, grant: () => {}, addFame: () => {}, markDirty: () => {},
   });
   k.services.provide(VillagesKey, {
     currentVillage: () => ({ chunkKey, plan }), loadedVillage: (id) => (id === plan.id ? plan : null),
@@ -49,11 +50,12 @@ function build(seed: string) {
     isTalkingTo: () => false,
   });
   k.services.provide(IndoorsKey, { send: () => {}, isIndoors: () => false, hold: () => {}, releaseHolds: () => {} });
+  const { paid } = provideQuests(k);
   k.install(new VillageRaidFeature());
-  return Object.assign(k, { log });
+  return Object.assign(k, { log, paid });
 }
 type Built = ReturnType<typeof build>;
-const observe = (k: Built) => ({ ...k.log, raids: k.services.get(RaidsKey).rules.getSaveState() });
+const observe = (k: Built) => ({ ...k.log, paid: k.paid.map((p) => p.gold), raids: k.services.get(RaidsKey).rules.getSaveState() });
 
 /** Play a session: hourly rolls; whenever raiders show up, the player cuts them all down. */
 function record(seed: string): { log: ReplayLog; end: unknown; raids: number } {

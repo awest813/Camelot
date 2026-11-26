@@ -5,8 +5,12 @@
  * world: hourly rolls while the player is in a village, raiders marching up
  * the entrance road, townsfolk sheltering, win and abandon outcomes.
  *
+ * Each raid is a framework radiant quest ("Raid on <village>", one step per
+ * raider): the quest log shows it, the engine counts the raiders down and
+ * the quest bridge pays when the last one falls. Leaving fails it.
+ *
  * Inputs:   events `time:hour`, `player:kill`, `save:loaded`, `npc:released`;
- *           services clock, player, feedback, village-world.
+ *           services clock, player, feedback, quests, village-world.
  * Outputs:  the `raids` service (state for saves, sheltering queries, start).
  *
  * First feature extracted from game.ts (engine overhaul, Phase 1).
@@ -18,10 +22,19 @@ import { createServiceKey } from "../../core/kernel";
 import { VillageRaidSystem, raiderCount } from "../../systems/village-raids";
 import type { VillagePlan } from "../../world/village-settlement";
 import { IndoorsKey, type IndoorsService } from "../indoors/indoors-feature";
+import { defendEvent, type RadiantTemplate } from "../../framework/quests/radiant";
 
 /** Hold name used to keep sheltering townsfolk inside. */
 const SHELTER_HOLD = "raid";
-import { ActorsKey, ClockKey, FeedbackKey, PlayerKey, VillagesKey, type ActorsService, type FeedbackService, type GameClockService, type PlayerService, type VillagesService, ownSave, ownTransient } from "../services";
+import { ActorsKey, ClockKey, FeedbackKey, PlayerKey, QuestsKey, VillagesKey, type ActorsService, type FeedbackService, type GameClockService, type PlayerService, type QuestsService, type VillagesService, ownSave, ownTransient } from "../services";
+
+/** The raid quest: beat every raider; gold and XP per raider. */
+export const RAID_TEMPLATE: RadiantTemplate = {
+  id: "village_raid", kind: "defend", name: "Raid on {place}",
+  description: "Bandits are raiding {place}. Drive them off before they take the village.",
+  objective: "Drive off the raiders ({required})", targetId: "", required: 2,
+  rewardGold: 35, xpReward: 25, fameReward: 10, perCount: true,
+};
 
 /** Service accessors, resolved at call time (the game provides them). */
 interface RaidDeps {
@@ -31,6 +44,7 @@ interface RaidDeps {
   readonly player: PlayerService;
   readonly clock: GameClockService;
   readonly feedback: FeedbackService;
+  readonly quests: QuestsService;
 }
 
 /** The player counts as having left a raided village past this distance (m). */
@@ -65,7 +79,9 @@ export class VillageRaidFeature implements Feature {
       get player() { return s.get(PlayerKey); },
       get clock() { return s.get(ClockKey); },
       get feedback() { return s.get(FeedbackKey); },
+      get quests() { return s.get(QuestsKey); },
     };
+    deps.quests.engine.registerRadiantTemplate(RAID_TEMPLATE);
     this._deps = deps;
     const rng = ctx.kernel.rng.stream("raids");
 
@@ -89,22 +105,30 @@ export class VillageRaidFeature implements Feature {
       if (go) this._start(here.chunkKey, here.plan);
     });
 
+    // Each raider down is a step of the raid's quest; the last one completes
+    // it, and the quest bridge pays.
     ctx.on("player:kill", ({ npcId }) => {
+      const raid = this.rules.active;
+      if (!raid?.remaining.has(npcId)) return;
+      const questId = this._questId(raid);
       const won = this.rules.onKill(npcId);
+      deps.quests.apply("custom", defendEvent(questId));
       if (!won) return;
       this._raiders.clear();
       this._endShelter();
-      deps.feedback.addFame(10);
-      deps.feedback.grant({
-        gold: won.rewardGold,
-        xp: won.rewardXp,
-        label: `${won.villageName} is safe — the raiders are beaten`,
-      });
+      deps.feedback.notify(`${won.villageName} is safe — the raiders are beaten`, 4000);
       deps.feedback.markDirty();
     });
 
-    // Raids aren't saved: a load mid-raid sends the raiders off.
-    ownTransient(ctx, "a raid in progress (a load sends the raiders off)", () => this._clearAftermath());
+    // Raids aren't saved: a load mid-raid sends the raiders off, and the
+    // raid's quest (in the engine's snapshot) fails.
+    ownTransient(ctx, "a raid in progress (a load sends the raiders off)", () => {
+      this._clearAftermath();
+      const engine = deps.quests.engine;
+      for (const [id, r] of Object.entries(engine.getSnapshot().radiant ?? {})) {
+        if (r.templateId === RAID_TEMPLATE.id) engine.failQuest(id);
+      }
+    });
 
     ctx.on("npc:released", ({ npcName }) => {
       for (const set of [this._raiders, this._sheltered]) {
@@ -173,7 +197,8 @@ export class VillageRaidFeature implements Feature {
       raiders.push(npc);
     }
     if (raiders.length === 0) return raiders;
-    this.rules.start(plan.id, plan.name, raiders.map((r) => r.key), services.clock.elapsedHours());
+    const raid = this.rules.start(plan.id, plan.name, raiders.map((r) => r.key), services.clock.elapsedHours());
+    services.quests.engine.startRadiant(RAID_TEMPLATE.id, this._questId(raid), { place: plan.name, required: String(raiders.length) });
     // Townsfolk hide; guards stay out; nobody vanishes mid-conversation.
     for (const npc of world.residents(chunkKey)) {
       if (npc.isDead || raiders.includes(npc) || world.isTalkingTo(npc)) continue;
@@ -193,8 +218,15 @@ export class VillageRaidFeature implements Feature {
     this._deps?.indoors.releaseHolds(SHELTER_HOLD);
   }
 
-  /** An unbeaten raid ends: raiders leave, townsfolk come out. */
+  /** The raid's quest: one per raid (village and start hour). */
+  private _questId(raid: { villageId: string; startedAt: number }): string {
+    return `raid_${raid.villageId}_${Math.round(raid.startedAt)}`;
+  }
+
+  /** An unbeaten raid ends: raiders leave, townsfolk come out, its quest fails. */
   private _clearAftermath(): void {
+    const raid = this.rules.active;
+    if (raid) this._deps?.quests.engine.failQuest(this._questId(raid));
     const world = this._deps?.actors;
     for (const npc of this._raiders) {
       if (npc.isDead || npc.mesh.isDisposed()) continue;

@@ -275,9 +275,11 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
       r.takeDamage(1e6);
       g.eventBus.emit("npc:killed", { npcName: r.mesh.name, xp: r.xpReward, npc: r });
     }
-    return { paid: g._pack.gold() - gold, active: !!g.raids.rules.active };
+    const quest = g.questSystem.getQuests().find((q: any) => q.name.startsWith("Raid on"));
+    return { paid: g._pack.gold() - gold, active: !!g.raids.rules.active, questDone: quest?.isCompleted };
   });
   expect(raidEnd.active).toBe(false);
+  expect(raidEnd.questDone, "the raid is a quest in the log, completed").toBe(true);
   expect(raidEnd.paid, "beating the raid pays").toBe(35 * raid.raiders);
   await expect.poll(() => page.evaluate(() => {
     const g = (window as any).__camelotGame;

@@ -6,6 +6,7 @@ import { VillageRaidFeature, RaidsKey, RAID_LEAVE_DISTANCE } from "./raid-featur
 import { IndoorsKey } from "../indoors/indoors-feature";
 import { planVillage, hasVillage } from "../../world/village-settlement";
 import type { NPC } from "../../entities/npc";
+import { provideQuests } from "../../testing/quests";
 
 function firstPlan() {
   for (let r = 3; r < 40; r++) for (let cx = -r; cx <= r; cx++) for (const cz of [-r, r]) {
@@ -64,12 +65,13 @@ function setup(opts: { level?: number } = {}) {
     hold: (npc, holder) => { indoors.add(npc); (holds.get(npc) ?? holds.set(npc, new Set()).get(npc)!).add(holder); },
     releaseHolds: (holder) => { for (const h of holds.values()) h.delete(holder); },
   });
+  const quests = provideQuests(k);
   const codecs = new Map<string, SaveCodec>();
   k.services.provide(SavesKey, { register: (c) => { codecs.set(c.key, c); return () => codecs.delete(c.key); } });
   const feature = new VillageRaidFeature();
   k.install(feature);
   return {
-    k, feature, plan, codecs, chunkKey, pos, townsfolk, indoors, holds, despawned, notes, grants,
+    k, feature, plan, codecs, ...quests, chunkKey, pos, townsfolk, indoors, holds, despawned, notes, grants,
     raids: k.services.get(RaidsKey),
     talkTo: (npc: NPC | null) => { talkingTo = npc; },
   };
@@ -95,9 +97,13 @@ describe("VillageRaidFeature (headless, through the kernel)", () => {
     expect(t.raids.isSheltered(t.townsfolk[0])).toBe(true);    // villager
     expect(t.raids.isSheltered(t.townsfolk[1])).toBe(false);   // talking
     expect(t.raids.isSheltered(t.townsfolk[2])).toBe(false);   // guard
+    const [id] = Object.keys(t.engine.getSnapshot().radiant ?? {});
+    expect(t.engine.getQuestDefinition(id)!.name, "the raid is a quest").toBe(`Raid on ${t.plan.name}`);
+    t.k.events.emit("player:kill", { npcId: "Wolf_1", npcName: "Wolf_1", xp: 10 }); // not a raider
     for (const r of raiders) t.k.events.emit("player:kill", { npcId: r.mesh.name, npcName: r.mesh.name, xp: 10 });
     expect(t.raids.rules.active).toBeNull();
-    expect(t.grants[0]?.gold).toBe(35 * 4);
+    expect(t.paid, "the quest pays per raider").toEqual([{ questId: id, gold: 35 * 4, xp: 25 * 4, fame: 10 }]);
+    expect(t.notes.at(-1)).toContain("is safe");
     expect(t.raids.isSheltered(t.townsfolk[0]), "townsfolk come out").toBe(false);
     expect(t.holds.get(t.townsfolk[0])?.has("raid"), "the raid's hold is released").toBe(false);
   });
@@ -112,13 +118,21 @@ describe("VillageRaidFeature (headless, through the kernel)", () => {
     expect(t.raids.rules.active).toBeNull();
     expect(t.despawned).toEqual(raiders);
     expect(t.notes.some((n) => n.includes("You left"))).toBe(true);
+    const [id] = Object.keys(t.engine.getSnapshot().radiant ?? {});
+    expect(t.engine.getQuestStatus(id), "its quest fails").toBe("failed");
+    expect(t.paid).toEqual([]);
   });
 
   it("a save loaded mid-raid clears it; uninstalling the feature cleans up too", () => {
     const t = setup();
     t.raids.start(t.chunkKey, t.plan);
+    // The load brings back the raid's quest from the engine's snapshot; it fails.
+    const snapshot = t.engine.getSnapshot();
+    t.feature.rules.restoreFromSave(t.feature.rules.getSaveState());
+    t.engine.restoreSnapshot(snapshot);
     t.k.events.emit("save:loaded", {});
     expect(t.raids.rules.active).toBeNull();
+    expect(Object.keys(snapshot.radiant ?? {}).map((id) => t.engine.getQuestStatus(id))).toEqual(["failed"]);
     expect(t.despawned.length).toBeGreaterThan(0);
 
     const u = setup();

@@ -4,7 +4,7 @@ import { FeedbackKey, InventoryKey, ModalKey, PlayerKey, QuestLogKey, QuestsKey,
 import { VillageJobsFeature, JobsKey } from "./jobs-feature";
 import { VillageJobBoard } from "../../systems/village-jobs";
 import { QuestSystem } from "../../systems/quest-system";
-import { QuestGraphEngine } from "../../framework/quests/quest-graph-engine";
+import { provideQuests } from "../../testing/quests";
 
 /** A board id whose first offer is the given template. */
 function boardOffering(templateId: string): string {
@@ -16,29 +16,16 @@ function boardOffering(templateId: string): string {
 function setup(boardId: string) {
   const k = new Kernel();
   const bag: Record<string, number> = {};
-  const engine = new QuestGraphEngine();
+  const { engine, paid } = provideQuests(k);
   const log = new QuestSystem({ showNotification: vi.fn(), toggleQuestLog: vi.fn(), updateQuestLog: vi.fn() } as never);
   log.setFramework(() => engine);
   const notes: string[] = [];
-  /** What the quest bridge paid (gold, fame) for completed quests. */
-  const paid: Array<{ questId: string; gold: number; fame: number }> = [];
   const modal = { suspendGameplay: vi.fn(), restoreGameplay: vi.fn() };
   k.services.provide(PlayerKey, { position: () => ({ x: 0, z: 0 }), level: () => 3 });
   k.services.provide(FeedbackKey, { notify: (t) => { notes.push(t); }, grant: vi.fn(), addFame: vi.fn(), markDirty: vi.fn() });
   k.services.provide(InventoryKey, {
     count: (id) => bag[id] ?? 0,
     remove: (id, n) => { if ((bag[id] ?? 0) < n) return false; bag[id] -= n; return true; },
-  });
-  // The quest bridge, in brief: events into the engine, progress reported, completion paid.
-  k.services.provide(QuestsKey, {
-    engine,
-    apply: (type, targetId, amount) => {
-      for (const r of engine.applyEvent({ type, targetId, amount })) {
-        const def = engine.getQuestDefinition(r.questId)!;
-        for (const p of r.progressed ?? []) k.events.emit("quest:progressed", { questId: r.questId, ...p });
-        if (r.questCompleted) paid.push({ questId: r.questId, gold: def.rewardGold ?? 0, fame: def.fameReward ?? 10 });
-      }
-    },
   });
   k.services.provide(QuestLogKey, {
     quests: () => log.getQuests(), add: (q) => log.addQuest(q, true),
@@ -87,7 +74,7 @@ describe("VillageJobsFeature (headless, through the kernel)", () => {
     // Back at the board, the job is handed in: the quest completes and the bridge pays.
     t.jobs.open({ boardId: board, placeName: "Camcross" });
     t.click("Hand in");
-    expect(t.paid).toEqual([{ questId: id, gold: 120, fame: 5 }]);
+    expect(t.paid).toEqual([{ questId: id, gold: 120, xp: 60, fame: 5 }]);
     expect(t.quest(id)!.isCompleted).toBe(true);
     expect(t.jobs.rules.completedAt(board)).toBe(1);
     t.click("Close");
