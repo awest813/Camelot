@@ -1369,7 +1369,7 @@
    as the dialogs, applied to their own class names.
    ══════════════════════════════════════════════════════════════════════════ */
 
-:is(.character-sheet-ui, .barter-ui, .container-ui, .fast-travel__panel, .spell-making__panel, .level-up__panel, .stable__panel, .saddlebag__panel) {
+:is(.character-sheet-ui, .barter-ui, .container-ui, .fast-travel__panel, .spell-making__panel, .level-up__panel, .stable__panel, .saddlebag__panel, .guard-encounter__panel) {
   border-radius: 4px !important;
   border: 1px solid var(--tome-gilt-dim) !important;
   background: var(--tome-leather-bg) !important;
@@ -1394,13 +1394,13 @@
 }
 
 /* Book type throughout. */
-:is(.character-sheet-ui, .crafting-ui, .barter-ui, .container-ui, .fast-travel__panel, .spell-making__panel, .level-up__panel, .stable__panel, .saddlebag__panel)
+:is(.character-sheet-ui, .crafting-ui, .barter-ui, .container-ui, .fast-travel__panel, .spell-making__panel, .level-up__panel, .stable__panel, .saddlebag__panel, .guard-encounter__panel)
   :is(p, span, li, div, button, label, td, th, dd, dt, input, select, small, strong) {
   font-family: var(--tome-font-book);
 }
 
 /* Titles: gilt Cinzel. */
-:is(.character-sheet-ui__title, .crafting-ui__title, .barter-ui__title, .container-ui__title, .fast-travel__title, .spell-making__title, .level-up__title, .saddlebag__title, .stable__title) {
+:is(.guard-encounter__title, .character-sheet-ui__title, .crafting-ui__title, .barter-ui__title, .container-ui__title, .fast-travel__title, .spell-making__title, .level-up__title, .saddlebag__title, .stable__title) {
   font-family: var(--tome-font-display) !important;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -1517,4 +1517,98 @@
 }
 :is(.pet-ui, .follower-ui, .shout-ui, .pickpocket-ui) button[aria-label^="Close"] {
   font-size: 13px !important;
+}
+
+/* The guard's challenge: a red-shadowed room behind the book. */
+.guard-encounter {
+  background:
+    radial-gradient(ellipse at 50% 35%, rgba(160, 40, 20, 0.16), transparent 55%),
+    radial-gradient(ellipse at center, rgba(10, 4, 2, 0.7), rgba(3, 1, 1, 0.92) 80%) !important;
+}
+.guard-encounter__btn {
+  border-radius: 2px !important;
+  border: 1px solid rgba(201, 154, 62, 0.45) !important;
+  background: linear-gradient(180deg, #3a2516, var(--tome-leather-deep)) !important;
+  color: var(--tome-leather-text) !important;
+  font-family: var(--tome-font-book) !important;
+  font-size: 16px !important;
+}
+.guard-encounter__btn:hover:enabled {
+  border-color: var(--tome-gilt-bright) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The conversation: a parchment page in a gilt frame, under the speaker.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.dialogue-box {
+  padding: 16px 26px 20px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--tome-parchment-bg);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 0 0 3px var(--tome-leather),
+    0 0 0 4px var(--tome-gilt),
+    0 18px 50px rgba(0, 0, 0, 0.6);
+  color: var(--tome-ink);
+  font-family: var(--tome-font-book);
+}
+.dialogue-box .dialogue-box__speaker {
+  margin: 0 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--tome-rule);
+  font-family: var(--tome-font-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--tome-wine);
+  text-shadow: none;
+}
+.dialogue-box .dialogue-box__text {
+  font-size: 20px;
+  line-height: 1.45;
+  color: var(--tome-ink);
+  text-shadow: none;
+}
+.dialogue-box .dialogue-box__choices {
+  gap: 0;
+  border-top: 1px solid var(--tome-rule);
+}
+.dialogue-box .dialogue-box__choice {
+  min-height: 34px;
+  padding: 6px 14px 6px 22px;
+  border: 0;
+  border-bottom: 1px solid var(--tome-rule);
+  border-radius: 0;
+  background: none;
+  color: var(--tome-ink);
+  font-family: var(--tome-font-book);
+  font-size: 18px;
+  position: relative;
+}
+.dialogue-box .dialogue-box__choice:hover:enabled,
+.dialogue-box .dialogue-box__choice[aria-current="true"] {
+  border: 0;
+  border-bottom: 1px solid var(--tome-rule);
+  background: linear-gradient(90deg, rgba(125, 33, 23, 0.14), transparent 70%);
+  color: var(--tome-wine);
+}
+.dialogue-box .dialogue-box__choice[aria-current="true"]::before {
+  content: "❧";
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  translate: 0 -50%;
+  font-size: 13px;
+  color: var(--tome-wine);
+}
+.dialogue-box .dialogue-box__choice:focus-visible {
+  outline: 2px solid var(--tome-wine-bright);
+  outline-offset: -2px;
+}
+.dialogue-box .dialogue-box__choice:disabled {
+  background: none;
+  color: var(--tome-ink-soft);
+  font-style: italic;
 }
