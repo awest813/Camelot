@@ -1,5 +1,5 @@
 /**
- * PickpocketUI — Oblivion-style lift overlay.
+ * PickpocketUI — Lift overlay.
  *
  * Lists an NPC's registered pickpocketable items with per-item success
  * chances.  Clicking "Steal" fires {@link onStealItem}; the game layer

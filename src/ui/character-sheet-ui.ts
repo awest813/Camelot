@@ -13,7 +13,7 @@ import { getAttributeIcon, getStatIcon } from "./icon-utils";
 export interface CharacterSheetData {
   /** Character display name. */
   name?:              string;
-  /** Oblivion-style character level (major-skill cycles via PlayerLevelSystem). */
+  /** Character level (major-skill cycles via PlayerLevelSystem). */
   level?:             number;
   /** Combat XP tier from the demo Player entity (`player.level`). */
   xpLevel?:           number;

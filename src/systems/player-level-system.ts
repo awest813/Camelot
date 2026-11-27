@@ -1,7 +1,7 @@
 /**
- * PlayerLevelSystem — Oblivion-style skill-based character leveling.
+ * PlayerLevelSystem — Skill-based character leveling.
  *
- * In Oblivion, your character level advances when you have earned 10 level-ups
+ * Your character level advances when you have earned 10 level-ups
  * across your class's major skills.  At that point you enter a level-up screen
  * where you choose 3 attributes to improve; each attribute's bonus (+1 to +5)
  * is proportional to how many of its governing skills you leveled during that
@@ -17,7 +17,7 @@
  *      chosen attribute bonuses and advance `characterLevel`.
  *   5. `onLevelUpComplete(newLevel)` fires after the attributes are applied.
  *
- * Skill → governing attribute mapping (adapted from Oblivion):
+ * Skill → governing attribute mapping:
  *   blade        → strength
  *   block        → endurance
  *   destruction  → willpower
@@ -27,7 +27,7 @@
  *   speechcraft  → luck
  *   alchemy      → intelligence
  *
- * Attribute bonus formula (Oblivion multiplier table):
+ * Attribute bonus formula (multiplier table):
  *   0 governing skill level-ups this level → +1
  *   1–4  → +2
  *   5–7  → +3
@@ -64,7 +64,7 @@ export const MAJOR_LEVELUPS_REQUIRED = 10;
 // ── Skill → Governing Attribute Mapping ──────────────────────────────────────
 
 /**
- * Maps each skill to the attribute it governs (following Oblivion conventions
+ * Maps each skill to the attribute it governs (following genre conventions
  * adapted for Camelot's attribute and skill sets).
  */
 export const SKILL_GOVERNING_ATTRIBUTE: Readonly<Record<ProgressionSkillId, AttributeName>> = {
@@ -90,7 +90,7 @@ export type AttributeBonuses = Record<AttributeName, number>;
 
 /** Saved state written to disk. */
 export interface PlayerLevelSaveState {
-  /** Oblivion-style character level (separate from XP-based player.level). */
+  /** Character level (separate from XP-based player.level). */
   characterLevel: number;
   /** Major-skill level-ups accumulated this character level. */
   majorLevelUpsThisLevel: number;
@@ -137,7 +137,7 @@ export class PlayerLevelSystem {
 
   // ── Runtime state ───────────────────────────────────────────────────────────
 
-  /** Oblivion-style character level (starts at 1, advances when confirmed). */
+  /** Character level (starts at 1, advances when confirmed). */
   private _characterLevel = 1;
 
   /** Cumulative major-skill level-ups since the last character level-up. */
@@ -182,7 +182,7 @@ export class PlayerLevelSystem {
 
   // ── Accessors ────────────────────────────────────────────────────────────────
 
-  /** Current Oblivion-style character level (1-based). */
+  /** Current character level (1-based). */
   public get characterLevel(): number {
     return this._characterLevel;
   }

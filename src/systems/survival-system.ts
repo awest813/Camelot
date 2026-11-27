@@ -1,5 +1,5 @@
 /**
- * SurvivalSystem — Skyrim Anniversary Edition-inspired survival needs.
+ * SurvivalSystem — survival needs: hunger, fatigue and cold.
  *
  * Tracks three player needs — hunger, fatigue, and cold — each on a [0, 100]
  * scale (100 = fully satisfied, 0 = critically depleted).  Each need

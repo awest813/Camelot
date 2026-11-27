@@ -2,7 +2,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Player } from "../entities/player";
 
 /**
- * FastTravelSystem — Oblivion-style discovered-location map and teleportation.
+ * FastTravelSystem — Discovered-location map and teleportation.
  *
  * The player discovers locations by visiting them (the caller decides when to
  * call `discoverLocation`; game.ts wires it to `cellManager.onCellChanged`

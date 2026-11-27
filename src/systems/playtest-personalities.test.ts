@@ -272,22 +272,22 @@ describe("Personality Playtest: The Drunk", () => {
 
   it("commits public drunken theft, gets caught by guards, and serves jail time", () => {
     env.time.restoreFromSave({ gameTime: 14 * 60 });
-    expect(env.crime.getBounty("whiterun_guard")).toBe(0);
+    expect(env.crime.getBounty("camelot_guard")).toBe(0);
 
     const mockWitness = { mesh: { name: "Guard Bob" } } as any;
 
     // Drunk Grog tries to swipe a merchant's golden goblet in broad daylight
-    env.crime.commitCrime("theft", "whiterun_guard", env.time.gameTime, [mockWitness]);
+    env.crime.commitCrime("theft", "camelot_guard", env.time.gameTime, [mockWitness]);
 
-    expect(env.crime.getBounty("whiterun_guard")).toBe(25);
+    expect(env.crime.getBounty("camelot_guard")).toBe(25);
 
     // Commits assault against a guard
-    env.crime.commitCrime("assault", "whiterun_guard", env.time.gameTime, [mockWitness]);
-    expect(env.crime.getBounty("whiterun_guard")).toBe(65); // 25 + 40
+    env.crime.commitCrime("assault", "camelot_guard", env.time.gameTime, [mockWitness]);
+    expect(env.crime.getBounty("camelot_guard")).toBe(65); // 25 + 40
 
     // Gets arrested and serves jail sentence
     env.crime.clearAllBounties();
-    expect(env.crime.getBounty("whiterun_guard")).toBe(0);
+    expect(env.crime.getBounty("camelot_guard")).toBe(0);
   });
 
   it("passes out in a 24-hour drunken coma using the wait system", () => {
@@ -597,7 +597,7 @@ describe("Personality Playtest: The Gamer", () => {
     env.cls.chooseClass("thief", env.attrs, env.skills);
     env.birthsign.chooseBirthsign("white_hart", env.attrs);
 
-    // Bosmer (+10) + Thief (+10) + Steed (+20) + Base 40 = 80 Speed
+    // Forest-kin (+10) + Raven (+10) + White Hart (+20) + Base 40 = 80 Speed
     expect(env.attrs.get("speed")).toBeGreaterThanOrEqual(60);
   });
 

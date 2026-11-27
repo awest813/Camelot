@@ -58,7 +58,7 @@ export type FollowerCombatRole = "warrior" | "archer" | "mage" | "rogue";
 export type FollowerCommand = "follow" | "wait" | "trade";
 
 /**
- * Tactical stance the follower adopts in combat (Avowed-style companion stance).
+ * Tactical stance the follower adopts in combat.
  *   aggressive — charges enemies and uses abilities offensively.
  *   defensive   — stays near the player and prioritises protection.
  *   stealth     — moves quietly and holds attacks until the player strikes.
@@ -97,7 +97,7 @@ export interface FollowerAbilityResult {
 /**
  * Definition of a player + follower action combo that creates a synergy burst.
  *
- * Avowed-style: landing a particular player action while the follower's role
+ * Landing a particular player action while the follower's role
  * matches triggers a bonus effect (e.g. player power-attack + warrior follower
  * → Momentum Surge that boosts the next hit).
  */

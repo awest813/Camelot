@@ -44,7 +44,7 @@ describe("CharacterFeature (headless, through the kernel)", () => {
     expect(t.notes.at(-1)).toBe("Welcome, Gawain! Character creation complete.");
   });
 
-  it("if the wizard fails, a Nord warrior, and the screen is handed back", async () => {
+  it("if the wizard fails, a Hill-folk warrior, and the screen is handed back", async () => {
     const t = setup(async () => { throw new Error("no DOM"); });
     vi.spyOn(console, "error").mockImplementation(() => {});
     await t.svc.create();

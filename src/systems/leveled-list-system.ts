@@ -84,7 +84,7 @@ function wangHash(seed: number): number {
 const MAX_DEPTH = 16;
 
 /**
- * Morrowind / OpenMW-style leveled lists.
+ * Leveled lists.
  *
  * A leveled list is a named registry of entries, each with a minimum player-
  * level threshold and an optional selection weight.  When the list is
@@ -265,7 +265,7 @@ export class LeveledListSystem {
 
 /**
  * Leveled weapon lists — resolve to item IDs compatible with LootTableSystem
- * item templates.  Modelled on Morrowind's leveled-item breakpoints.
+ * item templates.  Breakpoints by player level.
  */
 const LEVELED_WEAPON_LISTS: LeveledList[] = [
   {
@@ -337,7 +337,7 @@ const LEVELED_CREATURE_LISTS: LeveledList[] = [
       { minLevel: 1,  value: "wolf" },
       { minLevel: 3,  value: "bear" },
       { minLevel: 7,  value: "troll" },
-      { minLevel: 12, value: "frost_atronach" },
+      { minLevel: 12, value: "winter_wraith" },
     ],
   },
   {

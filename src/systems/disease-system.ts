@@ -48,7 +48,7 @@ export interface DiseaseSaveState {
 
 /**
  * The ailments of the realm: six medieval sicknesses, and the Moon-curse from
- * the Breton lays (Bisclavret).
+ * the lays of Marie de France (Bisclavret).
  * The DiseaseSystem registers all of these automatically.
  */
 export const BUILT_IN_DISEASES: DiseaseDefinition[] = [

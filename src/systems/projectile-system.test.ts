@@ -198,7 +198,7 @@ describe("ProjectileSystem", () => {
     expect(projectileSystem.equippedArrowType).toBe("iron");
   });
 
-  it("daedric arrows deal more damage than iron arrows", () => {
+  it("annwn arrows deal more damage than iron arrows", () => {
     // Fire with iron arrows and track the damage that hits the NPC
     projectileSystem.archerySkill = 50;
     mockNpc.mesh.position.z = 0.8; // within ARROW_HIT_RADIUS of spawn
@@ -211,7 +211,7 @@ describe("ProjectileSystem", () => {
     projectileSystem.update(0.1);
     const ironDmg: number = mockNpc.takeDamage.mock.calls.at(-1)?.[0] ?? 0;
 
-    // Reset and fire with daedric arrows
+    // Reset and fire with annwn arrows
     vi.clearAllMocks();
     mockPlayer.stamina = 100;
     projectileSystem.arrowCount = 10;
@@ -404,11 +404,11 @@ describe("ProjectileSystem", () => {
     expect(elvenProgress).toBeGreaterThan(ironProgress);
   });
 
-  it("daedric arrows draw slower than iron arrows (drawTimeMultiplier > 1)", () => {
+  it("annwn arrows draw slower than iron arrows (drawTimeMultiplier > 1)", () => {
     // Iron: drawTimeMultiplier = 1.00 → effectiveDrawTime = 0.8 s
-    // Daedric: drawTimeMultiplier = 1.25 → effectiveDrawTime = 1.0 s
+    // Annwn: drawTimeMultiplier = 1.25 → effectiveDrawTime = 1.0 s
     // After 0.5 s with iron: progress = 0.5/0.8 = 0.625
-    // After 0.5 s with daedric: progress = 0.5/1.0 = 0.5
+    // After 0.5 s with annwn: progress = 0.5/1.0 = 0.5
 
     projectileSystem.equippedArrowType = "iron";
     projectileSystem.beginDraw();
@@ -551,7 +551,7 @@ describe("ProjectileSystem", () => {
     rand.mockRestore();
   });
 
-  it("daedric arrows ignite the victim with burn", () => {
+  it("annwn arrows ignite the victim with burn", () => {
     mockNpc.applyStatusEffect = vi.fn();
     projectileSystem.equippedArrowType = "annwn";
     projectileSystem.fireArrow();

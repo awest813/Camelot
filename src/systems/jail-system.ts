@@ -1,5 +1,5 @@
 /**
- * JailSystem — Oblivion-style prison consequence for unpaid bounties.
+ * JailSystem — Prison consequence for unpaid bounties.
  *
  * When a guard challenges the player and they cannot (or will not) pay the
  * bounty, `serveJailTime()` provides the "go to jail" option:

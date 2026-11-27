@@ -60,7 +60,7 @@ export interface WeatherSaveState {
 // ── System ────────────────────────────────────────────────────────────────────
 
 /**
- * WeatherSystem — Oblivion-lite atmospheric weather.
+ * WeatherSystem — atmospheric weather.
  *
  * Manages a randomised Markov-chain weather progression that drives:
  *   - Scene fog density and colour

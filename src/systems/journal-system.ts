@@ -36,7 +36,7 @@ export interface JournalEntry {
   category: JournalCategory;
   /**
    * Arbitrary string tags for freeform filtering (e.g. "dark-brotherhood",
-   * "cyrodiil", "nirnroot").  Lower-cased on storage for consistent matching.
+   * "camelot", "mugwort").  Lower-cased on storage for consistent matching.
    */
   tags: string[];
   /** Optional short summary shown in list views. */

@@ -8,7 +8,7 @@ import type { GuardEncounterView, GuardEncounterAction } from "./guard-encounter
 function makeView(overrides: Partial<GuardEncounterView> = {}): GuardEncounterView {
   return {
     guardName: "Guard Valdus",
-    factionId: "whiterun_guard",
+    factionId: "camelot_guard",
     bounty: 100,
     playerGold: 250,
     canPersuade: true,
@@ -90,9 +90,9 @@ describe("GuardEncounterUI", () => {
     });
 
     it("shows faction id in the meta line", () => {
-      ui.open(makeView({ factionId: "riften_thieves_guild" }));
+      ui.open(makeView({ factionId: "caerleon_cutpurses" }));
       const meta = document.querySelector(".guard-encounter__meta");
-      expect(meta?.textContent).toContain("riften_thieves_guild");
+      expect(meta?.textContent).toContain("caerleon_cutpurses");
     });
 
     it("shows bounty in the meta line", () => {

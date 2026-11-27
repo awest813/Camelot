@@ -19,7 +19,7 @@ const DEFAULT_MOUNT_SPEED = 2.0;
 export interface Horse {
   /** Unique identifier. */
   id: string;
-  /** Display name (e.g. "Shadowmere"). */
+  /** Display name (e.g. "Llamrei"). */
   name: string;
   /** Speed multiplier while mounted (default 2.0). */
   speed: number;

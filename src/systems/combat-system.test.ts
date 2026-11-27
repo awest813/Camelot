@@ -138,7 +138,7 @@ describe('CombatSystem', () => {
             strafeSpeedMultiplier: 0.65,
             movementResponsiveness: 8,
             moveSpeed: 2,
-            // Status effects (Oblivion-lite v4)
+            // Status effects (v4)
             statusEffects: [],
             tickStatusEffects: vi.fn(() => 0),
             xpReward: 25,
@@ -562,7 +562,7 @@ describe('CombatSystem', () => {
         expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(10);
     });
 
-    // ─── Oblivion-style combat mechanics ───────────────────────────────────────
+    // ─── Combat mechanics ───────────────────────────────────────
 
     it('power attack deals more damage than a normal melee attack', () => {
         mockScene.pickWithRay.mockReturnValue({
@@ -848,7 +848,7 @@ describe('CombatSystem', () => {
         expect(dealt).toBe(expectedDamage);
     });
 
-    // ─── Oblivion-style: hit chance (blade skill below 50) ──────────────────
+    // ─── Hit chance (blade skill below 50) ──────────────────
 
     it('melee attack misses when hit-chance roll fails at low blade skill', () => {
         const attrs = new AttributeSystem({ agility: 40 });
@@ -940,7 +940,7 @@ describe('CombatSystem', () => {
         vi.restoreAllMocks();
     });
 
-    // ─── Oblivion-style: block skill scales block effectiveness ─────────────
+    // ─── Block skill scales block effectiveness ─────────────
 
     it('block damage reduction scales up with block skill', () => {
         const skills = new SkillProgressionSystem();
@@ -1029,7 +1029,7 @@ describe('CombatSystem', () => {
         expect(onBlockSuccess).not.toHaveBeenCalled();
     });
 
-    // ─── Oblivion-style: NPC armor rating ──────────────────────────────────
+    // ─── NPC armor rating ──────────────────────────────────
 
     it('NPC armor rating reduces player physical melee damage', () => {
         mockScene.pickWithRay.mockReturnValue({
@@ -1080,7 +1080,7 @@ describe('CombatSystem', () => {
         expect(mockNpcs[0].takeDamage).toHaveBeenCalledWith(10);
     });
 
-    // ─── Oblivion-style: player armor rating (bonusArmor) ──────────────────
+    // ─── Player armor rating (bonusArmor) ──────────────────
 
     it('player bonusArmor provides armor-rating-style reduction against NPC attacks', () => {
         mockNpcs[0].aiState = 'ATTACK';

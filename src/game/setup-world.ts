@@ -23,7 +23,7 @@ import { beginPortalTransition, onCellEntered } from "./cells";
 import { releaseNpc } from "./npcs";
 
 export function setupWorldSystems(g: Game): void {
-  // ── v8 system wiring (Oblivion depth: skill progression, fast travel, level scaling) ──
+  // ── v8 system wiring (skill progression, fast travel, level scaling) ──
   g.skillProgressionSystem = new SkillProgressionSystem();
   g.skillProgressionSystem.events = g.eventBus;
   g.saveSystem.setSkillProgressionSystem(g.skillProgressionSystem);
@@ -78,7 +78,7 @@ export function setupWorldSystems(g: Game): void {
     }
   });
 
-  // ── v9 system wiring (Oblivion parity: fame, active effects, jail) ─────────
+  // ── v9 system wiring (fame, active effects, jail) ─────────
   g.fameSystem = new FameSystem();
   g.fameSystem.events = g.eventBus;
   g.saveSystem.setFameSystem(g.fameSystem);
@@ -90,7 +90,7 @@ export function setupWorldSystems(g: Game): void {
   g.jailSystem = new JailSystem();
   g.saveSystem.setJailSystem(g.jailSystem);
 
-  // ── v10 system wiring (Oblivion depth: spell making, respawn, merchant restock) ──
+  // ── v10 system wiring (spell making, respawn, merchant restock) ──
   g._spellMaking.setAnimator(g.uiAnimator);
 
   g.levelUpUI.setAnimator(g.uiAnimator);
@@ -111,7 +111,7 @@ export function setupWorldSystems(g: Game): void {
   g.saveSystem.setBirthsignSystem(g.birthsignSystem);
   g.saveSystem.setClassSystem(g.classSystem);
 
-  // ── v12 system wiring (Oblivion depth: skill-based character progression) ──
+  // ── v12 system wiring (skill-based character progression) ──
   g.saveSystem.setPlayerLevelSystem(g.playerLevelSystem);
 
   // ── Schedules follow the clock ──────────────────────────────────────────

@@ -7,17 +7,17 @@ import type { FastTravelOptionView } from "./fast-travel-ui";
 
 function makeOption(overrides: Partial<FastTravelOptionView> = {}): FastTravelOptionView {
   return {
-    id: "whiterun",
-    name: "Whiterun",
+    id: "caerleon",
+    name: "Caerleon",
     estimatedHours: 4.5,
     ...overrides,
   };
 }
 
 const SAMPLE_OPTIONS: FastTravelOptionView[] = [
-  makeOption({ id: "whiterun", name: "Whiterun", estimatedHours: 4.5 }),
-  makeOption({ id: "riften", name: "Riften", estimatedHours: 8.0 }),
-  makeOption({ id: "solitude", name: "Solitude", estimatedHours: 12.0 }),
+  makeOption({ id: "caerleon", name: "Caerleon", estimatedHours: 4.5 }),
+  makeOption({ id: "tintagel", name: "Tintagel", estimatedHours: 8.0 }),
+  makeOption({ id: "carlisle", name: "Carlisle", estimatedHours: 12.0 }),
 ];
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
@@ -109,8 +109,8 @@ describe("FastTravelUI", () => {
     it("rows show destination name", () => {
       ui.open(SAMPLE_OPTIONS);
       const names = document.querySelectorAll(".fast-travel__row-name");
-      expect(names[0].textContent).toBe("Whiterun");
-      expect(names[1].textContent).toBe("Riften");
+      expect(names[0].textContent).toBe("Caerleon");
+      expect(names[1].textContent).toBe("Tintagel");
     });
 
     it("rows show estimated hours", () => {
@@ -128,7 +128,7 @@ describe("FastTravelUI", () => {
     it("status text references the selected destination", () => {
       ui.open(SAMPLE_OPTIONS);
       const status = document.querySelector(".fast-travel__status") as HTMLElement;
-      expect(status.textContent).toContain("Whiterun");
+      expect(status.textContent).toContain("Caerleon");
     });
 
     it("status includes estimated hours", () => {
@@ -142,7 +142,7 @@ describe("FastTravelUI", () => {
       const btn = document.querySelector(".fast-travel__btn--primary") as HTMLButtonElement;
       expect(btn.disabled).toBe(false);
       expect(btn.getAttribute("aria-disabled")).toBe("false");
-      expect(btn.title).toContain("Travel to Whiterun");
+      expect(btn.title).toContain("Travel to Caerleon");
     });
 
     it("open() with empty array shows empty message", () => {
@@ -167,10 +167,10 @@ describe("FastTravelUI", () => {
 
     it("open() re-renders options on second call", () => {
       ui.open(SAMPLE_OPTIONS);
-      ui.open([makeOption({ id: "markarth", name: "Markarth", estimatedHours: 6.0 })]);
+      ui.open([makeOption({ id: "astolat", name: "Astolat", estimatedHours: 6.0 })]);
       const rows = document.querySelectorAll(".fast-travel__row");
       expect(rows.length).toBe(1);
-      expect(rows[0].querySelector(".fast-travel__row-name")?.textContent).toBe("Markarth");
+      expect(rows[0].querySelector(".fast-travel__row-name")?.textContent).toBe("Astolat");
     });
   });
 
@@ -304,7 +304,7 @@ describe("FastTravelUI", () => {
       const rows = document.querySelectorAll<HTMLButtonElement>(".fast-travel__row");
       rows[1].click();
       const status = document.querySelector(".fast-travel__status") as HTMLElement;
-      expect(status.textContent).toContain("Riften");
+      expect(status.textContent).toContain("Tintagel");
     });
 
     it("clicking a row updates aria-pressed attributes", () => {
@@ -325,7 +325,7 @@ describe("FastTravelUI", () => {
       const rows = document.querySelectorAll<HTMLButtonElement>(".fast-travel__row");
       rows[1].click();
       const btn = document.querySelector(".fast-travel__btn--primary") as HTMLButtonElement;
-      expect(btn.title).toContain("Travel to Riften");
+      expect(btn.title).toContain("Travel to Tintagel");
     });
   });
 
@@ -336,7 +336,7 @@ describe("FastTravelUI", () => {
       ui.open(SAMPLE_OPTIONS);
       const travelBtn = document.querySelector<HTMLButtonElement>(".fast-travel__btn--primary");
       travelBtn?.click();
-      expect(onTravel).toHaveBeenCalledWith("whiterun");
+      expect(onTravel).toHaveBeenCalledWith("caerleon");
     });
 
     it("fires onTravel with the id of the clicked row", () => {
@@ -344,10 +344,10 @@ describe("FastTravelUI", () => {
       ui.onTravel = onTravel;
       ui.open(SAMPLE_OPTIONS);
       const rows = document.querySelectorAll<HTMLButtonElement>(".fast-travel__row");
-      rows[2].click(); // select Solitude
+      rows[2].click(); // select Carlisle
       const travelBtn = document.querySelector<HTMLButtonElement>(".fast-travel__btn--primary");
       travelBtn?.click();
-      expect(onTravel).toHaveBeenCalledWith("solitude");
+      expect(onTravel).toHaveBeenCalledWith("carlisle");
     });
 
     it("does not fire onTravel when no destination is selected", () => {
@@ -398,13 +398,13 @@ describe("FastTravelUI", () => {
 
   describe("ETA formatting", () => {
     it("formats fractional hours to one decimal place", () => {
-      ui.open([makeOption({ id: "d", name: "Dawnstar", estimatedHours: 3.25 })]);
+      ui.open([makeOption({ id: "d", name: "Lyonesse", estimatedHours: 3.25 })]);
       const eta = document.querySelector(".fast-travel__row-eta") as HTMLElement;
       expect(eta.textContent).toBe("~3.3h");
     });
 
     it("formats whole-number hours with .0", () => {
-      ui.open([makeOption({ id: "w", name: "Windhelm", estimatedHours: 6.0 })]);
+      ui.open([makeOption({ id: "w", name: "Orkney", estimatedHours: 6.0 })]);
       const eta = document.querySelector(".fast-travel__row-eta") as HTMLElement;
       expect(eta.textContent).toBe("~6.0h");
     });

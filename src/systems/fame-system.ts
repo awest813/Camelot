@@ -1,5 +1,5 @@
 /**
- * FameSystem — Oblivion-style player fame and infamy tracking.
+ * FameSystem — Player fame and infamy tracking.
  *
  * Fame rises when the player completes quests or performs heroic deeds.
  * Infamy rises when the player commits crimes.  The difference between the two
@@ -20,7 +20,7 @@
  * const mod = this.fameSystem.dispositionModifier;
  * ```
  *
- * Oblivion reference: Fame and Infamy each cap at 255 in the original game
+ * Fame and Infamy each cap at 255 in comparable games
  * (stored as bytes).  We use a generous 1000 cap to give the progression more
  * room over a long playthrough.
  */

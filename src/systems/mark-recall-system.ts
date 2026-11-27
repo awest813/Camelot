@@ -1,7 +1,7 @@
 /**
- * MarkRecallSystem — Morrowind-style Mark & Recall teleportation for Camelot.
+ * MarkRecallSystem — Mark & Recall: set a place, return to it later.
  *
- * Two iconic Morrowind Mysticism spells:
+ * Two spells of the old magic:
  *   - **Mark**   — Records the player's current world position (and optional
  *                  interior cell id) as a single persistent waypoint.
  *                  Casting Mark again moves the waypoint to the new location.
@@ -129,7 +129,7 @@ export class MarkRecallSystem {
    * Returns `null` (no-op) when no mark has been set.
    *
    * The system does **not** clear the mark after a Recall — the player can
-   * recall to the same spot multiple times, just as in Morrowind.
+   * recall to the same spot multiple times.
    */
   public recall(): RecallResult | null {
     if (!this._hasMarked || !this._position) return null;

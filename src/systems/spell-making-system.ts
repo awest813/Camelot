@@ -1,5 +1,5 @@
 /**
- * SpellMakingSystem — Oblivion-style custom spell creation.
+ * SpellMakingSystem — Custom spell creation.
  *
  * At the Altar of Spellmaking (Mage's Guild) the player can forge a personal
  * spell by combining 1–2 effect components.  A gold cost is computed from the

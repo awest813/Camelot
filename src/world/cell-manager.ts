@@ -38,7 +38,7 @@ export interface CellSaveState {
 }
 
 /**
- * Manages Oblivion-style cell (level) transitions.
+ * Manages cell (level) transitions.
  *
  * World layout:
  *   - "exterior"   = the streamed chunk world managed by WorldManager.

@@ -39,7 +39,7 @@ export class DialogueSystem {
   private _speaker = "";
   private _text = "";
   /**
-   * Bethesda-style framing: the player's own camera turns to the speaker and
+   * Framing: the player's own camera turns to the speaker and
    * zooms in.  The game calls `camera.update(dt)` every frame.
    */
   public readonly camera = new DialogueCamera();

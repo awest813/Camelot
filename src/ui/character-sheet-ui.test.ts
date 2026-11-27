@@ -20,7 +20,7 @@ function makeData(overrides: Partial<CharacterSheetData> = {}): CharacterSheetDa
     name:           "Aldric the Bold",
     level:          5,
     xpLevel:        12,
-    raceName:       "Nord",
+    raceName:       "Hill-folk",
     className:      "Warrior",
     birthsignName:  "The Warrior",
     specialization: "Combat",
@@ -158,11 +158,11 @@ describe("CharacterSheetUI", () => {
 
     it("displays the race name", () => {
       ui.show();
-      ui.update(makeData({ raceName: "Breton" }));
+      ui.update(makeData({ raceName: "Fae-blooded" }));
       const values = Array.from(
         document.querySelectorAll(".character-sheet-ui__identity-row .character-sheet-ui__row-value"),
       ).map((el) => el.textContent);
-      expect(values).toContain("Breton");
+      expect(values).toContain("Fae-blooded");
     });
 
     it("displays the class name", () => {

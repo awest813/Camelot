@@ -1,5 +1,5 @@
 /**
- * DialogueCamera — Bethesda-style conversation framing.
+ * DialogueCamera — Conversation framing.
  *
  * When a conversation starts, the player's own camera (no camera cut, so the
  * post-processing pipeline, fog and view model rules all stay the same)

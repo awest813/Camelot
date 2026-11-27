@@ -7,7 +7,7 @@ A modular, browser-based RPG **framework** built with **Babylon.js 8**, **TypeSc
 
 ## Why Camelot Framework
 
-Camelot is designed for developers who want to build Bethesda-lite RPG workflows in the browser while keeping systems decoupled and maintainable.
+Camelot is designed for developers who want to build open-world RPG workflows in the browser while keeping systems decoupled and maintainable.
 
 - Framework foundation: dialogue engine, quest graph, inventory domain, faction reputation.
 - Runtime persistence: versioned save-state JSON architecture with migration hooks.
@@ -35,7 +35,7 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 - Melee and magic combat loops with resource costs and cooldown discipline.
 - Damage feedback via floating combat text and hit indicators.
 - Three melee archetypes (Duelist / Soldier / Bruiser) and three magic archetypes (Spark / Bolt / Surge).
-- **Swimming**: breath meter (30 s) drains while submerged; drowning damage when depleted; Argonian racial immunity suppresses drain. (Argonian racial trait and Water Breathing spell/potion respected.)
+- **Swimming**: breath meter (30 s) drains while submerged; drowning damage when depleted. The Fen-folk (and the Breath of the Lake spell or potion) breathe water, so no drain.
 
 ### NPCs + AI
 
@@ -60,12 +60,12 @@ The framework modules live under `src/framework/` and are intentionally engine-a
 - Quest log with objective tracking (Kill / Fetch / Talk).
 - Skill trees (Combat / Magic / Survival) with persistent rank progression.
 - **Guard Challenge Modal**: when guards confront you over bounty, choose to pay fine, serve jail time, resist arrest, or attempt persuasion.
-- **Birthsign System**: choose one of 13 birthsigns at character creation for permanent attribute/stat bonuses and a once-per-day special power (Mara's Gift, Moonshadow, Lover's Kiss, …).
-- **Class System**: choose a character class (Warrior, Mage, Thief, Battlemage, etc.) that defines two favored attributes, five major skills (1.5× XP, start higher), and five minor skills (1.25× XP).
+- **Heritages and Omens**: choose one of eight heritages (the peoples of the realm) and one of 13 omens at character creation, for permanent attribute/stat bonuses and a once-per-day power (Grail's Grace, Under the Hill, Spellbound, …).
+- **Callings**: choose a calling (Man-at-arms, Mage, Cutpurse, War-druid, Hedge-witch, …) that defines two favored attributes, five major skills (1.5× XP, start higher), and five minor skills (1.25× XP).
 - **Horse / Stable System**: purchase and ride horses from stable NPCs; each horse has its own speed multiplier and saddlebag inventory; O to mount/dismount, Shift+O to browse stable or open saddlebag.
-- **Disease System**: contract one of seven Oblivion-style diseases (Rust Chancre, Swamp Rot, Witbane, Collywobbles, Brain Rot, Yellow Tick, Porphyric Hemophilia) through combat hits; each disease weakens one or more attributes until cured by a Cure Disease potion or shrine; Argonians are immune.
-- **Survival System** *(Skyrim AE-inspired)*: three survival needs — Hunger, Fatigue, and Cold — each tracked on a [0, 100] scale. Hunger drains over two in-game days; Fatigue over one day; Cold drains in freezing environments and recovers near fires or indoors. Threshold levels (satiated / normal / hungry / starving, etc.) apply stat penalties (stamina regen, max stamina, max magicka, frost damage) and XP bonuses when the player is well-fed and rested. Restored via eating food, resting, or warming up. Fully serialized (SAVE_VERSION 29).
-- **Companion Stance & Synergy** *(Avowed-inspired)*: the active follower now has a tactical **stance** (aggressive / defensive / stealth) toggled via the follower panel. Each combat role has a signature **ability** (warrior → Shield Bash, archer → Arrow Volley, mage → Arcane Surge, rogue → Smoke Bomb) triggered on cooldown. **Synergy combos** fire automatically when the player's combat action matches the follower's role (e.g. player power-attack + warrior follower → Momentum Surge; mage + cast-spell → Arcane Resonance). All cooldowns persist across saves.
+- **Ailments**: catch one of seven ailments (Marsh Ague, Fen Fever, Brain-fog, The Flux, Falling Sickness, Tick Fever, the Moon-curse) through combat hits; each weakens one or more attributes until cured by a Cure Disease potion or shrine; the Fen-folk are immune.
+- **Survival System**: three survival needs — Hunger, Fatigue, and Cold — each tracked on a [0, 100] scale. Hunger drains over two in-game days; Fatigue over one day; Cold drains in freezing environments and recovers near fires or indoors. Threshold levels (satiated / normal / hungry / starving, etc.) apply stat penalties (stamina regen, max stamina, max magicka, frost damage) and XP bonuses when the player is well-fed and rested. Restored via eating food, resting, or warming up. Fully serialized.
+- **Companion Stance & Synergy**: the active companion now has a tactical **stance** (aggressive / defensive / stealth) toggled via the follower panel. Each combat role has a signature **ability** (warrior → Shield Bash, archer → Arrow Volley, mage → Arcane Surge, rogue → Smoke Bomb) triggered on cooldown. **Synergy combos** fire automatically when the player's combat action matches the follower's role (e.g. player power-attack + warrior follower → Momentum Surge; mage + cast-spell → Arcane Resonance). All cooldowns persist across saves.
 - **Dynamic World Events** *(Crimson Desert-inspired)*: `DynamicWorldEventSystem` schedules reactive roadside encounters via biome, faction-threat, weather, and time-of-day weighting. Faction hostility multiplies spawn chance; storm weather and night-time windows boost dangerous events. Each template declares XP/gold rewards and can chain a follow-on event (e.g. bandit ambush → hidden cache becomes discoverable). Save-persistent trigger history (SAVE_VERSION 29).
 
 ### UI + Quality of Life

@@ -118,7 +118,7 @@ export class HudPresenter {
 
     // Hide the crosshair while any HTML modal overlay owns the screen
     // (barter, level-up, guard challenge, travel, stable, settings, …).
-    // Conversations hide the crosshair and the quick-slot bar (Bethesda-style).
+    // Conversations hide the crosshair and the quick-slot bar.
     const talking = src.talking();
     if (talking !== this._hudInDialogue) {
       this._hudInDialogue = talking;

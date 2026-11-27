@@ -52,7 +52,7 @@ const DELTA_CRIT_FAIL = -15;
 const MIN_SPEECH_TO_ATTEMPT = 5;
 
 /**
- * Oblivion-style action affinity modifier:
+ * Action affinity modifier:
  * -2 strongly dislikes, +2 strongly likes.
  */
 const ACTION_AFFINITY_MODIFIER = 0.06;
@@ -145,7 +145,7 @@ export class PersuasionSystem {
   }
 
   /**
-   * Deeper Oblivion-style check with action affinity.
+   * Deeper check with action affinity.
    *
    * Each NPC has deterministic per-action affinity in [-2, 2] based on npcId.
    * Actions they like are easier and reward larger disposition gains.

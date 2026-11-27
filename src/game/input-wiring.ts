@@ -140,7 +140,7 @@ export function wireInputAdapter(g: Game): void {
   adapter.onAction("toggleMapEditor", () => g.editors?.toggleMapEditor());
   adapter.onAction("toggleCharacterSheet", () => g.kernel.services.get(ProgressionKey).toggleSheet());
 
-  // ── Skyrim/Oblivion-style action handlers ─────────────────────────────
+  // ── action handlers ─────────────────────────────
   adapter.onAction("jump", () => {
     // Space also advances the onboarding tutorial when active
     if (g._tips.space()) return;
@@ -177,7 +177,7 @@ export function wireInputAdapter(g: Game): void {
     // (and no E-jump fallback) may bleed through.
     if (isCombatInputBlocked(g)) return;
 
-    // Skyrim-style: if nothing is within interact range, jump instead
+    // If nothing is within interact range, jump instead
     if (raycastInteract(g)) g.interactionSystem.interact();
     else hop(g);
   });

@@ -18,7 +18,7 @@ import type { ProjectileSystem } from "./projectile-system";
 const MELEE_DAMAGE = 10;
 const MAGIC_DAMAGE = 20;
 
-// ─── Oblivion-style combat constants ──────────────────────────────────────────
+// ─── Combat constants ──────────────────────────────────────────
 
 /** Block damage reduction fraction at block skill 0. */
 const BLOCK_SKILL_REDUCTION_BASE = 0.5;
@@ -777,7 +777,7 @@ export class CombatSystem {
       this._riposteTimer = 0;
     }
 
-    // Oblivion-style hit chance: low weapon skill / agility / fatigue can cause a miss.
+    // Hit chance: low weapon skill / agility / fatigue can cause a miss.
     // Only active when skill and attribute systems are wired up (backward-compatible).
     // Riposte swings never miss — the perfect-block reward must not be lost to RNG.
     const hitChance = this._hitChance();
@@ -967,7 +967,7 @@ export class CombatSystem {
   }
 
   /**
-   * Oblivion-style power attack.
+   * Power attack.
    *
    * Costs POWER_ATTACK_STAMINA_MULTIPLIER × the current archetype's stamina cost.
    * Deals POWER_ATTACK_DAMAGE_MULTIPLIER × normal melee damage (fatigue, crits,
@@ -1007,7 +1007,7 @@ export class CombatSystem {
     }
 
     const fatigueFactor = this._fatigueFactor();
-    // Directional power attacks (Oblivion-style): movement keys held during the
+    // Directional power attacks : movement keys held during the
     // swing pick the variant — forward = knockdown, sideways = disarm,
     // backward = quick back-cut. Neutral keeps the classic power strike.
     const intent = new Vector3();
@@ -1733,7 +1733,7 @@ export class CombatSystem {
   }
 
   /**
-   * Oblivion-style hit-chance for the player's melee swing.
+   * Hit-chance for the player's melee swing.
    *
    * Returns 1.0 (guaranteed hit) when:
    *   - No skill or attribute systems are wired (backward-compatible default), OR
@@ -1861,7 +1861,7 @@ export class CombatSystem {
       // Perfect block window: within first 0.3s of blocking.
       const isPerfect = this._blockActiveTimer < 0.3;
       
-      // Oblivion-style block: scale damage reduction with block skill.
+      // Block: scale damage reduction with block skill.
       const blockReduction = isPerfect ? 1.0 : this._blockDamageReduction();
       const blockCost = isPerfect ? 0 : this._blockStaminaCost();
       dmg = Math.max(0, Math.round(dmg * (1 - blockReduction)));
@@ -1886,7 +1886,7 @@ export class CombatSystem {
       }
       this.events?.emit("combat:blocked", {});
 
-      // Block counter: chance to stagger the attacker (Oblivion-style shield bash feel).
+      // Block counter: chance to stagger the attacker (shield bash feel).
       // Perfect block ALWAYS staggers.
       if (isPerfect || this.random() < BLOCK_COUNTER_STAGGER_CHANCE) {
         npc.isStaggered = true;

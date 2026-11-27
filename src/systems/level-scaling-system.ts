@@ -1,9 +1,9 @@
 import type { NPC } from "../entities/npc";
 
 /**
- * LevelScalingSystem — Oblivion-style enemy scaling.
+ * LevelScalingSystem — Enemy scaling.
  *
- * In Oblivion, creatures and NPCs scale with the player's level so that the
+ * Creatures and NPCs scale with the player's level so that the
  * world remains challenging throughout the playthrough.  This system mirrors
  * that behaviour by computing a scale factor from the player's current level
  * and applying it to a freshly-spawned NPC's stats.

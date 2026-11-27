@@ -1,7 +1,7 @@
 /**
- * MerchantRestockSystem — Oblivion-style timed merchant inventory restocking.
+ * MerchantRestockSystem — Timed merchant inventory restocking.
  *
- * In Oblivion, merchant inventories refresh every 72–120 in-game hours.
+ * Merchant inventories refresh every 72–120 in-game hours.
  * This system tracks per-merchant restock schedules using game-time (minutes)
  * from the TimeSystem.  When a merchant's restock window elapses their
  * inventory and gold are reset to a registered template snapshot.

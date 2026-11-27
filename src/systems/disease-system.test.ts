@@ -318,7 +318,7 @@ describe("DiseaseSystem — built-in disease roster", () => {
     expect(sys.getAttributePenalties().endurance).toBeLessThan(0);
   });
 
-  it("brain_rot applies larger intelligence penalty than witbane", () => {
+  it("falling_sickness applies larger intelligence penalty than brain_fog", () => {
     const sys1 = new DiseaseSystem();
     sys1.contractDisease("brain_fog", alwaysContract);
     const sys2 = new DiseaseSystem();
@@ -328,7 +328,7 @@ describe("DiseaseSystem — built-in disease roster", () => {
     );
   });
 
-  it("porphyric_hemophilia affects two attributes", () => {
+  it("moon_curse affects two attributes", () => {
     const sys = new DiseaseSystem();
     sys.contractDisease("moon_curse", alwaysContract);
     const p = sys.getAttributePenalties();

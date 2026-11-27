@@ -516,7 +516,7 @@ describe("FollowerSystem — getSaveState / restoreFromSave", () => {
   });
 });
 
-// ── Stance (Phase 2 — Avowed-inspired companion synergy) ─────────────────────
+// ── Stance (Phase 2 — companion synergy) ─────────────────────
 
 import {
   ROLE_ABILITIES,

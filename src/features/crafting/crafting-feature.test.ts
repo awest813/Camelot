@@ -43,7 +43,7 @@ const loaded = (t: { c: { alchemyPanel: { get(): Promise<unknown> }; enchantingP
   Promise.all([t.c.alchemyPanel.get(), t.c.enchantingPanel.get(), t.c.forgePanel.get()]).then(() => new Promise((r) => setTimeout(r, 0)));
 
 describe("CraftingFeature (headless, through the kernel)", () => {
-  it("starts the player with a forge kit, ingredients and soul gems", () => {
+  it("starts the player with a forge kit, ingredients and spirit vessels", () => {
     const t = setup();
     expect(t.items.map((i) => i.id)).toEqual(["iron_ingot", "leather_strips", "repair_hammer"]);
     expect(t.c.alchemy.getIngredientCount("plantain_leaves")).toBe(5);

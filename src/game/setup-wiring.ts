@@ -50,7 +50,7 @@ export function wireGameplay(g: Game): void {
   });
   g.eventBus.on("combat:playerStruck", () => {
       g.audioSystem.playPlayerHit();
-      // Small chance to contract a random disease on each hit (Oblivion-style).
+      // Small chance to contract a random disease on each hit .
       // ~5 % base chance per strike; resistance is factored inside contractDisease().
       const contagion = g.kernel.rng.stream("disease");
       if (contagion.chance(0.05)) {

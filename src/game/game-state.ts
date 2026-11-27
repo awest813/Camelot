@@ -210,7 +210,7 @@ export class GameState {
   public readonly _settings = new SettingsFeature();
   public get graphicsSettingsUI(): LazyPanel<GraphicsSettingsUI> { return this._settings.dialog; }
 
-  // v2 systems (Oblivion-lite)
+  // v2 systems 
   public attributeSystem: AttributeSystem;
   public timeSystem: TimeSystem;
   public stealthSystem: StealthSystem;
@@ -226,7 +226,7 @@ export class GameState {
   public shopSystem: ShopSystem;
   public cellManager: CellManager;
 
-  // v3 systems (Oblivion-lite depth)
+  // v3 systems (depth)
   public spellSystem: SpellSystem;
   public persuasionSystem: PersuasionSystem;
   public eventBus: GameEventBus;
@@ -235,7 +235,7 @@ export class GameState {
   /** Named schedule definitions; linked to {@link npcArchetypeSystem} for archetype `scheduleId`. */
   public npcScheduleSystem: NpcScheduleSystem;
 
-  // v4 systems (Oblivion-lite: alchemy)
+  // v4 systems (alchemy)
   /** Alchemy, enchanting and smithing (built early: see CraftingFeature). */
   public _crafting!: CraftingFeature;
   public get alchemySystem(): AlchemySystem { return this._crafting.alchemy; }
@@ -283,44 +283,44 @@ export class GameState {
     return this.kernel.services.get(JobsKey);
   }
 
-  // v5 systems (Oblivion parity: enchanting)
+  // v5 systems (enchanting)
   public get enchantingSystem(): EnchantingSystem { return this._crafting.enchanting; }
   public get enchantingUI(): LazyPanel<EnchantingUI> { return this._crafting.enchantingPanel; }
 
   // v4 browser optimisation: LOD culling
   public lodSystem: LodSystem;
 
-  // v6 systems (Oblivion atmosphere + hotkeys)
+  // v6 systems (hotkeys)
   public weatherSystem: WeatherSystem;
   public quickSlotSystem: QuickSlotSystem;
 
   // v7 systems (QoL + polish)
   public waitSystem: WaitSystem;
 
-  // v8 systems (Oblivion depth: skill progression, fast travel, level scaling)
+  // v8 systems (skill progression, fast travel, level scaling)
   public skillProgressionSystem: SkillProgressionSystem;
   public get fastTravelSystem(): FastTravelSystem { return this._fastTravel.places; }
   public levelScalingSystem: LevelScalingSystem;
 
-  // v9 systems (Oblivion parity: fame/infamy, active effects, jail)
+  // v9 systems (fame/infamy, active effects, jail)
   public fameSystem: FameSystem;
   public activeEffectsSystem: ActiveEffectsSystem;
   public jailSystem: JailSystem;
 
-  // v10 systems (Oblivion depth: spell making, respawn, merchant restock)
+  // v10 systems (spell making, respawn, merchant restock)
   public _spellMaking!: SpellMakingFeature;
   public get spellMakingSystem(): SpellMakingSystem { return this._spellMaking.altar; }
   public respawnSystem: RespawnSystem;
   public merchantRestockSystem: MerchantRestockSystem;
 
-  // v11 systems (Oblivion depth: character creation — birthsign and class)
+  // v11 systems (character creation — birthsign and class)
   /** Race, birthsign, class and the creation wizard. */
   public readonly _character = new CharacterFeature();
   public get birthsignSystem(): BirthsignSystem { return this._character.birthsigns; }
   public get classSystem(): ClassSystem { return this._character.classes; }
   public get raceSystem(): RaceSystem { return this._character.races; }
 
-  // v12 systems (Oblivion depth: character progression — skill-based level-up)
+  // v12 systems (character progression — skill-based level-up)
   public get playerLevelSystem(): PlayerLevelSystem { return this._progression.levels; }
 
   // v18 systems

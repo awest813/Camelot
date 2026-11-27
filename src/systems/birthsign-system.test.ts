@@ -145,7 +145,7 @@ describe("BirthsignSystem", () => {
     expect(system.getStatBonuses().maxMagicka).toBe(100);
   });
 
-  it("atronach sign gives +150 max magicka bonus", () => {
+  it("the Cauldron gives +150 max magicka bonus", () => {
     system.chooseBirthsign("cauldron");
     expect(system.getStatBonuses().maxMagicka).toBe(150);
   });
@@ -161,7 +161,7 @@ describe("BirthsignSystem", () => {
 
   // ── Passive flags ──────────────────────────────────────────────────────────
 
-  it("atronach sign marks stunted magicka", () => {
+  it("the Cauldron marks stunted magicka", () => {
     system.chooseBirthsign("cauldron");
     expect(system.stunted).toBe(true);
   });

@@ -25,12 +25,12 @@ describe("HorseSystem", () => {
 
   beforeEach(() => {
     hs = new HorseSystem();
-    hs.registerHorse({ id: "shadowmere", name: "Shadowmere", speed: 2.5, saddlebagCapacity: 5, stableId: "whiterun_stable" });
-    hs.registerHorse({ id: "frost", name: "Frost", speed: 2.0, stableId: "whiterun_stable" });
+    hs.registerHorse({ id: "llamrei", name: "Llamrei", speed: 2.5, saddlebagCapacity: 5, stableId: "camelot_stable" });
+    hs.registerHorse({ id: "frost", name: "Frost", speed: 2.0, stableId: "camelot_stable" });
     hs.registerStableNPC({
-      npcName: "Skulvar",
-      availableHorseIds: ["shadowmere", "frost"],
-      prices: { shadowmere: 1000, frost: 500 },
+      npcName: "Old Hob",
+      availableHorseIds: ["llamrei", "frost"],
+      prices: { llamrei: 1000, frost: 500 },
     });
   });
 
@@ -38,7 +38,7 @@ describe("HorseSystem", () => {
 
   it("should register horses and expose them via horses getter", () => {
     expect(hs.horses).toHaveLength(2);
-    expect(hs.horses.map(h => h.id)).toContain("shadowmere");
+    expect(hs.horses.map(h => h.id)).toContain("llamrei");
   });
 
   it("should return null for unknown horse id", () => {
@@ -58,39 +58,39 @@ describe("HorseSystem", () => {
   // ── Stable / purchasing ──────────────────────────────────────────────────
 
   it("purchaseHorse returns -1 for unknown NPC", () => {
-    expect(hs.purchaseHorse("NoOne", "shadowmere", 9999)).toBe(-1);
+    expect(hs.purchaseHorse("NoOne", "llamrei", 9999)).toBe(-1);
   });
 
   it("purchaseHorse returns -1 when horse not in stable roster", () => {
-    expect(hs.purchaseHorse("Skulvar", "unicorn", 9999)).toBe(-1);
+    expect(hs.purchaseHorse("Old Hob", "unicorn", 9999)).toBe(-1);
   });
 
   it("purchaseHorse returns -1 when player cannot afford", () => {
-    expect(hs.purchaseHorse("Skulvar", "shadowmere", 50)).toBe(-1);
+    expect(hs.purchaseHorse("Old Hob", "llamrei", 50)).toBe(-1);
   });
 
   it("purchaseHorse grants ownership and returns price", () => {
-    const price = hs.purchaseHorse("Skulvar", "shadowmere", 2000);
+    const price = hs.purchaseHorse("Old Hob", "llamrei", 2000);
     expect(price).toBe(1000);
-    expect(hs.getHorse("shadowmere")!.isOwned).toBe(true);
+    expect(hs.getHorse("llamrei")!.isOwned).toBe(true);
   });
 
   it("purchaseHorse returns -2 when horse already owned", () => {
     hs.grantHorse("frost");
-    expect(hs.purchaseHorse("Skulvar", "frost", 9999)).toBe(-2);
+    expect(hs.purchaseHorse("Old Hob", "frost", 9999)).toBe(-2);
   });
 
   it("purchaseHorse fires onHorsePurchased callback", () => {
     let purchased: string | null = null;
     hs.onHorsePurchased = (h) => { purchased = h.id; };
-    hs.purchaseHorse("Skulvar", "frost", 500);
+    hs.purchaseHorse("Old Hob", "frost", 500);
     expect(purchased).toBe("frost");
   });
 
   // ── Mounting / dismounting ──────────────────────────────────────────────
 
   it("cannot mount unowned horse", () => {
-    expect(hs.mountHorse("shadowmere")).toBe(false);
+    expect(hs.mountHorse("llamrei")).toBe(false);
     expect(hs.isMounted).toBe(false);
   });
 
@@ -99,35 +99,35 @@ describe("HorseSystem", () => {
   });
 
   it("can mount owned horse and fires onMount with speed multiplier", () => {
-    hs.grantHorse("shadowmere");
+    hs.grantHorse("llamrei");
     let mountedId: string | null = null;
     let receivedSpeed = 0;
     hs.onMount = (h, speed) => { mountedId = h.id; receivedSpeed = speed; };
 
-    expect(hs.mountHorse("shadowmere")).toBe(true);
+    expect(hs.mountHorse("llamrei")).toBe(true);
     expect(hs.isMounted).toBe(true);
-    expect(hs.currentHorse?.id).toBe("shadowmere");
-    expect(mountedId).toBe("shadowmere");
+    expect(hs.currentHorse?.id).toBe("llamrei");
+    expect(mountedId).toBe("llamrei");
     expect(receivedSpeed).toBe(2.5);
   });
 
   it("cannot mount while already mounted", () => {
-    hs.grantHorse("shadowmere");
+    hs.grantHorse("llamrei");
     hs.grantHorse("frost");
-    hs.mountHorse("shadowmere");
+    hs.mountHorse("llamrei");
     expect(hs.mountHorse("frost")).toBe(false);
   });
 
   it("can dismount and fires onDismount", () => {
-    hs.grantHorse("shadowmere");
-    hs.mountHorse("shadowmere");
+    hs.grantHorse("llamrei");
+    hs.mountHorse("llamrei");
     let dismountedId: string | null = null;
     hs.onDismount = (h) => { dismountedId = h.id; };
 
     expect(hs.dismountHorse()).toBe(true);
     expect(hs.isMounted).toBe(false);
     expect(hs.currentHorse).toBeNull();
-    expect(dismountedId).toBe("shadowmere");
+    expect(dismountedId).toBe("llamrei");
   });
 
   it("dismount returns false when not mounted", () => {
@@ -141,52 +141,52 @@ describe("HorseSystem", () => {
   });
 
   it("can add items to saddlebag", () => {
-    expect(hs.saddlebagAddItem("shadowmere", SWORD)).toBe(true);
-    expect(hs.getSaddlebag("shadowmere")).toHaveLength(1);
+    expect(hs.saddlebagAddItem("llamrei", SWORD)).toBe(true);
+    expect(hs.getSaddlebag("llamrei")).toHaveLength(1);
   });
 
   it("stacks stackable items in saddlebag", () => {
-    hs.saddlebagAddItem("shadowmere", POTION);
-    hs.saddlebagAddItem("shadowmere", { ...POTION, quantity: 3 });
-    const bag = hs.getSaddlebag("shadowmere")!;
+    hs.saddlebagAddItem("llamrei", POTION);
+    hs.saddlebagAddItem("llamrei", { ...POTION, quantity: 3 });
+    const bag = hs.getSaddlebag("llamrei")!;
     expect(bag).toHaveLength(1);
     expect(bag[0].quantity).toBe(5);
   });
 
   it("rejects items when saddlebag is full (capacity=5)", () => {
     for (let i = 0; i < 5; i++) {
-      hs.saddlebagAddItem("shadowmere", { ...SWORD, id: `item_${i}` });
+      hs.saddlebagAddItem("llamrei", { ...SWORD, id: `item_${i}` });
     }
-    expect(hs.saddlebagAddItem("shadowmere", { ...SWORD, id: "overflow" })).toBe(false);
+    expect(hs.saddlebagAddItem("llamrei", { ...SWORD, id: "overflow" })).toBe(false);
   });
 
   it("can remove items from saddlebag", () => {
-    hs.saddlebagAddItem("shadowmere", SWORD);
-    expect(hs.saddlebagRemoveItem("shadowmere", "iron_sword")).toBe(true);
-    expect(hs.getSaddlebag("shadowmere")).toHaveLength(0);
+    hs.saddlebagAddItem("llamrei", SWORD);
+    expect(hs.saddlebagRemoveItem("llamrei", "iron_sword")).toBe(true);
+    expect(hs.getSaddlebag("llamrei")).toHaveLength(0);
   });
 
   it("decrements stack quantity when removing stackable items", () => {
-    hs.saddlebagAddItem("shadowmere", { ...POTION, quantity: 5 });
-    hs.saddlebagRemoveItem("shadowmere", "health_potion", 2);
-    expect(hs.getSaddlebag("shadowmere")![0].quantity).toBe(3);
+    hs.saddlebagAddItem("llamrei", { ...POTION, quantity: 5 });
+    hs.saddlebagRemoveItem("llamrei", "health_potion", 2);
+    expect(hs.getSaddlebag("llamrei")![0].quantity).toBe(3);
   });
 
   it("returns false when removing item not in saddlebag", () => {
-    expect(hs.saddlebagRemoveItem("shadowmere", "ghost_item")).toBe(false);
+    expect(hs.saddlebagRemoveItem("llamrei", "ghost_item")).toBe(false);
   });
 
   // ── Persistence ───────────────────────────────────────────────────────────
 
   it("getSaveState captures ownership, mount state, and saddlebag", () => {
-    hs.grantHorse("shadowmere");
-    hs.mountHorse("shadowmere");
-    hs.saddlebagAddItem("shadowmere", SWORD);
+    hs.grantHorse("llamrei");
+    hs.mountHorse("llamrei");
+    hs.saddlebagAddItem("llamrei", SWORD);
 
     const state = hs.getSaveState();
     expect(state.isMounted).toBe(true);
-    expect(state.currentHorseId).toBe("shadowmere");
-    const saved = state.horses.find(h => h.id === "shadowmere")!;
+    expect(state.currentHorseId).toBe("llamrei");
+    const saved = state.horses.find(h => h.id === "llamrei")!;
     expect(saved.isOwned).toBe(true);
     expect(saved.saddlebag).toHaveLength(1);
   });
@@ -197,7 +197,7 @@ describe("HorseSystem", () => {
     const state = hs.getSaveState();
 
     const hs2 = new HorseSystem();
-    hs2.registerHorse({ id: "shadowmere", name: "Shadowmere", speed: 2.5, saddlebagCapacity: 5 });
+    hs2.registerHorse({ id: "llamrei", name: "Llamrei", speed: 2.5, saddlebagCapacity: 5 });
     hs2.registerHorse({ id: "frost", name: "Frost", speed: 2.0 });
 
     hs2.restoreFromSave(state);
@@ -206,12 +206,12 @@ describe("HorseSystem", () => {
   });
 
   it("restoreFromSave with isMounted=true fires onMount and sets currentHorse", () => {
-    hs.grantHorse("shadowmere");
-    hs.mountHorse("shadowmere");
+    hs.grantHorse("llamrei");
+    hs.mountHorse("llamrei");
     const state = hs.getSaveState();
 
     const hs2 = new HorseSystem();
-    hs2.registerHorse({ id: "shadowmere", name: "Shadowmere", speed: 2.5, saddlebagCapacity: 5 });
+    hs2.registerHorse({ id: "llamrei", name: "Llamrei", speed: 2.5, saddlebagCapacity: 5 });
     hs2.registerHorse({ id: "frost", name: "Frost", speed: 2.0 });
 
     let mounted = false;
@@ -219,16 +219,16 @@ describe("HorseSystem", () => {
     hs2.restoreFromSave(state);
 
     expect(hs2.isMounted).toBe(true);
-    expect(hs2.currentHorse?.id).toBe("shadowmere");
+    expect(hs2.currentHorse?.id).toBe("llamrei");
     expect(mounted).toBe(true);
   });
 
   it("restoreFromSave handles dismounted state", () => {
-    hs.grantHorse("shadowmere");
+    hs.grantHorse("llamrei");
     const state = hs.getSaveState();
 
     const hs2 = new HorseSystem();
-    hs2.registerHorse({ id: "shadowmere", name: "Shadowmere", speed: 2.5, saddlebagCapacity: 5 });
+    hs2.registerHorse({ id: "llamrei", name: "Llamrei", speed: 2.5, saddlebagCapacity: 5 });
     hs2.registerHorse({ id: "frost", name: "Frost", speed: 2.0 });
     hs2.restoreFromSave(state);
 
@@ -237,25 +237,25 @@ describe("HorseSystem", () => {
   });
 
   it("getSaveState round-trips correctly", () => {
-    hs.grantHorse("shadowmere");
-    hs.saddlebagAddItem("shadowmere", { ...SWORD });
+    hs.grantHorse("llamrei");
+    hs.saddlebagAddItem("llamrei", { ...SWORD });
     const state = hs.getSaveState();
 
     const hs2 = new HorseSystem();
-    hs2.registerHorse({ id: "shadowmere", name: "Shadowmere", speed: 2.5, saddlebagCapacity: 5 });
+    hs2.registerHorse({ id: "llamrei", name: "Llamrei", speed: 2.5, saddlebagCapacity: 5 });
     hs2.registerHorse({ id: "frost", name: "Frost", speed: 2.0 });
     hs2.restoreFromSave(state);
 
     const state2 = hs2.getSaveState();
-    expect(state2.horses.find(h => h.id === "shadowmere")?.isOwned).toBe(true);
-    expect(state2.horses.find(h => h.id === "shadowmere")?.saddlebag).toHaveLength(1);
+    expect(state2.horses.find(h => h.id === "llamrei")?.isOwned).toBe(true);
+    expect(state2.horses.find(h => h.id === "llamrei")?.saddlebag).toHaveLength(1);
   });
 
   it("getStableNPC returns the registered NPC", () => {
-    const stable = hs.getStableNPC("Skulvar");
+    const stable = hs.getStableNPC("Old Hob");
     expect(stable).not.toBeNull();
-    expect(stable!.npcName).toBe("Skulvar");
-    expect(stable!.availableHorseIds).toContain("shadowmere");
+    expect(stable!.npcName).toBe("Old Hob");
+    expect(stable!.availableHorseIds).toContain("llamrei");
   });
 
   it("getStableNPC returns null for unknown NPC", () => {

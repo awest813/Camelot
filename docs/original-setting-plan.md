@@ -183,21 +183,31 @@ not named) can stay generic.
 4. **Screenshots** of the creator, the sheet, the words window, the companion
    window and the alchemy bench after each player-facing phase.
 
-## 4. Phases
+## 4. Phases (all done, 2026-11-27)
 
-| Phase | Content | Why first | Size |
-|---|---|---|---|
-| 0 | Save version 30 (older refused), guardrail baseline | Everything after relies on it | S, done |
-| 1 | Heritages, omens, callings (the creator) | The first screen a player sees | L |
-| 2 | Companions; delete the parked standing stones | Named characters are the most recognisable | M |
-| 3 | Words of the Old Tongue (shouts) | The most distinctive borrowing | L |
-| 4 | Spells, ingredients, diseases, effect names | Systemic names, many ids | M |
-| 5 | Gear tiers, spirit vessels, creatures, coins | Items in saves and loot tables | M |
-| 6 | Skills and magic schools (ids stay, names change) | Touches perks and UI everywhere | M |
-| 7 | README, ROADMAP, CHANGELOG, store copy, code comments; guardrail to zero | Nothing left to find | S |
+| Phase | Content | Done |
+|---|---|---|
+| 0 | Save version 30 (older refused, the title says so); the `borrowed-names` guardrail | 601 names |
+| 1 | Eight heritages, thirteen omens, the callings (Warden, War-druid, Hedge-witch …) | 346 |
+| 2 | Companions from the legend (Sir Kay, Dame Lynette, Taliesin …); standing stones deleted | 258 |
+| 3 | Words of the Old Tongue (Gust, Flame, Held Moment …, ranks in Welsh), awen | 239 |
+| 4 | Ailments, hedgerow herbs, the realm's spells; Lightfoot / Weight / Owl-sight | 202 |
+| 5 | Saxon, Fae-wrought, Crystal, Star-iron and Annwn-forged gear; spirit vessels; barrow-dead | 138 |
+| 6 | Skill and school names (Swordplay, Archery, Evocation, Mending …) | 138 |
+| 7 | Code comments, test data, the README; the matcher widened (places, characters, ids) | 0 |
 
-Each phase ends with unit tests, guardrails (the borrowed-names count lower),
-the bundle check and the browser tests green.
+The guardrail now holds the count at zero. What is left on purpose:
+
+- **History:** `CHANGELOG.md` and `ROADMAP.md` record what shipped, under the old
+  names, with a note at the top; `docs/engine-overhaul-plan.md` likewise.
+- **Generic genre words** stay: Restore / Fortify / Damage effects, Warrior-style
+  class words (Knight, Mage, Archer, Bard, Monk, Rogue, Assassin), "standing
+  stone" as the ordinary word for a menhir.
+- **Code names** keep their old ids where only the player-facing name changed
+  (skills such as `marksman`, `DragonShoutSystem`, `dragonSouls`), so diffs stayed
+  small; renaming them is cosmetic.
+- **Omen powers** only announce themselves (as the old birthsign powers did); making
+  them act is separate gameplay work.
 
 ## 5. Decisions (2026-11-27)
 

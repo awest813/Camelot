@@ -75,8 +75,13 @@ export const BORROWED_NAMES = [
   "Harrada", "Clannfear", "Spiddal", "Cairn Bolete", "Imp Gall", "Wisp Stalk",
   "Witbane", "Collywobbles", "Rust Chancre", "Porphyric", "Yellow Tick", "Swamp Rot", "Brain Rot",
   "Oakflesh", "Guardian Stone", "Guardian Stones",
+  "Morrowind", "Shadowmere", "Riften", "Windhelm", "Markarth", "Winterhold", "Falkreath", "Morthal", "Dawnstar",
+  "Riverwood", "Helgen", "Kvatch", "Bruma", "Chorrol", "Cheydinhal", "Leyawiin", "Skingrad", "Bravil",
+  "Nirnroot", "Skooma", "Sweetroll", "Housecarl", "Jarl", "Sovngarde", "Akatosh", "Faendal", "Skulvar", "Vivec",
 ];
-const BORROWED_RE = new RegExp(`(?<![\\w'])(?:${BORROWED_NAMES.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?![\\w'])`, "gi");
+// Letters (and apostrophes) bound a name; digits and underscores don't, so ids like
+// "whiterun_guard" count too.
+const BORROWED_RE = new RegExp(`(?<![A-Za-z'])(?:${BORROWED_NAMES.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?![A-Za-z'])`, "gi");
 
 /** Borrowed names in `text`. */
 export function countBorrowed(text) {

@@ -32,7 +32,7 @@ export function resolveSneakAttackMultiplier(
  * Resistance/weakness pass:
  *   damage = baseDamage × max(0, 1 − resistance + weakness)
  *
- * Armor rating pass (physical damage only — Oblivion-style):
+ * Armor rating pass (physical damage only):
  *   effectiveAR = armorRating × (1 − armorPenFraction)
  *   damage = damage × 100 / (100 + effectiveAR)
  *

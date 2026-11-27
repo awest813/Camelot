@@ -309,7 +309,7 @@ export class NPC {
   public damageWeaknesses: Partial<Record<DamageType, number>> = {};
 
   /**
-   * Oblivion-style armor rating. Reduces incoming physical damage multiplicatively.
+   * Armor rating. Reduces incoming physical damage multiplicatively.
    * Formula: `damage × 100 / (100 + armorRating)`
    * - AR 0   → no reduction (default)
    * - AR 100 → 50 % reduction

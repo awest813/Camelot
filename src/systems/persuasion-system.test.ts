@@ -168,7 +168,7 @@ describe("PersuasionSystem", () => {
 
 
 
-  // ── Oblivion-style action affinity checks ─────────────────────────────────
+  // ── action affinity checks ─────────────────────────────────
 
   it("getActionAffinity is deterministic per npc/action", () => {
     const a = ps.getActionAffinity("npc_affinity", "admire");

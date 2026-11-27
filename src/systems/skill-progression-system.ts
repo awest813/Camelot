@@ -1,5 +1,5 @@
 /**
- * SkillProgressionSystem — Oblivion-style use-based skill leveling.
+ * SkillProgressionSystem — Use-based skill leveling.
  *
  * Unlike the SkillTreeSystem (which is a point-buy perk tree), this system
  * mirrors Oblivion's core: skills improve by *doing*.  Every time the player

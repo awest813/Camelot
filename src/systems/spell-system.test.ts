@@ -315,7 +315,7 @@ describe("SpellSystem", () => {
     expect(schools.has("conjuration")).toBe(true);
   });
 
-  it("can cast Alteration self-buff spell (Oakflesh)", () => {
+  it("can cast a Warding self-buff spell (Bark-skin)", () => {
     sys.learnSpell("barkskin");
     sys.equipSpell("barkskin");
     const initialMagicka = player.magicka;

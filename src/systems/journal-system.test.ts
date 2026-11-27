@@ -435,7 +435,7 @@ describe("JournalSystem", () => {
         title: "Round Trip",
         body: "Check all fields.",
         category: "quest",
-        tags: ["cyrodiil", "main"],
+        tags: ["camelot", "main"],
         summary: "A brief summary.",
         favorite: true,
       });
@@ -446,7 +446,7 @@ describe("JournalSystem", () => {
       expect(e.title).toBe("Round Trip");
       expect(e.body).toBe("Check all fields.");
       expect(e.category).toBe("quest");
-      expect(e.tags).toEqual(["cyrodiil", "main"]);
+      expect(e.tags).toEqual(["camelot", "main"]);
       expect(e.summary).toBe("A brief summary.");
       expect(e.favorite).toBe(true);
     });

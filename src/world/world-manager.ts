@@ -982,7 +982,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
   }
 
   /**
-   * Giant mushroom — Oblivion Blackwood/Morrowind overgrown-forest atmosphere.
+   * Giant mushroom — overgrown-forest atmosphere.
    * Thick pale stalk with a broad spotted cap in earthy burgundy/red.
    */
   private _spawnMushroom(x: number, z: number, name: string, scale: number): Mesh[] {
@@ -997,7 +997,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
       return m;
     });
 
-    // Earthy wine-red cap — Morrowind Telvanni / Oblivion deepwoods feel
+    // Earthy wine-red cap — a deep-woods feel
     const capMat = this._envMat("mushroom_cap", () => {
       const m = new StandardMaterial("mushroom_cap", this.scene);
       m.diffuseColor  = new Color3(0.62, 0.10, 0.08);
@@ -1116,7 +1116,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
 
   /**
    * Wildflower cluster — tiny coloured sphere "blooms" scattered in a radius.
-   * Plains ambient detail for a living Cyrodiil/Skyrim landscape.
+   * Plains ambient detail for a living landscape.
    */
   private _spawnWildflowers(x: number, z: number, name: string, seed: number): Mesh[] {
     const meshes: Mesh[] = [];
@@ -1235,7 +1235,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
   }
 
   /**
-   * Dead twisted tree — Skyrim Winterhold / Morthal atmosphere.
+   * Dead twisted tree — bleak northern atmosphere.
    * Bare black branches reaching skyward like clawed hands.
    */
   private _spawnDeadTree(x: number, z: number, name: string, scale: number): Mesh[] {

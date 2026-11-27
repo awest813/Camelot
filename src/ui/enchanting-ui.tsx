@@ -85,11 +85,11 @@ export function EnchantingPanel(p: EnchantingPanelProps) {
           ))}
         </section>
         <section class="craft-panel__section" aria-label="Spirit vessels">
-          <h3 class="craft-panel__section-title">Soul Gems</h3>
+          <h3 class="craft-panel__section-title">Spirit Vessels</h3>
           {gems.length === 0 && <p class="craft-panel__empty">No spirit vessels</p>}
           {gems.map(({ def, count }) => (
             <button key={def.type} type="button" class="craft-panel__row" aria-pressed={def.type === s.gem}
-              aria-label={`Soul Gem: ${def.name}`} onClick={() => p.onGem(def.type)}>
+              aria-label={`Spirit vessel: ${def.name}`} onClick={() => p.onGem(def.type)}>
               <span>
                 <span class="craft-panel__row-name">{def.name}  ×{count}</span>
                 <span class="craft-panel__row-detail">{def.magnitudeMultiplier}× magnitude</span>

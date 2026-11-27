@@ -183,10 +183,10 @@ describe("ClassSystem", () => {
     // (it's a minor skill for warrior — so check destruction which is minor too
     //  or pick a skill truly absent)
     // Actually let's just verify via isMajorSkill / isMinorSkill combo
-    // Use battlemage which has different skill lists
+    // Use the war-druid, which has different skill lists
     const newSystem = new ClassSystem();
     newSystem.chooseClass("wardruid");
-    // alchemy is a major for battlemage — ensure it returns major mult
+    // alchemy is a major for the war-druid — ensure it returns major mult
     expect(newSystem.xpMultiplierFor("alchemy")).toBe(MAJOR_SKILL_XP_MULTIPLIER);
   });
 

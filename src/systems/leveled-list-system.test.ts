@@ -412,9 +412,9 @@ describe("LeveledListSystem", () => {
     expect(r.value).toBe("wolf");
   });
 
-  it("ll_creature_beast resolves to frost_atronach at level 12+", () => {
+  it("ll_creature_beast resolves to winter_wraith at level 12+", () => {
     const r = lls.resolve("ll_creature_beast", 12, 1);
-    expect(r.value).toBe("frost_atronach");
+    expect(r.value).toBe("winter_wraith");
   });
 
   it("ll_creature_humanoid resolves to bandit at level 1", () => {

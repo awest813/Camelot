@@ -27,5 +27,6 @@ describe("borrowed-names", () => {
     expect(countBorrowed("J'zargo uses the Thu'um")).toBe(2);
     expect(countBorrowed("Petty Soul Gem, two soul gems")).toBe(2);
     expect(countBorrowed("Nordic north, Bretony, normal")).toBe(0);
+    expect(countBorrowed('factionId: "whiterun_guard"'), "inside a snake_case id").toBe(1);
   });
 });

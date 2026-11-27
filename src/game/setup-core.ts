@@ -35,7 +35,7 @@ import { syncWeaponArchetype } from "./game-loop";
 import { restoreGameplayInput, suspendGameplayInput } from "./play-focus";
 
 export function setupCoreSystems(g: Game): void {
-  // ── v2 Oblivion-lite systems ──────────────────────────────────────────────
+  // ── v2 systems ──────────────────────────────────────────────
   g.attributeSystem = new AttributeSystem();
   g.timeSystem      = new TimeSystem(120, 8);  // 2-min real day, start at 08:00
   g.cellManager     = new CellManager(g.scene, g.player);

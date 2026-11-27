@@ -49,8 +49,8 @@ describe("MarkRecallSystem — mark()", () => {
 
   it("stores an explicit cellId", () => {
     const sys = new MarkRecallSystem();
-    sys.mark(makePos(), "cell_vivec_arena");
-    expect(sys.markedCellId).toBe("cell_vivec_arena");
+    sys.mark(makePos(), "cell_tilting_yard");
+    expect(sys.markedCellId).toBe("cell_tilting_yard");
   });
 
   it("passing null cellId stores null", () => {
@@ -270,12 +270,12 @@ describe("MarkRecallSystem — getSaveState() / restoreFromSave()", () => {
     const savedState: MarkRecallSaveState = {
       hasMarked: true,
       position: { x: 5, y: 2, z: -9 },
-      cellId: "cell_vivec_palace",
+      cellId: "cell_caerleon_hall",
     };
     sys.restoreFromSave(savedState);
     expect(sys.hasMarked).toBe(true);
     expect(sys.markedPosition).toEqual({ x: 5, y: 2, z: -9 });
-    expect(sys.markedCellId).toBe("cell_vivec_palace");
+    expect(sys.markedCellId).toBe("cell_caerleon_hall");
   });
 
   it("restoreFromSave restores no-mark state", () => {

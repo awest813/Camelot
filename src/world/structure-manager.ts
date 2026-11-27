@@ -328,7 +328,7 @@ export class StructureManager {
 
   /**
    * Place a wall-mounted torch sconce: iron bracket cylinder + flame cone with
-   * emissive warm-orange glow and a dynamic PointLight. Oblivion-style ambient.
+   * emissive warm-orange glow and a dynamic PointLight. ambient.
    */
   private _addTorch(name: string, position: Vector3, meshes: Mesh[], lights: PointLight[]): void {
     // Iron sconce bracket
@@ -379,7 +379,7 @@ export class StructureManager {
 
   /**
    * Place a campfire: ring of log stumps + flame cone with PointLight.
-   * Guards' resting spot — warm Oblivion/Skyrim dungeon atmosphere.
+   * Guards' resting spot — warm dungeon atmosphere.
    */
   private _addCampfire(name: string, position: Vector3, meshes: Mesh[], lights: PointLight[]): void {
     const logMat = this._mat("campfire_log", new Color3(0.28, 0.14, 0.05), new Color3(0.05, 0.03, 0.01), 10);
@@ -447,7 +447,7 @@ export class StructureManager {
 
   /**
    * Place a wooden barrel with iron bands. Stacked beside structures for
-   * a lived-in Oblivion/Skyrim feel.
+   * a lived-in feel.
    */
   private _addBarrel(name: string, position: Vector3, meshes: Mesh[], bodies: PhysicsAggregate[]): void {
     const woodMat = this._mat("barrel_wood", new Color3(0.42, 0.26, 0.08), new Color3(0.10, 0.06, 0.02), 14);
@@ -480,7 +480,7 @@ export class StructureManager {
 
   /**
    * Place a faction banner: a tall pole with a coloured pennant.
-   * Marks guard camps and ruins for an Oblivion-style occupied fort feel.
+   * Marks guard camps and ruins for an occupied fort feel.
    * @param materialKey  Stable key for the pennant colour — used to share the material across chunks.
    */
   private _addBanner(name: string, position: Vector3, bannerColor: Color3, materialKey: string, meshes: Mesh[]): void {
@@ -519,7 +519,7 @@ export class StructureManager {
 
   /**
    * Place a carved standing stone / monolith.  Scattered throughout the world
-   * as Oblivion-style waymarkers and ancient Ayleid remnants.
+   * as waymarkers and ancient Ayleid remnants.
    */
   private _addStandingStone(name: string, position: Vector3, height: number, meshes: Mesh[], bodies: PhysicsAggregate[]): void {
     const stoneMat = this._mat(

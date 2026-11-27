@@ -9,7 +9,7 @@ export const WAIT_MIN_HOURS = 1;
 export const WAIT_MAX_HOURS = 24;
 /**
  * Fraction of each stat restored per hour waited.
- * At full 24 h the player is completely restored, matching Oblivion bed-rest
+ * At full 24 h the player is completely restored, as with a full night in a bed
  * behaviour where sleeping fully recovers all resources.
  */
 const RESTORE_RATE_PER_HOUR = 1 / 24;
@@ -24,7 +24,7 @@ export interface WaitSaveState {
 // ── System ────────────────────────────────────────────────────────────────────
 
 /**
- * WaitSystem — Oblivion-style time-skip rest mechanic.
+ * WaitSystem — Time-skip rest mechanic.
  *
  * Press T (the "toggleWaitDialog" action, game/input-wiring.ts) to open the Wait dialog.  The player chooses
  * 1–24 hours; `wait()` then advances the TimeSystem clock and restores

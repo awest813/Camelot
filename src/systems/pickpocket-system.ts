@@ -1,6 +1,6 @@
 import { unseededRandom } from "../core/rng/rng";
 /**
- * PickpocketSystem — Oblivion/Morrowind-style pickpocketing for Camelot.
+ * PickpocketSystem — pickpocketing for Camelot.
  *
  * Allows the player to steal items from NPC inventories while crouching
  * and undetected.  Success probability scales with the Sneak skill and is

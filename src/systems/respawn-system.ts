@@ -1,5 +1,5 @@
 /**
- * RespawnSystem — Oblivion-style zone respawning.
+ * RespawnSystem — Zone respawning.
  *
  * Oblivion's encounter zones and dungeons respawn their enemies and loot
  * containers after a fixed period of in-game time (default 3 in-game days =

@@ -168,7 +168,7 @@ export class InteractionSystem {
   /**
    * Returns the pickpocket prompt text when sneaking undetected behind a
    * living, non-hostile NPC with something to steal — otherwise null.
-   * Mirrors the Oblivion rule: crouch + undetected + a registered inventory.
+   * The rule: crouch + undetected + a registered inventory.
    */
   private _pickpocketPromptFor(npc: NPC): string | null {
     if (!this.stealthSystem || !this.pickpocketSystem) return null;

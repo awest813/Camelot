@@ -1,10 +1,10 @@
 /**
- * TrainerSystem — Morrowind-style NPC skill training for Camelot.
+ * TrainerSystem — NPC skill training: pay a trainer, gain a skill level.
  *
  * Players can pay NPC trainers to directly raise a skill level, up to the
  * trainer's expertise cap (`maxLevel`).  To prevent runaway grinding the
  * system enforces a configurable `maxSessionsPerLevel` limit (default 5) —
- * the same limit Morrowind and Oblivion used — that resets whenever the
+ * a common limit in the genre — that resets whenever the
  * player's character level increases via {@link onCharacterLevelUp}.
  *
  * Cost formula:
@@ -213,7 +213,7 @@ export class TrainerSystem {
   /**
    * Maximum number of training sessions allowed per character level cycle.
    * Reset to zero when `onCharacterLevelUp()` is called.
-   * Default: 5 (mirrors Morrowind / Oblivion).
+   * Default: 5 (the genre's usual limit).
    */
   public maxSessionsPerLevel: number = DEFAULT_MAX_SESSIONS_PER_LEVEL;
 

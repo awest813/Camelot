@@ -3,6 +3,11 @@
 All notable changes to Camelot are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+> **The setting changed (save version 30).** Entries below that predate it name
+> content borrowed from The Elder Scrolls (races, birthsigns, shouts, followers,
+> diseases, ingredients and so on). All of it has since been replaced by the
+> game's own Arthurian setting; see `docs/original-setting-plan.md`.
+
 ## [Unreleased]
 
 ### Added
