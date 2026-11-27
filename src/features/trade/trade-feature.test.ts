@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Kernel } from "../../core/kernel";
-import { FeedbackKey, ModalKey, PurseKey } from "../services";
+import { FeedbackKey, LawKey, ModalKey, PurseKey } from "../services";
 import { TradeFeature, TradeHostKey, TradeKey, type TradeHostService } from "./trade-feature";
 
 function setup(opts: { open?: boolean } = {}) {
@@ -89,6 +89,22 @@ describe("TradeFeature (headless, through the kernel)", () => {
     expect(t.svc.containerPanel.isVisible).toBe(false);
     expect(t.containers.closeContainer).toHaveBeenCalled();
     expect(emptied).toEqual(["chest"]);
+    t.k.uninstall("trade");
+  });
+
+  it("taking from someone's chest is theft, reported once per opening; one's own takings are not", () => {
+    const t = setup();
+    const crimes: Array<[string, string]> = [];
+    t.k.services.provide(LawKey, { crime: { commitCrime: (type: string, faction: string) => { crimes.push([type, faction]); return 0; } }, now: () => 0 } as never);
+    t.containers.activeContainer = { id: "chest_site_forest-inn_1_1", contents: [{ id: "gold" }, { id: "sword" }], owner: "village_guard" } as never;
+    t.containers.onContainerOpen!();
+    t.svc.containerPanel.onTakeItem!("gold");
+    t.svc.containerPanel.onTakeItem!("sword");
+    expect(crimes).toEqual([["theft", "village_guard"]]);
+    t.containers.activeContainer = { id: "chest_01", contents: [{ id: "gold" }] } as never;
+    t.containers.onContainerOpen!();
+    t.svc.containerPanel.onTakeItem!("gold");
+    expect(crimes, "no owner, no crime").toHaveLength(1);
     t.k.uninstall("trade");
   });
 });

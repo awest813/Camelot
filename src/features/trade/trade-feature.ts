@@ -8,7 +8,10 @@
  *
  * The barter window loads the first time it opens.
  *
- * Inputs:   services trade-host, purse, feedback, modal; events
+ * Taking from a chest with an owner is theft (the law service records it,
+ * if anyone sees).
+ *
+ * Inputs:   services trade-host, purse, feedback, modal, law; events
  *           `dialogue:action` ("barter:open"), `dialogue:closed`.
  * Outputs:  the `trade` service; event `container:emptied`.
  *
@@ -23,7 +26,7 @@ import type { BarterSystem } from "../../systems/barter-system";
 import type { ShopSystem } from "../../systems/shop-system";
 import type { ContainerSystem } from "../../systems/container-system";
 import type { Item } from "../../systems/inventory-system";
-import { FeedbackKey, ModalKey, PurseKey, declareStateless } from "../services";
+import { FeedbackKey, LawKey, ModalKey, PurseKey, declareStateless } from "../services";
 
 const DEFAULT_MERCHANT = "merchant_01";
 
@@ -91,7 +94,18 @@ export class TradeFeature implements Feature {
     };
 
     const containers = host().containers;
+    // Taking from someone's chest is theft: reported once per opening (the
+    // crime system counts it only if someone sees).
+    let reported: string | null = null;
+    const theft = () => {
+      const active = containers.activeContainer;
+      if (!active?.owner || reported === active.id) return;
+      reported = active.id;
+      const law = s.tryGet(LawKey);
+      law?.crime.commitCrime("theft", active.owner, law.now());
+    };
     containers.onContainerOpen = () => {
+      reported = null;
       this.containerPanel.show();
       this.containerPanel.update(containers);
       s.get(ModalKey).suspendGameplay();
@@ -99,7 +113,7 @@ export class TradeFeature implements Feature {
     this.containerPanel.onTakeItem = (itemId) => {
       const active = containers.activeContainer;
       if (!active) return;
-      if (containers.takeItem(active.id, itemId)) dirty();
+      if (containers.takeItem(active.id, itemId)) { theft(); dirty(); }
       this.containerPanel.update(containers);
       if (containers.activeContainer?.contents.length === 0) {
         ctx.kernel.events.emit("container:emptied", { id: active.id });
@@ -108,7 +122,7 @@ export class TradeFeature implements Feature {
     };
     this.containerPanel.onTakeAll = () => {
       const active = containers.activeContainer;
-      if (active) containers.takeAll(active.id);
+      if (active) { theft(); containers.takeAll(active.id); }
       if (active && active.contents.length === 0) ctx.kernel.events.emit("container:emptied", { id: active.id });
       dirty();
       this._closeContainer();

@@ -135,4 +135,16 @@ describe("data-driven wild sites", () => {
     }
     throw new Error("no manor in the sample");
   });
+
+  it("a forest inn's strongbox belongs to the inn (theft); a graveyard keeps a burial casket", () => {
+    const found: Record<string, { name: string; lock: number; owner?: string }> = {};
+    for (const biome of ["forest", "plains"] as const) for (let cx = -60; cx < 60; cx++) for (let cz = -30; cz < 30; cz++) {
+      const t = recorder();
+      const site = { ...(t.site as object), placeChest: (_k: string, c: { id: string; name: string; lock: number; owner?: string }) => { found[c.id.split("_")[2]] = c; } } as unknown as SiteBuilderService;
+      buildWildChunk({ site, spawn: t.spawn, chunkKey: "k", cx, cz, biome, size: 50 }, { ...WILD_SCATTER, pool: {} }, WILD_SITES);
+    }
+    expect(found["forest-inn"]).toMatchObject({ name: "Innkeeper's Strongbox", lock: 45, owner: "village_guard" });
+    expect(found["graveyard"]).toMatchObject({ name: "Burial Casket", lock: 40 });
+    expect(found["graveyard"].owner).toBeUndefined();
+  });
 });

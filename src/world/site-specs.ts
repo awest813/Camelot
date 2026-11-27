@@ -43,7 +43,7 @@ export type SitePart = { when?: PartCondition } & (
   | { asset: FantasyAssetKey; yaw: number; scale?: number | { base: number; slot: number; range: number }; tier?: "structure" | "scene" | "prop" }
   | { dragon: true; yaw: number }
   /** A chest the player can open: the chest model as a container, locked, filled from a loot table. */
-  | { chest: { name: string; lock: number; loot: string }; dx: number; dz: number; rot?: number }
+  | { chest: { name: string; lock: number; loot: string; owner?: string }; dx: number; dz: number; rot?: number }
 );
 
 export interface SiteSpec {
@@ -196,7 +196,7 @@ function buildPart(
     }
   } else if ("chest" in part) {
     const w = toWorld({ x: part.dx, z: part.dz }, o);
-    site.placeChest?.(chunkKey, { id: `chest_${siteId}`, name: part.chest.name, x: w.x, z: w.z, rot: o.rot + (part.rot ?? 0), lock: part.chest.lock, loot: part.chest.loot, empty: quiet });
+    site.placeChest?.(chunkKey, { id: `chest_${siteId}`, name: part.chest.name, x: w.x, z: w.z, rot: o.rot + (part.rot ?? 0), lock: part.chest.lock, loot: part.chest.loot, empty: quiet, ...(part.chest.owner ? { owner: part.chest.owner } : {}) });
   } else if ("npc" in part) {
     const archetype = typeof part.npc === "string" ? part.npc : part.npc[variant];
     return c.spawn(archetype, o.x + part.dx, o.z + part.dz);

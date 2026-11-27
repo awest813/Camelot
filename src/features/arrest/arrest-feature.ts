@@ -16,20 +16,10 @@ import type { Feature, FeatureContext, ServiceRegistry } from "../../core/kernel
 import { createServiceKey } from "../../core/kernel";
 import { GuardEncounterUI, type GuardEncounterAction } from "../../ui/guard-encounter-ui";
 import { AIState, type NPC } from "../../entities/npc";
-import type { CrimeSystem } from "../../systems/crime-system";
-import type { PersuasionSystem } from "../../systems/persuasion-system";
-import { FeedbackKey, ModalKey, PlayerKey, PurseKey, SkillsKey, declareStateless } from "../services";
+import { FeedbackKey, LawKey, ModalKey, PlayerKey, PurseKey, SkillsKey, declareStateless } from "../services";
+export { LawKey };
 
-/** The law the arrest acts on. */
-export interface LawService {
-  readonly crime: CrimeSystem;
-  readonly persuasion: PersuasionSystem;
-  /** Serve time for a bounty: the clock moves on and skills slip. */
-  serveJail(bounty: number, factionId: string): { message: string };
-  addInfamy(amount: number): void;
-  /** Game time (minutes) for crime records. */
-  now(): number;
-}
+export type { LawService } from "../services";
 
 const ASSAULT_DEBOUNCE_MS = 3000;
 
@@ -39,7 +29,6 @@ export interface ArrestService {
   resist(): void;
 }
 
-export const LawKey = createServiceKey<LawService>("law");
 export const ArrestKey = createServiceKey<ArrestService>("arrest");
 
 interface Challenge { guard: NPC; factionId: string; bounty: number }

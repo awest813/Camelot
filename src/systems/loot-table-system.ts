@@ -350,7 +350,32 @@ export const STARTER_LOOT_TABLES: LootTable[] = [
       { itemId: "health_potion", itemName: "Health Potion", weight: 15, maxQuantity: 2,  itemTemplate: { stackable: true, weight: 0.5, stats: { value: 25 } } },
       { itemId: "iron_ingot",     itemName: "Iron Ingot",     weight: 10, maxQuantity: 2,  itemTemplate: { description: "A bar of smelted iron. Used at the forge (Shift+B).", stackable: true, weight: 1.0, stats: { value: 7 } } },
       { itemId: "leather_strips", itemName: "Leather Strips", weight: 10, maxQuantity: 3,  itemTemplate: { description: "Cured hide cut into strips for grips and straps.", stackable: true, weight: 0.1, stats: { value: 3 } } },
-      { itemId: "lockpick",       itemName: "Lockpick",       weight: 12, maxQuantity: 3,  itemTemplate: { description: "A bent iron pick. Snaps if you force it.", stackable: true, weight: 0.05, stats: { value: 6 } } },
+      { itemId: "lockpick",       itemName: "Lockpick",       weight: 12, maxQuantity: 3,  itemTemplate: { description: "A bent iron pick. Snaps if you force it.", stackable: true, weight: 0.1, stats: { value: 8 } } },
+    ],
+  },
+  {
+    // What the dead were buried with: old coin, a brooch, a torc.
+    id: "grave_goods",
+    rolls: 3,
+    noneWeight: 4,
+    entries: [
+      { itemId: "gold_coins",     itemName: "Gold Coins",     weight: 30, minQuantity: 10, maxQuantity: 60, itemTemplate: { stackable: true, weight: 0.1, stats: { value: 1 } } },
+      { itemId: "silver_brooch",  itemName: "Silver Brooch",  weight: 18, itemTemplate: { description: "A dented brooch, green with age.", stackable: true, weight: 0.1, stats: { value: 60 } } },
+      { itemId: "bronze_torc",    itemName: "Bronze Torc",    weight: 10, itemTemplate: { description: "A twisted neck-ring from older days.", stackable: true, weight: 0.5, stats: { value: 90 } } },
+      { itemId: "bone_dice",      itemName: "Bone Dice",      weight: 14, maxQuantity: 2, itemTemplate: { description: "A gambler's dice, buried with him.", stackable: true, weight: 0.05, stats: { value: 5 } } },
+      { itemId: "silver_ring",    itemName: "Silver Ring",    weight: 8,  condition: { minLevel: 3 }, itemTemplate: { stackable: false, weight: 0.05, slot: "ring", stats: { value: 120 } } },
+    ],
+  },
+  {
+    // The inn's takings and stores, kept under the innkeeper's eye.
+    id: "innkeeper_strongbox",
+    rolls: 3,
+    noneWeight: 0,
+    entries: [
+      { itemId: "gold_coins",     itemName: "Gold Coins",     weight: 0, guarantee: true, minQuantity: 40, maxQuantity: 120, itemTemplate: { stackable: true, weight: 0.1, stats: { value: 1 } } },
+      { itemId: "health_potion",  itemName: "Health Potion",  weight: 20, maxQuantity: 2, itemTemplate: { stackable: true, weight: 0.5, stats: { value: 25 } } },
+      { itemId: "lockpick",       itemName: "Lockpick",       weight: 12, maxQuantity: 3, itemTemplate: { description: "A bent iron pick. Snaps if you force it.", stackable: true, weight: 0.1, stats: { value: 8 } } },
+      { itemId: "gold_coins",     itemName: "Gold Coins",     weight: 30, minQuantity: 10, maxQuantity: 40, itemTemplate: { stackable: true, weight: 0.1, stats: { value: 1 } } },
     ],
   },
   {

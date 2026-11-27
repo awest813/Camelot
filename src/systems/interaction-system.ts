@@ -104,10 +104,10 @@ export class InteractionSystem {
               if (c.isLocked && cs && cs.lockSkill() < c.lockDifficulty) {
                   const picks = cs.lockpicks();
                   this.ui.setInteractionText(picks > 0
-                      ? `[E] Pick the lock: ${c.name} (${picks} lockpick${picks === 1 ? "" : "s"})`
+                      ? `[E] ${c.owner ? "Steal: pick" : "Pick"} the lock of ${c.name} (${picks} lockpick${picks === 1 ? "" : "s"})`
                       : `${c.name}: locked (you need a lockpick)`);
               } else {
-                  this.ui.setInteractionText(`[E] Open ${c.name}`);
+                  this.ui.setInteractionText(c.owner ? `[E] Steal from ${c.name}` : `[E] Open ${c.name}`);
               }
               this.ui.setCrosshairActive(true);
           } else if (metadata.type === 'portal' && metadata.portal && this.cellManager) {

@@ -6,6 +6,8 @@
  * overhaul proceeds (entity store, scopes per chunk) the implementations
  * move out of game.ts too; the interfaces are the contract.
  */
+import type { CrimeSystem } from "../systems/crime-system";
+import type { PersuasionSystem } from "../systems/persuasion-system";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { NPC } from "../entities/npc";
 import type { ProgressionSkillId } from "../systems/skill-progression-system";
@@ -131,7 +133,7 @@ export interface SiteBuilderService {
    * container, locked at `lock`, filled from loot table `loot` (left empty
    * when `empty`: its site was cleared lately).  Owned by the chunk.
    */
-  placeChest?(chunkKey: string, chest: { id: string; name: string; x: number; z: number; rot: number; lock: number; loot: string; empty: boolean }): void;
+  placeChest?(chunkKey: string, chest: { id: string; name: string; x: number; z: number; rot: number; lock: number; loot: string; empty: boolean; owner?: string }): void;
   /** Own a mesh in the chunk: shadows and distance culling ("structure" tier). */
   ownStructure(chunkKey: string, mesh: AbstractMesh): void;
   /** Own a mesh in the chunk with no extras (colliders, hit boxes, decals). */
@@ -235,6 +237,18 @@ export interface LandmarksService {
   chestLooted?(id: string): boolean;
 }
 export const LandmarksKey = createServiceKey<LandmarksService>("landmarks");
+
+/** The law the arrest acts on. */
+export interface LawService {
+  readonly crime: CrimeSystem;
+  readonly persuasion: PersuasionSystem;
+  /** Serve time for a bounty: the clock moves on and skills slip. */
+  serveJail(bounty: number, factionId: string): { message: string };
+  addInfamy(amount: number): void;
+  /** Game time (minutes) for crime records. */
+  now(): number;
+}
+export const LawKey = createServiceKey<LawService>("law");
 export const SiteBuilderKey = createServiceKey<SiteBuilderService>("site-builder");
 export const InventoryKey = createServiceKey<InventoryService>("inventory");
 

@@ -16,7 +16,7 @@ export const LOCKPICK_ID = "lockpick";
 /** A lockpick, as merchants sell it and bandits carry it. */
 export const LOCKPICK: Item = {
   id: LOCKPICK_ID, name: "Lockpick", description: "A bent iron pick. Snaps if you force it.",
-  stackable: true, quantity: 1, weight: 0.05, stats: { value: 6 },
+  stackable: true, quantity: 1, weight: 0.1, stats: { value: 8 },
 };
 
 /**
@@ -46,6 +46,8 @@ export interface Container {
   isLocked: boolean;
   lockDifficulty: number;
   isOpen: boolean;
+  /** Whose it is (a faction): taking from it is theft, if anyone sees. */
+  owner?: string;
 }
 
 export interface ContainerSaveState {
@@ -201,8 +203,8 @@ export class ContainerSystem {
    * A chest placed in the world (a camp's strongbox): `mesh` is what the player
    * looks at (it gets the container metadata).  Locked when `lockDifficulty` > 0.
    */
-  public registerChest(id: string, name: string, mesh: Mesh, contents: Item[], lockDifficulty: number): Container {
-    const container: Container = { id, name, mesh, contents: [...contents], isLocked: lockDifficulty > 0, lockDifficulty, isOpen: false };
+  public registerChest(id: string, name: string, mesh: Mesh, contents: Item[], lockDifficulty: number, owner?: string): Container {
+    const container: Container = { id, name, mesh, contents: [...contents], isLocked: lockDifficulty > 0, lockDifficulty, isOpen: false, ...(owner ? { owner } : {}) };
     // The model's meshes all answer to the player's look (a chest is several meshes).
     for (const m of [mesh, ...mesh.getChildMeshes(false)]) { m.isPickable = true; m.metadata = { type: "container", container }; }
     this._register(container);

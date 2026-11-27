@@ -21,6 +21,8 @@ export interface ChestDeps {
 
 export interface ChestPlacement {
   id: string; name: string; x: number; z: number; rot: number; lock: number; loot: string; empty: boolean;
+  /** Whose it is (a faction): taking from it is theft. */
+  owner?: string;
 }
 
 export function placeChest(d: ChestDeps, chunkKey: string, chest: ChestPlacement): void {
@@ -31,7 +33,7 @@ export function placeChest(d: ChestDeps, chunkKey: string, chest: ChestPlacement
     if (d.chunks.record(chunkKey) !== record) { root.dispose(); return; }
     root.position.set(chest.x, 0, chest.z);
     setInstanceYaw(root, chest.rot);
-    d.containers.registerChest(chest.id, chest.name, root as Mesh, chest.empty ? [] : mergeStacks(d.contents(chest.loot, chest.id)), chest.lock);
+    d.containers.registerChest(chest.id, chest.name, root as Mesh, chest.empty ? [] : mergeStacks(d.contents(chest.loot, chest.id)), chest.lock, chest.owner);
     root.onDisposeObservable.addOnce(() => d.containers.unregister(chest.id));
     d.chunks.track(chunkKey, record, root, "prop");
   });

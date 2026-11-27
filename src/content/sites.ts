@@ -90,6 +90,8 @@ export const WILD_SITES: readonly SiteSpec[] = [
       { prop: "qLantern", dx: -2.4, dz: 4.6 },
       { prop: "qMarketStall", dx: 5.2, dz: -4.5, rot: -Math.PI / 2, when: { variant: [4] } },
       { npc: "archetype_innkeeper", dx: 2.5, dz: 2.5 },
+      // The takings, kept where the innkeeper can see them: taking from it is theft.
+      { chest: { name: "Innkeeper's Strongbox", lock: 45, loot: "innkeeper_strongbox", owner: "village_guard" }, dx: 1.4, dz: -3.6, rot: 0.15 },
       { npc: "archetype_barkeeper", dx: -2.5, dz: 2 },
       { npc: INN_SPECIALISTS, dx: 4, dz: -3 },
       { smithy: true, dx: 6.5, dz: -5, when: { variant: [1, 2] } },
@@ -108,7 +110,11 @@ export const WILD_SITES: readonly SiteSpec[] = [
   {
     id: "graveyard", biomes: ["plains", "forest"], roll: { slot: 21, chance: 0.1 }, at: { x: 22, z: 23, spread: 0.6 },
     landmark: { kind: "Graveyard", xp: 15, radius: 18, arrive: { dx: 0, dz: 12 } },
-    parts: [{ asset: "graveYardScene", yaw: 24, scale: 1.0, tier: "scene" }],
+    parts: [
+      { asset: "graveYardScene", yaw: 24, scale: 1.0, tier: "scene" },
+      // A casket of grave goods, half out of the earth.
+      { chest: { name: "Burial Casket", lock: 40, loot: "grave_goods" }, dx: 3.5, dz: -3, rot: 0.6 },
+    ],
   },
   {
     // Palisade, banners, stolen goods, and its garrison.
