@@ -1601,3 +1601,16 @@ Left as decisions:
 - From level 5, a board with a dragon roost within eight chunks can offer
   "The Dragon's Roost" (700 gold, 350 XP), the same way. A clearance
   template names its site (`site: { kind, reach }`).
+
+## Performance: a fixed light limit per material (2026-11-27)
+
+- Only six lights are ever on (sky, sun, the fire pool's four), but
+  Babylon's glTF loader raises every material's `maxSimultaneousLights` to
+  the scene's whole light count after each model loads, and that count
+  grows as chunks stream in torches and candles (each keeps its own light
+  off). Each raise made every material rebuild its shader during play.
+- `rendering/light-budget.ts` pins the limit at six on the lit material
+  classes, before any material exists (`App` constructor). Measured in the
+  headless browser over three village visits: shader programs linked
+  while travelling fell from 56–97 to 25–34, and at boot from about 67 to
+  about 58. The picture is unchanged.
