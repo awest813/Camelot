@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ShoutUI, type ShoutView } from "./shout-ui";
-import type { ShoutDefinition } from "../systems/dragon-shout-system";
+import type { ShoutDefinition } from "../systems/old-tongue-system";
 
 // ── Fixtures ───────────────────────────────────────────────────────────────────
 

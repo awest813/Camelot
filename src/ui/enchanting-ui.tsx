@@ -1,19 +1,19 @@
 /**
- * Enchanting altar: pick an item, an effect its kind can take, and a soul
- * gem, then Enchant.  A Preact panel on the DOM layer (engine overhaul,
+ * Enchanting altar: pick an item, an effect its kind can take, and a spirit
+ * vessel, then Enchant.  A Preact panel on the DOM layer (engine overhaul,
  * Phase 8; it was a Babylon GUI panel).  The class API is unchanged:
  * toggle / refresh / isVisible, and onEnchant / onClosed.
  */
 import { render } from "preact";
-import type { EnchantingSystem, EnchantmentCategory, SoulGemType } from "../systems/enchanting-system";
-import { SOUL_GEMS, getItemEnchantmentCategory } from "../systems/enchanting-system";
+import type { EnchantingSystem, EnchantmentCategory, VesselType } from "../systems/enchanting-system";
+import { SPIRIT_VESSELS, getItemEnchantmentCategory } from "../systems/enchanting-system";
 import type { Item } from "../systems/inventory-system";
 import { ModalDialog } from "./preact/modal-dialog";
 
 interface Selection {
   itemId: string | null;
   effectId: string | null;
-  gem: SoulGemType | null;
+  gem: VesselType | null;
   /** The selected item's kind (limits the effects on offer). */
   category: EnchantmentCategory | null;
 }
@@ -28,7 +28,7 @@ export function enchantStatus(system: EnchantingSystem, s: Selection): { text: s
   }
   const item = system.getEnchantableItems().find((i) => i.id === s.itemId);
   const eff = system.getEffectDefinitions().find((e) => e.id === s.effectId);
-  const gem = SOUL_GEMS[s.gem];
+  const gem = SPIRIT_VESSELS[s.gem];
   if (!item || !eff || !gem) return { text: "", ready: false };
   const skillMult = 0.5 + (system.enchantingSkill / 100) * 1.5;
   const magnitude = Math.max(1, Math.round(eff.baseMagnitude * gem.magnitudeMultiplier * skillMult));
@@ -40,7 +40,7 @@ interface EnchantingPanelProps {
   selection: Selection;
   onItem(item: Item): void;
   onEffect(id: string): void;
-  onGem(type: SoulGemType): void;
+  onGem(type: VesselType): void;
   onEnchant(): void;
   onClose(): void;
 }
@@ -49,7 +49,7 @@ export function EnchantingPanel(p: EnchantingPanelProps) {
   const s = p.selection;
   const items = p.system.getEnchantableItems();
   const effects = s.category ? p.system.getEffectsForCategory(s.category) : p.system.getEffectDefinitions();
-  const gems = p.system.getAvailableSoulGems();
+  const gems = p.system.getAvailableVessels();
   const status = enchantStatus(p.system, s);
   return (
     <ModalDialog id="enchanting-title" title="Enchanting — Arcane Altar" className="craft-panel enchanting-panel" panelClassName="craft-panel__panel" onClose={p.onClose}>
@@ -109,7 +109,7 @@ export function EnchantingPanel(p: EnchantingPanelProps) {
 /** The altar panel: open / close / refresh it; the game reacts to its events. */
 export class EnchantingUI {
   /** Fired when the player enchants: the item, the effect and the spirit vessel used. */
-  public onEnchant: ((itemId: string, effectId: string, gemType: SoulGemType) => void) | null = null;
+  public onEnchant: ((itemId: string, effectId: string, gemType: VesselType) => void) | null = null;
   /** Fired when the player closes the panel (✕, Escape or the backdrop). */
   public onClosed: (() => void) | null = null;
   public isVisible = false;

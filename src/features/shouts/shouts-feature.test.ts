@@ -45,7 +45,7 @@ function setup() {
 /** Learn and unlock the first word of a shout, then equip it. */
 function ready(t: ReturnType<typeof setup>, shoutId: string) {
   t.svc.shouts.learnWord(shoutId, 0);
-  t.svc.shouts.gainDragonSoul();
+  t.svc.shouts.gainAwen();
   expect(t.svc.shouts.unlockWord(shoutId, 0)).toBe(true);
   t.svc.panel.onEquip!(shoutId);
 }
@@ -55,8 +55,8 @@ describe("ShoutsFeature (headless, through the kernel)", () => {
     const t = setup();
     t.svc.use();
     expect(t.notes.at(-1)).toMatch(/No word is ready/);
-    t.svc.absorbDragonSoul();
-    expect(t.svc.shouts.dragonSouls).toBe(1);
+    t.svc.greatDeed();
+    expect(t.svc.shouts.awen).toBe(1);
     expect(t.notes.some((n) => n.startsWith("A word of the Old Tongue: GWYNT"))).toBe(true);
     t.k.uninstall("shouts");
   });
@@ -67,16 +67,16 @@ describe("ShoutsFeature (headless, through the kernel)", () => {
     expect(t.svc.shouts.isWordLearned("gust", 0)).toBe(false);
     t.k.events.emit("location:discovered", { id: "site_obelisk_1_2", name: "Ashford Obelisk" });
     expect(t.svc.shouts.isWordLearned("gust", 0)).toBe(true);
-    expect(t.svc.shouts.dragonSouls).toBe(0);
+    expect(t.svc.shouts.awen).toBe(0);
     t.k.uninstall("shouts");
   });
 
   it("clearing a bandit camp is a great deed (awen); a roost pays through its dragon", () => {
     const t = setup();
     t.k.events.emit("landmark:cleared", { id: "site_dragon_1_1", name: "Roost" });
-    expect(t.svc.shouts.dragonSouls).toBe(0);
+    expect(t.svc.shouts.awen).toBe(0);
     t.k.events.emit("landmark:cleared", { id: "site_bandit-camp_1_1", name: "Camp" });
-    expect(t.svc.shouts.dragonSouls).toBe(1);
+    expect(t.svc.shouts.awen).toBe(1);
     t.k.uninstall("shouts");
   });
 

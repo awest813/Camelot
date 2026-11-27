@@ -122,9 +122,9 @@ export class CraftingFeature implements Feature {
       ["plantain_leaves", 5], ["comfrey_root", 4], ["vervain", 4],
       ["st_johns_wort", 3], ["meadowsweet", 3],
     ] as const) this.alchemy.addIngredient(id, n);
-    this.enchanting.addSoulGem("clay", 3);
-    this.enchanting.addSoulGem("pewter", 2);
-    this.enchanting.addSoulGem("silver", 1);
+    this.enchanting.addVessel("clay", 3);
+    this.enchanting.addVessel("pewter", 2);
+    this.enchanting.addVessel("silver", 1);
     deps.inventory.items.push(
       smithingMaterialStack("iron_ingot", 3),
       smithingMaterialStack("leather_strips", 2),

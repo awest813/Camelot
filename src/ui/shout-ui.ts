@@ -7,14 +7,14 @@
  *                 and READY / cooldown countdown state.
  *   Shout panel — full modal opened with [N].  Lists every registered shout with
  *                 its three ranks, per-word learned/unlocked state, tier
- *                 effect preview, and Equip / Unlock (soul) actions.
+ *                 effect preview, and Choose / Master (awen) actions.
  *
  * Style follows the dark-amber design language used throughout the project.
  * Implemented as plain DOM so it matches the PetUI / StableUI pattern.
  */
 
 import { addHudChip } from "./hud-chips";
-import type { ShoutDefinition } from "../systems/dragon-shout-system";
+import type { ShoutDefinition } from "../systems/old-tongue-system";
 import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 
 // ── Design tokens (mirrors UIManager) ─────────────────────────────────────
@@ -38,7 +38,7 @@ const C = {
 
 // ── View models ─────────────────────────────────────────────────────────────
 
-/** Per-shout snapshot the game layer builds from DragonShoutSystem state. */
+/** Per-shout snapshot the game layer builds from OldTongueSystem state. */
 export interface ShoutView {
   def: ShoutDefinition;
   /** Which ranks have been learned (indexed 0–2). */
@@ -78,11 +78,11 @@ export class ShoutUI {
   // ── Management panel ────────────────────────────────────────────────────────
   private _panelRoot:    HTMLDivElement | null = null;
   private _panelList:    HTMLDivElement | null = null;
-  private _soulsLabel:   HTMLSpanElement | null = null;
+  private _awenLabel:   HTMLSpanElement | null = null;
 
   // ── State cache ─────────────────────────────────────────────────────────────
   private _views:           ShoutView[] = [];
-  private _dragonSouls:     number = 0;
+  private _awen:     number = 0;
   private _equippedShoutId: string | null = null;
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -125,10 +125,10 @@ export class ShoutUI {
   // ══════════════════════════════════════════════════════════════════════════
 
   /** Open the shouts panel, refreshing with current state. */
-  public open(views: ShoutView[], dragonSouls: number, equippedShoutId: string | null): void {
+  public open(views: ShoutView[], awen: number, equippedShoutId: string | null): void {
     if (typeof document === "undefined") return;
     this._views           = views.map(v => this._copyView(v));
-    this._dragonSouls     = dragonSouls;
+    this._awen     = awen;
     this._equippedShoutId = equippedShoutId;
 
     this._ensurePanel();
@@ -148,9 +148,9 @@ export class ShoutUI {
   }
 
   /** Refresh the panel with new state (no-op while closed). */
-  public refresh(views: ShoutView[], dragonSouls: number, equippedShoutId: string | null): void {
+  public refresh(views: ShoutView[], awen: number, equippedShoutId: string | null): void {
     this._views           = views.map(v => this._copyView(v));
-    this._dragonSouls     = dragonSouls;
+    this._awen     = awen;
     this._equippedShoutId = equippedShoutId;
     if (this.isVisible) this._renderPanel();
   }
@@ -261,12 +261,12 @@ export class ShoutUI {
 
     header.append(title, closeBtn);
 
-    // ── Soul counter ────────────────────────────────────────────────────────
-    const souls = document.createElement("p");
-    Object.assign(souls.style, { margin: "0", fontSize: "14px", color: C.TEXT });
-    const soulsLabel = document.createElement("span");
-    soulsLabel.setAttribute("aria-label", "Awen");
-    souls.append(soulsLabel);
+    // ── Awen held ────────────────────────────────────────────────────────
+    const awenRow = document.createElement("p");
+    Object.assign(awenRow.style, { margin: "0", fontSize: "14px", color: C.TEXT });
+    const awenLabel = document.createElement("span");
+    awenLabel.setAttribute("aria-label", "Awen");
+    awenRow.append(awenLabel);
 
     // ── Hint ────────────────────────────────────────────────────────────────
     const hint = document.createElement("p");
@@ -277,7 +277,7 @@ export class ShoutUI {
     const listEl = document.createElement("div");
     Object.assign(listEl.style, { display: "flex", flexDirection: "column", gap: "8px" });
 
-    root.append(header, souls, hint, listEl);
+    root.append(header, awenRow, hint, listEl);
 
     root.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
@@ -291,14 +291,14 @@ export class ShoutUI {
 
     this._panelRoot  = root;
     this._panelList  = listEl;
-    this._soulsLabel = soulsLabel;
+    this._awenLabel = awenLabel;
   }
 
   private _renderPanel(): void {
     const list = this._panelList;
-    if (!list || !this._soulsLabel) return;
+    if (!list || !this._awenLabel) return;
     list.innerHTML = "";
-    this._soulsLabel.textContent = `Awen: ${this._dragonSouls}`;
+    this._awenLabel.textContent = `Awen: ${this._awen}`;
 
     if (this._views.length === 0) {
       const empty = document.createElement("p");
@@ -425,7 +425,7 @@ export class ShoutUI {
         unlockBtn.type = "button";
         _styleButton(unlockBtn, `Master ${nextWord!.word} (1 awen)`);
         unlockBtn.setAttribute("aria-label", `Master ${nextWord!.word} for one awen`);
-        if (this._dragonSouls < 1) {
+        if (this._awen < 1) {
           unlockBtn.setAttribute("aria-disabled", "true");
           unlockBtn.style.opacity = "0.45";
           unlockBtn.style.cursor = "not-allowed";

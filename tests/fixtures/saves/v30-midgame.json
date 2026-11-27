@@ -4,7 +4,7 @@
   "capturedAt": "2026-11-27",
   "save": {
     "version": 30,
-    "timestamp": 1795746141067,
+    "timestamp": 1795796322885,
     "player": {
       "position": {
         "x": 1.2686834433116019,
@@ -76,7 +76,7 @@
     "quests": [],
     "skills": [],
     "skillPoints": 0,
-    "framework": "{\"schemaVersion\":1,\"savedAt\":1795746141067,\"profileId\":\"default\",\"state\":{\"dialogueState\":{},\"questState\":{\"quests\":{\"quest_guard_resolution\":{\"status\":\"active\",\"nodes\":{\"talk_to_guard\":{\"active\":true,\"completed\":false,\"progress\":0},\"defeat_ruin_guard\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_bandit_bounty\":{\"status\":\"inactive\",\"nodes\":{\"kill_bandits\":{\"active\":false,\"completed\":false,\"progress\":0},\"collect_proof\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_kill_guard\":{\"status\":\"active\",\"nodes\":{\"obj_kill_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_collect_potions\":{\"status\":\"active\",\"nodes\":{\"obj_collect_potions\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_speak_guard\":{\"status\":\"active\",\"nodes\":{\"obj_talk_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"job_inn_0_3\":{\"status\":\"active\",\"nodes\":{\"hunt\":{\"active\":true,\"completed\":false,\"progress\":0},\"report\":{\"active\":false,\"completed\":false,\"progress\":0}}}},\"radiant\":{\"job_inn_0_3\":{\"templateId\":\"clear_camp\",\"vars\":{\"place\":\"Craigagel Cross\",\"camp\":\"Gorseford Bandit Camp\",\"landmark\":\"site_bandit-camp_1_6\"}}}},\"inventoryState\":{\"capacity\":20,\"items\":[],\"equipped\":{}},\"factionState\":{\"reputations\":{\"village_guard\":0,\"bandits\":-50,\"merchants_guild\":10,\"mages_college\":0}},\"flags\":{},\"legacyState\":{}}}",
+    "framework": "{\"schemaVersion\":1,\"savedAt\":1795796322885,\"profileId\":\"default\",\"state\":{\"dialogueState\":{},\"questState\":{\"quests\":{\"quest_guard_resolution\":{\"status\":\"active\",\"nodes\":{\"talk_to_guard\":{\"active\":true,\"completed\":false,\"progress\":0},\"defeat_ruin_guard\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_bandit_bounty\":{\"status\":\"inactive\",\"nodes\":{\"kill_bandits\":{\"active\":false,\"completed\":false,\"progress\":0},\"collect_proof\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_kill_guard\":{\"status\":\"active\",\"nodes\":{\"obj_kill_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_collect_potions\":{\"status\":\"active\",\"nodes\":{\"obj_collect_potions\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_speak_guard\":{\"status\":\"active\",\"nodes\":{\"obj_talk_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"job_inn_0_3\":{\"status\":\"active\",\"nodes\":{\"hunt\":{\"active\":true,\"completed\":false,\"progress\":0},\"report\":{\"active\":false,\"completed\":false,\"progress\":0}}}},\"radiant\":{\"job_inn_0_3\":{\"templateId\":\"clear_camp\",\"vars\":{\"place\":\"Craigagel Cross\",\"camp\":\"Gorseford Bandit Camp\",\"landmark\":\"site_bandit-camp_1_6\"}}}},\"inventoryState\":{\"capacity\":20,\"items\":[],\"equipped\":{}},\"factionState\":{\"reputations\":{\"village_guard\":0,\"bandits\":-50,\"merchants_guild\":10,\"mages_college\":0}},\"flags\":{},\"legacyState\":{}}}",
     "attributes": {
       "base": {
         "strength": 60,
@@ -90,8 +90,8 @@
       "pendingPoints": 0
     },
     "time": {
-      "gameTime": 793.4000000000012,
-      "elapsedGameTime": 793.4000000000012
+      "gameTime": 789.6000000000005,
+      "elapsedGameTime": 789.6000000000005
     },
     "crime": {
       "bounties": {},
@@ -411,7 +411,7 @@
       "craftedPotions": []
     },
     "enchanting": {
-      "soulGems": {
+      "vessels": {
         "clay": 3,
         "pewter": 2,
         "silver": 1
@@ -420,7 +420,7 @@
     },
     "weather": {
       "state": "clear",
-      "nextChangeIn": 149.3549015383097
+      "nextChangeIn": 520.1391722968722
     },
     "quickSlots": {
       "slots": {
@@ -699,7 +699,7 @@
       },
       {
         "id": "ambient_market_news",
-        "lastFiredAt": 13.113333333333328,
+        "lastFiredAt": 13.103333333333328,
         "fired": true
       },
       {
@@ -750,8 +750,8 @@
       "totalCaught": 0
     },
     "survival": {
-      "hunger": 99.53472222222233,
-      "fatigue": 99.06944444444466,
+      "hunger": 99.66666666666674,
+      "fatigue": 99.33333333333348,
       "cold": 100
     },
     "crafting": {
@@ -831,8 +831,8 @@
         }
       ]
     },
-    "dragonShouts": {
-      "dragonSouls": 0,
+    "oldTongue": {
+      "awen": 0,
       "equippedShoutId": null,
       "shoutStates": {
         "gust": {

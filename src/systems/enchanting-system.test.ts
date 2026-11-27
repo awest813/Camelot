@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   EnchantingSystem,
-  SOUL_GEMS,
+  SPIRIT_VESSELS,
   ENCHANTMENT_EFFECTS,
   getItemEnchantmentCategory,
-  type SoulGemType,
+  type VesselType,
 } from "./enchanting-system";
 
 // ── Minimal stubs ─────────────────────────────────────────────────────────────
@@ -78,29 +78,29 @@ describe("EnchantingSystem — spirit vessel management", () => {
   });
 
   it("starts with no spirit vessels", () => {
-    expect(system.getAvailableSoulGems()).toHaveLength(0);
-    expect(system.getSoulGemCount("silver")).toBe(0);
+    expect(system.getAvailableVessels()).toHaveLength(0);
+    expect(system.getVesselCount("silver")).toBe(0);
   });
 
-  it("addSoulGem increases count", () => {
-    system.addSoulGem("silver", 3);
-    expect(system.getSoulGemCount("silver")).toBe(3);
+  it("addVessel increases count", () => {
+    system.addVessel("silver", 3);
+    expect(system.getVesselCount("silver")).toBe(3);
   });
 
-  it("removeSoulGem decrements count", () => {
-    system.addSoulGem("clay", 2);
-    expect(system.removeSoulGem("clay")).toBe(true);
-    expect(system.getSoulGemCount("clay")).toBe(1);
+  it("removeVessel decrements count", () => {
+    system.addVessel("clay", 2);
+    expect(system.removeVessel("clay")).toBe(true);
+    expect(system.getVesselCount("clay")).toBe(1);
   });
 
-  it("removeSoulGem returns false when none available", () => {
-    expect(system.removeSoulGem("grail")).toBe(false);
+  it("removeVessel returns false when none available", () => {
+    expect(system.removeVessel("grail")).toBe(false);
   });
 
-  it("getAvailableSoulGems lists all types with count > 0", () => {
-    system.addSoulGem("silver", 1);
-    system.addSoulGem("grail", 2);
-    const available = system.getAvailableSoulGems();
+  it("getAvailableVessels lists all types with count > 0", () => {
+    system.addVessel("silver", 1);
+    system.addVessel("grail", 2);
+    const available = system.getAvailableVessels();
     expect(available).toHaveLength(2);
     const types = available.map(g => g.def.type);
     expect(types).toContain("silver");
@@ -142,7 +142,7 @@ describe("EnchantingSystem — enchantItem", () => {
     inventory = makeInventory([makeWeapon(), makeArmor()]);
     system    = new EnchantingSystem(player, inventory, makeEquipment(), makeUI());
     ui        = system["_ui"];
-    system.addSoulGem("silver");
+    system.addVessel("silver");
   });
 
   it("successfully enchants a weapon with a weapon effect", () => {
@@ -161,11 +161,11 @@ describe("EnchantingSystem — enchantItem", () => {
 
   it("consumes the spirit vessel", () => {
     system.enchantItem("sword_01", "fire_damage", "silver");
-    expect(system.getSoulGemCount("silver")).toBe(0);
+    expect(system.getVesselCount("silver")).toBe(0);
   });
 
   it("returns null when no spirit vessel is available", () => {
-    system.removeSoulGem("silver");
+    system.removeVessel("silver");
     const result = system.enchantItem("sword_01", "fire_damage", "silver");
     expect(result).toBeNull();
   });
@@ -195,8 +195,8 @@ describe("EnchantingSystem — enchantItem", () => {
     const inventorySmall  = makeInventory([makeWeapon("s1"), makeWeapon("s2")]);
     const sysSmall = new EnchantingSystem(makePlayer(), inventorySmall, makeEquipment(), makeUI());
     sysSmall.enchantingSkill = 0; // eliminate skill variance
-    sysSmall.addSoulGem("clay");
-    sysSmall.addSoulGem("grail");
+    sysSmall.addVessel("clay");
+    sysSmall.addVessel("grail");
 
     const smallResult = sysSmall.enchantItem("s1", "fire_damage", "clay");
     const grandResult = sysSmall.enchantItem("s2", "fire_damage", "grail");
@@ -210,7 +210,7 @@ describe("EnchantingSystem — enchantItem", () => {
   it("applies stat delta to player when item is currently equipped", () => {
     const equipped = makeEquipment(new Set(["sword_01"]));
     const sys = new EnchantingSystem(makePlayer(), makeInventory([makeWeapon()]), equipped, makeUI());
-    sys.addSoulGem("silver");
+    sys.addVessel("silver");
     const before = sys["_player"].bonusDamage;
     sys.enchantItem("sword_01", "fire_damage", "silver");
     expect(sys["_player"].bonusDamage).toBeGreaterThan(before);
@@ -252,12 +252,12 @@ describe("EnchantingSystem — effects catalogue", () => {
   });
 });
 
-describe("EnchantingSystem — SOUL_GEMS catalogue", () => {
+describe("EnchantingSystem — SPIRIT_VESSELS catalogue", () => {
   it("magnitude multipliers are ordered petty < lesser < common < greater < grand", () => {
-    const types: SoulGemType[] = ["clay", "pewter", "silver", "gold", "grail"];
+    const types: VesselType[] = ["clay", "pewter", "silver", "gold", "grail"];
     for (let i = 1; i < types.length; i++) {
-      expect(SOUL_GEMS[types[i]].magnitudeMultiplier).toBeGreaterThan(
-        SOUL_GEMS[types[i - 1]].magnitudeMultiplier,
+      expect(SPIRIT_VESSELS[types[i]].magnitudeMultiplier).toBeGreaterThan(
+        SPIRIT_VESSELS[types[i - 1]].magnitudeMultiplier,
       );
     }
   });
@@ -266,8 +266,8 @@ describe("EnchantingSystem — SOUL_GEMS catalogue", () => {
 describe("EnchantingSystem — save / restore", () => {
   it("round-trips spirit vessels and skill through save state", () => {
     const system = new EnchantingSystem(makePlayer(), makeInventory(), makeEquipment(), makeUI());
-    system.addSoulGem("gold", 3);
-    system.addSoulGem("clay", 1);
+    system.addVessel("gold", 3);
+    system.addVessel("clay", 1);
     system.enchantingSkill = 42;
 
     const state = system.getSaveState();
@@ -275,33 +275,41 @@ describe("EnchantingSystem — save / restore", () => {
     const system2 = new EnchantingSystem(makePlayer(), makeInventory(), makeEquipment(), makeUI());
     system2.restoreFromSave(state);
 
-    expect(system2.getSoulGemCount("gold")).toBe(3);
-    expect(system2.getSoulGemCount("clay")).toBe(1);
-    expect(system2.getSoulGemCount("silver")).toBe(0);
+    expect(system2.getVesselCount("gold")).toBe(3);
+    expect(system2.getVesselCount("clay")).toBe(1);
+    expect(system2.getVesselCount("silver")).toBe(0);
     expect(system2.enchantingSkill).toBe(42);
   });
 
   it("restoreFromSave handles null gracefully", () => {
     const system = new EnchantingSystem(makePlayer(), makeInventory(), makeEquipment(), makeUI());
-    system.addSoulGem("grail", 5);
+    system.addVessel("grail", 5);
     expect(() => system.restoreFromSave(null as any)).not.toThrow();
     // State unchanged since null is a no-op
-    expect(system.getSoulGemCount("grail")).toBe(5);
+    expect(system.getVesselCount("grail")).toBe(5);
   });
 
   it("restoreFromSave clamps skill to 0–100", () => {
     const system = new EnchantingSystem(makePlayer(), makeInventory(), makeEquipment(), makeUI());
-    system.restoreFromSave({ soulGems: {}, enchantingSkill: 9999 });
+    system.restoreFromSave({ vessels: {}, enchantingSkill: 9999 });
     expect(system.enchantingSkill).toBe(100);
 
-    system.restoreFromSave({ soulGems: {}, enchantingSkill: -50 });
+    system.restoreFromSave({ vessels: {}, enchantingSkill: -50 });
     expect(system.enchantingSkill).toBe(0);
   });
 
   it("restoreFromSave ignores unknown gem types", () => {
     const system = new EnchantingSystem(makePlayer(), makeInventory(), makeEquipment(), makeUI());
-    system.restoreFromSave({ soulGems: { legendary: 5 } as any, enchantingSkill: 10 });
+    system.restoreFromSave({ vessels: { legendary: 5 } as any, enchantingSkill: 10 });
     // No crash, and no unknown gem stored
-    expect(system.getAvailableSoulGems()).toHaveLength(0);
+    expect(system.getAvailableVessels()).toHaveLength(0);
+  });
+});
+
+describe("EnchantingSystem — saves from before the rename", () => {
+  it("reads spirit vessels saved as soulGems", () => {
+    const system = new EnchantingSystem(makePlayer(), makeInventory(), makeEquipment(), makeUI());
+    system.restoreFromSave({ soulGems: { pewter: 2 }, enchantingSkill: 10 } as never);
+    expect(system.getVesselCount("pewter")).toBe(2);
   });
 });

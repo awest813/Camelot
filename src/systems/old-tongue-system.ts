@@ -1,7 +1,7 @@
 /**
- * DragonShoutSystem — the Words of the Old Tongue (shouts, in code): words
+ * OldTongueSystem — the Words of the Old Tongue (shouts, in code): words
  * learned at the old places, each with three ranks the hero masters by
- * spending awen (the bardic gift; `dragonSouls` in code).
+ * spending awen (the bardic gift).
  *
  * Players learn a word's ranks at the old places, then spend awen to master
  * (activate) each rank.  Each Shout is composed of one to
@@ -10,10 +10,10 @@
  * activated via an in-game hotkey (R).
  *
  * Integration points:
- *   - `gainDragonSoul(count?)` — award awen after a great deed (a dragon slain).
+ *   - `gainAwen(count?)` — award awen after a great deed (a dragon slain).
  *   - `learnWord(shoutId, wordIndex)` — mark a rank as learned (at an old place).
  *   - `unlockWord(shoutId, wordIndex)` — spend one awen to activate a
- *     word; returns false when the soul count is insufficient.
+ *     rank; returns false without awen.
  *   - `equipShout(shoutId)` — arm the shout for use.
  *   - `useShout(gameTimeMinutes)` — activate the equipped shout; returns a
  *     `ShoutUseResult` describing what happened.
@@ -24,15 +24,15 @@
  *
  * Wire-up example (game.ts):
  * ```ts
- * this.dragonShoutSystem = new DragonShoutSystem();
+ * this.oldTongueSystem = new OldTongueSystem();
  * // After slaying a dragon:
- * this.dragonShoutSystem.gainDragonSoul();
+ * this.oldTongueSystem.gainAwen();
  * // At an old place:
- * this.dragonShoutSystem.learnWord("gust", 0);
- * this.dragonShoutSystem.unlockWord("gust", 0);
+ * this.oldTongueSystem.learnWord("gust", 0);
+ * this.oldTongueSystem.unlockWord("gust", 0);
  * // Equip and use (R key):
- * this.dragonShoutSystem.equipShout("gust");
- * const result = this.dragonShoutSystem.useShout(this.timeSystem.gameTime);
+ * this.oldTongueSystem.equipShout("gust");
+ * const result = this.oldTongueSystem.useShout(this.timeSystem.gameTime);
  * if (result.success) { /* apply result.effects *\/ }
  * ```
  *
@@ -128,7 +128,7 @@ export type ShoutFailReason =
   | "no_words_unlocked"   // player has learned but not unlocked any words
   | "on_cooldown";        // shout was used recently
 
-/** Result of a {@link DragonShoutSystem.useShout} call. */
+/** Result of a {@link OldTongueSystem.useShout} call. */
 export type ShoutUseResult =
   | {
       success: true;
@@ -147,8 +147,8 @@ export type ShoutUseResult =
 
 // ── Save state ─────────────────────────────────────────────────────────────────
 
-export interface DragonShoutSaveState {
-  dragonSouls: number;
+export interface OldTongueSaveState {
+  awen: number;
   equippedShoutId: string | null;
   shoutStates: Record<string, {
     learned:  [boolean, boolean, boolean];
@@ -161,7 +161,7 @@ export interface DragonShoutSaveState {
 
 /**
  * The eight words of the Old Tongue (Welsh words for their ranks).
- * Games can register additional shouts via {@link DragonShoutSystem.registerShout}.
+ * Games can register additional shouts via {@link OldTongueSystem.registerShout}.
  */
 export const BUILTIN_SHOUTS: ReadonlyArray<ShoutDefinition> = [
   // ── Gust ───────────────────────────────────────────────────────
@@ -405,10 +405,10 @@ export const BUILTIN_SHOUTS: ReadonlyArray<ShoutDefinition> = [
  * Manages the Words of the Old Tongue: learning ranks, mastering them with awen,
  * equipping, use, and cooldown tracking.
  */
-export class DragonShoutSystem {
+export class OldTongueSystem {
   private _shouts:         Map<string, ShoutDefinition> = new Map();
   private _shoutStates:    Map<string, ShoutState>      = new Map();
-  private _dragonSouls     = 0;
+  private _awen     = 0;
   private _equippedShoutId: string | null                = null;
 
   constructor() {
@@ -428,7 +428,7 @@ export class DragonShoutSystem {
     | null = null;
 
   /**
-   * Fired when a Word of Power is unlocked (soul spent).
+   * Fired when a rank is mastered (awen spent).
    * Use this for HUD notifications.
    */
   public onWordUnlocked:
@@ -447,7 +447,7 @@ export class DragonShoutSystem {
    * Fired when awen are gained.
    * @param total Current total after the addition.
    */
-  public onDragonSoulGained: ((total: number) => void) | null = null;
+  public onAwenGained: ((total: number) => void) | null = null;
 
   // ── Shout registration ───────────────────────────────────────────────────────
 
@@ -506,31 +506,31 @@ export class DragonShoutSystem {
   // ── awen ─────────────────────────────────────────────────────────────
 
   /** Current awen count. */
-  public get dragonSouls(): number {
-    return this._dragonSouls;
+  public get awen(): number {
+    return this._awen;
   }
 
   /**
    * Award one or more awen to the player.
-   * Fires `onDragonSoulGained` with the new total.
+   * Fires `onAwenGained` with the new total.
    * @param count Number of souls to add (default 1).
    */
-  public gainDragonSoul(count = 1): void {
+  public gainAwen(count = 1): void {
     const amount = Math.max(0, Math.floor(count));
     if (amount === 0) return;
-    this._dragonSouls += amount;
-    this.onDragonSoulGained?.(this._dragonSouls);
+    this._awen += amount;
+    this.onAwenGained?.(this._awen);
   }
 
   /**
    * Deduct awen (for non-unlock uses, e.g. scripted events).
-   * Clamps to zero; does not fire `onDragonSoulGained`.
+   * Clamps to zero; does not fire `onAwenGained`.
    * @returns `true` if the full amount was available and deducted.
    */
-  public spendDragonSouls(count: number): boolean {
+  public spendAwen(count: number): boolean {
     const amount = Math.max(0, Math.floor(count));
-    if (this._dragonSouls < amount) return false;
-    this._dragonSouls -= amount;
+    if (this._awen < amount) return false;
+    this._awen -= amount;
     return true;
   }
 
@@ -591,8 +591,8 @@ export class DragonShoutSystem {
     if (wordIndex > 0 && !state.unlocked[wordIndex - 1 as 0 | 1]) return false;
 
     // Spend a soul
-    if (this._dragonSouls < 1) return false;
-    this._dragonSouls--;
+    if (this._awen < 1) return false;
+    this._awen--;
 
     state.unlocked[wordIndex] = true;
     this.onWordUnlocked?.(shoutId, wordIndex, def.words[wordIndex]!);
@@ -729,8 +729,8 @@ export class DragonShoutSystem {
   // ── Save / restore ────────────────────────────────────────────────────────────
 
   /** Returns a serialisable save snapshot. */
-  public getSaveState(): DragonShoutSaveState {
-    const shoutStates: DragonShoutSaveState["shoutStates"] = {};
+  public getSaveState(): OldTongueSaveState {
+    const shoutStates: OldTongueSaveState["shoutStates"] = {};
     for (const [id, state] of this._shoutStates) {
       shoutStates[id] = {
         learned:  [...state.learned]  as [boolean, boolean, boolean],
@@ -739,7 +739,7 @@ export class DragonShoutSystem {
       };
     }
     return {
-      dragonSouls:     this._dragonSouls,
+      awen:     this._awen,
       equippedShoutId: this._equippedShoutId,
       shoutStates,
     };
@@ -750,10 +750,10 @@ export class DragonShoutSystem {
    * Unknown shout ids in the snapshot are silently skipped.
    * Callbacks are NOT fired during restore.
    */
-  public restoreFromSave(saved: DragonShoutSaveState): void {
-    this._dragonSouls     = typeof saved.dragonSouls === "number" && saved.dragonSouls >= 0
-      ? saved.dragonSouls
-      : 0;
+  public restoreFromSave(saved: OldTongueSaveState): void {
+    // (Saves from before the rename call it `dragonSouls`.)
+    const awen = saved.awen ?? (saved as { dragonSouls?: number }).dragonSouls;
+    this._awen = typeof awen === "number" && awen >= 0 ? awen : 0;
     this._equippedShoutId = (typeof saved.equippedShoutId === "string" &&
                              this._shouts.has(saved.equippedShoutId))
       ? saved.equippedShoutId

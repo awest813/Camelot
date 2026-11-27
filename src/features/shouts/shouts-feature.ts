@@ -14,7 +14,7 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Feature, FeatureContext, ServiceRegistry } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
-import { DragonShoutSystem, type ShoutTierEffect } from "../../systems/dragon-shout-system";
+import { OldTongueSystem, type ShoutTierEffect } from "../../systems/old-tongue-system";
 import { ShoutUI, type ShoutView } from "../../ui/shout-ui";
 import type { ActiveEffect } from "../../systems/active-effects-system";
 import type { DamageType, NPC } from "../../entities/npc";
@@ -38,7 +38,7 @@ export interface ShoutHostService {
 }
 
 export interface ShoutsService {
-  readonly shouts: DragonShoutSystem;
+  readonly shouts: OldTongueSystem;
   readonly panel: ShoutUI;
   /** N: open or close the shouts panel. */
   togglePanel(): void;
@@ -47,7 +47,7 @@ export interface ShoutsService {
   /** Clock multiplier for hostile AI (below 1 during Slow Time). */
   hostileTimeScale(): number;
   /** A dragon died: take its soul and learn the next Word of Power. */
-  absorbDragonSoul(): void;
+  greatDeed(): void;
   /** Keep the HUD chip (name, word pips, cooldown) current. */
   updateHud(): void;
 }
@@ -62,7 +62,7 @@ const MAX_DASH = 30;
 
 export class ShoutsFeature implements Feature {
   public readonly id = "shouts";
-  public readonly shouts = new DragonShoutSystem();
+  public readonly shouts = new OldTongueSystem();
   public readonly panel = new ShoutUI();
   private _timeScale = 1;
   private _slowTimeLeft = 0;
@@ -70,7 +70,7 @@ export class ShoutsFeature implements Feature {
   private _s: ServiceRegistry | null = null;
 
   public install(ctx: FeatureContext): void {
-    ownSave(ctx, { key: "dragonShouts", save: () => this.shouts.getSaveState(), load: (data) => { if (data) this.shouts.restoreFromSave(data as never); } });
+    ownSave(ctx, { key: "oldTongue", save: () => this.shouts.getSaveState(), load: (data) => { if (data) this.shouts.restoreFromSave(data as never); } });
     const s = ctx.kernel.services;
     this._s = s;
     const feedback = () => s.get(FeedbackKey);
@@ -88,7 +88,7 @@ export class ShoutsFeature implements Feature {
       if (this.panel.isVisible) this._refreshPanel();
       feedback().markDirty();
     };
-    sh.onDragonSoulGained = (total) => feedback().notify(`Awen gained (${total} held).`, 3000);
+    sh.onAwenGained = (total) => feedback().notify(`Awen gained (${total} held).`, 3000);
 
     this.panel.onEquip = (shoutId) => {
       if (!sh.equipShout(shoutId)) return;
@@ -114,7 +114,7 @@ export class ShoutsFeature implements Feature {
           return;
         }
         if (!s.get(GameplayKey).canAct()) return;
-        this.panel.open(this._views(), sh.dragonSouls, sh.equippedShoutId);
+        this.panel.open(this._views(), sh.awen, sh.equippedShoutId);
         modal().suspendGameplay();
       },
       use: () => {
@@ -136,8 +136,8 @@ export class ShoutsFeature implements Feature {
         }
       },
       hostileTimeScale: () => this._timeScale,
-      absorbDragonSoul: () => {
-        sh.gainDragonSoul();
+      greatDeed: () => {
+        sh.gainAwen();
         this._learnNextWord();
         feedback().markDirty();
       },
@@ -155,10 +155,10 @@ export class ShoutsFeature implements Feature {
     // Great deeds bring awen and teach the next rank of a word: slaying a
     // dragon, or clearing a bandit camp (a roost pays through its dragon).
     ctx.on("player:kill", ({ npcId }) => {
-      if (/^DragonBoss/.test(npcId)) s.get(ShoutsKey).absorbDragonSoul();
+      if (/^DragonBoss/.test(npcId)) s.get(ShoutsKey).greatDeed();
     });
     ctx.on("landmark:cleared", ({ id }) => {
-      if (id.startsWith("site_bandit-camp_")) s.get(ShoutsKey).absorbDragonSoul();
+      if (id.startsWith("site_bandit-camp_")) s.get(ShoutsKey).greatDeed();
     });
     // The old places teach: finding an obelisk (an old waymarker) teaches the
     // next rank of a word.  Mastering it still takes awen.
@@ -176,7 +176,7 @@ export class ShoutsFeature implements Feature {
       sh.onShoutUsed = null;
       sh.onWordLearned = null;
       sh.onWordUnlocked = null;
-      sh.onDragonSoulGained = null;
+      sh.onAwenGained = null;
       if (this.panel.isVisible) this.panel.close();
       this._s = null;
     });
@@ -207,7 +207,7 @@ export class ShoutsFeature implements Feature {
   }
 
   private _refreshPanel(): void {
-    this.panel.refresh(this._views(), this.shouts.dragonSouls, this.shouts.equippedShoutId);
+    this.panel.refresh(this._views(), this.shouts.awen, this.shouts.equippedShoutId);
   }
 
   /** A validated shout's tier effects, delivered to the world. */

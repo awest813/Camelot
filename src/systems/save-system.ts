@@ -138,8 +138,8 @@ interface ParsedSaveData {
   /** Village job board (innkeeper work): active jobs + jobs done per board. */
   villageJobs?: unknown;
   villageRaids?: unknown;
-  // v26 additions
-  dragonShouts?: unknown;
+  // v26 additions (the Words of the Old Tongue)
+  oldTongue?: unknown;
   follower?: unknown;
   // v27 additions
   perks?: unknown;
@@ -249,8 +249,8 @@ export interface SaveData {
   crafting?: any;
   villageJobs?: any;
   villageRaids?: any;
-  // v26 additions
-  dragonShouts?: any;
+  // v26 additions (the Words of the Old Tongue)
+  oldTongue?: any;
   follower?: any;
   // v27 additions
   perks?: any;
@@ -956,7 +956,7 @@ export class SaveSystem {
       crafting: data.crafting,
       villageJobs: data.villageJobs,
       villageRaids: data.villageRaids,
-      dragonShouts: data.dragonShouts,
+      oldTongue: data.oldTongue,
       follower: data.follower,
       perks: data.perks,
       survival: data.survival,

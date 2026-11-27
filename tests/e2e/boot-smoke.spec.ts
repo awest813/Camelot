@@ -189,7 +189,7 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
   expect(await page.evaluate(() => {
     const g = (window as any).__camelotGame;
     g.shouts.use();
-    return g.shoutUI.isVisible === false && g.dragonShoutSystem === g.shouts.shouts;
+    return g.shoutUI.isVisible === false && g.oldTongueSystem === g.shouts.shouts;
   }), "shout used without errors").toBe(true);
 
   // Y — the travel menu; travel home; the open world is never a destination.

@@ -47,7 +47,7 @@ describe("CraftingFeature (headless, through the kernel)", () => {
     const t = setup();
     expect(t.items.map((i) => i.id)).toEqual(["iron_ingot", "leather_strips", "repair_hammer"]);
     expect(t.c.alchemy.getIngredientCount("plantain_leaves")).toBe(5);
-    expect(t.c.enchanting.getSaveState().soulGems).toBeDefined();
+    expect(t.c.enchanting.getSaveState().vessels).toBeDefined();
     t.k.uninstall("crafting");
   });
 

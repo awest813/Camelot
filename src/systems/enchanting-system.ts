@@ -5,10 +5,10 @@ import type { UIManager } from "../ui/ui-manager";
 
 // ── Spirit vessels (spirit vessels, in code) ────────────────────────────────────────────────────────────
 
-export type SoulGemType = "clay" | "pewter" | "silver" | "gold" | "grail";
+export type VesselType = "clay" | "pewter" | "silver" | "gold" | "grail";
 
-export interface SoulGemDefinition {
-  type: SoulGemType;
+export interface VesselDefinition {
+  type: VesselType;
   name: string;
   description: string;
   /** Multiplier applied to baseMagnitude when this gem is used. */
@@ -17,7 +17,7 @@ export interface SoulGemDefinition {
   value: number;
 }
 
-export const SOUL_GEMS: Record<SoulGemType, SoulGemDefinition> = {
+export const SPIRIT_VESSELS: Record<VesselType, VesselDefinition> = {
   clay:   { type: "clay",   name: "Clay Vessel",   description: "A little clay flask that holds a faint spirit. Enables minor enchantments.",   magnitudeMultiplier: 0.5,  value: 25  },
   pewter: { type: "pewter", name: "Pewter Vessel", description: "A pewter flask that holds a small spirit. Enables moderate enchantments.",   magnitudeMultiplier: 0.75, value: 50  },
   silver: { type: "silver", name: "Silver Vessel", description: "A silver flask that holds a spirit of fair strength. Enables standard enchantments.", magnitudeMultiplier: 1.0, value: 100 },
@@ -37,7 +37,7 @@ export interface EnchantmentEffectDefinition {
   /** Whether this enchantment applies to weapons or armor. */
   category: EnchantmentCategory;
   /**
-   * Base magnitude before soul-gem and skill scaling.
+   * Base magnitude before spirit-vessel and skill scaling.
    * For weapon enchants this is added to item.stats.damage.
    * For armor enchants this maps to the stat field below.
    */
@@ -151,14 +151,14 @@ export const ENCHANTMENT_EFFECTS: EnchantmentEffectDefinition[] = [
 export interface ItemEnchantment {
   effectId: string;
   magnitude: number;
-  soulGemType: SoulGemType;
+  vesselType: VesselType;
 }
 
 // ── Save state ────────────────────────────────────────────────────────────────
 
 export interface EnchantingSaveState {
   /** Count of each spirit vessel type in the player's collection. */
-  soulGems: Partial<Record<SoulGemType, number>>;
+  vessels: Partial<Record<VesselType, number>>;
   /** Enchanting skill level (0–100). */
   enchantingSkill: number;
 }
@@ -182,7 +182,7 @@ export function getItemEnchantmentCategory(slot: string | undefined): Enchantmen
  * Enchanting: binding a spirit held in a vessel into a weapon or armour.
  *
  * Core loop:
- *  1. Player collects spirit vessels (addSoulGem).
+ *  1. Player collects spirit vessels (addVessel).
  *  2. At the enchanting altar (E key), the player selects:
  *     a. An enchantable item from their inventory (weapon or armor).
  *     b. An enchantment effect appropriate for that item category.
@@ -205,7 +205,7 @@ export class EnchantingSystem {
   private _ui: UIManager;
 
   /** spirit vessel inventory: type → count. */
-  private _soulGems: Map<SoulGemType, number> = new Map();
+  private _vessels: Map<VesselType, number> = new Map();
 
   /** Enchanting skill (0–100). Scales enchantment magnitude. */
   public enchantingSkill: number = 10;
@@ -228,32 +228,32 @@ export class EnchantingSystem {
   // ── spirit vessel management ──────────────────────────────────────────────────
 
   /** Add `quantity` spirit vessels of the given type. */
-  public addSoulGem(type: SoulGemType, quantity: number = 1): void {
-    this._soulGems.set(type, (this._soulGems.get(type) ?? 0) + quantity);
+  public addVessel(type: VesselType, quantity: number = 1): void {
+    this._vessels.set(type, (this._vessels.get(type) ?? 0) + quantity);
   }
 
   /** Remove one spirit vessel of the given type. Returns false if none available. */
-  public removeSoulGem(type: SoulGemType): boolean {
-    const current = this._soulGems.get(type) ?? 0;
+  public removeVessel(type: VesselType): boolean {
+    const current = this._vessels.get(type) ?? 0;
     if (current < 1) return false;
     if (current === 1) {
-      this._soulGems.delete(type);
+      this._vessels.delete(type);
     } else {
-      this._soulGems.set(type, current - 1);
+      this._vessels.set(type, current - 1);
     }
     return true;
   }
 
   /** Current count of a spirit vessel type. */
-  public getSoulGemCount(type: SoulGemType): number {
-    return this._soulGems.get(type) ?? 0;
+  public getVesselCount(type: VesselType): number {
+    return this._vessels.get(type) ?? 0;
   }
 
   /** All spirit vessel types the player currently holds (count > 0). */
-  public getAvailableSoulGems(): Array<{ def: SoulGemDefinition; count: number }> {
-    const result: Array<{ def: SoulGemDefinition; count: number }> = [];
-    for (const [type, count] of this._soulGems) {
-      if (count > 0) result.push({ def: SOUL_GEMS[type], count });
+  public getAvailableVessels(): Array<{ def: VesselDefinition; count: number }> {
+    const result: Array<{ def: VesselDefinition; count: number }> = [];
+    for (const [type, count] of this._vessels) {
+      if (count > 0) result.push({ def: SPIRIT_VESSELS[type], count });
     }
     return result;
   }
@@ -298,11 +298,11 @@ export class EnchantingSystem {
   public enchantItem(
     itemId: string,
     effectId: string,
-    gemType: SoulGemType,
+    gemType: VesselType,
   ): Item | null {
     // Validate spirit vessel availability
-    if ((this._soulGems.get(gemType) ?? 0) < 1) {
-      this._ui.showNotification(`No ${SOUL_GEMS[gemType].name} available.`, 2000);
+    if ((this._vessels.get(gemType) ?? 0) < 1) {
+      this._ui.showNotification(`No ${SPIRIT_VESSELS[gemType].name} available.`, 2000);
       return null;
     }
 
@@ -340,15 +340,15 @@ export class EnchantingSystem {
     }
 
     // Compute magnitude: baseMagnitude × gemMultiplier × skillMultiplier
-    const gemDef       = SOUL_GEMS[gemType];
+    const gemDef       = SPIRIT_VESSELS[gemType];
     const skillMult    = 0.5 + (this.enchantingSkill / 100) * 1.5;
     const magnitude    = Math.max(1, Math.round(effectDef.baseMagnitude * gemDef.magnitudeMultiplier * skillMult));
 
     // Consume the spirit vessel
-    this.removeSoulGem(gemType);
+    this.removeVessel(gemType);
 
     // Apply stats to the item copy
-    const enchantment: ItemEnchantment = { effectId, magnitude, soulGemType: gemType };
+    const enchantment: ItemEnchantment = { effectId, magnitude, vesselType: gemType };
     const updatedStats = { ...(item.stats ?? {}), enchantment };
 
     if (effectDef.statField) {
@@ -373,7 +373,7 @@ export class EnchantingSystem {
     }
 
     // Raise skill (more complex enchants from larger vessels = more XP)
-    const gemTiers: Record<SoulGemType, number> = { clay: 1, pewter: 2, silver: 3, gold: 4, grail: 5 };
+    const gemTiers: Record<VesselType, number> = { clay: 1, pewter: 2, silver: 3, gold: 4, grail: 5 };
     this.enchantingSkill = Math.min(100, this.enchantingSkill + gemTiers[gemType]);
 
     this._ui.showNotification(`Enchanted: ${newName} (+${magnitude} ${effectDef.name})`, 3000);
@@ -397,21 +397,23 @@ export class EnchantingSystem {
   // ── Persistence ──────────────────────────────────────────────────────────
 
   public getSaveState(): EnchantingSaveState {
-    const soulGems: Partial<Record<SoulGemType, number>> = {};
-    for (const [type, count] of this._soulGems) {
-      soulGems[type] = count;
+    const vessels: Partial<Record<VesselType, number>> = {};
+    for (const [type, count] of this._vessels) {
+      vessels[type] = count;
     }
-    return { soulGems, enchantingSkill: this.enchantingSkill };
+    return { vessels, enchantingSkill: this.enchantingSkill };
   }
 
   public restoreFromSave(state: EnchantingSaveState): void {
     if (!state) return;
 
-    this._soulGems.clear();
-    if (state.soulGems && typeof state.soulGems === "object") {
-      for (const [type, count] of Object.entries(state.soulGems)) {
-        if (type in SOUL_GEMS && typeof count === "number" && count > 0) {
-          this._soulGems.set(type as SoulGemType, count);
+    this._vessels.clear();
+    // (Saves from before the rename call it `soulGems`.)
+    const vessels = state.vessels ?? (state as { soulGems?: EnchantingSaveState["vessels"] }).soulGems;
+    if (vessels && typeof vessels === "object") {
+      for (const [type, count] of Object.entries(vessels)) {
+        if (type in SPIRIT_VESSELS && typeof count === "number" && count > 0) {
+          this._vessels.set(type as VesselType, count);
         }
       }
     }

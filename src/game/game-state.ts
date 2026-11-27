@@ -144,7 +144,7 @@ import { CameraDirector, DeathCamera } from "../rendering/camera-director";
 import { QuickSlotHUD } from "../ui/quickslot-hud";
 import { PerkSystem } from "../systems/perk-system";
 import { DynamicWorldEventSystem } from "../systems/dynamic-world-event-system";
-import type { DragonShoutSystem } from "../systems/dragon-shout-system";
+import type { OldTongueSystem } from "../systems/old-tongue-system";
 import type { ShoutUI } from "../ui/shout-ui";
 import { ShoutsKey, type ShoutsService } from "../features/shouts/shouts-feature";
 import type { GraphicsSettingsUI } from "../ui/graphics-settings-ui";
@@ -367,7 +367,7 @@ export class GameState {
 
   // Words of the Old Tongue (shouts in code; state persists via saveSystem)
   public get shouts(): ShoutsService { return this.kernel.services.get(ShoutsKey); }
-  public get dragonShoutSystem(): DragonShoutSystem { return this.shouts.shouts; }
+  public get oldTongueSystem(): OldTongueSystem { return this.shouts.shouts; }
   public get shoutUI(): ShoutUI { return this.shouts.panel; }
 
   /** Fantasy asset loader — streams BabylonJS CDN models (weapons, structures, creatures). */

@@ -49,7 +49,7 @@ describe("EnchantingUI (Preact)", () => {
       { id: "helm", name: "Iron Helm", description: "", stackable: false, quantity: 1, slot: "head", stats: {} },
     ] };
     const system = new EnchantingSystem({} as never, inventory as never, {} as never, ui);
-    system.addSoulGem("clay", 2);
+    system.addVessel("clay", 2);
     const panel = new EnchantingUI(system);
     const done: string[][] = [];
     panel.onEnchant = (i, e, g) => done.push([i, e, g]);
