@@ -450,7 +450,7 @@ export class GameState {
     spells: () => this.spellSystem,
     races: () => this.raceSystem, omens: () => this.birthsignSystem, containers: () => this.containerSystem,
     effects: () => this.activeEffectsSystem,
-    gameTime: () => this.timeSystem.gameTime,
+    gameTime: () => this.timeSystem.elapsedGameTime, // monotonic: the daily powers' cooldowns span midnight
     blocked: () => isCombatInputBlocked(this.asGame),
     free: () => !this.isPaused && !this.dialogueSystem.isInDialogue,
     swing: (power) => { this._viewModel?.swing(power); this.audioSystem.playMeleeAttack(); },

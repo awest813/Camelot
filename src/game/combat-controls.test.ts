@@ -59,7 +59,9 @@ describe("CombatControls", () => {
 });
 
 describe("omen powers (Shift+V)", () => {
+  let clock = 600;
   async function omenSetup(signId: string, target: object | null = null) {
+    clock = 600;
     const { BirthsignSystem } = await import("../systems/birthsign-system");
     const omens = new BirthsignSystem();
     omens.chooseBirthsign(signId);
@@ -72,7 +74,7 @@ describe("omen powers (Shift+V)", () => {
       spells: () => ({ targetInFront: () => target }),
       races: () => ({ chosenRace: null }), omens: () => omens, containers: () => containers,
       effects: () => ({ addEffect: (e: { effectType: string; magnitude: number; duration: number }) => added.push(e) }),
-      gameTime: () => 600, blocked: () => false, free: () => true, swing: vi.fn(), twang: vi.fn(), notify: (t: string) => notes.push(t),
+      gameTime: () => clock, blocked: () => false, free: () => true, swing: vi.fn(), twang: vi.fn(), notify: (t: string) => notes.push(t),
     } as unknown as CombatControlsDeps;
     return { c: new CombatControls(deps), omens, added, stealth, containers, notes };
   }
@@ -84,6 +86,17 @@ describe("omen powers (Shift+V)", () => {
     t.c.omenPower();
     expect(t.added).toHaveLength(1);
     expect(t.notes.at(-1)).toMatch(/recharging/);
+  });
+
+  it("a power comes back a game-day later, across midnight (the clock never wraps)", async () => {
+    const t = await omenSetup("grail");
+    t.c.omenPower();
+    clock = 600 + 1439;
+    t.c.omenPower();
+    expect(t.added, "not yet").toHaveLength(1);
+    clock = 600 + 1440;
+    t.c.omenPower();
+    expect(t.added, "a day on, again").toHaveLength(2);
   });
 
   it("Under the Hill hides you for a minute; the Locked Door gives one master key", async () => {
