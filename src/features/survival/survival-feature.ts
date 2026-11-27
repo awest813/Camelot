@@ -31,6 +31,8 @@ export interface SurvivalHostService {
   isCold(): boolean;
   /** Learning slows when the needs go unmet. */
   setXpMultiplier(multiplier: number): void;
+  /** The names of the diseases the player carries (for the HUD). */
+  ailments?(): string[];
 }
 
 export const SurvivalHostKey = createServiceKey<SurvivalHostService>("survival-host");
@@ -78,7 +80,7 @@ export class SurvivalFeature implements Feature {
       },
     });
 
-    ctx.system({ id: "survival.chip", phase: "ui", update: () => this.chip.update(n.hungerLevel, n.fatigueLevel, n.coldLevel) });
+    ctx.system({ id: "survival.chip", phase: "ui", update: () => this.chip.update(n.hungerLevel, n.fatigueLevel, n.coldLevel, s.get(SurvivalHostKey).ailments?.() ?? []) });
 
     ctx.scope.add(() => {
       n.onHungerLevelChanged = n.onFatigueLevelChanged = n.onColdLevelChanged = null;

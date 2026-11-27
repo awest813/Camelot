@@ -8,3 +8,16 @@ describe("survival chip", () => {
     expect(survivalTags("starving", "tired", "freezing").map((t) => t.text)).toEqual(["Starving", "Tired", "Freezing"]);
   });
 });
+
+describe("survival chip — ailments", () => {
+  it("a carried disease shows by name", async () => {
+    const { SurvivalChip } = await import("./survival-chip");
+    const chip = new SurvivalChip();
+    chip.update("normal", "normal", "warm", ["Marsh Ague"]);
+    const el = document.querySelector(".survival-chip") as HTMLElement;
+    expect(el.textContent).toContain("Marsh Ague");
+    expect(el.style.display).toBe("flex");
+    chip.update("normal", "normal", "warm", []);
+    expect(el.style.display).toBe("none");
+  });
+});

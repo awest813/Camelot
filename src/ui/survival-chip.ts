@@ -1,7 +1,8 @@
 /**
  * The survival chip: what hunger, fatigue and cold are doing to you, shown
  * only when it matters (well fed / rested for their XP bonus, hungry or
- * worse, tired or worse, chilly or worse). The bottom of the HUD chips' stack.
+ * worse, tired or worse, chilly or worse), and any disease you carry. The
+ * bottom of the HUD chips' stack.
  */
 import { addHudChip } from "./hud-chips";
 import type { ColdLevel, FatigueLevel, HungerLevel } from "../systems/survival-system";
@@ -35,12 +36,13 @@ export class SurvivalChip {
   private _root: HTMLDivElement | null = null;
   private _last = "";
 
-  public update(hunger: HungerLevel, fatigue: FatigueLevel, cold: ColdLevel): void {
+  /** `ailments`: the names of the diseases you carry. */
+  public update(hunger: HungerLevel, fatigue: FatigueLevel, cold: ColdLevel, ailments: readonly string[] = []): void {
     if (typeof document === "undefined") return;
-    const key = `${hunger}|${fatigue}|${cold}`;
+    const key = `${hunger}|${fatigue}|${cold}|${ailments.join(",")}`;
     if (key === this._last) return;
     this._last = key;
-    const tags = survivalTags(hunger, fatigue, cold);
+    const tags = [...survivalTags(hunger, fatigue, cold), ...ailments.map((name) => ({ icon: "✚", text: name, color: BAD }))];
     const root = this._ensure();
     root.replaceChildren(...tags.map((t) => {
       const el = document.createElement("span");
@@ -56,7 +58,7 @@ export class SurvivalChip {
     const root = document.createElement("div");
     root.className = "survival-chip";
     root.setAttribute("role", "status");
-    root.setAttribute("aria-label", "Hunger, fatigue and cold");
+    root.setAttribute("aria-label", "Hunger, fatigue, cold and sickness");
     Object.assign(root.style, {
       display: "none", gap: "10px", alignItems: "center",
       background: "rgba(30, 19, 11, 0.97)", border: "1px solid #8A6A2C", borderRadius: "6px",

@@ -157,8 +157,7 @@ export function installGameFeatures(game: Game): void {
         purgeEffects: () => {
           for (const effect of game.activeEffectsSystem.activeEffects) game.activeEffectsSystem.removeEffect(effect.id);
         },
-        calmAttackers: () => {
-          // So the waking place is not a fight (and fast travel isn't blocked).
+        calmAttackers: () => { // so the waking place is not a fight (and fast travel isn't blocked)
           for (const npc of game.scheduleSystem.npcs) {
             if (npc.isDead) continue;
             if (npc.aiState === AIState.ALERT || npc.aiState === AIState.INVESTIGATE || npc.aiState === AIState.CHASE || npc.aiState === AIState.ATTACK) {
@@ -328,6 +327,7 @@ export function installGameFeatures(game: Game): void {
         isCold: () => isColdHere({ at: game.player.camera.position, interior: !!game.cellManager?.isInterior, lights: game.scene.lights,
           weather: game.weatherSystem?.state ?? "clear", biome: (x, z) => game.world.getBiome(Math.floor(x / game.world.chunkSize), Math.floor(z / game.world.chunkSize)) }),
         setXpMultiplier: (m) => { game.skillProgressionSystem.globalXpMultiplier = m; },
+        ailments: () => game.diseaseSystem?.getActiveDiseases().map((id) => game.diseaseSystem.getDefinition(id)?.name ?? id) ?? [],
       });
       k.install(game._survival);
       k.services.provide(OnboardingHostKey, {
