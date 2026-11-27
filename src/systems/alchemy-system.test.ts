@@ -360,3 +360,25 @@ describe("NpcArchetypeSystem resistance/weakness integration", () => {
     expect(def?.damageWeaknesses?.frost).toBe(0.25);
   });
 });
+
+describe("AlchemySystem — lasting potion effects go through the game's effects", () => {
+  it("fortify, resist, weight and unseen effects are timed, not permanent", () => {
+    const player = { health: 50, maxHealth: 100, magicka: 50, maxMagicka: 100, stamina: 50, maxStamina: 100, maxCarryWeight: 300, bonusDamage: 0 } as any;
+    const sys = new AlchemySystem(player, { showNotification: () => {} } as any);
+    const timed: unknown[][] = [];
+    let unseen = 0;
+    sys.effects = { timed: (...a) => { timed.push(a); }, unseen: (s) => { unseen = s; } };
+    const apply = (id: string, m: number, d: number) => (sys as any)._applyEffectToPlayer(id, m, d);
+    apply("fortify_strength", 10, 30);
+    apply("fortify_endurance", 10, 30);
+    apply("feather", 25, 30);
+    apply("resist_fire", 40, 30);
+    apply("invisibility", 0, 20);
+    expect(timed.map((a) => a.slice(0, 3))).toEqual([
+      ["fortify_strength", 10, 30], ["fortify_health", 20, 30], ["burden", -25, 30], ["resist_damage", 20, 30],
+    ]);
+    expect(unseen).toBe(20);
+    expect(player.bonusDamage, "no permanent bonus").toBe(0);
+    expect(player.maxCarryWeight).toBe(300);
+  });
+});

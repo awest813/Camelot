@@ -1,5 +1,6 @@
 import type { Item } from "./inventory-system";
 import type { NPC } from "../entities/npc";
+import type { SpellEffect } from "./spell-system";
 import type { ManagedEventDefinition } from "./event-manager-system";
 import type { MarkPosition } from "./mark-recall-system";
 import type { ActiveEffect } from "./active-effects-system";
@@ -45,7 +46,7 @@ export interface GameEvents {
   /** The player committed a crime witnessed by an NPC. */
   "crime:committed": { crimeType: string; factionId: string; bounty: number };
   /** The player cast a spell. */
-  "spell:cast": { spellId: string; spellName: string; magickaCost: number; damage?: number; heal?: number };
+  "spell:cast": { spellId: string; spellName: string; magickaCost: number; damage?: number; heal?: number; effect?: SpellEffect; magnitude?: number; duration?: number };
   /** A spell hit an NPC. */
   "spell:hit": { spellId: string; npcName: string; damage: number };
   /** A spell healed the player. */

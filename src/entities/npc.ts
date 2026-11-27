@@ -334,6 +334,8 @@ export class NPC {
 
   /** While > 0, this NPC's strikes are weakened (side power-attack disarm). */
   public disarmTimer: number = 0;
+  /** Seconds left of a calming spell (Hush): the NPC does not fight the player. */
+  public pacifiedTimer: number = 0;
 
   /** True while the NPC's current telegraphed blow is unblockable (elites). */
   public get isAttackUnblockable(): boolean { return actors.has(this.actorId, Unblockable); }

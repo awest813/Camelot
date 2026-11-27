@@ -93,6 +93,8 @@ export class SwimmingSystem {
    * Water Breathing spell/potion effect).
    */
   public hasWaterBreathing: boolean = false;
+  /** Seconds left of breathing water by magic (Breath of the Lake). */
+  public waterBreathingSeconds = 0;
 
   // ── Queries ────────────────────────────────────────────────────────────────
 
@@ -171,9 +173,10 @@ export class SwimmingSystem {
    * @param player     Player object whose `health` may be reduced by drowning.
    */
   public update(deltaTime: number, player: SwimmingPlayer): void {
+    if (this.waterBreathingSeconds > 0) this.waterBreathingSeconds = Math.max(0, this.waterBreathingSeconds - deltaTime);
     if (!this._isSubmerged) return;
 
-    if (!this.hasWaterBreathing) {
+    if (!this.hasWaterBreathing && this.waterBreathingSeconds <= 0) {
       let remainingDt = deltaTime;
 
       if (this._currentBreath > 0) {

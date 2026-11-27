@@ -112,4 +112,18 @@ describe("PetsFeature (headless, through the kernel)", () => {
     expect(t.pets.pets.activePet!.health).toBeLessThan(hp);
     t.k.uninstall("pets");
   });
+
+  it("Call the Familiar: a spirit wolf bites the nearest foe, then fades", () => {
+    const t = setup();
+    t.k.events.emit("spell:cast", { spellId: "call_familiar", spellName: "Call the Familiar", magickaCost: 50, effect: "familiar", magnitude: 0, duration: 5 });
+    const wolf = t.scene.getMeshByName("familiar_wolf")!;
+    expect(wolf).toBeTruthy();
+    const foe = actor(wolf.position.x + 1, AIState.ATTACK);
+    t.npcs.push(foe);
+    t.k.phases.run("sim", 0.1);
+    expect(foe.health).toBeLessThan(100);
+    for (let i = 0; i < 6; i++) t.k.phases.run("sim", 1);
+    expect(t.scene.getMeshByName("familiar_wolf")).toBeNull();
+    t.k.uninstall("pets");
+  });
 });

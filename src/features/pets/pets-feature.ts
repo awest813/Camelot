@@ -24,6 +24,7 @@ import type { Scene } from "@babylonjs/core/scene";
 import type { Feature, FeatureContext, ServiceRegistry } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { PetSystem, type Pet } from "../../systems/pet-system";
+import { CompanionBody } from "../../entities/companion-body";
 import { PetUI } from "../../ui/pet-ui";
 import type { NPC } from "../../entities/npc";
 import { ActorsKey, AnimationKey, FeedbackKey, GameplayKey, ModalKey, PlayerKey, ownSave } from "../services";
@@ -33,6 +34,8 @@ const ATTACK_COOLDOWN = 2.0;
 /** A hostile this close (m) to the companion bites back every `STRUCK_EVERY` s. */
 const STRUCK_REACH = 2.0;
 const STRUCK_EVERY = 2.0;
+/** Call the Familiar: a spirit wolf's bite, reach (m) and pace. */
+const FAMILIAR = { damage: 14, reach: 2.4, every: 1.4, speed: 7 };
 
 export interface PetsService {
   readonly pets: PetSystem;
@@ -51,6 +54,8 @@ export class PetsFeature implements Feature {
   private _body: PhysicsAggregate | null = null;
   private _attackTimer = 0;
   private _struckTimer = STRUCK_EVERY;
+  /** Call the Familiar's spirit wolf, while it lasts. */
+  private _familiar: { body: CompanionBody; left: number; bite: number } | null = null;
   private readonly _vel = new Vector3();
   private readonly _look = new Vector3();
   private _services: ServiceRegistry | null = null;
@@ -136,7 +141,18 @@ export class PetsFeature implements Feature {
       feedback().markDirty();
     });
 
-    ctx.system({ id: "pets.ai", phase: "sim", update: (dt) => this._updateAI(dt) });
+    // Call the Familiar: a spirit wolf fights beside the caster for a while.
+    ctx.on("spell:cast", ({ effect, duration = 0 }) => {
+      if (effect !== "familiar" || duration <= 0) return;
+      this._dismissFamiliar();
+      const p = s.get(PlayerKey).position();
+      const body = new CompanionBody(this._scene, { name: "familiar_wolf", radius: 0.35, height: 1.2, color: { r: 0.45, g: 0.7, b: 1 } },
+        { x: p.x + 1.5, y: Math.max(1.2, (p.y ?? 2) - 0.6), z: p.z + 1.5 });
+      body.mesh.visibility = 0.65;
+      this._familiar = { body, left: duration, bite: 0 };
+    });
+
+    ctx.system({ id: "pets.ai", phase: "sim", update: (dt) => { this._updateAI(dt); this._updateFamiliar(dt); } });
     // The companion HUD chip, redrawn when the companion or its health changes.
     let hudId: string | null | undefined, hudHealth = -1;
     ctx.system({
@@ -152,6 +168,7 @@ export class PetsFeature implements Feature {
 
     ctx.scope.add(() => {
       this._despawn();
+      this._dismissFamiliar();
       this.pets.onPetAcquired = null;
       this.pets.onPetSummoned = null;
       this.pets.onPetDismissed = null;
@@ -199,6 +216,34 @@ export class PetsFeature implements Feature {
     this._mesh.dispose();
     this._mesh = null;
     this._body = null;
+  }
+
+  private _dismissFamiliar(): void {
+    this._familiar?.body.dispose();
+    this._familiar = null;
+  }
+
+  /** The spirit wolf runs at the nearest foe (or after the player), bites, and fades when its time is up. */
+  private _updateFamiliar(dt: number): void {
+    const f = this._familiar, services = this._services;
+    if (!f || !services) return;
+    f.left -= dt;
+    if (f.left <= 0) { this._dismissFamiliar(); return; }
+    const at = f.body.position;
+    let foe: NPC | null = null;
+    let best = 20 * 20;
+    for (const npc of services.get(ActorsKey).hostiles()) {
+      const ex = npc.mesh.position.x - at.x, ez = npc.mesh.position.z - at.z;
+      const d = ex * ex + ez * ez;
+      if (d < best) { best = d; foe = npc; }
+    }
+    const to = foe ? foe.mesh.position : services.get(PlayerKey).position();
+    f.body.steer(to, foe ? FAMILIAR.reach * 0.8 : 2.5, FAMILIAR.speed, dt);
+    f.bite -= dt;
+    if (foe && best <= FAMILIAR.reach * FAMILIAR.reach && f.bite <= 0) {
+      foe.takeDamage(FAMILIAR.damage);
+      f.bite = FAMILIAR.every;
+    }
   }
 
   /** Follow the player; bite whoever is fighting them. */

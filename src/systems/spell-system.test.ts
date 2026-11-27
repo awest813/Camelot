@@ -333,3 +333,51 @@ describe("SpellSystem", () => {
     expect(npc.takeDamage).toHaveBeenCalled();
   });
 });
+
+describe("SpellSystem — effects beyond harm and healing", () => {
+  const cast = (id: string, npcs: any[] = []) => {
+    const scene = makeScene();
+    const player = makePlayer(scene);
+    const sys = new SpellSystem(player, npcs, makeUI());
+    const events: any[] = [];
+    listen(sys, "spell:cast", (payload) => { events.push({ payload }); });
+    sys.learnSpell(id);
+    sys.equipSpell(id);
+    const result = sys.castSpell();
+    return { result, events, sys };
+  };
+
+  it("every built-in spell does something: damage, healing, or an effect", () => {
+    for (const s of DEFAULT_SPELLS) expect(!!(s.damage || s.heal || s.effect), s.id).toBe(true);
+  });
+
+  it("self spells report their effect, magnitude and duration on spell:cast", () => {
+    const { events } = cast("barkskin");
+    expect(events.at(-1)?.payload).toMatchObject({ spellId: "barkskin", effect: "ward", magnitude: 30, duration: 60 });
+  });
+
+  it("Hush calms its target for the spell's duration", () => {
+    const foe = makeNPC(5, true, { isAggressive: true, hostileOnSight: true, pacifiedTimer: 0, aiState: "attack" });
+    const { result } = cast("hush", [foe]);
+    expect(result.hitNpc).toBe("Bandit");
+    expect(foe.pacifiedTimer).toBe(15);
+    expect(foe.isAggressive).toBe(false);
+  });
+
+  it("Banish the Dead strikes the restless dead harder", () => {
+    const skeleton = makeNPC(5, true, { key: "Skeleton_Warrior" });
+    const bandit = makeNPC(5, true);
+    const a = cast("banish_dead", [skeleton]).result.damage!;
+    const b = cast("banish_dead", [bandit]).result.damage!;
+    expect(a).toBeGreaterThan(b * 2);
+  });
+
+  it("Mend Another heals a friend, not a foe", () => {
+    const foe = makeNPC(5, true, { isAggressive: true, hostileOnSight: true, health: 50 });
+    cast("mend_another", [foe]);
+    expect(foe.health).toBe(50);
+    const friend = makeNPC(5, true, { isAggressive: false, hostileOnSight: false, health: 50 });
+    cast("mend_another", [friend]);
+    expect(friend.health).toBeGreaterThan(50);
+  });
+});

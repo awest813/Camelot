@@ -549,11 +549,36 @@ export class AlchemySystem {
    * Apply a single alchemy effect to the player.
    * Returns a short description of what was applied.
    */
+  /**
+   * Where a potion's lasting effects go (the game's active effects and the
+   * stealth cloak): set by the game. Without it they fall back to the old
+   * permanent bonuses.
+   */
+  public effects: {
+    timed(kind: "fortify_strength" | "fortify_health" | "fortify_magicka" | "resist_damage" | "burden", magnitude: number, seconds: number, name: string): void;
+    unseen(seconds: number): void;
+  } | null = null;
+
   private _applyEffectToPlayer(
     effectId: AlchemyEffectId,
     magnitude: number,
     _duration: number,
   ): string {
+    const fx = this.effects;
+    const secs = _duration > 0 ? _duration : 60;
+    if (fx) {
+      switch (effectId) {
+        case "fortify_strength": fx.timed("fortify_strength", magnitude, secs, "Fortify Strength"); return `+${magnitude} Strength (${secs}s)`;
+        case "fortify_endurance": fx.timed("fortify_health", magnitude * 2, secs, "Fortify Endurance"); return `+${magnitude * 2} max health (${secs}s)`;
+        case "fortify_intelligence": fx.timed("fortify_magicka", magnitude, secs, "Fortify Intelligence"); return `+${magnitude} max magicka (${secs}s)`;
+        case "feather": fx.timed("burden", -magnitude, secs, "Lightfoot"); return `+${magnitude} carry weight (${secs}s)`;
+        case "burden": fx.timed("burden", magnitude, secs, "Weight"); return `-${magnitude} carry weight (${secs}s)`;
+        case "resist_fire": case "resist_frost": case "resist_shock":
+          fx.timed("resist_damage", Math.round(magnitude / 2), secs, "Resist harm"); return `Harm taken -${Math.round(magnitude / 2)}% (${secs}s)`;
+        case "invisibility": fx.unseen(secs); return `Unseen (${secs}s)`;
+        default: break;
+      }
+    }
     switch (effectId) {
       case "restore_health": {
         const actual = Math.min(magnitude, this._player.maxHealth - this._player.health);

@@ -1414,6 +1414,12 @@ export class CombatSystem {
     // NPC, nowhere: chasers give up and go home, the alert go searching.
     const unseen = this.playerUnseen();
     if (unseen) distSq = Number.POSITIVE_INFINITY;
+    // Calmed by a spell: the player is, for now, no concern of theirs.
+    if (npc.pacifiedTimer > 0) {
+      npc.pacifiedTimer = Math.max(0, npc.pacifiedTimer - deltaTime);
+      npc.isAggressive = false;
+      distSq = Number.POSITIVE_INFINITY;
+    }
 
     // Track the player's last known world position any time they are within aggro range.
     // Uses copyFrom to avoid frequent Vector3 allocations.
@@ -1705,8 +1711,10 @@ export class CombatSystem {
     return this._skillSystem?.multiplier("destruction") ?? 1;
   }
 
+  /** Strength's share of a blow: the attribute, plus any fortified strength (a power, a potion, Spirit Blade). */
   private _strengthBonus(): number {
-    return this._attributeSystem?.meleeDamageBonus ?? 0;
+    const fortified = this._activeEffectsSystem?.totalMagnitude("fortify_strength") ?? 0;
+    return (this._attributeSystem?.meleeDamageBonus ?? 0) + fortified * 0.2;
   }
 
   private _magicBonus(): number {

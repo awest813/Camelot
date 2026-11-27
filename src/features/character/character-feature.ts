@@ -90,9 +90,11 @@ export class CharacterFeature implements Feature {
       feedback().notify(`${p.name}: ${p.description}`, 3000);
       feedback().markDirty();
     };
-    // A disease saps the maxima; its cure gives them back.
+    // The maxima follow what feeds them (a disease, its cure, a fortify
+    // potion wearing off): the sync only moves them by what changed.
     ctx.on("disease:contracted", () => host().syncMaxStats());
     ctx.on("disease:cured", () => host().syncMaxStats());
+    ctx.system({ id: "character.maxima", phase: "sim", update: () => { if (!this._creating) host().syncMaxStats(); } });
     this.races.onPowerActivated = power;
     this.birthsigns.onPowerActivated = power;
 

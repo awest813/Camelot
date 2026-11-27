@@ -33,7 +33,8 @@ import { ProgressionHostKey } from "../features/progression/progression-feature"
 import { DialogueServicesFeature, DialogueHostKey } from "../features/dialogue-services/dialogue-services-feature";
 import { SurvivalHostKey } from "../features/survival/survival-feature";
 import { isColdHere } from "../systems/survival-system";
-import { MaxStatLedger, addStats, maxStatsFromAttributeDeltas, type MaxStats } from "../systems/max-stat-ledger";
+import { playerMaxStats } from "../systems/max-stat-ledger";
+import { SpellEffectsFeature } from "../features/spell-effects/spell-effects-feature";
 import { ProvisionsFeature } from "../features/provisions/provisions-feature";
 import { SpellMakingFeature } from "../features/spell-making/spell-making-feature";
 import { persistSkipOnboardingTips } from "../onboarding-preferences";
@@ -205,13 +206,9 @@ export function installGameFeatures(game: Game): void {
         drop: (at, item) => { new Loot(game.scene, at, item); },
       });
       k.install(new SpoilsFeature());
-      // The maxima: attributes + the omen's bonus + the diseases' penalties (perks and enchantments add their own on top).
-      const a = game.attributeSystem;
-      const fromAttributes = (): MaxStats => ({ maxHealth: a.maxHealth, maxMagicka: a.maxMagicka, maxStamina: a.maxStamina, carryWeight: a.carryWeight });
-      const maxStats = new MaxStatLedger(() => addStats(fromAttributes(), game.birthsignSystem.getStatBonuses(),
-        maxStatsFromAttributeDeltas(game.diseaseSystem.getAttributePenalties())), game.player, fromAttributes());
-      // A load resets the maxima to the attributes' (the save system), then the omen and diseases go back on.
-      game.saveSystem.setMaximaRestorer(() => { maxStats.adopt(fromAttributes()); maxStats.sync(); });
+      // The maxima: attributes + omen + diseases + fortify/burden effects; a load resets them to the attributes' first.
+      const maxStats = playerMaxStats({ attributes: game.attributeSystem, omen: () => game.birthsignSystem, diseases: () => game.diseaseSystem, effects: () => game.activeEffectsSystem, body: game.player });
+      game.saveSystem.setMaximaRestorer(() => maxStats.afterLoad());
       k.services.provide(CharacterHostKey, {
         get attributes() { return game.attributeSystem; },
         get skills() { return game.skillProgressionSystem; },
@@ -452,6 +449,7 @@ export function installGameFeatures(game: Game): void {
       k.install(game._spellMaking);
       k.install(new ProvisionsFeature({ inventory: game.inventorySystem, quiver: game.projectileSystem, spells: game.spellSystem,
         alchemy: game._crafting.alchemy, enchanting: game._crafting.enchanting, diseases: game.diseaseSystem }));
+      k.install(new SpellEffectsFeature({ get effects() { return game.activeEffectsSystem; }, get stealth() { return game.stealthSystem; }, get swim() { return game.swimSystem; }, alchemy: game._crafting.alchemy }));
       k.services.provide(LawKey, {
         get crime() { return game.crimeSystem; },
         get persuasion() { return game.persuasionSystem; },

@@ -1,6 +1,6 @@
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
-import type { NPC, DamageType } from "../entities/npc";
+import { AIState, type NPC, type DamageType } from "../entities/npc";
 import type { Player } from "../entities/player";
 import type { UIManager } from "../ui/ui-manager";
 import type { SkillProgressionSystem } from "./skill-progression-system";
@@ -45,6 +45,28 @@ export interface SpellDefinition {
   range?: number;
   /** Splash/area radius (0 or undefined = single target). */
   aoeRadius?: number;
+  /**
+   * What a spell with no damage or healing does, for `duration` seconds at
+   * `magnitude`: the game applies it on `spell:cast` (pacify is the spell
+   * system's own, on its target).
+   *   ward            damage taken reduced by `magnitude` %
+   *   unseen          no one can see or hear the caster
+   *   water_breathing no breath drain under water
+   *   spirit_weapon   +`magnitude` strength (harder blows)
+   *   familiar        a spirit wolf fights beside the caster
+   *   pacify          the target stops fighting for the duration
+   */
+  effect?: SpellEffect;
+  magnitude?: number;
+  /** Damage multiplier against the restless dead (skeletons, barrow-wights). */
+  undeadBane?: number;
+}
+
+export type SpellEffect = "ward" | "unseen" | "water_breathing" | "spirit_weapon" | "familiar" | "pacify";
+
+/** The restless dead, by their spawn names. */
+export function isUndeadName(key: string): boolean {
+  return /skeleton|undead|barrow|wight|zombie|lich|ruinguard/i.test(key);
 }
 
 export interface SpellCastResult {
@@ -169,6 +191,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     magickaCost: 28,
     cooldown: 2.0,
     duration: 60,
+    effect: "ward",
+    magnitude: 30,
   },
   {
     id: "lake_breath",
@@ -179,6 +203,7 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     magickaCost: 30,
     cooldown: 1.0,
     duration: 30,
+    effect: "water_breathing",
   },
   {
     id: "fade",
@@ -189,6 +214,7 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     magickaCost: 45,
     cooldown: 3.0,
     duration: 15,
+    effect: "unseen",
   },
   {
     id: "hush",
@@ -200,6 +226,7 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     cooldown: 2.0,
     range: 20,
     duration: 15,
+    effect: "pacify",
   },
   {
     id: "spirit_blade",
@@ -210,6 +237,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     magickaCost: 35,
     cooldown: 2.5,
     duration: 60,
+    effect: "spirit_weapon",
+    magnitude: 50,
   },
   {
     id: "call_familiar",
@@ -220,6 +249,7 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     magickaCost: 50,
     cooldown: 4.0,
     duration: 60,
+    effect: "familiar",
   },
   {
     id: "fork_lightning",
@@ -259,6 +289,7 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     damage: 20,
     damageType: "magic",
     range: 18,
+    undeadBane: 3,
   },
 ];
 
@@ -448,10 +479,15 @@ export class SpellSystem {
         ? `${spell.name} → ${result.hitNpc} (+${result.heal} HP)`
         : result.heal
           ? `${spell.name} → healed ${result.heal} HP`
-          : `${spell.name} cast`;
+          : spell.effect === "pacify" && result.hitNpc
+            ? `${spell.name} → ${result.hitNpc} is calmed`
+            : `${spell.name} cast`;
     this._ui.showNotification(msg, 1500);
 
-    this.events?.emit("spell:cast", { spellId: spell.id, spellName: spell.name, magickaCost: spell.magickaCost, damage: result.damage, heal: result.heal });
+    this.events?.emit("spell:cast", {
+      spellId: spell.id, spellName: spell.name, magickaCost: spell.magickaCost, damage: result.damage, heal: result.heal,
+      ...(spell.effect ? { effect: spell.effect, magnitude: spell.magnitude ?? 0, duration: spell.duration ?? 0 } : {}),
+    });
     if (result.hitNpc && result.damage) this.events?.emit("spell:hit", { spellId: spell.id, npcName: result.hitNpc, damage: result.damage });
     if (result.heal) this.events?.emit("spell:heal", { spellId: spell.id, amount: result.heal });
     return result;
@@ -478,6 +514,11 @@ export class SpellSystem {
     const gearBonus = this._player.bonusMagicDamage ?? 0;
     const base = (spell.damage ?? 0) + this.magicDamageBonus + gearBonus;
     return Math.max(1, Math.round(base * destructionMult));
+  }
+
+  /** A bane spell's extra force against the restless dead. */
+  private _baneFor(spell: SpellDefinition, npc: NPC, raw: number): number {
+    return spell.undeadBane && isUndeadName(npc.key) ? Math.round(raw * spell.undeadBane) : raw;
   }
 
   private _resolveEffect(spell: SpellDefinition): SpellCastResult {
@@ -512,7 +553,7 @@ export class SpellSystem {
           if (npc.isDead) continue;
           const dist = Vector3.Distance(npc.mesh.position, impactPoint);
           if (dist <= spell.aoeRadius) {
-            const finalDmg = applyDamageWithResistance(rawHit, npc, damageType);
+            const finalDmg = applyDamageWithResistance(this._baneFor(spell, npc, rawHit), npc, damageType);
             npc.takeDamage(finalDmg);
             this.events?.emit("combat:hostileHit", { npc, damage: finalDmg });
             this._applySpellDoT(spell, npc);
@@ -525,7 +566,7 @@ export class SpellSystem {
       } else {
         const target = this._findTargetNpc(playerPos, range);
         if (target) {
-          const finalDmg = applyDamageWithResistance(rawHit, target, damageType);
+          const finalDmg = applyDamageWithResistance(this._baneFor(spell, target, rawHit), target, damageType);
           target.takeDamage(finalDmg);
           this.events?.emit("combat:hostileHit", { npc: target, damage: finalDmg });
           this._applySpellDoT(spell, target);
@@ -537,9 +578,20 @@ export class SpellSystem {
       return { success: true, damage: reportedDamage, hitNpc: hitNpcName };
     }
 
-    if (spell.heal && (spell.delivery === "target" || spell.delivery === "touch")) {
+    if (spell.effect === "pacify") {
       const target = this._findTargetNpc(playerPos, range);
-      if (target) {
+      if (!target) return { success: true };
+      target.pacifiedTimer = spell.duration ?? 15;
+      target.isAggressive = false;
+      target.provoked = false;
+      target.aiState = AIState.IDLE;
+      return { success: true, hitNpc: target.key };
+    }
+
+    if (spell.heal && (spell.delivery === "target" || spell.delivery === "touch")) {
+      // Mending is for friends: a foe in the way is not healed.
+      const target = this._findTargetNpc(playerPos, range);
+      if (target && !target.isAggressive && !target.hostileOnSight) {
         const healingMultiplier = (this._player as unknown as { perkHealingMultiplier?: number }).perkHealingMultiplier ?? 1.0;
         const scaledHeal = spell.heal * healingMultiplier;
         const actual = Math.min(scaledHeal, target.maxHealth - target.health);
