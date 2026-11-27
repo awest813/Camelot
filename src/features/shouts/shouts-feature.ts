@@ -4,8 +4,9 @@
  * word's effect on the world, and the timed buffs (Held Moment, Battle-wind).
  *
  * Inputs:   services feedback, modal, gameplay, shout-host; event
- *           `player:kill` (dragons), `landmark:cleared` (camps); a sim-phase
- *           system ticks the buffs.
+ *           `player:kill` (dragons), `landmark:cleared` (camps),
+ *           `location:discovered` (obelisks teach); a sim-phase system ticks
+ *           the buffs.
  * Outputs:  the `shouts` service.
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
@@ -158,6 +159,13 @@ export class ShoutsFeature implements Feature {
     });
     ctx.on("landmark:cleared", ({ id }) => {
       if (id.startsWith("site_bandit-camp_")) s.get(ShoutsKey).absorbDragonSoul();
+    });
+    // The old places teach: finding an obelisk (an old waymarker) teaches the
+    // next rank of a word.  Mastering it still takes awen.
+    ctx.on("location:discovered", ({ id }) => {
+      if (!id.startsWith("site_obelisk_")) return;
+      this._learnNextWord();
+      feedback().markDirty();
     });
 
     ctx.system({ id: "shouts.buffs", phase: "sim", update: (dt) => this._tickBuffs(dt) });

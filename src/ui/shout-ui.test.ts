@@ -171,7 +171,7 @@ describe("ShoutUI", () => {
   it("shows the old-places hint instead of an Unlock button for undiscovered words", () => {
     ui.open([makeView({ learned: [false, false, false] })], 5, null);
     const text = (document.querySelector(".shout-ui") as HTMLDivElement).textContent ?? "";
-    expect(text).toContain("The next rank is taught at the old places");
+    expect(text).toContain("Find an obelisk, or do a great deed, to learn the next rank");
     const unlockBtn = Array.from(document.querySelectorAll("button"))
       .find(b => b.textContent?.includes("Master"));
     expect(unlockBtn).toBeUndefined();

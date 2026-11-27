@@ -414,7 +414,7 @@ export class ShoutUI {
       if (!nextLearned) {
         const learnHint = document.createElement("span");
         Object.assign(learnHint.style, { color: C.LOCKED, fontSize: "14px", fontStyle: "italic" });
-        learnHint.textContent = "The next rank is taught at the old places…";
+        learnHint.textContent = "Find an obelisk, or do a great deed, to learn the next rank…";
         actionRow.appendChild(learnHint);
       } else if (!nextUnlocked) {
         const unlockBtn = document.createElement("button");

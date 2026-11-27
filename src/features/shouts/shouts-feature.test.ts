@@ -61,6 +61,16 @@ describe("ShoutsFeature (headless, through the kernel)", () => {
     t.k.uninstall("shouts");
   });
 
+  it("finding an obelisk (an old place) teaches the next rank, without awen", () => {
+    const t = setup();
+    t.k.events.emit("location:discovered", { id: "village_3_4", name: "Millbrook" });
+    expect(t.svc.shouts.isWordLearned("gust", 0)).toBe(false);
+    t.k.events.emit("location:discovered", { id: "site_obelisk_1_2", name: "Ashford Obelisk" });
+    expect(t.svc.shouts.isWordLearned("gust", 0)).toBe(true);
+    expect(t.svc.shouts.dragonSouls).toBe(0);
+    t.k.uninstall("shouts");
+  });
+
   it("clearing a bandit camp is a great deed (awen); a roost pays through its dragon", () => {
     const t = setup();
     t.k.events.emit("landmark:cleared", { id: "site_dragon_1_1", name: "Roost" });
