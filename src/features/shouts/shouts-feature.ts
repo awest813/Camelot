@@ -1,10 +1,11 @@
 /**
- * The Thu'um as a kernel feature: dragon souls and Words of Power, the
- * shouts panel (N), using the equipped shout (Shift+N), each shout's effect
- * on the world, and the timed buffs (Slow Time, Elemental Fury).
+ * The Words of the Old Tongue as a kernel feature: awen and the ranks it
+ * masters, the words panel (N), speaking the ready word (Shift+N), each
+ * word's effect on the world, and the timed buffs (Held Moment, Battle-wind).
  *
  * Inputs:   services feedback, modal, gameplay, shout-host; event
- *           `player:kill` (dragons); a sim-phase system ticks the buffs.
+ *           `player:kill` (dragons), `landmark:cleared` (camps); a sim-phase
+ *           system ticks the buffs.
  * Outputs:  the `shouts` service.
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
@@ -78,26 +79,26 @@ export class ShoutsFeature implements Feature {
 
     sh.onShoutUsed = (shoutId, _words, tier) => this._apply(shoutId, tier);
     sh.onWordLearned = (_id, _i, word) => {
-      feedback().notify(`Word of Power learned: ${word.dragonWord} — "${word.translation}"`, 3600);
+      feedback().notify(`A word of the Old Tongue: ${word.word}, "${word.translation}"`, 3600);
     };
     sh.onWordUnlocked = (shoutId, wordIndex, word) => {
       const def = sh.getShout(shoutId);
-      feedback().notify(`${def?.name ?? shoutId}: "${word.dragonWord}" unlocked (${wordIndex + 1}/3 words).`, 3000);
+      feedback().notify(`${def?.name ?? shoutId}: ${word.word} mastered (rank ${wordIndex + 1} of 3).`, 3000);
       if (this.panel.isVisible) this._refreshPanel();
       feedback().markDirty();
     };
-    sh.onDragonSoulGained = (total) => feedback().notify(`Dragon soul absorbed (${total} held).`, 3000);
+    sh.onDragonSoulGained = (total) => feedback().notify(`Awen gained (${total} held).`, 3000);
 
     this.panel.onEquip = (shoutId) => {
       if (!sh.equipShout(shoutId)) return;
       this._refreshPanel();
       const def = sh.getShout(shoutId);
-      feedback().notify(`${def?.name ?? shoutId} equipped — Shift+N to shout.`, 2400);
+      feedback().notify(`${def?.name ?? shoutId} ready: Shift+N to speak it.`, 2400);
       feedback().markDirty();
     };
     this.panel.onUnlockWord = (shoutId, wordIndex) => {
       if (!sh.unlockWord(shoutId, wordIndex)) {
-        feedback().notify("Cannot unlock that word — a dragon soul is required.", 2400);
+        feedback().notify("You need awen to master that rank.", 2400);
       }
     };
     this.panel.onClose = () => modal().restoreGameplay();
@@ -121,13 +122,13 @@ export class ShoutsFeature implements Feature {
         if (result.success) return; // effects arrive through onShoutUsed
         switch (result.reason) {
           case "no_shout_equipped":
-            feedback().notify("No shout equipped — open the shouts panel (N).", 2200);
+            feedback().notify("No word is ready: choose one in the words panel (N).", 2200);
             break;
           case "no_words_unlocked":
-            feedback().notify("That shout has no unlocked words — spend a dragon soul (N).", 2600);
+            feedback().notify("You have mastered no rank of that word yet: spend awen (N).", 2600);
             break;
           case "on_cooldown":
-            feedback().notify(`The Thu'um needs ${Math.ceil(result.cooldownRemainingSeconds ?? 0)}s to recover.`, 1800);
+            feedback().notify(`Your voice needs ${Math.ceil(result.cooldownRemainingSeconds ?? 0)}s to recover.`, 1800);
             break;
           default:
             break;
@@ -150,9 +151,13 @@ export class ShoutsFeature implements Feature {
       },
     });
 
-    // Slaying a dragon absorbs its soul and teaches the next Word of Power.
+    // Great deeds bring awen and teach the next rank of a word: slaying a
+    // dragon, or clearing a bandit camp (a roost pays through its dragon).
     ctx.on("player:kill", ({ npcId }) => {
       if (/^DragonBoss/.test(npcId)) s.get(ShoutsKey).absorbDragonSoul();
+    });
+    ctx.on("landmark:cleared", ({ id }) => {
+      if (id.startsWith("site_bandit-camp_")) s.get(ShoutsKey).absorbDragonSoul();
     });
 
     ctx.system({ id: "shouts.buffs", phase: "sim", update: (dt) => this._tickBuffs(dt) });
@@ -169,7 +174,7 @@ export class ShoutsFeature implements Feature {
     });
   }
 
-  /** Learn the first unknown Word of Power, in catalogue order. */
+  /** Learn the first rank not yet known, in catalogue order. */
   private _learnNextWord(): void {
     for (const def of this.shouts.getAllShouts()) {
       for (let i = 0 as 0 | 1 | 2; i < def.words.length; i = (i + 1) as 0 | 1 | 2) {
@@ -204,7 +209,7 @@ export class ShoutsFeature implements Feature {
     if (!s || !def) return;
     const host = s.get(ShoutHostKey);
     const fx = tier.effects;
-    const words = def.words.slice(0, this.shouts.getUnlockedTier(shoutId)).map((w) => w!.dragonWord).join(" ");
+    const words = def.words.slice(0, this.shouts.getUnlockedTier(shoutId)).map((w) => w!.word).join(" ");
     s.get(FeedbackKey).notify(`"${words}!" — ${tier.description}`, 2400);
 
     const { origin, forward } = host.stance();
@@ -237,7 +242,7 @@ export class ShoutsFeature implements Feature {
     if (fx.ethereal_duration) {
       host.addEffect({
         id: `shout_ethereal_${Date.now()}`,
-        name: "Become Ethereal",
+        name: "Shade-step",
         effectType: "resist_damage",
         magnitude: 100,
         duration: fx.ethereal_duration,

@@ -4,7 +4,7 @@
   "capturedAt": "2026-11-27",
   "save": {
     "version": 30,
-    "timestamp": 1795744270998,
+    "timestamp": 1795744611473,
     "player": {
       "position": {
         "x": 1.2686834433116019,
@@ -76,7 +76,7 @@
     "quests": [],
     "skills": [],
     "skillPoints": 0,
-    "framework": "{\"schemaVersion\":1,\"savedAt\":1795744270998,\"profileId\":\"default\",\"state\":{\"dialogueState\":{},\"questState\":{\"quests\":{\"quest_guard_resolution\":{\"status\":\"active\",\"nodes\":{\"talk_to_guard\":{\"active\":true,\"completed\":false,\"progress\":0},\"defeat_ruin_guard\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_bandit_bounty\":{\"status\":\"inactive\",\"nodes\":{\"kill_bandits\":{\"active\":false,\"completed\":false,\"progress\":0},\"collect_proof\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_kill_guard\":{\"status\":\"active\",\"nodes\":{\"obj_kill_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_collect_potions\":{\"status\":\"active\",\"nodes\":{\"obj_collect_potions\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_speak_guard\":{\"status\":\"active\",\"nodes\":{\"obj_talk_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"job_inn_0_3\":{\"status\":\"active\",\"nodes\":{\"hunt\":{\"active\":true,\"completed\":false,\"progress\":0},\"report\":{\"active\":false,\"completed\":false,\"progress\":0}}}},\"radiant\":{\"job_inn_0_3\":{\"templateId\":\"clear_camp\",\"vars\":{\"place\":\"Craigagel Cross\",\"camp\":\"Gorseford Bandit Camp\",\"landmark\":\"site_bandit-camp_1_6\"}}}},\"inventoryState\":{\"capacity\":20,\"items\":[],\"equipped\":{}},\"factionState\":{\"reputations\":{\"village_guard\":0,\"bandits\":-50,\"merchants_guild\":10,\"mages_college\":0}},\"flags\":{},\"legacyState\":{}}}",
+    "framework": "{\"schemaVersion\":1,\"savedAt\":1795744611473,\"profileId\":\"default\",\"state\":{\"dialogueState\":{},\"questState\":{\"quests\":{\"quest_guard_resolution\":{\"status\":\"active\",\"nodes\":{\"talk_to_guard\":{\"active\":true,\"completed\":false,\"progress\":0},\"defeat_ruin_guard\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_bandit_bounty\":{\"status\":\"inactive\",\"nodes\":{\"kill_bandits\":{\"active\":false,\"completed\":false,\"progress\":0},\"collect_proof\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_kill_guard\":{\"status\":\"active\",\"nodes\":{\"obj_kill_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_collect_potions\":{\"status\":\"active\",\"nodes\":{\"obj_collect_potions\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_speak_guard\":{\"status\":\"active\",\"nodes\":{\"obj_talk_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"job_inn_0_3\":{\"status\":\"active\",\"nodes\":{\"hunt\":{\"active\":true,\"completed\":false,\"progress\":0},\"report\":{\"active\":false,\"completed\":false,\"progress\":0}}}},\"radiant\":{\"job_inn_0_3\":{\"templateId\":\"clear_camp\",\"vars\":{\"place\":\"Craigagel Cross\",\"camp\":\"Gorseford Bandit Camp\",\"landmark\":\"site_bandit-camp_1_6\"}}}},\"inventoryState\":{\"capacity\":20,\"items\":[],\"equipped\":{}},\"factionState\":{\"reputations\":{\"village_guard\":0,\"bandits\":-50,\"merchants_guild\":10,\"mages_college\":0}},\"flags\":{},\"legacyState\":{}}}",
     "attributes": {
       "base": {
         "strength": 60,
@@ -90,8 +90,8 @@
       "pendingPoints": 0
     },
     "time": {
-      "gameTime": 794.4000000000011,
-      "elapsedGameTime": 794.4000000000011
+      "gameTime": 794.0000000000011,
+      "elapsedGameTime": 794.0000000000011
     },
     "crime": {
       "bounties": {},
@@ -420,7 +420,7 @@
     },
     "weather": {
       "state": "clear",
-      "nextChangeIn": 232.58240432347853
+      "nextChangeIn": 572.7762474068447
     },
     "quickSlots": {
       "slots": {
@@ -699,7 +699,7 @@
       },
       {
         "id": "ambient_market_news",
-        "lastFiredAt": 13.129999999999994,
+        "lastFiredAt": 13.123333333333328,
         "fired": true
       },
       {
@@ -750,8 +750,8 @@
       "totalCaught": 0
     },
     "survival": {
-      "hunger": 99.50000000000011,
-      "fatigue": 99.00000000000023,
+      "hunger": 99.513888888889,
+      "fatigue": 99.027777777778,
       "cold": 100
     },
     "crafting": {
@@ -835,7 +835,7 @@
       "dragonSouls": 0,
       "equippedShoutId": null,
       "shoutStates": {
-        "unrelenting_force": {
+        "gust": {
           "learned": [
             false,
             false,
@@ -848,7 +848,7 @@
           ],
           "lastUsedMinutes": null
         },
-        "whirlwind_sprint": {
+        "swift_feet": {
           "learned": [
             false,
             false,
@@ -861,7 +861,7 @@
           ],
           "lastUsedMinutes": null
         },
-        "become_ethereal": {
+        "shade_step": {
           "learned": [
             false,
             false,
@@ -874,7 +874,7 @@
           ],
           "lastUsedMinutes": null
         },
-        "fire_breath": {
+        "flame": {
           "learned": [
             false,
             false,
@@ -887,7 +887,7 @@
           ],
           "lastUsedMinutes": null
         },
-        "ice_form": {
+        "hoarfrost": {
           "learned": [
             false,
             false,
@@ -900,7 +900,7 @@
           ],
           "lastUsedMinutes": null
         },
-        "slow_time": {
+        "held_moment": {
           "learned": [
             false,
             false,
@@ -913,7 +913,7 @@
           ],
           "lastUsedMinutes": null
         },
-        "clear_skies": {
+        "clear_sky": {
           "learned": [
             false,
             false,
@@ -926,7 +926,7 @@
           ],
           "lastUsedMinutes": null
         },
-        "elemental_fury": {
+        "battle_wind": {
           "learned": [
             false,
             false,

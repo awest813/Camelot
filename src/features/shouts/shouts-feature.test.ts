@@ -54,10 +54,19 @@ describe("ShoutsFeature (headless, through the kernel)", () => {
   it("without a shout, Shift+N says what to do; a slain dragon teaches a word", () => {
     const t = setup();
     t.svc.use();
-    expect(t.notes.at(-1)).toMatch(/No shout equipped/);
+    expect(t.notes.at(-1)).toMatch(/No word is ready/);
     t.svc.absorbDragonSoul();
     expect(t.svc.shouts.dragonSouls).toBe(1);
-    expect(t.notes.some((n) => n.startsWith("Word of Power learned:"))).toBe(true);
+    expect(t.notes.some((n) => n.startsWith("A word of the Old Tongue: GWYNT"))).toBe(true);
+    t.k.uninstall("shouts");
+  });
+
+  it("clearing a bandit camp is a great deed (awen); a roost pays through its dragon", () => {
+    const t = setup();
+    t.k.events.emit("landmark:cleared", { id: "site_dragon_1_1", name: "Roost" });
+    expect(t.svc.shouts.dragonSouls).toBe(0);
+    t.k.events.emit("landmark:cleared", { id: "site_bandit-camp_1_1", name: "Camp" });
+    expect(t.svc.shouts.dragonSouls).toBe(1);
     t.k.uninstall("shouts");
   });
 
@@ -79,7 +88,7 @@ describe("ShoutsFeature (headless, through the kernel)", () => {
     expect(reachedAhead, "shouts hit what is in front").toBeGreaterThan(0);
   });
 
-  it("Slow Time and Elemental Fury wear off on the sim clock", () => {
+  it("Held Moment and Battle-wind wear off on the sim clock", () => {
     const t = setup();
     const all = t.svc.shouts.getAllShouts();
     const slow = all.find((d) => d.tiers.some((x) => x?.effects.time_scale));

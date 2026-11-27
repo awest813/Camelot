@@ -1,12 +1,12 @@
 /**
- * ShoutUI — Thu'um management panel and HUD chip for the DragonShoutSystem.
+ * ShoutUI — the Words of the Old Tongue: the panel and the HUD chip.
  *
  * Layout:
  *   HUD chip    — compact indicator in the bottom-right corner; visible while a
  *                 shout is equipped.  Shows the shout name, unlocked word count,
  *                 and READY / cooldown countdown state.
  *   Shout panel — full modal opened with [N].  Lists every registered shout with
- *                 its Words of Power, per-word learned/unlocked state, tier
+ *                 its three ranks, per-word learned/unlocked state, tier
  *                 effect preview, and Equip / Unlock (soul) actions.
  *
  * Style follows the dark-amber design language used throughout the project.
@@ -40,9 +40,9 @@ const C = {
 /** Per-shout snapshot the game layer builds from DragonShoutSystem state. */
 export interface ShoutView {
   def: ShoutDefinition;
-  /** Which words have been discovered at a Word Wall (indexed 0–2). */
+  /** Which ranks have been learned (indexed 0–2). */
   learned: boolean[];
-  /** Which words have been unlocked by spending a Dragon Soul (indexed 0–2). */
+  /** Which ranks have been mastered with awen (indexed 0–2). */
   unlocked: boolean[];
 }
 
@@ -164,7 +164,7 @@ export class ShoutUI {
     const root = document.createElement("div");
     root.setAttribute("role", "status");
     root.setAttribute("aria-live", "polite");
-    root.setAttribute("aria-label", "Equipped shout");
+    root.setAttribute("aria-label", "Word ready to speak");
     Object.assign(root.style, {
       position:      "fixed",
       bottom:        "150px",         // above the companion HUD chip
@@ -251,12 +251,12 @@ export class ShoutUI {
     Object.assign(title.style, {
       margin: "0", fontFamily: C.FONT, color: C.TITLE, fontSize: "17px", letterSpacing: "1px",
     });
-    title.textContent = "SHOUTS";
+    title.textContent = "WORDS OF THE OLD TONGUE";
 
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
     _styleButton(closeBtn, "✕", { fontSize: "18px", padding: "0 6px" });
-    closeBtn.setAttribute("aria-label", "Close shouts panel");
+    closeBtn.setAttribute("aria-label", "Close the words");
     closeBtn.addEventListener("click", () => {
       this.close();
       this.onClose?.();
@@ -268,13 +268,13 @@ export class ShoutUI {
     const souls = document.createElement("p");
     Object.assign(souls.style, { margin: "0", fontSize: "14px", color: C.TEXT });
     const soulsLabel = document.createElement("span");
-    soulsLabel.setAttribute("aria-label", "Dragon souls");
+    soulsLabel.setAttribute("aria-label", "Awen");
     souls.append(soulsLabel);
 
     // ── Hint ────────────────────────────────────────────────────────────────
     const hint = document.createElement("p");
     Object.assign(hint.style, { margin: "0", fontSize: "13px", color: C.DIM });
-    hint.textContent = "N or Esc to close  ·  Shift+N to shout  ·  Slay dragons to absorb souls";
+    hint.textContent = "N or Esc to close  ·  Shift+N to speak the word  ·  Great deeds bring awen";
 
     // ── Shout list ──────────────────────────────────────────────────────────
     const listEl = document.createElement("div");
@@ -301,12 +301,12 @@ export class ShoutUI {
     const list = this._panelList;
     if (!list || !this._soulsLabel) return;
     list.innerHTML = "";
-    this._soulsLabel.textContent = `Dragon Souls: ${this._dragonSouls}`;
+    this._soulsLabel.textContent = `Awen: ${this._dragonSouls}`;
 
     if (this._views.length === 0) {
       const empty = document.createElement("p");
       Object.assign(empty.style, { color: C.DIM, fontSize: "15px", textAlign: "center" });
-      empty.textContent = "No shouts are known to you yet.";
+      empty.textContent = "No words of the Old Tongue are known to you yet.";
       list.appendChild(empty);
       return;
     }
@@ -354,7 +354,7 @@ export class ShoutUI {
         background: C.BORDER, color: "#FFF8DC", fontSize: "12px",
         padding: "2px 5px", borderRadius: "3px", fontFamily: C.MONO,
       });
-      badge.textContent = "EQUIPPED";
+      badge.textContent = "CHOSEN";
       topRow.appendChild(badge);
     }
 
@@ -377,7 +377,7 @@ export class ShoutUI {
         background: unlocked[i] ? "rgba(107, 79, 18, 0.35)" : "transparent",
       });
       chip.textContent = learned[i] || unlocked[i]
-        ? `${word!.dragonWord} · ${word!.translation}`
+        ? `${word!.word} · ${word!.translation}`
         : "??? · Unknown";
       chip.setAttribute(
         "aria-label",
@@ -393,7 +393,7 @@ export class ShoutUI {
     if (tierDef) {
       effectEl.textContent = tierDef.description;
     } else {
-      effectEl.textContent = "Unlock a Word of Power to use this shout.";
+      effectEl.textContent = "Master a rank of this word to speak it.";
       effectEl.style.color = C.LOCKED;
     }
 
@@ -414,18 +414,18 @@ export class ShoutUI {
       if (!nextLearned) {
         const learnHint = document.createElement("span");
         Object.assign(learnHint.style, { color: C.LOCKED, fontSize: "14px", fontStyle: "italic" });
-        learnHint.textContent = "Next word awaits at a Word Wall…";
+        learnHint.textContent = "The next rank is taught at the old places…";
         actionRow.appendChild(learnHint);
       } else if (!nextUnlocked) {
         const unlockBtn = document.createElement("button");
         unlockBtn.type = "button";
-        _styleButton(unlockBtn, `Unlock ${nextWord!.dragonWord} (1 soul)`);
-        unlockBtn.setAttribute("aria-label", `Unlock word ${nextWord!.dragonWord} for one dragon soul`);
+        _styleButton(unlockBtn, `Master ${nextWord!.word} (1 awen)`);
+        unlockBtn.setAttribute("aria-label", `Master ${nextWord!.word} for one awen`);
         if (this._dragonSouls < 1) {
           unlockBtn.setAttribute("aria-disabled", "true");
           unlockBtn.style.opacity = "0.45";
           unlockBtn.style.cursor = "not-allowed";
-          unlockBtn.title = "No dragon souls — slay a dragon to absorb one.";
+          unlockBtn.title = "No awen. Great deeds (a dragon slain) bring it.";
         } else {
           unlockBtn.addEventListener("click", () => {
             this.onUnlockWord?.(def.id, nextIndex);
@@ -438,13 +438,13 @@ export class ShoutUI {
     const equipBtn = document.createElement("button");
     equipBtn.type = "button";
     if (isEquipped) {
-      _styleButton(equipBtn, "Equipped");
+      _styleButton(equipBtn, "Chosen");
       equipBtn.setAttribute("aria-disabled", "true");
       equipBtn.style.opacity = "0.45";
       equipBtn.style.cursor = "default";
     } else {
-      _styleButton(equipBtn, "Equip");
-      equipBtn.setAttribute("aria-label", `Equip ${def.name}`);
+      _styleButton(equipBtn, "Choose");
+      equipBtn.setAttribute("aria-label", `Choose ${def.name} to speak`);
       equipBtn.addEventListener("click", () => {
         this.onEquip?.(def.id);
       });

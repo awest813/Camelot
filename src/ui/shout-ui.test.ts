@@ -5,19 +5,19 @@ import type { ShoutDefinition } from "../systems/dragon-shout-system";
 
 // ── Fixtures ───────────────────────────────────────────────────────────────────
 
-function makeWord(dragonWord: string, translation: string) {
-  return { dragonWord, translation };
+function makeWord(word: string, translation: string) {
+  return { word, translation };
 }
 
 function makeShoutDef(overrides: Partial<ShoutDefinition> = {}): ShoutDefinition {
   return {
-    id: "unrelenting_force",
-    name: "Unrelenting Force",
+    id: "gust",
+    name: "Gust",
     description: "Your Voice is raw power.",
     words: [
-      makeWord("FUS", "Force"),
-      makeWord("RO", "Balance"),
-      makeWord("DAH", "Push"),
+      makeWord("GWYNT", "Wind"),
+      makeWord("CRYF", "Strong"),
+      makeWord("CHWYTH", "Blow"),
     ],
     tiers: [
       { description: "Staggers nearby enemies.", cooldownSeconds: 2, effects: { knockback_force: 50 } },
@@ -71,7 +71,7 @@ describe("ShoutUI", () => {
   it("refresh() re-renders while open but is a no-op while closed", () => {
     ui.open([makeView()], 0, null);
     ui.refresh([makeView()], 3, null);
-    const souls = document.querySelector('[aria-label="Dragon souls"]') as HTMLSpanElement;
+    const souls = document.querySelector('[aria-label="Awen"]') as HTMLSpanElement;
     expect(souls.textContent).toContain("3");
 
     ui.close();
@@ -84,19 +84,19 @@ describe("ShoutUI", () => {
   it("renders every shout with its name and description", () => {
     const shoutA = makeView();
     const shoutB = makeView({
-      def: makeShoutDef({ id: "fire_breath", name: "Fire Breath", description: "Exhale flame." }),
+      def: makeShoutDef({ id: "flame", name: "Flame", description: "Exhale flame." }),
     });
     ui.open([shoutA, shoutB], 0, null);
     const text = (document.querySelector(".shout-ui") as HTMLDivElement).textContent ?? "";
-    expect(text).toContain("Unrelenting Force");
+    expect(text).toContain("Gust");
     expect(text).toContain("Your Voice is raw power.");
-    expect(text).toContain("Fire Breath");
+    expect(text).toContain("Flame");
     expect(text).toContain("Exhale flame.");
   });
 
-  it("shows the dragon soul count", () => {
+  it("shows the awen held", () => {
     ui.open([makeView()], 4, null);
-    const souls = document.querySelector('[aria-label="Dragon souls"]') as HTMLSpanElement;
+    const souls = document.querySelector('[aria-label="Awen"]') as HTMLSpanElement;
     expect(souls.textContent).toContain("4");
   });
 
@@ -104,7 +104,7 @@ describe("ShoutUI", () => {
     const view = makeView({ learned: [true, false, false], unlocked: [true, false, false] });
     ui.open([view], 0, null);
     const text = (document.querySelector(".shout-ui") as HTMLDivElement).textContent ?? "";
-    expect(text).toContain("FUS · Force");     // unlocked → revealed
+    expect(text).toContain("GWYNT · Wind");     // unlocked → revealed
     expect(text).toContain("??? · Unknown");   // unknown words masked
     expect(text).not.toContain("RO · Balance");
   });
@@ -112,7 +112,7 @@ describe("ShoutUI", () => {
   it("shows an empty-state message when no shouts are provided", () => {
     ui.open([], 0, null);
     const text = (document.querySelector(".shout-ui") as HTMLDivElement).textContent ?? "";
-    expect(text).toContain("No shouts are known to you yet.");
+    expect(text).toContain("No words of the Old Tongue are known to you yet.");
   });
 
   // ── Equip interaction ───────────────────────────────────────────────────────
@@ -123,22 +123,22 @@ describe("ShoutUI", () => {
     ui.open([makeView()], 0, null);
 
     const btn = Array.from(document.querySelectorAll("button"))
-      .find(b => b.textContent === "Equip") as HTMLButtonElement;
+      .find(b => b.textContent === "Choose") as HTMLButtonElement;
     expect(btn).toBeDefined();
     btn.click();
-    expect(onEquip).toHaveBeenCalledWith("unrelenting_force");
+    expect(onEquip).toHaveBeenCalledWith("gust");
   });
 
   it("the equipped shout is badged and its Equip button is inert", () => {
     const onEquip = vi.fn();
     ui.onEquip = onEquip;
-    ui.open([makeView()], 0, "unrelenting_force");
+    ui.open([makeView()], 0, "gust");
 
     const text = (document.querySelector(".shout-ui") as HTMLDivElement).textContent ?? "";
-    expect(text).toContain("EQUIPPED");
+    expect(text).toContain("CHOSEN");
 
     const btn = Array.from(document.querySelectorAll("button"))
-      .find(b => b.textContent === "Equipped") as HTMLButtonElement;
+      .find(b => b.textContent === "Chosen") as HTMLButtonElement;
     expect(btn).toBeDefined();
     expect(btn.getAttribute("aria-disabled")).toBe("true");
     btn.click();
@@ -153,27 +153,27 @@ describe("ShoutUI", () => {
     ui.open([makeView({ learned: [true, false, false] })], 1, null);
 
     const btn = Array.from(document.querySelectorAll("button"))
-      .find(b => b.textContent?.includes("Unlock FUS")) as HTMLButtonElement;
+      .find(b => b.textContent?.includes("Master GWYNT")) as HTMLButtonElement;
     expect(btn).toBeDefined();
     btn.click();
-    expect(onUnlockWord).toHaveBeenCalledWith("unrelenting_force", 0);
+    expect(onUnlockWord).toHaveBeenCalledWith("gust", 0);
   });
 
-  it("disables the Unlock button when the player has no souls", () => {
+  it("disables the Unlock button when the player has no awen", () => {
     ui.open([makeView({ learned: [true, false, false] })], 0, null);
     const btn = Array.from(document.querySelectorAll("button"))
-      .find(b => b.textContent?.includes("Unlock FUS")) as HTMLButtonElement;
+      .find(b => b.textContent?.includes("Master GWYNT")) as HTMLButtonElement;
     expect(btn).toBeDefined();
     expect(btn.getAttribute("aria-disabled")).toBe("true");
     expect(btn.style.cursor).toBe("not-allowed");
   });
 
-  it("shows the word-wall hint instead of an Unlock button for undiscovered words", () => {
+  it("shows the old-places hint instead of an Unlock button for undiscovered words", () => {
     ui.open([makeView({ learned: [false, false, false] })], 5, null);
     const text = (document.querySelector(".shout-ui") as HTMLDivElement).textContent ?? "";
-    expect(text).toContain("Next word awaits at a Word Wall");
+    expect(text).toContain("The next rank is taught at the old places");
     const unlockBtn = Array.from(document.querySelectorAll("button"))
-      .find(b => b.textContent?.includes("Unlock"));
+      .find(b => b.textContent?.includes("Master"));
     expect(unlockBtn).toBeUndefined();
   });
 
@@ -183,7 +183,7 @@ describe("ShoutUI", () => {
     const onClose = vi.fn();
     ui.onClose = onClose;
     ui.open([makeView()], 0, null);
-    (document.querySelector('[aria-label="Close shouts panel"]') as HTMLButtonElement).click();
+    (document.querySelector('[aria-label="Close the words"]') as HTMLButtonElement).click();
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(ui.isVisible).toBe(false);
   });
@@ -203,31 +203,31 @@ describe("ShoutUI", () => {
   it("updateHUD(null) hides the chip", () => {
     ui.updateHUD(null);
     // Chip element is not even created for a null update before any show.
-    const chip = document.querySelector('[aria-label="Equipped shout"]');
+    const chip = document.querySelector('[aria-label="Word ready to speak"]');
     expect(chip).toBeNull();
   });
 
   it("updateHUD shows name, tier pips, and READY state", () => {
-    ui.updateHUD({ name: "Unrelenting Force", tier: 2, cooldownSeconds: 0 });
-    const chip = document.querySelector('[aria-label="Equipped shout"]') as HTMLDivElement;
+    ui.updateHUD({ name: "Gust", tier: 2, cooldownSeconds: 0 });
+    const chip = document.querySelector('[aria-label="Word ready to speak"]') as HTMLDivElement;
     expect(chip.style.display).toBe("flex");
-    expect(chip.textContent).toContain("Unrelenting Force");
+    expect(chip.textContent).toContain("Gust");
     expect(chip.textContent).toContain("READY");
     expect(chip.textContent).toContain("◆◆◇");
   });
 
   it("updateHUD shows a ceil-ed cooldown countdown while recovering", () => {
-    ui.updateHUD({ name: "Fire Breath", tier: 1, cooldownSeconds: 4.2 });
-    const chip = document.querySelector('[aria-label="Equipped shout"]') as HTMLDivElement;
+    ui.updateHUD({ name: "Flame", tier: 1, cooldownSeconds: 4.2 });
+    const chip = document.querySelector('[aria-label="Word ready to speak"]') as HTMLDivElement;
     expect(chip.textContent).toContain("5s");
     expect(chip.textContent).not.toContain("READY");
   });
 
   it("updateHUD skips DOM writes when the state is unchanged", () => {
-    ui.updateHUD({ name: "Fire Breath", tier: 1, cooldownSeconds: 4.2 });
-    const chip = document.querySelector('[aria-label="Equipped shout"]') as HTMLDivElement;
+    ui.updateHUD({ name: "Flame", tier: 1, cooldownSeconds: 4.2 });
+    const chip = document.querySelector('[aria-label="Word ready to speak"]') as HTMLDivElement;
     const before = chip.innerHTML;
-    ui.updateHUD({ name: "Fire Breath", tier: 1, cooldownSeconds: 4.1 });
+    ui.updateHUD({ name: "Flame", tier: 1, cooldownSeconds: 4.1 });
     expect(chip.innerHTML).toBe(before); // same ceil bucket (5s) → no write
   });
 });

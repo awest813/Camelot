@@ -1,16 +1,18 @@
 /**
- * DragonShoutSystem — Skyrim-style Thu'um / Dragon Shout engine.
+ * DragonShoutSystem — the Words of the Old Tongue (shouts, in code): words
+ * learned at the old places, each with three ranks the hero masters by
+ * spending awen (the bardic gift; `dragonSouls` in code).
  *
- * Players discover Words of Power at Word Wall locations, then spend Dragon
- * Souls to unlock (activate) each word.  Each Shout is composed of one to
+ * Players learn a word's ranks at the old places, then spend awen to master
+ * (activate) each rank.  Each Shout is composed of one to
  * three words; using more unlocked words produces a stronger effect and a
  * longer cooldown.  Only one Shout may be equipped at a time and it is
  * activated via an in-game hotkey (R).
  *
  * Integration points:
- *   - `gainDragonSoul(count?)` — award souls after defeating a dragon.
- *   - `learnWord(shoutId, wordIndex)` — mark a word as discovered (Word Wall).
- *   - `unlockWord(shoutId, wordIndex)` — spend one Dragon Soul to activate a
+ *   - `gainDragonSoul(count?)` — award awen after a great deed (a dragon slain).
+ *   - `learnWord(shoutId, wordIndex)` — mark a rank as learned (at an old place).
+ *   - `unlockWord(shoutId, wordIndex)` — spend one awen to activate a
  *     word; returns false when the soul count is insufficient.
  *   - `equipShout(shoutId)` — arm the shout for use.
  *   - `useShout(gameTimeMinutes)` — activate the equipped shout; returns a
@@ -25,11 +27,11 @@
  * this.dragonShoutSystem = new DragonShoutSystem();
  * // After slaying a dragon:
  * this.dragonShoutSystem.gainDragonSoul();
- * // At a Word Wall:
- * this.dragonShoutSystem.learnWord("unrelenting_force", 0);
- * this.dragonShoutSystem.unlockWord("unrelenting_force", 0);
+ * // At an old place:
+ * this.dragonShoutSystem.learnWord("gust", 0);
+ * this.dragonShoutSystem.unlockWord("gust", 0);
  * // Equip and use (R key):
- * this.dragonShoutSystem.equipShout("unrelenting_force");
+ * this.dragonShoutSystem.equipShout("gust");
  * const result = this.dragonShoutSystem.useShout(this.timeSystem.gameTime);
  * if (result.success) { /* apply result.effects *\/ }
  * ```
@@ -50,8 +52,8 @@ export const GAME_MINUTES_PER_HOUR = 60;
  * Each word has a dragon-script name and an English translation.
  */
 export interface WordOfPower {
-  /** Dragon-script word (e.g. "FUS"). */
-  dragonWord: string;
+  /** The rank's word in the Old Tongue (e.g. "GWYNT"). */
+  word: string;
   /** English translation (e.g. "Force"). */
   translation: string;
 }
@@ -65,7 +67,7 @@ export interface ShoutTierEffect {
   description: string;
   /**
    * Cooldown in real seconds after using this tier.
-   * Skyrim uses real-time cooldowns; we store them in seconds and apply them
+   * Cooldowns are real time; we store them in seconds and apply them
    * as in-game-minute offsets when saving.
    */
   cooldownSeconds: number;
@@ -77,16 +79,16 @@ export interface ShoutTierEffect {
   effects: Record<string, number>;
 }
 
-/** A complete Shout definition containing up to three Words of Power. */
+/** A word of the Old Tongue: up to three ranks. */
 export interface ShoutDefinition {
-  /** Unique identifier (e.g. "unrelenting_force"). */
+  /** Unique identifier (e.g. "gust"). */
   id: string;
   /** Display name (e.g. "Unrelenting Force"). */
   name: string;
   /** Flavour description shown in the shouts menu. */
   description: string;
   /**
-   * The one, two, or three Words of Power for this shout.
+   * The one, two or three ranks of this word.
    * Index 0 = first word, 1 = second, 2 = third.
    * A shout MUST have at least one word.
    */
@@ -108,7 +110,7 @@ export interface ShoutState {
    */
   learned: [boolean, boolean, boolean];
   /**
-   * Which words have been unlocked by spending a Dragon Soul.
+   * Which words have been unlocked by spending a awen.
    * Indexed 0–2; `true` = word is active (contributes to shout tier).
    */
   unlocked: [boolean, boolean, boolean];
@@ -158,20 +160,20 @@ export interface DragonShoutSaveState {
 // ── Built-in shout catalogue ───────────────────────────────────────────────────
 
 /**
- * Eight canonical Skyrim shouts provided out of the box.
+ * The eight words of the Old Tongue (Welsh words for their ranks).
  * Games can register additional shouts via {@link DragonShoutSystem.registerShout}.
  */
 export const BUILTIN_SHOUTS: ReadonlyArray<ShoutDefinition> = [
-  // ── Unrelenting Force ───────────────────────────────────────────────────────
+  // ── Gust ───────────────────────────────────────────────────────
   {
-    id: "unrelenting_force",
-    name: "Unrelenting Force",
+    id: "gust",
+    name: "Gust",
     description:
-      "Your Voice is raw power, pushing aside anything — or anyone — that stands in your path.",
+      "Speak the wind's word, and it shoves aside anything (or anyone) in your path.",
     words: [
-      { dragonWord: "FUS",  translation: "Force"   },
-      { dragonWord: "RO",   translation: "Balance" },
-      { dragonWord: "DAH",  translation: "Push"    },
+      { word: "GWYNT", translation: "Wind" },
+      { word: "CRYF", translation: "Strong" },
+      { word: "CHWYTH", translation: "Blow" },
     ],
     tiers: [
       {
@@ -186,22 +188,22 @@ export const BUILTIN_SHOUTS: ReadonlyArray<ShoutDefinition> = [
       },
       {
         description:
-          "Unleashes the full power of the Thu'um, sending enemies flying.",
+          "The full word, spoken: enemies are hurled away.",
         cooldownSeconds: 15,
         effects: { knockback_force: 250, stagger_duration: 3.0, knockback_damage: 10 },
       },
     ],
   },
-  // ── Whirlwind Sprint ────────────────────────────────────────────────────────
+  // ── Swift Feet ────────────────────────────────────────────────────────
   {
-    id: "whirlwind_sprint",
-    name: "Whirlwind Sprint",
+    id: "swift_feet",
+    name: "Swift Feet",
     description:
-      "The Thu'um rushes forward, carrying you in its wake with the speed of a whirlwind.",
+      "The word for running carries you forward faster than any horse.",
     words: [
-      { dragonWord: "WULD",  translation: "Whirlwind" },
-      { dragonWord: "NAH",   translation: "Fury"      },
-      { dragonWord: "KEST",  translation: "Tempest"   },
+      { word: "BUAN", translation: "Swift" },
+      { word: "RHED", translation: "Run" },
+      { word: "HEDFAN", translation: "Fly" },
     ],
     tiers: [
       {
@@ -221,45 +223,45 @@ export const BUILTIN_SHOUTS: ReadonlyArray<ShoutDefinition> = [
       },
     ],
   },
-  // ── Become Ethereal ─────────────────────────────────────────────────────────
+  // ── Shade-step ─────────────────────────────────────────────────────────
   {
-    id: "become_ethereal",
-    name: "Become Ethereal",
+    id: "shade_step",
+    name: "Shade-step",
     description:
-      "The Thu'um reaches out to the Void, changing your form to one that cannot be harmed.",
+      "Speak yourself half into the Otherworld, where no blade can reach you.",
     words: [
-      { dragonWord: "FEIM",  translation: "Fade"  },
-      { dragonWord: "ZII",   translation: "Spirit" },
-      { dragonWord: "GRON",  translation: "Bind"   },
+      { word: "CYSGOD", translation: "Shadow" },
+      { word: "NIWL", translation: "Mist" },
+      { word: "DIM", translation: "Nothing" },
     ],
     tiers: [
       {
-        description: "Become ethereal for 8 seconds; you cannot attack or be harmed.",
+        description: "Step half out of the world for 8 seconds; you cannot attack or be harmed.",
         cooldownSeconds: 26,
         effects: { ethereal_duration: 8 },
       },
       {
-        description: "Become ethereal for 13 seconds.",
+        description: "Step half out of the world for 13 seconds.",
         cooldownSeconds: 26,
         effects: { ethereal_duration: 13 },
       },
       {
-        description: "Become ethereal for 18 seconds.",
+        description: "Step half out of the world for 18 seconds.",
         cooldownSeconds: 26,
         effects: { ethereal_duration: 18 },
       },
     ],
   },
-  // ── Fire Breath ─────────────────────────────────────────────────────────────
+  // ── Flame ─────────────────────────────────────────────────────────────
   {
-    id: "fire_breath",
-    name: "Fire Breath",
+    id: "flame",
+    name: "Flame",
     description:
-      "Inhale air, exhale flame, and behold the Thu'um as a blazing inferno.",
+      "The oldest word of all: speak it, and fire answers.",
     words: [
-      { dragonWord: "YOL",   translation: "Fire"    },
-      { dragonWord: "TOOR",  translation: "Inferno" },
-      { dragonWord: "SHUL",  translation: "Sun"     },
+      { word: "TÂN", translation: "Fire" },
+      { word: "FFLAM", translation: "Flame" },
+      { word: "GODDAITH", translation: "Bonfire" },
     ],
     tiers: [
       {
@@ -279,16 +281,16 @@ export const BUILTIN_SHOUTS: ReadonlyArray<ShoutDefinition> = [
       },
     ],
   },
-  // ── Ice Form ────────────────────────────────────────────────────────────────
+  // ── Hoarfrost ────────────────────────────────────────────────────────────────
   {
-    id: "ice_form",
-    name: "Ice Form",
+    id: "hoarfrost",
+    name: "Hoarfrost",
     description:
-      "Your Thu'um freezes an opponent solid.",
+      "The winter's word, spoken at a foe, locks them in ice.",
     words: [
-      { dragonWord: "IIZ",   translation: "Ice"  },
-      { dragonWord: "SLEN",  translation: "Flesh" },
-      { dragonWord: "NUS",   translation: "Statue" },
+      { word: "RHEW", translation: "Frost" },
+      { word: "IÂ", translation: "Ice" },
+      { word: "GAEAF", translation: "Winter" },
     ],
     tiers: [
       {
@@ -308,16 +310,16 @@ export const BUILTIN_SHOUTS: ReadonlyArray<ShoutDefinition> = [
       },
     ],
   },
-  // ── Slow Time ───────────────────────────────────────────────────────────────
+  // ── Held Moment ───────────────────────────────────────────────────────────────
   {
-    id: "slow_time",
-    name: "Slow Time",
+    id: "held_moment",
+    name: "Held Moment",
     description:
-      "Shout at time itself, halting it momentarily as your Thu'um echoes through Eternity.",
+      "A word the bards whisper: the world slows around you while you do not.",
     words: [
-      { dragonWord: "TIID",  translation: "Time"  },
-      { dragonWord: "KLO",   translation: "Sand"  },
-      { dragonWord: "UL",    translation: "Eternity" },
+      { word: "AMSER", translation: "Time" },
+      { word: "ARAF", translation: "Slow" },
+      { word: "LLONYDD", translation: "Still" },
     ],
     tiers: [
       {
@@ -337,16 +339,16 @@ export const BUILTIN_SHOUTS: ReadonlyArray<ShoutDefinition> = [
       },
     ],
   },
-  // ── Clear Skies ─────────────────────────────────────────────────────────────
+  // ── Clear Sky ─────────────────────────────────────────────────────────────
   {
-    id: "clear_skies",
-    name: "Clear Skies",
+    id: "clear_sky",
+    name: "Clear Sky",
     description:
-      "Skyrim itself yields before the Thu'um, as you clear away fog and inclement weather.",
+      "Speak to the sky, and the mist and the cloud draw back.",
     words: [
-      { dragonWord: "LOK",   translation: "Sky"  },
-      { dragonWord: "VAH",   translation: "Spring" },
-      { dragonWord: "KOOR",  translation: "Summer" },
+      { word: "AWYR", translation: "Sky" },
+      { word: "GLÂN", translation: "Clear" },
+      { word: "HAUL", translation: "Sun" },
     ],
     tiers: [
       {
@@ -366,16 +368,16 @@ export const BUILTIN_SHOUTS: ReadonlyArray<ShoutDefinition> = [
       },
     ],
   },
-  // ── Elemental Fury ──────────────────────────────────────────────────────────
+  // ── Battle-wind ──────────────────────────────────────────────────────────
   {
-    id: "elemental_fury",
-    name: "Elemental Fury",
+    id: "battle_wind",
+    name: "Battle-wind",
     description:
-      "The Thu'um imbues your arms with the speed of wind, allowing you to attack faster.",
+      "The wind's word for battle: your arms move with its speed.",
     words: [
-      { dragonWord: "SU",    translation: "Air"    },
-      { dragonWord: "GRAH",  translation: "Battle" },
-      { dragonWord: "DUN",   translation: "Grace"  },
+      { word: "BRWYDR", translation: "Battle" },
+      { word: "LLID", translation: "Wrath" },
+      { word: "TYMESTL", translation: "Storm" },
     ],
     tiers: [
       {
@@ -400,7 +402,7 @@ export const BUILTIN_SHOUTS: ReadonlyArray<ShoutDefinition> = [
 // ── System ────────────────────────────────────────────────────────────────────
 
 /**
- * Manages Skyrim-style Dragon Shouts: word discovery, soul unlocking,
+ * Manages the Words of the Old Tongue: learning ranks, mastering them with awen,
  * equipping, use, and cooldown tracking.
  */
 export class DragonShoutSystem {
@@ -442,7 +444,7 @@ export class DragonShoutSystem {
     | null = null;
 
   /**
-   * Fired when dragon souls are gained.
+   * Fired when awen are gained.
    * @param total Current total after the addition.
    */
   public onDragonSoulGained: ((total: number) => void) | null = null;
@@ -501,15 +503,15 @@ export class DragonShoutSystem {
     return Array.from(this._shouts.keys());
   }
 
-  // ── Dragon souls ─────────────────────────────────────────────────────────────
+  // ── awen ─────────────────────────────────────────────────────────────
 
-  /** Current dragon soul count. */
+  /** Current awen count. */
   public get dragonSouls(): number {
     return this._dragonSouls;
   }
 
   /**
-   * Award one or more dragon souls to the player.
+   * Award one or more awen to the player.
    * Fires `onDragonSoulGained` with the new total.
    * @param count Number of souls to add (default 1).
    */
@@ -521,7 +523,7 @@ export class DragonShoutSystem {
   }
 
   /**
-   * Deduct dragon souls (for non-unlock uses, e.g. scripted events).
+   * Deduct awen (for non-unlock uses, e.g. scripted events).
    * Clamps to zero; does not fire `onDragonSoulGained`.
    * @returns `true` if the full amount was available and deducted.
    */
@@ -536,7 +538,7 @@ export class DragonShoutSystem {
 
   /**
    * Mark a word as discovered (player visited a Word Wall).
-   * A learned word can be unlocked by spending a Dragon Soul.
+   * A learned word can be unlocked by spending a awen.
    *
    * @param shoutId    The shout the word belongs to.
    * @param wordIndex  Which word (0, 1, or 2).
@@ -563,10 +565,10 @@ export class DragonShoutSystem {
     return this._shoutStates.get(shoutId)?.learned[wordIndex] ?? false;
   }
 
-  // ── Word unlocking (Dragon Soul spending) ─────────────────────────────────────
+  // ── Word unlocking (awen spending) ─────────────────────────────────────
 
   /**
-   * Spend one Dragon Soul to unlock a learned word.
+   * Spend one awen to unlock a learned word.
    * Words must be unlocked in order (word 1 before word 2, etc.).
    *
    * @returns `false` when:
@@ -574,7 +576,7 @@ export class DragonShoutSystem {
    *   - wordIndex is invalid,
    *   - the word is not yet learned,
    *   - a previous word has not been unlocked,
-   *   - or the player has no Dragon Souls.
+   *   - or the player has no awen.
    */
   public unlockWord(shoutId: string, wordIndex: 0 | 1 | 2): boolean {
     const def   = this._shouts.get(shoutId);

@@ -18,9 +18,9 @@ function makeCustomShout(overrides: Partial<ShoutDefinition> = {}): ShoutDefinit
     name: "Test Shout",
     description: "A test shout.",
     words: [
-      { dragonWord: "TEST", translation: "Test" },
-      { dragonWord: "ZWEI", translation: "Two"  },
-      { dragonWord: "DREI", translation: "Three"},
+      { word: "TEST", translation: "Test" },
+      { word: "ZWEI", translation: "Two"  },
+      { word: "DREI", translation: "Three"},
     ],
     tiers: [
       { description: "Tier 1", cooldownSeconds: 10, effects: { damage: 10 } },
@@ -34,7 +34,7 @@ function makeCustomShout(overrides: Partial<ShoutDefinition> = {}): ShoutDefinit
 // ── Initial state ─────────────────────────────────────────────────────────────
 
 describe("DragonShoutSystem — initial state", () => {
-  it("starts with 0 dragon souls", () => {
+  it("starts with no awen", () => {
     const sys = new DragonShoutSystem();
     expect(sys.dragonSouls).toBe(0);
   });
@@ -59,8 +59,8 @@ describe("DragonShoutSystem — initial state", () => {
   it("no word is learned or unlocked by default", () => {
     const sys = new DragonShoutSystem();
     for (let i = 0; i < 3; i++) {
-      expect(sys.isWordLearned("unrelenting_force", i as 0 | 1 | 2)).toBe(false);
-      expect(sys.isWordUnlocked("unrelenting_force", i as 0 | 1 | 2)).toBe(false);
+      expect(sys.isWordLearned("gust", i as 0 | 1 | 2)).toBe(false);
+      expect(sys.isWordUnlocked("gust", i as 0 | 1 | 2)).toBe(false);
     }
   });
 });
@@ -77,8 +77,8 @@ describe("DragonShoutSystem — registration", () => {
 
   it("getShout returns the definition", () => {
     const sys = new DragonShoutSystem();
-    const def = sys.getShout("unrelenting_force")!;
-    expect(def.name).toBe("Unrelenting Force");
+    const def = sys.getShout("gust")!;
+    expect(def.name).toBe("Gust");
   });
 
   it("getShout returns undefined for unknown id", () => {
@@ -90,7 +90,7 @@ describe("DragonShoutSystem — registration", () => {
     const sys = new DragonShoutSystem();
     const all = sys.getAllShouts();
     expect(all.length).toBeGreaterThanOrEqual(8);
-    expect(all.find(s => s.id === "fire_breath")).toBeDefined();
+    expect(all.find(s => s.id === "flame")).toBeDefined();
   });
 
   it("removeShout removes the shout and returns true", () => {
@@ -134,7 +134,7 @@ describe("DragonShoutSystem — registration", () => {
 
 // ── Dragon souls ───────────────────────────────────────────────────────────────
 
-describe("DragonShoutSystem — dragon souls", () => {
+describe("DragonShoutSystem — awen", () => {
   it("gainDragonSoul increments souls by 1", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul();
@@ -181,15 +181,15 @@ describe("DragonShoutSystem — dragon souls", () => {
 describe("DragonShoutSystem — learnWord", () => {
   it("learnWord marks the word as learned", () => {
     const sys = new DragonShoutSystem();
-    expect(sys.learnWord("unrelenting_force", 0)).toBe(true);
-    expect(sys.isWordLearned("unrelenting_force", 0)).toBe(true);
+    expect(sys.learnWord("gust", 0)).toBe(true);
+    expect(sys.isWordLearned("gust", 0)).toBe(true);
   });
 
   it("learnWord is idempotent", () => {
     const sys = new DragonShoutSystem();
-    sys.learnWord("unrelenting_force", 0);
-    expect(sys.learnWord("unrelenting_force", 0)).toBe(true);
-    expect(sys.isWordLearned("unrelenting_force", 0)).toBe(true);
+    sys.learnWord("gust", 0);
+    expect(sys.learnWord("gust", 0)).toBe(true);
+    expect(sys.isWordLearned("gust", 0)).toBe(true);
   });
 
   it("learnWord returns false for unknown shout", () => {
@@ -201,22 +201,22 @@ describe("DragonShoutSystem — learnWord", () => {
     const sys = new DragonShoutSystem();
     const cb = vi.fn();
     sys.onWordLearned = cb;
-    sys.learnWord("unrelenting_force", 0);
-    expect(cb).toHaveBeenCalledWith("unrelenting_force", 0, expect.objectContaining({ dragonWord: "FUS" }));
+    sys.learnWord("gust", 0);
+    expect(cb).toHaveBeenCalledWith("gust", 0, expect.objectContaining({ word: "GWYNT" }));
   });
 
   it("onWordLearned does not fire when already known", () => {
     const sys = new DragonShoutSystem();
     const cb = vi.fn();
     sys.onWordLearned = cb;
-    sys.learnWord("unrelenting_force", 0);
-    sys.learnWord("unrelenting_force", 0);
+    sys.learnWord("gust", 0);
+    sys.learnWord("gust", 0);
     expect(cb).toHaveBeenCalledTimes(1);
   });
 
   it("learnWord returns false for invalid index", () => {
     const sys = new DragonShoutSystem();
-    expect(sys.learnWord("unrelenting_force", 5 as any)).toBe(false);
+    expect(sys.learnWord("gust", 5 as any)).toBe(false);
   });
 });
 
@@ -226,41 +226,41 @@ describe("DragonShoutSystem — unlockWord", () => {
   it("unlockWord returns false when word not learned", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul();
-    expect(sys.unlockWord("unrelenting_force", 0)).toBe(false);
+    expect(sys.unlockWord("gust", 0)).toBe(false);
   });
 
-  it("unlockWord returns false when no dragon souls", () => {
+  it("unlockWord returns false with no awen", () => {
     const sys = new DragonShoutSystem();
-    sys.learnWord("unrelenting_force", 0);
-    expect(sys.unlockWord("unrelenting_force", 0)).toBe(false);
+    sys.learnWord("gust", 0);
+    expect(sys.unlockWord("gust", 0)).toBe(false);
   });
 
   it("unlockWord succeeds when learned and soul available", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul();
-    sys.learnWord("unrelenting_force", 0);
-    expect(sys.unlockWord("unrelenting_force", 0)).toBe(true);
-    expect(sys.isWordUnlocked("unrelenting_force", 0)).toBe(true);
+    sys.learnWord("gust", 0);
+    expect(sys.unlockWord("gust", 0)).toBe(true);
+    expect(sys.isWordUnlocked("gust", 0)).toBe(true);
     expect(sys.dragonSouls).toBe(0);
   });
 
   it("unlockWord spends exactly one soul per unlock", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul(3);
-    sys.learnWord("unrelenting_force", 0);
-    sys.learnWord("unrelenting_force", 1);
-    sys.unlockWord("unrelenting_force", 0);
-    sys.unlockWord("unrelenting_force", 1);
+    sys.learnWord("gust", 0);
+    sys.learnWord("gust", 1);
+    sys.unlockWord("gust", 0);
+    sys.unlockWord("gust", 1);
     expect(sys.dragonSouls).toBe(1);
   });
 
   it("unlockWord enforces word ordering (cannot unlock word 2 before word 1)", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul(3);
-    sys.learnWord("unrelenting_force", 0);
-    sys.learnWord("unrelenting_force", 1);
+    sys.learnWord("gust", 0);
+    sys.learnWord("gust", 1);
     // word 0 not yet unlocked — word 1 must fail
-    expect(sys.unlockWord("unrelenting_force", 1)).toBe(false);
+    expect(sys.unlockWord("gust", 1)).toBe(false);
   });
 
   it("onWordUnlocked callback fires", () => {
@@ -268,18 +268,18 @@ describe("DragonShoutSystem — unlockWord", () => {
     const cb  = vi.fn();
     sys.onWordUnlocked = cb;
     sys.gainDragonSoul();
-    sys.learnWord("fire_breath", 0);
-    sys.unlockWord("fire_breath", 0);
-    expect(cb).toHaveBeenCalledWith("fire_breath", 0, expect.objectContaining({ dragonWord: "YOL" }));
+    sys.learnWord("flame", 0);
+    sys.unlockWord("flame", 0);
+    expect(cb).toHaveBeenCalledWith("flame", 0, expect.objectContaining({ word: "TÂN" }));
   });
 
   it("unlockWord is idempotent when already unlocked", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul(2);
-    sys.learnWord("unrelenting_force", 0);
-    sys.unlockWord("unrelenting_force", 0);
+    sys.learnWord("gust", 0);
+    sys.unlockWord("gust", 0);
     // second call — no more soul cost
-    const result = sys.unlockWord("unrelenting_force", 0);
+    const result = sys.unlockWord("gust", 0);
     expect(result).toBe(true);
     expect(sys.dragonSouls).toBe(1); // only one soul spent total
   });
@@ -287,16 +287,16 @@ describe("DragonShoutSystem — unlockWord", () => {
   it("getUnlockedTier reflects unlocked word count", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul(3);
-    sys.learnWord("unrelenting_force", 0);
-    sys.learnWord("unrelenting_force", 1);
-    sys.learnWord("unrelenting_force", 2);
-    expect(sys.getUnlockedTier("unrelenting_force")).toBe(0);
-    sys.unlockWord("unrelenting_force", 0);
-    expect(sys.getUnlockedTier("unrelenting_force")).toBe(1);
-    sys.unlockWord("unrelenting_force", 1);
-    expect(sys.getUnlockedTier("unrelenting_force")).toBe(2);
-    sys.unlockWord("unrelenting_force", 2);
-    expect(sys.getUnlockedTier("unrelenting_force")).toBe(3);
+    sys.learnWord("gust", 0);
+    sys.learnWord("gust", 1);
+    sys.learnWord("gust", 2);
+    expect(sys.getUnlockedTier("gust")).toBe(0);
+    sys.unlockWord("gust", 0);
+    expect(sys.getUnlockedTier("gust")).toBe(1);
+    sys.unlockWord("gust", 1);
+    expect(sys.getUnlockedTier("gust")).toBe(2);
+    sys.unlockWord("gust", 2);
+    expect(sys.getUnlockedTier("gust")).toBe(3);
   });
 });
 
@@ -305,8 +305,8 @@ describe("DragonShoutSystem — unlockWord", () => {
 describe("DragonShoutSystem — equipShout / unequipShout", () => {
   it("equipShout returns true for a registered shout", () => {
     const sys = new DragonShoutSystem();
-    expect(sys.equipShout("unrelenting_force")).toBe(true);
-    expect(sys.equippedShoutId).toBe("unrelenting_force");
+    expect(sys.equipShout("gust")).toBe(true);
+    expect(sys.equippedShoutId).toBe("gust");
   });
 
   it("equipShout returns false for unknown shout", () => {
@@ -317,7 +317,7 @@ describe("DragonShoutSystem — equipShout / unequipShout", () => {
 
   it("unequipShout clears the equipped shout", () => {
     const sys = new DragonShoutSystem();
-    sys.equipShout("unrelenting_force");
+    sys.equipShout("gust");
     sys.unequipShout();
     expect(sys.equippedShoutId).toBeNull();
   });
@@ -328,34 +328,34 @@ describe("DragonShoutSystem — equipShout / unequipShout", () => {
 describe("DragonShoutSystem — cooldown", () => {
   it("cooldownRemaining is 0 when shout has never been used", () => {
     const sys = new DragonShoutSystem();
-    expect(sys.cooldownRemaining("unrelenting_force", 0)).toBe(0);
+    expect(sys.cooldownRemaining("gust", 0)).toBe(0);
   });
 
   it("cooldownRemaining returns remaining seconds after use", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul(3);
-    sys.learnWord("unrelenting_force", 0);
-    sys.unlockWord("unrelenting_force", 0);
-    sys.equipShout("unrelenting_force");
+    sys.learnWord("gust", 0);
+    sys.unlockWord("gust", 0);
+    sys.equipShout("gust");
     sys.useShout(0);
 
     // Tier 1 cooldown = 2 s → 2/60 minutes
     // After 1 second has passed (1/60 minute), ~1 second remains
     const afterOneSecond = 1 / 60;
-    const remaining = sys.cooldownRemaining("unrelenting_force", afterOneSecond);
+    const remaining = sys.cooldownRemaining("gust", afterOneSecond);
     expect(remaining).toBeCloseTo(1, 0);
   });
 
   it("cooldownRemaining returns 0 after full cooldown elapsed", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul();
-    sys.learnWord("unrelenting_force", 0);
-    sys.unlockWord("unrelenting_force", 0);
-    sys.equipShout("unrelenting_force");
+    sys.learnWord("gust", 0);
+    sys.unlockWord("gust", 0);
+    sys.equipShout("gust");
     sys.useShout(0);
 
     const cooldownMinutes = 2 / 60; // 2 second cooldown in minutes
-    expect(sys.cooldownRemaining("unrelenting_force", cooldownMinutes + 0.001)).toBe(0);
+    expect(sys.cooldownRemaining("gust", cooldownMinutes + 0.001)).toBe(0);
   });
 
   it("isShoutReady returns false when no shout equipped", () => {
@@ -365,25 +365,25 @@ describe("DragonShoutSystem — cooldown", () => {
 
   it("isShoutReady returns false when no words unlocked", () => {
     const sys = new DragonShoutSystem();
-    sys.equipShout("unrelenting_force");
+    sys.equipShout("gust");
     expect(sys.isShoutReady(0)).toBe(false);
   });
 
   it("isShoutReady returns true when equipped and off cooldown", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul();
-    sys.learnWord("unrelenting_force", 0);
-    sys.unlockWord("unrelenting_force", 0);
-    sys.equipShout("unrelenting_force");
+    sys.learnWord("gust", 0);
+    sys.unlockWord("gust", 0);
+    sys.equipShout("gust");
     expect(sys.isShoutReady(0)).toBe(true);
   });
 
   it("isShoutReady returns false while on cooldown", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul();
-    sys.learnWord("unrelenting_force", 0);
-    sys.unlockWord("unrelenting_force", 0);
-    sys.equipShout("unrelenting_force");
+    sys.learnWord("gust", 0);
+    sys.unlockWord("gust", 0);
+    sys.equipShout("gust");
     sys.useShout(0);
     expect(sys.isShoutReady(0)).toBe(false);
   });
@@ -401,7 +401,7 @@ describe("DragonShoutSystem — useShout", () => {
 
   it("returns failure when no words are unlocked", () => {
     const sys = new DragonShoutSystem();
-    sys.equipShout("unrelenting_force");
+    sys.equipShout("gust");
     const result = sys.useShout(0);
     expect(result.success).toBe(false);
     if (!result.success) expect(result.reason).toBe("no_words_unlocked");
@@ -410,9 +410,9 @@ describe("DragonShoutSystem — useShout", () => {
   it("returns on_cooldown while shout is recharging", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul();
-    sys.learnWord("unrelenting_force", 0);
-    sys.unlockWord("unrelenting_force", 0);
-    sys.equipShout("unrelenting_force");
+    sys.learnWord("gust", 0);
+    sys.unlockWord("gust", 0);
+    sys.equipShout("gust");
     sys.useShout(0);
     const result = sys.useShout(0);
     expect(result.success).toBe(false);
@@ -425,9 +425,9 @@ describe("DragonShoutSystem — useShout", () => {
   it("returns success with tier 1 when only first word is unlocked", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul();
-    sys.learnWord("fire_breath", 0);
-    sys.unlockWord("fire_breath", 0);
-    sys.equipShout("fire_breath");
+    sys.learnWord("flame", 0);
+    sys.unlockWord("flame", 0);
+    sys.equipShout("flame");
     const result = sys.useShout(0);
     expect(result.success).toBe(true);
     if (result.success) {
@@ -440,10 +440,10 @@ describe("DragonShoutSystem — useShout", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul(3);
     for (let i = 0; i < 3; i++) {
-      sys.learnWord("fire_breath", i as 0 | 1 | 2);
-      sys.unlockWord("fire_breath", i as 0 | 1 | 2);
+      sys.learnWord("flame", i as 0 | 1 | 2);
+      sys.unlockWord("flame", i as 0 | 1 | 2);
     }
-    sys.equipShout("fire_breath");
+    sys.equipShout("flame");
     const result = sys.useShout(0);
     expect(result.success).toBe(true);
     if (result.success) {
@@ -457,9 +457,9 @@ describe("DragonShoutSystem — useShout", () => {
     const cb  = vi.fn();
     sys.onShoutUsed = cb;
     sys.gainDragonSoul();
-    sys.learnWord("unrelenting_force", 0);
-    sys.unlockWord("unrelenting_force", 0);
-    sys.equipShout("unrelenting_force");
+    sys.learnWord("gust", 0);
+    sys.unlockWord("gust", 0);
+    sys.equipShout("gust");
     sys.useShout(0);
     expect(cb).toHaveBeenCalledTimes(1);
   });
@@ -467,9 +467,9 @@ describe("DragonShoutSystem — useShout", () => {
   it("success allows re-use after cooldown expires", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul();
-    sys.learnWord("unrelenting_force", 0);
-    sys.unlockWord("unrelenting_force", 0);
-    sys.equipShout("unrelenting_force");
+    sys.learnWord("gust", 0);
+    sys.unlockWord("gust", 0);
+    sys.equipShout("gust");
     sys.useShout(0);
     const cooldownMinutes = 2 / 60;
     const result = sys.useShout(cooldownMinutes + 0.01);
@@ -482,38 +482,38 @@ describe("DragonShoutSystem — useShout", () => {
 describe("DragonShoutSystem — built-in shout definitions", () => {
   const sys = new DragonShoutSystem();
 
-  it("Unrelenting Force has correct first word", () => {
-    const def = sys.getShout("unrelenting_force")!;
-    expect(def.words[0]!.dragonWord).toBe("FUS");
+  it("Gust has correct first word", () => {
+    const def = sys.getShout("gust")!;
+    expect(def.words[0]!.word).toBe("GWYNT");
   });
 
-  it("Whirlwind Sprint tier 3 dash distance is 75", () => {
-    const def = sys.getShout("whirlwind_sprint")!;
+  it("Swift Feet tier 3 dash distance is 75", () => {
+    const def = sys.getShout("swift_feet")!;
     expect(def.tiers[2]!.effects.dash_distance).toBe(75);
   });
 
-  it("Slow Time tier 3 time_scale is 0.1", () => {
-    const def = sys.getShout("slow_time")!;
+  it("Held Moment tier 3 time_scale is 0.1", () => {
+    const def = sys.getShout("held_moment")!;
     expect(def.tiers[2]!.effects.time_scale).toBe(0.1);
   });
 
-  it("Clear Skies has zero cooldown side-effects only", () => {
-    const def = sys.getShout("clear_skies")!;
+  it("Clear Sky has zero cooldown side-effects only", () => {
+    const def = sys.getShout("clear_sky")!;
     expect(def.tiers[0]!.cooldownSeconds).toBe(5);
   });
 
-  it("Become Ethereal has all three tiers defined", () => {
-    const def = sys.getShout("become_ethereal")!;
+  it("Shade-step has all three tiers defined", () => {
+    const def = sys.getShout("shade_step")!;
     expect(def.tiers[2]).toBeDefined();
   });
 
-  it("Ice Form tier 1 freezes for 5 seconds", () => {
-    const def = sys.getShout("ice_form")!;
+  it("Hoarfrost tier 1 freezes for 5 seconds", () => {
+    const def = sys.getShout("hoarfrost")!;
     expect(def.tiers[0]!.effects.freeze_duration).toBe(5);
   });
 
-  it("Elemental Fury tier 2 attack_speed_mult is 1.5", () => {
-    const def = sys.getShout("elemental_fury")!;
+  it("Battle-wind tier 2 attack_speed_mult is 1.5", () => {
+    const def = sys.getShout("battle_wind")!;
     expect(def.tiers[1]!.effects.attack_speed_mult).toBe(1.5);
   });
 });
@@ -521,7 +521,7 @@ describe("DragonShoutSystem — built-in shout definitions", () => {
 // ── Save / restore ────────────────────────────────────────────────────────────
 
 describe("DragonShoutSystem — getSaveState / restoreFromSave", () => {
-  it("save → restore round-trips dragon souls", () => {
+  it("save → restore round-trips awen", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul(7);
     const saved = sys.getSaveState();
@@ -532,46 +532,46 @@ describe("DragonShoutSystem — getSaveState / restoreFromSave", () => {
 
   it("save → restore round-trips equipped shout", () => {
     const sys = new DragonShoutSystem();
-    sys.equipShout("slow_time");
+    sys.equipShout("held_moment");
     const sys2 = new DragonShoutSystem();
     sys2.restoreFromSave(sys.getSaveState());
-    expect(sys2.equippedShoutId).toBe("slow_time");
+    expect(sys2.equippedShoutId).toBe("held_moment");
   });
 
   it("save → restore round-trips learned and unlocked words", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul(2);
-    sys.learnWord("fire_breath", 0);
-    sys.learnWord("fire_breath", 1);
-    sys.unlockWord("fire_breath", 0);
-    sys.unlockWord("fire_breath", 1);
+    sys.learnWord("flame", 0);
+    sys.learnWord("flame", 1);
+    sys.unlockWord("flame", 0);
+    sys.unlockWord("flame", 1);
     const sys2 = new DragonShoutSystem();
     sys2.restoreFromSave(sys.getSaveState());
-    expect(sys2.isWordLearned("fire_breath", 0)).toBe(true);
-    expect(sys2.isWordLearned("fire_breath", 1)).toBe(true);
-    expect(sys2.isWordUnlocked("fire_breath", 0)).toBe(true);
-    expect(sys2.isWordUnlocked("fire_breath", 1)).toBe(true);
-    expect(sys2.isWordUnlocked("fire_breath", 2)).toBe(false);
+    expect(sys2.isWordLearned("flame", 0)).toBe(true);
+    expect(sys2.isWordLearned("flame", 1)).toBe(true);
+    expect(sys2.isWordUnlocked("flame", 0)).toBe(true);
+    expect(sys2.isWordUnlocked("flame", 1)).toBe(true);
+    expect(sys2.isWordUnlocked("flame", 2)).toBe(false);
   });
 
   it("save → restore round-trips lastUsedMinutes (cooldown)", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul();
-    sys.learnWord("unrelenting_force", 0);
-    sys.unlockWord("unrelenting_force", 0);
-    sys.equipShout("unrelenting_force");
+    sys.learnWord("gust", 0);
+    sys.unlockWord("gust", 0);
+    sys.equipShout("gust");
     sys.useShout(100);
     const sys2 = new DragonShoutSystem();
     sys2.restoreFromSave(sys.getSaveState());
     // At same game time (100), should still be on cooldown
-    expect(sys2.cooldownRemaining("unrelenting_force", 100)).toBeGreaterThan(0);
+    expect(sys2.cooldownRemaining("gust", 100)).toBeGreaterThan(0);
   });
 
   it("restore does not fire callbacks", () => {
     const sys = new DragonShoutSystem();
     sys.gainDragonSoul(3);
-    sys.learnWord("unrelenting_force", 0);
-    sys.unlockWord("unrelenting_force", 0);
+    sys.learnWord("gust", 0);
+    sys.unlockWord("gust", 0);
     const saved = sys.getSaveState();
 
     const sys2 = new DragonShoutSystem();

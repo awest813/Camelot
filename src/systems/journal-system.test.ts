@@ -289,7 +289,7 @@ describe("JournalSystem", () => {
 
   describe("search", () => {
     beforeEach(() => {
-      sys.addEntry({ id: "a", title: "Dragon Shout Discovery", body: "Found a Word Wall.", category: "quest", tags: [] });
+      sys.addEntry({ id: "a", title: "A Word of the Old Tongue", body: "Found an old place.", category: "quest", tags: [] });
       advanceClock(100);
       sys.addEntry({ id: "b", title: "Old Note", body: "The dragon lurks in the east.", category: "lore", tags: [] });
       advanceClock(100);

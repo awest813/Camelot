@@ -365,7 +365,7 @@ export class GameState {
   // v28 systems
   public get dynamicWorldEventSystem(): DynamicWorldEventSystem { return this.kernel.services.get(WorldEventsKey).dynamic; }
 
-  // Thu'um — dragon shouts (wired post-alpha; state persists via saveSystem)
+  // Words of the Old Tongue (shouts in code; state persists via saveSystem)
   public get shouts(): ShoutsService { return this.kernel.services.get(ShoutsKey); }
   public get dragonShoutSystem(): DragonShoutSystem { return this.shouts.shouts; }
   public get shoutUI(): ShoutUI { return this.shouts.panel; }
