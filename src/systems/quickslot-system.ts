@@ -24,7 +24,8 @@ export function isConsumableItem(item: Item): boolean {
     (typeof s.heal === "number" && s.heal > 0) ||
     (typeof s.magicka === "number" && s.magicka > 0) ||
     (typeof s.stamina === "number" && s.stamina > 0) ||
-    (typeof s.nutrition === "number" && s.nutrition > 0)
+    (typeof s.nutrition === "number" && s.nutrition > 0) ||
+    (typeof s.cure === "number" && s.cure > 0)
   );
 }
 
@@ -150,6 +151,15 @@ export class QuickSlotSystem {
     if (!this._isConsumable(live)) return false;
     this._consumeOneUnit(live, "inventory");
     return true;
+  }
+
+  /** F8: one line naming what is on each bound slot (or how to bind one). */
+  public describe(): string {
+    const name = (id: string) => this._inventory.items.find((i) => i.id === id)?.name ?? `${id} (none left)`;
+    const bound = QUICK_SLOT_KEYS.filter((k) => this._slots[k]).map((k) => `${k}: ${name(this._slots[k]!)}`);
+    return bound.length
+      ? `Quick slots — ${bound.join(" · ")}`
+      : "No quick slots yet: click a slot on the HUD, then a potion or food in the inventory.";
   }
 
   // ── Save / Load ───────────────────────────────────────────────────────────

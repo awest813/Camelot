@@ -558,3 +558,15 @@ describe("SurvivalSystem — getSaveState / restoreFromSave", () => {
     expect(sys.cold).toBe(100);
   });
 });
+
+describe("nearFire", () => {
+  const light = (x: number, on = true, cls = "PointLight") => ({ getClassName: () => cls, isEnabled: () => on, intensity: 1, position: { x, y: 1, z: 0 } });
+  it("a lit point light within reach warms; far, off or other lights do not", async () => {
+    const { nearFire } = await import("./survival-system");
+    const at = { x: 0, y: 1, z: 0 };
+    expect(nearFire([light(3)], at)).toBe(true);
+    expect(nearFire([light(8)], at)).toBe(false);
+    expect(nearFire([light(3, false)], at)).toBe(false);
+    expect(nearFire([light(3, true, "DirectionalLight")], at)).toBe(false);
+  });
+});

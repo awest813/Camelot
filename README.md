@@ -140,15 +140,24 @@ The editors live in the **editor app**, a second page next to the game: `/editor
 | H              | Show fame / infamy status and active effects             |
 | T              | Wait / Rest (choose 1–24 hours)                          |
 | X              | Open Spellmaking Altar                                   |
-| 1 / 2 / 3      | Melee archetype select                                   |
-| 4 / 5 / 6      | Magic archetype select                                   |
-| 7 / 8 / 9 / 0  | Quick-slot consumable use                                |
-| Y              | Open fast travel menu                                    |
+| Shift+1 / 2 / 3 | Melee stance select                                     |
+| Shift+4 / 5 / 6 | Magic stance select                                     |
+| 1 – 0          | Use the quick-slot consumable (click a HUD slot to assign) |
+| F8             | List what is on each quick slot                          |
+| Tab            | Character sheet                                          |
+| F              | Dodge roll                                               |
+| CapsLock       | Auto-run on / off                                        |
+| N              | Words of the Old Tongue (choose a word)                  |
+| Shift+N        | Speak the chosen word                                    |
+| Y              | Open fast travel menu (also Recall to your mark)         |
+| Shift+M        | Mark this spot for Recall                                |
+| M              | World map                                                |
 | P              | Toggle pet companion panel                               |
-| F              | Toggle follower panel / cycle follower stance            |
+| G              | Toggle follower panel                                    |
 | O              | Mount / dismount horse                                   |
 | Shift+O        | Browse stable (unmounted) / open saddlebag (mounted)     |
-| M              | Toggle audio mute                                        |
+| F4             | Toggle first / third person                              |
+| F7             | Toggle audio mute                                        |
 | F1             | Toggle controls / help overlay                           |
 | F3             | Toggle debug overlay                                     |
 | F5             | Quick save                                               |

@@ -264,3 +264,17 @@ describe("QuickSlotSystem", () => {
     });
   });
 });
+
+describe("QuickSlotSystem.describe (F8)", () => {
+  it("names each bound slot, or says how to bind one", () => {
+    const inv = makeInventory([makeMagickaPotion()]);
+    const sys = new QuickSlotSystem(inv, makePlayer(), makeUI());
+    expect(sys.describe()).toMatch(/No quick slots yet/);
+    sys.bindSlot("2", "potion_mp_01");
+    sys.bindSlot("5", "gone_item");
+    expect(sys.describe()).toBe("Quick slots — 2: Magicka Potion · 5: gone_item (none left)");
+  });
+  it("a cure draught counts as a consumable", () => {
+    expect(isConsumableItem({ id: "potion_cure", name: "Cure", description: "", stackable: true, quantity: 1, stats: { cure: 1 } })).toBe(true);
+  });
+});

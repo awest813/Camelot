@@ -32,6 +32,8 @@ import { CharacterHostKey, CharacterKey } from "../features/character/character-
 import { ProgressionHostKey } from "../features/progression/progression-feature";
 import { DialogueServicesFeature, DialogueHostKey } from "../features/dialogue-services/dialogue-services-feature";
 import { SurvivalHostKey } from "../features/survival/survival-feature";
+import { isColdHere } from "../systems/survival-system";
+import { ProvisionsFeature } from "../features/provisions/provisions-feature";
 import { SpellMakingFeature } from "../features/spell-making/spell-making-feature";
 import { persistSkipOnboardingTips } from "../onboarding-preferences";
 import { OnboardingFeature, OnboardingHostKey } from "../features/onboarding/onboarding-feature";
@@ -331,12 +333,8 @@ export function installGameFeatures(game: Game): void {
       k.install(new DialogueServicesFeature());
       k.services.provide(SurvivalHostKey, {
         body: () => game.player,
-        isCold: () => {
-          const p = game.player.camera.position;
-          const biome = game.world.getBiome(Math.floor(p.x / game.world.chunkSize), Math.floor(p.z / game.world.chunkSize));
-          const weather = game.weatherSystem?.state ?? "clear";
-          return biome === "tundra" || weather === "rain" || weather === "storm";
-        },
+        isCold: () => isColdHere({ at: game.player.camera.position, interior: !!game.cellManager?.isInterior, lights: game.scene.lights,
+          weather: game.weatherSystem?.state ?? "clear", biome: (x, z) => game.world.getBiome(Math.floor(x / game.world.chunkSize), Math.floor(z / game.world.chunkSize)) }),
         setXpMultiplier: (m) => { game.skillProgressionSystem.globalXpMultiplier = m; },
       });
       k.install(game._survival);
@@ -456,6 +454,8 @@ export function installGameFeatures(game: Game): void {
       k.install(game._crafting);
       game._spellMaking = new SpellMakingFeature(game.spellSystem);
       k.install(game._spellMaking);
+      k.install(new ProvisionsFeature({ inventory: game.inventorySystem, quiver: game.projectileSystem, spells: game.spellSystem,
+        alchemy: game._crafting.alchemy, enchanting: game._crafting.enchanting, diseases: game.diseaseSystem }));
       k.services.provide(LawKey, {
         get crime() { return game.crimeSystem; },
         get persuasion() { return game.persuasionSystem; },

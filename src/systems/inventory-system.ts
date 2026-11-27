@@ -33,6 +33,8 @@ export class InventorySystem {
   public _ui: UIManager;
   public _canvas: HTMLCanvasElement;
 
+  private readonly _absorbers: Array<(item: Item) => string | null> = [];
+
   constructor(player: Player, ui: UIManager, canvas: HTMLCanvasElement) {
     this._player = player;
     this._ui = ui;
@@ -51,11 +53,27 @@ export class InventorySystem {
     this._player.carryWeight = this.totalWeight;
   }
 
+  /**
+   * Something that takes certain items before they reach the pack (arrows
+   * into the quiver, herbs into the satchel): it returns the notice to show
+   * when it took the item, or null to leave it alone.
+   */
+  public addAbsorber(fn: (item: Item) => string | null): void {
+    this._absorbers.push(fn);
+  }
+
   /** Add an item; `quiet` skips the "Added …" notice (the caller says it another way). */
   public addItem(newItem: Item, opts?: { quiet?: boolean }): boolean {
     if (newItem.quantity <= 0) {
       this._ui.showNotification("Invalid item quantity.", 2000);
       return false;
+    }
+    for (const absorb of this._absorbers) {
+      const notice = absorb(newItem);
+      if (notice !== null) {
+        this._ui.showNotification(notice, 2200);
+        return true;
+      }
     }
 
     // Check if stackable

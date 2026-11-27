@@ -161,7 +161,8 @@ export function wireInputAdapter(g: Game): void {
 
   adapter.onAction("autoRun", () => {
     if (isCombatInputBlocked(g)) return;
-    g.ui.showNotification("Auto-run toggled", 1000);
+    g.player.autoRun = !g.player.autoRun;
+    g.ui.showNotification(g.player.autoRun ? "Auto-run on (CapsLock to stop)" : "Auto-run off", 1000);
   });
 
   adapter.onAction("interact", () => {
@@ -183,9 +184,7 @@ export function wireInputAdapter(g: Game): void {
   });
 
   adapter.onAction("favoritesMenu", () => {
-    if (!g.isPaused && !g.dialogueSystem.isInDialogue) {
-      g.ui.showNotification("Favorites — assign with quick-slot keys (1-0)", 2500);
-    }
+    if (!g.isPaused && !g.dialogueSystem.isInDialogue) g.ui.showNotification(g.quickSlotSystem.describe(), 4000);
   });
 
   adapter.onAction("togglePOV", () => {
@@ -233,7 +232,7 @@ export function raycastInteract(g: Game): boolean {
   const hit = g.player.raycastForward(3, true);
   if (hit?.pickedMesh?.metadata) {
     const m = hit.pickedMesh.metadata;
-    return m.type === "npc" || m.type === "loot" || m.type === "portal" || m.type === "container";
+    return m.type === "npc" || m.type === "loot" || m.type === "portal" || m.type === "container" || m.type === "activator";
   }
   return false;
 }

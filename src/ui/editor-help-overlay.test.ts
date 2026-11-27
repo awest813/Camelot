@@ -32,7 +32,7 @@ describe("buildHelpOverlayLines", () => {
     const lines = buildHelpOverlayLines(true);
     expect(lines[0]).toBe("Editor Controls");
     expect(lines.join("\n")).toContain("F7: Toggle Validation Panel");
-    expect(lines.join("\n")).toContain("F8: Favorites Menu");
+    expect(lines.join("\n")).not.toContain("F8: Favorites Menu");
     expect(lines.join("\n")).toContain("F10: Open Quest Creator");
     expect(lines.join("\n")).toContain("F11: Open Editor Hub");
     expect(lines.join("\n")).toContain("Shift+F11: Open Spawn Creator");

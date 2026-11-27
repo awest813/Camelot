@@ -61,6 +61,7 @@ export const STARTER_MERCHANTS: readonly StarterMerchant[] = [
       { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 4, weight: 1, stats: { value: 15 } },
       { ...LOCKPICK, quantity: 10, stats: { ...LOCKPICK.stats } },
       { id: "bread", name: "Loaf of Bread", description: "Hearty bread. Restores hunger.", stackable: true, quantity: 6, weight: 0.2, stats: { value: 5, nutrition: 30 } },
+      { id: "mead", name: "Horn of Mead", description: "Honey-sweet and strong. Restores some hunger.", stackable: true, quantity: 4, weight: 0.4, stats: { value: 6, nutrition: 20 } },
       { id: "ale", name: "Mug of Ale", description: "Watered-down but filling.", stackable: true, quantity: 6, weight: 0.4, stats: { value: 4, nutrition: 15 } },
       { id: "stew", name: "Bowl of Stew", description: "Hot and hearty. Restores a lot of hunger.", stackable: true, quantity: 4, weight: 0.5, stats: { value: 8, nutrition: 50 } },
     ],
@@ -110,9 +111,32 @@ export const STARTER_MERCHANTS: readonly StarterMerchant[] = [
     shop: { id: "shop_stillwater_reagents", name: "Stillwater Reagents", type: "alchemist" },
     stock: () => [
       { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 12, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
+      { id: "potion_mp_01", name: "Magicka Potion", description: "Restores 50 magicka.", stackable: true, quantity: 8, weight: 0.3, stats: { value: 30, magicka: 50 } },
+      { id: "potion_cure", name: "Cure Disease", description: "A bitter draught. Drink to clear any sickness.", stackable: true, quantity: 4, weight: 0.1, stats: { value: 40, cure: 1 } },
+      { id: "henbane", name: "Henbane", description: "A reagent for the alchemy bench (L).", stackable: true, quantity: 6, weight: 0.1, stats: { value: 6 } },
+      { id: "eyebright", name: "Eyebright", description: "A reagent for the alchemy bench (L).", stackable: true, quantity: 6, weight: 0.1, stats: { value: 5 } },
+      { id: "st_johns_wort", name: "St John's Wort", description: "A reagent for the alchemy bench (L).", stackable: true, quantity: 6, weight: 0.1, stats: { value: 5 } },
+      { id: "foxglove", name: "Foxglove", description: "A reagent for the alchemy bench (L).", stackable: true, quantity: 4, weight: 0.1, stats: { value: 8 } },
+      { id: "puffball", name: "Puffball", description: "A reagent for the alchemy bench (L).", stackable: true, quantity: 4, weight: 0.1, stats: { value: 6 } },
+      { id: "fern_seed", name: "Fern Seed", description: "A reagent for the alchemy bench (L).", stackable: true, quantity: 3, weight: 0.1, stats: { value: 12 } },
+      { id: "vessel_clay", name: "Clay Vessel", description: "Holds a small spirit for the enchanting altar (B).", stackable: true, quantity: 4, weight: 0.1, stats: { value: 20 } },
+      { id: "vessel_pewter", name: "Pewter Vessel", description: "Holds a spirit for the enchanting altar (B).", stackable: true, quantity: 2, weight: 0.1, stats: { value: 45 } },
+      { id: "tome_rime", name: "Tome: Rime", description: "Read it to learn Rime.", stackable: false, quantity: 1, weight: 0.5, stats: { value: 90 } },
+      { id: "tome_barkskin", name: "Tome: Bark-skin", description: "Read it to learn Bark-skin.", stackable: false, quantity: 1, weight: 0.5, stats: { value: 110 } },
+      { id: "tome_fade", name: "Tome: Fade", description: "Read it to learn Fade.", stackable: false, quantity: 1, weight: 0.5, stats: { value: 140 } },
+      { id: "tome_thunderlash", name: "Tome: Thunderlash", description: "Read it to learn Thunderlash.", stackable: false, quantity: 1, weight: 0.5, stats: { value: 120 } },
     ],
   },
 ];
+
+/** The shop version of an item id (its stats, weight and text), for gifts from dialogue. */
+export function stockItem(id: string): Item | undefined {
+  for (const m of STARTER_MERCHANTS) {
+    const hit = m.stock().find((i) => i.id === id);
+    if (hit) return { ...hit, stats: hit.stats ? { ...hit.stats } : undefined };
+  }
+  return undefined;
+}
 
 /** Register every starter merchant with barter, restock and the shop list. */
 export function registerStarterMerchants(

@@ -10,7 +10,8 @@ const BASE_CONTROLS: readonly string[] = [
   "N: Words of the Old Tongue · Shift+N: Speak the word · Great deeds bring awen",
   "C: Crouch (sneak) · E while undetected: Pickpocket · P: Pets · G: Followers",
   "O: Mount / Dismount · Shift+O: Stable (buy horse) or Saddlebag (if mounted)",
-  "1–0: Quick Slots · F4: Toggle POV · F5/F9: Save/Load · F3: Debug Overlay",
+  "Shift+1–3: Melee stance · Shift+4–6: Magic stance · CapsLock: Auto-run",
+  "1–0: Quick Slots (F8: list) · F4: Toggle POV · F5/F9: Save/Load · F3: Debug Overlay",
   "PrintScreen: Screenshot",
 ];
 
@@ -24,7 +25,6 @@ const EDITOR_CONTROLS: readonly string[] = [
   "L: Toggle Layers Panel · Ctrl+M: Scene Notes",
   "Ctrl+Z: Undo · Ctrl+Y: Redo",
   "F6: Import Map · F7: Toggle Validation Panel",
-  "F8: Favorites Menu",
   "F10: Open Quest Creator",
   "Shift+F10: Open NPC Creator",
   "F11: Open Editor Hub",

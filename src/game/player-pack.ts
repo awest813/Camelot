@@ -9,7 +9,7 @@
  * Moved out of game.ts (engine overhaul, Phase 1).
  */
 import type { Item } from "../systems/inventory-system";
-import { HEALTH_POTION_STATS } from "../content/starter-merchants";
+import { HEALTH_POTION_STATS, stockItem } from "../content/starter-merchants";
 
 export const GOLD_ITEM_ID = "gold_coins";
 
@@ -90,9 +90,10 @@ export class PlayerPack {
       inv.addItem({ ...existing, quantity });
       return true;
     }
+    const shop = stockItem(id);
     const item: Item = {
-      id, name: def.name, description: def.description, stackable: def.stackable, quantity, weight: 0.3,
-      stats: frameworkId === "health_potion" ? { ...HEALTH_POTION_STATS } : { value: 10 },
+      id, name: def.name, description: def.description, stackable: def.stackable, quantity, weight: shop?.weight ?? 0.3,
+      stats: shop?.stats ?? (frameworkId === "health_potion" ? { ...HEALTH_POTION_STATS } : { value: 10 }),
     };
     if (def.slot) item.slot = def.slot;
     inv.addItem(item);

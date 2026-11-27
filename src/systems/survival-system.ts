@@ -302,3 +302,35 @@ export class SurvivalSystem {
     return "freezing";
   }
 }
+
+type WarmthLight = { getClassName(): string; isEnabled(): boolean; intensity: number; position?: { x: number; y: number; z: number } };
+
+/**
+ * Whether it is cold where the player stands: the tundra, or out in rain or
+ * a storm — unless under a roof (any interior) or by a fire or torch.
+ */
+export function isColdHere(o: {
+  at: { x: number; y: number; z: number }; interior: boolean; weather: string;
+  biome(x: number, z: number): string; lights: ReadonlyArray<WarmthLight>;
+}): boolean {
+  if (!(o.weather === "rain" || o.weather === "storm" || o.biome(o.at.x, o.at.z) === "tundra")) return false;
+  return !o.interior && !nearFire(o.lights, o.at);
+}
+
+/** How close (m) a fire or torch must be to warm the player. */
+export const FIRE_WARMTH_RADIUS = 5;
+
+/** Whether a lit point light (a campfire, brazier or torch) is within warming reach of `at`. */
+export function nearFire(
+  lights: ReadonlyArray<WarmthLight>,
+  at: { x: number; y: number; z: number },
+  radius = FIRE_WARMTH_RADIUS,
+): boolean {
+  const r2 = radius * radius;
+  for (const l of lights) {
+    if (l.getClassName() !== "PointLight" || !l.position || l.intensity <= 0 || !l.isEnabled()) continue;
+    const dx = l.position.x - at.x, dy = l.position.y - at.y, dz = l.position.z - at.z;
+    if (dx * dx + dy * dy + dz * dz <= r2) return true;
+  }
+  return false;
+}

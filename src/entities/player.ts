@@ -106,6 +106,9 @@ export class Player {
   /** Riding and similar: scales movement on top of the base (1 on foot). */
   public speedMultiplier: number = 1;
 
+  /** CapsLock: keep walking forward until toggled off (or a menu takes the controls). */
+  public autoRun = false;
+
   constructor(scene: Scene, canvas: HTMLCanvasElement) {
     this.scene = scene;
     this.canvas = canvas;
@@ -140,6 +143,16 @@ export class Player {
       // changes without requiring the caller to manage camera.speed directly.
       const encumbranceFactor = this.isEncumbered ? 0.5 : 1.0;
       this.camera.speed = this.baseSpeed * encumbranceFactor * this.speedMultiplier;
+      if (this.autoRun && this.camera.inputs.attachedToElement) this._stepForward();
+  }
+
+  /** One frame of walking along the flat look direction, as holding W would. */
+  private _stepForward(): void {
+    const f = this.camera.getDirection(Vector3.Forward());
+    f.y = 0;
+    if (f.lengthSquared() < 1e-6) return;
+    const speed = (this.camera as unknown as { _computeLocalCameraSpeed?(): number })._computeLocalCameraSpeed?.() ?? this.camera.speed;
+    this.camera.cameraDirection.addInPlace(f.normalize().scaleInPlace(speed));
   }
 
   /** Delay health recovery after receiving combat damage. */
