@@ -23,8 +23,7 @@ export interface CombatControlsDeps {
   /** The omen the hero was born under, and the chests (optional: tests and tools leave them out). */
   omens?(): OmenPowerDeps["omens"]; containers?(): OmenPowerDeps["containers"];
   effects(): ActiveEffectsSystem;
-  /** Game minutes since the start (monotonic, never the time of day: cooldowns span midnight). */
-  gameTime(): number;
+  gameTime(): number; // game minutes since the start (monotonic, never the time of day: cooldowns span midnight)
   /** Combat input is off (paused, a menu, a conversation, the editor). */
   blocked(): boolean;
   /** Not paused and not talking (spell cycling works with menus open). */
