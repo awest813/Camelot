@@ -1,5 +1,5 @@
 /**
- * DynamicWorldEventSystem — Crimson Desert-inspired reactive world events.
+ * DynamicWorldEventSystem — reactive world events.
  *
  * Extends the encounter-scheduling model with:
  *   - **Faction threat weighting**: when hostile factions are active in the area
