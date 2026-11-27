@@ -26,7 +26,7 @@ import type { BarterSystem } from "../../systems/barter-system";
 import type { ShopSystem } from "../../systems/shop-system";
 import type { ContainerSystem } from "../../systems/container-system";
 import type { Item } from "../../systems/inventory-system";
-import { FeedbackKey, LawKey, ModalKey, PurseKey, SkillsKey, declareStateless } from "../services";
+import { FeedbackKey, LawKey, ModalKey, PurseKey, SkillsKey, VillagesKey, declareStateless } from "../services";
 
 const DEFAULT_MERCHANT = "merchant_01";
 
@@ -39,6 +39,8 @@ export interface TradeHostService {
   hour(): number;
   /** Price factor from fame, and from `npcName`'s disposition when known. */
   reputationFactor(npcName: string | null): number;
+  /** This place's own branch of a shop (registered on first use); its merchant id. */
+  branch?(baseMerchantId: string, placeId: string): string;
 }
 
 export interface TradeService {
@@ -168,7 +170,10 @@ export class TradeFeature implements Feature {
       s.get(FeedbackKey).notify(`${shop.name} is closed right now.`, 2600);
       return;
     }
-    if (!h.barter.openBarter(pending.merchantId, hour)) return;
+    // Each village keeps its own shelves and purse.
+    const village = s.tryGet(VillagesKey)?.currentVillage()?.plan.id;
+    const merchantId = village && h.branch ? h.branch(pending.merchantId, village) : pending.merchantId;
+    if (!h.barter.openBarter(merchantId, hour)) return;
     h.barter.sessionBuyPriceFactor = Math.min(1.5, Math.max(0.7, h.reputationFactor(pending.npcName)));
     h.barter.playerGold = s.get(PurseKey).gold();
     // Haggling is a matter of Persuasion: better prices both ways as it rises.

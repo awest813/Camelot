@@ -27,8 +27,11 @@ export function getItemIcon(
   if (/poison|venom|toxin/.test(target)) return "☠";
   if (/scroll|tome|book|note|letter|parchment|journal/.test(target)) return "📜";
   if (/ring|amulet|necklace|choker|circlet/.test(target)) return "💍";
-  if (/key|latchkey/.test(target)) return "🗝";
-  if (/bow|crossbow|arrow|quiver/.test(target)) return "🏹";
+  if (/key|latchkey|lockpick/.test(target)) return "🗝";
+  // Food and drink before weapons ("Bowl of Stew" is not a bow).
+  if (/\b(ale|mead|wine|beer|cider)\b|mug of|horn of|tankard/.test(target)) return "🍺";
+  if (/meat|bread|loaf|cheese|apple|berry|food|ration|fish|stew|soup|bowl/.test(target)) return "🍖";
+  if (/bow(?!l)|arrow|quiver/.test(target)) return "🏹";
   if (/axe|battleaxe|hatchet|cleaver/.test(target)) return "🪓";
   if (/hammer|mace|warhammer|club|maul|flail/.test(target)) return "🔨";
   if (/staff|wand|scepter|rod/.test(target)) return "🪄";
@@ -40,7 +43,6 @@ export function getItemIcon(
   if (/boots|shoes|sandals/.test(target)) return "👢";
   if (/gold|coin|crown|currency|money/.test(target)) return "🪙";
   if (/torch|candle|lantern/.test(target)) return "🪵";
-  if (/meat|bread|cheese|apple|berry|food|ration|fish/.test(target)) return "🍖";
   if (/gem|ruby|sapphire|emerald|diamond|ore|ingot|crystal/.test(target)) return "💎";
   if (/flower|herb|leaf|root|mushroom|spore/.test(target)) return "🌿";
 

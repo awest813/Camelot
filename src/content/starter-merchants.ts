@@ -156,3 +156,31 @@ export function registerStarterMerchants(
     ...m.shop, merchantId: m.id, factionId: m.factionId, openHour: m.openHour, closeHour: m.closeHour,
   })));
 }
+
+/**
+ * A village's own branch of a starter shop (`merchant_general_01@village_3_-2`):
+ * the same trade, its own shelves and purse, registered the first time the
+ * player trades there (a saved branch takes back its stock as it registers).
+ * Returns the branch's merchant id; an unknown base id comes back unchanged.
+ */
+export function branchMerchant(
+  barter: BarterSystem,
+  restock: MerchantRestockSystem,
+  baseId: string,
+  placeId: string,
+  nowGameTime: number,
+): string {
+  const def = STARTER_MERCHANTS.find((m) => m.id === baseId);
+  if (!def) return baseId;
+  const id = `${baseId}@${placeId}`;
+  if (barter.hasMerchant(id)) return id;
+  barter.registerMerchant({
+    id, name: def.name, factionId: def.factionId, inventory: def.stock(), gold: def.gold,
+    priceMultiplier: def.priceMultiplier, isOpen: true, openHour: def.openHour, closeHour: def.closeHour,
+  });
+  restock.registerMerchant(id, def.stock(), def.gold, RESTOCK_HOURS, nowGameTime);
+  return id;
+}
+
+/** The starter shop a branch id belongs to ("merchant_general_01@…" → "merchant_general_01"). */
+export const baseMerchantId = (id: string): string => id.split("@")[0];

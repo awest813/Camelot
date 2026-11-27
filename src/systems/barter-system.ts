@@ -75,7 +75,23 @@ export class BarterSystem {
   public registerMerchant(def: MerchantDef): void {
     this._merchants.set(def.id, { ...def, inventory: [...def.inventory] });
     if (!this._merchantRapport.has(def.id)) this._merchantRapport.set(def.id, 0);
+    // A village's branch saved in a game, registered only now (on first trade after a load).
+    const saved = this._unclaimed.get(def.id);
+    if (saved) {
+      this._unclaimed.delete(def.id);
+      const m = this._merchants.get(def.id)!;
+      m.inventory = [...saved.inventory];
+      m.gold = saved.gold;
+    }
   }
+
+  /** Whether a merchant with this id is registered. */
+  public hasMerchant(id: string): boolean {
+    return this._merchants.has(id);
+  }
+
+  /** Saved merchants not registered yet (a village shop the player has not visited this session). */
+  private readonly _unclaimed = new Map<string, { inventory: Item[]; gold: number }>();
 
   // ── Pricing ────────────────────────────────────────────────────────────────
 
@@ -262,6 +278,7 @@ export class BarterSystem {
 
   public getSaveState(): BarterSaveState {
     const merchants: BarterSaveState["merchants"] = [];
+    for (const [id, m] of this._unclaimed) merchants.push({ id, inventory: [...m.inventory], gold: m.gold });
     for (const m of this._merchants.values()) {
       merchants.push({ id: m.id, inventory: [...m.inventory], gold: m.gold });
     }
@@ -273,11 +290,14 @@ export class BarterSystem {
   }
 
   public restoreFromSave(state: BarterSaveState): void {
+    this._unclaimed.clear();
     for (const saved of state?.merchants ?? []) {
       const merchant = this._merchants.get(saved.id);
       if (merchant) {
         merchant.inventory = [...saved.inventory];
         merchant.gold      = saved.gold;
+      } else {
+        this._unclaimed.set(saved.id, { inventory: [...saved.inventory], gold: saved.gold });
       }
     }
     if (typeof state?.playerGold === "number") {

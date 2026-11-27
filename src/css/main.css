@@ -4517,6 +4517,10 @@ body::before {
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid rgba(212, 160, 23, 0.25);
+  /* The merchant's purse on the left, yours on the right. */
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .barter-ui__gold-row {

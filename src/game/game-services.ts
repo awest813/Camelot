@@ -35,6 +35,7 @@ import { SurvivalHostKey } from "../features/survival/survival-feature";
 import { isColdHere } from "../systems/survival-system";
 import { playerMaxStats } from "../systems/max-stat-ledger";
 import { SpellEffectsFeature } from "../features/spell-effects/spell-effects-feature";
+import { branchMerchant } from "../content/starter-merchants";
 import { ProvisionsFeature } from "../features/provisions/provisions-feature";
 import { SpellMakingFeature } from "../features/spell-making/spell-making-feature";
 import { persistSkipOnboardingTips } from "../onboarding-preferences";
@@ -111,8 +112,7 @@ export function installGameFeatures(game: Game): void {
       k.services.provide(TravelHostKey, {
         position: () => game.player.camera.position,
         teleport: (to) => { game.player.camera.position.copyFrom(to); },
-        // Anyone alive in a fighting state (the Engaged tag).
-        inCombat: () => actors.bodies([Engaged], [Dead]).length > 0,
+        inCombat: () => actors.bodies([Engaged], [Dead]).length > 0, // anyone alive in a fighting state
         sneaking: () => game.stealthSystem.isCrouching,
         encumbered: () => game.player.isEncumbered,
         isInterior: (id) => game.cellManager.getCellDefinition(id)?.type === "interior",
@@ -188,6 +188,7 @@ export function installGameFeatures(game: Game): void {
         get containers() { return game.containerSystem; },
         items: () => game.inventorySystem.items,
         hour: () => game.timeSystem.hour,
+        branch: (baseId, placeId) => branchMerchant(game.barterSystem, game.merchantRestockSystem, baseId, placeId, game.timeSystem.elapsedGameTime),
         reputationFactor: (npcName) => {
           const fame = 1 - (game.fameSystem.dispositionModifier / 20) * 0.15;
           return fame * (npcName ? game.persuasionSystem.getMerchantPriceMultiplier(npcName) : 1.0);
@@ -499,8 +500,7 @@ export function installGameFeatures(game: Game): void {
       k.services.provide(LooksKey, { dress: (mesh, model) => game._npcVisuals.dress(mesh, model) });
       const followers = new FollowersFeature(game.scene);
       k.install(followers);
-      // A starter wolf companion for new games.
-      pets.pets.grantPet("pet_wolf");
+      pets.pets.grantPet("pet_wolf"); // a starter wolf companion for new games
 
       k.services.provide(MountHostKey, {
         canAct: () => !isCombatInputBlocked(game), // not over another menu either

@@ -98,3 +98,13 @@ describe("icon-utils", () => {
     });
   });
 });
+
+describe("getItemIcon — food, drink and bows", () => {
+  it("a bowl of stew is food, a horn of mead a drink, a longbow a bow", () => {
+    expect(getItemIcon({ id: "stew", name: "Bowl of Stew" })).toBe("🍖");
+    expect(getItemIcon({ id: "mead", name: "Horn of Mead" })).toBe("🍺");
+    expect(getItemIcon({ id: "ale", name: "Mug of Ale" })).toBe("🍺");
+    expect(getItemIcon({ id: "longbow_01", name: "Longbow" })).toBe("🏹");
+    expect(getItemIcon({ id: "arrow_bundle", name: "Arrows (20)" })).toBe("🏹");
+  });
+});
