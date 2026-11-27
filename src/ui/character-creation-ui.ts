@@ -1,4 +1,5 @@
 import { BIRTHSIGNS, type BirthsignDefinition } from "../systems/birthsign-system";
+import { skillName } from "../systems/skill-progression-system";
 import { manageDialogFocus } from "./dialog-focus";
 import { CHARACTER_CLASSES, type CharacterClass } from "../systems/class-system";
 import { RACES, type RaceDefinition } from "../systems/race-system";
@@ -506,7 +507,7 @@ export class CharacterCreationUI {
           if (entry.skillBonus) {
             const skillParts = Object.entries(entry.skillBonus)
               .filter(([, v]) => v !== 0)
-              .map(([k, v]) => `${k} +${v}`);
+              .map(([k, v]) => `${skillName(k)} +${v}`);
             if (skillParts.length) {
               const skillLi = document.createElement("li");
               skillLi.textContent = `Skill bonuses: ${skillParts.join(", ")}`;
@@ -567,7 +568,7 @@ export class CharacterCreationUI {
           if (entry.skillBonus) {
             const skillParts = Object.entries(entry.skillBonus)
               .filter(([, v]) => v !== 0)
-              .map(([k, v]) => `${k} +${v}`);
+              .map(([k, v]) => `${skillName(k)} +${v}`);
             if (skillParts.length) {
               const skillLi = document.createElement("li");
               skillLi.textContent = `Skill bonuses: ${skillParts.join(", ")}`;
@@ -614,7 +615,7 @@ export class CharacterCreationUI {
           detailsMeta.appendChild(attrs);
 
           const majors = document.createElement("li");
-          majors.textContent = `Major skills (+25 starting, 1.5× XP): ${entry.majorSkills.join(", ")}`;
+          majors.textContent = `Major skills (+25 starting, 1.5× XP): ${entry.majorSkills.map(skillName).join(", ")}`;
           detailsMeta.appendChild(majors);
         }
       };

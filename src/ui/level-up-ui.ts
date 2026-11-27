@@ -11,13 +11,13 @@ interface AttributeMeta {
 }
 
 const ATTRIBUTE_META: Record<AttributeName, AttributeMeta> = {
-  strength:     { label: "Strength",     governingSkills: "Blade" },
+  strength:     { label: "Strength",     governingSkills: "Swordplay" },
   endurance:    { label: "Endurance",    governingSkills: "Block" },
   intelligence: { label: "Intelligence", governingSkills: "Alchemy" },
-  agility:      { label: "Agility",      governingSkills: "Marksman" },
-  willpower:    { label: "Willpower",    governingSkills: "Destruction, Restoration" },
+  agility:      { label: "Agility",      governingSkills: "Archery" },
+  willpower:    { label: "Willpower",    governingSkills: "Evocation, Mending" },
   speed:        { label: "Speed",        governingSkills: "Sneak" },
-  luck:         { label: "Luck",         governingSkills: "Speechcraft" },
+  luck:         { label: "Luck",         governingSkills: "Persuasion" },
 };
 
 const ATTRIBUTE_ORDER: AttributeName[] = [

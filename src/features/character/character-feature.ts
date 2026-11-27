@@ -8,6 +8,7 @@
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
  */
+import { skillName } from "../../systems/skill-progression-system";
 import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { RaceSystem } from "../../systems/race-system";
@@ -80,7 +81,7 @@ export class CharacterFeature implements Feature {
       feedback().markDirty();
     };
     this.classes.onClassChosen = (cls) => {
-      feedback().notify(`Calling: ${cls.name} (${cls.specialization}) — Major skills: ${cls.majorSkills.join(", ")}`, 4000);
+      feedback().notify(`Calling: ${cls.name} (${cls.specialization}) — Major skills: ${cls.majorSkills.map(skillName).join(", ")}`, 4000);
       host().syncMaxStats();
       feedback().markDirty();
     };

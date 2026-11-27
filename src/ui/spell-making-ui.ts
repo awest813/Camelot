@@ -1,4 +1,4 @@
-import type { DamageType, SpellSchool } from "../systems/spell-system";
+import { SPELL_SCHOOL_NAMES, type DamageType, type SpellSchool } from "../systems/spell-system";
 import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 import type { SpellComponent, SpellComponentEffect } from "../systems/spell-making-system";
 import {
@@ -247,12 +247,12 @@ export class SpellMakingUI {
 
     const effect = this._createSelect(
       "Effect",
-      SPELL_COMPONENT_EFFECTS.map((value) => ({ label: value.replace("_", " "), value })),
+      SPELL_COMPONENT_EFFECTS.map((value) => ({ label: value === "burden" ? "weight" : value.replace("_", " "), value })),
       fields,
     );
     const school = this._createSelect(
       "School",
-      SPELL_COMPONENT_SCHOOLS.map((value) => ({ label: value, value })),
+      SPELL_COMPONENT_SCHOOLS.map((value) => ({ label: SPELL_SCHOOL_NAMES[value], value })),
       fields,
     );
     const magnitude = this._createNumberInput("Magnitude", 1, 200, 1, fields);

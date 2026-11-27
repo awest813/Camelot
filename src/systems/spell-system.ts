@@ -10,6 +10,15 @@ import type { GameEventBus } from "./event-bus";
 // ── Spell types ───────────────────────────────────────────────────────────────
 
 export type SpellSchool = "destruction" | "restoration" | "illusion" | "conjuration" | "alteration";
+
+/** Each school's name as the player sees it (the ids are older and stay as they are). */
+export const SPELL_SCHOOL_NAMES: Readonly<Record<SpellSchool, string>> = {
+  destruction: "Evocation",
+  restoration: "Mending",
+  illusion:    "Glamour",
+  conjuration: "Summoning",
+  alteration:  "Warding",
+};
 export type SpellDelivery = "touch" | "target" | "self";
 
 /** Re-export for spell-making UI and custom spell data. */

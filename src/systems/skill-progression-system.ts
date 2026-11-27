@@ -80,6 +80,23 @@ export interface SkillProgressionSaveState {
 
 // ── System ────────────────────────────────────────────────────────────────────
 
+/** Each skill's name as the player sees it (the ids are older and stay as they are). */
+export const SKILL_NAMES: Readonly<Record<ProgressionSkillId, string>> = {
+  blade:       "Swordplay",
+  blunt:       "Maces",
+  block:       "Block",
+  destruction: "Evocation",
+  restoration: "Mending",
+  marksman:    "Archery",
+  sneak:       "Sneak",
+  speechcraft: "Persuasion",
+  alchemy:     "Alchemy",
+  armorer:     "Smithing",
+};
+
+/** A skill's display name ("marksman" → "Archery"); unknown ids come back as they are. */
+export const skillName = (id: string): string => SKILL_NAMES[id as ProgressionSkillId] ?? id;
+
 export class SkillProgressionSystem {
   /** Where this system reports what happened (the game's event bus). */
   public events: GameEventBus | null = null;
@@ -88,18 +105,7 @@ export class SkillProgressionSystem {
 
   constructor() {
     this._skills = new Map<ProgressionSkillId, ProgressionSkill>();
-    const definitions: Array<{ id: ProgressionSkillId; name: string }> = [
-      { id: "blade",       name: "Blade" },
-      { id: "blunt",       name: "Blunt" },
-      { id: "block",       name: "Block" },
-      { id: "destruction", name: "Destruction" },
-      { id: "restoration", name: "Restoration" },
-      { id: "marksman",    name: "Marksman" },
-      { id: "sneak",       name: "Sneak" },
-      { id: "speechcraft", name: "Speechcraft" },
-      { id: "alchemy",     name: "Alchemy" },
-      { id: "armorer",     name: "Armorer" },
-    ];
+    const definitions = (Object.keys(SKILL_NAMES) as ProgressionSkillId[]).map((id) => ({ id, name: SKILL_NAMES[id] }));
     for (const def of definitions) {
       this._skills.set(def.id, {
         id: def.id,
