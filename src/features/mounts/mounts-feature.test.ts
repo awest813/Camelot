@@ -41,8 +41,12 @@ describe("MountsFeature (headless, through the kernel)", () => {
     t.mounts.toggleMount();
     expect(t.notes.at(-1)).toMatch(/don't own a horse/);
 
-    // Shift+O on foot: the stable.
+    // Shift+O on foot says where horses are sold; the ostler opens the stable.
     t.mounts.toggleStableOrSaddlebag();
+    expect(t.notes.at(-1)).toMatch(/ostler/);
+    expect(t.mounts.stable.isVisible).toBe(false);
+    t.k.events.emit("dialogue:action", { eventId: "stable:open", npcName: "Ostler" });
+    t.k.events.emit("dialogue:closed", {} as never);
     const stable = await t.mounts.stable.get(); // loaded on first use
     expect(t.mounts.stable.isVisible).toBe(true);
     expect(t.modal.suspendGameplay).toHaveBeenCalledOnce();
@@ -73,7 +77,7 @@ describe("MountsFeature (headless, through the kernel)", () => {
 
   it("loading a save puts the speed back: mounted in the save rides, on foot walks", () => {
     const t = setup({ gold: 800 });
-    expect(t.mounts.horses.purchaseHorse("Stable Master", "bay_mare", 800)).toBeGreaterThan(0);
+    expect(t.mounts.horses.purchaseHorse("Ostler", "bay_mare", 800)).toBeGreaterThan(0);
     const codec = t.codecs.get("horse")!;
     const onFoot = JSON.parse(JSON.stringify(codec.save()));
     t.mounts.toggleMount();

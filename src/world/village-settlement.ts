@@ -175,6 +175,8 @@ export function planVillage(cx: number, cz: number, chunkSize: number): VillageP
         residents.push({ archetype: "archetype_barkeeper", ...a2 });
         const b = front(-2.8, 0.8);
         props.push({ key: "qBarrel", ...b, rot: 0 });
+        // The ostler keeps the stable beside the inn (horses: talk to them).
+        residents.push({ archetype: "archetype_ostler", ...toWorld({ x: width / 2 + 1.8, z: depth / 2 - 0.5 }, origin) });
         break;
       }
       case "smithy": {

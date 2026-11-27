@@ -1,12 +1,15 @@
 /**
- * Horses as a kernel feature: the horse roster and stable master, mounting,
- * the stable (buy a horse) and saddlebag (take items) windows.
+ * Horses as a kernel feature: the horse roster and the ostler's stable,
+ * mounting, the stable (buy a horse) and saddlebag (take items) windows.
+ * The stable opens from the ostler's dialogue ("stable:open"); Shift+O on
+ * foot says where to find one, mounted it opens the saddlebag.
  *
  * One pair of actions — `toggleMount` (O) and `toggleStableOrSaddlebag`
  * (Shift+O) — serves both the input adapter and the legacy keyboard path,
  * which used to carry two full copies of this logic.
  *
- * Inputs:   services feedback, modal, purse, mount-host.
+ * Inputs:   services feedback, modal, purse, mount-host; `dialogue:action`,
+ *           `dialogue:closed`.
  * Outputs:  the `mounts` service.
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
@@ -44,7 +47,7 @@ export interface MountsService {
 export const MountHostKey = createServiceKey<MountHostService>("mount-host");
 export const MountsKey = createServiceKey<MountsService>("mounts");
 
-const STABLE_MASTER = "Stable Master";
+const STABLE_MASTER = "Ostler";
 
 export class MountsFeature implements Feature {
   public readonly id = "mounts";
@@ -64,6 +67,11 @@ export class MountsFeature implements Feature {
     return panel;
   });
   private _wireStable: ((panel: StableUI) => void) | null = null;
+  private _stableAfterTalk = false;
+  private _openStable: () => void = () => {};
+
+  /** Show the ostler's horses (asked for in dialogue). */
+  public openStable(): void { this._openStable(); }
   private _wireSaddlebag: ((panel: SaddlebagUI) => void) | null = null;
 
   constructor() {
@@ -154,7 +162,7 @@ export class MountsFeature implements Feature {
           return;
         }
         const owned = this.horses.ownedHorses;
-        if (owned.length === 0) feedback().notify("You don't own a horse. Visit a stable (Shift+O).", 2500);
+        if (owned.length === 0) feedback().notify("You don't own a horse. The ostler at a village inn sells them.", 2500);
         else this.horses.mountHorse(owned[0].id);
       },
       toggleStableOrSaddlebag: () => {
@@ -171,24 +179,30 @@ export class MountsFeature implements Feature {
           });
           return;
         }
-        const stable = this.horses.getStableNPC(STABLE_MASTER);
-        if (!stable) {
-          feedback().notify("No stable nearby.", 1500);
-          return;
-        }
-        const offers = stable.availableHorseIds.map((id) => {
-          const h = this.horses.getHorse(id)!;
-          return {
-            id: h.id, name: h.name, speed: h.speed,
-            saddlebagCapacity: h.saddlebagCapacity, price: stable.prices[id] ?? 0, isOwned: h.isOwned,
-          };
-        });
-        void this.stable.get().then((panel) => {
-          panel.open(STABLE_MASTER, offers, purse().gold());
-          modal().suspendGameplay();
-        });
+        feedback().notify("To buy a horse, talk to the ostler at a village inn.", 2500);
       },
     });
+    ctx.on("dialogue:action", ({ eventId }) => { if (eventId === "stable:open") this._stableAfterTalk = true; });
+    ctx.on("dialogue:closed", () => {
+      if (!this._stableAfterTalk) return;
+      this._stableAfterTalk = false;
+      if (!this.stable.isVisible) this.openStable();
+    });
+    this._openStable = () => {
+      const stable = this.horses.getStableNPC(STABLE_MASTER);
+      if (!stable) return;
+      const offers = stable.availableHorseIds.map((id) => {
+        const h = this.horses.getHorse(id)!;
+        return {
+          id: h.id, name: h.name, speed: h.speed,
+          saddlebagCapacity: h.saddlebagCapacity, price: stable.prices[id] ?? 0, isOwned: h.isOwned,
+        };
+      });
+      void this.stable.get().then((panel) => {
+        panel.open(STABLE_MASTER, offers, purse().gold());
+        modal().suspendGameplay();
+      });
+    };
 
     ctx.scope.add(() => {
       this.horses.onMount = null;

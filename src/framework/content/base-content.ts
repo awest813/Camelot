@@ -97,6 +97,30 @@ export const frameworkBaseContent: RpgContentBundle = {
       ],
     },
     {
+      id: "ostler_intro",
+      startNodeId: "greet",
+      nodes: [
+        {
+          id: "greet",
+          speaker: "Ostler",
+          text: "Mind the straw. Every beast in this stable is sound in wind and limb, and every one is for sale.",
+          choices: [
+            {
+              id: "horses",
+              text: "Show me your horses.",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "stable:open" }],
+            },
+            {
+              id: "leave",
+              text: "Just looking.",
+              endsDialogue: true,
+            },
+          ],
+        },
+      ],
+    },
+    {
       id: "innkeeper_intro",
       startNodeId: "greet",
       nodes: [
@@ -947,6 +971,21 @@ export const frameworkBaseContent: RpgContentBundle = {
       level: 1,
       skills: { "speechcraft": 45, "mercantile": 40 },
       disposition: 65,
+      respawns: false,
+    },
+    {
+      id: "archetype_ostler",
+      name: "Ostler",
+      description: "Keeps the inn's stable: sells horses and minds them.",
+      role: "merchant",
+      isHostile: false,
+      isMerchant: false,
+      scheduleId: "sched_innkeeper",
+      dialogueId: "ostler_intro",
+      baseHealth: 60,
+      level: 1,
+      skills: { "speechcraft": 30, "mercantile": 35 },
+      disposition: 60,
       respawns: false,
     },
     {

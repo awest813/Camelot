@@ -97,7 +97,7 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
   }, v);
   expect(state.roofs).toBe(6);
   expect(state.forge).toBe("forge");
-  for (const who of ["Innkeeper", "Barkeeper", "Village Smith", "Town Guard"]) {
+  for (const who of ["Innkeeper", "Barkeeper", "Ostler", "Village Smith", "Town Guard"]) {
     expect(state.npcs, `${who} lives in ${v!.name}`).toContain(who);
   }
   expect(state.calm, "villagers don't attack a visitor").toBe(true);
