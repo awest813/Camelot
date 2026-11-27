@@ -24,7 +24,7 @@ import { UIAnimator } from "../../ui/ui-animator";
 import type { Item } from "../../systems/inventory-system";
 import type { Scene } from "@babylonjs/core/scene";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import { HORSE_COATS, buildRiderView, buildStandingHorse, groundUnder } from "../../entities/horse-body";
+import { HORSE_COATS, HORSE_MODEL_TINT, buildRiderView, buildStandingHorse, groundUnder, spawnHorseModel, type HorseInstance } from "../../entities/horse-body";
 import { FeedbackKey, ModalKey, PlayerKey, PurseKey, ownSave } from "../services";
 
 /** What riding needs from the game. */
@@ -52,6 +52,9 @@ export const MountsKey = createServiceKey<MountsService>("mounts");
 
 const STABLE_MASTER = "Ostler";
 
+/** Where the ridden horse sits under the camera: a rider's eye (1.7 m up, in its stance) over its back (1.6 m), its head (2 m) ahead. */
+const RIDE_OFFSET = { x: 0, y: -1.7, z: 0.35 };
+
 export class MountsFeature implements Feature {
   public readonly id = "mounts";
   public readonly horses = new HorseSystem();
@@ -73,7 +76,11 @@ export class MountsFeature implements Feature {
   private _stableAfterTalk = false;
   private _openStable: () => void = () => {};
 
-  /** Riding: the standing horse goes; its neck and head ride ahead of the camera. */
+  /**
+   * Riding: the horse model carries you (its back just under your eyes, its
+   * head ahead); until it loads, or if it can't, the shape horse's neck and
+   * head ride ahead of the camera.
+   */
   private _ride(horseId: string): void {
     this._clearBodies();
     const scene = this._scene, camera = scene?.activeCamera;
@@ -81,6 +88,15 @@ export class MountsFeature implements Feature {
     const view = buildRiderView(scene, `rider_${horseId}`, HORSE_COATS[horseId] ?? HORSE_COATS.bay_mare);
     view.parent = camera;
     this._riderView = view;
+    const token = this._bodyToken;
+    void spawnHorseModel(scene, `ridden_${horseId}`, HORSE_MODEL_TINT[horseId]).then((horse) => {
+      if (!horse) return;
+      if (token !== this._bodyToken || !this._riderView) { horse.dispose(); return; }
+      this._riderView.dispose(false, true);
+      this._riderView = null;
+      this._model = horse;
+      this._carry(camera as unknown as Parameters<MountsFeature["_carry"]>[0]);
+    });
   }
 
   /** Off the horse: it stands beside you, facing your way, on the ground. */
@@ -90,18 +106,45 @@ export class MountsFeature implements Feature {
     if (!scene) return;
     const p = player.position();
     const yaw = player.heading?.() ?? 0;
-    // A pace to your right.
-    const x = p.x + Math.cos(yaw) * 1.6, z = p.z - Math.sin(yaw) * 1.6;
-    const horse = buildStandingHorse(scene, `horse_${horseId}`, HORSE_COATS[horseId] ?? HORSE_COATS.bay_mare);
-    horse.position.set(x, groundUnder(scene, x, p.y ?? 2, z) ?? (p.y ?? 2) - 1.8, z);
-    horse.rotation.y = yaw;
-    this._standing = horse;
+    // A pace and a half to your right.
+    const x = p.x + Math.cos(yaw) * 2, z = p.z - Math.sin(yaw) * 2;
+    const y = groundUnder(scene, x, p.y ?? 2, z) ?? (p.y ?? 2) - 1.8;
+    const shape = buildStandingHorse(scene, `horse_${horseId}`, HORSE_COATS[horseId] ?? HORSE_COATS.bay_mare);
+    shape.position.set(x, y, z);
+    shape.rotation.y = yaw;
+    this._standing = shape;
+    const token = this._bodyToken;
+    void spawnHorseModel(scene, `horse_${horseId}_model`, HORSE_MODEL_TINT[horseId]).then((horse) => {
+      if (!horse) return;
+      if (token !== this._bodyToken || !this._standing) { horse.dispose(); return; }
+      this._standing.dispose(false, true);
+      this._standing = null;
+      horse.root.position.set(x, y, z);
+      horse.root.rotation.y = yaw;
+      this._model = horse;
+    });
+  }
+
+  /** Keep the ridden horse under the rider: their heading (not their gaze up or down), their place. */
+  private _carry(camera: { position: { x: number; y: number; z: number }; rotation: { y: number } }): void {
+    const horse = this._model;
+    if (!horse || !this.horses.isMounted) return;
+    const yaw = camera.rotation.y, c = Math.cos(yaw), sn = Math.sin(yaw);
+    horse.root.position.set(
+      camera.position.x + RIDE_OFFSET.x * c + RIDE_OFFSET.z * sn,
+      camera.position.y + RIDE_OFFSET.y,
+      camera.position.z - RIDE_OFFSET.x * sn + RIDE_OFFSET.z * c,
+    );
+    horse.root.rotation.y = yaw;
   }
 
   private _clearBodies(): void {
+    this._bodyToken++;
     this._standing?.dispose(false, true);
     this._riderView?.dispose(false, true);
+    this._model?.dispose();
     this._standing = this._riderView = null;
+    this._model = null;
   }
 
   /** Show the ostler's horses (asked for in dialogue). */
@@ -111,13 +154,17 @@ export class MountsFeature implements Feature {
   /** The horse you left standing (dismounted), and the neck and head you see while riding. */
   private _standing: TransformNode | null = null;
   private _riderView: TransformNode | null = null;
+  /** The horse model, when it has loaded (riding or standing). */
+  private _model: HorseInstance | null = null;
+  /** Bumped on every change, so a model that finishes loading late is dropped. */
+  private _bodyToken = 0;
   private _bob = 0;
 
   constructor(private readonly _scene: Scene | null = null) {
     // Starter horses available at world stables.
     this.horses.registerHorse({ id: "bay_mare", name: "Bay Mare", speed: 1.8, saddlebagCapacity: 8, stableId: "starter_stable" });
     this.horses.registerHorse({ id: "black_stallion", name: "Black Stallion", speed: 2.2, saddlebagCapacity: 6, stableId: "starter_stable" });
-    this.horses.registerHorse({ id: "grey_gelding", name: "Grey Gelding", speed: 2.0, saddlebagCapacity: 10, stableId: "starter_stable" });
+    this.horses.registerHorse({ id: "grey_gelding", name: "Chestnut Gelding", speed: 2.0, saddlebagCapacity: 10, stableId: "starter_stable" });
     this.horses.registerStableNPC({
       npcName: STABLE_MASTER,
       availableHorseIds: ["bay_mare", "black_stallion", "grey_gelding"],
@@ -252,12 +299,18 @@ export class MountsFeature implements Feature {
     let last: { x: number; z: number } | null = null;
     ctx.system({
       id: "mounts.rider", phase: "ui", update: (dt) => {
-        const view = this._riderView;
-        if (!view) { last = null; return; }
         const p = s.tryGet(PlayerKey)?.position();
-        if (!p) return;
-        const moved = last ? Math.hypot(p.x - last.x, p.z - last.z) : 0;
-        last = { x: p.x, z: p.z };
+        const moved = p && last ? Math.hypot(p.x - last.x, p.z - last.z) : 0;
+        last = p ? { x: p.x, z: p.z } : null;
+        // The ridden model walks or runs with your pace (metres a second).
+        if (this._model && this.horses.isMounted) {
+          const camera = this._scene?.activeCamera as unknown as { position: { x: number; y: number; z: number }; rotation: { y: number } } | null;
+          if (camera?.rotation) this._carry(camera);
+          const pace = dt > 0 ? moved / dt : 0;
+          this._model.play(pace > 6 ? "run" : pace > 0.6 ? "walk" : "stand");
+        }
+        const view = this._riderView;
+        if (!view) return;
         if (moved > 0.01) this._bob += dt * 9;
         view.position.y = Math.sin(this._bob) * 0.035;
         view.rotation.x = Math.sin(this._bob + 0.6) * 0.03;

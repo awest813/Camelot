@@ -127,7 +127,7 @@ describe("MountsFeature — the horse in the world", () => {
     feature.horses.dismountHorse();
     expect(scene.getTransformNodeByName("rider_black_stallion")).toBeNull();
     const standing = scene.getTransformNodeByName("horse_black_stallion")!;
-    expect(standing.position.x).toBeCloseTo(11.6);
+    expect(standing.position.x, "two paces to the right").toBeCloseTo(12);
     k.uninstall("mounts");
     expect(scene.getTransformNodeByName("horse_black_stallion")).toBeNull();
     scene.dispose();

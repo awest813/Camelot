@@ -12,6 +12,11 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { Scene } from "@babylonjs/core/scene";
 import type { Node } from "@babylonjs/core/node";
+import type { AssetContainer } from "@babylonjs/core/assetContainer";
+import type { Material } from "@babylonjs/core/Materials/material";
+import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
+import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
+import { asyncWork } from "../core/async-work";
 
 export type HorseCoat = { r: number; g: number; b: number };
 
@@ -19,7 +24,7 @@ export type HorseCoat = { r: number; g: number; b: number };
 export const HORSE_COATS: Record<string, HorseCoat> = {
   bay_mare: { r: 0.42, g: 0.24, b: 0.11 },
   black_stallion: { r: 0.07, g: 0.06, b: 0.06 },
-  grey_gelding: { r: 0.56, g: 0.55, b: 0.52 },
+  grey_gelding: { r: 0.5, g: 0.28, b: 0.12 },
 };
 
 function materials(scene: Scene, name: string, coat: HorseCoat) {
@@ -77,4 +82,90 @@ export function groundUnder(scene: Scene, x: number, y: number, z: number): numb
   const ray = new Ray(new Vector3(x, y + 2, z), new Vector3(0, -1, 0), 50);
   const hit = scene.pickWithRay(ray, (m) => m.isPickable && m.checkCollisions && m.isEnabled());
   return hit?.hit && hit.pickedPoint ? hit.pickedPoint.y : null;
+}
+
+// ── The horse model (public/model/horse/Horse.glb) ────────────────────────────
+
+/** Its four clips, and "stand": the walk's first pose held (head up; idle grazes). */
+export type HorseClip = "idle" | "walk" | "run" | "lie" | "stand";
+
+/** One placed horse: its root (set position and yaw on it) and its clips. */
+export interface HorseInstance {
+  readonly root: TransformNode;
+  play(clip: HorseClip): void;
+  dispose(): void;
+}
+
+/** Turns the model (head toward −Z once loaded) to face +Z like the rest of the world. */
+export const HORSE_MODEL_YAW = Math.PI;
+
+let horseContainer: Promise<AssetContainer | null> | null = null;
+let horseScene: Scene | null = null;
+
+/** Load the horse model once per scene (null when it can't load: the shape horse stands in). */
+export function loadHorseModel(scene: Scene): Promise<AssetContainer | null> {
+  if (horseContainer && horseScene === scene) return horseContainer;
+  horseScene = scene;
+  const base = `${import.meta.env?.BASE_URL ?? "/"}model/horse/`;
+  horseContainer = asyncWork.ordered(SceneLoader.LoadAssetContainerAsync(base, "Horse.glb", scene))
+    .catch((err) => {
+      console.warn("[horse] model failed to load; the shape horse stands in", err);
+      return null;
+    });
+  return horseContainer;
+}
+
+/** The model is a chestnut; a darker horse multiplies its coat (linear colour; only darker: a tint can't lighten). */
+export const HORSE_MODEL_TINT: Record<string, HorseCoat | undefined> = {
+  black_stallion: { r: 0.045, g: 0.04, b: 0.04 },
+};
+
+/** A new horse from the model, idling at the origin (its coat tinted, if given); null when the model can't load. */
+export async function spawnHorseModel(scene: Scene, name: string, tint?: HorseCoat): Promise<HorseInstance | null> {
+  const container = await loadHorseModel(scene);
+  if (!container || scene.isDisposed) return null;
+  // A tinted horse gets its own copies of the materials (the coat is shared otherwise).
+  const inst = container.instantiateModelsToScene((n) => `${name}|${n}`, !!tint, { doNotInstantiate: true });
+  const root = new TransformNode(name, scene);
+  const turn = new TransformNode(`${name}|turn`, scene);
+  turn.parent = root;
+  turn.rotation.y = HORSE_MODEL_YAW;
+  for (const node of inst.rootNodes) node.parent = turn;
+  for (const m of root.getChildMeshes()) {
+    m.isPickable = false;
+    m.receiveShadows = true;
+    const mat = m.material as (Material & { albedoColor?: Color3 }) | null;
+    if (tint && mat?.albedoColor && !/eye/i.test(mat.name)) {
+      if (mat.isFrozen) mat.unfreeze(); // a copy of a frozen material is frozen too
+      mat.albedoColor = new Color3(tint.r, tint.g, tint.b);
+      mat.markDirty();
+    }
+  }
+  const clips = new Map<string, AnimationGroup>();
+  for (const g of inst.animationGroups) clips.set(g.name.slice(g.name.lastIndexOf("|") + 1), g);
+  let current: AnimationGroup | null = null;
+  let standing = false;
+  const horse: HorseInstance = {
+    root,
+    play(clip) {
+      const g = clips.get(clip === "stand" ? "walk" : clip);
+      if (!g) return;
+      const held = clip === "stand";
+      if (g === current && held === standing) return;
+      current?.stop();
+      current = g;
+      standing = held;
+      g.start(clip !== "lie" && !held, 1.0, g.from, g.to);
+      if (held) { g.goToFrame(g.from); g.pause(); }
+    },
+    dispose() {
+      for (const g of inst.animationGroups) g.dispose();
+      // Not the textures (every horse shares the loaded model's); a tinted horse's own material copies go.
+      const own = tint ? root.getChildMeshes().map((m) => m.material).filter((m): m is Material => !!m) : [];
+      root.dispose(false, false);
+      for (const m of new Set(own)) m.dispose(false, false);
+    },
+  };
+  horse.play("idle");
+  return horse;
 }
