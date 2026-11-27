@@ -583,7 +583,7 @@ export const frameworkBaseContent: RpgContentBundle = {
       nodes: [
         {
           id: "greet",
-          speaker: "Battlemage",
+          speaker: "War-druid",
           text: "Power without control is just noise. I drill mages until their sparks go where they intend.",
           choices: [
             {
@@ -1122,7 +1122,7 @@ export const frameworkBaseContent: RpgContentBundle = {
     },
     {
       id: "archetype_trainer_destruction",
-      name: "Battlemage Instructor",
+      name: "War-druid Instructor",
       description: "A war-mage who drills students in controlled destructive force.",
       role: "trainer",
       factionId: "mages_college",

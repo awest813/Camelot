@@ -80,7 +80,7 @@ export class CharacterFeature implements Feature {
       feedback().markDirty();
     };
     this.classes.onClassChosen = (cls) => {
-      feedback().notify(`Class chosen: ${cls.name} (${cls.specialization}) — Major skills: ${cls.majorSkills.join(", ")}`, 4000);
+      feedback().notify(`Calling: ${cls.name} (${cls.specialization}) — Major skills: ${cls.majorSkills.join(", ")}`, 4000);
       host().syncMaxStats();
       feedback().markDirty();
     };

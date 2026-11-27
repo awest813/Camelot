@@ -8,7 +8,7 @@
  * and the combat rolls all have to come out the same.
  */
 import { test, expect, type Page } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { passTitle } from "./helpers/title";
 
@@ -152,7 +152,10 @@ async function playBack(browser: import("@playwright/test").Browser, log: unknow
 test("a session that loads a save (F9) replays from the storage it started with", async ({ browser }) => {
   test.setTimeout(600_000);
   const errors: string[] = [];
-  const fixture = JSON.parse(readFileSync(fileURLToPath(new URL("../fixtures/saves/v29-midgame.json", import.meta.url)), "utf8"));
+  // The corpus's current save (one per save version; older ones don't load).
+  const dir = fileURLToPath(new URL("../fixtures/saves/", import.meta.url));
+  const latest = readdirSync(dir).filter((f) => /^v\d+-midgame\.json$/.test(f)).sort((a, b) => parseInt(b.slice(1)) - parseInt(a.slice(1)))[0];
+  const fixture = JSON.parse(readFileSync(dir + latest, "utf8"));
 
   const rec = await browser.newPage();
   rec.on("pageerror", (e) => { if (!/pointer\s*lock/i.test(e.message)) errors.push(e.message); });

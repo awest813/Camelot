@@ -92,7 +92,7 @@ export function modelForNpcName(name: string): CharacterModelId | null {
   // Humans are Quaternius outfit characters; gender varies by name hash.
   const female = nameHash(name) < 0.45;
   if (/chief|warlord|brute|barbarian|orc/.test(n)) return "Orc_Brute";
-  if (/guard|knight|soldier|captain|bandit|outlaw|robber|pirate|archer|ranger|hunter|scout|thief|rogue|assassin|instructor|battlemage|mage|wizard|sorcer|witch|priest|healer/.test(n)) {
+  if (/guard|knight|soldier|captain|bandit|outlaw|robber|pirate|archer|ranger|hunter|scout|thief|rogue|assassin|instructor|druid|mage|wizard|sorcer|witch|priest|healer/.test(n)) {
     return female ? "Ranger_Female" : "Ranger_Male";
   }
   return female ? "Peasant_Female" : "Peasant_Male";

@@ -259,7 +259,7 @@ export class CharacterCreationUI {
 
       const classStep = document.createElement("span");
       classStep.className = "character-create__step-pill";
-      classStep.textContent = "Class";
+      classStep.textContent = "Calling";
       stepPills.appendChild(classStep);
 
       const layout = document.createElement("div");
@@ -369,7 +369,7 @@ export class CharacterCreationUI {
           ["Name", enteredName.trim() || null],
           ["Heritage", selectedRace?.name ?? null],
           ["Omen", selectedBirthsign?.name ?? null],
-          ["Class", selectedClass?.name ?? null],
+          ["Calling", selectedClass?.name ?? null],
         ];
         for (const [label, value] of rows) {
           const dt = document.createElement("dt");
@@ -622,7 +622,7 @@ export class CharacterCreationUI {
       const renderWelcome = () => {
         clearCards();
         subtitle.textContent =
-          "You will name your hero, choose a people and an omen, then a class. Afterward, optional tips introduce movement and interaction.";
+          "You will name your hero, choose a people and an omen, then a calling. Afterward, optional tips introduce movement and interaction.";
         continueButton.textContent = "Continue";
         setBtnDisabled(continueButton, false);
         setBtnDisabled(backButton, true);
@@ -640,7 +640,7 @@ export class CharacterCreationUI {
 
         const p1 = document.createElement("p");
         p1.textContent =
-          "Heritage sets your people and their gifts. The omen you were born under grants lasting gifts and often a daily power. Class sets which skills level fastest at the start.";
+          "Heritage sets your people and their gifts. The omen you were born under grants lasting gifts and often a daily power. Your calling sets which skills level fastest at the start.";
         intro.appendChild(p1);
 
         const p2 = document.createElement("p");
@@ -1233,9 +1233,9 @@ export class CharacterCreationUI {
 
       const renderClasses = () => {
         clearCards();
-        subtitle.textContent = "Select a class to shape early skill growth, XP multipliers, and your opening combat style.";
+        subtitle.textContent = "Choose your calling: the trade you follow, which skills you start strong in, and which grow fastest.";
         continueButton.textContent = "Begin adventure";
-        setBtnDisabled(continueButton, !selectedClass, "Please select a class to continue.");
+        setBtnDisabled(continueButton, !selectedClass, "Choose a calling to continue.");
         setBtnDisabled(backButton, false);
         setAllStepPills("class");
 

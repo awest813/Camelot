@@ -52,7 +52,7 @@ describe("ClassSystem", () => {
   it("getDefinition returns the correct class", () => {
     const warrior = system.getDefinition("warrior");
     expect(warrior).toBeDefined();
-    expect(warrior!.name).toBe("Warrior");
+    expect(warrior!.name).toBe("Man-at-arms");
     expect(warrior!.specialization).toBe("combat");
 
     const assassin = system.getDefinition("assassin");
@@ -62,7 +62,7 @@ describe("ClassSystem", () => {
 
     const crusader = system.getDefinition("crusader");
     expect(crusader).toBeDefined();
-    expect(crusader!.name).toBe("Crusader");
+    expect(crusader!.name).toBe("Grail Knight");
     expect(crusader!.favoredAttributes).toEqual(["strength", "willpower"]);
   });
 
@@ -185,7 +185,7 @@ describe("ClassSystem", () => {
     // Actually let's just verify via isMajorSkill / isMinorSkill combo
     // Use battlemage which has different skill lists
     const newSystem = new ClassSystem();
-    newSystem.chooseClass("battlemage");
+    newSystem.chooseClass("wardruid");
     // alchemy is a major for battlemage — ensure it returns major mult
     expect(newSystem.xpMultiplierFor("alchemy")).toBe(MAJOR_SKILL_XP_MULTIPLIER);
   });

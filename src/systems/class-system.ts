@@ -1,5 +1,5 @@
 /**
- * ClassSystem — Oblivion-style character class selection.
+ * ClassSystem — the callings: the trade a hero follows (classes, in code).
  *
  * At character creation the player picks (or creates) a character class.
  * Each class defines:
@@ -104,8 +104,7 @@ export const FAVORED_ATTRIBUTE_BONUS = 10;
 // ── Character class catalogue ─────────────────────────────────────────────────
 
 /**
- * Ten preset classes mirroring Oblivion's built-in class roster, adapted to
- * the nine ProgressionSkillIds available in this engine.
+ * The callings of the realm, each built on the nine ProgressionSkillIds.
  *
  * Each class lists 3–4 distinct major skills; all remaining skills are
  * automatically treated as minor skills.
@@ -114,10 +113,10 @@ export const CHARACTER_CLASSES: ReadonlyArray<CharacterClass> = [
   // ── Combat specialization ─────────────────────────────────────────────────
   {
     id: "warrior",
-    name: "Warrior",
+    name: "Man-at-arms",
     specialization: "combat",
     description:
-      "Fearless and heavily armoured, Warriors excel in close-quarters combat. " +
+      "Fearless and heavily armoured, men-at-arms hold the line in close quarters. " +
       "Their strength and endurance make them difficult to put down.",
     favoredAttributes: ["strength", "endurance"],
     majorSkills: ["blade", "block", "marksman"],
@@ -134,21 +133,21 @@ export const CHARACTER_CLASSES: ReadonlyArray<CharacterClass> = [
   },
   {
     id: "barbarian",
-    name: "Barbarian",
+    name: "Berserker",
     specialization: "combat",
     description:
-      "Barbarians rely on brute force and an intimidating presence. They hit hard " +
+      "Berserkers rely on brute force and a terrible presence. They hit hard " +
       "but care little for subtlety or magic.",
     favoredAttributes: ["strength", "agility"],
     majorSkills: ["blade", "marksman", "alchemy"],
   },
   {
     id: "crusader",
-    name: "Crusader",
+    name: "Grail Knight",
     specialization: "combat",
     description:
-      "Holy warriors clad in heavy armor, smiting evil with blade and blunt " +
-      "while sustaining themselves with restorative miracles.",
+      "Knights sworn to the quest for the grail, clad in heavy armour, smiting " +
+      "evil with blade and mace and kept whole by the grace they carry.",
     favoredAttributes: ["strength", "willpower"],
     majorSkills: ["blade", "blunt", "restoration", "block"],
   },
@@ -194,32 +193,32 @@ export const CHARACTER_CLASSES: ReadonlyArray<CharacterClass> = [
     majorSkills: ["restoration", "alchemy", "speechcraft"],
   },
   {
-    id: "spellsword",
-    name: "Spellsword",
+    id: "warden",
+    name: "Warden",
     specialization: "magic",
     description:
-      "Versatile battle casters who weave offensive destruction and protective " +
-      "restoration spells seamlessly with martial blade combat.",
+      "Keepers of the king's roads and forests, who fight with sword and shield " +
+      "and with spells that burn and spells that mend.",
     favoredAttributes: ["willpower", "endurance"],
     majorSkills: ["blade", "destruction", "restoration", "block"],
   },
   {
-    id: "battlemage",
-    name: "Battlemage",
+    id: "wardruid",
+    name: "War-druid",
     specialization: "magic",
     description:
-      "Battlemages combine swordsmanship with destructive sorcery, making them " +
-      "dangerous at any range and in any situation.",
+      "Druids of the old groves who took up the sword when the raiders came, " +
+      "as dangerous with a blade as with the fire they call down.",
     favoredAttributes: ["intelligence", "strength"],
     majorSkills: ["blade", "destruction", "alchemy"],
   },
   // ── Stealth specialization ────────────────────────────────────────────────
   {
     id: "thief",
-    name: "Thief",
+    name: "Cutpurse",
     specialization: "stealth",
     description:
-      "Thieves move silently through the shadows, relying on agility and cunning " +
+      "Cutpurses move silently through crowds and shadows, relying on agility and cunning " +
       "rather than brute force.",
     favoredAttributes: ["agility", "speed"],
     majorSkills: ["sneak", "speechcraft", "marksman"],
@@ -236,10 +235,10 @@ export const CHARACTER_CLASSES: ReadonlyArray<CharacterClass> = [
   },
   {
     id: "scout",
-    name: "Scout",
+    name: "Forester",
     specialization: "stealth",
     description:
-      "Scouts are wilderness experts equally at home sniping from afar or " +
+      "Foresters keep the king's woods, equally at home shooting from afar or " +
       "disappearing into the undergrowth.",
     favoredAttributes: ["agility", "endurance"],
     majorSkills: ["marksman", "sneak", "alchemy"],
@@ -255,12 +254,12 @@ export const CHARACTER_CLASSES: ReadonlyArray<CharacterClass> = [
     majorSkills: ["blade", "sneak", "speechcraft"],
   },
   {
-    id: "nightblade",
-    name: "Nightblade",
+    id: "hedgewitch",
+    name: "Hedge-witch",
     specialization: "stealth",
     description:
-      "Cunning infiltrators who cloak their movements with magic, striking from " +
-      "the shadows with enchanted blades and destructive spells.",
+      "Wise-women and cunning-men of the hedgerows, who walk unseen, curse with " +
+      "a word, mend with another, and keep a knife for the rest.",
     favoredAttributes: ["willpower", "speed"],
     majorSkills: ["blade", "destruction", "restoration", "sneak"],
   },
@@ -290,8 +289,7 @@ export const CHARACTER_CLASSES: ReadonlyArray<CharacterClass> = [
 
 /**
  * Skills belonging to each specialization category.
- * The game has fewer skills than Oblivion; this mapping approximates
- * the original groupings.
+ * Which skills count as combat, magic and stealth.
  */
 const SPECIALIZATION_SKILLS: Record<ClassSpecialization, ReadonlySet<ProgressionSkillId>> = {
   combat:  new Set(["blade", "blunt", "block", "marksman", "armorer"]),
