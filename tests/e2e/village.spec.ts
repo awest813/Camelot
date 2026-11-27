@@ -144,9 +144,11 @@ test("a village is built, populated and discovered on entry", async ({ page }) =
     const questOf = () => g.questSystem.getQuests().find((q: any) => q.id === questId);
     const t = g.jobs.rules.constructor.template(active.templateId);
     const handInEnabledEarly = !document.querySelector<HTMLButtonElement>(".job-board__btn--primary")!.disabled;
-    // Fulfil it (supply: stock the bag; bounty: fake the kills) and collect.
+    // Fulfil it (supply: stock the bag; bounty: fake the kills; clearance: its site falls) and collect.
     if (t.kind === "supply") {
       g.inventorySystem.addItem({ id: t.target, name: t.target, description: "", stackable: true, quantity: t.required, weight: 0 });
+    } else if (t.kind === "clear") {
+      g.eventBus.emit("landmark:cleared", { id: active.camp.id, name: active.camp.name });
     } else {
       for (let i = 0; i < t.required; i++) g._quests.apply("kill", g._quests.targetId(`${t.target}_${i}`));
     }
