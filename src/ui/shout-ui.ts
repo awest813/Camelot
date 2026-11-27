@@ -13,6 +13,7 @@
  * Implemented as plain DOM so it matches the PetUI / StableUI pattern.
  */
 
+import { addHudChip } from "./hud-chips";
 import type { ShoutDefinition } from "../systems/dragon-shout-system";
 import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 
@@ -166,9 +167,6 @@ export class ShoutUI {
     root.setAttribute("aria-live", "polite");
     root.setAttribute("aria-label", "Word ready to speak");
     Object.assign(root.style, {
-      position:      "fixed",
-      bottom:        "150px",         // above the companion HUD chip
-      right:         "14px",
       display:       "none",
       alignItems:    "center",
       gap:           "6px",
@@ -176,7 +174,6 @@ export class ShoutUI {
       border:        `1px solid ${C.BORDER}`,
       borderRadius:  "6px",
       padding:       "5px 8px",
-      zIndex: "20" /* a HUD chip: under every panel */,
       pointerEvents: "none",
       fontFamily:    C.FONT,
       minWidth:      "150px",
@@ -196,7 +193,7 @@ export class ShoutUI {
     Object.assign(state.style, { fontSize: "12px", fontFamily: C.FONT, fontWeight: "bold", letterSpacing: "1px" });
 
     root.append(icon, name, pips, state);
-    document.body.appendChild(root);
+    addHudChip(root, 3); // the HUD chips' stack (ui/hud-chips.ts)
 
     this._hudRoot  = root;
     this._hudName  = name;

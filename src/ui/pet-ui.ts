@@ -11,6 +11,7 @@
  * Implemented as plain DOM so it matches the StableUI / SaddlebagUI pattern.
  */
 
+import { addHudChip } from "./hud-chips";
 import type { Pet, PetTemplate } from "../systems/pet-system";
 import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 
@@ -146,9 +147,6 @@ export class PetUI {
 
     const root = document.createElement("div");
     Object.assign(root.style, {
-      position:    "fixed",
-      bottom:      "110px",          // above the resource bars
-      right:       "14px",
       display:     "none",           // hidden until a pet is active
       alignItems:  "center",
       gap:         "6px",
@@ -156,7 +154,6 @@ export class PetUI {
       border:      `1px solid ${C.BORDER}`,
       borderRadius:"6px",
       padding:     "5px 8px",
-      zIndex: "20" /* a HUD chip: under every panel */,
       pointerEvents:"none",
       fontFamily:  C.FONT,
       minWidth:    "160px",
@@ -205,7 +202,7 @@ export class PetUI {
 
     info.append(nameRow, hpOuter, hpText);
     root.append(icon, info);
-    document.body.appendChild(root);
+    addHudChip(root, 1); // the HUD chips' stack (ui/hud-chips.ts)
 
     this._hudRoot   = root;
     this._hudIcon   = icon;

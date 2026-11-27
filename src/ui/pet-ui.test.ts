@@ -48,14 +48,14 @@ describe("PetUI", () => {
     it("hides the HUD when activePet is null", () => {
       ui.updateHUD(makePet());
       ui.updateHUD(null);
-      // The first child appended to body is the HUD root
-      const hud = document.body.querySelector("div") as HTMLDivElement;
+      // The HUD chip, in the chips' stack
+      const hud = document.querySelector("#hud-chips > div") as HTMLDivElement;
       expect(hud.style.display).toBe("none");
     });
 
     it("shows the HUD when a pet is active", () => {
       ui.updateHUD(makePet());
-      const hud = document.body.querySelector("div") as HTMLDivElement;
+      const hud = document.querySelector("#hud-chips > div") as HTMLDivElement;
       expect(hud.style.display).toBe("flex");
     });
 
@@ -102,7 +102,7 @@ describe("PetUI", () => {
     it("hides the HUD when it exists", () => {
       ui.updateHUD(makePet());
       ui.hideHUD();
-      const hud = document.body.querySelector("div") as HTMLDivElement;
+      const hud = document.querySelector("#hud-chips > div") as HTMLDivElement;
       expect(hud.style.display).toBe("none");
     });
 

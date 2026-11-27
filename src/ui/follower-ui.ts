@@ -12,6 +12,7 @@
  * Implemented as plain DOM so it matches the PetUI / StableUI / SaddlebagUI pattern.
  */
 
+import { addHudChip } from "./hud-chips";
 import type {
   FollowerTemplate,
   ActiveFollowerState,
@@ -184,9 +185,6 @@ export class FollowerUI {
 
     const root = document.createElement("div");
     Object.assign(root.style, {
-      position:    "fixed",
-      bottom:      "140px",          // above the pet HUD (which is at 110px)
-      right:       "14px",
       display:     "none",           // hidden until a follower is active
       alignItems:  "center",
       gap:         "6px",
@@ -194,7 +192,6 @@ export class FollowerUI {
       border:      `1px solid ${C.BORDER}`,
       borderRadius:"6px",
       padding:     "5px 8px",
-      zIndex: "20" /* a HUD chip: under every panel */,
       pointerEvents:"none",
       fontFamily:  C.FONT,
       minWidth:    "180px",
@@ -243,7 +240,7 @@ export class FollowerUI {
 
     info.append(nameRow, hpOuter, hpText);
     root.append(icon, info);
-    document.body.appendChild(root);
+    addHudChip(root, 2); // the HUD chips' stack (ui/hud-chips.ts)
 
     this._hudRoot    = root;
     this._hudIcon    = icon;
