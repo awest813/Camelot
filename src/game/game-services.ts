@@ -147,7 +147,7 @@ export function installGameFeatures(game: Game): void {
           if (game.dialogueSystem.isInDialogue) game.dialogueSystem.endDialogue();
           if (game.inventorySystem.isOpen) game.inventorySystem.toggleInventory();
           if (game._containerUI.isVisible) game._containerUI.onClose?.();
-          if (game._barterUI.isVisible) game._barterUI.onClose?.();
+          game._trade.closeBarter();
           restoreGameplayInput(game);
         },
         purgeEffects: () => {

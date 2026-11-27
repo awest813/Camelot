@@ -377,7 +377,7 @@ export class GameState {
   public readonly screenshotSystem = new ScreenshotSystem();
 
   public readonly _trade = new TradeFeature();
-  public get _barterUI(): BarterUI { return this._trade.barterPanel; }
+  public get _barterUI(): LazyPanel<BarterUI> { return this._trade.barterPanel; }
   public get _containerUI(): ContainerUI { return this._trade.containerPanel; }
   /** When set, open barter after dialogue teardown (pointer lock restored first). */
   /** Set by the smith's "use your forge" dialogue choice; opened once dialogue closes. */

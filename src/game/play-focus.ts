@@ -23,7 +23,7 @@ export function registerModals(g: Game): void {
     { id: "forge", isOpen: () => g.craftingUI.isVisible, close: () => g.crafting.toggleSmithing() },
     { id: "jobs", isOpen: () => g.jobs.window.isVisible, close: () => { g.jobs.window.hide(); g.jobs.window.onClose?.(); } },
     { id: "spell-making", isOpen: () => g.spellMakingUI.isVisible, close: () => g.spellMakingUI.close() },
-    { id: "barter", isOpen: () => g._barterUI.isVisible, close: () => g._trade.barterPanel.onClose?.() },
+    { id: "barter", isOpen: () => g._trade.barterOpen, close: () => g._trade.closeBarter() },
     { id: "container", isOpen: () => g._containerUI.isVisible, close: () => g._trade.containerPanel.onClose?.() },
     { id: "fast-travel", isOpen: () => g.fastTravelUI.isVisible, close: () => g.fastTravelUI.close() },
     { id: "pets", isOpen: () => g.petUI.isVisible, close: () => g.pets.togglePanel() },

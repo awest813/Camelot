@@ -85,10 +85,10 @@ export function setupGameplaySystems(g: Game): void {
   });
   // Worn gear trades for less, and barter rows show each piece's condition.
   g.barterSystem.itemValueMultiplier = (item) => g.smithing.getValueMultiplier(item);
-  g._barterUI.itemTag = (item) => {
+  g._trade.setItemTag((item) => {
     const c = g.smithing.getItemCondition(item);
     return c === null ? null : `${Math.round(c)}%`;
-  };
+  });
   // Hovering a piece of gear in the inventory shows its condition.
   g.ui.itemDetailSuffix = (item) => {
     const c = g.smithing.getItemCondition(item);

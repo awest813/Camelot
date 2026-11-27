@@ -43,14 +43,18 @@ function setup(opts: { open?: boolean } = {}) {
 }
 
 describe("TradeFeature (headless, through the kernel)", () => {
-  it("a merchant's wares open once the talk ends, priced by reputation", () => {
+  it("a merchant's wares open once the talk ends (loading the window), priced by reputation", async () => {
     const t = setup();
+    t.f.setItemTag(() => "90%");
     t.talk("Friend", "merchant_weapons_01");
     expect(t.barter.openBarter).toHaveBeenCalledWith("merchant_weapons_01", 12);
     expect(t.barter.sessionBuyPriceFactor, "clamped to 0.7").toBe(0.7);
     expect(t.barter.playerGold).toBe(77);
+    expect(t.f.barterOpen, "open while the window loads").toBe(true);
+    const ui = await t.svc.barterPanel.get();
     expect(t.svc.barterPanel.isVisible).toBe(true);
-    t.svc.barterPanel.onBuy!("sword");
+    expect(ui.itemTag?.({} as never), "the item tag set before it loaded").toBe("90%");
+    ui.onBuy!("sword");
     expect(t.barter.buyItem).toHaveBeenCalledWith("merchant_weapons_01", "sword", undefined);
     t.svc.closeBarter();
     expect(t.barter.closeBarter).toHaveBeenCalled();

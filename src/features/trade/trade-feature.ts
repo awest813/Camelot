@@ -6,6 +6,8 @@
  * Prices follow reputation: fame shifts them, and the merchant's own
  * disposition refines that (friends give discounts; enemies gouge).
  *
+ * The barter window loads the first time it opens.
+ *
  * Inputs:   services trade-host, purse, feedback, modal; events
  *           `dialogue:action` ("barter:open"), `dialogue:closed`.
  * Outputs:  the `trade` service.
@@ -14,7 +16,8 @@
  */
 import type { Feature, FeatureContext, ServiceRegistry } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
-import { BarterUI } from "../../ui/barter-ui";
+import type { BarterUI } from "../../ui/barter-ui";
+import { LazyPanel } from "../../ui/lazy-panel";
 import { ContainerUI } from "../../ui/container-ui";
 import type { BarterSystem } from "../../systems/barter-system";
 import type { ShopSystem } from "../../systems/shop-system";
@@ -36,18 +39,31 @@ export interface TradeHostService {
 }
 
 export interface TradeService {
-  readonly barterPanel: BarterUI;
+  /** The barter window (loaded on first use). */
+  readonly barterPanel: LazyPanel<BarterUI>;
   readonly containerPanel: ContainerUI;
   closeBarter(): void;
   closeContainer(): void;
 }
+
+/** A short tag after an item's name in the barter rows (e.g. its condition), or null. */
+export type ItemTag = (item: Item) => string | null;
 
 export const TradeHostKey = createServiceKey<TradeHostService>("trade-host");
 export const TradeKey = createServiceKey<TradeService>("trade");
 
 export class TradeFeature implements Feature {
   public readonly id = "trade";
-  public readonly barterPanel = new BarterUI();
+  /** The barter window: its code loads the first time a merchant opens it. */
+  public readonly barterPanel = new LazyPanel<BarterUI>(async () => {
+    const { BarterUI } = await import("../../ui/barter-ui");
+    const ui = new BarterUI();
+    ui.itemTag = this._itemTag;
+    this._wireBarter?.(ui);
+    return ui;
+  });
+  private _wireBarter: ((ui: BarterUI) => void) | null = null;
+  private _itemTag: ItemTag | null = null;
   public readonly containerPanel = new ContainerUI();
   private _pending: { merchantId: string; npcName: string | null } | null = null;
   private _s: ServiceRegistry | null = null;
@@ -65,12 +81,14 @@ export class TradeFeature implements Feature {
       if (!mid) return;
       if (sell) h.barter.sellItem(mid, itemId, instanceId);
       else h.barter.buyItem(mid, itemId, instanceId);
-      this.barterPanel.update(h.barter, h.items());
+      this.barterPanel.current?.update(h.barter, h.items());
       dirty();
     };
-    this.barterPanel.onBuy = trade(false);
-    this.barterPanel.onSell = trade(true);
-    this.barterPanel.onClose = () => this._closeBarter();
+    this._wireBarter = (ui) => {
+      ui.onBuy = trade(false);
+      ui.onSell = trade(true);
+      ui.onClose = () => this._closeBarter();
+    };
 
     const containers = host().containers;
     containers.onContainerOpen = () => {
@@ -110,7 +128,9 @@ export class TradeFeature implements Feature {
 
     ctx.scope.add(() => {
       containers.onContainerOpen = null;
-      this.barterPanel.onBuy = this.barterPanel.onSell = this.barterPanel.onClose = null;
+      const ui = this.barterPanel.current;
+      if (ui) { ui.hide(); ui.onBuy = ui.onSell = ui.onClose = null; }
+      this._wireBarter = null;
       this.containerPanel.onTakeItem = this.containerPanel.onClose = null;
       this.containerPanel.onTakeAll = null;
       this._s = null;
@@ -131,13 +151,38 @@ export class TradeFeature implements Feature {
     if (!h.barter.openBarter(pending.merchantId, hour)) return;
     h.barter.sessionBuyPriceFactor = Math.min(1.5, Math.max(0.7, h.reputationFactor(pending.npcName)));
     h.barter.playerGold = s.get(PurseKey).gold();
-    this.barterPanel.show();
-    this.barterPanel.update(h.barter, h.items());
     s.get(ModalKey).suspendGameplay();
+    this._opening = true;
+    void this.barterPanel.get().then((ui) => {
+      this._opening = false;
+      // Closed (or the feature removed) while the window loaded: don't open it.
+      if (!this._s || !h.barter.activeMerchantId) return;
+      ui.show();
+      ui.update(h.barter, h.items());
+    });
+  }
+
+  /** Condition tags and the like after item names in the barter rows. */
+  public setItemTag(tag: ItemTag | null): void {
+    this._itemTag = tag;
+    const ui = this.barterPanel.current;
+    if (ui) ui.itemTag = tag;
+  }
+
+  /** The barter window is open, or loading to open. */
+  public get barterOpen(): boolean {
+    return this.barterPanel.isVisible || this._opening;
+  }
+  private _opening = false;
+
+  /** Close the barter window (Escape, a fall, a modal taking over). */
+  public closeBarter(): void {
+    if (this.barterOpen) this._closeBarter();
   }
 
   private _closeBarter(): void {
-    this.barterPanel.hide();
+    this._opening = false;
+    this.barterPanel.current?.hide();
     this._s?.get(TradeHostKey).barter.closeBarter();
     this._s?.get(ModalKey).restoreGameplay();
   }

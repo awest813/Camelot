@@ -74,6 +74,11 @@ export class BarterUI {
   }
 
   /** Hide the panel without destroying its DOM. */
+  /** Close it (as the other windows do): hide it. */
+  public close(): void {
+    this.hide();
+  }
+
   public hide(): void {
     if (this._root) this._root.style.display = "none";
     this.isVisible = false;
