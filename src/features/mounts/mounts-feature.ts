@@ -22,7 +22,10 @@ import type { SaddlebagUI } from "../../ui/saddlebag-ui";
 import { LazyPanel } from "../../ui/lazy-panel";
 import { UIAnimator } from "../../ui/ui-animator";
 import type { Item } from "../../systems/inventory-system";
-import { FeedbackKey, ModalKey, PurseKey, ownSave } from "../services";
+import type { Scene } from "@babylonjs/core/scene";
+import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { HORSE_COATS, buildRiderView, buildStandingHorse, groundUnder } from "../../entities/horse-body";
+import { FeedbackKey, ModalKey, PlayerKey, PurseKey, ownSave } from "../services";
 
 /** What riding needs from the game. */
 export interface MountHostService {
@@ -70,11 +73,47 @@ export class MountsFeature implements Feature {
   private _stableAfterTalk = false;
   private _openStable: () => void = () => {};
 
+  /** Riding: the standing horse goes; its neck and head ride ahead of the camera. */
+  private _ride(horseId: string): void {
+    this._clearBodies();
+    const scene = this._scene, camera = scene?.activeCamera;
+    if (!scene || !camera) return;
+    const view = buildRiderView(scene, `rider_${horseId}`, HORSE_COATS[horseId] ?? HORSE_COATS.bay_mare);
+    view.parent = camera;
+    this._riderView = view;
+  }
+
+  /** Off the horse: it stands beside you, facing your way, on the ground. */
+  private _standAside(horseId: string, player: { position(): { x: number; y?: number; z: number }; heading?(): number }): void {
+    this._clearBodies();
+    const scene = this._scene;
+    if (!scene) return;
+    const p = player.position();
+    const yaw = player.heading?.() ?? 0;
+    // A pace to your right.
+    const x = p.x + Math.cos(yaw) * 1.6, z = p.z - Math.sin(yaw) * 1.6;
+    const horse = buildStandingHorse(scene, `horse_${horseId}`, HORSE_COATS[horseId] ?? HORSE_COATS.bay_mare);
+    horse.position.set(x, groundUnder(scene, x, p.y ?? 2, z) ?? (p.y ?? 2) - 1.8, z);
+    horse.rotation.y = yaw;
+    this._standing = horse;
+  }
+
+  private _clearBodies(): void {
+    this._standing?.dispose(false, true);
+    this._riderView?.dispose(false, true);
+    this._standing = this._riderView = null;
+  }
+
   /** Show the ostler's horses (asked for in dialogue). */
   public openStable(): void { this._openStable(); }
   private _wireSaddlebag: ((panel: SaddlebagUI) => void) | null = null;
 
-  constructor() {
+  /** The horse you left standing (dismounted), and the neck and head you see while riding. */
+  private _standing: TransformNode | null = null;
+  private _riderView: TransformNode | null = null;
+  private _bob = 0;
+
+  constructor(private readonly _scene: Scene | null = null) {
     // Starter horses available at world stables.
     this.horses.registerHorse({ id: "bay_mare", name: "Bay Mare", speed: 1.8, saddlebagCapacity: 8, stableId: "starter_stable" });
     this.horses.registerHorse({ id: "black_stallion", name: "Black Stallion", speed: 2.2, saddlebagCapacity: 6, stableId: "starter_stable" });
@@ -94,6 +133,8 @@ export class MountsFeature implements Feature {
       load: (data) => {
         if (data) this.horses.restoreFromSave(data as never); // a mounted save re-mounts (onMount sets the speed)
         if (!this.horses.isMounted) s.get(MountHostKey).setMoveSpeedMultiplier(1); // on foot in the save: walk
+        this._clearBodies();
+        if (this.horses.isMounted) this._ride(this.horses.currentHorse!.id);
       },
     });
     const host = () => s.get(MountHostKey);
@@ -103,12 +144,15 @@ export class MountsFeature implements Feature {
 
     this.horses.onMount = (horse, speed) => {
       host().setMoveSpeedMultiplier(speed);
+      this._ride(horse.id);
       feedback().notify(`Mounted ${horse.name}`, 1800);
       host().unlockAchievement("ACH_SADDLED");
       feedback().markDirty();
     };
     this.horses.onDismount = (horse) => {
       host().setMoveSpeedMultiplier(1);
+      const player = s.tryGet(PlayerKey);
+      if (player) this._standAside(horse.id, player);
       feedback().notify(`Dismounted ${horse.name}`, 1800);
       feedback().markDirty();
     };
@@ -204,7 +248,24 @@ export class MountsFeature implements Feature {
       });
     };
 
+    // While riding, the horse's neck nods with your pace.
+    let last: { x: number; z: number } | null = null;
+    ctx.system({
+      id: "mounts.rider", phase: "ui", update: (dt) => {
+        const view = this._riderView;
+        if (!view) { last = null; return; }
+        const p = s.tryGet(PlayerKey)?.position();
+        if (!p) return;
+        const moved = last ? Math.hypot(p.x - last.x, p.z - last.z) : 0;
+        last = { x: p.x, z: p.z };
+        if (moved > 0.01) this._bob += dt * 9;
+        view.position.y = Math.sin(this._bob) * 0.035;
+        view.rotation.x = Math.sin(this._bob + 0.6) * 0.03;
+      },
+    });
+
     ctx.scope.add(() => {
+      this._clearBodies();
       this.horses.onMount = null;
       this.horses.onDismount = null;
       this.horses.onHorsePurchased = null;

@@ -507,7 +507,7 @@ export function installGameFeatures(game: Game): void {
         setMoveSpeedMultiplier: (m) => { game.player.speedMultiplier = Math.max(0, m); },
         unlockAchievement: (id) => { game._achievements?.unlock(id as never); }, give: (item) => { game.inventorySystem.addItem(item); },
       });
-      const mounts = new MountsFeature(); k.install(mounts);
+      const mounts = new MountsFeature(game.scene); k.install(mounts);
 
       k.install(new IndoorsFeature());
       k.install(new RoutinesFeature());

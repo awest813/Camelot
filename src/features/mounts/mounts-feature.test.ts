@@ -101,3 +101,35 @@ describe("MountsFeature (headless, through the kernel)", () => {
     t.k.uninstall("mounts");
   });
 });
+
+describe("MountsFeature — the horse in the world", () => {
+  it("riding shows its neck and head ahead of the camera; dismounting leaves it standing beside you", async () => {
+    const { NullEngine } = await import("@babylonjs/core/Engines/nullEngine");
+    const { Scene } = await import("@babylonjs/core/scene");
+    const { FreeCamera } = await import("@babylonjs/core/Cameras/freeCamera");
+    const { Vector3 } = await import("@babylonjs/core/Maths/math.vector");
+    const { PlayerKey } = await import("../services");
+    const scene = new Scene(new NullEngine());
+    const camera = new FreeCamera("cam", new Vector3(10, 2, 10), scene);
+    scene.activeCamera = camera;
+    const k = new Kernel();
+    k.services.provide(FeedbackKey, { notify: vi.fn(), grant: vi.fn(), addFame: vi.fn(), markDirty: vi.fn() });
+    k.services.provide(ModalKey, { suspendGameplay: vi.fn(), restoreGameplay: vi.fn() });
+    k.services.provide(PurseKey, { gold: () => 5000, spend: () => true });
+    k.services.provide(MountHostKey, { canAct: () => true, setMoveSpeedMultiplier: vi.fn(), unlockAchievement: vi.fn(), give: vi.fn() });
+    k.services.provide(PlayerKey, { position: () => camera.position, level: () => 1, heading: () => 0 });
+    const feature = new MountsFeature(scene);
+    k.install(feature);
+    feature.horses.purchaseHorse("Ostler", "black_stallion", 5000);
+    feature.horses.mountHorse("black_stallion");
+    const view = scene.getTransformNodeByName("rider_black_stallion");
+    expect(view?.parent).toBe(camera);
+    feature.horses.dismountHorse();
+    expect(scene.getTransformNodeByName("rider_black_stallion")).toBeNull();
+    const standing = scene.getTransformNodeByName("horse_black_stallion")!;
+    expect(standing.position.x).toBeCloseTo(11.6);
+    k.uninstall("mounts");
+    expect(scene.getTransformNodeByName("horse_black_stallion")).toBeNull();
+    scene.dispose();
+  });
+});
