@@ -1,5 +1,5 @@
 /**
- * DiseaseSystem — Oblivion-style disease contraction and cure for Camelot.
+ * DiseaseSystem — the ailments of the realm: catching them, and their cures.
  *
  * Players can contract diseases through enemy attacks, environmental hazards,
  * or scripted events.  Each disease weakens one or more attributes until it is
@@ -23,9 +23,9 @@ import type { GameEventBus } from "./event-bus";
  * Static definition of a disease, registered once at startup.
  */
 export interface DiseaseDefinition {
-  /** Stable unique identifier (e.g. `"rust_chancre"`). */
+  /** Stable unique identifier (e.g. `"marsh_ague"`). */
   id: string;
-  /** Human-readable display name (e.g. `"Rust Chancre"`). */
+  /** Human-readable display name (e.g. `"Marsh Ague"`). */
   name: string;
   /** Short lore description shown in the active-effects HUD. */
   description: string;
@@ -47,50 +47,51 @@ export interface DiseaseSaveState {
 // ── Built-in disease table ────────────────────────────────────────────────────
 
 /**
- * Canonical disease definitions mirroring Oblivion's disease roster.
+ * The ailments of the realm: six medieval sicknesses, and the Moon-curse from
+ * the Breton lays (Bisclavret).
  * The DiseaseSystem registers all of these automatically.
  */
 export const BUILT_IN_DISEASES: DiseaseDefinition[] = [
   {
-    id: "rust_chancre",
-    name: "Rust Chancre",
-    description: "A corrosive ailment that saps the body's endurance.",
+    id: "marsh_ague",
+    name: "Marsh Ague",
+    description: "A shaking fever caught in the wet lowlands; it saps the body's endurance.",
     attributeEffects: { endurance: -5 },
   },
   {
-    id: "swamp_rot",
-    name: "Swamp Rot",
-    description: "A festering rot that clouds the mind and weakens willpower.",
+    id: "fen_fever",
+    name: "Fen Fever",
+    description: "A fen-born fever that clouds the mind and weakens the will.",
     attributeEffects: { willpower: -5 },
   },
   {
-    id: "witbane",
-    name: "Witbane",
-    description: "A curse-disease that dulls intelligence and magical affinity.",
+    id: "brain_fog",
+    name: "Brain-fog",
+    description: "A grey fog over the thoughts that dulls the wits and the gift for spells.",
     attributeEffects: { intelligence: -5 },
   },
   {
-    id: "collywobbles",
-    name: "Collywobbles",
-    description: "A stomach ailment that saps raw physical strength.",
+    id: "flux",
+    name: "The Flux",
+    description: "A bloody flux of the belly that saps raw strength.",
     attributeEffects: { strength: -5 },
   },
   {
-    id: "brain_rot",
-    name: "Brain Rot",
-    description: "A severe daedric affliction that devastates the intellect.",
+    id: "falling_sickness",
+    name: "Falling Sickness",
+    description: "Fits and fallings that leave the mind in ruins between them.",
     attributeEffects: { intelligence: -10 },
   },
   {
-    id: "yellow_tick",
-    name: "Yellow Tick",
-    description: "Spread by insects and arachnids; greatly reduces agility.",
+    id: "tick_fever",
+    name: "Tick Fever",
+    description: "Spread by ticks in the long grass; it stiffens every joint.",
     attributeEffects: { agility: -5 },
   },
   {
-    id: "porphyric_hemophilia",
-    name: "Porphyric Hemophilia",
-    description: "A vampiric disease that weakens body and will over time.",
+    id: "moon_curse",
+    name: "Moon-curse",
+    description: "The curse of the wolf-shaped men in the old lays: it wears at body and will.",
     attributeEffects: { willpower: -2, endurance: -2 },
   },
 ];
@@ -112,7 +113,7 @@ export const BUILT_IN_DISEASES: DiseaseDefinition[] = [
  * diseases.diseaseResistanceChance = 1.0;
  *
  * // On enemy hit
- * diseases.contractDisease("rust_chancre");
+ * diseases.contractDisease("marsh_ague");
  *
  * // Each frame — pull merged penalties and apply to AttributeSystem
  * const penalties = diseases.getAttributePenalties();
@@ -144,8 +145,8 @@ export class DiseaseSystem {
   // ── Constructor ────────────────────────────────────────────────────────────
 
   /**
-   * Creates a new DiseaseSystem pre-seeded with the built-in Oblivion-style
-   * disease roster.  Additional diseases can be registered via
+   * Creates a new DiseaseSystem pre-seeded with the built-in ailments.
+   * Additional diseases can be registered via
    * {@link registerDisease}.
    */
   constructor() {

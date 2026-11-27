@@ -74,7 +74,7 @@ describe("DiseaseSystem — registerDisease", () => {
     const sys = new DiseaseSystem();
     sys.registerDisease(CUSTOM);
     const ids = sys.getRegisteredDiseaseIds();
-    expect(ids).toContain("rust_chancre");
+    expect(ids).toContain("marsh_ague");
     expect(ids).toContain("test_plague");
   });
 
@@ -91,8 +91,8 @@ describe("DiseaseSystem — contractDisease", () => {
   beforeEach(() => { sys = new DiseaseSystem(); });
 
   it("contracts a known disease and returns true", () => {
-    expect(sys.contractDisease("rust_chancre", alwaysContract)).toBe(true);
-    expect(sys.hasDisease("rust_chancre")).toBe(true);
+    expect(sys.contractDisease("marsh_ague", alwaysContract)).toBe(true);
+    expect(sys.hasDisease("marsh_ague")).toBe(true);
   });
 
   it("returns false for an unknown disease id", () => {
@@ -100,8 +100,8 @@ describe("DiseaseSystem — contractDisease", () => {
   });
 
   it("is a no-op if the disease is already active", () => {
-    sys.contractDisease("rust_chancre", alwaysContract);
-    const result = sys.contractDisease("rust_chancre", alwaysContract);
+    sys.contractDisease("marsh_ague", alwaysContract);
+    const result = sys.contractDisease("marsh_ague", alwaysContract);
     expect(result).toBe(false);
     expect(sys.activeDiseaseCount).toBe(1);
   });
@@ -109,59 +109,59 @@ describe("DiseaseSystem — contractDisease", () => {
   it("fires onDiseaseContracted callback", () => {
     const cb = vi.fn();
     listen(sys, "disease:contracted", (p) => cb(p.diseaseId));
-    sys.contractDisease("rust_chancre", alwaysContract);
+    sys.contractDisease("marsh_ague", alwaysContract);
     expect(cb).toHaveBeenCalledOnce();
-    expect(cb).toHaveBeenCalledWith("rust_chancre");
+    expect(cb).toHaveBeenCalledWith("marsh_ague");
   });
 
   it("does not fire onDiseaseContracted if already infected", () => {
     const cb = vi.fn();
     listen(sys, "disease:contracted", (p) => cb(p.diseaseId));
-    sys.contractDisease("rust_chancre", alwaysContract);
-    sys.contractDisease("rust_chancre", alwaysContract); // duplicate
+    sys.contractDisease("marsh_ague", alwaysContract);
+    sys.contractDisease("marsh_ague", alwaysContract); // duplicate
     expect(cb).toHaveBeenCalledOnce();
   });
 
   it("respects resistance — resists when rng < resistance", () => {
     sys.diseaseResistanceChance = 1.0; // full immunity
-    expect(sys.contractDisease("rust_chancre", alwaysContract)).toBe(false);
-    expect(sys.hasDisease("rust_chancre")).toBe(false);
+    expect(sys.contractDisease("marsh_ague", alwaysContract)).toBe(false);
+    expect(sys.hasDisease("marsh_ague")).toBe(false);
   });
 
   it("contracts when rng roll exceeds resistance", () => {
     sys.diseaseResistanceChance = 0.5;
     // rng returns 0.9 > 0.5 → NOT resisted (probability model: resist if rng < resistance)
-    expect(sys.contractDisease("rust_chancre", () => 0.9)).toBe(true);
+    expect(sys.contractDisease("marsh_ague", () => 0.9)).toBe(true);
   });
 
   it("resists when rng roll is below resistance", () => {
     sys.diseaseResistanceChance = 0.5;
-    expect(sys.contractDisease("rust_chancre", () => 0.3)).toBe(false);
+    expect(sys.contractDisease("marsh_ague", () => 0.3)).toBe(false);
   });
 
   it("clamps resistance above 1.0 to full immunity", () => {
     sys.diseaseResistanceChance = 2.0;
-    expect(sys.contractDisease("rust_chancre", alwaysContract)).toBe(false);
+    expect(sys.contractDisease("marsh_ague", alwaysContract)).toBe(false);
   });
 
   it("clamps resistance below 0 to no resistance", () => {
     sys.diseaseResistanceChance = -1.0;
-    expect(sys.contractDisease("rust_chancre", alwaysContract)).toBe(true);
+    expect(sys.contractDisease("marsh_ague", alwaysContract)).toBe(true);
   });
 
   it("multiple diseases can be active simultaneously", () => {
-    sys.contractDisease("rust_chancre", alwaysContract);
-    sys.contractDisease("swamp_rot", alwaysContract);
+    sys.contractDisease("marsh_ague", alwaysContract);
+    sys.contractDisease("fen_fever", alwaysContract);
     expect(sys.activeDiseaseCount).toBe(2);
-    expect(sys.hasDisease("rust_chancre")).toBe(true);
-    expect(sys.hasDisease("swamp_rot")).toBe(true);
+    expect(sys.hasDisease("marsh_ague")).toBe(true);
+    expect(sys.hasDisease("fen_fever")).toBe(true);
   });
 
   it("does not fire onDiseaseContracted when resisted", () => {
     const cb = vi.fn();
     listen(sys, "disease:contracted", (p) => cb(p.diseaseId));
     sys.diseaseResistanceChance = 1.0;
-    sys.contractDisease("rust_chancre", alwaysContract);
+    sys.contractDisease("marsh_ague", alwaysContract);
     expect(cb).not.toHaveBeenCalled();
   });
 });
@@ -172,38 +172,38 @@ describe("DiseaseSystem — cureDisease", () => {
   let sys: DiseaseSystem;
   beforeEach(() => {
     sys = new DiseaseSystem();
-    sys.contractDisease("rust_chancre", alwaysContract);
+    sys.contractDisease("marsh_ague", alwaysContract);
   });
 
   it("cures an active disease and returns true", () => {
-    expect(sys.cureDisease("rust_chancre")).toBe(true);
-    expect(sys.hasDisease("rust_chancre")).toBe(false);
+    expect(sys.cureDisease("marsh_ague")).toBe(true);
+    expect(sys.hasDisease("marsh_ague")).toBe(false);
   });
 
   it("returns false when disease is not active", () => {
-    expect(sys.cureDisease("swamp_rot")).toBe(false);
+    expect(sys.cureDisease("fen_fever")).toBe(false);
   });
 
   it("fires onDiseaseCured callback", () => {
     const cb = vi.fn();
     listen(sys, "disease:cured", (p) => cb(p.diseaseId));
-    sys.cureDisease("rust_chancre");
+    sys.cureDisease("marsh_ague");
     expect(cb).toHaveBeenCalledOnce();
-    expect(cb).toHaveBeenCalledWith("rust_chancre");
+    expect(cb).toHaveBeenCalledWith("marsh_ague");
   });
 
   it("does not fire onDiseaseCured if disease was not active", () => {
     const cb = vi.fn();
     listen(sys, "disease:cured", (p) => cb(p.diseaseId));
-    sys.cureDisease("swamp_rot");
+    sys.cureDisease("fen_fever");
     expect(cb).not.toHaveBeenCalled();
   });
 
   it("curing one disease does not affect others", () => {
-    sys.contractDisease("swamp_rot", alwaysContract);
-    sys.cureDisease("rust_chancre");
-    expect(sys.hasDisease("rust_chancre")).toBe(false);
-    expect(sys.hasDisease("swamp_rot")).toBe(true);
+    sys.contractDisease("fen_fever", alwaysContract);
+    sys.cureDisease("marsh_ague");
+    expect(sys.hasDisease("marsh_ague")).toBe(false);
+    expect(sys.hasDisease("fen_fever")).toBe(true);
   });
 });
 
@@ -213,9 +213,9 @@ describe("DiseaseSystem — cureAllDiseases", () => {
   let sys: DiseaseSystem;
   beforeEach(() => {
     sys = new DiseaseSystem();
-    sys.contractDisease("rust_chancre", alwaysContract);
-    sys.contractDisease("swamp_rot", alwaysContract);
-    sys.contractDisease("witbane", alwaysContract);
+    sys.contractDisease("marsh_ague", alwaysContract);
+    sys.contractDisease("fen_fever", alwaysContract);
+    sys.contractDisease("brain_fog", alwaysContract);
   });
 
   it("removes all active diseases", () => {
@@ -245,24 +245,24 @@ describe("DiseaseSystem — cureAllDiseases", () => {
 describe("DiseaseSystem — hasDisease / getActiveDiseases", () => {
   it("hasDisease returns false for non-active disease", () => {
     const sys = new DiseaseSystem();
-    expect(sys.hasDisease("rust_chancre")).toBe(false);
+    expect(sys.hasDisease("marsh_ague")).toBe(false);
   });
 
   it("getActiveDiseases returns only active disease ids", () => {
     const sys = new DiseaseSystem();
-    sys.contractDisease("rust_chancre", alwaysContract);
-    sys.contractDisease("swamp_rot", alwaysContract);
+    sys.contractDisease("marsh_ague", alwaysContract);
+    sys.contractDisease("fen_fever", alwaysContract);
     const active = sys.getActiveDiseases();
-    expect(active).toContain("rust_chancre");
-    expect(active).toContain("swamp_rot");
+    expect(active).toContain("marsh_ague");
+    expect(active).toContain("fen_fever");
     expect(active).toHaveLength(2);
   });
 
   it("getActiveDiseases returns a copy (mutation does not affect internal state)", () => {
     const sys = new DiseaseSystem();
-    sys.contractDisease("rust_chancre", alwaysContract);
+    sys.contractDisease("marsh_ague", alwaysContract);
     const list = sys.getActiveDiseases();
-    list.push("swamp_rot");
+    list.push("fen_fever");
     expect(sys.activeDiseaseCount).toBe(1);
   });
 });
@@ -272,14 +272,14 @@ describe("DiseaseSystem — hasDisease / getActiveDiseases", () => {
 describe("DiseaseSystem — getAttributePenalties", () => {
   it("returns correct penalty for a single disease", () => {
     const sys = new DiseaseSystem();
-    sys.contractDisease("rust_chancre", alwaysContract); // endurance: -5
+    sys.contractDisease("marsh_ague", alwaysContract); // endurance: -5
     expect(sys.getAttributePenalties()).toEqual({ endurance: -5 });
   });
 
   it("stacks penalties from multiple diseases on the same attribute", () => {
     const sys = new DiseaseSystem();
-    sys.contractDisease("rust_chancre", alwaysContract); // endurance: -5
-    sys.contractDisease("porphyric_hemophilia", alwaysContract); // willpower: -2, endurance: -2
+    sys.contractDisease("marsh_ague", alwaysContract); // endurance: -5
+    sys.contractDisease("moon_curse", alwaysContract); // willpower: -2, endurance: -2
     const p = sys.getAttributePenalties();
     expect(p.endurance).toBe(-7);
     expect(p.willpower).toBe(-2);
@@ -287,15 +287,15 @@ describe("DiseaseSystem — getAttributePenalties", () => {
 
   it("merges penalties from diseases affecting different attributes", () => {
     const sys = new DiseaseSystem();
-    sys.contractDisease("rust_chancre", alwaysContract); // endurance: -5
-    sys.contractDisease("swamp_rot", alwaysContract);    // willpower: -5
+    sys.contractDisease("marsh_ague", alwaysContract); // endurance: -5
+    sys.contractDisease("fen_fever", alwaysContract);    // willpower: -5
     expect(sys.getAttributePenalties()).toEqual({ endurance: -5, willpower: -5 });
   });
 
   it("penalties disappear after curing the disease", () => {
     const sys = new DiseaseSystem();
-    sys.contractDisease("rust_chancre", alwaysContract);
-    sys.cureDisease("rust_chancre");
+    sys.contractDisease("marsh_ague", alwaysContract);
+    sys.cureDisease("marsh_ague");
     expect(sys.getAttributePenalties()).toEqual({});
   });
 
@@ -314,15 +314,15 @@ describe("DiseaseSystem — getAttributePenalties", () => {
 describe("DiseaseSystem — built-in disease roster", () => {
   it("rust_chancre applies endurance penalty", () => {
     const sys = new DiseaseSystem();
-    sys.contractDisease("rust_chancre", alwaysContract);
+    sys.contractDisease("marsh_ague", alwaysContract);
     expect(sys.getAttributePenalties().endurance).toBeLessThan(0);
   });
 
   it("brain_rot applies larger intelligence penalty than witbane", () => {
     const sys1 = new DiseaseSystem();
-    sys1.contractDisease("witbane", alwaysContract);
+    sys1.contractDisease("brain_fog", alwaysContract);
     const sys2 = new DiseaseSystem();
-    sys2.contractDisease("brain_rot", alwaysContract);
+    sys2.contractDisease("falling_sickness", alwaysContract);
     expect(sys2.getAttributePenalties().intelligence!).toBeLessThan(
       sys1.getAttributePenalties().intelligence!,
     );
@@ -330,7 +330,7 @@ describe("DiseaseSystem — built-in disease roster", () => {
 
   it("porphyric_hemophilia affects two attributes", () => {
     const sys = new DiseaseSystem();
-    sys.contractDisease("porphyric_hemophilia", alwaysContract);
+    sys.contractDisease("moon_curse", alwaysContract);
     const p = sys.getAttributePenalties();
     const keys = Object.keys(p);
     expect(keys.length).toBeGreaterThanOrEqual(2);
@@ -342,11 +342,11 @@ describe("DiseaseSystem — built-in disease roster", () => {
 describe("DiseaseSystem — persistence", () => {
   it("getSaveState captures active disease ids", () => {
     const sys = new DiseaseSystem();
-    sys.contractDisease("rust_chancre", alwaysContract);
-    sys.contractDisease("swamp_rot", alwaysContract);
+    sys.contractDisease("marsh_ague", alwaysContract);
+    sys.contractDisease("fen_fever", alwaysContract);
     const state = sys.getSaveState();
-    expect(state.activeDiseases).toContain("rust_chancre");
-    expect(state.activeDiseases).toContain("swamp_rot");
+    expect(state.activeDiseases).toContain("marsh_ague");
+    expect(state.activeDiseases).toContain("fen_fever");
     expect(state.activeDiseases).toHaveLength(2);
   });
 
@@ -357,31 +357,31 @@ describe("DiseaseSystem — persistence", () => {
 
   it("restoreFromSave rehydrates active diseases", () => {
     const sys = new DiseaseSystem();
-    sys.restoreFromSave({ activeDiseases: ["rust_chancre", "witbane"] });
-    expect(sys.hasDisease("rust_chancre")).toBe(true);
-    expect(sys.hasDisease("witbane")).toBe(true);
+    sys.restoreFromSave({ activeDiseases: ["marsh_ague", "brain_fog"] });
+    expect(sys.hasDisease("marsh_ague")).toBe(true);
+    expect(sys.hasDisease("brain_fog")).toBe(true);
     expect(sys.activeDiseaseCount).toBe(2);
   });
 
   it("restoreFromSave ignores unknown disease ids", () => {
     const sys = new DiseaseSystem();
-    sys.restoreFromSave({ activeDiseases: ["unknown_disease", "rust_chancre"] });
-    expect(sys.hasDisease("rust_chancre")).toBe(true);
+    sys.restoreFromSave({ activeDiseases: ["unknown_disease", "marsh_ague"] });
+    expect(sys.hasDisease("marsh_ague")).toBe(true);
     expect(sys.activeDiseaseCount).toBe(1);
   });
 
   it("restoreFromSave clears previously active diseases", () => {
     const sys = new DiseaseSystem();
-    sys.contractDisease("swamp_rot", alwaysContract);
-    sys.restoreFromSave({ activeDiseases: ["rust_chancre"] });
-    expect(sys.hasDisease("swamp_rot")).toBe(false);
-    expect(sys.hasDisease("rust_chancre")).toBe(true);
+    sys.contractDisease("fen_fever", alwaysContract);
+    sys.restoreFromSave({ activeDiseases: ["marsh_ague"] });
+    expect(sys.hasDisease("fen_fever")).toBe(false);
+    expect(sys.hasDisease("marsh_ague")).toBe(true);
   });
 
   it("round-trip: save then restore preserves active diseases", () => {
     const original = new DiseaseSystem();
-    original.contractDisease("rust_chancre", alwaysContract);
-    original.contractDisease("yellow_tick", alwaysContract);
+    original.contractDisease("marsh_ague", alwaysContract);
+    original.contractDisease("tick_fever", alwaysContract);
     const state = original.getSaveState();
 
     const restored = new DiseaseSystem();
@@ -393,7 +393,7 @@ describe("DiseaseSystem — persistence", () => {
 
   it("restoreFromSave with empty activeDiseases clears all", () => {
     const sys = new DiseaseSystem();
-    sys.contractDisease("rust_chancre", alwaysContract);
+    sys.contractDisease("marsh_ague", alwaysContract);
     sys.restoreFromSave({ activeDiseases: [] });
     expect(sys.hasDiseases).toBe(false);
   });

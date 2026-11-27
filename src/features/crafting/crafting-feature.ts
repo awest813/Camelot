@@ -119,8 +119,8 @@ export class CraftingFeature implements Feature {
     // Starter kit: a few ingredients, soul gems, and enough to use the forge
     // before the first merchant visit.
     for (const [id, n] of [
-      ["aloe_vera_leaves", 5], ["cairn_bolete_cap", 4], ["fennel_seeds", 4],
-      ["dragon_tongue", 3], ["bergamot_seeds", 3],
+      ["plantain_leaves", 5], ["comfrey_root", 4], ["vervain", 4],
+      ["st_johns_wort", 3], ["meadowsweet", 3],
     ] as const) this.alchemy.addIngredient(id, n);
     this.enchanting.addSoulGem("petty", 3);
     this.enchanting.addSoulGem("lesser", 2);

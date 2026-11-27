@@ -46,8 +46,8 @@ describe("AlchemySystem", () => {
 
   describe("addIngredient / removeIngredient / getIngredientCount", () => {
     it("adds a known ingredient to the satchel", () => {
-      expect(alchemy.addIngredient("cairn_bolete_cap", 3)).toBe(true);
-      expect(alchemy.getIngredientCount("cairn_bolete_cap")).toBe(3);
+      expect(alchemy.addIngredient("comfrey_root", 3)).toBe(true);
+      expect(alchemy.getIngredientCount("comfrey_root")).toBe(3);
     });
 
     it("returns false for an unknown ingredient", () => {
@@ -55,27 +55,27 @@ describe("AlchemySystem", () => {
     });
 
     it("stacks additions", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 2);
-      alchemy.addIngredient("aloe_vera_leaves", 3);
-      expect(alchemy.getIngredientCount("aloe_vera_leaves")).toBe(5);
+      alchemy.addIngredient("plantain_leaves", 2);
+      alchemy.addIngredient("plantain_leaves", 3);
+      expect(alchemy.getIngredientCount("plantain_leaves")).toBe(5);
     });
 
     it("removes the correct quantity", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 5);
-      expect(alchemy.removeIngredient("aloe_vera_leaves", 3)).toBe(true);
-      expect(alchemy.getIngredientCount("aloe_vera_leaves")).toBe(2);
+      alchemy.addIngredient("plantain_leaves", 5);
+      expect(alchemy.removeIngredient("plantain_leaves", 3)).toBe(true);
+      expect(alchemy.getIngredientCount("plantain_leaves")).toBe(2);
     });
 
     it("returns false when insufficient quantity", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 1);
-      expect(alchemy.removeIngredient("aloe_vera_leaves", 2)).toBe(false);
-      expect(alchemy.getIngredientCount("aloe_vera_leaves")).toBe(1);
+      alchemy.addIngredient("plantain_leaves", 1);
+      expect(alchemy.removeIngredient("plantain_leaves", 2)).toBe(false);
+      expect(alchemy.getIngredientCount("plantain_leaves")).toBe(1);
     });
 
     it("deletes the key when quantity drops to 0", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 1);
-      alchemy.removeIngredient("aloe_vera_leaves", 1);
-      expect(alchemy.getIngredientCount("aloe_vera_leaves")).toBe(0);
+      alchemy.addIngredient("plantain_leaves", 1);
+      alchemy.removeIngredient("plantain_leaves", 1);
+      expect(alchemy.getIngredientCount("plantain_leaves")).toBe(0);
       expect(alchemy.getSatchelContents()).toHaveLength(0);
     });
   });
@@ -84,29 +84,29 @@ describe("AlchemySystem", () => {
 
   describe("eatIngredient", () => {
     it("returns null when the ingredient is not in the satchel", () => {
-      expect(alchemy.eatIngredient("aloe_vera_leaves")).toBeNull();
+      expect(alchemy.eatIngredient("plantain_leaves")).toBeNull();
     });
 
     it("consumes one unit and discovers the first effect", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 2);
-      const result = alchemy.eatIngredient("aloe_vera_leaves");
+      alchemy.addIngredient("plantain_leaves", 2);
+      const result = alchemy.eatIngredient("plantain_leaves");
       expect(result).not.toBeNull();
-      expect(alchemy.getIngredientCount("aloe_vera_leaves")).toBe(1);
-      expect(alchemy.hasDiscoveredEffect("aloe_vera_leaves", 0)).toBe(true);
+      expect(alchemy.getIngredientCount("plantain_leaves")).toBe(1);
+      expect(alchemy.hasDiscoveredEffect("plantain_leaves", 0)).toBe(true);
     });
 
     it("applies restore_health to player HP", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 1);
-      // aloe_vera_leaves first effect is restore_health
+      alchemy.addIngredient("plantain_leaves", 1);
+      // plantain_leaves first effect is restore_health
       const before = player.health;
-      alchemy.eatIngredient("aloe_vera_leaves");
+      alchemy.eatIngredient("plantain_leaves");
       expect(player.health).toBeGreaterThanOrEqual(before);
     });
 
     it("does not reveal effects beyond index 0", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 1);
-      alchemy.eatIngredient("aloe_vera_leaves");
-      expect(alchemy.hasDiscoveredEffect("aloe_vera_leaves", 1)).toBe(false);
+      alchemy.addIngredient("plantain_leaves", 1);
+      alchemy.eatIngredient("plantain_leaves");
+      expect(alchemy.hasDiscoveredEffect("plantain_leaves", 1)).toBe(false);
     });
   });
 
@@ -114,24 +114,24 @@ describe("AlchemySystem", () => {
 
   describe("craftPotion", () => {
     it("requires at least 2 ingredients", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 1);
-      const result = alchemy.craftPotion(["aloe_vera_leaves"]);
+      alchemy.addIngredient("plantain_leaves", 1);
+      const result = alchemy.craftPotion(["plantain_leaves"]);
       expect(result).toBeNull();
     });
 
     it("returns null if an ingredient is not in the satchel", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 1);
-      const result = alchemy.craftPotion(["aloe_vera_leaves", "cairn_bolete_cap"]);
+      alchemy.addIngredient("plantain_leaves", 1);
+      const result = alchemy.craftPotion(["plantain_leaves", "comfrey_root"]);
       expect(result).toBeNull();
     });
 
     it("creates a potion with shared effects when effects overlap", () => {
-      // aloe_vera_leaves: [restore_health, restore_stamina, resist_fire, fortify_endurance]
-      // cairn_bolete_cap: [restore_health, restore_stamina, damage_magicka, fortify_strength]
+      // plantain_leaves: [restore_health, restore_stamina, resist_fire, fortify_endurance]
+      // comfrey_root: [restore_health, restore_stamina, damage_magicka, fortify_strength]
       // Shared: restore_health, restore_stamina
-      alchemy.addIngredient("aloe_vera_leaves", 1);
-      alchemy.addIngredient("cairn_bolete_cap", 1);
-      const potion = alchemy.craftPotion(["aloe_vera_leaves", "cairn_bolete_cap"]);
+      alchemy.addIngredient("plantain_leaves", 1);
+      alchemy.addIngredient("comfrey_root", 1);
+      const potion = alchemy.craftPotion(["plantain_leaves", "comfrey_root"]);
       expect(potion).not.toBeNull();
       const effectIds = potion!.effects.map(e => e.effectId);
       expect(effectIds).toContain("restore_health");
@@ -139,61 +139,61 @@ describe("AlchemySystem", () => {
     });
 
     it("consumes one unit of each ingredient on success", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 3);
-      alchemy.addIngredient("cairn_bolete_cap", 3);
-      alchemy.craftPotion(["aloe_vera_leaves", "cairn_bolete_cap"]);
-      expect(alchemy.getIngredientCount("aloe_vera_leaves")).toBe(2);
-      expect(alchemy.getIngredientCount("cairn_bolete_cap")).toBe(2);
+      alchemy.addIngredient("plantain_leaves", 3);
+      alchemy.addIngredient("comfrey_root", 3);
+      alchemy.craftPotion(["plantain_leaves", "comfrey_root"]);
+      expect(alchemy.getIngredientCount("plantain_leaves")).toBe(2);
+      expect(alchemy.getIngredientCount("comfrey_root")).toBe(2);
     });
 
     it("reveals all effects of used ingredients on success", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 1);
-      alchemy.addIngredient("cairn_bolete_cap", 1);
-      alchemy.craftPotion(["aloe_vera_leaves", "cairn_bolete_cap"]);
+      alchemy.addIngredient("plantain_leaves", 1);
+      alchemy.addIngredient("comfrey_root", 1);
+      alchemy.craftPotion(["plantain_leaves", "comfrey_root"]);
       for (let i = 0; i < 4; i++) {
-        expect(alchemy.hasDiscoveredEffect("aloe_vera_leaves", i)).toBe(true);
-        expect(alchemy.hasDiscoveredEffect("cairn_bolete_cap", i)).toBe(true);
+        expect(alchemy.hasDiscoveredEffect("plantain_leaves", i)).toBe(true);
+        expect(alchemy.hasDiscoveredEffect("comfrey_root", i)).toBe(true);
       }
     });
 
     it("returns null and shows notification when no shared effects", () => {
       // Craft two ingredients that share no effects
-      // imp_gall:   [damage_health, weakness_fire, damage_magicka, restore_stamina]
-      // fennel_seeds:[restore_magicka, fortify_intelligence, restore_health, resist_frost]
+      // henbane:   [damage_health, weakness_fire, damage_magicka, restore_stamina]
+      // vervain:[restore_magicka, fortify_intelligence, restore_health, resist_frost]
       // No overlap
-      alchemy.addIngredient("imp_gall", 1);
-      alchemy.addIngredient("fennel_seeds", 1);
-      const result = alchemy.craftPotion(["imp_gall", "fennel_seeds"]);
+      alchemy.addIngredient("henbane", 1);
+      alchemy.addIngredient("vervain", 1);
+      const result = alchemy.craftPotion(["henbane", "vervain"]);
       expect(result).toBeNull();
     });
 
     it("adds the crafted potion to craftedPotions", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 1);
-      alchemy.addIngredient("cairn_bolete_cap", 1);
-      alchemy.craftPotion(["aloe_vera_leaves", "cairn_bolete_cap"]);
+      alchemy.addIngredient("plantain_leaves", 1);
+      alchemy.addIngredient("comfrey_root", 1);
+      alchemy.craftPotion(["plantain_leaves", "comfrey_root"]);
       expect(alchemy.craftedPotions).toHaveLength(1);
     });
 
     it("increases alchemy skill on successful craft", () => {
       const skillBefore = alchemy.alchemySkill;
-      alchemy.addIngredient("aloe_vera_leaves", 1);
-      alchemy.addIngredient("cairn_bolete_cap", 1);
-      alchemy.craftPotion(["aloe_vera_leaves", "cairn_bolete_cap"]);
+      alchemy.addIngredient("plantain_leaves", 1);
+      alchemy.addIngredient("comfrey_root", 1);
+      alchemy.craftPotion(["plantain_leaves", "comfrey_root"]);
       expect(alchemy.alchemySkill).toBeGreaterThan(skillBefore);
     });
 
     it("respects the 4-ingredient maximum", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 1);
-      alchemy.addIngredient("cairn_bolete_cap", 1);
-      alchemy.addIngredient("fennel_seeds", 1);
-      alchemy.addIngredient("lady_smock_leaves", 1);
-      alchemy.addIngredient("dragon_tongue", 1);
+      alchemy.addIngredient("plantain_leaves", 1);
+      alchemy.addIngredient("comfrey_root", 1);
+      alchemy.addIngredient("vervain", 1);
+      alchemy.addIngredient("eyebright", 1);
+      alchemy.addIngredient("st_johns_wort", 1);
       const result = alchemy.craftPotion([
-        "aloe_vera_leaves",
-        "cairn_bolete_cap",
-        "fennel_seeds",
-        "lady_smock_leaves",
-        "dragon_tongue",
+        "plantain_leaves",
+        "comfrey_root",
+        "vervain",
+        "eyebright",
+        "st_johns_wort",
       ]);
       expect(result).toBeNull();
     });
@@ -201,9 +201,9 @@ describe("AlchemySystem", () => {
     it("fires onPotionCrafted callback", () => {
       const callback = vi.fn();
       alchemy.onPotionCrafted = callback;
-      alchemy.addIngredient("aloe_vera_leaves", 1);
-      alchemy.addIngredient("cairn_bolete_cap", 1);
-      alchemy.craftPotion(["aloe_vera_leaves", "cairn_bolete_cap"]);
+      alchemy.addIngredient("plantain_leaves", 1);
+      alchemy.addIngredient("comfrey_root", 1);
+      alchemy.craftPotion(["plantain_leaves", "comfrey_root"]);
       expect(callback).toHaveBeenCalledTimes(1);
       const [potion] = callback.mock.calls[0] as [AlchemyPotion];
       expect(potion.name).toContain("Potion");
@@ -216,9 +216,9 @@ describe("AlchemySystem", () => {
     let potion: AlchemyPotion;
 
     beforeEach(() => {
-      alchemy.addIngredient("aloe_vera_leaves", 1);
-      alchemy.addIngredient("cairn_bolete_cap", 1);
-      potion = alchemy.craftPotion(["aloe_vera_leaves", "cairn_bolete_cap"])!;
+      alchemy.addIngredient("plantain_leaves", 1);
+      alchemy.addIngredient("comfrey_root", 1);
+      potion = alchemy.craftPotion(["plantain_leaves", "comfrey_root"])!;
     });
 
     it("applies restore_health effect to player", () => {
@@ -249,31 +249,31 @@ describe("AlchemySystem", () => {
 
   describe("getSaveState / restoreFromSave", () => {
     it("round-trips ingredients", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 3);
-      alchemy.addIngredient("fennel_seeds", 7);
+      alchemy.addIngredient("plantain_leaves", 3);
+      alchemy.addIngredient("vervain", 7);
       const state = alchemy.getSaveState();
 
       const alchemy2 = new AlchemySystem(player, ui);
       alchemy2.restoreFromSave(state);
-      expect(alchemy2.getIngredientCount("aloe_vera_leaves")).toBe(3);
-      expect(alchemy2.getIngredientCount("fennel_seeds")).toBe(7);
+      expect(alchemy2.getIngredientCount("plantain_leaves")).toBe(3);
+      expect(alchemy2.getIngredientCount("vervain")).toBe(7);
     });
 
     it("round-trips discovered effects", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 1);
-      alchemy.eatIngredient("aloe_vera_leaves");
+      alchemy.addIngredient("plantain_leaves", 1);
+      alchemy.eatIngredient("plantain_leaves");
       const state = alchemy.getSaveState();
 
       const alchemy2 = new AlchemySystem(player, ui);
       alchemy2.restoreFromSave(state);
-      expect(alchemy2.hasDiscoveredEffect("aloe_vera_leaves", 0)).toBe(true);
-      expect(alchemy2.hasDiscoveredEffect("aloe_vera_leaves", 1)).toBe(false);
+      expect(alchemy2.hasDiscoveredEffect("plantain_leaves", 0)).toBe(true);
+      expect(alchemy2.hasDiscoveredEffect("plantain_leaves", 1)).toBe(false);
     });
 
     it("round-trips crafted potions", () => {
-      alchemy.addIngredient("aloe_vera_leaves", 1);
-      alchemy.addIngredient("cairn_bolete_cap", 1);
-      alchemy.craftPotion(["aloe_vera_leaves", "cairn_bolete_cap"]);
+      alchemy.addIngredient("plantain_leaves", 1);
+      alchemy.addIngredient("comfrey_root", 1);
+      alchemy.craftPotion(["plantain_leaves", "comfrey_root"]);
       const state = alchemy.getSaveState();
 
       const alchemy2 = new AlchemySystem(player, ui);
@@ -288,12 +288,12 @@ describe("AlchemySystem", () => {
 
     it("ignores ingredients with unknown ids on restore", () => {
       const state = {
-        ingredients: { aloe_vera_leaves: 2, unknown_herb: 5 },
+        ingredients: { plantain_leaves: 2, unknown_herb: 5 },
         discoveredEffects: [] as Array<[string, number]>,
         craftedPotions: [],
       };
       alchemy.restoreFromSave(state);
-      expect(alchemy.getIngredientCount("aloe_vera_leaves")).toBe(2);
+      expect(alchemy.getIngredientCount("plantain_leaves")).toBe(2);
       expect(alchemy.getIngredientCount("unknown_herb")).toBe(0);
     });
   });
@@ -321,9 +321,9 @@ describe("AlchemySystem", () => {
         effects: ["restore_health", "restore_stamina", "resist_fire", "feather"],
       });
       alchemy.addIngredient("test_herb", 1);
-      alchemy.addIngredient("aloe_vera_leaves", 1);
+      alchemy.addIngredient("plantain_leaves", 1);
       // Both have restore_health — should craft successfully
-      const potion = alchemy.craftPotion(["test_herb", "aloe_vera_leaves"]);
+      const potion = alchemy.craftPotion(["test_herb", "plantain_leaves"]);
       expect(potion).not.toBeNull();
     });
   });

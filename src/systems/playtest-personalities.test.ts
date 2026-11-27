@@ -567,14 +567,14 @@ describe("Personality Playtest: The Hardcore", () => {
   });
 
   it("contracts a deadly disease and immediately cures it with a prepared antidote", () => {
-    // Contracts Swamp Rot (-5 Willpower)
-    const contracted = env.disease.contractDisease("swamp_rot");
+    // Contracts Fen Fever (-5 Willpower)
+    const contracted = env.disease.contractDisease("fen_fever");
     expect(contracted).toBe(true);
-    expect(env.disease.hasDisease("swamp_rot")).toBe(true);
+    expect(env.disease.hasDisease("fen_fever")).toBe(true);
 
     // Diagnoses disease and consumes Cure Disease potion immediately
     env.disease.cureAllDiseases();
-    expect(env.disease.hasDisease("swamp_rot")).toBe(false);
+    expect(env.disease.hasDisease("fen_fever")).toBe(false);
     expect(env.disease.getActiveDiseases().length).toBe(0);
   });
 });

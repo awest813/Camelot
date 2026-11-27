@@ -54,7 +54,7 @@ export function wireGameplay(g: Game): void {
       // ~5 % base chance per strike; resistance is factored inside contractDisease().
       const contagion = g.kernel.rng.stream("disease");
       if (contagion.chance(0.05)) {
-          g.diseaseSystem.contractDisease(contagion.pick(["rust_chancre", "swamp_rot", "witbane", "collywobbles", "yellow_tick"]), () => contagion.next());
+          g.diseaseSystem.contractDisease(contagion.pick(["marsh_ague", "fen_fever", "brain_fog", "flux", "tick_fever"]), () => contagion.next());
       }
   });
   g.eventBus.on("combat:blocked", () => {

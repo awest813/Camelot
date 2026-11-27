@@ -46,7 +46,7 @@ describe("CraftingFeature (headless, through the kernel)", () => {
   it("starts the player with a forge kit, ingredients and soul gems", () => {
     const t = setup();
     expect(t.items.map((i) => i.id)).toEqual(["iron_ingot", "leather_strips", "repair_hammer"]);
-    expect(t.c.alchemy.getIngredientCount("aloe_vera_leaves")).toBe(5);
+    expect(t.c.alchemy.getIngredientCount("plantain_leaves")).toBe(5);
     expect(t.c.enchanting.getSaveState().soulGems).toBeDefined();
     t.k.uninstall("crafting");
   });

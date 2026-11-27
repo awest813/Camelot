@@ -525,29 +525,29 @@ describe("Playtest — new game to 12 gameplay hours", () => {
 
   describe("14:00 — Disease contraction and cure", () => {
     it("contracts a disease from an enemy attack", () => {
-      // Rust Chancre: endurance −5
-      const contracted = w.disease.contractDisease("rust_chancre");
+      // Marsh Ague: endurance −5
+      const contracted = w.disease.contractDisease("marsh_ague");
       // Hill-folk has no built-in disease resistance in this engine;
       // contractDisease returns true when successful
       if (contracted) {
-        expect(w.disease.hasDisease("rust_chancre")).toBe(true);
+        expect(w.disease.hasDisease("marsh_ague")).toBe(true);
         const penalties = w.disease.getAttributePenalties();
         expect(penalties["endurance"]).toBeLessThan(0);
       }
     });
 
     it("cures the disease with a Cure Disease potion", () => {
-      w.disease.contractDisease("rust_chancre");
-      w.disease.cureDisease("rust_chancre");
+      w.disease.contractDisease("marsh_ague");
+      w.disease.cureDisease("marsh_ague");
 
-      expect(w.disease.hasDisease("rust_chancre")).toBe(false);
+      expect(w.disease.hasDisease("marsh_ague")).toBe(false);
       const penalties = w.disease.getAttributePenalties();
       expect(penalties["endurance"] ?? 0).toBe(0);
     });
 
     it("cureAllDiseases removes every active disease", () => {
-      w.disease.contractDisease("rust_chancre");
-      w.disease.contractDisease("swamp_rot");
+      w.disease.contractDisease("marsh_ague");
+      w.disease.contractDisease("fen_fever");
       w.disease.cureAllDiseases();
 
       expect(w.disease.getActiveDiseases()).toHaveLength(0);
@@ -850,7 +850,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
       w.birthsign.chooseBirthsign("sword_stone", w.attrs, w.skills);
       w.time.advanceHours(12);
       w.fame.addFame(25);
-      w.disease.contractDisease("rust_chancre");
+      w.disease.contractDisease("marsh_ague");
       w.skills.gainXP("blade", 60);
     });
 
@@ -874,7 +874,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
       const restored = new DiseaseSystem();
       for (const def of BUILT_IN_DISEASES) restored.registerDisease(def);
       restored.restoreFromSave(snap);
-      expect(restored.hasDisease("rust_chancre")).toBe(true);
+      expect(restored.hasDisease("marsh_ague")).toBe(true);
     });
 
     it("SkillProgressionSystem round-trips correctly", () => {
