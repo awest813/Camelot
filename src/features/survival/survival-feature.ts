@@ -11,6 +11,7 @@
  */
 import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
+import { SurvivalChip } from "../../ui/survival-chip";
 import { SurvivalSystem } from "../../systems/survival-system";
 import { FeedbackKey, ownSave } from "../services";
 
@@ -46,6 +47,8 @@ const WARNINGS: Record<string, [string, number]> = {
 export class SurvivalFeature implements Feature {
   public readonly id = "survival";
   public readonly needs = new SurvivalSystem();
+  /** What the needs are doing to you, on the HUD. */
+  public readonly chip = new SurvivalChip();
 
   public install(ctx: FeatureContext): void {
     ownSave(ctx, { key: "survival", save: () => this.needs.getSaveState(), load: (data) => { if (data) this.needs.restoreFromSave(data as never); } });
@@ -74,6 +77,8 @@ export class SurvivalFeature implements Feature {
         }
       },
     });
+
+    ctx.system({ id: "survival.chip", phase: "ui", update: () => this.chip.update(n.hungerLevel, n.fatigueLevel, n.coldLevel) });
 
     ctx.scope.add(() => {
       n.onHungerLevelChanged = n.onFatigueLevelChanged = n.onColdLevelChanged = null;
