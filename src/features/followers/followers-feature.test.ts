@@ -27,16 +27,16 @@ describe("FollowersFeature (headless, through the kernel)", () => {
     expect(t.f.panel.isVisible).toBe(true);
     expect(t.modal.suspendGameplay).toHaveBeenCalledOnce();
 
-    t.f.panel.onRecruit!("jenassa");
+    t.f.panel.onRecruit!("dagonet");
     expect(t.gold()).toBe(100);
-    expect(t.f.followers.getActiveFollower()?.name).toBe("Jenassa");
-    expect(t.notes.at(-1)).toBe("Jenassa has joined you.");
+    expect(t.f.followers.getActiveFollower()?.name).toBe("Sir Dagonet");
+    expect(t.notes.at(-1)).toBe("Sir Dagonet has joined you.");
 
     t.f.panel.onCommand!("wait");
     expect(t.notes.at(-1)).toBe("Follower command: wait");
     t.f.panel.onDismiss!();
     expect(t.f.followers.getActiveFollower()).toBeNull();
-    expect(t.notes.at(-1)).toMatch(/^Jenassa has returned to /);
+    expect(t.notes.at(-1)).toMatch(/^Sir Dagonet has returned to /);
 
     t.f.togglePanel();
     expect(t.f.panel.isVisible).toBe(false);
@@ -46,7 +46,7 @@ describe("FollowersFeature (headless, through the kernel)", () => {
 
   it("a hire the purse can't cover takes nothing", () => {
     const t = setup(100);
-    t.f.panel.onRecruit!("jenassa");
+    t.f.panel.onRecruit!("dagonet");
     expect(t.gold()).toBe(100);
     expect(t.f.followers.getActiveFollower()).toBeNull();
     t.k.uninstall("followers");

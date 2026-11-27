@@ -1062,7 +1062,7 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
   }
 
   /**
-   * Ancient monolith / standing stone — Oblivion Ayleid waymarker.
+   * Ancient monolith / standing stone — a waymarker of the old peoples.
    * Tall weathered limestone block with a rough cap slab.
    */
   private _spawnMonolith(x: number, z: number, name: string, scale: number): Mesh[] {

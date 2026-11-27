@@ -161,7 +161,7 @@ describe("GuardEncounterUI", () => {
     });
 
     it("updates header text when opened a second time with new view", () => {
-      ui.open(makeView({ guardName: "Guard Aela" }));
+      ui.open(makeView({ guardName: "Guard Dame Lynette" }));
       ui.open(makeView({ guardName: "Guard Bolvyn" }));
       const header = document.querySelector(".guard-encounter__line");
       expect(header?.textContent).toContain("Guard Bolvyn");

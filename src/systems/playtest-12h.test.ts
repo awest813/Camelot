@@ -756,7 +756,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
 
       w.barter.registerMerchant({
         id: "merchant_alchemist",
-        name: "Lydia the Alchemist",
+        name: "Sir Kay the Alchemist",
         factionId: "mages_guild",
         inventory: [
           { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 HP.", stackable: true, quantity: 10, stats: { value: 25, heal: 50 }, weight: 0.5 },

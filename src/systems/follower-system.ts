@@ -1,6 +1,6 @@
 import { hoursSince } from "./game-hours";
 /**
- * FollowerSystem — Skyrim-style human companion system.
+ * FollowerSystem — the companions who ride with the hero.
  *
  * Allows the player to recruit one NPC follower at a time.  Followers travel
  * with the player, assist in combat, and can be given commands (follow, wait,
@@ -25,7 +25,7 @@ import { hoursSince } from "./game-hours";
  *   this._ui.showNotification(`${name} has joined you.`);
  * };
  * // When talking to a potential follower NPC:
- * this.followerSystem.recruitFollower("lydia");
+ * this.followerSystem.recruitFollower("kay");
  * // E to command:
  * this.followerSystem.commandFollower("wait");
  * ```
@@ -36,7 +36,7 @@ import { hoursSince } from "./game-hours";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-/** Maximum number of concurrent followers (Skyrim default: 1). */
+/** Maximum number of concurrent followers (one at a time). */
 export const MAX_FOLLOWERS = 1;
 /** Default follower base health. */
 export const DEFAULT_FOLLOWER_HEALTH = 150;
@@ -127,7 +127,7 @@ export interface ComboResult {
 
 /** Template definition for a potential follower. */
 export interface FollowerTemplate {
-  /** Unique identifier (e.g. "lydia"). */
+  /** Unique identifier (e.g. "kay"). */
   id: string;
   /** Display name. */
   name: string;
@@ -215,96 +215,97 @@ export interface FollowerSaveState {
 // ── Built-in follower templates ────────────────────────────────────────────────
 
 /**
- * Eight iconic potential followers modelled on Skyrim companions.
+ * Eight companions from the legend of the Round Table (public domain), and
+ * one hedge-wizard of the realm's own.
  */
 export const BUILTIN_FOLLOWERS: ReadonlyArray<FollowerTemplate> = [
   {
-    id: "lydia",
-    name: "Lydia",
+    id: "kay",
+    name: "Sir Kay",
     description:
-      "A fierce and loyal housecarl, sworn to your service.  Favours heavy armour and one-handed weapons.",
+      "The king's foster-brother and seneschal, sharp of tongue and quick to take offence, but steadfast at your side.  Favours heavy armour and the sword.",
     level: 6,
     combatRole: "warrior",
     carryWeightBonus: 50,
     hireCost: 0,
-    homeLocationId: "whiterun_dragonsreach",
+    homeLocationId: "camelot_great_hall",
   },
   {
-    id: "aela",
-    name: "Aela the Huntress",
+    id: "lynette",
+    name: "Dame Lynette",
     description:
-      "A skilled ranger and Companion.  Expert with the bow and light on her feet.",
+      "She knows every road between Camelot and the Castle Perilous and has no patience for fools.  Expert with the bow and light on her feet.",
     level: 12,
     combatRole: "archer",
     carryWeightBonus: 35,
     hireCost: 0,
-    homeLocationId: "whiterun_companions_hall",
+    homeLocationId: "castle_perilous",
   },
   {
-    id: "jenassa",
-    name: "Jenassa",
+    id: "dagonet",
+    name: "Sir Dagonet",
     description:
-      "A deadly mercenary for hire.  She prefers the shadows and dual blades.",
+      "The king's fool, knighted for a jest, and far slyer than anyone allows.  He works the shadows with two short blades, for a fee.",
     level: 10,
     combatRole: "rogue",
     carryWeightBonus: 30,
     hireCost: 500,
-    homeLocationId: "whiterun_drunken_huntsman",
+    homeLocationId: "camelot_jesters_loft",
   },
   {
-    id: "j_zargo",
-    name: "J'zargo",
+    id: "taliesin",
+    name: "Taliesin",
     description:
-      "A Khajiit mage of great ambition.  His destructive spells are unmatched, though his ego rivals them.",
+      "Chief of bards, who drank from the cauldron of inspiration as a boy.  His songs burn as well as soothe, and he knows it.",
     level: 15,
     combatRole: "mage",
     carryWeightBonus: 20,
     hireCost: 0,
-    homeLocationId: "winterhold_college",
+    homeLocationId: "llyn_tegid",
   },
   {
-    id: "farkas",
-    name: "Farkas",
+    id: "bedivere",
+    name: "Sir Bedivere",
     description:
-      "A hulking Nord warrior and Companion.  Unshakeable in battle.",
+      "One-handed and unshakeable, the last to leave any field.  He fights as well with one hand as most men with two.",
     level: 10,
     combatRole: "warrior",
     carryWeightBonus: 60,
     hireCost: 0,
-    homeLocationId: "whiterun_companions_hall",
+    homeLocationId: "camelot_great_hall",
   },
   {
-    id: "borgakh",
-    name: "Borgakh the Steel Heart",
+    id: "gareth",
+    name: "Sir Gareth",
     description:
-      "An Orcish warrior of formidable strength.  She may join you in exchange for her freedom.",
+      "Called Beaumains, the kitchen-knight, who served a year in the scullery before he drew his sword.  He will follow anyone who treats him fairly.",
     level: 14,
     combatRole: "warrior",
     carryWeightBonus: 55,
     hireCost: 0,
-    homeLocationId: "mor_khazgur",
+    homeLocationId: "camelot_kitchens",
   },
   {
-    id: "marcurio",
-    name: "Marcurio",
+    id: "elidyr",
+    name: "Elidyr the Hedge-wizard",
     description:
-      "An Imperial mage-for-hire who specialises in Destruction magic.",
+      "A wandering hedge-wizard who sells his fire to whoever pays.  Fond of a loud spell and a full purse.",
     level: 12,
     combatRole: "mage",
     carryWeightBonus: 25,
     hireCost: 500,
-    homeLocationId: "riften_bee_and_barb",
+    homeLocationId: "the_wayside_inn",
   },
   {
-    id: "uthgerd",
-    name: "Uthgerd the Unbroken",
+    id: "lamorak",
+    name: "Sir Lamorak",
     description:
-      "A brawling Nord who respects strength.  Win her in a fist-fight and she will follow you anywhere.",
+      "A jouster who respects strength above all.  Unhorse him fairly in the lists and he will ride with you anywhere.",
     level: 8,
     combatRole: "warrior",
     carryWeightBonus: 45,
     hireCost: 0,
-    homeLocationId: "whiterun_bannered_mare",
+    homeLocationId: "the_tilting_yard",
   },
 ] as const;
 

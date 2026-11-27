@@ -1,5 +1,5 @@
 /**
- * FollowerUI — HUD widget and management panel for the Skyrim-style follower system.
+ * FollowerUI — HUD widget and management panel for the companions (followers in code).
  *
  * Layout:
  *   HUD widget    — compact bar showing active follower's name, health, and current command.
@@ -64,7 +64,7 @@ function pct(val: number, max: number): string {
 
 // ── FollowerUI ─────────────────────────────────────────────────────────────
 
-/** "whiterun_dragonsreach" → "Whiterun Dragonsreach" for display. */
+/** "camelot_great_hall" → "Camelot Great Hall" for display. */
 function humanizeId(id: string): string {
   return id.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
 }

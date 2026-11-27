@@ -74,7 +74,7 @@ export const BORROWED_NAMES = [
   "Atronach", "Nightblade", "Spellsword", "Battlemage", "Mysticism", "Fus Ro", "soul gem", "soul gems",
   "Harrada", "Clannfear", "Spiddal", "Cairn Bolete", "Imp Gall", "Wisp Stalk",
   "Witbane", "Collywobbles", "Rust Chancre", "Porphyric", "Yellow Tick", "Swamp Rot", "Brain Rot",
-  "Oakflesh", "Standing Stone", "Standing Stones", "Guardian Stone", "Guardian Stones",
+  "Oakflesh", "Guardian Stone", "Guardian Stones",
 ];
 const BORROWED_RE = new RegExp(`(?<![\\w'])(?:${BORROWED_NAMES.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?![\\w'])`, "gi");
 

@@ -6,13 +6,13 @@ describe("FollowerUI", () => {
   let ui: FollowerUI;
 
   const mockTemplates: FollowerTemplate[] = [
-    { id: "tmpl_1", name: "Lydia", combatRole: "warrior", level: 10, hireCost: 500, description: "Housecarl", homeLocationId: "whiterun", carryWeightBonus: 100 },
+    { id: "tmpl_1", name: "Sir Kay", combatRole: "warrior", level: 10, hireCost: 500, description: "Housecarl", homeLocationId: "whiterun", carryWeightBonus: 100 },
     { id: "tmpl_2", name: "Faendal", combatRole: "archer", level: 5, hireCost: 0, description: "Archer", homeLocationId: "riverwood", carryWeightBonus: 50 }
   ];
 
   const mockActive: ActiveFollowerState = {
     templateId: "tmpl_1",
-    name: "Lydia",
+    name: "Sir Kay",
     health: 100,
     maxHealth: 100,
     level: 10,

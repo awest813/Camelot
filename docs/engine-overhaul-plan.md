@@ -695,7 +695,7 @@ components.
   product decision, see "Audit" at the end.)
   - Phase 6, world: `offscreen-simulation-system` (the off-screen
     schedules), `region-system`, `biome-system`, `encounter-system`,
-    `landmark-system`, `inn-system`, `standing-stone-system`,
+    `landmark-system`, `inn-system`, `standing-stone-system` (deleted 2026-11-27),
     `dungeon-generator-system`, `weather-schedule-system`;
   - Phase 9, editor: `map-annotation-system`, `map-pack-system`,
     `recent-projects-system`, `standalone-editor-shell`;
@@ -1527,7 +1527,7 @@ Left as decisions:
 
 - **Parked systems.** These have no owner phase and nothing runs them:
   - world: `region`, `biome`, `encounter`, `landmark`, `inn`,
-    `standing-stone`, `dungeon-generator`, `weather-schedule`,
+    `dungeon-generator`, `weather-schedule`,
     `offscreen-simulation`;
   - editor: `map-annotation`, `map-pack`, `recent-projects`, the
     standalone editor shell;

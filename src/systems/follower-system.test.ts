@@ -417,24 +417,24 @@ describe("FollowerSystem — activeCarryWeightBonus", () => {
 describe("FollowerSystem — built-in followers", () => {
   const sys = new FollowerSystem();
 
-  it("Lydia has hireCost 0", () => {
-    expect(sys.getFollowerTemplate("lydia")!.hireCost).toBe(0);
+  it("Sir Kay has hireCost 0", () => {
+    expect(sys.getFollowerTemplate("kay")!.hireCost).toBe(0);
   });
 
-  it("Jenassa has hireCost 500", () => {
-    expect(sys.getFollowerTemplate("jenassa")!.hireCost).toBe(500);
+  it("Sir Dagonet has hireCost 500", () => {
+    expect(sys.getFollowerTemplate("dagonet")!.hireCost).toBe(500);
   });
 
-  it("J'zargo has combatRole mage", () => {
-    expect(sys.getFollowerTemplate("j_zargo")!.combatRole).toBe("mage");
+  it("Taliesin has combatRole mage", () => {
+    expect(sys.getFollowerTemplate("taliesin")!.combatRole).toBe("mage");
   });
 
-  it("Aela has combatRole archer", () => {
-    expect(sys.getFollowerTemplate("aela")!.combatRole).toBe("archer");
+  it("Dame Lynette has combatRole archer", () => {
+    expect(sys.getFollowerTemplate("lynette")!.combatRole).toBe("archer");
   });
 
-  it("Farkas carries extra weight", () => {
-    expect(sys.getFollowerTemplate("farkas")!.carryWeightBonus).toBeGreaterThan(0);
+  it("Sir Bedivere carries extra weight", () => {
+    expect(sys.getFollowerTemplate("bedivere")!.carryWeightBonus).toBeGreaterThan(0);
   });
 });
 
