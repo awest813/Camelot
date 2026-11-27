@@ -275,7 +275,7 @@ const LEVELED_WEAPON_LISTS: LeveledList[] = [
       { minLevel: 1,  value: "iron_sword" },
       { minLevel: 3,  value: "steel_sword" },
       { minLevel: 6,  value: "silver_sword" },
-      { minLevel: 10, value: "daedric_sword" },
+      { minLevel: 10, value: "annwn_sword" },
     ],
   },
   {
@@ -284,7 +284,7 @@ const LEVELED_WEAPON_LISTS: LeveledList[] = [
     entries: [
       { minLevel: 1, value: "iron_bow" },
       { minLevel: 4, value: "steel_bow" },
-      { minLevel: 8, value: "elven_bow" },
+      { minLevel: 8, value: "fae_bow" },
     ],
   },
 ];
@@ -300,7 +300,7 @@ const LEVELED_ARMOR_LISTS: LeveledList[] = [
       { minLevel: 1,  value: "hide_armor" },
       { minLevel: 3,  value: "leather_armor" },
       { minLevel: 6,  value: "chitin_armor" },
-      { minLevel: 10, value: "glass_armor" },
+      { minLevel: 10, value: "crystal_armor" },
     ],
   },
   {
@@ -309,8 +309,8 @@ const LEVELED_ARMOR_LISTS: LeveledList[] = [
     entries: [
       { minLevel: 1,  value: "iron_cuirass" },
       { minLevel: 4,  value: "steel_cuirass" },
-      { minLevel: 8,  value: "orcish_cuirass" },
-      { minLevel: 12, value: "daedric_cuirass" },
+      { minLevel: 8,  value: "saxon_cuirass" },
+      { minLevel: 12, value: "annwn_cuirass" },
     ],
   },
 ];

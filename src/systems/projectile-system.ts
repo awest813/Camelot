@@ -47,10 +47,10 @@ const NPC_EVASION_LONG_RANGE = 15;
 const NPC_EVASION_LONG_RANGE_BONUS = 0.08;
 /** Shield carriers turn this fraction of incoming arrows for half damage. */
 const NPC_SHIELD_BLOCK_CHANCE = 0.25;
-/** Daedric arrows ignite victims: burn ticks at this fraction of the hit. */
-const DAEDRIC_BURN_TICK_FRACTION = 0.25;
-/** Daedric burn duration in seconds. */
-const DAEDRIC_BURN_DURATION = 4;
+/** Annwn-forged arrows ignite victims: burn ticks at this fraction of the hit. */
+const ANNWN_BURN_TICK_FRACTION = 0.25;
+/** Annwn-forged burn duration in seconds. */
+const ANNWN_BURN_DURATION = 4;
 
 /** Status effect delivered by a hostile bolt (mirrors NPC.attackStatusEffect). */
 export interface NpcBoltStatusEffect {
@@ -71,7 +71,7 @@ const BOW_MIN_DRAW         = 0.1;
 // ─── Arrow type profiles ──────────────────────────────────────────────────────
 
 /** Available arrow material types ordered by increasing quality. */
-export type ArrowType = "iron" | "steel" | "elven" | "daedric";
+export type ArrowType = "iron" | "steel" | "fae" | "annwn";
 
 interface ArrowProfile {
   /** Multiplier applied to the final arrow damage. */
@@ -80,8 +80,8 @@ interface ArrowProfile {
   speedMultiplier: number;
   /**
    * Multiplier applied to BOW_DRAW_TIME for this arrow type.
-   * < 1.0 = lighter arrow, draws faster (elven).
-   * > 1.0 = heavier arrow, draws slower (daedric).
+   * < 1.0 = lighter arrow, draws faster (fae-wrought).
+   * > 1.0 = heavier arrow, draws slower (Annwn-forged).
    */
   drawTimeMultiplier: number;
   /** Human-readable name. */
@@ -91,8 +91,8 @@ interface ArrowProfile {
 const ARROW_PROFILES: Record<ArrowType, ArrowProfile> = {
   iron:    { damageMultiplier: 1.0,  speedMultiplier: 1.0,  drawTimeMultiplier: 1.00, label: "Iron Arrow"    },
   steel:   { damageMultiplier: 1.25, speedMultiplier: 1.05, drawTimeMultiplier: 1.05, label: "Steel Arrow"   },
-  elven:   { damageMultiplier: 1.55, speedMultiplier: 1.10, drawTimeMultiplier: 0.90, label: "Elven Arrow"   },
-  daedric: { damageMultiplier: 2.0,  speedMultiplier: 1.15, drawTimeMultiplier: 1.25, label: "Daedric Arrow" },
+  fae:     { damageMultiplier: 1.55, speedMultiplier: 1.10, drawTimeMultiplier: 0.90, label: "Fae-wrought Arrow" },
+  annwn:   { damageMultiplier: 2.0,  speedMultiplier: 1.15, drawTimeMultiplier: 1.25, label: "Annwn-forged Arrow" },
 };
 
 interface PooledArrow {
@@ -638,14 +638,14 @@ export class ProjectileSystem {
           this._skillSystem?.gainXP("marksman", SKILL_XP_MARKSMAN_HIT);
           this.events?.emit("combat:hostileHit", { npc, damage: finalDamage });
 
-          // Daedric arrows are wreathed in Oblivion flame — victims burn.
-          if (this.equippedArrowType === "daedric") {
+          // Annwn-forged arrows burn with Otherworld fire: victims burn.
+          if (this.equippedArrowType === "annwn") {
             npc.applyStatusEffect?.({
               type: "burn",
-              damagePerTick: Math.max(1, Math.round(finalDamage * DAEDRIC_BURN_TICK_FRACTION)),
+              damagePerTick: Math.max(1, Math.round(finalDamage * ANNWN_BURN_TICK_FRACTION)),
               tickInterval: 1,
               tickTimer: 1,
-              remainingDuration: DAEDRIC_BURN_DURATION,
+              remainingDuration: ANNWN_BURN_DURATION,
             });
           }
 

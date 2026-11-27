@@ -216,7 +216,7 @@ describe("ProjectileSystem", () => {
     mockPlayer.stamina = 100;
     projectileSystem.arrowCount = 10;
     projectileSystem.update(1.0); // drain cooldown
-    projectileSystem.equippedArrowType = "daedric";
+    projectileSystem.equippedArrowType = "annwn";
     projectileSystem.fireArrow();
     projectileSystem.update(0.1);
     projectileSystem.update(0.1);
@@ -396,7 +396,7 @@ describe("ProjectileSystem", () => {
     projectileSystem.releaseArrow();
     projectileSystem.update(1.0); // clear cooldown
 
-    projectileSystem.equippedArrowType = "elven";
+    projectileSystem.equippedArrowType = "fae";
     projectileSystem.beginDraw();
     projectileSystem.update(0.36);
     const elvenProgress = projectileSystem.drawProgress;
@@ -417,7 +417,7 @@ describe("ProjectileSystem", () => {
     projectileSystem.releaseArrow();
     projectileSystem.update(1.0); // clear cooldown
 
-    projectileSystem.equippedArrowType = "daedric";
+    projectileSystem.equippedArrowType = "annwn";
     projectileSystem.beginDraw();
     projectileSystem.update(0.5);
     const daedricProgress = projectileSystem.drawProgress;
@@ -553,7 +553,7 @@ describe("ProjectileSystem", () => {
 
   it("daedric arrows ignite the victim with burn", () => {
     mockNpc.applyStatusEffect = vi.fn();
-    projectileSystem.equippedArrowType = "daedric";
+    projectileSystem.equippedArrowType = "annwn";
     projectileSystem.fireArrow();
     projectileSystem.update(0.016);
     projectileSystem.update(0.016);

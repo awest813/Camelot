@@ -23,7 +23,7 @@ const NONE: Selection = { itemId: null, effectId: null, gem: null, category: nul
 /** The status line: what is still missing, or what the enchantment will be. */
 export function enchantStatus(system: EnchantingSystem, s: Selection): { text: string; ready: boolean } {
   if (!s.itemId || !s.effectId || !s.gem) {
-    const missing = [!s.itemId && "item", !s.effectId && "effect", !s.gem && "soul gem"].filter(Boolean);
+    const missing = [!s.itemId && "item", !s.effectId && "effect", !s.gem && "spirit vessel"].filter(Boolean);
     return { text: `Select a${missing.length === 3 ? "n" : ""}: ${missing.join(", ")}`, ready: false };
   }
   const item = system.getEnchantableItems().find((i) => i.id === s.itemId);
@@ -84,9 +84,9 @@ export function EnchantingPanel(p: EnchantingPanelProps) {
             </button>
           ))}
         </section>
-        <section class="craft-panel__section" aria-label="Soul gems">
+        <section class="craft-panel__section" aria-label="Spirit vessels">
           <h3 class="craft-panel__section-title">Soul Gems</h3>
-          {gems.length === 0 && <p class="craft-panel__empty">No soul gems</p>}
+          {gems.length === 0 && <p class="craft-panel__empty">No spirit vessels</p>}
           {gems.map(({ def, count }) => (
             <button key={def.type} type="button" class="craft-panel__row" aria-pressed={def.type === s.gem}
               aria-label={`Soul Gem: ${def.name}`} onClick={() => p.onGem(def.type)}>
@@ -108,7 +108,7 @@ export function EnchantingPanel(p: EnchantingPanelProps) {
 
 /** The altar panel: open / close / refresh it; the game reacts to its events. */
 export class EnchantingUI {
-  /** Fired when the player enchants: the item, the effect and the soul gem used. */
+  /** Fired when the player enchants: the item, the effect and the spirit vessel used. */
   public onEnchant: ((itemId: string, effectId: string, gemType: SoulGemType) => void) | null = null;
   /** Fired when the player closes the panel (✕, Escape or the backdrop). */
   public onClosed: (() => void) | null = null;

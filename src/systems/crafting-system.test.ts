@@ -856,7 +856,7 @@ describe("CraftingSystem — XP tier scaling", () => {
 
   it("daedric tier → 2.5× multiplier", () => {
     const sys = new CraftingSystem();
-    const recipe: CraftingRecipe = { ...ironSwordRecipe, id: "t3", tier: "daedric", craftingXp: 20 };
+    const recipe: CraftingRecipe = { ...ironSwordRecipe, id: "t3", tier: "annwn", craftingXp: 20 };
     sys.addRecipe(recipe);
     const outcome = sys.craft("t3", makeInventory());
     expect(outcome.success).toBe(true);

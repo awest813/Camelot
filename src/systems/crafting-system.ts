@@ -48,32 +48,32 @@ export const CRAFTING_STATION_LABELS: Record<CraftingStationId, string> = {
 export type CraftingTier =
   | "iron"
   | "steel"
-  | "dwarven"
-  | "elven"
-  | "glass"
-  | "ebony"
-  | "daedric";
+  | "saxon"
+  | "fae"
+  | "crystal"
+  | "stariron"
+  | "annwn";
 
 /** XP multipliers applied per tier on top of the base `craftingXp` value. */
 export const CRAFTING_TIER_XP_MULTIPLIERS: Record<CraftingTier, number> = {
   iron:    1.0,
   steel:   1.2,
-  dwarven: 1.4,
-  elven:   1.6,
-  glass:   1.8,
-  ebony:   2.0,
-  daedric: 2.5,
+  saxon:    1.4,
+  fae:      1.6,
+  crystal:  1.8,
+  stariron: 2.0,
+  annwn:    2.5,
 };
 
 /** Human-readable display names for each material tier. */
 export const CRAFTING_TIER_LABELS: Record<CraftingTier, string> = {
   iron:    "Iron",
   steel:   "Steel",
-  dwarven: "Dwarven",
-  elven:   "Elven",
-  glass:   "Glass",
-  ebony:   "Ebony",
-  daedric: "Daedric",
+  saxon:    "Saxon",
+  fae:      "Fae-wrought",
+  crystal:  "Crystal",
+  stariron: "Star-iron",
+  annwn:    "Annwn-forged",
 };
 
 // ── Quality ───────────────────────────────────────────────────────────────────

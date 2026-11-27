@@ -386,10 +386,10 @@ export const STARTER_LOOT_TABLES: LootTable[] = [
       // Guaranteed gold drop for every boss kill
       { itemId: "gold_coins",       itemName: "Gold Coins",       weight: 0,  guarantee: true, minQuantity: 50, maxQuantity: 150, itemTemplate: { stackable: true, weight: 0.1, stats: { value: 1 } } },
       // High-tier weapons — only available to players level 5+
-      { itemId: "daedric_sword",    itemName: "Daedric Sword",    weight: 20, condition: { minLevel: 5 },  itemTemplate: { stackable: false, weight: 5.0, slot: "mainHand", stats: { damage: 30, value: 500 } } },
-      { itemId: "daedric_shield",   itemName: "Daedric Shield",   weight: 15, condition: { minLevel: 5 },  itemTemplate: { stackable: false, weight: 7.0, slot: "offHand",  stats: { armor: 20, value: 400 } } },
-      { itemId: "glass_armor",      itemName: "Glass Armor",      weight: 15, condition: { minLevel: 8 },  itemTemplate: { stackable: false, weight: 8.0, slot: "chest",    stats: { armor: 22, value: 600 } } },
-      { itemId: "soul_gem_grand",   itemName: "Grand Soul Gem",   weight: 20, maxQuantity: 2, itemTemplate: { stackable: true, weight: 0.3, stats: { value: 200 } } },
+      { itemId: "annwn_sword",      itemName: "Annwn-forged Sword", weight: 20, condition: { minLevel: 5 },  itemTemplate: { stackable: false, weight: 5.0, slot: "mainHand", stats: { damage: 30, value: 500 } } },
+      { itemId: "annwn_shield",     itemName: "Annwn-forged Shield", weight: 15, condition: { minLevel: 5 },  itemTemplate: { stackable: false, weight: 7.0, slot: "offHand",  stats: { armor: 20, value: 400 } } },
+      { itemId: "crystal_armor",    itemName: "Crystal Armor",    weight: 15, condition: { minLevel: 8 },  itemTemplate: { stackable: false, weight: 8.0, slot: "chest",    stats: { armor: 22, value: 600 } } },
+      { itemId: "vessel_grail",     itemName: "Grail Vessel",     weight: 20, maxQuantity: 2, itemTemplate: { stackable: true, weight: 0.3, stats: { value: 200 } } },
       // Sub-table for extra consumables
       {                             weight: 10, subTableId: "common_loot" },
       // Low-level players get standard dungeon gear

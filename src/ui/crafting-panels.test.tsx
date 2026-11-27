@@ -49,25 +49,25 @@ describe("EnchantingUI (Preact)", () => {
       { id: "helm", name: "Iron Helm", description: "", stackable: false, quantity: 1, slot: "head", stats: {} },
     ] };
     const system = new EnchantingSystem({} as never, inventory as never, {} as never, ui);
-    system.addSoulGem("petty", 2);
+    system.addSoulGem("clay", 2);
     const panel = new EnchantingUI(system);
     const done: string[][] = [];
     panel.onEnchant = (i, e, g) => done.push([i, e, g]);
     panel.toggle(true);
 
-    expect(status()).toBe("Select an: item, effect, soul gem");
+    expect(status()).toBe("Select an: item, effect, spirit vessel");
     const allEffects = rows("Effects").length;
     rows("Items")[0].click();
     expect(rows("Effects").length, "only what a weapon can take").toBeLessThan(allEffects);
     rows("Effects")[0].click();
-    expect(status()).toBe("Select a: soul gem");
+    expect(status()).toBe("Select a: spirit vessel");
     expect(button("Enchant").disabled).toBe(true);
-    rows("Soul gems")[0].click();
+    rows("Spirit vessels")[0].click();
     expect(status()).toMatch(/Iron Sword — .* \+\d+$/);
     button("Enchant").click();
     expect(done).toHaveLength(1);
     expect(done[0][0]).toBe("sword");
-    expect(done[0][2]).toBe("petty");
-    expect(status(), "starts over").toBe("Select an: item, effect, soul gem");
+    expect(done[0][2]).toBe("clay");
+    expect(status(), "starts over").toBe("Select an: item, effect, spirit vessel");
   });
 });

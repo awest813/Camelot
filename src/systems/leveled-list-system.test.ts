@@ -82,26 +82,26 @@ describe("LeveledListSystem", () => {
     expect(result.value).toBe("steel_sword");
   });
 
-  it("level-10 player gets daedric_sword from ll_weapon_melee", () => {
+  it("level-10 player gets annwn_sword from ll_weapon_melee", () => {
     const result = lls.resolve("ll_weapon_melee", 10, 42);
-    expect(result.value).toBe("daedric_sword");
+    expect(result.value).toBe("annwn_sword");
   });
 
-  it("level-15 player still gets daedric_sword (capped at highest entry)", () => {
+  it("level-15 player still gets annwn_sword (capped at highest entry)", () => {
     const result = lls.resolve("ll_weapon_melee", 15, 42);
-    expect(result.value).toBe("daedric_sword");
+    expect(result.value).toBe("annwn_sword");
   });
 
   it("calculateAllLevels=false never returns lower tiers at high level", () => {
     // ll_weapon_melee uses calculateAllLevels=false, so level-10 should only
-    // ever return daedric_sword (the sole entry at the highest eligible minLevel)
+    // ever return annwn_sword (the sole entry at the highest eligible minLevel)
     const seen = new Set<string>();
     for (let seed = 0; seed < 100; seed++) {
       const r = lls.resolve("ll_weapon_melee", 10, seed);
       if (r.value) seen.add(r.value);
     }
     expect(seen.size).toBe(1);
-    expect(seen.has("daedric_sword")).toBe(true);
+    expect(seen.has("annwn_sword")).toBe(true);
   });
 
   // ── resolve: calculateAllLevels = true ───────────────────────────────────
@@ -113,7 +113,7 @@ describe("LeveledListSystem", () => {
       entries: [
         { minLevel: 1,  value: "iron_sword",    weight: 1 },
         { minLevel: 5,  value: "steel_sword",   weight: 1 },
-        { minLevel: 10, value: "daedric_sword", weight: 1 },
+        { minLevel: 10, value: "annwn_sword", weight: 1 },
       ],
     };
     lls.registerList(list);
@@ -125,7 +125,7 @@ describe("LeveledListSystem", () => {
     }
     expect(seen.has("iron_sword")).toBe(true);
     expect(seen.has("steel_sword")).toBe(true);
-    expect(seen.has("daedric_sword")).toBe(true);
+    expect(seen.has("annwn_sword")).toBe(true);
   });
 
   it("calculateAllLevels=true excludes entries above player level", () => {
@@ -255,7 +255,7 @@ describe("LeveledListSystem", () => {
       id: "weapon_sub",
       entries: [
         { minLevel: 1,  value: "iron_sword" },
-        { minLevel: 10, value: "daedric_sword" },
+        { minLevel: 10, value: "annwn_sword" },
       ],
     });
     lls.registerList({
@@ -368,9 +368,9 @@ describe("LeveledListSystem", () => {
     expect(r.value).toBe("iron_bow");
   });
 
-  it("ll_weapon_ranged resolves to elven_bow at level 8+", () => {
+  it("ll_weapon_ranged resolves to fae_bow at level 8+", () => {
     const r = lls.resolve("ll_weapon_ranged", 8, 1);
-    expect(r.value).toBe("elven_bow");
+    expect(r.value).toBe("fae_bow");
   });
 
   // ── Built-in armor lists ──────────────────────────────────────────────────
@@ -380,9 +380,9 @@ describe("LeveledListSystem", () => {
     expect(r.value).toBe("hide_armor");
   });
 
-  it("ll_armor_light resolves to glass_armor at level 10+", () => {
+  it("ll_armor_light resolves to crystal_armor at level 10+", () => {
     const r = lls.resolve("ll_armor_light", 10, 1);
-    expect(r.value).toBe("glass_armor");
+    expect(r.value).toBe("crystal_armor");
   });
 
   it("ll_armor_heavy resolves to iron_cuirass at level 1", () => {
@@ -390,9 +390,9 @@ describe("LeveledListSystem", () => {
     expect(r.value).toBe("iron_cuirass");
   });
 
-  it("ll_armor_heavy resolves to daedric_cuirass at level 12+", () => {
+  it("ll_armor_heavy resolves to annwn_cuirass at level 12+", () => {
     const r = lls.resolve("ll_armor_heavy", 12, 1);
-    expect(r.value).toBe("daedric_cuirass");
+    expect(r.value).toBe("annwn_cuirass");
   });
 
   // ── Built-in creature lists ───────────────────────────────────────────────

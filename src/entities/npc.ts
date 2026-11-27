@@ -533,7 +533,7 @@ export class NPC {
     if (lower.includes("merchant") || lower.includes("innkeeper") || lower.includes("vendor")) return "merchant";
     if (lower.includes("mage") || lower.includes("wizard") || lower.includes("sorcerer")) return "mage";
     if (lower.includes("boss") || lower.includes("chief") || lower.includes("lord")) return "boss";
-    if (lower.includes("undead") || lower.includes("skeleton") || lower.includes("draugr") || lower.includes("zombie")) return "undead";
+    if (lower.includes("undead") || lower.includes("skeleton") || lower.includes("barrow") || lower.includes("zombie")) return "undead";
     // Ranged role reads first so "Bandit Archer" renders as an archer, not a bandit.
     if (lower.includes("archer") || lower.includes("ranger") || lower.includes("hunter")) return "archer";
     if (lower.includes("bandit") || lower.includes("outlaw") || lower.includes("robber")) return "bandit";
@@ -578,7 +578,7 @@ export class NPC {
         this._baseColor = new Color3(0.10, 0.08, 0.06);
         break;
       case "undead":
-        // Draugr / undead — ashen bone grey
+        // Barrow-dead / undead — ashen bone grey
         material.diffuseColor  = new Color3(0.62, 0.58, 0.52);
         material.specularColor = new Color3(0.08, 0.08, 0.07);
         material.specularPower = 12;

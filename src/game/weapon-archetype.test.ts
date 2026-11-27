@@ -6,7 +6,7 @@ const w = (id: string, name = id) => ({ id, name, description: "", stackable: fa
 describe("weaponArchetypeOf", () => {
   it("reads the archetype from the weapon's id and name", () => {
     expect(weaponArchetypeOf(undefined)).toBe("sword");
-    expect(weaponArchetypeOf(w("elven_bow"))).toBe("bow");
+    expect(weaponArchetypeOf(w("fae_bow"))).toBe("bow");
     expect(weaponArchetypeOf(w("x", "Oak Staff"))).toBe("staff");
     expect(weaponArchetypeOf(w("molten_dagger_01"))).toBe("dagger");
     expect(weaponArchetypeOf(w("x", "Two-Handed Claymore"))).toBe("greatsword");

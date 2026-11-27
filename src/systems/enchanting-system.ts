@@ -3,9 +3,9 @@ import type { EquipmentSystem } from "./equipment-system";
 import type { Player } from "../entities/player";
 import type { UIManager } from "../ui/ui-manager";
 
-// ── Soul gem types ────────────────────────────────────────────────────────────
+// ── Spirit vessels (spirit vessels, in code) ────────────────────────────────────────────────────────────
 
-export type SoulGemType = "petty" | "lesser" | "common" | "greater" | "grand";
+export type SoulGemType = "clay" | "pewter" | "silver" | "gold" | "grail";
 
 export interface SoulGemDefinition {
   type: SoulGemType;
@@ -18,11 +18,11 @@ export interface SoulGemDefinition {
 }
 
 export const SOUL_GEMS: Record<SoulGemType, SoulGemDefinition> = {
-  petty:   { type: "petty",   name: "Petty Soul Gem",   description: "Holds a petty soul. Enables minor enchantments.",   magnitudeMultiplier: 0.5,  value: 25  },
-  lesser:  { type: "lesser",  name: "Lesser Soul Gem",  description: "Holds a lesser soul. Enables moderate enchantments.", magnitudeMultiplier: 0.75, value: 50  },
-  common:  { type: "common",  name: "Common Soul Gem",  description: "Holds a common soul. Enables standard enchantments.", magnitudeMultiplier: 1.0,  value: 100 },
-  greater: { type: "greater", name: "Greater Soul Gem", description: "Holds a greater soul. Enables powerful enchantments.", magnitudeMultiplier: 1.5,  value: 200 },
-  grand:   { type: "grand",   name: "Grand Soul Gem",   description: "Holds a grand soul. Enables the strongest enchantments.", magnitudeMultiplier: 2.0, value: 400 },
+  clay:   { type: "clay",   name: "Clay Vessel",   description: "A little clay flask that holds a faint spirit. Enables minor enchantments.",   magnitudeMultiplier: 0.5,  value: 25  },
+  pewter: { type: "pewter", name: "Pewter Vessel", description: "A pewter flask that holds a small spirit. Enables moderate enchantments.",   magnitudeMultiplier: 0.75, value: 50  },
+  silver: { type: "silver", name: "Silver Vessel", description: "A silver flask that holds a spirit of fair strength. Enables standard enchantments.", magnitudeMultiplier: 1.0, value: 100 },
+  gold:   { type: "gold",   name: "Gold Vessel",   description: "A gold flask that holds a strong spirit. Enables powerful enchantments.",   magnitudeMultiplier: 1.5,  value: 200 },
+  grail:  { type: "grail",  name: "Grail Vessel",  description: "A cup fit for the grail itself; it holds the greatest spirits. Enables the strongest enchantments.", magnitudeMultiplier: 2.0, value: 400 },
 };
 
 // ── Enchantment effect types ──────────────────────────────────────────────────
@@ -157,7 +157,7 @@ export interface ItemEnchantment {
 // ── Save state ────────────────────────────────────────────────────────────────
 
 export interface EnchantingSaveState {
-  /** Count of each soul gem type in the player's collection. */
+  /** Count of each spirit vessel type in the player's collection. */
   soulGems: Partial<Record<SoulGemType, number>>;
   /** Enchanting skill level (0–100). */
   enchantingSkill: number;
@@ -179,15 +179,15 @@ export function getItemEnchantmentCategory(slot: string | undefined): Enchantmen
 // ── EnchantingSystem ──────────────────────────────────────────────────────────
 
 /**
- * Oblivion-style enchanting system.
+ * Enchanting: binding a spirit held in a vessel into a weapon or armour.
  *
  * Core loop:
- *  1. Player collects soul gems (addSoulGem).
+ *  1. Player collects spirit vessels (addSoulGem).
  *  2. At the enchanting altar (E key), the player selects:
  *     a. An enchantable item from their inventory (weapon or armor).
  *     b. An enchantment effect appropriate for that item category.
- *     c. A soul gem to power the enchantment.
- *  3. enchantItem() validates prerequisites, consumes the soul gem,
+ *     c. A spirit vessel to power the enchantment.
+ *  3. enchantItem() validates prerequisites, consumes the spirit vessel,
  *     modifies the item's stats, renames the item, and raises the skill.
  *
  * Skill integration:
@@ -195,7 +195,7 @@ export function getItemEnchantmentCategory(slot: string | undefined): Enchantmen
  *  - Every successful enchantment raises the skill by 1–3 points.
  *
  * Save integration:
- *  - Soul gem counts and skill are persisted via getSaveState / restoreFromSave.
+ *  - spirit vessel counts and skill are persisted via getSaveState / restoreFromSave.
  *  - Enchanted item stats are already captured by the inventory/equipment save.
  */
 export class EnchantingSystem {
@@ -204,7 +204,7 @@ export class EnchantingSystem {
   private _equipment: EquipmentSystem;
   private _ui: UIManager;
 
-  /** Soul gem inventory: type → count. */
+  /** spirit vessel inventory: type → count. */
   private _soulGems: Map<SoulGemType, number> = new Map();
 
   /** Enchanting skill (0–100). Scales enchantment magnitude. */
@@ -225,14 +225,14 @@ export class EnchantingSystem {
     this._ui        = ui;
   }
 
-  // ── Soul gem management ──────────────────────────────────────────────────
+  // ── spirit vessel management ──────────────────────────────────────────────────
 
-  /** Add `quantity` soul gems of the given type. */
+  /** Add `quantity` spirit vessels of the given type. */
   public addSoulGem(type: SoulGemType, quantity: number = 1): void {
     this._soulGems.set(type, (this._soulGems.get(type) ?? 0) + quantity);
   }
 
-  /** Remove one soul gem of the given type. Returns false if none available. */
+  /** Remove one spirit vessel of the given type. Returns false if none available. */
   public removeSoulGem(type: SoulGemType): boolean {
     const current = this._soulGems.get(type) ?? 0;
     if (current < 1) return false;
@@ -244,12 +244,12 @@ export class EnchantingSystem {
     return true;
   }
 
-  /** Current count of a soul gem type. */
+  /** Current count of a spirit vessel type. */
   public getSoulGemCount(type: SoulGemType): number {
     return this._soulGems.get(type) ?? 0;
   }
 
-  /** All soul gem types the player currently holds (count > 0). */
+  /** All spirit vessel types the player currently holds (count > 0). */
   public getAvailableSoulGems(): Array<{ def: SoulGemDefinition; count: number }> {
     const result: Array<{ def: SoulGemDefinition; count: number }> = [];
     for (const [type, count] of this._soulGems) {
@@ -292,7 +292,7 @@ export class EnchantingSystem {
    *
    * @param itemId    - ID of the inventory item to enchant.
    * @param effectId  - Enchantment effect to apply.
-   * @param gemType   - Soul gem type to consume.
+   * @param gemType   - spirit vessel type to consume.
    * @returns The enchanted item on success, or null with a UI notification on failure.
    */
   public enchantItem(
@@ -300,7 +300,7 @@ export class EnchantingSystem {
     effectId: string,
     gemType: SoulGemType,
   ): Item | null {
-    // Validate soul gem availability
+    // Validate spirit vessel availability
     if ((this._soulGems.get(gemType) ?? 0) < 1) {
       this._ui.showNotification(`No ${SOUL_GEMS[gemType].name} available.`, 2000);
       return null;
@@ -344,7 +344,7 @@ export class EnchantingSystem {
     const skillMult    = 0.5 + (this.enchantingSkill / 100) * 1.5;
     const magnitude    = Math.max(1, Math.round(effectDef.baseMagnitude * gemDef.magnitudeMultiplier * skillMult));
 
-    // Consume the soul gem
+    // Consume the spirit vessel
     this.removeSoulGem(gemType);
 
     // Apply stats to the item copy
@@ -372,8 +372,8 @@ export class EnchantingSystem {
       this._applyStatDelta(effectDef.statField, magnitude);
     }
 
-    // Raise skill (more complex enchants from larger gems = more XP)
-    const gemTiers: Record<SoulGemType, number> = { petty: 1, lesser: 2, common: 3, greater: 4, grand: 5 };
+    // Raise skill (more complex enchants from larger vessels = more XP)
+    const gemTiers: Record<SoulGemType, number> = { clay: 1, pewter: 2, silver: 3, gold: 4, grail: 5 };
     this.enchantingSkill = Math.min(100, this.enchantingSkill + gemTiers[gemType]);
 
     this._ui.showNotification(`Enchanted: ${newName} (+${magnitude} ${effectDef.name})`, 3000);

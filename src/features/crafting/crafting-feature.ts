@@ -116,15 +116,15 @@ export class CraftingFeature implements Feature {
       random: () => this._rng?.next() ?? 0.5,
     });
 
-    // Starter kit: a few ingredients, soul gems, and enough to use the forge
+    // Starter kit: a few ingredients, spirit vessels, and enough to use the forge
     // before the first merchant visit.
     for (const [id, n] of [
       ["plantain_leaves", 5], ["comfrey_root", 4], ["vervain", 4],
       ["st_johns_wort", 3], ["meadowsweet", 3],
     ] as const) this.alchemy.addIngredient(id, n);
-    this.enchanting.addSoulGem("petty", 3);
-    this.enchanting.addSoulGem("lesser", 2);
-    this.enchanting.addSoulGem("common", 1);
+    this.enchanting.addSoulGem("clay", 3);
+    this.enchanting.addSoulGem("pewter", 2);
+    this.enchanting.addSoulGem("silver", 1);
     deps.inventory.items.push(
       smithingMaterialStack("iron_ingot", 3),
       smithingMaterialStack("leather_strips", 2),

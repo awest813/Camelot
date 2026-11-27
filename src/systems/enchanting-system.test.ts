@@ -70,41 +70,41 @@ describe("getItemEnchantmentCategory", () => {
   });
 });
 
-describe("EnchantingSystem — soul gem management", () => {
+describe("EnchantingSystem — spirit vessel management", () => {
   let system: EnchantingSystem;
 
   beforeEach(() => {
     system = new EnchantingSystem(makePlayer(), makeInventory(), makeEquipment(), makeUI());
   });
 
-  it("starts with no soul gems", () => {
+  it("starts with no spirit vessels", () => {
     expect(system.getAvailableSoulGems()).toHaveLength(0);
-    expect(system.getSoulGemCount("common")).toBe(0);
+    expect(system.getSoulGemCount("silver")).toBe(0);
   });
 
   it("addSoulGem increases count", () => {
-    system.addSoulGem("common", 3);
-    expect(system.getSoulGemCount("common")).toBe(3);
+    system.addSoulGem("silver", 3);
+    expect(system.getSoulGemCount("silver")).toBe(3);
   });
 
   it("removeSoulGem decrements count", () => {
-    system.addSoulGem("petty", 2);
-    expect(system.removeSoulGem("petty")).toBe(true);
-    expect(system.getSoulGemCount("petty")).toBe(1);
+    system.addSoulGem("clay", 2);
+    expect(system.removeSoulGem("clay")).toBe(true);
+    expect(system.getSoulGemCount("clay")).toBe(1);
   });
 
   it("removeSoulGem returns false when none available", () => {
-    expect(system.removeSoulGem("grand")).toBe(false);
+    expect(system.removeSoulGem("grail")).toBe(false);
   });
 
   it("getAvailableSoulGems lists all types with count > 0", () => {
-    system.addSoulGem("common", 1);
-    system.addSoulGem("grand", 2);
+    system.addSoulGem("silver", 1);
+    system.addSoulGem("grail", 2);
     const available = system.getAvailableSoulGems();
     expect(available).toHaveLength(2);
     const types = available.map(g => g.def.type);
-    expect(types).toContain("common");
-    expect(types).toContain("grand");
+    expect(types).toContain("silver");
+    expect(types).toContain("grail");
   });
 });
 
@@ -142,11 +142,11 @@ describe("EnchantingSystem — enchantItem", () => {
     inventory = makeInventory([makeWeapon(), makeArmor()]);
     system    = new EnchantingSystem(player, inventory, makeEquipment(), makeUI());
     ui        = system["_ui"];
-    system.addSoulGem("common");
+    system.addSoulGem("silver");
   });
 
   it("successfully enchants a weapon with a weapon effect", () => {
-    const result = system.enchantItem("sword_01", "fire_damage", "common");
+    const result = system.enchantItem("sword_01", "fire_damage", "silver");
     expect(result).not.toBeNull();
     expect(result!.name).toContain("Flaming");
     expect(result!.stats.enchantment).toBeDefined();
@@ -154,52 +154,52 @@ describe("EnchantingSystem — enchantItem", () => {
   });
 
   it("updates the inventory item in place", () => {
-    system.enchantItem("sword_01", "fire_damage", "common");
+    system.enchantItem("sword_01", "fire_damage", "silver");
     const item = inventory.items.find((i: any) => i.id === "sword_01");
     expect(item?.name).toContain("Flaming");
   });
 
-  it("consumes the soul gem", () => {
-    system.enchantItem("sword_01", "fire_damage", "common");
-    expect(system.getSoulGemCount("common")).toBe(0);
+  it("consumes the spirit vessel", () => {
+    system.enchantItem("sword_01", "fire_damage", "silver");
+    expect(system.getSoulGemCount("silver")).toBe(0);
   });
 
-  it("returns null when no soul gem is available", () => {
-    system.removeSoulGem("common");
-    const result = system.enchantItem("sword_01", "fire_damage", "common");
+  it("returns null when no spirit vessel is available", () => {
+    system.removeSoulGem("silver");
+    const result = system.enchantItem("sword_01", "fire_damage", "silver");
     expect(result).toBeNull();
   });
 
   it("returns null for unknown item", () => {
-    const result = system.enchantItem("nonexistent", "fire_damage", "common");
+    const result = system.enchantItem("nonexistent", "fire_damage", "silver");
     expect(result).toBeNull();
   });
 
   it("returns null when applying a weapon effect to armor", () => {
-    const result = system.enchantItem("helm_01", "fire_damage", "common");
+    const result = system.enchantItem("helm_01", "fire_damage", "silver");
     expect(result).toBeNull();
   });
 
   it("returns null when applying an armor effect to weapon", () => {
-    const result = system.enchantItem("sword_01", "fortify_health", "common");
+    const result = system.enchantItem("sword_01", "fortify_health", "silver");
     expect(result).toBeNull();
   });
 
   it("raises the enchanting skill after a successful enchant", () => {
     const before = system.enchantingSkill;
-    system.enchantItem("sword_01", "fire_damage", "common");
+    system.enchantItem("sword_01", "fire_damage", "silver");
     expect(system.enchantingSkill).toBeGreaterThan(before);
   });
 
-  it("magnitude scales with soul gem multiplier", () => {
+  it("magnitude scales with spirit vessel multiplier", () => {
     const inventorySmall  = makeInventory([makeWeapon("s1"), makeWeapon("s2")]);
     const sysSmall = new EnchantingSystem(makePlayer(), inventorySmall, makeEquipment(), makeUI());
     sysSmall.enchantingSkill = 0; // eliminate skill variance
-    sysSmall.addSoulGem("petty");
-    sysSmall.addSoulGem("grand");
+    sysSmall.addSoulGem("clay");
+    sysSmall.addSoulGem("grail");
 
-    const smallResult = sysSmall.enchantItem("s1", "fire_damage", "petty");
-    const grandResult = sysSmall.enchantItem("s2", "fire_damage", "grand");
+    const smallResult = sysSmall.enchantItem("s1", "fire_damage", "clay");
+    const grandResult = sysSmall.enchantItem("s2", "fire_damage", "grail");
 
     const smallMag = smallResult!.stats.enchantment.magnitude;
     const grandMag = grandResult!.stats.enchantment.magnitude;
@@ -210,16 +210,16 @@ describe("EnchantingSystem — enchantItem", () => {
   it("applies stat delta to player when item is currently equipped", () => {
     const equipped = makeEquipment(new Set(["sword_01"]));
     const sys = new EnchantingSystem(makePlayer(), makeInventory([makeWeapon()]), equipped, makeUI());
-    sys.addSoulGem("common");
+    sys.addSoulGem("silver");
     const before = sys["_player"].bonusDamage;
-    sys.enchantItem("sword_01", "fire_damage", "common");
+    sys.enchantItem("sword_01", "fire_damage", "silver");
     expect(sys["_player"].bonusDamage).toBeGreaterThan(before);
   });
 
   it("fires onItemEnchanted callback on success", () => {
     let fired = false;
     system.onItemEnchanted = () => { fired = true; };
-    system.enchantItem("sword_01", "fire_damage", "common");
+    system.enchantItem("sword_01", "fire_damage", "silver");
     expect(fired).toBe(true);
   });
 });
@@ -254,7 +254,7 @@ describe("EnchantingSystem — effects catalogue", () => {
 
 describe("EnchantingSystem — SOUL_GEMS catalogue", () => {
   it("magnitude multipliers are ordered petty < lesser < common < greater < grand", () => {
-    const types: SoulGemType[] = ["petty", "lesser", "common", "greater", "grand"];
+    const types: SoulGemType[] = ["clay", "pewter", "silver", "gold", "grail"];
     for (let i = 1; i < types.length; i++) {
       expect(SOUL_GEMS[types[i]].magnitudeMultiplier).toBeGreaterThan(
         SOUL_GEMS[types[i - 1]].magnitudeMultiplier,
@@ -264,10 +264,10 @@ describe("EnchantingSystem — SOUL_GEMS catalogue", () => {
 });
 
 describe("EnchantingSystem — save / restore", () => {
-  it("round-trips soul gems and skill through save state", () => {
+  it("round-trips spirit vessels and skill through save state", () => {
     const system = new EnchantingSystem(makePlayer(), makeInventory(), makeEquipment(), makeUI());
-    system.addSoulGem("greater", 3);
-    system.addSoulGem("petty", 1);
+    system.addSoulGem("gold", 3);
+    system.addSoulGem("clay", 1);
     system.enchantingSkill = 42;
 
     const state = system.getSaveState();
@@ -275,18 +275,18 @@ describe("EnchantingSystem — save / restore", () => {
     const system2 = new EnchantingSystem(makePlayer(), makeInventory(), makeEquipment(), makeUI());
     system2.restoreFromSave(state);
 
-    expect(system2.getSoulGemCount("greater")).toBe(3);
-    expect(system2.getSoulGemCount("petty")).toBe(1);
-    expect(system2.getSoulGemCount("common")).toBe(0);
+    expect(system2.getSoulGemCount("gold")).toBe(3);
+    expect(system2.getSoulGemCount("clay")).toBe(1);
+    expect(system2.getSoulGemCount("silver")).toBe(0);
     expect(system2.enchantingSkill).toBe(42);
   });
 
   it("restoreFromSave handles null gracefully", () => {
     const system = new EnchantingSystem(makePlayer(), makeInventory(), makeEquipment(), makeUI());
-    system.addSoulGem("grand", 5);
+    system.addSoulGem("grail", 5);
     expect(() => system.restoreFromSave(null as any)).not.toThrow();
     // State unchanged since null is a no-op
-    expect(system.getSoulGemCount("grand")).toBe(5);
+    expect(system.getSoulGemCount("grail")).toBe(5);
   });
 
   it("restoreFromSave clamps skill to 0–100", () => {

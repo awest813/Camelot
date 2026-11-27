@@ -328,7 +328,7 @@ describe("LootTableSystem", () => {
   });
 
   it("boss_loot high-tier items only appear at level 5+", () => {
-    const highTierIds = new Set(["daedric_sword", "daedric_shield", "glass_armor"]);
+    const highTierIds = new Set(["annwn_sword", "annwn_shield", "crystal_armor"]);
     for (let seed = 0; seed < 50; seed++) {
       const result = lts.rollTable("boss_loot", seed, { playerLevel: 3 });
       for (const item of result.items) {
@@ -338,7 +338,7 @@ describe("LootTableSystem", () => {
   });
 
   it("boss_loot high-tier items can appear at level 5+", () => {
-    const highTierIds = new Set(["daedric_sword", "daedric_shield"]);
+    const highTierIds = new Set(["annwn_sword", "annwn_shield"]);
     let gotHighTier = false;
     for (let seed = 0; seed < 200; seed++) {
       const result = lts.rollTable("boss_loot", seed, { playerLevel: 5 });
@@ -398,7 +398,7 @@ describe("LootTableSystem", () => {
 
   it("rollTables passes context to each table", () => {
     // Level 1 player should never get boss high-tier items
-    const highTierIds = new Set(["daedric_sword", "daedric_shield", "glass_armor"]);
+    const highTierIds = new Set(["annwn_sword", "annwn_shield", "crystal_armor"]);
     const items = lts.rollTables(["boss_loot"], 42, { playerLevel: 1 });
     expect(items.some(i => highTierIds.has(i.id))).toBe(false);
   });

@@ -38,7 +38,7 @@ export function getItemIcon(
   if (/armor|cuirass|mail|plate|robe|tunic|vest/.test(target)) return "🥋";
   if (/greaves|leggings|pants|breeches/.test(target)) return "👖";
   if (/boots|shoes|sandals/.test(target)) return "👢";
-  if (/gold|coin|septim|currency|money/.test(target)) return "🪙";
+  if (/gold|coin|crown|currency|money/.test(target)) return "🪙";
   if (/torch|candle|lantern/.test(target)) return "🪵";
   if (/meat|bread|cheese|apple|berry|food|ration|fish/.test(target)) return "🍖";
   if (/gem|ruby|sapphire|emerald|diamond|ore|ingot|crystal/.test(target)) return "💎";

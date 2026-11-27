@@ -83,7 +83,7 @@ export function modelForNpcName(name: string): CharacterModelId | null {
   const n = name.toLowerCase();
   if (n.startsWith("dragon")) return null;
   // Ruin guards are the restless dead of the old ruins.
-  if (/undead|skeleton|draugr|zombie|wight|barrow|lich|ruinguard/.test(n)) {
+  if (/undead|skeleton|barrowdead|zombie|wight|barrow|lich|ruinguard/.test(n)) {
     if (/mage|lich|necro/.test(n)) return "Skeleton_Mage";
     if (/archer|rogue|ranger/.test(n)) return "Skeleton_Rogue";
     if (/minion|thrall|lesser/.test(n)) return "Skeleton_Minion";

@@ -5,7 +5,7 @@ describe("character model mapping", () => {
   it("picks models by archetype words", () => {
     // Undead stay KayKit skeletons; living humans are Quaternius outfit characters.
     expect(modelForNpcName("RuinGuard_1_2")).toBe("Skeleton_Warrior");
-    expect(modelForNpcName("Draugr Archer")).toBe("Skeleton_Rogue");
+    expect(modelForNpcName("Barrow-dead Archer")).toBe("Skeleton_Rogue");
     expect(modelForNpcName("TowerGuard_1_2")).toMatch(/^Ranger_(Male|Female)$/);
     expect(modelForNpcName("Village Mage")).toMatch(/^Ranger_(Male|Female)$/);
     expect(modelForNpcName("Forest Archer")).toMatch(/^Ranger_(Male|Female)$/);
