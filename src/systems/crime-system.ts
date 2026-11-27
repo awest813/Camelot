@@ -61,6 +61,12 @@ export class CrimeSystem {
    */
   public onGuardChallenge: ((guard: NPC, factionId: string, bounty: number) => void) | null = null;
 
+  /**
+   * The player's stealth, when wired: an unseen player (Fade, Under the Hill)
+   * has no witnesses, and a sneaking one only those who have noticed them.
+   */
+  public stealth: { unseenSeconds: number; isCrouching: boolean; getDetectionLevel(npc: NPC): number } | null = null;
+
   constructor(player: Player, npcs: NPC[], ui: UIManager, scene: any) {
     this._player = player;
     this._npcs   = npcs;
@@ -257,8 +263,12 @@ export class CrimeSystem {
   // ── Private helpers ────────────────────────────────────────────────────────
 
   private _findNearbyWitnesses(): NPC[] {
+    const stealth = this.stealth;
+    if (stealth && stealth.unseenSeconds > 0) return [];
     return this._npcs.filter((npc) => {
       if (npc.isDead) return false;
+      // Sneaking: only those who have half-noticed you saw it.
+      if (stealth?.isCrouching && stealth.getDetectionLevel(npc) < 30) return false;
       // Indoors / hidden (e.g. asleep at home) — can't see anything.
       if (typeof npc.mesh.isEnabled === "function" && !npc.mesh.isEnabled()) return false;
       const playerPos = this._player.camera.position;

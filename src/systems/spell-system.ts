@@ -58,6 +58,9 @@ export interface SpellDefinition {
    */
   effect?: SpellEffect;
   magnitude?: number;
+  /** Magicka / stamina restored to the caster (self spells). */
+  restoreMagicka?: number;
+  restoreStamina?: number;
   /** Damage multiplier against the restless dead (skeletons, barrow-wights). */
   undeadBane?: number;
 }
@@ -524,6 +527,9 @@ export class SpellSystem {
   private _resolveEffect(spell: SpellDefinition): SpellCastResult {
     // Self-targeted spells
     if (spell.delivery === "self") {
+      if (spell.restoreMagicka) this._player.magicka = Math.min(this._player.maxMagicka, this._player.magicka + spell.restoreMagicka);
+      const body = this._player as unknown as { stamina?: number; maxStamina?: number };
+      if (spell.restoreStamina && typeof body.stamina === "number") body.stamina = Math.min(body.maxStamina ?? body.stamina, body.stamina + spell.restoreStamina);
       if (spell.heal) {
         const healingMultiplier = (this._player as unknown as { perkHealingMultiplier?: number }).perkHealingMultiplier ?? 1.0;
         const scaledHeal = spell.heal * healingMultiplier;

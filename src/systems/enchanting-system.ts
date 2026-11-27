@@ -59,7 +59,7 @@ export const ENCHANTMENT_EFFECTS: EnchantmentEffectDefinition[] = [
     description: "Sets the weapon alight, dealing bonus fire damage on each hit.",
     category: "weapon",
     baseMagnitude: 5,
-    statField: "damage",
+    // Lands with each blow (CombatSystem reads the weapon's enchantment).
     namePrefix: "Flaming",
   },
   {
@@ -68,7 +68,7 @@ export const ENCHANTMENT_EFFECTS: EnchantmentEffectDefinition[] = [
     description: "Coats the blade with frost, dealing bonus frost damage on each hit.",
     category: "weapon",
     baseMagnitude: 5,
-    statField: "damage",
+    // Lands with each blow (CombatSystem reads the weapon's enchantment).
     namePrefix: "Frozen",
   },
   {
@@ -77,7 +77,7 @@ export const ENCHANTMENT_EFFECTS: EnchantmentEffectDefinition[] = [
     description: "Charges the weapon with lightning, dealing bonus shock damage on each hit.",
     category: "weapon",
     baseMagnitude: 5,
-    statField: "damage",
+    // Lands with each blow (CombatSystem reads the weapon's enchantment).
     namePrefix: "Shocking",
   },
   {
@@ -86,7 +86,7 @@ export const ENCHANTMENT_EFFECTS: EnchantmentEffectDefinition[] = [
     description: "Drains the target's life force, transferring it to the wielder.",
     category: "weapon",
     baseMagnitude: 4,
-    statField: "damage",
+    // Lands with each blow (CombatSystem reads the weapon's enchantment).
     namePrefix: "Vampiric",
   },
   {
@@ -95,7 +95,7 @@ export const ENCHANTMENT_EFFECTS: EnchantmentEffectDefinition[] = [
     description: "Siphons magicka from the target on each strike.",
     category: "weapon",
     baseMagnitude: 5,
-    statField: "damage",
+    // Lands with each blow (CombatSystem reads the weapon's enchantment).
     namePrefix: "Mystic",
   },
   // ── Armor enchantments ────────────────────────────────────────────────────

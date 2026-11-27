@@ -192,6 +192,27 @@ describe('CombatSystem', () => {
         expect(mockPlayer.notifyResourceSpent).toHaveBeenCalledWith('stamina');
     });
 
+    const wield = (effectId: string, magnitude: number) => combatSystem.setScalingSystems({
+        equipment: { getEquipped: () => new Map([['mainHand', { stats: { enchantment: { effectId, magnitude } } }]]) },
+    });
+
+    it('an enchanted weapon lands its element with the blow', () => {
+        mockScene.pickWithRay.mockReturnValue({ pickedMesh: mockNpcs[0].mesh, pickedPoint: new Vector3(0, 0, 1) });
+        wield('fire_damage', 7);
+        combatSystem.meleeAttack();
+        expect(mockNpcs[0].takeDamage).toHaveBeenNthCalledWith(1, 10);
+        expect(mockNpcs[0].takeDamage).toHaveBeenNthCalledWith(2, 7);
+    });
+
+    it('Absorb Health heals you by what it takes', () => {
+        mockScene.pickWithRay.mockReturnValue({ pickedMesh: mockNpcs[0].mesh, pickedPoint: new Vector3(0, 0, 1) });
+        wield('absorb_health', 5);
+        mockPlayer.health = 50;
+        mockPlayer.maxHealth = 100;
+        combatSystem.meleeAttack();
+        expect(mockPlayer.health).toBe(55);
+    });
+
     it('townsfolk (not hostile on sight) ignore the player walking up', () => {
         mockNpcs[0].hostileOnSight = false;
         mockNpcs[0].aiState = "PATROL";

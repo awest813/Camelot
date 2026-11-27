@@ -177,10 +177,8 @@ export function installGameFeatures(game: Game): void {
           const npc = game.scheduleSystem.npcs.find((n) => n.key === npcId);
           return npc ? game.stealthSystem.getDetectionLevel(npc) >= 30 : true;
         },
-        reportTheft: (npcId) => {
-          const npc = game.scheduleSystem.npcs.find((n) => n.key === npcId);
-          game.crimeSystem.commitCrime("theft", npc?.factionId ?? "village_guard", game.timeSystem.elapsedGameTime);
-        },
+        // Caught with a hand in their purse: the mark is the witness, whoever else is looking.
+        reportTheft: (npcId) => { const npc = game.scheduleSystem.npcs.find((n) => n.key === npcId); game.crimeSystem.commitCrime("theft", npc?.factionId ?? "village_guard", game.timeSystem.elapsedGameTime, npc ? [npc] : undefined); },
         receive: (itemId) => grantPickpocketItem(game, itemId),
       });
       k.install(game._thief);

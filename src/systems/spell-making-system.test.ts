@@ -217,3 +217,18 @@ describe("SpellMakingSystem", () => {
     expect(sms2.customSpells[0].name).toBe("Inferno");
   });
 });
+
+describe("SpellMakingSystem — what the components really do", () => {
+  it("restore magicka/stamina restore those, not health; silence calms the target", () => {
+    const sms = new SpellMakingSystem(makeSpellSystem() as unknown as SpellSystem);
+    const restore = sms.forgeSpell("Wellspring", [
+      { effectType: "restore_magicka", school: "restoration", magnitude: 30, duration: 0 },
+      { effectType: "restore_stamina", school: "restoration", magnitude: 20, duration: 0 },
+    ], makeBarterSystem(5000)).spell!;
+    expect(restore).toMatchObject({ restoreMagicka: 30, restoreStamina: 20, delivery: "self" });
+    expect(restore.heal).toBeUndefined();
+    const hush = sms.forgeSpell("Quiet", [{ effectType: "silence", school: "illusion", magnitude: 10, duration: 12 }], makeBarterSystem(5000)).spell!;
+    expect(hush).toMatchObject({ effect: "pacify", duration: 12, delivery: "target" });
+    expect(hush.damage).toBeUndefined();
+  });
+});

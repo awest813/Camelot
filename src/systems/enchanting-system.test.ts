@@ -150,7 +150,8 @@ describe("EnchantingSystem — enchantItem", () => {
     expect(result).not.toBeNull();
     expect(result!.name).toContain("Flaming");
     expect(result!.stats.enchantment).toBeDefined();
-    expect(result!.stats.damage).toBeGreaterThan(5); // original + enchant
+    expect(result!.stats.damage, "fire lands as its own element, not flat damage").toBe(makeWeapon().stats!.damage);
+    expect(result!.stats.enchantment.effectId).toBe("fire_damage");
   });
 
   it("updates the inventory item in place", () => {
@@ -208,11 +209,11 @@ describe("EnchantingSystem — enchantItem", () => {
   });
 
   it("applies stat delta to player when item is currently equipped", () => {
-    const equipped = makeEquipment(new Set(["sword_01"]));
-    const sys = new EnchantingSystem(makePlayer(), makeInventory([makeWeapon()]), equipped, makeUI());
+    const equipped = makeEquipment(new Set(["helm_01"]));
+    const sys = new EnchantingSystem(makePlayer(), makeInventory([makeArmor()]), equipped, makeUI());
     sys.addVessel("silver");
     const before = sys["_player"].bonusDamage;
-    sys.enchantItem("sword_01", "fire_damage", "silver");
+    sys.enchantItem("helm_01", "fortify_strength", "silver");
     expect(sys["_player"].bonusDamage).toBeGreaterThan(before);
   });
 

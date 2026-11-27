@@ -231,11 +231,19 @@ export class SpellMakingSystem {
       } else if (c.effectType === "heal") {
         totalHeal += c.magnitude;
         spell.delivery = "self";
-      } else if (c.effectType === "restore_magicka" || c.effectType === "restore_stamina") {
-        totalHeal += Math.round(c.magnitude * 0.5);
+      } else if (c.effectType === "restore_magicka") {
+        spell.restoreMagicka = (spell.restoreMagicka ?? 0) + c.magnitude;
         spell.delivery = "self";
-      } else if (c.effectType === "silence" || c.effectType === "burden") {
-        // These are debuff-style effects — piggyback a small damage value
+      } else if (c.effectType === "restore_stamina") {
+        spell.restoreStamina = (spell.restoreStamina ?? 0) + c.magnitude;
+        spell.delivery = "self";
+      } else if (c.effectType === "silence") {
+        // Silence the target's fight: it is calmed (as Hush) for the duration.
+        spell.effect = "pacify";
+        spell.duration = Math.max(spell.duration ?? 0, c.duration, 5);
+        spell.delivery = "target";
+      } else if (c.effectType === "burden") {
+        // A crushing weight: harm in proportion to the burden laid on.
         totalDamage += Math.round(c.magnitude * 0.4);
         spell.delivery = "target";
       }

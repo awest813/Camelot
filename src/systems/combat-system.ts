@@ -416,6 +416,31 @@ export class CombatSystem {
     }
   }
 
+  private _equipment: { getEquipped(): Map<string, { stats?: { enchantment?: { effectId: string; magnitude: number } } }> } | null = null;
+
+  /**
+   * An enchanted main-hand weapon's element on top of the blow: fire, frost
+   * or shock damage (against the target's resistances), or life taken
+   * (Absorb Health heals you) or magicka drawn (Drain Magicka restores yours).
+   */
+  private _weaponEnchantmentHit(npc: NPC): void {
+    const ench = this._equipment?.getEquipped().get("mainHand")?.stats?.enchantment;
+    if (!ench || npc.isDead) return;
+    const element = ({ fire_damage: "fire", frost_damage: "frost", shock_damage: "shock" } as const)[ench.effectId as "fire_damage"];
+    if (element) {
+      const dmg = applyDamageWithResistance(ench.magnitude, npc, element);
+      npc.takeDamage(dmg);
+      this.events?.emit("combat:npcDamaged", { npc, damage: dmg });
+    } else if (ench.effectId === "absorb_health") {
+      const dmg = applyDamageWithResistance(ench.magnitude, npc, "magic");
+      npc.takeDamage(dmg);
+      this.events?.emit("combat:npcDamaged", { npc, damage: dmg });
+      this.player.health = Math.min(this.player.maxHealth, this.player.health + dmg);
+    } else if (ench.effectId === "drain_magicka") {
+      this.player.magicka = Math.min(this.player.maxMagicka, this.player.magicka + ench.magnitude);
+    }
+  }
+
   public setStealthSystem(s: { canSneakAttack(npc: NPC): boolean } | null): void {
     this._stealthSystem = s;
   }
@@ -432,7 +457,10 @@ export class CombatSystem {
     skillSystem?: SkillProgressionSystem | null;
     attributeSystem?: AttributeSystem | null;
     activeEffectsSystem?: ActiveEffectsSystem | null;
+    /** Worn gear: an enchanted weapon's element lands with each blow. */
+    equipment?: { getEquipped(): Map<string, { stats?: { enchantment?: { effectId: string; magnitude: number } } }> } | null;
   }): void {
+    if (opts.equipment !== undefined) this._equipment = opts.equipment;
     if (opts.skillSystem !== undefined) {
       this._skillSystem = opts.skillSystem;
     }
@@ -870,6 +898,7 @@ export class CombatSystem {
 
       npc.takeDamage(meleeDmg);
       this.events?.emit("combat:npcDamaged", { npc, damage: meleeDmg });
+      this._weaponEnchantmentHit(npc);
       this.events?.emit("combat:weaponHit", { powerAttack: false });
       this._ui.applyHitStop(isFinisher ? 160 : isCrit ? 120 : 60);
       this._ui.shakeCamera(isFinisher ? 0.7 : isCrit ? 0.6 : 0.25);
@@ -1059,6 +1088,7 @@ export class CombatSystem {
           : applyDamageWithResistance(rawDmg, npc, "physical", weaponProfile.armorPenFraction);
         npc.takeDamage(finalDmg);
         this.events?.emit("combat:npcDamaged", { npc, damage: finalDmg });
+        this._weaponEnchantmentHit(npc);
         this.events?.emit("combat:weaponHit", { powerAttack: true });
 
         this._ui.applyHitStop(isExecute ? 200 : 140);

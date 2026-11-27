@@ -30,6 +30,7 @@ export function setupWorldSystems(g: Game): void {
   g.combatSystem.setScalingSystems({
     skillSystem: g.skillProgressionSystem,
     attributeSystem: g.attributeSystem,
+    equipment: g.equipmentSystem,
   });
   // Lets ranged/magic NPCs fire arrows and bolts at the player.
   g.combatSystem.setProjectileSystem(g.projectileSystem);

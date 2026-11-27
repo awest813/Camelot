@@ -46,6 +46,17 @@ describe("CrimeSystem", () => {
     expect(mockUI.showNotification).toHaveBeenCalled();
   });
 
+  it("an unseen player has no witnesses; a sneaking one only those who noticed", () => {
+    const stealth = { unseenSeconds: 10, isCrouching: false, getDetectionLevel: () => 0 };
+    crimeSystem.stealth = stealth;
+    expect(crimeSystem.commitCrime("theft", "town_guard", 480)).toBe(0);
+    stealth.unseenSeconds = 0;
+    stealth.isCrouching = true;
+    expect(crimeSystem.commitCrime("theft", "town_guard", 480)).toBe(0);
+    stealth.getDetectionLevel = () => 40;
+    expect(crimeSystem.commitCrime("theft", "town_guard", 480)).toBe(25);
+  });
+
   it("commitCrime returns 0 when no witnesses are present", () => {
     // NPC is far away (> 15 units)
     mockNpc.mesh.position = new Vector3(0, 0, 50);
