@@ -117,6 +117,12 @@ export const frameworkBaseContent: RpgContentBundle = {
               nextNodeId: "rumors_reply",
             },
             {
+              id: "hire",
+              text: "Anyone here who'd take the road with me, for coin?",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "followers:hire" }],
+            },
+            {
               id: "work",
               text: "Any work going?",
               endsDialogue: true,
@@ -209,6 +215,12 @@ export const frameworkBaseContent: RpgContentBundle = {
               id: "rumors",
               text: "Heard anything worth knowing?",
               nextNodeId: "rumors_reply",
+            },
+            {
+              id: "hire",
+              text: "Any swords for hire drinking here?",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "followers:hire" }],
             },
             {
               id: "leave",

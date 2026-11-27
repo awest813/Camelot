@@ -504,7 +504,7 @@ export function installGameFeatures(game: Game): void {
       });
       const shouts = new ShoutsFeature();
       k.install(shouts);
-      const followers = new FollowersFeature();
+      const followers = new FollowersFeature(game.scene);
       k.install(followers);
       // A starter wolf companion for new games.
       pets.pets.grantPet("pet_wolf");

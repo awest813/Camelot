@@ -77,6 +77,8 @@ export class FollowerUI {
   private _focusSession: DialogFocusSession | null = null;
 
   public onRecruit:   ((templateId: string) => void) | null = null;
+  /** Whether Recruit is live (the panel was opened at an inn). */
+  private _hiring = true;
   public onDismiss:   (() => void) | null = null;
   public onCommand:   ((command: FollowerCommand) => void) | null = null;
   public onClose:     (() => void) | null = null;
@@ -139,8 +141,10 @@ export class FollowerUI {
     activeFollower: ActiveFollowerState | null,
     deceasedIds:    string[],
     playerGold:     number,
+    hiring          = true,
   ): void {
     if (typeof document === "undefined") return;
+    this._hiring         = hiring;
     this._templates      = templates.slice();
     this._activeFollower = activeFollower;
     this._deceasedIds    = new Set(deceasedIds);
@@ -168,7 +172,9 @@ export class FollowerUI {
     activeFollower: ActiveFollowerState | null,
     deceasedIds:    string[],
     playerGold:     number,
+    hiring          = this._hiring,
   ): void {
+    this._hiring         = hiring;
     this._templates      = templates.slice();
     this._activeFollower = activeFollower;
     this._deceasedIds    = new Set(deceasedIds);
@@ -602,10 +608,12 @@ export class FollowerUI {
     if (!isDeceased) {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.setAttribute("aria-disabled", (hasActive || !canAfford) ? "true" : "false");
+      btn.setAttribute("aria-disabled", (hasActive || !canAfford || !this._hiring) ? "true" : "false");
       _styleButton(btn, tmpl.hireCost > 0 ? `Recruit (${tmpl.hireCost} 🪙)` : "Recruit");
       btn.setAttribute("aria-label", `Recruit ${tmpl.name}`);
-      if (hasActive) {
+      if (!this._hiring) {
+        btn.title = "Hirelings are found at inns: ask the innkeeper.";
+      } else if (hasActive) {
         btn.title = "You already have an active follower. Dismiss them first.";
       } else if (!canAfford) {
         btn.title = `You need ${tmpl.hireCost} gold to hire this follower.`;
