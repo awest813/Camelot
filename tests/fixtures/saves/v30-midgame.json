@@ -4,21 +4,21 @@
   "capturedAt": "2026-11-27",
   "save": {
     "version": 30,
-    "timestamp": 1795742233215,
+    "timestamp": 1795742724535,
     "player": {
       "position": {
         "x": 1.2686834433116019,
         "y": 3,
         "z": 147.7175831180066
       },
-      "health": 240,
-      "magicka": 140,
-      "stamina": 170,
+      "health": 220,
+      "magicka": 145,
+      "stamina": 160,
       "level": 1,
       "experience": 0,
       "experienceToNextLevel": 100,
       "carryWeight": 8.2,
-      "maxCarryWeight": 450,
+      "maxCarryWeight": 400,
       "name": "Fixture"
     },
     "inventory": [
@@ -76,22 +76,22 @@
     "quests": [],
     "skills": [],
     "skillPoints": 0,
-    "framework": "{\"schemaVersion\":1,\"savedAt\":1795742233215,\"profileId\":\"default\",\"state\":{\"dialogueState\":{},\"questState\":{\"quests\":{\"quest_guard_resolution\":{\"status\":\"active\",\"nodes\":{\"talk_to_guard\":{\"active\":true,\"completed\":false,\"progress\":0},\"defeat_ruin_guard\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_bandit_bounty\":{\"status\":\"inactive\",\"nodes\":{\"kill_bandits\":{\"active\":false,\"completed\":false,\"progress\":0},\"collect_proof\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_kill_guard\":{\"status\":\"active\",\"nodes\":{\"obj_kill_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_collect_potions\":{\"status\":\"active\",\"nodes\":{\"obj_collect_potions\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_speak_guard\":{\"status\":\"active\",\"nodes\":{\"obj_talk_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"job_inn_0_3\":{\"status\":\"active\",\"nodes\":{\"hunt\":{\"active\":true,\"completed\":false,\"progress\":0},\"report\":{\"active\":false,\"completed\":false,\"progress\":0}}}},\"radiant\":{\"job_inn_0_3\":{\"templateId\":\"clear_camp\",\"vars\":{\"place\":\"Craigagel Cross\",\"camp\":\"Gorseford Bandit Camp\",\"landmark\":\"site_bandit-camp_1_6\"}}}},\"inventoryState\":{\"capacity\":20,\"items\":[],\"equipped\":{}},\"factionState\":{\"reputations\":{\"village_guard\":0,\"bandits\":-50,\"merchants_guild\":10,\"mages_college\":0}},\"flags\":{},\"legacyState\":{}}}",
+    "framework": "{\"schemaVersion\":1,\"savedAt\":1795742724536,\"profileId\":\"default\",\"state\":{\"dialogueState\":{},\"questState\":{\"quests\":{\"quest_guard_resolution\":{\"status\":\"active\",\"nodes\":{\"talk_to_guard\":{\"active\":true,\"completed\":false,\"progress\":0},\"defeat_ruin_guard\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_bandit_bounty\":{\"status\":\"inactive\",\"nodes\":{\"kill_bandits\":{\"active\":false,\"completed\":false,\"progress\":0},\"collect_proof\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_kill_guard\":{\"status\":\"active\",\"nodes\":{\"obj_kill_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_collect_potions\":{\"status\":\"active\",\"nodes\":{\"obj_collect_potions\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_speak_guard\":{\"status\":\"active\",\"nodes\":{\"obj_talk_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"job_inn_0_3\":{\"status\":\"active\",\"nodes\":{\"hunt\":{\"active\":true,\"completed\":false,\"progress\":0},\"report\":{\"active\":false,\"completed\":false,\"progress\":0}}}},\"radiant\":{\"job_inn_0_3\":{\"templateId\":\"clear_camp\",\"vars\":{\"place\":\"Craigagel Cross\",\"camp\":\"Gorseford Bandit Camp\",\"landmark\":\"site_bandit-camp_1_6\"}}}},\"inventoryState\":{\"capacity\":20,\"items\":[],\"equipped\":{}},\"factionState\":{\"reputations\":{\"village_guard\":0,\"bandits\":-50,\"merchants_guild\":10,\"mages_college\":0}},\"flags\":{},\"legacyState\":{}}}",
     "attributes": {
       "base": {
-        "strength": 70,
-        "endurance": 70,
+        "strength": 60,
+        "endurance": 60,
         "intelligence": 40,
         "agility": 40,
-        "willpower": 40,
+        "willpower": 50,
         "speed": 40,
-        "luck": 40
+        "luck": 50
       },
       "pendingPoints": 0
     },
     "time": {
-      "gameTime": 793.600000000001,
-      "elapsedGameTime": 793.600000000001
+      "gameTime": 793.6000000000012,
+      "elapsedGameTime": 793.6000000000012
     },
     "crime": {
       "bounties": {},
@@ -420,7 +420,7 @@
     },
     "weather": {
       "state": "clear",
-      "nextChangeIn": 592.4258932956184
+      "nextChangeIn": 539.6649217967471
     },
     "quickSlots": {
       "slots": {
@@ -443,7 +443,7 @@
       "skills": [
         {
           "id": "blade",
-          "level": 40,
+          "level": 30,
           "xp": 0
         },
         {
@@ -463,7 +463,7 @@
         },
         {
           "id": "restoration",
-          "level": 10,
+          "level": 20,
           "xp": 0
         },
         {
@@ -478,7 +478,7 @@
         },
         {
           "id": "speechcraft",
-          "level": 10,
+          "level": 20,
           "xp": 0
         },
         {
@@ -586,7 +586,7 @@
       "chosenId": "warrior"
     },
     "race": {
-      "chosenId": "nord",
+      "chosenId": "lowlander",
       "lastPowerUseTime": null
     },
     "playerLevel": {
@@ -699,7 +699,7 @@
       },
       {
         "id": "ambient_market_news",
-        "lastFiredAt": 13.123333333333328,
+        "lastFiredAt": 13.116666666666662,
         "fired": true
       },
       {

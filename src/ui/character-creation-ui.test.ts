@@ -440,19 +440,9 @@ describe("CharacterCreationUI", () => {
   // ── Name step & suggestions enhancements ───────────────────────────────────
 
   describe("Name step suggestions & randomize", () => {
-    it("exposes RACIAL_NAME_SUGGESTIONS with all 10 playable races", () => {
-      const expectedRaces = [
-        "nord",
-        "imperial",
-        "breton",
-        "redguard",
-        "altmer",
-        "dunmer",
-        "bosmer",
-        "orsimer",
-        "khajiit",
-        "argonian",
-      ];
+    it("exposes RACIAL_NAME_SUGGESTIONS with all 8 heritages", () => {
+      const expectedRaces = ["lowlander", "seaborn", "ashkin", "hillfolk", "forestkin", "fenfolk", "giantblood", "faeblood"];
+      expect(Object.keys(RACIAL_NAME_SUGGESTIONS).sort()).toEqual([...expectedRaces].sort());
       for (const r of expectedRaces) {
         expect(RACIAL_NAME_SUGGESTIONS[r]).toBeDefined();
         expect(RACIAL_NAME_SUGGESTIONS[r].length).toBeGreaterThanOrEqual(8);
@@ -462,9 +452,9 @@ describe("CharacterCreationUI", () => {
     it("ALL_NAME_SUGGESTIONS includes both Zodiac and racial names", () => {
       expect(ALL_NAME_SUGGESTIONS.length).toBeGreaterThan(ZODIAC_NAME_SUGGESTIONS.length);
       const hasZodiac = ALL_NAME_SUGGESTIONS.some((s) => s.name === "Arion");
-      const hasNord = ALL_NAME_SUGGESTIONS.some((s) => s.name === "Ragnar");
+      const hasHillFolk = ALL_NAME_SUGGESTIONS.some((s) => s.name === "Bran");
       expect(hasZodiac).toBe(true);
-      expect(hasNord).toBe(true);
+      expect(hasHillFolk).toBe(true);
     });
 
     it("Randomize button on Name step generates a name and enables Continue", async () => {
@@ -507,22 +497,22 @@ describe("CharacterCreationUI", () => {
       const catBtns = Array.from(
         document.querySelectorAll<HTMLButtonElement>(".character-create__name-cat-btn"),
       );
-      const nordBtn = catBtns.find((b) => b.textContent === "Nord");
-      expect(nordBtn).toBeDefined();
+      const hillBtn = catBtns.find((b) => b.textContent === "Hill-folk");
+      expect(hillBtn).toBeDefined();
 
-      nordBtn!.click();
+      hillBtn!.click();
       const suggestBtns = Array.from(
         document.querySelectorAll<HTMLButtonElement>(".character-create__suggest-btn"),
       );
       const names = suggestBtns.map((b) => b.textContent);
-      expect(names).toContain("Ragnar");
-      expect(names).toContain("Astrid");
+      expect(names).toContain("Bran");
+      expect(names).toContain("Rhiannon");
 
-      // Clicking Ragnar sets the name
-      const ragnarBtn = suggestBtns.find((b) => b.textContent === "Ragnar")!;
-      ragnarBtn.click();
+      // Clicking Bran sets the name
+      const branBtn = suggestBtns.find((b) => b.textContent === "Bran")!;
+      branBtn.click();
       const nameInput = document.querySelector<HTMLInputElement>(".character-create__name-input")!;
-      expect(nameInput.value).toBe("Ragnar");
+      expect(nameInput.value).toBe("Bran");
       expect(continueBtn().getAttribute("aria-disabled")).toBe("false");
     });
   });

@@ -9,7 +9,7 @@
  * - `contractDisease(id)` — try to infect the player (respects resistance chance).
  * - `cureDisease(id)` / `cureAllDiseases()` — remove one or all diseases.
  * - `getAttributePenalties()` — merged per-attribute debuff map for stat systems.
- * - `diseaseResistanceChance` — [0, 1]; Argonians set this to 1.0 for full immunity.
+ * - `diseaseResistanceChance` — [0, 1]; the Fen-folk set this to 1.0 for full immunity.
  *
  * Headless: no BabylonJS dependencies — integrates via callbacks.
  * SAVE_VERSION: 21
@@ -108,7 +108,7 @@ export const BUILT_IN_DISEASES: DiseaseDefinition[] = [
  * diseases.onDiseaseContracted = (id) => ui.showNotification(`Contracted ${id}!`);
  * diseases.onDiseaseCured      = (id) => ui.showNotification(`Cured ${id}.`);
  *
- * // Argonian racial immunity
+ * // A heritage's immunity (the Fen-folk)
  * diseases.diseaseResistanceChance = 1.0;
  *
  * // On enemy hit
@@ -136,7 +136,7 @@ export class DiseaseSystem {
   /**
    * Probability [0, 1] that the player resists contracting any disease.
    * - `0.0` — no resistance (default for most races).
-   * - `1.0` — full immunity (Argonian racial trait).
+   * - `1.0` — full immunity (the Fen-folk's trait).
    * Values outside [0, 1] are clamped internally.
    */
   public diseaseResistanceChance: number = 0;

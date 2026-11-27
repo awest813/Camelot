@@ -862,15 +862,15 @@ body::before {
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
 }
 
-.character-create__card--human .character-create__tag {
+.character-create__card--hearth .character-create__tag {
   color: #c9a855;
 }
 
-.character-create__card--elven .character-create__tag {
+.character-create__card--fae .character-create__tag {
   color: #7cc4cc;
 }
 
-.character-create__card--beast .character-create__tag {
+.character-create__card--wild .character-create__tag {
   color: #c4874a;
 }
 

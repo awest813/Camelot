@@ -124,7 +124,7 @@ export function setupWorldSystems(g: Game): void {
 
   // ── v20: Swimming system ───────────────────────────────────────────────
   g.swimSystem = new SwimmingSystem();
-  // Argonian racial water breathing — suppress breath drain for g race
+  // A heritage that breathes water (the Fen-folk): no breath drain
   if (g.raceSystem.chosenRace?.waterBreathing) {
     g.swimSystem.hasWaterBreathing = true;
   }
@@ -134,8 +134,8 @@ export function setupWorldSystems(g: Game): void {
 
   // ── v21: Disease system ────────────────────────────────────────────────
   g.diseaseSystem = new DiseaseSystem();
-  // Argonian racial disease immunity — 100 % resistance
-  if (g.raceSystem.chosenRace?.id === "argonian") {
+  // A heritage diseases don't take (the Fen-folk): 100 % resistance
+  if (g.raceSystem.chosenRace?.diseaseImmune) {
     g.diseaseSystem.diseaseResistanceChance = 1.0;
   }
   g.diseaseSystem.events = g.eventBus;

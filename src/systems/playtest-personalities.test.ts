@@ -3,7 +3,7 @@
  *
  * Simulates end-to-end gameplay from the perspective of four distinct player archetypes:
  *   1. The Drunk (Grog the Flagon-Brawler) — chaotic, intoxicated, encumbered, unarmed, criminal, coma sleeper
- *   2. The Average (Arthur the Imperial Knight) — rule-follower, questing, blocking, daytime trading, balanced leveling
+ *   2. The Average (Arthur the Lowland-born Knight) — rule-follower, questing, blocking, daytime trading, balanced leveling
  *   3. The Hardcore (Vaelen the Permadeath Scout) — min-maxer, 3x stealth sniper, alchemist, disease-conscious, flawless 0-damage
  *   4. The Gamer (GlitchStrider the Exploit Hunter) — boundary stress, economy exploit tester, spellmaking clamp checks, AI reset kiting
  */
@@ -187,20 +187,20 @@ describe("Personality Playtest: The Drunk", () => {
     env = createPlaytestEnv();
   });
 
-  it("creates a brawler with Nord heritage and erratic birthsign", () => {
+  it("creates a brawler with Hill-folk heritage and erratic birthsign", () => {
     env.player.name = "Grog 'Flagon' Stone";
-    env.race.chooseRace("nord", env.attrs, env.skills);
+    env.race.chooseRace("hillfolk", env.attrs, env.skills);
     env.cls.chooseClass("warrior", env.attrs, env.skills);
     env.birthsign.chooseBirthsign("lover", env.attrs);
 
     expect(env.attrs.get("strength")).toBeGreaterThanOrEqual(50);
     expect(env.attrs.get("endurance")).toBeGreaterThanOrEqual(50);
     expect(env.race.canActivatePower(env.time.gameTime)).toBe(true);
-    expect(env.race.chosenRace?.name).toBe("Nord");
+    expect(env.race.chosenRace?.name).toBe("Hill-folk");
   });
 
   it("drinks everything in sight and stacks multiple contradictory active effects", () => {
-    env.race.chooseRace("nord", env.attrs, env.skills);
+    env.race.chooseRace("hillfolk", env.attrs, env.skills);
 
     // Consume Mead (fortify strength)
     env.effects.addEffect({
@@ -316,7 +316,7 @@ describe("Personality Playtest: The Drunk", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ── Personality 2: The Average (Arthur the Imperial Knight)
+// ── Personality 2: The Average (Arthur the Lowland-born Knight)
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("Personality Playtest: The Average", () => {
@@ -327,13 +327,13 @@ describe("Personality Playtest: The Average", () => {
     env = createPlaytestEnv();
   });
 
-  it("starts with balanced Imperial Knight build and The Warrior birthsign", () => {
+  it("starts with balanced Lowland-born Knight build and The Warrior birthsign", () => {
     env.player.name = "Arthur";
-    env.race.chooseRace("imperial", env.attrs, env.skills);
+    env.race.chooseRace("lowlander", env.attrs, env.skills);
     env.cls.chooseClass("knight", env.attrs, env.skills);
     env.birthsign.chooseBirthsign("warrior", env.attrs);
 
-    expect(env.race.chosenRace?.id).toBe("imperial");
+    expect(env.race.chosenRace?.id).toBe("lowlander");
     expect(env.attrs.get("strength")).toBeGreaterThanOrEqual(40);
     expect(env.attrs.get("endurance")).toBeGreaterThanOrEqual(40);
   });
@@ -475,7 +475,7 @@ describe("Personality Playtest: The Hardcore", () => {
 
   it("min-maxes Wood Elf scout attributes with stealth focus", () => {
     env.player.name = "Vaelen";
-    env.race.chooseRace("bosmer", env.attrs, env.skills);
+    env.race.chooseRace("forestkin", env.attrs, env.skills);
     env.cls.chooseClass("thief", env.attrs, env.skills);
     env.birthsign.chooseBirthsign("shadow", env.attrs);
 
@@ -593,7 +593,7 @@ describe("Personality Playtest: The Gamer", () => {
 
   it("creates high-agility speed runner with The Steed birthsign", () => {
     env.player.name = "SpeedyGamer";
-    env.race.chooseRace("bosmer", env.attrs, env.skills);
+    env.race.chooseRace("forestkin", env.attrs, env.skills);
     env.cls.chooseClass("thief", env.attrs, env.skills);
     env.birthsign.chooseBirthsign("steed", env.attrs);
 

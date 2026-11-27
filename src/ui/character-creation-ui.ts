@@ -41,108 +41,88 @@ export const ZODIAC_NAME_SUGGESTIONS: ReadonlyArray<{ sign: string; name: string
 ];
 
 /**
- * Culturally authentic, lore-friendly name suggestions for all 10 playable races.
+ * Name suggestions for each heritage (the peoples of the realm).
  */
 export const RACIAL_NAME_SUGGESTIONS: Readonly<Record<string, ReadonlyArray<{ race: string; name: string }>>> = {
-  nord: [
-    { race: "Nord", name: "Ragnar" },
-    { race: "Nord", name: "Bjorn" },
-    { race: "Nord", name: "Torvald" },
-    { race: "Nord", name: "Astrid" },
-    { race: "Nord", name: "Freya" },
-    { race: "Nord", name: "Sigrid" },
-    { race: "Nord", name: "Ulfgar" },
-    { race: "Nord", name: "Brynja" },
+  lowlander: [
+    { race: "Lowland-born", name: "Edwin" },
+    { race: "Lowland-born", name: "Aldith" },
+    { race: "Lowland-born", name: "Osric" },
+    { race: "Lowland-born", name: "Hilda" },
+    { race: "Lowland-born", name: "Godric" },
+    { race: "Lowland-born", name: "Edith" },
+    { race: "Lowland-born", name: "Leofric" },
+    { race: "Lowland-born", name: "Elfreda" },
   ],
-  imperial: [
-    { race: "Imperial", name: "Marcus" },
-    { race: "Imperial", name: "Valeria" },
-    { race: "Imperial", name: "Lucian" },
-    { race: "Imperial", name: "Camilla" },
-    { race: "Imperial", name: "Titus" },
-    { race: "Imperial", name: "Octavia" },
-    { race: "Imperial", name: "Aurelius" },
-    { race: "Imperial", name: "Julia" },
+  seaborn: [
+    { race: "Sea-born", name: "Piran" },
+    { race: "Sea-born", name: "Morwenna" },
+    { race: "Sea-born", name: "Jago" },
+    { race: "Sea-born", name: "Kerensa" },
+    { race: "Sea-born", name: "Petroc" },
+    { race: "Sea-born", name: "Tamsin" },
+    { race: "Sea-born", name: "Corentin" },
+    { race: "Sea-born", name: "Ia" },
   ],
-  breton: [
-    { race: "Breton", name: "Alain" },
-    { race: "Breton", name: "Antoinette" },
-    { race: "Breton", name: "Etienne" },
-    { race: "Breton", name: "Delphine" },
-    { race: "Breton", name: "Tristan" },
-    { race: "Breton", name: "Genevieve" },
-    { race: "Breton", name: "Giraud" },
-    { race: "Breton", name: "Vivienne" },
+  ashkin: [
+    { race: "Ash-kin", name: "Idris" },
+    { race: "Ash-kin", name: "Nest" },
+    { race: "Ash-kin", name: "Caradoc" },
+    { race: "Ash-kin", name: "Angharad" },
+    { race: "Ash-kin", name: "Emrys" },
+    { race: "Ash-kin", name: "Sioned" },
+    { race: "Ash-kin", name: "Owain" },
+    { race: "Ash-kin", name: "Glesni" },
   ],
-  redguard: [
-    { race: "Redguard", name: "Cyrus" },
-    { race: "Redguard", name: "Sadiya" },
-    { race: "Redguard", name: "Isran" },
-    { race: "Redguard", name: "Raya" },
-    { race: "Redguard", name: "Tariq" },
-    { race: "Redguard", name: "Yasmin" },
-    { race: "Redguard", name: "Nazir" },
-    { race: "Redguard", name: "Safiya" },
+  hillfolk: [
+    { race: "Hill-folk", name: "Bran" },
+    { race: "Hill-folk", name: "Cadoc" },
+    { race: "Hill-folk", name: "Morcant" },
+    { race: "Hill-folk", name: "Elfed" },
+    { race: "Hill-folk", name: "Gwenda" },
+    { race: "Hill-folk", name: "Rhiannon" },
+    { race: "Hill-folk", name: "Tegid" },
+    { race: "Hill-folk", name: "Eluned" },
   ],
-  altmer: [
-    { race: "Altmer", name: "Ayrenn" },
-    { race: "Altmer", name: "Calcelmo" },
-    { race: "Altmer", name: "Faralda" },
-    { race: "Altmer", name: "Ancano" },
-    { race: "Altmer", name: "Taarie" },
-    { race: "Altmer", name: "Ondolemar" },
-    { race: "Altmer", name: "Elenwen" },
-    { race: "Altmer", name: "Valmir" },
+  forestkin: [
+    { race: "Forest-kin", name: "Rowan" },
+    { race: "Forest-kin", name: "Hazel" },
+    { race: "Forest-kin", name: "Linden" },
+    { race: "Forest-kin", name: "Wren" },
+    { race: "Forest-kin", name: "Sorrel" },
+    { race: "Forest-kin", name: "Bramble" },
+    { race: "Forest-kin", name: "Ash" },
+    { race: "Forest-kin", name: "Teasel" },
   ],
-  dunmer: [
-    { race: "Dunmer", name: "Velyn" },
-    { race: "Dunmer", name: "Brelas" },
-    { race: "Dunmer", name: "Jiub" },
-    { race: "Dunmer", name: "Jenassa" },
-    { race: "Dunmer", name: "Neloth" },
-    { race: "Dunmer", name: "Karliah" },
-    { race: "Dunmer", name: "Divayth" },
-    { race: "Dunmer", name: "Brelyna" },
+  fenfolk: [
+    { race: "Fen-folk", name: "Hereward" },
+    { race: "Fen-folk", name: "Ebba" },
+    { race: "Fen-folk", name: "Guthlac" },
+    { race: "Fen-folk", name: "Mildred" },
+    { race: "Fen-folk", name: "Botolph" },
+    { race: "Fen-folk", name: "Tova" },
+    { race: "Fen-folk", name: "Wilfrid" },
+    { race: "Fen-folk", name: "Ethelind" },
   ],
-  bosmer: [
-    { race: "Bosmer", name: "Faendal" },
-    { race: "Bosmer", name: "Nimriel" },
-    { race: "Bosmer", name: "Gwilym" },
-    { race: "Bosmer", name: "Aralor" },
-    { race: "Bosmer", name: "Findal" },
-    { race: "Bosmer", name: "Silana" },
-    { race: "Bosmer", name: "Thoronir" },
-    { race: "Bosmer", name: "Lothiel" },
+  giantblood: [
+    { race: "Giant-blooded", name: "Corin" },
+    { race: "Giant-blooded", name: "Hulda" },
+    { race: "Giant-blooded", name: "Gerwyn" },
+    { race: "Giant-blooded", name: "Thora" },
+    { race: "Giant-blooded", name: "Brannock" },
+    { race: "Giant-blooded", name: "Gunnor" },
+    { race: "Giant-blooded", name: "Tarran" },
+    { race: "Giant-blooded", name: "Orm" },
   ],
-  orsimer: [
-    { race: "Orsimer", name: "Gro-Khash" },
-    { race: "Orsimer", name: "Mazoga" },
-    { race: "Orsimer", name: "Ghorbash" },
-    { race: "Orsimer", name: "Shelur" },
-    { race: "Orsimer", name: "Yashnag" },
-    { race: "Orsimer", name: "Bolar" },
-    { race: "Orsimer", name: "Mauhulakh" },
-    { race: "Orsimer", name: "Urzoga" },
-  ],
-  khajiit: [
-    { race: "Khajiit", name: "J'zargo" },
-    { race: "Khajiit", name: "Ahkari" },
-    { race: "Khajiit", name: "M'aiq" },
-    { race: "Khajiit", name: "Shavari" },
-    { race: "Khajiit", name: "Kharjo" },
-    { race: "Khajiit", name: "Tsavani" },
-    { race: "Khajiit", name: "Ri'saad" },
-    { race: "Khajiit", name: "Zaynabi" },
-  ],
-  argonian: [
-    { race: "Argonian", name: "Teeba-Khat" },
-    { race: "Argonian", name: "Shahvee" },
-    { race: "Argonian", name: "Derkeethus" },
-    { race: "Argonian", name: "Keerava" },
-    { race: "Argonian", name: "Deetsan" },
-    { race: "Argonian", name: "Wujeeta" },
-    { race: "Argonian", name: "Scouts-Many-Marshes" },
-    { race: "Argonian", name: "Stands-In-Shallows" },
+  faeblood: [
+    { race: "Fae-blooded", name: "Olwen" },
+    { race: "Fae-blooded", name: "Gwydion" },
+    { race: "Fae-blooded", name: "Arianwen" },
+    { race: "Fae-blooded", name: "Lleu" },
+    { race: "Fae-blooded", name: "Blodwen" },
+    { race: "Fae-blooded", name: "Pryderi" },
+    { race: "Fae-blooded", name: "Enid" },
+    { race: "Fae-blooded", name: "Math" },
   ],
 };
 
@@ -154,25 +134,23 @@ export const ALL_NAME_SUGGESTIONS: ReadonlyArray<{ tag: string; name: string }> 
   ),
 ];
 
-/** Per-race decorative icons shown on race cards. */
+/** Per-heritage icons shown on the heritage cards. */
 const RACE_ICONS: Readonly<Record<string, string>> = {
-  nord:     "❄",
-  imperial: "⚜",
-  breton:   "✦",
-  redguard: "⚔",
-  altmer:   "⚡",
-  dunmer:   "🔥",
-  bosmer:   "🍃",
-  orsimer:  "🛡",
-  khajiit:  "🌙",
-  argonian: "💧",
+  lowlander:  "⚜",
+  seaborn:    "⚓",
+  ashkin:     "🔥",
+  hillfolk:   "❄",
+  forestkin:  "🍃",
+  fenfolk:    "💧",
+  giantblood: "🛡",
+  faeblood:   "✦",
 };
 
-/** Fallback icons by heritage when no per-race icon is defined. */
+/** Fallback icons by where a people come from. */
 const HERITAGE_ICONS: Readonly<Record<RaceDefinition["heritage"], string>> = {
-  human: "⚜",
-  elven: "✦",
-  beast: "🐾",
+  hearth: "⚜",
+  wild:   "🍃",
+  fae:    "✦",
 };
 
 /** Icons for birthsign guardian types. */
@@ -193,9 +171,12 @@ const guardianLabel = (guardian: BirthsignDefinition["guardian"]): string => {
   return guardian.charAt(0).toUpperCase() + guardian.slice(1);
 };
 
-const heritageLabel = (heritage: RaceDefinition["heritage"]): string => {
-  return heritage.charAt(0).toUpperCase() + heritage.slice(1);
+const HERITAGE_LABELS: Readonly<Record<RaceDefinition["heritage"], string>> = {
+  hearth: "Settled lands",
+  wild:   "Wild places",
+  fae:    "Fae-touched",
 };
+const heritageLabel = (heritage: RaceDefinition["heritage"]): string => HERITAGE_LABELS[heritage];
 
 type CreationStep = "welcome" | "world" | "name" | "race" | "birthsign" | "class";
 
@@ -255,7 +236,7 @@ export class CharacterCreationUI {
 
       const raceStep = document.createElement("span");
       raceStep.className = "character-create__step-pill";
-      raceStep.textContent = "Race";
+      raceStep.textContent = "Heritage";
       stepPills.appendChild(raceStep);
 
       const birthsignStep = document.createElement("span");
@@ -373,7 +354,7 @@ export class CharacterCreationUI {
         heroList.replaceChildren();
         const rows: Array<[string, string | null]> = [
           ["Name", enteredName.trim() || null],
-          ["Race", selectedRace?.name ?? null],
+          ["Heritage", selectedRace?.name ?? null],
           ["Birthsign", selectedBirthsign?.name ?? null],
           ["Class", selectedClass?.name ?? null],
         ];
@@ -489,7 +470,7 @@ export class CharacterCreationUI {
 
         if ("heritage" in entry) {
           const heritage = document.createElement("li");
-          heritage.textContent = `Heritage: ${heritageLabel(entry.heritage)}`;
+          heritage.textContent = heritageLabel(entry.heritage);
           detailsMeta.appendChild(heritage);
 
           if (entry.power) {
@@ -535,6 +516,12 @@ export class CharacterCreationUI {
             const wbLi = document.createElement("li");
             wbLi.textContent = "Trait: Water Breathing (unlimited underwater breath)";
             detailsMeta.appendChild(wbLi);
+          }
+
+          if (entry.diseaseImmune) {
+            const dLi = document.createElement("li");
+            dLi.textContent = "Trait: Disease immunity (no sickness takes hold)";
+            detailsMeta.appendChild(dLi);
           }
 
           if (entry.maxMagickaBonus) {
@@ -640,7 +627,7 @@ export class CharacterCreationUI {
 
         const p1 = document.createElement("p");
         p1.textContent =
-          "Race shapes heritage and passive bonuses. Birthsign grants lasting gifts and often a daily power. Class sets which skills level fastest at the start.";
+          "Heritage sets your people and their gifts. Birthsign grants lasting gifts and often a daily power. Class sets which skills level fastest at the start.";
         intro.appendChild(p1);
 
         const p2 = document.createElement("p");
@@ -1059,7 +1046,7 @@ export class CharacterCreationUI {
 
         const suggestLabel = document.createElement("p");
         suggestLabel.className = "character-create__suggest-label";
-        suggestLabel.textContent = "Lore suggestions by culture:";
+        suggestLabel.textContent = "Names by people:";
         cards.appendChild(suggestLabel);
 
         const suggestGrid = document.createElement("div");
@@ -1099,20 +1086,8 @@ export class CharacterCreationUI {
           }
         };
 
-        const categories = [
-          "All",
-          "Zodiac",
-          "Nord",
-          "Imperial",
-          "Breton",
-          "Redguard",
-          "Altmer",
-          "Dunmer",
-          "Bosmer",
-          "Orsimer",
-          "Khajiit",
-          "Argonian",
-        ];
+        // "All", "Zodiac", then each heritage's own names (in catalogue order).
+        const categories = ["All", "Zodiac", ...Object.values(RACIAL_NAME_SUGGESTIONS).map((list) => list[0].race)];
 
         for (const cat of categories) {
           const catBtn = document.createElement("button");
@@ -1153,9 +1128,9 @@ export class CharacterCreationUI {
 
       const renderRaces = () => {
         clearCards();
-        subtitle.textContent = "Choose your race to define heritage, innate talents, and starting skill leanings.";
+        subtitle.textContent = "Choose the people you were born to: their gifts, their power, and the skills they start you in.";
         continueButton.textContent = "Continue";
-        setBtnDisabled(continueButton, !selectedRace, "Please select a race to continue.");
+        setBtnDisabled(continueButton, !selectedRace, "Choose a heritage to continue.");
         setBtnDisabled(backButton, false);
         setAllStepPills("race");
 

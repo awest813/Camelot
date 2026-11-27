@@ -46,7 +46,7 @@ export interface CharacterService {
   readonly races: RaceSystem;
   readonly birthsigns: BirthsignSystem;
   readonly classes: ClassSystem;
-  /** Run the creation wizard (falls back to a Nord warrior if it fails). */
+  /** Run the creation wizard (falls back to a Hill-folk warrior if it fails). */
   create(): Promise<void>;
   readonly creating: boolean;
 }
@@ -68,10 +68,10 @@ export class CharacterFeature implements Feature {
     const feedback = () => s.get(FeedbackKey);
 
     this.races.onRaceChosen = (race) => {
-      feedback().notify(`Race chosen: ${race.name} (${race.heritage})${race.power ? ` — Power: ${race.power.name}` : ""}`, 3000);
+      feedback().notify(`Heritage: ${race.name}${race.power ? ` — Power: ${race.power.name}` : ""}`, 3000);
       host().syncMaxStats();
-      // Argonians breathe water and shrug off disease.
-      host().setRacialTraits({ waterBreathing: race.waterBreathing ?? false, diseaseImmune: race.id === "argonian" });
+      // Some peoples breathe water, or shrug off disease (the Fen-folk).
+      host().setRacialTraits({ waterBreathing: race.waterBreathing ?? false, diseaseImmune: race.diseaseImmune ?? false });
       feedback().markDirty();
     };
     this.birthsigns.onBirthsignChosen = (sign) => {
@@ -131,7 +131,7 @@ export class CharacterFeature implements Feature {
     } catch (error) {
       console.error("Character creation failed; applying defaults", error);
     }
-    if (!choice || !this._choose(choice.raceId, choice.birthsignId, choice.classId)) this._choose("nord", "warrior", "warrior");
+    if (!choice || !this._choose(choice.raceId, choice.birthsignId, choice.classId)) this._choose("hillfolk", "warrior", "warrior");
     if (choice) {
       h.becomeHero(choice.name, this.birthsigns.getStatBonuses());
       if (choice.worldSeed) h.seedWorld(choice.worldSeed);

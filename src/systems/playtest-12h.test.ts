@@ -7,14 +7,14 @@
  * game state stays valid throughout.
  *
  * Timeline (game starts at 08:00, default 120-second real day):
- *   08:00 — Character creation (Nord / Warrior class / Warrior birthsign)
+ *   08:00 — Character creation (Hill-folk / Warrior class / Warrior birthsign)
  *   09:00 — Morning exploration, first wolf encounter
  *   10:00 — Visit weapons shop (open 08–20), buy a health potion
  *   11:00 — Active-effects / potion use, skill XP from combat
  *   12:00 — Noon: Fast travel to a second location
  *   13:00 — Quest pickup, fame from completion
  *   14:00 — Disease contraction + cure
- *   15:00 — Racial power activation (Nord's Fury)
+ *   15:00 — Racial power activation (Hill-fury)
  *   16:00 — Offscreen NPC simulation (merchant restock ticks)
  *   17:00 — Ambient events in forest biome
  *   18:00 — NPCs begin heading home (schedule shift)
@@ -182,17 +182,17 @@ describe("Playtest — new game to 12 gameplay hours", () => {
   // ── 1. Character creation ─────────────────────────────────────────────────
 
   describe("08:00 — Character creation", () => {
-    it("applies Nord race bonuses to attributes and skills", () => {
-      w.race.chooseRace("nord", w.attrs, w.skills);
+    it("applies Hill-folk race bonuses to attributes and skills", () => {
+      w.race.chooseRace("hillfolk", w.attrs, w.skills);
 
-      // Nord: +10 strength, +10 endurance, +10 blade skill
+      // Hill-folk: +10 strength, +10 endurance, +10 blade skill
       expect(w.attrs.get("strength")).toBe(50);   // base 40 + 10
       expect(w.attrs.get("endurance")).toBe(50);  // base 40 + 10
       expect(w.skills.getSkill("blade")!.level).toBe(10);
     });
 
     it("applies Warrior class bonuses to attributes and skills", () => {
-      w.race.chooseRace("nord", w.attrs, w.skills);
+      w.race.chooseRace("hillfolk", w.attrs, w.skills);
       w.cls.chooseClass("warrior", w.attrs, w.skills);
 
       // Warrior favoured attributes: Strength, Endurance (+10 each on top of race)
@@ -201,7 +201,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
     });
 
     it("applies Warrior birthsign bonuses", () => {
-      w.race.chooseRace("nord", w.attrs, w.skills);
+      w.race.chooseRace("hillfolk", w.attrs, w.skills);
       w.cls.chooseClass("warrior", w.attrs, w.skills);
       w.birthsign.chooseBirthsign("warrior", w.attrs, w.skills);
 
@@ -209,7 +209,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
     });
 
     it("wires the player level system to the class system", () => {
-      w.race.chooseRace("nord", w.attrs, w.skills);
+      w.race.chooseRace("hillfolk", w.attrs, w.skills);
       w.cls.chooseClass("warrior", w.attrs, w.skills);
       w.birthsign.chooseBirthsign("warrior", w.attrs, w.skills);
 
@@ -292,7 +292,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
 
   describe("09:00–11:00 — Combat and skill progression", () => {
     beforeEach(() => {
-      w.race.chooseRace("nord", w.attrs, w.skills);
+      w.race.chooseRace("hillfolk", w.attrs, w.skills);
       w.cls.chooseClass("warrior", w.attrs, w.skills);
       w.playerLevel.attachToClassSystem(w.cls);
       w.playerLevel.attachToAttributeSystem(w.attrs);
@@ -314,7 +314,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
 
       const blade = w.skills.getSkill("blade");
       expect(blade!.xp).toBeGreaterThan(0);
-      // Starting level was 10 (Nord race bonus); may or may not have leveled up yet
+      // Starting level was 10 (Hill-folk race bonus); may or may not have leveled up yet
       expect(blade!.level).toBeGreaterThanOrEqual(baseLevel);
     });
 
@@ -527,7 +527,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
     it("contracts a disease from an enemy attack", () => {
       // Rust Chancre: endurance −5
       const contracted = w.disease.contractDisease("rust_chancre");
-      // Nord has no built-in disease resistance in this engine;
+      // Hill-folk has no built-in disease resistance in this engine;
       // contractDisease returns true when successful
       if (contracted) {
         expect(w.disease.hasDisease("rust_chancre")).toBe(true);
@@ -556,9 +556,9 @@ describe("Playtest — new game to 12 gameplay hours", () => {
 
   // ── 8. Racial power activation — 15:00 ───────────────────────────────────
 
-  describe("15:00 — Racial power (Nord's Fury)", () => {
+  describe("15:00 — Racial power (Hill-fury)", () => {
     beforeEach(() => {
-      w.race.chooseRace("nord", w.attrs, w.skills);
+      w.race.chooseRace("hillfolk", w.attrs, w.skills);
     });
 
     it("racial power is available at 15:00 (first use)", () => {
@@ -566,7 +566,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
       expect(w.race.canActivatePower(gameTimeMinutes)).toBe(true);
     });
 
-    it("activating Nord's Fury registers active effects", () => {
+    it("activating Hill-fury registers active effects", () => {
       const effects: string[] = [];
       listen(w.effects, "effect:expired", () => {});
       const gameTimeMinutes = 15 * 60;
@@ -845,7 +845,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
 
   describe("Save / restore — full state round-trip at 20:00", () => {
     beforeEach(() => {
-      w.race.chooseRace("nord", w.attrs, w.skills);
+      w.race.chooseRace("hillfolk", w.attrs, w.skills);
       w.cls.chooseClass("warrior", w.attrs, w.skills);
       w.birthsign.chooseBirthsign("warrior", w.attrs, w.skills);
       w.time.advanceHours(12);
@@ -898,7 +898,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
       const snap = w.race.getSaveState();
       const restored = new RaceSystem();
       restored.restoreFromSave(snap);
-      expect(restored.chosenRace?.id).toBe("nord");
+      expect(restored.chosenRace?.id).toBe("hillfolk");
       expect(restored.canActivatePower(w.time.gameTime)).toBe(false); // still on cooldown
     });
 

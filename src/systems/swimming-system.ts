@@ -3,7 +3,7 @@
  *
  * Tracks whether the player is submerged, drains a breath meter while
  * underwater, and applies drowning damage once breath is exhausted.
- * Races (e.g. Argonian) or active effects (e.g. Water Breathing spell)
+ * Heritages (e.g. the Fen-folk) or active effects (e.g. Water Breathing spell)
  * can suppress breath drain via the `hasWaterBreathing` flag.
  *
  * Headless: no BabylonJS dependencies — integrates via callbacks.
@@ -64,7 +64,7 @@ export interface SwimmingPlayer {
  * swim.enterWater();
  * swim.exitWater();
  *
- * // For Argonian race or a Water Breathing active effect:
+ * // For the Fen-folk or a Water Breathing active effect:
  * swim.hasWaterBreathing = true;
  * ```
  */
@@ -89,7 +89,7 @@ export class SwimmingSystem {
   // ── Configuration ──────────────────────────────────────────────────────────
 
   /**
-   * When `true` the breath meter is never drained (Argonian racial ability or
+   * When `true` the breath meter is never drained (the Fen-folk's gift or
    * Water Breathing spell/potion effect).
    */
   public hasWaterBreathing: boolean = false;

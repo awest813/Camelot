@@ -29,7 +29,7 @@ function setup(answer: () => Promise<CharacterChoice>) {
   return { k, f, notes, calls, svc: k.services.get(CharacterKey) };
 }
 
-const choice: CharacterChoice = { name: "Gawain", raceId: "argonian", birthsignId: "mage", classId: "battlemage", skipGameplayTips: true, worldSeed: null };
+const choice: CharacterChoice = { name: "Gawain", raceId: "fenfolk", birthsignId: "mage", classId: "battlemage", skipGameplayTips: true, worldSeed: null };
 
 describe("CharacterFeature (headless, through the kernel)", () => {
   it("the wizard's choices make the hero", async () => {
@@ -38,7 +38,7 @@ describe("CharacterFeature (headless, through the kernel)", () => {
     expect(t.svc.creating).toBe(true);
     await run;
     expect(t.svc.creating).toBe(false);
-    expect(t.f.races.chosenRace?.id).toBe("argonian");
+    expect(t.f.races.chosenRace?.id).toBe("fenfolk");
     expect(t.calls).toContain("traits:true:true");
     expect(t.calls.slice(-3)).toEqual(["hero:Gawain", "end", "welcome:true"]);
     expect(t.notes.at(-1)).toBe("Welcome, Gawain! Character creation complete.");
@@ -48,7 +48,7 @@ describe("CharacterFeature (headless, through the kernel)", () => {
     const t = setup(async () => { throw new Error("no DOM"); });
     vi.spyOn(console, "error").mockImplementation(() => {});
     await t.svc.create();
-    expect(t.f.races.chosenRace?.id).toBe("nord");
+    expect(t.f.races.chosenRace?.id).toBe("hillfolk");
     expect(t.f.classes.chosenClass?.id).toBe("warrior");
     expect(t.calls.slice(-2)).toEqual(["end", "welcome:null"]);
   });

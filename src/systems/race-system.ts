@@ -1,7 +1,8 @@
 /**
- * RaceSystem — Bethesda-inspired playable race selection.
+ * RaceSystem — the heritages: the peoples of the realm a hero can be born to.
  *
- * At character creation the player selects one of ten races.  Each race
+ * At character creation the player selects one of eight heritages (called
+ * races in code).  Each race
  * applies permanent passive bonuses to base attributes and starting skill
  * levels, and all races carry a once-per-day rechargeable special power.
  *
@@ -20,7 +21,7 @@
  * ```ts
  * this.raceSystem = new RaceSystem();
  * // At character creation:
- * this.raceSystem.chooseRace("nord", this.attributeSystem, this.skillProgressionSystem);
+ * this.raceSystem.chooseRace("hillfolk", this.attributeSystem, this.skillProgressionSystem);
  * // V key — activate racial power:
  * this.raceSystem.activatePower(this.timeSystem.gameTime, this.activeEffectsSystem);
  * ```
@@ -68,7 +69,7 @@ export interface RacePower {
   description: string;
   /**
    * Recharge time in in-game hours.
-   * Default: 24 (once per in-game day), matching Oblivion's racial powers.
+   * Default: 24 (once per in-game day).
    */
   cooldownHours: number;
   /**
@@ -86,8 +87,8 @@ export interface RaceDefinition {
   name: string;
   /** Flavour description shown at character creation. */
   description: string;
-  /** Heritage grouping (human / elven / beast). */
-  heritage: "human" | "elven" | "beast";
+  /** Where the people come from: the settled lands, the wild places, or the Otherworld. */
+  heritage: "hearth" | "wild" | "fae";
   /**
    * Permanent attribute base increases applied when the race is chosen.
    * Positive values raise the base; negative values lower it.
@@ -118,6 +119,8 @@ export interface RaceDefinition {
    * Used by `SwimmingSystem` to suppress breath drain for this race.
    */
   waterBreathing?: boolean;
+  /** When `true` diseases never take hold (the Fen-folk). */
+  diseaseImmune?: boolean;
 }
 
 /** State saved to disk. */
@@ -138,229 +141,188 @@ export const RACE_SKILL_BONUS = 10;
 // ── Race catalogue ────────────────────────────────────────────────────────────
 
 /**
- * Ten playable races inspired by The Elder Scrolls, adapted to the attributes
- * and skills available in this engine.
+ * The eight heritages: the peoples of the realm of Camelot (invented, not
+ * real-world peoples).  Each sets two attributes and two skills a little
+ * ahead, may resist an element, and has a power usable once a day.
  */
 export const RACES: ReadonlyArray<RaceDefinition> = [
-  // ── Human races ───────────────────────────────────────────────────────────
+  // ── Folk of the settled lands ─────────────────────────────────────────────
   {
-    id: "nord",
-    name: "Nord",
-    heritage: "human",
+    id: "lowlander",
+    name: "Lowland-born",
+    heritage: "hearth",
     description:
-      "Hardy warriors from the frozen north, Nords possess great strength and " +
-      "endurance honed by a lifetime of brutal cold.  They are naturally resistant " +
-      "to frost and excel with a blade in hand.",
-    attributeBonus: { strength: RACE_ATTRIBUTE_BONUS, endurance: RACE_ATTRIBUTE_BONUS },
-    skillBonus: { blade: RACE_SKILL_BONUS },
-    resistance: { frost: 0.5 },
-    power: {
-      id: "nords_fury",
-      name: "Nord's Fury",
-      description: "Channel Nordic rage to boost strength and stamina recovery for 60 seconds.",
-      cooldownHours: 24,
-      effects: [
-        { name: "Nordic Strength",   effectType: "fortify_strength", magnitude: 20, duration: 60 },
-        { name: "Nordic Endurance",  effectType: "stamina_restore",  magnitude: 5,  duration: 60 },
-      ],
-    },
-  },
-  {
-    id: "imperial",
-    name: "Imperial",
-    heritage: "human",
-    description:
-      "Natives of the fertile heartlands, Imperials are natural diplomats and " +
-      "traders.  Their silver tongues and tactical discipline make them " +
-      "well-rounded adventurers equally at home in courts or on battlefields.",
+      "Raised in the market towns and manors of the heartland, the Lowland-born " +
+      "learn courtesy before they learn the sword.  They talk their way through " +
+      "most doors and mend what they cannot talk past.",
     attributeBonus: { willpower: RACE_ATTRIBUTE_BONUS, luck: RACE_ATTRIBUTE_BONUS },
     skillBonus: { speechcraft: RACE_SKILL_BONUS, restoration: RACE_SKILL_BONUS },
     power: {
-      id: "voice_of_the_emperor",
-      name: "Voice of the Emperor",
-      description: "Project commanding authority, reducing incoming damage and restoring health for 30 seconds.",
+      id: "kingsvoice",
+      name: "Kingsvoice",
+      description: "Speak with a lord's authority: take less harm and mend steadily for 30 seconds.",
       cooldownHours: 24,
       effects: [
-        { name: "Imperial Authority", effectType: "resist_damage",   magnitude: 25, duration: 30 },
-        { name: "Imperial Resolve",   effectType: "health_restore",  magnitude: 5,  duration: 30 },
+        { name: "Kingsvoice",       effectType: "resist_damage",  magnitude: 25, duration: 30 },
+        { name: "Steady Heart",     effectType: "health_restore", magnitude: 5,  duration: 30 },
       ],
     },
   },
   {
-    id: "breton",
-    name: "Breton",
-    heritage: "human",
+    id: "seaborn",
+    name: "Sea-born",
+    heritage: "hearth",
     description:
-      "Part human, part elven in ancestry, Bretons are gifted in the arcane arts " +
-      "and possess a natural aptitude for absorbing and resisting spells. " +
-      "Their intelligence and willpower make them formidable spellcasters.",
-    attributeBonus: { intelligence: RACE_ATTRIBUTE_BONUS, willpower: RACE_ATTRIBUTE_BONUS },
-    skillBonus: { restoration: RACE_SKILL_BONUS, alchemy: RACE_SKILL_BONUS },
-    maxMagickaBonus: 50,
-    resistance: { magic: 0.25 },
-    power: {
-      id: "spell_absorption",
-      name: "Spell Absorption",
-      description: "Absorb ambient magic, rapidly restoring Magicka and fortifying the Magicka pool for 30 seconds.",
-      cooldownHours: 24,
-      effects: [
-        { name: "Spell Absorption",  effectType: "magicka_restore",  magnitude: 20, duration: 15 },
-        { name: "Fortified Magicka", effectType: "fortify_magicka",  magnitude: 30, duration: 30 },
-      ],
-    },
-  },
-  {
-    id: "redguard",
-    name: "Redguard",
-    heritage: "human",
-    description:
-      "The finest swordsmen in the world, Redguards are naturally gifted " +
-      "warriors who combine speed and agility with extraordinary endurance.  " +
-      "Their adrenaline rush makes them terrifying in close combat.",
+      "Fisher-folk and raiders of the western coves, the Sea-born are quick on a " +
+      "pitching deck and hard to tire.  Salt and hard living have made them proof " +
+      "against most poisons.",
     attributeBonus: { agility: RACE_ATTRIBUTE_BONUS, endurance: RACE_ATTRIBUTE_BONUS },
     skillBonus: { blade: RACE_SKILL_BONUS, marksman: RACE_SKILL_BONUS },
     resistance: { poison: 0.75 },
     power: {
-      id: "adrenaline_rush",
-      name: "Adrenaline Rush",
-      description: "Surge with adrenaline, boosting strength and rapidly restoring stamina for 60 seconds.",
+      id: "second_wind",
+      name: "Second Wind",
+      description: "Find the strength of the last oar-stroke: stronger, and quick to recover, for 60 seconds.",
       cooldownHours: 24,
       effects: [
-        { name: "Adrenaline Strength", effectType: "fortify_strength", magnitude: 15, duration: 60 },
-        { name: "Adrenaline Rush",     effectType: "stamina_restore",  magnitude: 4,  duration: 60 },
-      ],
-    },
-  },
-  // ── Elven races ───────────────────────────────────────────────────────────
-  {
-    id: "altmer",
-    name: "High Elf",
-    heritage: "elven",
-    description:
-      "The Altmer are the tallest and most gifted of the elven races.  " +
-      "Their vast intelligence and willpower grant an enormous Magicka pool " +
-      "at the cost of slight physical frailty and a weakness to elemental magic.",
-    attributeBonus: { intelligence: RACE_ATTRIBUTE_BONUS, willpower: RACE_ATTRIBUTE_BONUS, endurance: -RACE_ATTRIBUTE_BONUS },
-    skillBonus: { destruction: RACE_SKILL_BONUS, restoration: RACE_SKILL_BONUS },
-    maxMagickaBonus: 100,
-    resistance: { fire: -0.25, frost: -0.25 },
-    power: {
-      id: "highborn",
-      name: "Highborn",
-      description: "Channel elven heritage to rapidly regenerate Magicka and fortify the Magicka pool for 15 seconds.",
-      cooldownHours: 24,
-      effects: [
-        { name: "Highborn Regeneration", effectType: "magicka_restore",  magnitude: 25, duration: 15 },
-        { name: "Highborn Fortitude",    effectType: "fortify_magicka",   magnitude: 20, duration: 30 },
+        { name: "Second Wind",      effectType: "fortify_strength", magnitude: 15, duration: 60 },
+        { name: "Sea Legs",         effectType: "stamina_restore",  magnitude: 4,  duration: 60 },
       ],
     },
   },
   {
-    id: "dunmer",
-    name: "Dark Elf",
-    heritage: "elven",
+    id: "ashkin",
+    name: "Ash-kin",
+    heritage: "hearth",
     description:
-      "The Dunmer are a cunning people, equally adept at bladeplay and sorcery.  " +
-      "Their natural agility and intelligence, combined with an ancestral resistance " +
-      "to fire, make them feared and versatile adventurers.",
+      "From the burnt marches where the old wars were fought, the Ash-kin are " +
+      "wiry and clever, as handy with a spell as with a blade.  Fire troubles " +
+      "them less than it troubles others.",
     attributeBonus: { agility: RACE_ATTRIBUTE_BONUS, intelligence: RACE_ATTRIBUTE_BONUS },
     skillBonus: { blade: RACE_SKILL_BONUS, destruction: RACE_SKILL_BONUS },
     resistance: { fire: 0.5 },
     power: {
-      id: "ancestors_wrath",
-      name: "Ancestor's Wrath",
-      description: "Invoke ancestral fury, shrouding yourself in fire and reducing incoming damage for 30 seconds.",
+      id: "ember_blood",
+      name: "Ember-blood",
+      description: "Let the old fire rise: take less harm and keep your breath for 30 seconds.",
       cooldownHours: 24,
       effects: [
-        { name: "Ancestor's Ward",     effectType: "resist_damage",   magnitude: 30, duration: 30 },
-        { name: "Ancestor's Wrath",    effectType: "stamina_restore", magnitude: 4,  duration: 30 },
+        { name: "Ember Ward",       effectType: "resist_damage",   magnitude: 30, duration: 30 },
+        { name: "Ember-blood",      effectType: "stamina_restore", magnitude: 4,  duration: 30 },
+      ],
+    },
+  },
+  // ── Folk of the wild places ───────────────────────────────────────────────
+  {
+    id: "hillfolk",
+    name: "Hill-folk",
+    heritage: "wild",
+    description:
+      "Shepherds and spearmen of the high northern fells, the Hill-folk are strong " +
+      "and enduring, and winters that would kill a lowlander only make them " +
+      "grumble.  They are at home with a blade in hand.",
+    attributeBonus: { strength: RACE_ATTRIBUTE_BONUS, endurance: RACE_ATTRIBUTE_BONUS },
+    skillBonus: { blade: RACE_SKILL_BONUS },
+    resistance: { frost: 0.5 },
+    power: {
+      id: "hill_fury",
+      name: "Hill-fury",
+      description: "Rouse the fury of the fells: stronger, and quick to recover, for 60 seconds.",
+      cooldownHours: 24,
+      effects: [
+        { name: "Hill-fury",        effectType: "fortify_strength", magnitude: 20, duration: 60 },
+        { name: "Fell-wind",        effectType: "stamina_restore",  magnitude: 5,  duration: 60 },
       ],
     },
   },
   {
-    id: "bosmer",
-    name: "Wood Elf",
-    heritage: "elven",
+    id: "forestkin",
+    name: "Forest-kin",
+    heritage: "wild",
     description:
-      "The Bosmer are the best archers in Tamriel, swift and stealthy hunters " +
-      "who thrive in the wilderness.  Their agility and speed allow them to " +
-      "strike from the shadows before their prey even notices them.",
+      "Born under the great woods, the Forest-kin move without a sound and shoot " +
+      "straighter than anyone in the realm.  They know which berries kill, and " +
+      "shrug off the lesser poisons.",
     attributeBonus: { agility: RACE_ATTRIBUTE_BONUS, speed: RACE_ATTRIBUTE_BONUS },
     skillBonus: { marksman: RACE_SKILL_BONUS, sneak: RACE_SKILL_BONUS },
     resistance: { poison: 0.5 },
     power: {
-      id: "beast_tongue",
-      name: "Beast Tongue",
-      description: "Commune with the wild, fortifying strength and restoring stamina for 45 seconds.",
+      id: "hunters_stride",
+      name: "Hunter's Stride",
+      description: "Run with the hunt: stronger, and untiring, for 45 seconds.",
       cooldownHours: 24,
       effects: [
-        { name: "Beast Strength",   effectType: "fortify_strength", magnitude: 10, duration: 45 },
-        { name: "Beast Endurance",  effectType: "stamina_restore",  magnitude: 3,  duration: 45 },
-      ],
-    },
-  },
-  // ── Beast races ───────────────────────────────────────────────────────────
-  {
-    id: "orsimer",
-    name: "Orc",
-    heritage: "beast",
-    description:
-      "The Orsimer are the most physically powerful of the civilised races.  " +
-      "Their legendary berserker fury and natural armour allow them to wade into " +
-      "battle and shrug off blows that would fell lesser warriors.",
-    attributeBonus: { strength: RACE_ATTRIBUTE_BONUS, endurance: RACE_ATTRIBUTE_BONUS, agility: -5 },
-    skillBonus: { blade: RACE_SKILL_BONUS, alchemy: RACE_SKILL_BONUS },
-    resistance: { frost: 0.25 },
-    power: {
-      id: "berserk",
-      name: "Berserk",
-      description: "Enter a berserker fury, greatly increasing strength and reducing incoming damage for 60 seconds.",
-      cooldownHours: 24,
-      effects: [
-        { name: "Berserker Fury",    effectType: "fortify_strength", magnitude: 30, duration: 60 },
-        { name: "Berserker Defense", effectType: "resist_damage",    magnitude: 25, duration: 60 },
+        { name: "Hunter's Stride",  effectType: "fortify_strength", magnitude: 10, duration: 45 },
+        { name: "Deer's Wind",      effectType: "stamina_restore",  magnitude: 3,  duration: 45 },
       ],
     },
   },
   {
-    id: "khajiit",
-    name: "Khajiit",
-    heritage: "beast",
+    id: "fenfolk",
+    name: "Fen-folk",
+    heritage: "wild",
     description:
-      "The cat-folk of Elsweyr are fleet of foot and razor-sharp of claw.  " +
-      "Khajiit excel at thievery, alchemy, and infiltration, and their " +
-      "natural night vision makes them deadly hunters in the darkness.",
-    attributeBonus: { agility: RACE_ATTRIBUTE_BONUS, speed: RACE_ATTRIBUTE_BONUS },
-    skillBonus: { sneak: RACE_SKILL_BONUS, alchemy: RACE_SKILL_BONUS },
-    power: {
-      id: "eye_of_fear",
-      name: "Eye of Fear",
-      description: "Project primal terror, greatly reducing incoming damage for 20 seconds.",
-      cooldownHours: 24,
-      effects: [
-        { name: "Fearsome Aspect", effectType: "resist_damage", magnitude: 50, duration: 20 },
-      ],
-    },
-  },
-  {
-    id: "argonian",
-    name: "Argonian",
-    heritage: "beast",
-    description:
-      "The reptilian Argonians are masters of the dark arts of stealth and " +
-      "restoration magic.  They are immune to poison, can breathe underwater, " +
-      "and heal at a remarkable rate when injured.",
+      "The eel-catchers and reed-cutters of the eastern fens breathe the marsh as " +
+      "easily as air: they can stay under water as long as they like, and the " +
+      "fen-fevers and poisons that kill outsiders pass them by.",
     attributeBonus: { endurance: RACE_ATTRIBUTE_BONUS, agility: RACE_ATTRIBUTE_BONUS },
     skillBonus: { sneak: RACE_SKILL_BONUS, restoration: RACE_SKILL_BONUS },
     resistance: { poison: 1.0 },
     waterBreathing: true,
+    diseaseImmune: true,
     power: {
-      id: "histskin",
-      name: "Histskin",
-      description: "Invoke the power of the Hist to rapidly regenerate health for 15 seconds.",
+      id: "marsh_mending",
+      name: "Marsh-mending",
+      description: "Draw on the slow strength of the fen to heal quickly for 15 seconds.",
       cooldownHours: 24,
       effects: [
-        { name: "Histskin", effectType: "health_restore", magnitude: 20, duration: 15 },
+        { name: "Marsh-mending",    effectType: "health_restore", magnitude: 20, duration: 15 },
+      ],
+    },
+  },
+  {
+    id: "giantblood",
+    name: "Giant-blooded",
+    heritage: "wild",
+    description:
+      "Their grandmothers' grandmothers wed the giants of the old hills, the " +
+      "stories say, and the Giant-blooded are the strongest folk in the realm. " +
+      "They are slow to anger, and slower to stop.",
+    attributeBonus: { strength: RACE_ATTRIBUTE_BONUS, endurance: RACE_ATTRIBUTE_BONUS, agility: -5 },
+    skillBonus: { blade: RACE_SKILL_BONUS, block: RACE_SKILL_BONUS },
+    resistance: { frost: 0.25 },
+    power: {
+      id: "berserk",
+      name: "Berserk",
+      description: "Let the giant's anger out: far stronger, and harder to hurt, for 60 seconds.",
+      cooldownHours: 24,
+      effects: [
+        { name: "Giant's Anger",    effectType: "fortify_strength", magnitude: 30, duration: 60 },
+        { name: "Thick Hide",       effectType: "resist_damage",    magnitude: 25, duration: 60 },
+      ],
+    },
+  },
+  // ── The fae-touched ───────────────────────────────────────────────────────
+  {
+    id: "faeblood",
+    name: "Fae-blooded",
+    heritage: "fae",
+    description:
+      "Somewhere in their line a mortal danced with the Fair Folk and came home " +
+      "changed.  The Fae-blooded have deep wells of magicka and a gift for " +
+      "spells, but cold iron and hard frost bite them deeper.",
+    attributeBonus: { intelligence: RACE_ATTRIBUTE_BONUS, willpower: RACE_ATTRIBUTE_BONUS, endurance: -RACE_ATTRIBUTE_BONUS },
+    skillBonus: { destruction: RACE_SKILL_BONUS, restoration: RACE_SKILL_BONUS },
+    maxMagickaBonus: 100,
+    resistance: { fire: -0.25, frost: -0.25, magic: 0.25 },
+    power: {
+      id: "glamour",
+      name: "Glamour",
+      description: "Call on the Otherworld: magicka floods back and the well runs deeper for 30 seconds.",
+      cooldownHours: 24,
+      effects: [
+        { name: "Glamour",          effectType: "magicka_restore", magnitude: 25, duration: 15 },
+        { name: "Deep Well",        effectType: "fortify_magicka", magnitude: 20, duration: 30 },
       ],
     },
   },
@@ -417,7 +379,7 @@ export class RaceSystem {
    *   - Attribute bonuses: added to each attribute's base value.
    *   - Skill bonuses:     `setSkillLevel` to current + bonus amount.
    *
-   * @param id               Race id (e.g. `"nord"`, `"altmer"`).
+   * @param id               Race id (e.g. `"hillfolk"`, `"faeblood"`).
    * @param attributeSystem  Optional: system to receive attribute bonuses.
    * @param skillSystem      Optional: system to receive skill starting bonuses.
    * @returns `true` if the race was chosen successfully.
