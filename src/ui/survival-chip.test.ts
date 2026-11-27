@@ -21,3 +21,15 @@ describe("survival chip — ailments", () => {
     expect(el.style.display).toBe("none");
   });
 });
+
+describe("statusChip", () => {
+  it("shows its text, hides on null", async () => {
+    const { statusChip } = await import("./hud-chips");
+    const chip = statusChip(0, "Bounty on your head");
+    chip.set("⚖ Wanted: 40g bounty");
+    const el = document.querySelector('[aria-label="Bounty on your head"]') as HTMLElement;
+    expect(el.textContent).toBe("⚖ Wanted: 40g bounty");
+    chip.set(null);
+    expect(el.style.display).toBe("none");
+  });
+});

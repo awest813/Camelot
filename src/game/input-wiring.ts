@@ -82,7 +82,7 @@ export function wireInputAdapter(g: Game): void {
       g.ui.showNotification(
         `Fame: ${g.fameSystem.fame} (${g.fameSystem.fameLabel})` +
         `  Infamy: ${g.fameSystem.infamy} (${g.fameSystem.infamyLabel})` +
-        `  Sentences: ${g.jailSystem.totalSentences}${effectStr}${spellStr}`,
+        `  Bounty: ${g.crimeSystem.getTotalBounty()}g  Sentences: ${g.jailSystem.totalSentences}${effectStr}${spellStr}`,
         4000,
       );
     }

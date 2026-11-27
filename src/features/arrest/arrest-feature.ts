@@ -14,6 +14,7 @@ import { simClock } from "../../core/sim-clock";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Feature, FeatureContext, ServiceRegistry } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
+import { statusChip } from "../../ui/hud-chips";
 import { GuardEncounterUI, type GuardEncounterAction } from "../../ui/guard-encounter-ui";
 import { AIState, type NPC } from "../../entities/npc";
 import { FeedbackKey, LawKey, ModalKey, PlayerKey, PurseKey, SkillsKey, declareStateless } from "../services";
@@ -52,6 +53,15 @@ export class ArrestFeature implements Feature {
       ctx.kernel.events.emit("crime:committed", { crimeType: "challenge", factionId, bounty });
     };
     this.panel.onResolve = (action) => this._resolve(action, ctx);
+
+    // While a bounty is on your head the HUD says so (guards will stop you).
+    const wanted = statusChip(0, "Bounty on your head");
+    ctx.system({
+      id: "arrest.wanted", phase: "ui", update: () => {
+        const bounty = s.get(LawKey).crime.getTotalBounty();
+        wanted.set(bounty > 0 ? `⚖ Wanted: ${bounty}g bounty` : null);
+      },
+    });
 
     // Killing or striking a peaceful settler is a crime; witnesses post a
     // bounty and nearby guards come for the player.  Assault is booked at

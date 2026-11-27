@@ -20,3 +20,28 @@ export function addHudChip(chip: HTMLElement, order: number): void {
   chip.style.order = String(order);
   stack.appendChild(chip);
 }
+
+/** A one-line chip in the stack: `set(text)` shows it, `set(null)` hides it (writes only on change). */
+export function statusChip(order: number, label: string): { set(text: string | null, color?: string): void } {
+  let el: HTMLDivElement | null = null;
+  let last: string | null = null;
+  return {
+    set(text, color = "#E0533F") {
+      if (typeof document === "undefined" || `${text}|${color}` === last) return;
+      last = `${text}|${color}`;
+      if (!el) {
+        el = document.createElement("div");
+        el.setAttribute("role", "status");
+        el.setAttribute("aria-label", label);
+        Object.assign(el.style, {
+          background: "rgba(30, 19, 11, 0.97)", border: "1px solid #8A6A2C", borderRadius: "6px",
+          padding: "4px 9px", pointerEvents: "none", fontFamily: "'EB Garamond', Georgia, serif", fontSize: "13px",
+        });
+        addHudChip(el, order);
+      }
+      el.textContent = text ?? "";
+      el.style.color = color;
+      el.style.display = text ? "block" : "none";
+    },
+  };
+}
