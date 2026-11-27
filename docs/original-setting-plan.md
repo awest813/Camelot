@@ -206,8 +206,10 @@ The guardrail now holds the count at zero. What is left on purpose:
 - **Code names** keep their old ids where only the player-facing name changed
   (skills such as `marksman`, `DragonShoutSystem`, `dragonSouls`), so diffs stayed
   small; renaming them is cosmetic.
-- **Omen powers** only announce themselves (as the old birthsign powers did); making
-  them act is separate gameplay work.
+- **Omen powers** now act (Shift+V; `systems/daily-powers.ts`): Pendragon's Blood
+  and Grail's Grace heal, Under the Hill hides you from sight and hearing for a
+  minute, the Warden's Key opens the next locked chest, Spellbound holds and the
+  Adder's Bite poisons the foe in front of you. They had no key before.
 
 ## 5. Decisions (2026-11-27)
 

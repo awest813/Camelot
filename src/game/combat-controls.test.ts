@@ -57,3 +57,64 @@ describe("CombatControls", () => {
     expect(b.spells.castSpell).not.toHaveBeenCalled();
   });
 });
+
+describe("omen powers (Shift+V)", () => {
+  async function omenSetup(signId: string, target: object | null = null) {
+    const { BirthsignSystem } = await import("../systems/birthsign-system");
+    const omens = new BirthsignSystem();
+    omens.chooseBirthsign(signId);
+    const added: Array<{ effectType: string; magnitude: number; duration: number }> = [];
+    const stealth = { pushNoise: vi.fn(), unseenSeconds: 0 };
+    const containers = { masterKeys: 0 };
+    const notes: string[] = [];
+    const deps = {
+      combat: () => ({}), projectiles: () => ({}), stealth: () => stealth,
+      spells: () => ({ targetInFront: () => target }),
+      races: () => ({ chosenRace: null }), omens: () => omens, containers: () => containers,
+      effects: () => ({ addEffect: (e: { effectType: string; magnitude: number; duration: number }) => added.push(e) }),
+      gameTime: () => 600, blocked: () => false, free: () => true, swing: vi.fn(), twang: vi.fn(), notify: (t: string) => notes.push(t),
+    } as unknown as CombatControlsDeps;
+    return { c: new CombatControls(deps), omens, added, stealth, containers, notes };
+  }
+
+  it("the Grail heals 200 over five seconds, once a day", async () => {
+    const t = await omenSetup("grail");
+    t.c.omenPower();
+    expect(t.added).toEqual([expect.objectContaining({ effectType: "health_restore", magnitude: 40, duration: 5 })]);
+    t.c.omenPower();
+    expect(t.added).toHaveLength(1);
+    expect(t.notes.at(-1)).toMatch(/recharging/);
+  });
+
+  it("Under the Hill hides you for a minute; the Locked Door gives one master key", async () => {
+    const hill = await omenSetup("hollow_hill");
+    hill.c.omenPower();
+    expect(hill.stealth.unseenSeconds).toBe(60);
+    const door = await omenSetup("locked_door");
+    door.c.omenPower();
+    expect(door.containers.masterKeys).toBe(1);
+  });
+
+  it("Spellbound holds the foe in front of you; with no foe, nothing is spent", async () => {
+    const none = await omenSetup("enchantress", null);
+    none.c.omenPower();
+    expect(none.notes.at(-1)).toMatch(/no foe in front/);
+    expect(none.omens.canActivatePower(600), "the power is still there").toBe(true);
+
+    const foe = { applyStatusEffect: vi.fn(), isStaggered: false, isAttackTelegraphing: true, staggerTimer: 0 };
+    const t = await omenSetup("enchantress", foe);
+    t.c.omenPower();
+    expect(foe.applyStatusEffect).toHaveBeenCalledWith(expect.objectContaining({ type: "freeze", remainingDuration: 10 }));
+    expect(foe.staggerTimer).toBe(10);
+  });
+
+  it("the Adder poisons the foe in front of you; a sign with no power says so", async () => {
+    const foe = { applyStatusEffect: vi.fn(), provoked: false };
+    const t = await omenSetup("adder", foe);
+    t.c.omenPower();
+    expect(foe.applyStatusEffect).toHaveBeenCalledWith(expect.objectContaining({ type: "poison", damagePerTick: 3, remainingDuration: 20 }));
+    const plain = await omenSetup("sword_stone");
+    plain.c.omenPower();
+    expect(plain.notes.at(-1)).toBe("Your omen grants no power.");
+  });
+});

@@ -448,7 +448,7 @@ export class GameState {
     projectiles: () => this.projectileSystem,
     stealth: () => this.stealthSystem,
     spells: () => this.spellSystem,
-    races: () => this.raceSystem,
+    races: () => this.raceSystem, omens: () => this.birthsignSystem, containers: () => this.containerSystem,
     effects: () => this.activeEffectsSystem,
     gameTime: () => this.timeSystem.gameTime,
     blocked: () => isCombatInputBlocked(this.asGame),

@@ -99,6 +99,14 @@ describe("ContainerSystem", () => {
     expect(mockUI.showNotification).toHaveBeenCalled();
   });
 
+  it("a master key (the Warden's Key) opens one lock of any difficulty", () => {
+    const make = (id: string) => containerSystem.spawnContainer({ id, name: "C", position: new Vector3(), contents: [], isLocked: true, lockDifficulty: 100 });
+    containerSystem.masterKeys = 1;
+    expect(containerSystem.tryOpen(make("k1"), 0)).toBe(true);
+    expect(containerSystem.masterKeys).toBe(0);
+    expect(containerSystem.tryOpen(make("k2"), 0), "the key is spent").toBe(false);
+  });
+
   it("tryOpen succeeds when skill >= lockDifficulty", () => {
     const container = containerSystem.spawnContainer({
       id: "c4", name: "C", position: new Vector3(), contents: [],

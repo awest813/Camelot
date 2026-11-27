@@ -134,7 +134,8 @@ The editors live in the **editor app**, a second page next to the game: `/editor
 | L              | Open alchemy workbench                                   |
 | B              | Open enchanting altar                                    |
 | Shift+B        | Open smithing forge (craft gear; materials from inventory) |
-| V              | Activate racial power                                    |
+| V              | Use your heritage's power (once a day)                  |
+| Shift+V        | Use your omen's power (once a day)                      |
 | H              | Show fame / infamy status and active effects             |
 | T              | Wait / Rest (choose 1–24 hours)                          |
 | X              | Open Spellmaking Altar                                   |

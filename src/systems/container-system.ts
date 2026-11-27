@@ -139,6 +139,12 @@ export class ContainerSystem {
    * @returns true if the container was opened, false if locked and skill too low.
    */
   public tryOpen(container: Container, lockpickSkill: number = 0): boolean {
+    if (container.isLocked && lockpickSkill < container.lockDifficulty && this.masterKeys > 0) {
+      // A master key (the Warden's Key omen) opens it, once.
+      this.masterKeys--;
+      container.isLocked = false;
+      this._ui.showNotification("The Warden's Key turns the lock.", 2000);
+    }
     if (container.isLocked && lockpickSkill < container.lockDifficulty) {
       this._ui.showNotification(
         `Locked (difficulty ${container.lockDifficulty})`, 2000,
@@ -151,6 +157,9 @@ export class ContainerSystem {
     this.onContainerOpen?.(container);
     return true;
   }
+
+  /** Locks the player can open regardless of difficulty (each opens one). */
+  public masterKeys = 0;
 
   /** Take one item from a container into the player's inventory. */
   public takeItem(containerId: string, itemId: string): boolean {

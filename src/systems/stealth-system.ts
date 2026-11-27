@@ -191,7 +191,11 @@ export class StealthSystem {
    * @param deltaTime       Frame time in seconds.
    * @param ambientIntensity World ambient intensity [0-1] from TimeSystem.
    */
+  /** Seconds the player stays unseen and unheard (the Under the Hill omen). */
+  public unseenSeconds = 0;
+
   public update(deltaTime: number, ambientIntensity: number = 1.0): void {
+    if (this.unseenSeconds > 0) this.unseenSeconds = Math.max(0, this.unseenSeconds - deltaTime);
     // Decay transient noise level
     this._noiseLevel = Math.max(0, this._noiseLevel - NOISE_DECAY_RATE * deltaTime);
 
@@ -239,7 +243,7 @@ export class StealthSystem {
   }
 
   private _canNPCSee(npc: NPC, ambientIntensity: number, shouldRaycast: boolean): boolean {
-    if (npc.isDead) return false;
+    if (npc.isDead || this.unseenSeconds > 0) return false;
 
     const playerPos = this._player.camera.position;
     const npcPos    = npc.mesh.position;
@@ -281,7 +285,7 @@ export class StealthSystem {
   }
 
   private _canNPCHear(npc: NPC): boolean {
-    if (npc.isDead) return false;
+    if (npc.isDead || this.unseenSeconds > 0) return false;
 
     const dist = Vector3.Distance(this._player.camera.position, npc.mesh.position);
 

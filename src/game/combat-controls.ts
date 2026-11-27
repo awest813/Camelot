@@ -1,7 +1,7 @@
 /**
  * What the player's combat inputs do: swing or power-attack (or draw a bow),
  * dodge, block, cast (or charge a staff), cycle spells, loose an arrow, use
- * the racial power.  Each action is one method, bound to the input adapter
+ * the heritage power (V) or the omen's power (Shift+V).  Each action is one method, bound to the input adapter
  * here; the mouse and the editor's key-up path reuse the same methods.
  *
  * Moved out of game.ts (engine overhaul, Phase 1).
@@ -11,6 +11,7 @@ import type { ProjectileSystem } from "../systems/projectile-system";
 import type { StealthSystem } from "../systems/stealth-system";
 import type { SpellSystem } from "../systems/spell-system";
 import type { RaceSystem } from "../systems/race-system";
+import { useHeritagePower, useOmenPower, type OmenPowerDeps } from "../systems/daily-powers";
 import type { ActiveEffectsSystem } from "../systems/active-effects-system";
 
 export interface CombatControlsDeps {
@@ -19,6 +20,8 @@ export interface CombatControlsDeps {
   stealth(): StealthSystem;
   spells(): SpellSystem;
   races(): RaceSystem;
+  /** The omen the hero was born under, and the chests (optional: tests and tools leave them out). */
+  omens?(): OmenPowerDeps["omens"]; containers?(): OmenPowerDeps["containers"];
   effects(): ActiveEffectsSystem;
   gameTime(): number;
   /** Combat input is off (paused, a menu, a conversation, the editor). */
@@ -82,19 +85,15 @@ export class CombatControls {
     sp.equipSpell(known[(i + 1) % known.length].id);
   }
 
+  /** V: the heritage's power, once a day (systems/daily-powers.ts). */
   public racialPower(): void {
-    if (this._d.blocked()) return;
-    const races = this._d.races();
-    const race = races.chosenRace;
-    const now = this._d.gameTime();
-    if (!race?.power) {
-      this._d.notify("No racial power available.", 2000);
-    } else if (!races.canActivatePower(now)) {
-      const mins = Math.ceil(races.powerCooldownRemaining(now));
-      this._d.notify(`${race.power.name} is recharging (${mins} game-minutes remaining).`, 2500);
-    } else {
-      races.activatePower(now, this._d.effects());
-    }
+    if (!this._d.blocked()) useHeritagePower(this._d.races(), this._d.effects(), this._d.gameTime(), this._d.notify);
+  }
+
+  /** Shift+V: the omen's power, once a day (systems/daily-powers.ts). */
+  public omenPower(): void {
+    const d = this._d;
+    if (!d.blocked()) useOmenPower({ omens: d.omens?.(), containers: d.containers?.(), stealth: d.stealth(), spells: d.spells(), effects: d.effects(), now: d.gameTime(), notify: d.notify });
   }
 
   public readyWeapon(): void {
@@ -121,7 +120,7 @@ export class CombatControls {
     on("cycleSpell", () => this.cycleSpell());
     on("drawBow", () => this.drawBow());
     on("releaseBow", () => this.releaseBow());
-    on("racialPower", () => this.racialPower());
+    on("racialPower", () => this.racialPower()); on("omenPower", () => this.omenPower());
     on("readyWeapon", () => this.readyWeapon());
   }
 }

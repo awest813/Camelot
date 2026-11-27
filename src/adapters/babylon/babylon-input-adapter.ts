@@ -45,6 +45,7 @@ export type InputAction =
   | "drawBow"
   | "releaseBow"
   | "racialPower"
+  | "omenPower"
   | "dodgeRoll"
   | "toggleFollowerPanel"
   | "toggleShoutMenu"
@@ -177,7 +178,8 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   // F = Dodge roll (i-frame dash; shift:false so editor Shift+F = Frame All)
   { key: "f", action: "dodgeRoll", caseInsensitive: true, shift: false },
   // V = Racial power
-  { key: "v", action: "racialPower", caseInsensitive: true },
+  { key: "v", action: "omenPower", shift: true, caseInsensitive: true },
+  { key: "v", action: "racialPower", caseInsensitive: true, shift: false },
   // F8 = Favorites menu (shift:false so editor Shift+F8 = Loot Table Creator)
   { key: "F8", action: "favoritesMenu", shift: false },
   // G = Follower panel (F is taken by the dodge roll)

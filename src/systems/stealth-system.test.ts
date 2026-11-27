@@ -58,6 +58,15 @@ describe("StealthSystem", () => {
     expect(stealthSystem.overallDetection).toBe(0);
   });
 
+  it("while unseen (Under the Hill) no one sees or hears the player; then they can again", () => {
+    stealthSystem.unseenSeconds = 1;
+    stealthSystem.update(0.5);
+    expect(stealthSystem.getDetectionLevel(mockNpc)).toBe(0);
+    stealthSystem.update(0.6);
+    stealthSystem.update(0.5);
+    expect(stealthSystem.getDetectionLevel(mockNpc)).toBeGreaterThan(0);
+  });
+
   it("detection builds when player is in NPC hearing range while walking", () => {
     // NPC at 5 units — within walking hearing range (7)
     stealthSystem.update(0.5);

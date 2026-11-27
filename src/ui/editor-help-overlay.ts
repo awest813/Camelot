@@ -6,7 +6,7 @@ const BASE_CONTROLS: readonly string[] = [
   "F: Dodge Roll · R (hold): Draw Bow, release to fire",
   "I: Inventory · Tab: Character Sheet · J: Quest Log · K: Skills · U: Attributes",
   "Q: Cast Spell · Z: Cycle Spells · X: Spellmaking · L: Alchemy · B: Enchanting · Shift+B: Smithing · T: Wait",
-  "V: Racial Power · H: Fame / Status · Y: Fast Travel Menu (Recall) · M: Map · Shift+M: Mark · F7: Mute",
+  "V: Heritage power · Shift+V: Omen power · H: Fame / Status · Y: Fast Travel Menu (Recall) · M: Map · Shift+M: Mark · F7: Mute",
   "N: Words of the Old Tongue · Shift+N: Speak the word · Great deeds bring awen",
   "C: Crouch (sneak) · E while undetected: Pickpocket · P: Pets · G: Followers",
   "O: Mount / Dismount · Shift+O: Stable (buy horse) or Saddlebag (if mounted)",

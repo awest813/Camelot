@@ -590,6 +590,11 @@ export class SpellSystem {
    * so targeting follows where the player aims, giving them directional
    * control over which enemy they hit.
    */
+  /** The closest live NPC within `range` in front of the player (as spells aim), or null. */
+  public targetInFront(range: number): NPC | null {
+    return this._findTargetNpc(this._player.camera.position, range);
+  }
+
   private _findTargetNpc(playerPos: Vector3, range: number): NPC | null {
     // Obtain the camera's normalised forward direction.
     // getForwardRay requires BabylonJS's Ray class side-effect; fall back to
