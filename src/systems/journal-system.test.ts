@@ -289,11 +289,11 @@ describe("JournalSystem", () => {
 
   describe("search", () => {
     beforeEach(() => {
-      sys.addEntry({ id: "a", title: "A Word of the Old Tongue", body: "Found an old place.", category: "quest", tags: [] });
+      sys.addEntry({ id: "a", title: "The Dragon and the Old Tongue", body: "Found an old place.", category: "quest", tags: [] });
       advanceClock(100);
       sys.addEntry({ id: "b", title: "Old Note", body: "The dragon lurks in the east.", category: "lore", tags: [] });
       advanceClock(100);
-      sys.addEntry({ id: "c", title: "Alchemy Recipe", body: "Mix nirnroot with...", category: "note", tags: [], summary: "Potion of dragon power" });
+      sys.addEntry({ id: "c", title: "Alchemy Recipe", body: "Mix mugwort with...", category: "note", tags: [], summary: "Potion of dragon power" });
     });
 
     it("returns all entries for empty query", () => {
@@ -301,12 +301,12 @@ describe("JournalSystem", () => {
     });
 
     it("matches title case-insensitively", () => {
-      const results = sys.search("dragon shout");
+      const results = sys.search("old tongue");
       expect(results[0].id).toBe("a");
     });
 
     it("matches body case-insensitively", () => {
-      const results = sys.search("word wall");
+      const results = sys.search("an OLD place");
       expect(results.map((e) => e.id)).toContain("a");
     });
 
