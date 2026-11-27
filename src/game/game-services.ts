@@ -24,7 +24,7 @@ import { WorldEventsFeature } from "../features/world-events/world-events-featur
 import { NoticesFeature } from "../features/notices/notices-feature";
 import { SaveTriggersFeature } from "../features/notices/save-triggers-feature";
 import { VillageJobsFeature } from "../features/village-jobs/jobs-feature";
-import { spawnDragon } from "../world/dragon-lair";
+import { spawnDragon } from "../world/dragon-lair"; import { placeChest } from "../world/chest";
 import { TravelHostKey } from "../features/fast-travel/fast-travel-feature";
 import { DeathFeature, DeathHostKey } from "../features/death/death-feature";
 import { SpoilsFeature, SpoilsHostKey } from "../features/spoils/spoils-feature";
@@ -375,7 +375,7 @@ export function installGameFeatures(game: Game): void {
         addKeepOut: (fp) => {
           return game._chunks.addKeepOut(fp);
         },
-        nightFlame: (name, x, y, z) => game._chunks.nightFlame(name, x, y, z),
+        nightFlame: (name, x, y, z) => game._chunks.nightFlame(name, x, y, z), placeChest: (chunkKey, chest) => placeChest({ chunks: game._chunks, containers: game.containerSystem, assets: game.fantasyAssets, contents: (loot, id) => game.lootTableSystem.rollTable(loot, Math.floor(k.rng.stream("chest", id).next() * 2 ** 31), { playerLevel: game.player.level }).items }, chunkKey, chest),
         placeAsset: (chunkKey, key, at) => {
           if (!record(chunkKey)) return;
           game.fantasyAssets.getInstance(key, (root) => {

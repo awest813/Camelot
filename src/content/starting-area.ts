@@ -4,6 +4,7 @@
  * forge, and the first quests
  * (framework quests, added to the content the game's runtime is built from).
  */
+import { LOCKPICK } from "../systems/container-system";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Scene } from "@babylonjs/core/scene";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
@@ -108,7 +109,13 @@ export function seedStartingArea(d: StartingAreaDeps): void {
     contents: [
       { id: "gold_coins", name: "Gold Coins", description: "A handful of gold coins.", stackable: true, quantity: 50, weight: 0.1, stats: { value: 1 } },
       { id: "iron_sword", name: "Iron Sword", description: "A basic iron sword.", stackable: false, quantity: 1, slot: "mainHand", weight: 3, stats: { damage: 10, value: 80 } },
+      { ...LOCKPICK, quantity: 3, stats: { ...LOCKPICK.stats } },
     ],
+  });
+  // A practice lock beside it: the picks in the Old Chest open it, given a try or two.
+  d.containers.spawnContainer({
+    id: "chest_02", name: "Rusted Strongbox", position: new Vector3(6.5, 1, 5), isLocked: true, lockDifficulty: 30,
+    contents: [{ id: "gold_coins", name: "Gold Coins", description: "A handful of gold coins.", stackable: true, quantity: 40, weight: 0.1, stats: { value: 1 } }],
   });
 
   // The Old Cave's entrance, with where the player comes back out.

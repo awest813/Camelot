@@ -42,6 +42,8 @@ export type SitePart = { when?: PartCondition } & (
   /** A single asset at the origin, turned by a roll and optionally scaled by one. */
   | { asset: FantasyAssetKey; yaw: number; scale?: number | { base: number; slot: number; range: number }; tier?: "structure" | "scene" | "prop" }
   | { dragon: true; yaw: number }
+  /** A chest the player can open: the chest model as a container, locked, filled from a loot table. */
+  | { chest: { name: string; lock: number; loot: string }; dx: number; dz: number; rot?: number }
 );
 
 export interface SiteSpec {
@@ -156,7 +158,7 @@ export function buildWildChunk(c: SiteContext, scatter: WildScatter, specs: read
       if (empty && ("npc" in part || "dragon" in part)) continue;
       if (part.when?.variant && !part.when.variant.includes(variant)) continue;
       if (part.when?.roll && r(part.when.roll.slot) >= part.when.roll.chance) continue;
-      const actor = buildPart(c, part, origin, variant, r);
+      const actor = buildPart(c, part, origin, variant, r, id, empty);
       if (actor) spawned.push(actor);
     }
     const lm = spec.landmark;
@@ -174,6 +176,7 @@ export function buildWildChunk(c: SiteContext, scatter: WildScatter, specs: read
 
 function buildPart(
   c: SiteContext, part: SitePart, o: { x: number; z: number; rot: number }, variant: number, r: (slot: number) => number,
+  siteId: string, quiet: boolean,
 ): unknown {
   const { site, chunkKey } = c;
   if ("building" in part) {
@@ -189,6 +192,9 @@ function buildPart(
       const w = toWorld({ x: Math.sin(a) * part.radius, z: Math.cos(a) * part.radius }, o);
       site.placeProp(chunkKey, part.ring, w.x, w.z, o.rot + a);
     }
+  } else if ("chest" in part) {
+    const w = toWorld({ x: part.dx, z: part.dz }, o);
+    site.placeChest?.(chunkKey, { id: `chest_${siteId}`, name: part.chest.name, x: w.x, z: w.z, rot: o.rot + (part.rot ?? 0), lock: part.chest.lock, loot: part.chest.loot, empty: quiet });
   } else if ("npc" in part) {
     const archetype = typeof part.npc === "string" ? part.npc : part.npc[variant];
     return c.spawn(archetype, o.x + part.dx, o.z + part.dz);

@@ -120,7 +120,7 @@ export const WILD_SITES: readonly SiteSpec[] = [
       { prop: "qCrate", dx: 5.0, dz: -2.2, rot: 1.1 },
       { prop: "qBarrel", dx: -3.6, dz: -4.6 },
       { prop: "qBarrel", dx: -2.8, dz: -5.3, rot: 0.8 },
-      { prop: "qChest", dx: 0, dz: -2.6, rot: Math.PI },
+      { chest: { name: "Bandits' Strongbox", lock: 35, loot: "treasure_chest" }, dx: 0, dz: -2.6, rot: Math.PI },
       { prop: "qSignPost", dx: 3.6, dz: 1.4, rot: -Math.PI / 2 }, // weapon rack
       { prop: "qLantern", dx: -1.6, dz: 2.2 },
       { npc: "archetype_bandit", dx: 3, dz: 2 },

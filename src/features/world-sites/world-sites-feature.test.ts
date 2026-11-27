@@ -5,7 +5,7 @@ import type { BiomeType } from "../../world/world-manager";
 import { ActorsKey, SiteBuilderKey, VillagesKey, WorldInfoKey } from "../services";
 import { WorldSitesFeature, WorldSitesKey, chunkRand } from "./world-sites-feature";
 
-type Placed = { kind: string; key?: string; x: number; z: number };
+type Placed = { kind: string; key?: string; x: number; z: number; lock?: number };
 
 function setup(opts: { pond?: boolean; village?: boolean; biome?: BiomeType } = {}) {
   const k = new Kernel();
@@ -30,6 +30,7 @@ function setup(opts: { pond?: boolean; village?: boolean; biome?: BiomeType } = 
     placeAsset: (_c, key, at) => { placed.push({ kind: "asset", key, x: at.x, z: at.z }); },
     placeSmithy: (_c, x, z) => { placed.push({ kind: "smithy", x, z }); },
     spawnDragon: (_c, x, z) => { placed.push({ kind: "dragon", x, z }); return null; },
+    placeChest: (_c, chest) => { placed.push({ kind: "chest", key: "qChest", x: chest.x, z: chest.z, lock: chest.lock }); },
     ownStructure: () => undefined, own: () => undefined,
     addKeepOut: () => () => undefined, nightFlame: () => null,
   });
@@ -65,6 +66,7 @@ describe("WorldSitesFeature (headless, through the kernel)", () => {
     t.sites.populate(`${cx},${cz}`, cx, cz, "desert");
     expect(t.placed.filter((p) => p.key === "vFence")).toHaveLength(21);   // 24 posts minus three at the gate
     expect(t.placed.some((p) => p.key === "qChest")).toBe(true);
+    expect(t.placed.find((p) => p.kind === "chest"), "the strongbox is a locked chest").toMatchObject({ lock: 35 });
     expect(t.spawned).toEqual(["archetype_bandit", "archetype_bandit", "archetype_bandit_archer", "archetype_bandit_chief"]);
   });
 

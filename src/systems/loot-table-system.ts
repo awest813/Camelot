@@ -350,6 +350,7 @@ export const STARTER_LOOT_TABLES: LootTable[] = [
       { itemId: "health_potion", itemName: "Health Potion", weight: 15, maxQuantity: 2,  itemTemplate: { stackable: true, weight: 0.5, stats: { value: 25 } } },
       { itemId: "iron_ingot",     itemName: "Iron Ingot",     weight: 10, maxQuantity: 2,  itemTemplate: { description: "A bar of smelted iron. Used at the forge (Shift+B).", stackable: true, weight: 1.0, stats: { value: 7 } } },
       { itemId: "leather_strips", itemName: "Leather Strips", weight: 10, maxQuantity: 3,  itemTemplate: { description: "Cured hide cut into strips for grips and straps.", stackable: true, weight: 0.1, stats: { value: 3 } } },
+      { itemId: "lockpick",       itemName: "Lockpick",       weight: 12, maxQuantity: 3,  itemTemplate: { description: "A bent iron pick. Snaps if you force it.", stackable: true, weight: 0.05, stats: { value: 6 } } },
     ],
   },
   {

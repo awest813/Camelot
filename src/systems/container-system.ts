@@ -8,6 +8,25 @@ import { Item } from "./inventory-system";
 import { InventorySystem } from "./inventory-system";
 import { UIManager } from "../ui/ui-manager";
 import { Player } from "../entities/player";
+import { unseededRandom } from "../core/rng/rng";
+
+/** The item that picks locks. */
+export const LOCKPICK_ID = "lockpick";
+
+/** A lockpick, as merchants sell it and bandits carry it. */
+export const LOCKPICK: Item = {
+  id: LOCKPICK_ID, name: "Lockpick", description: "A bent iron pick. Snaps if you force it.",
+  stackable: true, quantity: 1, weight: 0.05, stats: { value: 6 },
+};
+
+/**
+ * The chance a lockpick opens a lock: an even chance when the lock is just
+ * beyond your skill, falling as it gets harder (never below 10 %, never
+ * above 95 %).  Locks within your skill open without a pick.
+ */
+export function pickChance(skill: number, difficulty: number): number {
+  return Math.min(0.95, Math.max(0.1, 0.5 + (skill - difficulty) * 0.015));
+}
 
 export interface ContainerDef {
   id: string;
@@ -42,10 +61,11 @@ export interface ContainerSaveState {
  *   calls `tryOpen()`, which fires `onContainerOpen` for the UI to handle.
  * - Container contents are persisted through save/load via `getSaveState()`.
  *
- * Lockpicking:
- *   `tryOpen(container, lockpickSkill)` — player must have a lockpick skill
- *   ≥ lockDifficulty to open a locked container.  On failure, a notification
- *   is shown and `tryOpen` returns false.
+ * Locks:
+ *   `tryOpen(container)` — a lock within the player's lock skill (`lockSkill`)
+ *   opens.  A harder one takes a lockpick: each try succeeds with
+ *   `pickChance(skill, difficulty)` (a seeded roll, `lockRng`), and a failure
+ *   snaps the pick.  A master key (the Warden's Key omen) opens any lock once.
  */
 export class ContainerSystem {
   private _scene: Scene;
@@ -54,6 +74,12 @@ export class ContainerSystem {
   private _ui: UIManager;
 
   private _containers: Map<string, Container> = new Map();
+  /** The player's lock skill, 0–100 (set by the game: Sneak and Agility). */
+  public lockSkill: () => number = () => 0;
+  /** Rolls for picking locks (set by the game to a seeded stream). */
+  public lockRng: () => number = unseededRandom;
+  /** A lock was picked (the game grants Sneak experience). */
+  public onLockPicked: ((container: Container) => void) | null = null;
   public activeContainer: Container | null = null;
 
   /** Fired when the player successfully opens a container. Hook to show UI. */
@@ -138,7 +164,7 @@ export class ContainerSystem {
    * @param lockpickSkill  Player's lockpick skill (0-100). Defaults to 0.
    * @returns true if the container was opened, false if locked and skill too low.
    */
-  public tryOpen(container: Container, lockpickSkill: number = 0): boolean {
+  public tryOpen(container: Container, lockpickSkill: number = this.lockSkill()): boolean {
     if (container.isLocked && lockpickSkill < container.lockDifficulty && this.masterKeys > 0) {
       // A master key (the Warden's Key omen) opens it, once.
       this.masterKeys--;
@@ -146,16 +172,48 @@ export class ContainerSystem {
       this._ui.showNotification("The Warden's Key turns the lock.", 2000);
     }
     if (container.isLocked && lockpickSkill < container.lockDifficulty) {
-      this._ui.showNotification(
-        `Locked (difficulty ${container.lockDifficulty})`, 2000,
-      );
-      return false;
+      if (this.lockpicks() === 0) {
+        this._ui.showNotification(`Locked. You need a lockpick (lock ${container.lockDifficulty}, your skill ${Math.round(lockpickSkill)}).`, 2600);
+        return false;
+      }
+      if (this.lockRng() >= pickChance(lockpickSkill, container.lockDifficulty)) {
+        this._inventory.removeQuantity(LOCKPICK_ID, 1);
+        this._ui.showNotification(`The lockpick snaps. (${this.lockpicks()} left)`, 2200);
+        return false;
+      }
+      container.isLocked = false;
+      this._ui.showNotification("You pick the lock.", 2000);
+      this.onLockPicked?.(container);
     }
 
     container.isOpen  = true;
     this.activeContainer = container;
     this.onContainerOpen?.(container);
     return true;
+  }
+
+  /** Lockpicks the player carries. */
+  public lockpicks(): number {
+    return this._inventory.items.filter((i) => i.id === LOCKPICK_ID).reduce((n, i) => n + i.quantity, 0);
+  }
+
+  /**
+   * A chest placed in the world (a camp's strongbox): `mesh` is what the player
+   * looks at (it gets the container metadata).  Locked when `lockDifficulty` > 0.
+   */
+  public registerChest(id: string, name: string, mesh: Mesh, contents: Item[], lockDifficulty: number): Container {
+    const container: Container = { id, name, mesh, contents: [...contents], isLocked: lockDifficulty > 0, lockDifficulty, isOpen: false };
+    mesh.metadata = { type: "container", container };
+    this._containers.set(id, container);
+    return container;
+  }
+
+  /** Forget a container (its chunk unloaded). */
+  public unregister(id: string): void {
+    const c = this._containers.get(id);
+    if (!c) return;
+    if (this.activeContainer === c) this.activeContainer = null;
+    this._containers.delete(id);
   }
 
   /** Locks the player can open regardless of difficulty (each opens one). */

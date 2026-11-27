@@ -6,6 +6,7 @@
  * used to be separate copies, and the general store's restock had lost its
  * food.
  */
+import { LOCKPICK } from "../systems/container-system";
 import type { Item } from "../systems/inventory-system";
 import type { BarterSystem } from "../systems/barter-system";
 import type { MerchantRestockSystem } from "../systems/merchant-restock-system";
@@ -43,6 +44,7 @@ export const STARTER_MERCHANTS: readonly StarterMerchant[] = [
     stock: () => [
       { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 5, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
       { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 3, weight: 1, stats: { value: 15 } },
+      { ...LOCKPICK, quantity: 6, stats: { ...LOCKPICK.stats } },
     ],
   },
   {
@@ -57,6 +59,7 @@ export const STARTER_MERCHANTS: readonly StarterMerchant[] = [
     stock: () => [
       { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 8, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
       { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 4, weight: 1, stats: { value: 15 } },
+      { ...LOCKPICK, quantity: 10, stats: { ...LOCKPICK.stats } },
       { id: "bread", name: "Loaf of Bread", description: "Hearty bread. Restores hunger.", stackable: true, quantity: 6, weight: 0.2, stats: { value: 5, nutrition: 30 } },
       { id: "ale", name: "Mug of Ale", description: "Watered-down but filling.", stackable: true, quantity: 6, weight: 0.4, stats: { value: 4, nutrition: 15 } },
       { id: "stew", name: "Bowl of Stew", description: "Hot and hearty. Restores a lot of hunger.", stackable: true, quantity: 4, weight: 0.5, stats: { value: 8, nutrition: 50 } },

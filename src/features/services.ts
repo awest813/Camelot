@@ -126,6 +126,12 @@ export interface SiteBuilderService {
   /** The tundra dragon boss (NPC + body), owned by the chunk. */
   spawnDragon(chunkKey: string, x: number, z: number, yaw: number): NPC | null;
   placeSmithy(chunkKey: string, x: number, z: number, rot: number): void;
+  /**
+   * A chest the player can open (a camp's strongbox): the chest model as a
+   * container, locked at `lock`, filled from loot table `loot` (left empty
+   * when `empty`: its site was cleared lately).  Owned by the chunk.
+   */
+  placeChest?(chunkKey: string, chest: { id: string; name: string; x: number; z: number; rot: number; lock: number; loot: string; empty: boolean }): void;
   /** Own a mesh in the chunk: shadows and distance culling ("structure" tier). */
   ownStructure(chunkKey: string, mesh: AbstractMesh): void;
   /** Own a mesh in the chunk with no extras (colliders, hit boxes, decals). */

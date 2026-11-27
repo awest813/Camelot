@@ -99,7 +99,16 @@ export class InteractionSystem {
               this.ui.setInteractionText(`[E] Take ${metadata.loot.item.name}`);
               this.ui.setCrosshairActive(true);
           } else if (metadata.type === 'container' && metadata.container) {
-              this.ui.setInteractionText(`[E] Open ${metadata.container.name}`);
+              const c = metadata.container;
+              const cs = this.containerSystem;
+              if (c.isLocked && cs && cs.lockSkill() < c.lockDifficulty) {
+                  const picks = cs.lockpicks();
+                  this.ui.setInteractionText(picks > 0
+                      ? `[E] Pick the lock: ${c.name} (${picks} lockpick${picks === 1 ? "" : "s"})`
+                      : `${c.name}: locked (you need a lockpick)`);
+              } else {
+                  this.ui.setInteractionText(`[E] Open ${c.name}`);
+              }
               this.ui.setCrosshairActive(true);
           } else if (metadata.type === 'portal' && metadata.portal && this.cellManager) {
               if (this.cellManager.isTransitioning || this.ui.isScreenFadeActive) {
@@ -151,8 +160,8 @@ export class InteractionSystem {
               this.events?.emit("loot:pickedUp", { itemId: loot.item.id });
           }
       } else if (metadata.type === 'container' && metadata.container && this.containerSystem) {
-          // No lockpick skill exists yet — locked chests report their difficulty.
-          this.containerSystem.tryOpen(metadata.container, 0);
+          // A lock beyond the player's skill takes a lockpick (ContainerSystem.tryOpen).
+          this.containerSystem.tryOpen(metadata.container);
       } else if (metadata.type === 'portal' && metadata.portal && this.cellManager) {
           if (this.cellManager.isTransitioning || this.ui.isScreenFadeActive) return;
           const portalId = metadata.portal.id as string;

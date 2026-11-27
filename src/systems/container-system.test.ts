@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ContainerSystem } from "./container-system";
+import { ContainerSystem, LOCKPICK, pickChance } from "./container-system";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
 // ── Babylon mocks ─────────────────────────────────────────────────────────────
@@ -97,6 +97,50 @@ describe("ContainerSystem", () => {
     const result = containerSystem.tryOpen(container, 20); // skill 20 < difficulty 50
     expect(result).toBe(false);
     expect(mockUI.showNotification).toHaveBeenCalled();
+  });
+
+  it("picking a lock: a roll under the chance opens it; a miss snaps a pick; no picks, no try", () => {
+    let n = 0;
+    const strongbox = () => containerSystem.spawnContainer({ id: `s${n++}`, name: "Strongbox", position: new Vector3(), contents: [], isLocked: true, lockDifficulty: 35 });
+    mockInventory.items = [{ ...LOCKPICK, quantity: 2 }];
+    mockInventory.removeQuantity = vi.fn((_id: string, k: number) => { mockInventory.items[0].quantity -= k; return true; });
+    containerSystem.lockSkill = () => 25;
+    const picked = vi.fn();
+    containerSystem.onLockPicked = picked;
+
+    containerSystem.lockRng = () => 0.99; // a miss
+    const box = strongbox();
+    expect(containerSystem.tryOpen(box)).toBe(false);
+    expect(mockInventory.removeQuantity).toHaveBeenCalledWith("lockpick", 1);
+    expect(mockUI.showNotification).toHaveBeenLastCalledWith("The lockpick snaps. (1 left)", 2200);
+
+    containerSystem.lockRng = () => 0.0; // a success
+    expect(containerSystem.tryOpen(box)).toBe(true);
+    expect(box.isLocked).toBe(false);
+    expect(picked).toHaveBeenCalledWith(box);
+    expect(containerSystem.lockpicks(), "a success keeps the pick").toBe(1);
+
+    mockInventory.items = [];
+    expect(containerSystem.tryOpen(strongbox())).toBe(false);
+    expect(mockUI.showNotification.mock.calls.at(-1)[0]).toMatch(/You need a lockpick/);
+  });
+
+  it("a lock within your skill opens without a pick; the odds fall as locks get harder", () => {
+    containerSystem.lockSkill = () => 50;
+    const easy = containerSystem.spawnContainer({ id: "e1", name: "Box", position: new Vector3(), contents: [], isLocked: true, lockDifficulty: 40 });
+    expect(containerSystem.tryOpen(easy)).toBe(true);
+    expect(pickChance(25, 35)).toBeCloseTo(0.35);
+    expect(pickChance(0, 100)).toBe(0.1);
+    expect(pickChance(100, 0)).toBe(0.95);
+  });
+
+  it("a chest in the world: registered on its model, forgotten when its chunk goes", () => {
+    const mesh: any = { metadata: null };
+    const c = containerSystem.registerChest("chest_site_x", "Bandits' Strongbox", mesh, [sampleItem], 35);
+    expect(c.isLocked).toBe(true);
+    expect(mesh.metadata).toEqual({ type: "container", container: c });
+    containerSystem.unregister("chest_site_x");
+    expect(containerSystem.getSaveState().containers.some((x) => x.id === "chest_site_x")).toBe(false);
   });
 
   it("a master key (the Warden's Key) opens one lock of any difficulty", () => {

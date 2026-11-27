@@ -12,6 +12,8 @@ function recorder() {
   const site = {
     placeBuilding: log("building"), placeProp: log("prop"), placeAsset: log("asset"),
     placeSmithy: log("smithy"), spawnDragon: log("dragon"),
+    // A chest places the chest model the hand-written code placed as a prop.
+    placeChest: (chunkKey: string, c: { x: number; z: number; rot: number }) => { calls.push(["prop", chunkKey, "qChest", c.x, c.z, c.rot]); },
   } as unknown as SiteBuilderService;
   return { site, calls, spawn: log("npc") };
 }
@@ -94,6 +96,23 @@ describe("data-driven wild sites", () => {
       expect(full.calls.filter((c) => c[0] === "npc").length).toBeGreaterThanOrEqual(4);
       expect(empty.calls.filter((c) => c[0] === "npc")).toHaveLength(full.calls.filter((c) => c[0] === "npc").length - 4);
       expect(empty.calls.filter((c) => c[0] === "prop").length).toBe(full.calls.filter((c) => c[0] === "prop").length);
+      return;
+    }
+    throw new Error("no bandit camp in the sample");
+  });
+
+  it("a bandit camp's strongbox is a locked chest, empty while the camp is quiet", () => {
+    for (let cx = -60; cx < 60; cx++) for (let cz = -30; cz < 30; cz++) {
+      const chests: Array<{ id: string; lock: number; empty: boolean }> = [];
+      const t = recorder();
+      const site = { ...(t.site as object), placeChest: (_k: string, c: { id: string; lock: number; empty: boolean }) => chests.push(c) } as unknown as SiteBuilderService;
+      const base = { site, spawn: t.spawn, chunkKey: "k", cx, cz, biome: "desert" as const, size: 50 };
+      const camps = buildWildChunk(base, { ...WILD_SCATTER, pool: {} }, WILD_SITES).filter((l) => l.kind === "Bandit Camp");
+      if (camps.length === 0) continue;
+      expect(chests).toEqual([expect.objectContaining({ id: `chest_${camps[0].id}`, lock: 35, empty: false })]);
+      chests.length = 0;
+      buildWildChunk({ ...base, quiet: () => true }, { ...WILD_SCATTER, pool: {} }, WILD_SITES);
+      expect(chests[0].empty, "cleared lately: nothing to steal yet").toBe(true);
       return;
     }
     throw new Error("no bandit camp in the sample");
