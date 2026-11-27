@@ -6,7 +6,8 @@
  * keyboard path, which used to carry two copies of it.
  *
  * Inputs:   services player, actors, animation, feedback, modal, gameplay,
- *           and the scene; a sim-phase system runs the AI.
+ *           and the scene; a sim-phase system runs the AI; `dialogue:action`
+ *           "pets:grant" { petId } gives a new companion.
  * Outputs:  the `pets` service; pet:* events on the bus.
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
@@ -29,6 +30,9 @@ import { ActorsKey, AnimationKey, FeedbackKey, GameplayKey, ModalKey, PlayerKey,
 
 /** Seconds between a companion's attacks. */
 const ATTACK_COOLDOWN = 2.0;
+/** A hostile this close (m) to the companion bites back every `STRUCK_EVERY` s. */
+const STRUCK_REACH = 2.0;
+const STRUCK_EVERY = 2.0;
 
 export interface PetsService {
   readonly pets: PetSystem;
@@ -46,6 +50,7 @@ export class PetsFeature implements Feature {
   private _mesh: Mesh | null = null;
   private _body: PhysicsAggregate | null = null;
   private _attackTimer = 0;
+  private _struckTimer = STRUCK_EVERY;
   private readonly _vel = new Vector3();
   private readonly _look = new Vector3();
   private _services: ServiceRegistry | null = null;
@@ -121,6 +126,14 @@ export class PetsFeature implements Feature {
         this.panel.open(this.pets.pets, this.pets.activePet?.id ?? null);
         s.get(ModalKey).suspendGameplay();
       },
+    });
+
+    // Bought or given in conversation (a kitten from the barkeeper, a raven from the alchemist).
+    ctx.on("dialogue:action", ({ eventId, payload }) => {
+      if (eventId !== "pets:grant" || typeof payload?.petId !== "string") return;
+      if (!this.pets.grantPet(payload.petId)) return;
+      feedback().notify("P opens the companion panel: summon them from there.", 3000);
+      feedback().markDirty();
     });
 
     ctx.system({ id: "pets.ai", phase: "sim", update: (dt) => this._updateAI(dt) });
@@ -230,6 +243,18 @@ export class PetsFeature implements Feature {
       const ex = npc.mesh.position.x - petPos.x, ez = npc.mesh.position.z - petPos.z;
       const d = ex * ex + ez * ez;
       if (d < best) { best = d; target = npc; }
+    }
+    // A foe beside the companion strikes it too (it can fall in battle).
+    this._struckTimer -= dt;
+    if (this._struckTimer <= 0) {
+      this._struckTimer = STRUCK_EVERY;
+      const reach = STRUCK_REACH * STRUCK_REACH;
+      const foe = services.get(ActorsKey).hostiles().find((npc) => {
+        const ex = npc.mesh.position.x - petPos.x, ez = npc.mesh.position.z - petPos.z;
+        return ex * ex + ez * ez < reach;
+      });
+      if (foe) this.pets.petTakeDamage(Math.max(1, foe.attackDamage));
+      if (!this._mesh) return; // it fell
     }
     if (target) {
       target.takeDamage(this.pets.getEffectiveAttackDamage());

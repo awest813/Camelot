@@ -41,6 +41,8 @@ export interface TravelHostService {
   /** Roll a travel event for an arrival at `at`; returns its message, if any. */
   arrivalEvent(at: Vector3): string | null;
   hasMark(): boolean;
+  /** The interior the mark was set in (null: the open world). */
+  markCell(): string | null;
   /** Recall to the mark; false when there is none. */
   recall(): boolean;
 }
@@ -129,9 +131,15 @@ export class FastTravelFeature implements Feature {
       // Teleporting and its message are the recall system's own.
       if (host.inCombat()) { refuse("Cannot recall while in combat."); this.menu.close(); return; }
       if (host.sneaking()) { refuse("Cannot recall while sneaking."); this.menu.close(); return; }
-      const recalled = host.recall();
       this.menu.close();
-      if (!recalled) { refuse("No mark has been placed.", 2000); return; }
+      if (!host.hasMark()) { refuse("No mark has been placed.", 2000); return; }
+      const cell = host.markCell();
+      // Between an interior and the open world (or two interiors), step through the cell change first.
+      if (cell !== null || host.indoors()) {
+        host.fade(() => { host.enterCell(cell ?? "exterior", host.position().clone()); host.recall(); }, () => feedback.markDirty());
+        return;
+      }
+      host.recall();
       feedback.markDirty();
       return;
     }

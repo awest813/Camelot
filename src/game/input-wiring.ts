@@ -55,7 +55,7 @@ export function wireInputAdapter(g: Game): void {
   adapter.onAction("markPosition", () => {
     if (isCombatInputBlocked(g)) return;
     const p = g.player.camera.position;
-    g.markRecallSystem.mark({ x: p.x, y: p.y, z: p.z });
+    g.markRecallSystem.mark({ x: p.x, y: p.y, z: p.z }, g.cellManager.isInterior ? g.cellManager.currentCellId : null);
     g.saveSystem.markDirty();
   });
   adapter.onAction("togglePetPanel", () => g.pets.togglePanel());

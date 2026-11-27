@@ -241,6 +241,20 @@ export const frameworkBaseContent: RpgContentBundle = {
               nextNodeId: "rumors_reply",
             },
             {
+              id: "kitten",
+              text: "Is that a litter of kittens by the hearth? (25 gold)",
+              nextNodeId: "kitten_reply",
+              conditions: [
+                { type: "flag", flag: "bought_kitten", equals: false },
+                { type: "has_item", itemId: "gold_coins", minQuantity: 25 },
+              ],
+              effects: [
+                { type: "consume_item", itemId: "gold_coins", quantity: 25 },
+                { type: "set_flag", flag: "bought_kitten", value: true },
+                { type: "emit_event", eventId: "pets:grant", payload: { petId: "pet_cat" } },
+              ],
+            },
+            {
               id: "hire",
               text: "Any swords for hire drinking here?",
               endsDialogue: true,
@@ -251,6 +265,15 @@ export const frameworkBaseContent: RpgContentBundle = {
               text: "Nothing for me right now.",
               endsDialogue: true,
             },
+          ],
+        },
+        {
+          id: "kitten_reply",
+          speaker: "Barkeeper",
+          text: "Take the grey one. Fierce little thing: she'll keep the rats off you, and worse than rats if you let her.",
+          choices: [
+            { id: "back", text: "I'll look after her.", nextNodeId: "greet" },
+            { id: "leave", text: "Come on, then.", endsDialogue: true },
           ],
         },
         {
@@ -478,10 +501,33 @@ export const frameworkBaseContent: RpgContentBundle = {
               nextNodeId: "lore_reply",
             },
             {
+              id: "raven",
+              text: "That raven on your perch: would you part with it? (60 gold)",
+              nextNodeId: "raven_reply",
+              conditions: [
+                { type: "flag", flag: "bought_raven", equals: false },
+                { type: "has_item", itemId: "gold_coins", minQuantity: 60 },
+              ],
+              effects: [
+                { type: "consume_item", itemId: "gold_coins", quantity: 60 },
+                { type: "set_flag", flag: "bought_raven", value: true },
+                { type: "emit_event", eventId: "pets:grant", payload: { petId: "pet_raven" } },
+              ],
+            },
+            {
               id: "leave",
               text: "I was just looking.",
               endsDialogue: true,
             },
+          ],
+        },
+        {
+          id: "raven_reply",
+          speaker: "Alchemist",
+          text: "He has opinions, that one, and a beak to back them. He'll fly ahead of you and peck at anything that means you harm.",
+          choices: [
+            { id: "back", text: "We'll get along.", nextNodeId: "greet" },
+            { id: "leave", text: "Farewell.", endsDialogue: true },
           ],
         },
         {

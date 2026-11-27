@@ -97,4 +97,19 @@ describe("PetsFeature (headless, through the kernel)", () => {
     expect(t.pets.panel.isVisible).toBe(false);
     t.k.uninstall("pets");
   });
+
+  it("a kitten bought in conversation joins the roster; a foe beside a companion wounds it", () => {
+    const t = setup();
+    t.k.events.emit("dialogue:action", { eventId: "pets:grant", npcName: "Barkeeper", payload: { petId: "pet_cat" } });
+    expect(t.pets.pets.pets.map((p) => p.id)).toContain("pet_cat");
+    t.pets.pets.summonPet("pet_cat");
+    const hp = t.pets.pets.activePet!.health;
+    const mesh = t.scene.getMeshByName("pet_pet_cat")!;
+    const foe = actor(mesh.position.x + 1, AIState.ATTACK);
+    (foe as unknown as { attackDamage: number }).attackDamage = 7;
+    t.npcs.push(foe);
+    for (let i = 0; i < 3; i++) t.k.phases.run("sim", 1);
+    expect(t.pets.pets.activePet!.health).toBeLessThan(hp);
+    t.k.uninstall("pets");
+  });
 });

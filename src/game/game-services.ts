@@ -136,7 +136,7 @@ export function installGameFeatures(game: Game): void {
           getFlag: (flag) => game.frameworkRuntime.getFlag(flag),
           setFlag: (flag, value) => game.frameworkRuntime.setFlag(flag, value),
         }, () => k.rng.stream("travel-events").next())?.notification ?? null,
-        hasMark: () => game.markRecallSystem.hasMarked,
+        hasMark: () => game.markRecallSystem.hasMarked, markCell: () => game.markRecallSystem.markedCellId,
         recall: () => !!game.markRecallSystem.recall(),
       });
       k.install(game._fastTravel);

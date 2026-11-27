@@ -23,6 +23,7 @@ function setup(over: Partial<TravelHostService> = {}) {
     passHours: (h) => { hours.push(h); return "10:00"; },
     arrivalEvent: () => "Mist rolls in.",
     hasMark: () => false,
+    markCell: () => null,
     recall: () => false,
     ...over,
   };
@@ -82,6 +83,27 @@ describe("FastTravelFeature (headless, through the kernel)", () => {
     t.svc.travel(RECALL_ID);
     expect(recall).toHaveBeenCalledOnce();
     expect(t.svc.menu.isVisible).toBe(false);
+    t.k.uninstall("fast-travel");
+  });
+
+  it("recalling to a mark in a cave from the open world (and back out) changes cell first", () => {
+    const recall = vi.fn(() => true);
+    let cell: string | null = "cave_01";
+    const t = setup({ hasMark: () => true, markCell: () => cell, recall });
+    t.svc.travel(RECALL_ID);
+    expect(t.indoors(), "in the cave").toBe(true);
+    expect(recall).toHaveBeenCalledOnce();
+    cell = null;
+    t.svc.travel(RECALL_ID);
+    expect(t.indoors(), "back out in the open").toBe(false);
+    expect(recall).toHaveBeenCalledTimes(2);
+    t.k.uninstall("fast-travel");
+  });
+
+  it("no mark: says so", () => {
+    const t = setup();
+    t.svc.travel(RECALL_ID);
+    expect(t.notes.at(-1)).toMatch(/No mark/);
     t.k.uninstall("fast-travel");
   });
 
