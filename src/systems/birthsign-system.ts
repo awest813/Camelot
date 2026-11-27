@@ -240,7 +240,7 @@ export const BIRTHSIGNS: ReadonlyArray<BirthsignDefinition> = [
     power: {
       id: "under_the_hill",
       name: "Under the Hill",
-      description: "Become unseen for 60 seconds.",
+      description: "Vanish for 60 seconds: no one sees or hears you, and foes lose your trail.",
       cooldownHours: 24,
     },
   },

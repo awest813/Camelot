@@ -128,8 +128,8 @@ export function setupCoreSystems(g: Game): void {
   g.containerSystem = new ContainerSystem(g.scene, g.player, g.inventorySystem, g.ui);
   g.projectileSystem = new ProjectileSystem(g.scene, g.player, g.scheduleSystem.npcs, g.ui);
   g.projectileSystem.stealthSystem = g.stealthSystem;
-  g.barterSystem    = new BarterSystem(g.inventorySystem, g.ui);
-  g.shopSystem      = new ShopSystem();
+  g.combatSystem.playerUnseen = () => g.stealthSystem.unseenSeconds > 0; // the Under the Hill omen
+  g.barterSystem    = new BarterSystem(g.inventorySystem, g.ui); g.shopSystem = new ShopSystem();
   g.barterSystem.events = g.eventBus;
   g.eventBus.on("barter:transaction", () => g._pack.setGold(g.barterSystem.playerGold));
   g.frameworkRuntime.setDialogueHostHooks({

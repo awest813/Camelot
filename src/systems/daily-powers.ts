@@ -3,7 +3,7 @@
  * once a day.  The heritage's dispatches its active effects; the omens':
  *
  *   Pendragon's Blood, Grail's Grace — heal 150 / 200 over five seconds;
- *   Under the Hill  — unseen and unheard for a minute;
+ *   Under the Hill  — unseen and unheard for a minute, and foes lose your trail;
  *   Warden's Key    — the next locked chest opens;
  *   Spellbound      — the foe in front of you is held for ten seconds;
  *   Adder's Bite    — the foe in front of you is poisoned (3 a second, 20 s).

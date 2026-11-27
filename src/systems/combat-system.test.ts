@@ -222,6 +222,19 @@ describe('CombatSystem', () => {
         expect(mockNpcs[0].isAggressive).toBe(true);
     });
 
+    it('a chasing foe loses an unseen player (Under the Hill) and gives up; a patrolling one never notices', () => {
+        mockNpcs[0].aiState = "CHASE";
+        combatSystem.playerUnseen = () => true;
+        combatSystem.updateNPCAI(0.1);
+        expect(mockNpcs[0].aiState).toBe("RETURN");
+        mockNpcs[0].aiState = "PATROL";
+        combatSystem.updateNPCAI(0.1);
+        expect(mockNpcs[0].aiState, "no aggro while unseen").toBe("PATROL");
+        combatSystem.playerUnseen = () => false;
+        combatSystem.updateNPCAI(0.1);
+        expect(mockNpcs[0].aiState, "seen again").toBe("ALERT");
+    });
+
     it('a struck townsperson fights back, then calms down once home', () => {
         mockNpcs[0].hostileOnSight = false;
         mockScene.pickWithRay.mockReturnValue({ pickedMesh: mockNpcs[0].mesh, pickedPoint: new Vector3(0, 0, 1) });

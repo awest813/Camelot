@@ -1377,6 +1377,9 @@ export class CombatSystem {
 
   // ─── State machine implementation ──────────────────────────────────────────
 
+  /** Whether NPCs can't perceive the player at all (set by the game: the Under the Hill omen). */
+  public playerUnseen: () => boolean = () => false;
+
   private _tickNPC(npc: NPC, playerPos: Vector3, deltaTime: number, distSq: number): void {
     // Disarm wears off over time (side power-attack effect).
     if (npc.disarmTimer > 0) {
@@ -1406,6 +1409,11 @@ export class CombatSystem {
     const engageSq = engage * engage;
     const disengage = this._getAttackDisengageRange(npc);
     const disengageSq = disengage * disengage;
+
+    // While the player is unseen (the Under the Hill omen) they are, to the
+    // NPC, nowhere: chasers give up and go home, the alert go searching.
+    const unseen = this.playerUnseen();
+    if (unseen) distSq = Number.POSITIVE_INFINITY;
 
     // Track the player's last known world position any time they are within aggro range.
     // Uses copyFrom to avoid frequent Vector3 allocations.
