@@ -32,11 +32,10 @@ export function setupProgressionAndStart(g: Game): void {
   g.trainerSystem = new TrainerSystem();
   g.trainerSystem.events = g.eventBus;
   g.eventBus.on("trainer:trained", ({ skillId, newLevel, goldSpent }) => {
-    // Gold sufficiency is pre-validated by TrainerSystem.train() via canTrain();
-    // g callback only fires on a successful, already-approved session.
-    g.skillProgressionSystem.setSkillLevel(skillId, newLevel);
+    // Only a successful, already-paid-for session (TrainerSystem.train checks the gold).
+    g.skillProgressionSystem.trainTo(skillId, newLevel); // keeps the XP already earned; counts toward the character's level
     g._pack.spendGold(goldSpent);
-    g.ui.showNotification(`${skillId} raised to ${newLevel}!  (−${goldSpent}g)`, 3000);
+    g.ui.showNotification(`${g.skillProgressionSystem.getSkill(skillId)?.name ?? skillId} raised to ${newLevel}!  (−${goldSpent}g)`, 3000);
     g.saveSystem.markDirty();
   });
   g.saveSystem.setTrainerSystem(g.trainerSystem);

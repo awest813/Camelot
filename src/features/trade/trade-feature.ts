@@ -26,7 +26,7 @@ import type { BarterSystem } from "../../systems/barter-system";
 import type { ShopSystem } from "../../systems/shop-system";
 import type { ContainerSystem } from "../../systems/container-system";
 import type { Item } from "../../systems/inventory-system";
-import { FeedbackKey, LawKey, ModalKey, PurseKey, declareStateless } from "../services";
+import { FeedbackKey, LawKey, ModalKey, PurseKey, SkillsKey, declareStateless } from "../services";
 
 const DEFAULT_MERCHANT = "merchant_01";
 
@@ -129,6 +129,8 @@ export class TradeFeature implements Feature {
     };
     this.containerPanel.onClose = () => this._closeContainer();
 
+    // Every deal struck teaches a little Persuasion.
+    ctx.on("barter:transaction", () => s.tryGet(SkillsKey)?.gainXP("speechcraft", 2));
     ctx.on("dialogue:action", ({ eventId, npcName, payload }) => {
       if (eventId !== "barter:open") return;
       if (this.barterPanel.isVisible) this._closeBarter();
@@ -169,6 +171,8 @@ export class TradeFeature implements Feature {
     if (!h.barter.openBarter(pending.merchantId, hour)) return;
     h.barter.sessionBuyPriceFactor = Math.min(1.5, Math.max(0.7, h.reputationFactor(pending.npcName)));
     h.barter.playerGold = s.get(PurseKey).gold();
+    // Haggling is a matter of Persuasion: better prices both ways as it rises.
+    h.barter.barterSkill = Math.max(5, s.tryGet(SkillsKey)?.level("speechcraft") ?? 20);
     s.get(ModalKey).suspendGameplay();
     this._opening = true;
     void this.barterPanel.get().then((ui) => {

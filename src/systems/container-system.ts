@@ -52,6 +52,8 @@ export interface Container {
 
 export interface ContainerSaveState {
   containers: Array<{ id: string; contents: Item[]; isLocked: boolean }>;
+  /** Charges left on the Warden's Key. */
+  masterKeys?: number;
 }
 
 /**
@@ -288,11 +290,12 @@ export class ContainerSystem {
     for (const c of this._containers.values()) {
       containers.push({ id: c.id, contents: [...c.contents], isLocked: c.isLocked });
     }
-    return { containers };
+    return { containers, masterKeys: this.masterKeys };
   }
 
   public restoreFromSave(state: ContainerSaveState): void {
     this._pending.clear();
+    if (typeof state?.masterKeys === "number" && Number.isFinite(state.masterKeys)) this.masterKeys = Math.max(0, Math.floor(state.masterKeys));
     for (const saved of state?.containers ?? []) {
       const container = this._containers.get(saved.id);
       if (container) this._apply(container, saved);

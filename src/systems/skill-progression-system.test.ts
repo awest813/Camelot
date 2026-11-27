@@ -5,6 +5,7 @@ import {
   type ProgressionSkillId,
 } from "./skill-progression-system";
 import { listen } from "../testing/listen";
+import { GameEventBus } from "./event-bus";
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -147,5 +148,23 @@ describe("SkillProgressionSystem", () => {
     sps2.restoreFromSave(state);
     expect(sps2.getSkill("marksman")!.level).toBe(1);
     expect(sps2.getSkill("marksman")!.xp).toBe(10);
+  });
+});
+
+describe("SkillProgressionSystem.trainTo (a trainer's lesson)", () => {
+  it("raises one level at a time, reporting each, and keeps the XP already earned", () => {
+    const sps = new SkillProgressionSystem();
+    const ups: number[] = [];
+    sps.events = new GameEventBus();
+    sps.events.on("skill:levelUp", ({ newLevel }) => { ups.push(newLevel); });
+    const start = sps.getSkill("blade")!;
+    const level = start.level;
+    sps.gainXP("blade", start.xpToNext / 2);
+    const before = start.xp / start.xpToNext;
+    sps.trainTo("blade", level + 2);
+    const after = sps.getSkill("blade")!;
+    expect(after.level).toBe(level + 2);
+    expect(ups).toEqual([level + 1, level + 2]);
+    expect(after.xp / after.xpToNext).toBeCloseTo(before, 5);
   });
 });

@@ -81,6 +81,8 @@ export interface AlchemySaveState {
   discoveredEffects: Array<[string, number]>;
   /** Potions the player has crafted but not yet used. */
   craftedPotions: AlchemyPotion[];
+  /** The brewer's practised hand (0–100). */
+  alchemySkill?: number;
 }
 
 // ── Effect catalogue ──────────────────────────────────────────────────────────
@@ -665,11 +667,15 @@ export class AlchemySystem {
       ingredients,
       discoveredEffects,
       craftedPotions: this._craftedPotions.slice(),
+      alchemySkill: this.alchemySkill,
     };
   }
 
   public restoreFromSave(state: AlchemySaveState): void {
     if (!state) return;
+    if (typeof state.alchemySkill === "number" && Number.isFinite(state.alchemySkill)) {
+      this.alchemySkill = Math.max(0, Math.min(100, state.alchemySkill));
+    }
 
     this._ingredients.clear();
     if (state.ingredients && typeof state.ingredients === "object") {

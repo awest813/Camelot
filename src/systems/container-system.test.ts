@@ -63,6 +63,14 @@ describe("ContainerSystem", () => {
     containerSystem = new ContainerSystem(mockScene, mockPlayer, mockInventory, mockUI);
   });
 
+  it("saves the Warden's Key charges left", () => {
+    containerSystem.masterKeys = 2;
+    const saved = containerSystem.getSaveState();
+    containerSystem.masterKeys = 0;
+    containerSystem.restoreFromSave(saved);
+    expect(containerSystem.masterKeys).toBe(2);
+  });
+
   it("spawnContainer creates a container with the given contents", () => {
     const container = containerSystem.spawnContainer({
       id: "chest_1",

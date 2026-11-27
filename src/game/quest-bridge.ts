@@ -32,6 +32,7 @@ export class QuestBridge {
   public targetId(entityName: string): string {
     if (entityName.startsWith("RuinGuard")) return "RuinGuard";
     if (entityName.startsWith("TowerGuard")) return "TowerGuard";
+    if (entityName.startsWith("Bandit")) return "Bandit"; // a camp's archers and chief too ("Bandit Archer_2")
     return entityName.split("_")[0];
   }
 

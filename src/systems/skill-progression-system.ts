@@ -154,6 +154,24 @@ export class SkillProgressionSystem {
   }
 
   /**
+   * Raise a skill to `level` (a trainer's lesson): one level at a time, each
+   * reported as `skill:levelUp` (so it counts toward the character's level),
+   * keeping the XP already earned toward the next one.
+   */
+  public trainTo(skillId: ProgressionSkillId, level: number): void {
+    const skill = this._skills.get(skillId);
+    if (!skill) return;
+    const target = Math.min(SKILL_MAX_LEVEL, Math.round(level));
+    while (skill.level < target) {
+      const progress = skill.xpToNext > 0 ? skill.xp / skill.xpToNext : 0;
+      skill.level += 1;
+      skill.xpToNext = xpToNext(skill.level);
+      skill.xp = skill.level >= SKILL_MAX_LEVEL ? 0 : Math.min(skill.xpToNext - 1e-6, progress * skill.xpToNext);
+      this.events?.emit("skill:levelUp", { skillId: skill.id, skillName: skill.name, newLevel: skill.level });
+    }
+  }
+
+  /**
    * Directly set a skill's level (used by JailSystem to apply skill loss).
    * Resets accumulated XP so the skill cleanly progresses from the new level.
    * Clamped to [0, SKILL_MAX_LEVEL].

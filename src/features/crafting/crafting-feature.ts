@@ -160,7 +160,12 @@ export class CraftingFeature implements Feature {
     // Hooked up when each window first loads (and now, if one already has).
     this._wire = {
       alchemy: (p) => {
-        p.onCraft = (ids) => { this.alchemy.craftPotion(ids); p.refresh(); };
+        p.onCraft = (ids) => {
+          // Potency follows the Alchemy skill (lessons from a trainer count).
+          this.alchemy.alchemySkill = Math.max(this.alchemy.alchemySkill, s.get(SkillsKey).level("alchemy"));
+          this.alchemy.craftPotion(ids);
+          p.refresh();
+        };
         p.onDrink = (potionId) => { this.alchemy.drinkPotion(potionId); feedback().markDirty(); };
         p.onClosed = () => modal().restoreGameplay(); // its own ✕
       },
