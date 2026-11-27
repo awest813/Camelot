@@ -1614,3 +1614,11 @@ Left as decisions:
   headless browser over three village visits: shader programs linked
   while travelling fell from 56–97 to 25–34, and at boot from about 67 to
   about 58. The picture is unchanged.
+- **The low tier's single shadow map covers a fixed 100 m square** around
+  the player (`fixSingleMapArea` in `render-pipeline.ts`). Babylon's
+  default stretched it over every caster in the loaded world, so a 512
+  map had metres per texel and drew every caster. The sun's position is
+  snapped to the map's texel grid in light space (`snapSunToTexels`) so
+  shadows don't shimmer as the player moves, and only casters over the
+  square are drawn: 388 of 820 in a village, with visibly sharper
+  shadows. The cascaded tiers already culled per cascade.

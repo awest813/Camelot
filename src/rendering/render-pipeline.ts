@@ -91,11 +91,74 @@ export function createSunShadows(
   shadows.bias = 0.0015;
   shadows.normalBias = 0.02;
   shadows.darkness = 0.12;
+  fixSingleMapArea(sun, shadows);
   // Halve the caster-pass rate — a one-frame-old single shadow map is
   // imperceptible and the pass is a large share of frame time.
   const map = shadows.getShadowMap();
   if (map) map.refreshRate = 2;
   return shadows;
+}
+
+/** Metres across the single (non-cascaded) shadow map: the ground around the player. */
+export const SINGLE_MAP_AREA = 100;
+
+/**
+ * The single shadow map covers a fixed square around the player instead of
+ * Babylon's default, which stretches it to fit every caster in the loaded
+ * world (a few metres per texel, and all of them drawn).  The sun follows
+ * the player (world-environment); `snapSunToTexels` keeps the square on the
+ * map's texel grid so shadows don't shimmer as the player walks.  Only the
+ * casters over the square are drawn into it.
+ */
+export function fixSingleMapArea(sun: DirectionalLight, shadows: ShadowGenerator): void {
+  sun.autoUpdateExtends = false;
+  sun.shadowFrustumSize = SINGLE_MAP_AREA;
+  sun.shadowMinZ = 1;
+  sun.shadowMaxZ = 400;
+  const map = shadows.getShadowMap();
+  if (!map) return;
+  const out: AbstractMesh[] = [];
+  const half = SINGLE_MAP_AREA / 2;
+  const axes = { x: new Vector3(), y: new Vector3() };
+  const d = new Vector3();
+  map.getCustomRenderList = (_layer, renderList, renderListLength) => {
+    if (!renderList) return null;
+    if (!lightAxes(sun.direction, axes)) return null;
+    out.length = 0;
+    for (let i = 0; i < renderListLength; i++) {
+      const mesh = renderList[i];
+      const sphere = mesh.getBoundingInfo().boundingSphere;
+      sphere.centerWorld.subtractToRef(sun.position, d);
+      const r = sphere.radiusWorld;
+      if (Math.abs(Vector3.Dot(d, axes.x)) - r > half || Math.abs(Vector3.Dot(d, axes.y)) - r > half) continue;
+      out.push(mesh);
+    }
+    return out;
+  };
+}
+
+/** The light view's right and up axes (as Babylon's LookAtLH builds them); false when the sun is straight up or down. */
+export function lightAxes(dir: Vector3, out: { x: Vector3; y: Vector3 }): boolean {
+  // x = normalize(up × dir), y = dir × x
+  out.x.set(dir.z, 0, -dir.x);
+  const len = out.x.length();
+  if (len < 1e-4) return false;
+  out.x.scaleInPlace(1 / len);
+  Vector3.CrossToRef(dir, out.x, out.y);
+  out.y.normalize();
+  return true;
+}
+
+/** Move the sun's position onto the single shadow map's texel grid (in light space). */
+export function snapSunToTexels(sun: DirectionalLight, mapSize: number): void {
+  const axes = { x: new Vector3(), y: new Vector3() };
+  if (!lightAxes(sun.direction, axes)) return;
+  const texel = SINGLE_MAP_AREA / mapSize;
+  for (const axis of [axes.x, axes.y]) {
+    const u = Vector3.Dot(sun.position, axis);
+    const snapped = Math.round(u / texel) * texel;
+    sun.position.addInPlace(axis.scale(snapped - u));
+  }
 }
 
 /**

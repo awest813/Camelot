@@ -21,7 +21,8 @@ import { HorizonMountains } from "./horizon";
 import { WaterRenderer } from "./water";
 import { FireFx, WeatherFx } from "./particles-fx";
 import { createFoliageMaterials, GrassField, WindState } from "./foliage";
-import { createPostFx, createSunShadows, type PostFxHandle } from "./render-pipeline";
+import { createPostFx, createSunShadows, snapSunToTexels, type PostFxHandle } from "./render-pipeline";
+import { CascadedShadowGenerator } from "@babylonjs/core/Lights/Shadows/cascadedShadowGenerator";
 import type { GraphicsSystem } from "../systems/graphics-system";
 import type { WeatherSystem } from "../systems/weather-system";
 import type { WorldManager } from "../world/world-manager";
@@ -240,6 +241,10 @@ export class WorldEnvironment {
         p.y - state.lightDir[1] * 150,
         p.z - state.lightDir[2] * 150,
       );
+      // The single map covers a fixed square: keep it on its texel grid.
+      if (this.shadows && !(this.shadows instanceof CascadedShadowGenerator)) {
+        snapSunToTexels(sun, this.shadows.getShadowMap()?.getSize().width ?? this._g.shadow.mapSize);
+      }
     }
   }
 
