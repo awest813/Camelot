@@ -18,7 +18,8 @@ import type { AttributeSystem } from "../../systems/attribute-system";
 import type { SkillProgressionSystem } from "../../systems/skill-progression-system";
 import type { CharacterCreationResult } from "../../ui/character-creation-ui";
 import type { WorldSeed } from "../../world/world-seed";
-import { FeedbackKey, declareStateless } from "../services";
+import { ClockKey, FeedbackKey, declareStateless } from "../services";
+import { PowersHud, type PowerLine } from "../../ui/powers-hud";
 
 /** What the wizard returns. */
 export type CharacterChoice = CharacterCreationResult;
@@ -61,6 +62,8 @@ export class CharacterFeature implements Feature {
   public readonly birthsigns = new BirthsignSystem();
   public readonly classes = new ClassSystem();
   private _creating = false;
+  /** The daily powers' HUD chip (heritage on V, omen on Shift+V). */
+  public readonly powersHud = new PowersHud();
 
   public install(ctx: FeatureContext): void {
     declareStateless(ctx, "race, birthsign and class are saved by the save system");
@@ -102,7 +105,25 @@ export class CharacterFeature implements Feature {
       create: () => this._create(),
     });
 
+    // The powers chip: what each daily power is, and when it is ready (2 Hz is plenty).
+    let wait = 0;
+    ctx.system({
+      id: "character.powers-hud", phase: "ui", update: (dt) => {
+        wait -= dt;
+        if (wait > 0) return;
+        wait = 0.5;
+        const now = (s.tryGet(ClockKey)?.elapsedHours() ?? 0) * 60;
+        const lines: PowerLine[] = [];
+        const race = this.races.chosenRace?.power;
+        if (race && !this._creating) lines.push({ key: "V", name: race.name, minutesLeft: this.races.powerCooldownRemaining(now) });
+        const omen = this.birthsigns.chosenBirthsign?.power;
+        if (omen && !this._creating) lines.push({ key: "Shift+V", name: omen.name, minutesLeft: this.birthsigns.powerCooldownRemaining(now) });
+        this.powersHud.update(lines);
+      },
+    });
+
     ctx.scope.add(() => {
+      this.powersHud.destroy();
       this.races.onRaceChosen = this.races.onPowerActivated = null;
       this.birthsigns.onBirthsignChosen = this.birthsigns.onPowerActivated = null;
       this.classes.onClassChosen = null;

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Kernel } from "../../core/kernel";
 import { AttributeSystem } from "../../systems/attribute-system";
 import { SkillProgressionSystem } from "../../systems/skill-progression-system";
-import { FeedbackKey } from "../services";
+import { ClockKey, FeedbackKey } from "../services";
 import { CharacterFeature, CharacterHostKey, CharacterKey, type CharacterChoice, type CharacterHostService } from "./character-feature";
 
 function setup(answer: () => Promise<CharacterChoice>) {
@@ -51,5 +51,21 @@ describe("CharacterFeature (headless, through the kernel)", () => {
     expect(t.f.races.chosenRace?.id).toBe("hillfolk");
     expect(t.f.classes.chosenClass?.id).toBe("warrior");
     expect(t.calls.slice(-2)).toEqual(["end", "welcome:null"]);
+  });
+
+  it("the HUD shows both daily powers, and when each is ready again", async () => {
+    const t = setup(async () => ({ ...choice, birthsignId: "grail" }));
+    let hours = 10;
+    t.k.services.provide(ClockKey, { hour: () => hours % 24, elapsedHours: () => hours });
+    await t.svc.create();
+    t.k.phases.run("ui", 1);
+    const chip = () => document.querySelector(".powers-hud")?.textContent;
+    expect(chip()).toBe("VMarsh-mendingREADYShift+VGrail's GraceREADY");
+    t.f.birthsigns.activatePower(hours * 60);
+    hours += 2;
+    t.k.phases.run("ui", 1);
+    expect(chip()).toBe("VMarsh-mendingREADYShift+VGrail's Grace22h 00m");
+    t.k.uninstall("character");
+    expect(document.querySelector(".powers-hud"), "the feature takes its chip away").toBeNull();
   });
 });

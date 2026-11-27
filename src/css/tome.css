@@ -2076,7 +2076,7 @@
 }
 
 /* While the title is up, nothing of play shows behind it. */
-body.is-title :is(.hud, .quickslot-hud, .active-effect-hud, .onboarding-tip, #display-fps, .graphics-settings-btn) {
+body.is-title :is(.hud, .quickslot-hud, .active-effect-hud, .hud-chips, .onboarding-tip, #display-fps, .graphics-settings-btn) {
   visibility: hidden;
 }
 
@@ -2202,3 +2202,32 @@ body:has(.death-veil:not(.is-lifting)) .hud-crosshair { visibility: hidden; }
   text-align: center;
   color: var(--tome-leather-dim);
 }
+
+/* The daily powers' chip (V and Shift+V), in the HUD chips' stack. */
+.powers-hud {
+  display: none;
+  gap: 3px;
+  min-width: 190px;
+  padding: 5px 9px;
+  border: 1px solid var(--tome-gilt-dim);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(42, 26, 16, 0.92), rgba(24, 14, 8, 0.92));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  font-family: var(--tome-font-book);
+}
+.powers-hud__row { display: flex; align-items: baseline; gap: 8px; }
+.powers-hud__key {
+  min-width: 46px;
+  font-family: var(--tome-font-display);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--tome-gilt-dim);
+}
+.powers-hud__name { flex: 1; text-align: left; font-size: 15px; color: var(--tome-leather-text); }
+.powers-hud__state {
+  font-family: var(--tome-font-display);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--tome-leather-dim);
+}
+.powers-hud__state.is-ready { color: #8fce7a; }
