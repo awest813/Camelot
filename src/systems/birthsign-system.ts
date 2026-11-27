@@ -1,8 +1,8 @@
 /**
- * BirthsignSystem — Oblivion-style birthsign selection and passive bonuses.
+ * BirthsignSystem — the omens a hero was born under, and their gifts.
  *
- * At character creation the player selects one of 13 birthsigns (grouped under
- * three Guardian constellations: Warrior, Mage, and Thief).  Each sign applies
+ * At character creation the player selects one of 13 omens (called birthsigns
+ * in code), grouped as omens of the sword, the cup and the road.  Each sign applies
  * permanent passive bonuses to attributes, maximum stats, or carry capacity,
  * and many also grant a rechargeable once-per-day special power.
  *
@@ -12,16 +12,16 @@
  *   - `activatePower(currentGameTimeMinutes)` uses the birthsign's special power
  *     if it is off cooldown.
  *   - `getStatBonuses()` returns extra max-stat deltas to apply on top of the
- *     attribute-derived values (e.g. the Mage's +50 Magicka).
+ *     attribute-derived values (e.g. the Lady of the Lake's +50 Magicka).
  *   - `stunted` signals that the player has no natural magicka regeneration
- *     (Atronach sign); query this in the regeneration loop.
+ *     (the Cauldron); query this in the regeneration loop.
  *
  * Wire-up example (game.ts):
  * ```ts
  * this.birthsignSystem = new BirthsignSystem();
  * // At character creation:
  * this.birthsignSystem.chooseBirthsign(
- *   "mage",
+ *   "lady_lake",
  *   this.attributeSystem,
  *   this.skillProgressionSystem,
  * );
@@ -38,7 +38,7 @@ import type { SkillProgressionSystem, ProgressionSkillId } from "./skill-progres
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-/** Guardian constellation grouping. */
+/** The omen's group: of the sword (warrior), the cup (mage) or the road (thief). */
 export type BirthsignGuardian = "warrior" | "mage" | "thief";
 
 /** Rechargeable special power granted by some birthsigns. */
@@ -61,7 +61,7 @@ export interface BirthsignDefinition {
   name: string;
   /** Flavour description shown at character creation. */
   description: string;
-  /** Guardian constellation this sign belongs to. */
+  /** The omen's group (sword, cup or road). */
   guardian: BirthsignGuardian;
   /**
    * Permanent attribute base increases applied when the sign is chosen.
@@ -83,7 +83,7 @@ export interface BirthsignDefinition {
   carryWeightBonus?: number;
   /**
    * When `true` the player's magicka does not regenerate naturally.
-   * (Atronach birthsign — Stunted Magicka.)
+   * (The Cauldron: magicka does not return on its own.)
    */
   stunted?: boolean;
   /**
@@ -114,159 +114,160 @@ export interface BirthsignStatBonuses {
 // ── Birthsign catalogue ────────────────────────────────────────────────────────
 
 /**
- * The thirteen birthsigns mirroring Oblivion's constellations.
+ * The thirteen omens of the realm.
  * Attribute bonus values are designed to be meaningful but not overpowering.
  */
 export const BIRTHSIGNS: ReadonlyArray<BirthsignDefinition> = [
-  // ── Warrior signs ──────────────────────────────────────────────────────────
+  // ── Omens of the sword ─────────────────────────────────────────────────────
   {
-    id: "warrior",
-    name: "The Warrior",
+    id: "sword_stone",
+    name: "The Sword in the Stone",
     guardian: "warrior",
     description:
-      "The Warrior is the most common Guardian sign. Those born under it are more " +
-      "skilled with weapons and recover stamina quickly.",
+      "Born when the sword would not leave the stone for any hand but one, you " +
+      "are strong of arm and slow to tire.",
     attributeBonus: { strength: 10, endurance: 10 },
   },
   {
-    id: "lady",
-    name: "The Lady",
+    id: "round_table",
+    name: "The Round Table",
     guardian: "warrior",
     description:
-      "The Lady is one of the Warrior signs. Those born under her sign recover " +
-      "health and willpower faster and are more durable in a fight.",
+      "Born on a feast day, when every seat at the great table was full.  You " +
+      "keep your feet in a fight and your heart in a crisis.",
     attributeBonus: { endurance: 10, willpower: 10 },
   },
   {
-    id: "lord",
-    name: "The Lord",
+    id: "red_dragon",
+    name: "The Red Dragon",
     guardian: "warrior",
     description:
-      "The Lord is a Warrior sign associated with protection and endurance, but " +
-      "those born under it share a weakness to fire.",
+      "Born the night the red dragon of the old prophecy was seen over the hills. " +
+      "Once a day the dragon's blood in you closes your wounds, but the fire " +
+      "that made you still answers to you: you burn more easily.",
     fireWeakness: 0.25,
     power: {
-      id: "blood_of_the_north",
-      name: "Blood of the North",
+      id: "pendragons_blood",
+      name: "Pendragon's Blood",
       description: "Restore 150 points of Health.",
       cooldownHours: 24,
     },
   },
   {
-    id: "steed",
-    name: "The Steed",
+    id: "white_hart",
+    name: "The White Hart",
     guardian: "warrior",
     description:
-      "Those born under the sign of the Steed are swift of foot and can carry " +
-      "heavier burdens than most.",
+      "Born while the white hart ran before the hunt and was never caught.  You " +
+      "are swift of foot and carry more than most.",
     attributeBonus: { speed: 20 },
     carryWeightBonus: 100,
   },
   {
-    id: "ritual",
-    name: "The Ritual",
-    guardian: "warrior",
+    id: "grail",
+    name: "The Grail",
+    guardian: "mage",
     description:
-      "The Ritual is a Warrior sign with two magic effects. Those born under it " +
-      "may call upon Mara's Gift to restore their health once a day.",
+      "Born in the hour the grail was glimpsed in the hall.  Once a day its grace " +
+      "makes you whole.",
     power: {
-      id: "maras_gift",
-      name: "Mara's Gift",
+      id: "grails_grace",
+      name: "Grail's Grace",
       description: "Restore 200 points of Health.",
       cooldownHours: 24,
     },
   },
-  // ── Mage signs ─────────────────────────────────────────────────────────────
+  // ── Omens of the cup ───────────────────────────────────────────────────────
   {
-    id: "mage",
-    name: "The Mage",
+    id: "lady_lake",
+    name: "The Lady of the Lake",
     guardian: "mage",
     description:
-      "The Mage is a Guardian sign. Those born under it have more Magicka and " +
-      "are more skilled in the magical arts.",
+      "Born beside still water, under the Lady's eye.  You hold more magicka than " +
+      "most, and spells come easily to you.",
     maxMagickaBonus: 50,
   },
   {
-    id: "apprentice",
-    name: "The Apprentice",
+    id: "isle_apples",
+    name: "The Isle of Apples",
     guardian: "mage",
     description:
-      "Those born under the sign of the Apprentice have a larger Magicka pool " +
-      "than most, but are vulnerable to magic.",
+      "Born as the mist lifted over the isle where the wounded king was carried. " +
+      "Your well of magicka runs deep.",
     maxMagickaBonus: 100,
   },
   {
-    id: "atronach",
-    name: "The Atronach",
+    id: "cauldron",
+    name: "The Cauldron",
     guardian: "mage",
     description:
-      "The Atronach sign grants a massive Magicka pool, but those born under it " +
-      "cannot regenerate Magicka naturally — they must absorb or restore it.",
+      "Born under the cauldron of the Otherworld, which gives without end and " +
+      "never refills itself.  Your magicka is vast, but it does not return on its " +
+      "own: you must drink it back.",
     maxMagickaBonus: 150,
     stunted: true,
   },
   {
-    id: "tower",
-    name: "The Tower",
+    id: "locked_door",
+    name: "The Locked Door",
     guardian: "thief",
     description:
-      "Those born under the Tower can use the Tower Key ability once per day to " +
-      "open a lock of any difficulty.",
+      "Born behind a door no key could open.  Once a day no lock can keep you out.",
     power: {
-      id: "tower_key",
-      name: "Tower Key",
+      id: "wardens_key",
+      name: "Warden's Key",
       description: "Open any lock.",
       cooldownHours: 24,
     },
   },
-  // ── Thief signs ────────────────────────────────────────────────────────────
+  // ── Omens of the road ──────────────────────────────────────────────────────
   {
-    id: "thief",
-    name: "The Thief",
+    id: "raven",
+    name: "The Raven",
     guardian: "thief",
     description:
-      "The Thief is the last of the Guardian signs. Those born under it are more " +
-      "nimble and lucky, though perhaps not as reliable.",
+      "Born as the ravens left the tower.  You are quick, light-fingered and " +
+      "luckier than you deserve.",
     attributeBonus: { agility: 10, speed: 10, luck: 10 },
   },
   {
-    id: "shadow",
-    name: "The Shadow",
+    id: "hollow_hill",
+    name: "The Hollow Hill",
     guardian: "thief",
     description:
-      "Those born under the Shadow can call upon Moonshadow to make themselves " +
-      "invisible for a short time once per day.",
+      "Born on the night the fair folk opened their hill.  Once a day you can " +
+      "step out of sight, as they do.",
     power: {
-      id: "moonshadow",
-      name: "Moonshadow",
-      description: "Become invisible for 60 seconds.",
+      id: "under_the_hill",
+      name: "Under the Hill",
+      description: "Become unseen for 60 seconds.",
       cooldownHours: 24,
     },
   },
   {
-    id: "lover",
-    name: "The Lover",
+    id: "enchantress",
+    name: "The Enchantress",
     guardian: "thief",
     description:
-      "Those born under the Lover sign can use the Lover's Kiss ability once " +
-      "per day to paralyze an opponent.",
+      "Born while the enchantress sang in the wood.  Once a day you can hold " +
+      "a foe spellbound.",
     power: {
-      id: "lovers_kiss",
-      name: "Lover's Kiss",
-      description: "Paralyze a target for 10 seconds.",
+      id: "spellbound",
+      name: "Spellbound",
+      description: "Hold a target spellbound for 10 seconds.",
       cooldownHours: 24,
     },
   },
   {
-    id: "serpent",
-    name: "The Serpent",
+    id: "adder",
+    name: "The Adder",
     guardian: "thief",
     description:
-      "The Serpent is the most powerful and most rare sign. Those born under it " +
-      "can poison those who try to harm them, but have no other advantage.",
+      "The rarest omen: born as the adder struck at the feast.  Once a day your " +
+      "touch carries its venom, but it brings no other gift.",
     power: {
-      id: "serpents_spell",
-      name: "Serpent's Spell",
+      id: "adders_bite",
+      name: "Adder's Bite",
       description: "Poison a target for 3 points per second over 20 seconds.",
       cooldownHours: 24,
     },
@@ -413,7 +414,7 @@ export class BirthsignSystem {
 
   /**
    * `true` if the chosen birthsign prevents natural magicka regeneration
-   * (Atronach sign).  Query this in the stamina/magicka regen loop.
+   * (the Cauldron).  Query this in the stamina/magicka regen loop.
    */
   public get stunted(): boolean {
     return this.chosenBirthsign?.stunted === true;

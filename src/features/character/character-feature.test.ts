@@ -29,7 +29,7 @@ function setup(answer: () => Promise<CharacterChoice>) {
   return { k, f, notes, calls, svc: k.services.get(CharacterKey) };
 }
 
-const choice: CharacterChoice = { name: "Gawain", raceId: "fenfolk", birthsignId: "mage", classId: "battlemage", skipGameplayTips: true, worldSeed: null };
+const choice: CharacterChoice = { name: "Gawain", raceId: "fenfolk", birthsignId: "lady_lake", classId: "battlemage", skipGameplayTips: true, worldSeed: null };
 
 describe("CharacterFeature (headless, through the kernel)", () => {
   it("the wizard's choices make the hero", async () => {

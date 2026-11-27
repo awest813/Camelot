@@ -75,7 +75,7 @@ export class CharacterFeature implements Feature {
       feedback().markDirty();
     };
     this.birthsigns.onBirthsignChosen = (sign) => {
-      feedback().notify(`Birthsign chosen: ${sign.name}${sign.power ? ` — Power: ${sign.power.name}` : ""}`, 3000);
+      feedback().notify(`Omen: ${sign.name}${sign.power ? ` — Power: ${sign.power.name}` : ""}`, 3000);
       host().addMaxStats(this.birthsigns.getStatBonuses());
       feedback().markDirty();
     };
@@ -131,7 +131,7 @@ export class CharacterFeature implements Feature {
     } catch (error) {
       console.error("Character creation failed; applying defaults", error);
     }
-    if (!choice || !this._choose(choice.raceId, choice.birthsignId, choice.classId)) this._choose("hillfolk", "warrior", "warrior");
+    if (!choice || !this._choose(choice.raceId, choice.birthsignId, choice.classId)) this._choose("hillfolk", "sword_stone", "warrior");
     if (choice) {
       h.becomeHero(choice.name, this.birthsigns.getStatBonuses());
       if (choice.worldSeed) h.seedWorld(choice.worldSeed);

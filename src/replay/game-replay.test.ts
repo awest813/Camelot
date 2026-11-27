@@ -18,7 +18,7 @@ describe("GameReplay (no scene)", () => {
     localStorage.setItem("stale", "1");
     const log: GameReplayLog = {
       version: 1, kind: "camelot-game", stepMs: 16, frames: 0, inputs: [],
-      choice: { name: "R", raceId: "hillfolk", birthsignId: "warrior", classId: "warrior", skipGameplayTips: true, worldSeed: null },
+      choice: { name: "R", raceId: "hillfolk", birthsignId: "sword_stone", classId: "warrior", skipGameplayTips: true, worldSeed: null },
       storage: { camelot_save: '{"version":29}' },
     };
     localStorage.setItem(REPLAY_LOG_KEY, JSON.stringify(log));

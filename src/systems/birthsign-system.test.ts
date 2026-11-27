@@ -50,9 +50,9 @@ describe("BirthsignSystem", () => {
   });
 
   it("getDefinition returns the correct sign", () => {
-    const mage = system.getDefinition("mage");
+    const mage = system.getDefinition("lady_lake");
     expect(mage).toBeDefined();
-    expect(mage!.name).toBe("The Mage");
+    expect(mage!.name).toBe("The Lady of the Lake");
   });
 
   it("getDefinition returns undefined for unknown id", () => {
@@ -62,7 +62,7 @@ describe("BirthsignSystem", () => {
   // ── chooseBirthsign ────────────────────────────────────────────────────────
 
   it("chooseBirthsign returns true for a valid id", () => {
-    expect(system.chooseBirthsign("warrior")).toBe(true);
+    expect(system.chooseBirthsign("sword_stone")).toBe(true);
   });
 
   it("chooseBirthsign returns false for an unknown id", () => {
@@ -71,23 +71,23 @@ describe("BirthsignSystem", () => {
   });
 
   it("chooseBirthsign can only be called once — returns false on retry", () => {
-    system.chooseBirthsign("warrior");
-    expect(system.chooseBirthsign("mage")).toBe(false);
-    expect(system.chosenBirthsign!.id).toBe("warrior");
+    system.chooseBirthsign("sword_stone");
+    expect(system.chooseBirthsign("lady_lake")).toBe(false);
+    expect(system.chosenBirthsign!.id).toBe("sword_stone");
   });
 
   it("chooseBirthsign sets chosenBirthsign", () => {
-    system.chooseBirthsign("mage");
-    expect(system.chosenBirthsign!.id).toBe("mage");
-    expect(system.chosenBirthsign!.name).toBe("The Mage");
+    system.chooseBirthsign("lady_lake");
+    expect(system.chosenBirthsign!.id).toBe("lady_lake");
+    expect(system.chosenBirthsign!.name).toBe("The Lady of the Lake");
   });
 
   it("chooseBirthsign fires onBirthsignChosen callback", () => {
     const cb = vi.fn();
     system.onBirthsignChosen = cb;
-    system.chooseBirthsign("warrior");
+    system.chooseBirthsign("sword_stone");
     expect(cb).toHaveBeenCalledOnce();
-    expect(cb.mock.calls[0][0].id).toBe("warrior");
+    expect(cb.mock.calls[0][0].id).toBe("sword_stone");
   });
 
   // ── Attribute bonuses ──────────────────────────────────────────────────────
@@ -96,7 +96,7 @@ describe("BirthsignSystem", () => {
     const attrs = new AttributeSystem();
     const baseStr = attrs.get("strength");
     const baseEnd = attrs.get("endurance");
-    system.chooseBirthsign("warrior", attrs);
+    system.chooseBirthsign("sword_stone", attrs);
     expect(attrs.get("strength")).toBe(baseStr + 10);
     expect(attrs.get("endurance")).toBe(baseEnd + 10);
   });
@@ -106,7 +106,7 @@ describe("BirthsignSystem", () => {
     const baseAgi = attrs.get("agility");
     const baseSpd = attrs.get("speed");
     const baseLck = attrs.get("luck");
-    system.chooseBirthsign("thief", attrs);
+    system.chooseBirthsign("raven", attrs);
     expect(attrs.get("agility")).toBe(baseAgi + 10);
     expect(attrs.get("speed")).toBe(baseSpd + 10);
     expect(attrs.get("luck")).toBe(baseLck + 10);
@@ -115,19 +115,19 @@ describe("BirthsignSystem", () => {
   it("steed sign applies +20 speed via attribute bonus", () => {
     const attrs = new AttributeSystem();
     const baseSpd = attrs.get("speed");
-    system.chooseBirthsign("steed", attrs);
+    system.chooseBirthsign("white_hart", attrs);
     expect(attrs.get("speed")).toBe(baseSpd + 20);
   });
 
   it("steed sign provides +100 carry weight bonus", () => {
-    system.chooseBirthsign("steed");
+    system.chooseBirthsign("white_hart");
     expect(system.getStatBonuses().carryWeight).toBe(100);
   });
 
   it("mage sign does not alter attribute bases", () => {
     const attrs = new AttributeSystem();
     const snapshot = { ...attrs.getAll() };
-    system.chooseBirthsign("mage", attrs);
+    system.chooseBirthsign("lady_lake", attrs);
     for (const [key, value] of Object.entries(snapshot)) {
       expect(attrs.get(key as any)).toBe(value);
     }
@@ -136,22 +136,22 @@ describe("BirthsignSystem", () => {
   // ── Stat bonuses ───────────────────────────────────────────────────────────
 
   it("mage sign gives +50 max magicka bonus", () => {
-    system.chooseBirthsign("mage");
+    system.chooseBirthsign("lady_lake");
     expect(system.getStatBonuses().maxMagicka).toBe(50);
   });
 
   it("apprentice sign gives +100 max magicka bonus", () => {
-    system.chooseBirthsign("apprentice");
+    system.chooseBirthsign("isle_apples");
     expect(system.getStatBonuses().maxMagicka).toBe(100);
   });
 
   it("atronach sign gives +150 max magicka bonus", () => {
-    system.chooseBirthsign("atronach");
+    system.chooseBirthsign("cauldron");
     expect(system.getStatBonuses().maxMagicka).toBe(150);
   });
 
   it("warrior sign gives zero stat bonuses", () => {
-    system.chooseBirthsign("warrior");
+    system.chooseBirthsign("sword_stone");
     const bonuses = system.getStatBonuses();
     expect(bonuses.maxHealth).toBe(0);
     expect(bonuses.maxMagicka).toBe(0);
@@ -162,61 +162,61 @@ describe("BirthsignSystem", () => {
   // ── Passive flags ──────────────────────────────────────────────────────────
 
   it("atronach sign marks stunted magicka", () => {
-    system.chooseBirthsign("atronach");
+    system.chooseBirthsign("cauldron");
     expect(system.stunted).toBe(true);
   });
 
   it("warrior sign does NOT mark stunted magicka", () => {
-    system.chooseBirthsign("warrior");
+    system.chooseBirthsign("sword_stone");
     expect(system.stunted).toBe(false);
   });
 
-  it("lord sign grants fire weakness of 0.25", () => {
-    system.chooseBirthsign("lord");
+  it("the Red Dragon carries a fire weakness of 0.25", () => {
+    system.chooseBirthsign("red_dragon");
     expect(system.fireWeakness).toBeCloseTo(0.25);
   });
 
-  it("mage sign has no fire weakness", () => {
-    system.chooseBirthsign("mage");
+  it("the Lady of the Lake has no fire weakness", () => {
+    system.chooseBirthsign("lady_lake");
     expect(system.fireWeakness).toBe(0);
   });
 
   // ── Special powers ─────────────────────────────────────────────────────────
 
   it("mage sign has no special power", () => {
-    system.chooseBirthsign("mage");
+    system.chooseBirthsign("lady_lake");
     expect(system.hasPower).toBe(false);
     expect(system.canActivatePower(0)).toBe(false);
   });
 
   it("shadow sign has a special power", () => {
-    system.chooseBirthsign("shadow");
+    system.chooseBirthsign("hollow_hill");
     expect(system.hasPower).toBe(true);
   });
 
   it("power is available immediately after choosing a sign", () => {
-    system.chooseBirthsign("shadow");
+    system.chooseBirthsign("hollow_hill");
     expect(system.canActivatePower(0)).toBe(true);
   });
 
   it("activatePower returns true when available and fires callback", () => {
     const cb = vi.fn();
     system.onPowerActivated = cb;
-    system.chooseBirthsign("shadow");
+    system.chooseBirthsign("hollow_hill");
     expect(system.activatePower(0)).toBe(true);
     expect(cb).toHaveBeenCalledOnce();
-    expect(cb.mock.calls[0][0].id).toBe("moonshadow");
+    expect(cb.mock.calls[0][0].id).toBe("under_the_hill");
   });
 
   it("activatePower returns false immediately after use (on cooldown)", () => {
-    system.chooseBirthsign("shadow");
+    system.chooseBirthsign("hollow_hill");
     system.activatePower(0);
     expect(system.canActivatePower(0)).toBe(false);
     expect(system.activatePower(0)).toBe(false);
   });
 
   it("power becomes available again after cooldown elapses", () => {
-    system.chooseBirthsign("shadow");
+    system.chooseBirthsign("hollow_hill");
     const power = system.chosenBirthsign!.power!;
     system.activatePower(0);
     const cooldownMinutes = power.cooldownHours * 60;
@@ -225,12 +225,12 @@ describe("BirthsignSystem", () => {
   });
 
   it("powerCooldownRemaining returns zero when power is ready", () => {
-    system.chooseBirthsign("ritual");
+    system.chooseBirthsign("grail");
     expect(system.powerCooldownRemaining(0)).toBe(0);
   });
 
   it("powerCooldownRemaining returns the correct remaining time", () => {
-    system.chooseBirthsign("ritual");
+    system.chooseBirthsign("grail");
     system.activatePower(0); // used at time 0
     const power = system.chosenBirthsign!.power!;
     const cooldown = power.cooldownHours * 60;
@@ -249,7 +249,7 @@ describe("BirthsignSystem", () => {
     // has no skill bonus; inject our own via a custom system
     // Instead, test via the serpent sign which we know has no skill bonus
     // and verify skills are unchanged.
-    system.chooseBirthsign("warrior", undefined, skills);
+    system.chooseBirthsign("sword_stone", undefined, skills);
     // warrior has no skillBonus
     expect(skills.getSkill("blade")?.level).toBe(0);
   });
@@ -257,10 +257,10 @@ describe("BirthsignSystem", () => {
   // ── Persistence ───────────────────────────────────────────────────────────
 
   it("getSaveState returns chosenId and lastPowerUseTime", () => {
-    system.chooseBirthsign("shadow");
+    system.chooseBirthsign("hollow_hill");
     system.activatePower(500);
     const state = system.getSaveState();
-    expect(state.chosenId).toBe("shadow");
+    expect(state.chosenId).toBe("hollow_hill");
     expect(state.lastPowerUseTime).toBe(500);
   });
 
@@ -272,14 +272,14 @@ describe("BirthsignSystem", () => {
 
   it("restoreFromSave re-populates chosen birthsign", () => {
     const fresh = new BirthsignSystem();
-    fresh.restoreFromSave({ chosenId: "mage", lastPowerUseTime: null });
-    expect(fresh.chosenBirthsign!.id).toBe("mage");
+    fresh.restoreFromSave({ chosenId: "lady_lake", lastPowerUseTime: null });
+    expect(fresh.chosenBirthsign!.id).toBe("lady_lake");
     expect(fresh.getStatBonuses().maxMagicka).toBe(50);
   });
 
   it("restoreFromSave re-populates power cooldown state", () => {
     const fresh = new BirthsignSystem();
-    fresh.restoreFromSave({ chosenId: "shadow", lastPowerUseTime: 1000 });
+    fresh.restoreFromSave({ chosenId: "hollow_hill", lastPowerUseTime: 1000 });
     // Power used at t=1000; cooldown is 24h = 1440 min; not yet elapsed at t=1100
     expect(fresh.canActivatePower(1100)).toBe(false);
     expect(fresh.canActivatePower(2440)).toBe(true);
@@ -296,12 +296,12 @@ describe("BirthsignSystem", () => {
   });
 
   it("full round-trip save/restore preserves state", () => {
-    system.chooseBirthsign("serpent");
+    system.chooseBirthsign("adder");
     system.activatePower(720);
     const state  = system.getSaveState();
     const fresh  = new BirthsignSystem();
     fresh.restoreFromSave(state);
-    expect(fresh.chosenBirthsign!.id).toBe("serpent");
+    expect(fresh.chosenBirthsign!.id).toBe("adder");
     expect(fresh.canActivatePower(720 + 24 * 60 - 1)).toBe(false);
     expect(fresh.canActivatePower(720 + 24 * 60)).toBe(true);
   });

@@ -191,7 +191,7 @@ describe("Personality Playtest: The Drunk", () => {
     env.player.name = "Grog 'Flagon' Stone";
     env.race.chooseRace("hillfolk", env.attrs, env.skills);
     env.cls.chooseClass("warrior", env.attrs, env.skills);
-    env.birthsign.chooseBirthsign("lover", env.attrs);
+    env.birthsign.chooseBirthsign("enchantress", env.attrs);
 
     expect(env.attrs.get("strength")).toBeGreaterThanOrEqual(50);
     expect(env.attrs.get("endurance")).toBeGreaterThanOrEqual(50);
@@ -331,7 +331,7 @@ describe("Personality Playtest: The Average", () => {
     env.player.name = "Arthur";
     env.race.chooseRace("lowlander", env.attrs, env.skills);
     env.cls.chooseClass("knight", env.attrs, env.skills);
-    env.birthsign.chooseBirthsign("warrior", env.attrs);
+    env.birthsign.chooseBirthsign("sword_stone", env.attrs);
 
     expect(env.race.chosenRace?.id).toBe("lowlander");
     expect(env.attrs.get("strength")).toBeGreaterThanOrEqual(40);
@@ -473,15 +473,15 @@ describe("Personality Playtest: The Hardcore", () => {
     env = createPlaytestEnv();
   });
 
-  it("min-maxes Wood Elf scout attributes with stealth focus", () => {
+  it("min-maxes Forest-kin scout attributes with stealth focus", () => {
     env.player.name = "Vaelen";
     env.race.chooseRace("forestkin", env.attrs, env.skills);
     env.cls.chooseClass("thief", env.attrs, env.skills);
-    env.birthsign.chooseBirthsign("shadow", env.attrs);
+    env.birthsign.chooseBirthsign("hollow_hill", env.attrs);
 
     expect(env.attrs.get("agility")).toBeGreaterThanOrEqual(50);
     expect(env.attrs.get("speed")).toBeGreaterThanOrEqual(50);
-    expect(env.birthsign.chosenBirthsign?.id).toBe("shadow");
+    expect(env.birthsign.chosenBirthsign?.id).toBe("hollow_hill");
   });
 
   it("strictly manages inventory, keeping only high value-to-weight ratio loot", () => {
@@ -595,7 +595,7 @@ describe("Personality Playtest: The Gamer", () => {
     env.player.name = "SpeedyGamer";
     env.race.chooseRace("forestkin", env.attrs, env.skills);
     env.cls.chooseClass("thief", env.attrs, env.skills);
-    env.birthsign.chooseBirthsign("steed", env.attrs);
+    env.birthsign.chooseBirthsign("white_hart", env.attrs);
 
     // Bosmer (+10) + Thief (+10) + Steed (+20) + Base 40 = 80 Speed
     expect(env.attrs.get("speed")).toBeGreaterThanOrEqual(60);

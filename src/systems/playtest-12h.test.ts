@@ -203,15 +203,15 @@ describe("Playtest — new game to 12 gameplay hours", () => {
     it("applies Warrior birthsign bonuses", () => {
       w.race.chooseRace("hillfolk", w.attrs, w.skills);
       w.cls.chooseClass("warrior", w.attrs, w.skills);
-      w.birthsign.chooseBirthsign("warrior", w.attrs, w.skills);
+      w.birthsign.chooseBirthsign("sword_stone", w.attrs, w.skills);
 
-      expect(w.birthsign.chosenBirthsign?.id).toBe("warrior");
+      expect(w.birthsign.chosenBirthsign?.id).toBe("sword_stone");
     });
 
     it("wires the player level system to the class system", () => {
       w.race.chooseRace("hillfolk", w.attrs, w.skills);
       w.cls.chooseClass("warrior", w.attrs, w.skills);
-      w.birthsign.chooseBirthsign("warrior", w.attrs, w.skills);
+      w.birthsign.chooseBirthsign("sword_stone", w.attrs, w.skills);
 
       w.playerLevel.attachToClassSystem(w.cls);
       w.playerLevel.attachToAttributeSystem(w.attrs);
@@ -847,7 +847,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
     beforeEach(() => {
       w.race.chooseRace("hillfolk", w.attrs, w.skills);
       w.cls.chooseClass("warrior", w.attrs, w.skills);
-      w.birthsign.chooseBirthsign("warrior", w.attrs, w.skills);
+      w.birthsign.chooseBirthsign("sword_stone", w.attrs, w.skills);
       w.time.advanceHours(12);
       w.fame.addFame(25);
       w.disease.contractDisease("rust_chancre");
@@ -906,7 +906,7 @@ describe("Playtest — new game to 12 gameplay hours", () => {
       const snap = w.birthsign.getSaveState();
       const restored = new BirthsignSystem();
       restored.restoreFromSave(snap);
-      expect(restored.chosenBirthsign?.id).toBe("warrior");
+      expect(restored.chosenBirthsign?.id).toBe("sword_stone");
     });
 
     it("OffscreenSimulationSystem snapshot round-trips NPC state", () => {

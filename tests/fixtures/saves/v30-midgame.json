@@ -4,7 +4,7 @@
   "capturedAt": "2026-11-27",
   "save": {
     "version": 30,
-    "timestamp": 1795742724535,
+    "timestamp": 1795743071017,
     "player": {
       "position": {
         "x": 1.2686834433116019,
@@ -76,7 +76,7 @@
     "quests": [],
     "skills": [],
     "skillPoints": 0,
-    "framework": "{\"schemaVersion\":1,\"savedAt\":1795742724536,\"profileId\":\"default\",\"state\":{\"dialogueState\":{},\"questState\":{\"quests\":{\"quest_guard_resolution\":{\"status\":\"active\",\"nodes\":{\"talk_to_guard\":{\"active\":true,\"completed\":false,\"progress\":0},\"defeat_ruin_guard\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_bandit_bounty\":{\"status\":\"inactive\",\"nodes\":{\"kill_bandits\":{\"active\":false,\"completed\":false,\"progress\":0},\"collect_proof\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_kill_guard\":{\"status\":\"active\",\"nodes\":{\"obj_kill_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_collect_potions\":{\"status\":\"active\",\"nodes\":{\"obj_collect_potions\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_speak_guard\":{\"status\":\"active\",\"nodes\":{\"obj_talk_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"job_inn_0_3\":{\"status\":\"active\",\"nodes\":{\"hunt\":{\"active\":true,\"completed\":false,\"progress\":0},\"report\":{\"active\":false,\"completed\":false,\"progress\":0}}}},\"radiant\":{\"job_inn_0_3\":{\"templateId\":\"clear_camp\",\"vars\":{\"place\":\"Craigagel Cross\",\"camp\":\"Gorseford Bandit Camp\",\"landmark\":\"site_bandit-camp_1_6\"}}}},\"inventoryState\":{\"capacity\":20,\"items\":[],\"equipped\":{}},\"factionState\":{\"reputations\":{\"village_guard\":0,\"bandits\":-50,\"merchants_guild\":10,\"mages_college\":0}},\"flags\":{},\"legacyState\":{}}}",
+    "framework": "{\"schemaVersion\":1,\"savedAt\":1795743071017,\"profileId\":\"default\",\"state\":{\"dialogueState\":{},\"questState\":{\"quests\":{\"quest_guard_resolution\":{\"status\":\"active\",\"nodes\":{\"talk_to_guard\":{\"active\":true,\"completed\":false,\"progress\":0},\"defeat_ruin_guard\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_bandit_bounty\":{\"status\":\"inactive\",\"nodes\":{\"kill_bandits\":{\"active\":false,\"completed\":false,\"progress\":0},\"collect_proof\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_kill_guard\":{\"status\":\"active\",\"nodes\":{\"obj_kill_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_collect_potions\":{\"status\":\"active\",\"nodes\":{\"obj_collect_potions\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_speak_guard\":{\"status\":\"active\",\"nodes\":{\"obj_talk_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"job_inn_0_3\":{\"status\":\"active\",\"nodes\":{\"hunt\":{\"active\":true,\"completed\":false,\"progress\":0},\"report\":{\"active\":false,\"completed\":false,\"progress\":0}}}},\"radiant\":{\"job_inn_0_3\":{\"templateId\":\"clear_camp\",\"vars\":{\"place\":\"Craigagel Cross\",\"camp\":\"Gorseford Bandit Camp\",\"landmark\":\"site_bandit-camp_1_6\"}}}},\"inventoryState\":{\"capacity\":20,\"items\":[],\"equipped\":{}},\"factionState\":{\"reputations\":{\"village_guard\":0,\"bandits\":-50,\"merchants_guild\":10,\"mages_college\":0}},\"flags\":{},\"legacyState\":{}}}",
     "attributes": {
       "base": {
         "strength": 60,
@@ -420,7 +420,7 @@
     },
     "weather": {
       "state": "clear",
-      "nextChangeIn": 539.6649217967471
+      "nextChangeIn": 365.1877984892822
     },
     "quickSlots": {
       "slots": {
@@ -579,7 +579,7 @@
       ]
     },
     "birthsign": {
-      "chosenId": "warrior",
+      "chosenId": "sword_stone",
       "lastPowerUseTime": null
     },
     "characterClass": {

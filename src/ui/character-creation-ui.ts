@@ -153,6 +153,16 @@ const HERITAGE_ICONS: Readonly<Record<RaceDefinition["heritage"], string>> = {
   fae:    "✦",
 };
 
+/** Each omen's own icon. */
+const OMEN_ICONS: Readonly<Record<string, string>> = {
+  sword_stone: "⚔", round_table: "◎", red_dragon: "🐉", white_hart: "🦌", grail: "⚱",
+  lady_lake: "≈", isle_apples: "🍎", cauldron: "♨", locked_door: "🗝",
+  raven: "🐦", hollow_hill: "⛰", enchantress: "✶", adder: "🐍",
+};
+
+/** An omen's group, short (on its card). */
+const GUARDIAN_SHORT: Readonly<Record<BirthsignDefinition["guardian"], string>> = { warrior: "Sword", mage: "Cup", thief: "Road" };
+
 /** Icons for birthsign guardian types. */
 const GUARDIAN_ICONS: Readonly<Record<BirthsignDefinition["guardian"], string>> = {
   warrior: "⚔",
@@ -167,9 +177,12 @@ const SPEC_ICONS: Readonly<Record<CharacterClass["specialization"], string>> = {
   stealth: "🌙",
 };
 
-const guardianLabel = (guardian: BirthsignDefinition["guardian"]): string => {
-  return guardian.charAt(0).toUpperCase() + guardian.slice(1);
+const GUARDIAN_LABELS: Readonly<Record<BirthsignDefinition["guardian"], string>> = {
+  warrior: "Omen of the sword",
+  mage:    "Omen of the cup",
+  thief:   "Omen of the road",
 };
+const guardianLabel = (guardian: BirthsignDefinition["guardian"]): string => GUARDIAN_LABELS[guardian];
 
 const HERITAGE_LABELS: Readonly<Record<RaceDefinition["heritage"], string>> = {
   hearth: "Settled lands",
@@ -241,7 +254,7 @@ export class CharacterCreationUI {
 
       const birthsignStep = document.createElement("span");
       birthsignStep.className = "character-create__step-pill";
-      birthsignStep.textContent = "Birthsign";
+      birthsignStep.textContent = "Omen";
       stepPills.appendChild(birthsignStep);
 
       const classStep = document.createElement("span");
@@ -355,7 +368,7 @@ export class CharacterCreationUI {
         const rows: Array<[string, string | null]> = [
           ["Name", enteredName.trim() || null],
           ["Heritage", selectedRace?.name ?? null],
-          ["Birthsign", selectedBirthsign?.name ?? null],
+          ["Omen", selectedBirthsign?.name ?? null],
           ["Class", selectedClass?.name ?? null],
         ];
         for (const [label, value] of rows) {
@@ -531,7 +544,7 @@ export class CharacterCreationUI {
           }
         } else if ("guardian" in entry) {
           const guardian = document.createElement("li");
-          guardian.textContent = `Guardian: ${guardianLabel(entry.guardian)}`;
+          guardian.textContent = guardianLabel(entry.guardian);
           detailsMeta.appendChild(guardian);
 
           if (entry.power) {
@@ -609,7 +622,7 @@ export class CharacterCreationUI {
       const renderWelcome = () => {
         clearCards();
         subtitle.textContent =
-          "You will name your hero, choose a people and birthsign, then a class. Afterward, optional tips introduce movement and interaction.";
+          "You will name your hero, choose a people and an omen, then a class. Afterward, optional tips introduce movement and interaction.";
         continueButton.textContent = "Continue";
         setBtnDisabled(continueButton, false);
         setBtnDisabled(backButton, true);
@@ -627,7 +640,7 @@ export class CharacterCreationUI {
 
         const p1 = document.createElement("p");
         p1.textContent =
-          "Heritage sets your people and their gifts. Birthsign grants lasting gifts and often a daily power. Class sets which skills level fastest at the start.";
+          "Heritage sets your people and their gifts. The omen you were born under grants lasting gifts and often a daily power. Class sets which skills level fastest at the start.";
         intro.appendChild(p1);
 
         const p2 = document.createElement("p");
@@ -1174,9 +1187,9 @@ export class CharacterCreationUI {
 
       const renderBirthsigns = () => {
         clearCards();
-        subtitle.textContent = "Pick your birthsign for innate gifts, attribute shaping, and often a once-per-day power.";
+        subtitle.textContent = "Choose the omen you were born under: a lasting gift, and often a power once a day.";
         continueButton.textContent = "Continue";
-        setBtnDisabled(continueButton, !selectedBirthsign, "Please select a birthsign to continue.");
+        setBtnDisabled(continueButton, !selectedBirthsign, "Choose an omen to continue.");
         setBtnDisabled(backButton, false);
         setAllStepPills("birthsign");
 
@@ -1190,7 +1203,7 @@ export class CharacterCreationUI {
 
           const icon = document.createElement("span");
           icon.className = "character-create__card-icon";
-          icon.textContent = GUARDIAN_ICONS[sign.guardian];
+          icon.textContent = OMEN_ICONS[sign.id] ?? GUARDIAN_ICONS[sign.guardian];
           icon.setAttribute("aria-hidden", "true");
           card.appendChild(icon);
 
@@ -1200,7 +1213,7 @@ export class CharacterCreationUI {
 
           const cardTag = document.createElement("span");
           cardTag.className = "character-create__tag";
-          cardTag.textContent = guardianLabel(sign.guardian);
+          cardTag.textContent = GUARDIAN_SHORT[sign.guardian];
           card.appendChild(cardTag);
 
           card.addEventListener("click", () => {
