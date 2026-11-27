@@ -746,8 +746,7 @@ export class ProjectileSystem {
 
   /** Small agility-derived bonus — bows reward dexterity without duplicating strength melee scaling. */
   private _agilityRangedBonus(): number {
-    if (!this._attributeSystem) return 0;
-    return (this._attributeSystem.get("agility") - 40) * 0.15;
+    return this._attributeSystem?.archeryBonus ?? 0;
   }
 
   private _marksmanLevel(): number {

@@ -106,6 +106,9 @@ export class Player {
   /** Riding and similar: scales movement on top of the base (1 on foot). */
   public speedMultiplier: number = 1;
 
+  /** The Speed attribute's stride (×1 at 40), on top of a horse's or a power's multiplier. */
+  public strideMultiplier = 1;
+
   /** CapsLock: keep walking forward until toggled off (or a menu takes the controls). */
   public autoRun = false;
 
@@ -142,7 +145,7 @@ export class Player {
       // This is computed every frame so that it reacts immediately to inventory
       // changes without requiring the caller to manage camera.speed directly.
       const encumbranceFactor = this.isEncumbered ? 0.5 : 1.0;
-      this.camera.speed = this.baseSpeed * encumbranceFactor * this.speedMultiplier;
+      this.camera.speed = this.baseSpeed * encumbranceFactor * this.speedMultiplier * this.strideMultiplier;
       if (this.autoRun && this.camera.inputs.attachedToElement) this._stepForward();
   }
 

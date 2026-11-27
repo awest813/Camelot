@@ -87,12 +87,14 @@ describe("AttributeSystem", () => {
     expect(attrs.critChance).toBe(0.1);
   });
 
-  it("derives speedMultiplier from agility relative to 40", () => {
-    // agility=40 → 1.0
+  it("derives speedMultiplier from the Speed attribute relative to 40", () => {
+    attrs.setBase("speed", 40);
     expect(attrs.speedMultiplier).toBeCloseTo(1.0);
-    attrs.setBase("agility", 60);
+    attrs.setBase("agility", 80);
+    expect(attrs.speedMultiplier, "agility is not speed").toBeCloseTo(1.0);
+    attrs.setBase("speed", 60);
     expect(attrs.speedMultiplier).toBeCloseTo(1.1);
-    attrs.setBase("agility", 20);
+    attrs.setBase("speed", 20);
     expect(attrs.speedMultiplier).toBeCloseTo(0.9);
   });
 

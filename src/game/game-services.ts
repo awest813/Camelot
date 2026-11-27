@@ -210,7 +210,7 @@ export function installGameFeatures(game: Game): void {
       k.services.provide(CharacterHostKey, {
         get attributes() { return game.attributeSystem; },
         get skills() { return game.skillProgressionSystem; },
-        syncMaxStats: () => maxStats.sync(),
+        syncMaxStats: () => { maxStats.sync(); game.player.strideMultiplier = Math.max(0.5, game.attributeSystem.speedMultiplier); },
         setRacialTraits: (t) => {
           game.swimSystem.hasWaterBreathing = t.waterBreathing;
           game.diseaseSystem.diseaseResistanceChance = t.diseaseImmune ? 1.0 : 0;

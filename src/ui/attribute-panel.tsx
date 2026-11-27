@@ -21,8 +21,8 @@ export function attributeHint(name: AttributeName, a: AttributeSystem): string {
     case "endurance": return `HP max ${a.maxHealth}`;
     case "intelligence":
     case "willpower": return `MP max ${a.maxMagicka.toFixed(0)}`;
-    case "agility":
-    case "speed": return `Speed ×${a.speedMultiplier.toFixed(2)}`;
+    case "agility": return `Bow ${a.archeryBonus >= 0 ? "+" : ""}${a.archeryBonus.toFixed(1)} · locks`;
+    case "speed": return `Move ×${a.speedMultiplier.toFixed(2)}`;
     case "luck": return `Crit ${(a.critChance * 100).toFixed(1)}%`;
     default: return "";
   }

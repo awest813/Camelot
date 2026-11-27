@@ -57,7 +57,7 @@ export const DEFAULT_ATTRIBUTES: Readonly<AttributeSet> = {
  *   meleeDamageBonus = strength * 0.2             (base 40 → +8)
  *   magicDamageBonus = intelligence * 0.2         (base 40 → +8)
  *   critChance    = luck / 1000                   (base 40 → 4 %)
- *   speedMultiplier = 1 + (agility − 40) * 0.005  (base 40 → ×1.0)
+ *   speedMultiplier = 1 + (speed − 40) * 0.005  (base 40 → ×1.0)
  */
 export class AttributeSystem {
   private _base: AttributeSet;
@@ -143,9 +143,14 @@ export class AttributeSystem {
     return Math.min(0.1, this.get("luck") / 1000);
   }
 
-  /** Movement speed multiplier based on agility.  ±0.5 % per point away from 40. */
+  /** Movement speed multiplier from the Speed attribute: ±0.5 % per point away from 40. */
   public get speedMultiplier(): number {
-    return 1 + (this.get("agility") - 40) * 0.005;
+    return 1 + (this.get("speed") - 40) * 0.005;
+  }
+
+  /** Bow damage from Agility: +0.15 per point above 40 (the projectile system's bonus). */
+  public get archeryBonus(): number {
+    return (this.get("agility") - 40) * 0.15;
   }
 
   // ── Snapshot ──────────────────────────────────────────────────────────────
