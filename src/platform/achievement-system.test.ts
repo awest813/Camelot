@@ -65,6 +65,24 @@ describe("AchievementSystem", () => {
     expect(system.isUnlocked("ACH_COMPANION")).toBe(true);
   });
 
+  it("exploring, clearing a camp and a board job each have theirs", () => {
+    const system = new AchievementSystem();
+    const bus = new GameEventBus();
+    system.bind(bus);
+    bus.emit("location:discovered", { id: "a", name: "A", known: 9 });
+    expect(system.isUnlocked("ACH_WAYFARER")).toBe(false);
+    bus.emit("location:discovered", { id: "b", name: "B", known: 10 });
+    expect(system.isUnlocked("ACH_WAYFARER")).toBe(true);
+    bus.emit("landmark:cleared", { id: "site_dragon_1_1", name: "Roost" });
+    expect(system.isUnlocked("ACH_CAMP_BREAKER"), "a roost is not a camp").toBe(false);
+    bus.emit("landmark:cleared", { id: "site_bandit-camp_1_1", name: "Camp" });
+    expect(system.isUnlocked("ACH_CAMP_BREAKER")).toBe(true);
+    bus.emit("quest:completed", { questId: "main_1", xpReward: 0 });
+    expect(system.isUnlocked("ACH_SWORD_FOR_HIRE")).toBe(false);
+    bus.emit("quest:completed", { questId: "job_inn_3_4", xpReward: 0 });
+    expect(system.isUnlocked("ACH_SWORD_FOR_HIRE")).toBe(true);
+  });
+
   it("unions desktop unlocks without a second toast", async () => {
     const system = new AchievementSystem();
     const toasted: string[] = [];

@@ -72,7 +72,7 @@ export interface GameEvents {
   /** An NPC left the world (despawned or its chunk unloaded); drop references. */
   "npc:released": { npcName: string };
   /** A place was discovered (a village or a landmark): on the map and for fast travel. */
-  "location:discovered": { id: string; name: string };
+  "location:discovered": { id: string; name: string; /** Places known now, this one included. */ known?: number };
   /** A landmark's foes have all fallen (once per world). */
   "landmark:cleared": { id: string; name: string };
   /** A world chunk unloaded (its content and NPCs are gone). */

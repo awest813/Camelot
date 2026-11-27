@@ -101,7 +101,7 @@ export interface FastTravelService {
   isDiscovered(id: string): boolean;
   /** Returns true when newly discovered. */
   discover(id: string, name: string, at: { x: number; y: number; z: number }): boolean;
-  /** The places discovered so far (for the map). */
+  /** The places discovered so far (for the map, and counting them). */
   places?(): ReadonlyArray<{ id: string; name: string; x: number; z: number }>;
 }
 

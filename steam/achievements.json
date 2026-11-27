@@ -49,5 +49,20 @@
     "id": "ACH_SADDLED",
     "name": "Saddled",
     "description": "Mount a horse."
+  },
+  {
+    "id": "ACH_WAYFARER",
+    "name": "Wayfarer",
+    "description": "Discover ten places."
+  },
+  {
+    "id": "ACH_CAMP_BREAKER",
+    "name": "Camp Breaker",
+    "description": "Clear a bandit camp."
+  },
+  {
+    "id": "ACH_SWORD_FOR_HIRE",
+    "name": "Sword for Hire",
+    "description": "Finish a job from an innkeeper's board."
   }
 ]

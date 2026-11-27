@@ -62,8 +62,10 @@ export class AchievementSystem {
       this.unlock("ACH_FIRST_BLOOD");
       if (/dragon/i.test(npcName)) this.unlock("ACH_DRAGONSLAYER");
     });
-    bus.on("quest:completed", () => {
+    bus.on("quest:completed", ({ questId }) => {
       this.unlock("ACH_OATH_KEPT");
+      // Board jobs are radiant quests with ids "job_<board>…".
+      if (questId.startsWith("job_")) this.unlock("ACH_SWORD_FOR_HIRE");
     });
     bus.on("player:levelUp", ({ newLevel }) => {
       if (newLevel >= 5) this.unlock("ACH_SEASONED");
@@ -78,6 +80,13 @@ export class AchievementSystem {
     bus.on("pet:acquired", () => {
       this.unlock("ACH_COMPANION");
     });
+    bus.on("location:discovered", ({ known }) => {
+      if ((known ?? 0) >= 10) this.unlock("ACH_WAYFARER");
+    });
+    bus.on("landmark:cleared", ({ id }) => {
+      if (id.startsWith("site_bandit-camp_")) this.unlock("ACH_CAMP_BREAKER");
+    });
+
   }
 
   /**

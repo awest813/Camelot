@@ -149,7 +149,7 @@ export class LandmarksFeature implements Feature {
             discover(lm);
             const fb = s.get(FeedbackKey);
             fb.grant({ xp: lm.xp, label: `Discovered: ${lm.name}` });
-            ctx.kernel.events.emit("location:discovered", { id: lm.id, name: lm.name });
+            ctx.kernel.events.emit("location:discovered", { id: lm.id, name: lm.name, known: travel.places?.().length });
             fb.markDirty();
           }
         }
