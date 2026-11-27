@@ -42,9 +42,9 @@ export function setupGameplaySystems(g: Game): void {
 
   g.spellSystem     = new SpellSystem(g.player, g.scheduleSystem.npcs, g.ui, g.scene);
   // Seed the player with the two starter spells
-  g.spellSystem.learnSpell("flames");
-  g.spellSystem.learnSpell("healing");
-  g.spellSystem.equipSpell("flames");
+  g.spellSystem.learnSpell("kindle");
+  g.spellSystem.learnSpell("mending");
+  g.spellSystem.equipSpell("kindle");
   // Sync magic damage bonus from attributes
   g.spellSystem.magicDamageBonus = g.attributeSystem.magicDamageBonus;
 

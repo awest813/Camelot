@@ -56,8 +56,8 @@ export interface SpellSaveState {
 
 export const DEFAULT_SPELLS: SpellDefinition[] = [
   {
-    id: "flames",
-    name: "Flames",
+    id: "kindle",
+    name: "Kindle",
     description: "A gout of fire that deals 8 fire damage on contact and burns for 3 seconds.",
     school: "destruction",
     delivery: "target",
@@ -69,8 +69,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     duration: 3,
   },
   {
-    id: "frostbite",
-    name: "Frostbite",
+    id: "rime",
+    name: "Rime",
     description: "A freezing ray dealing 10 frost damage and slowing for 4 seconds.",
     school: "destruction",
     delivery: "target",
@@ -82,8 +82,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     duration: 4,
   },
   {
-    id: "spark",
-    name: "Spark",
+    id: "thunderlash",
+    name: "Thunderlash",
     description: "A jolt of lightning dealing 12 shock damage and shocking for 2 seconds.",
     school: "destruction",
     delivery: "target",
@@ -95,8 +95,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     duration: 2,
   },
   {
-    id: "healing",
-    name: "Healing",
+    id: "mending",
+    name: "Mending",
     description: "Restore 20 HP instantly.",
     school: "restoration",
     delivery: "self",
@@ -105,8 +105,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     heal: 20,
   },
   {
-    id: "heal_other",
-    name: "Heal Other",
+    id: "mend_another",
+    name: "Mend Another",
     description: "Restore 15 HP to a friendly target.",
     school: "restoration",
     delivery: "target",
@@ -116,8 +116,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     range: 12,
   },
   {
-    id: "fireball",
-    name: "Fireball",
+    id: "balefire",
+    name: "Balefire",
     description: "An explosive ball of fire dealing 35 damage in a 5m radius and burning for 5 seconds.",
     school: "destruction",
     delivery: "target",
@@ -130,8 +130,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     duration: 5,
   },
   {
-    id: "poison_touch",
-    name: "Poison Touch",
+    id: "adders_touch",
+    name: "Adder's Touch",
     description: "Deals 8 poison damage on touch, then 2 poison damage per second for 6 seconds.",
     school: "destruction",
     delivery: "touch",
@@ -142,8 +142,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     duration: 6,
   },
   {
-    id: "greater_heal",
-    name: "Greater Heal",
+    id: "great_mending",
+    name: "Great Mending",
     description: "Restore 50 HP instantly.",
     school: "restoration",
     delivery: "self",
@@ -152,8 +152,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     heal: 50,
   },
   {
-    id: "oakflesh",
-    name: "Oakflesh",
+    id: "barkskin",
+    name: "Bark-skin",
     description: "Hardens the caster's flesh with earthen magic, protecting against incoming damage for 60 seconds.",
     school: "alteration",
     delivery: "self",
@@ -162,8 +162,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     duration: 60,
   },
   {
-    id: "water_breathing",
-    name: "Water Breathing",
+    id: "lake_breath",
+    name: "Breath of the Lake",
     description: "Allows the caster to breathe freely underwater for 30 seconds.",
     school: "alteration",
     delivery: "self",
@@ -172,8 +172,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     duration: 30,
   },
   {
-    id: "invisibility",
-    name: "Invisibility",
+    id: "fade",
+    name: "Fade",
     description: "Shrouds the caster in a cloak of light and shadow, becoming unseen for 15 seconds.",
     school: "illusion",
     delivery: "self",
@@ -182,8 +182,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     duration: 15,
   },
   {
-    id: "calm",
-    name: "Calm",
+    id: "hush",
+    name: "Hush",
     description: "Pacifies a hostile target for 15 seconds, breaking aggressive combat engagement.",
     school: "illusion",
     delivery: "target",
@@ -193,9 +193,9 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     duration: 15,
   },
   {
-    id: "bound_sword",
-    name: "Bound Sword",
-    description: "Conjures a mystical daedric blade from the void into the caster's grasp for 60 seconds.",
+    id: "spirit_blade",
+    name: "Spirit Blade",
+    description: "Calls a blade of spirit-light from the Otherworld into the caster's grasp for 60 seconds.",
     school: "conjuration",
     delivery: "self",
     magickaCost: 35,
@@ -203,8 +203,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     duration: 60,
   },
   {
-    id: "summon_familiar",
-    name: "Summon Familiar",
+    id: "call_familiar",
+    name: "Call the Familiar",
     description: "Summons an ethereal spectral wolf from the spirit realm to fight beside the caster for 60 seconds.",
     school: "conjuration",
     delivery: "self",
@@ -213,8 +213,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     duration: 60,
   },
   {
-    id: "chain_lightning",
-    name: "Chain Lightning",
+    id: "fork_lightning",
+    name: "Fork-lightning",
     description: "A violent electrical discharge dealing 30 shock damage that arcs outwards to surrounding enemies in a 6m radius.",
     school: "destruction",
     delivery: "target",
@@ -227,8 +227,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     duration: 3,
   },
   {
-    id: "ice_spike",
-    name: "Ice Spike",
+    id: "icicle",
+    name: "Icicle",
     description: "Fires a concentrated lance of glacier ice dealing 25 frost damage and chilling the target.",
     school: "destruction",
     delivery: "target",
@@ -240,8 +240,8 @@ export const DEFAULT_SPELLS: SpellDefinition[] = [
     duration: 3,
   },
   {
-    id: "turn_undead",
-    name: "Turn Undead",
+    id: "banish_dead",
+    name: "Banish the Dead",
     description: "Channels holy light that deals 20 holy magic damage to an enemy and shakes their resolve.",
     school: "restoration",
     delivery: "target",
@@ -578,7 +578,7 @@ export class SpellSystem {
    * forward-facing targeting cone (dot product ≥ SPELL_TARGET_CONE_DOT).
    *
    * This prevents spells from snapping onto enemies behind or beside the player —
-   * matching Oblivion's intent-based targeting and giving the player directional
+   * so targeting follows where the player aims, giving them directional
    * control over which enemy they hit.
    */
   private _findTargetNpc(playerPos: Vector3, range: number): NPC | null {

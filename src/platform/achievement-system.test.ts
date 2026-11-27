@@ -52,7 +52,7 @@ describe("AchievementSystem", () => {
     bus.emit("quest:completed", { questId: "q", xpReward: 25 });
     bus.emit("player:levelUp", { newLevel: 10 });
     bus.emit("player:died", {});
-    bus.emit("spell:cast", { spellId: "flames", spellName: "Flames", magickaCost: 10 });
+    bus.emit("spell:cast", { spellId: "kindle", spellName: "Kindle", magickaCost: 10 });
     bus.emit("pet:acquired", { petId: "wolf", petName: "Wolf", species: "wolf" });
 
     expect(system.isUnlocked("ACH_FIRST_BLOOD")).toBe(true);

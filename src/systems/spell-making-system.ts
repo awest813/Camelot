@@ -300,7 +300,7 @@ export class SpellMakingSystem {
         case "silence":
           return `Silence target for ${c.duration}s`;
         case "burden":
-          return `Burden target by ${c.magnitude} units for ${c.duration}s`;
+          return `Weigh the target down by ${c.magnitude} units for ${c.duration}s`;
         default:
           return "Unknown effect";
       }

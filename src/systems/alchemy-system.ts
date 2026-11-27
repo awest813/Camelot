@@ -102,9 +102,9 @@ export const ALCHEMY_EFFECTS: Record<AlchemyEffectId, AlchemyEffect> = {
   weakness_frost:       { id: "weakness_frost",       name: "Weakness to Frost",    description: "Increases frost damage taken.",                        baseMagnitude: 10, baseDuration: 30,   isHarmful: true  },
   weakness_shock:       { id: "weakness_shock",       name: "Weakness to Shock",    description: "Increases shock damage taken.",                        baseMagnitude: 10, baseDuration: 30,   isHarmful: true  },
   invisibility:         { id: "invisibility",         name: "Invisibility",         description: "Renders the caster invisible.",                        baseMagnitude: 1,  baseDuration: 30,   isHarmful: false },
-  night_eye:            { id: "night_eye",            name: "Night Eye",            description: "Allows seeing in the dark.",                           baseMagnitude: 1,  baseDuration: 60,   isHarmful: false },
-  feather:              { id: "feather",              name: "Feather",              description: "Reduces carry weight burden.",                         baseMagnitude: 50, baseDuration: 120,  isHarmful: false },
-  burden:               { id: "burden",               name: "Burden",               description: "Increases the target's carry weight.",                 baseMagnitude: 50, baseDuration: 30,   isHarmful: true  },
+  night_eye:            { id: "night_eye",            name: "Owl-sight",            description: "Allows seeing in the dark.",                           baseMagnitude: 1,  baseDuration: 60,   isHarmful: false },
+  feather:              { id: "feather",              name: "Lightfoot",            description: "Reduces carry weight burden.",                         baseMagnitude: 50, baseDuration: 120,  isHarmful: false },
+  burden:               { id: "burden",               name: "Weight",               description: "Increases the target's carry weight.",                 baseMagnitude: 50, baseDuration: 30,   isHarmful: true  },
   silence:              { id: "silence",              name: "Silence",              description: "Prevents the target from casting spells.",             baseMagnitude: 1,  baseDuration: 15,   isHarmful: true  },
 };
 
@@ -614,7 +614,7 @@ export class AlchemySystem {
       case "invisibility":
         return `Invisible (${_duration}s)`;
       case "night_eye":
-        return `Night Eye (${_duration}s)`;
+        return `Owl-sight (${_duration}s)`;
       case "silence":
         return `Silenced (${_duration}s)`;
       default:

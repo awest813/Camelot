@@ -77,10 +77,10 @@ describe("SpellSystem", () => {
   // ── Learn & equip ──────────────────────────────────────────────────────────
 
   it("learnSpell adds a known spell", () => {
-    expect(sys.knowsSpell("flames")).toBe(false);
-    const ok = sys.learnSpell("flames");
+    expect(sys.knowsSpell("kindle")).toBe(false);
+    const ok = sys.learnSpell("kindle");
     expect(ok).toBe(true);
-    expect(sys.knowsSpell("flames")).toBe(true);
+    expect(sys.knowsSpell("kindle")).toBe(true);
   });
 
   it("learnSpell returns false for unknown spell id", () => {
@@ -88,19 +88,19 @@ describe("SpellSystem", () => {
   });
 
   it("learnSpell returns false when already known", () => {
-    sys.learnSpell("healing");
-    expect(sys.learnSpell("healing")).toBe(false);
+    sys.learnSpell("mending");
+    expect(sys.learnSpell("mending")).toBe(false);
   });
 
   it("equipSpell returns false if spell not learned", () => {
-    expect(sys.equipSpell("flames")).toBe(false);
+    expect(sys.equipSpell("kindle")).toBe(false);
     expect(sys.equippedSpell).toBeNull();
   });
 
   it("equipSpell selects the spell after learning", () => {
-    sys.learnSpell("flames");
-    expect(sys.equipSpell("flames")).toBe(true);
-    expect(sys.equippedSpell?.id).toBe("flames");
+    sys.learnSpell("kindle");
+    expect(sys.equipSpell("kindle")).toBe(true);
+    expect(sys.equippedSpell?.id).toBe("kindle");
   });
 
   // ── Cast preconditions ─────────────────────────────────────────────────────
@@ -112,8 +112,8 @@ describe("SpellSystem", () => {
   });
 
   it("castSpell fails with insufficient_magicka", () => {
-    sys.learnSpell("fireball");
-    sys.equipSpell("fireball");
+    sys.learnSpell("balefire");
+    sys.equipSpell("balefire");
     player.magicka = 0;
     const result = sys.castSpell();
     expect(result.success).toBe(false);
@@ -121,8 +121,8 @@ describe("SpellSystem", () => {
   });
 
   it("castSpell fails on_cooldown after firing", () => {
-    sys.learnSpell("flames");
-    sys.equipSpell("flames");
+    sys.learnSpell("kindle");
+    sys.equipSpell("kindle");
     sys.castSpell(); // first cast
     const result = sys.castSpell();
     expect(result.success).toBe(false);
@@ -132,8 +132,8 @@ describe("SpellSystem", () => {
   // ── Cast effects ───────────────────────────────────────────────────────────
 
   it("castSpell (destruction) deducts magicka", () => {
-    sys.learnSpell("flames");
-    sys.equipSpell("flames");
+    sys.learnSpell("kindle");
+    sys.equipSpell("kindle");
     const before = player.magicka;
     const spell = sys.equippedSpell!;
     sys.castSpell();
@@ -141,8 +141,8 @@ describe("SpellSystem", () => {
   });
 
   it("castSpell (restoration/self) heals the player", () => {
-    sys.learnSpell("healing");
-    sys.equipSpell("healing");
+    sys.learnSpell("mending");
+    sys.equipSpell("mending");
     player.health = 50;
     player.maxHealth = 100;
     sys.castSpell();
@@ -150,8 +150,8 @@ describe("SpellSystem", () => {
   });
 
   it("castSpell (target) calls takeDamage on nearby NPC", () => {
-    sys.learnSpell("flames");
-    sys.equipSpell("flames");
+    sys.learnSpell("kindle");
+    sys.equipSpell("kindle");
     sys.castSpell();
     expect(npc.takeDamage).toHaveBeenCalled();
   });
@@ -159,37 +159,37 @@ describe("SpellSystem", () => {
   it("castSpell does not hit dead NPCs", () => {
     const deadNpc = makeNPC(2, false);
     sys.npcs = [deadNpc];
-    sys.learnSpell("flames");
-    sys.equipSpell("flames");
+    sys.learnSpell("kindle");
+    sys.equipSpell("kindle");
     sys.castSpell();
     expect(deadNpc.takeDamage).not.toHaveBeenCalled();
   });
 
   it("magicDamageBonus adds to spell damage", () => {
     sys.magicDamageBonus = 10;
-    sys.learnSpell("flames");
-    sys.equipSpell("flames");
+    sys.learnSpell("kindle");
+    sys.equipSpell("kindle");
     sys.castSpell();
     const called = npc.takeDamage.mock.calls[0][0] as number;
-    const flamesDef = DEFAULT_SPELLS.find(s => s.id === "flames")!;
+    const flamesDef = DEFAULT_SPELLS.find(s => s.id === "kindle")!;
     expect(called).toBe(flamesDef.damage! + 10);
   });
 
   it("bonusMagicDamage from equipment adds to spell damage", () => {
     player.bonusMagicDamage = 7;
-    sys.learnSpell("flames");
-    sys.equipSpell("flames");
+    sys.learnSpell("kindle");
+    sys.equipSpell("kindle");
     sys.castSpell();
     const called = npc.takeDamage.mock.calls[0][0] as number;
-    const flamesDef = DEFAULT_SPELLS.find(s => s.id === "flames")!;
+    const flamesDef = DEFAULT_SPELLS.find(s => s.id === "kindle")!;
     expect(called).toBe(flamesDef.damage! + 7);
   });
 
   it("spell damage respects NPC fire resistance", () => {
     const resistant = makeNPC(5, true, { damageResistances: { fire: 0.5 } });
     sys.npcs = [resistant];
-    sys.learnSpell("flames");
-    sys.equipSpell("flames");
+    sys.learnSpell("kindle");
+    sys.equipSpell("kindle");
     sys.castSpell();
     const called = resistant.takeDamage.mock.calls[0][0] as number;
     expect(called).toBe(4);
@@ -203,8 +203,8 @@ describe("SpellSystem", () => {
       key: "Villager", displayName: "Villager", mesh: { name: "Villager", position: new Vector3(0, 0, 5) },
     });
     sys.npcs = [targetNpc];
-    sys.learnSpell("heal_other");
-    sys.equipSpell("heal_other");
+    sys.learnSpell("mend_another");
+    sys.equipSpell("mend_another");
     const result = sys.castSpell();
     expect(result.heal).toBe(15);
     expect(result.hitNpc).toBe("Villager");
@@ -214,8 +214,8 @@ describe("SpellSystem", () => {
   // ── Cooldown ───────────────────────────────────────────────────────────────
 
   it("update reduces cooldown over time", () => {
-    sys.learnSpell("flames");
-    sys.equipSpell("flames");
+    sys.learnSpell("kindle");
+    sys.equipSpell("kindle");
     sys.castSpell();
     expect(sys.cooldownRemaining).toBeGreaterThan(0);
     sys.update(10);
@@ -223,8 +223,8 @@ describe("SpellSystem", () => {
   });
 
   it("can cast again after cooldown expires", () => {
-    sys.learnSpell("flames");
-    sys.equipSpell("flames");
+    sys.learnSpell("kindle");
+    sys.equipSpell("kindle");
     sys.castSpell();
     sys.update(100);
     const result = sys.castSpell();
@@ -255,30 +255,30 @@ describe("SpellSystem", () => {
   // ── Save / load ────────────────────────────────────────────────────────────
 
   it("getSaveState serializes known spells and equipped spell", () => {
-    sys.learnSpell("flames");
-    sys.learnSpell("healing");
-    sys.equipSpell("healing");
+    sys.learnSpell("kindle");
+    sys.learnSpell("mending");
+    sys.equipSpell("mending");
     const state = sys.getSaveState();
-    expect(state.knownSpellIds).toContain("flames");
-    expect(state.knownSpellIds).toContain("healing");
-    expect(state.equippedSpellId).toBe("healing");
+    expect(state.knownSpellIds).toContain("kindle");
+    expect(state.knownSpellIds).toContain("mending");
+    expect(state.equippedSpellId).toBe("mending");
   });
 
   it("restoreFromSave rehydrates known spells and equipped spell", () => {
-    sys.restoreFromSave({ knownSpellIds: ["flames", "healing"], equippedSpellId: "flames" });
-    expect(sys.knowsSpell("flames")).toBe(true);
-    expect(sys.knowsSpell("healing")).toBe(true);
-    expect(sys.equippedSpell?.id).toBe("flames");
+    sys.restoreFromSave({ knownSpellIds: ["kindle", "mending"], equippedSpellId: "kindle" });
+    expect(sys.knowsSpell("kindle")).toBe(true);
+    expect(sys.knowsSpell("mending")).toBe(true);
+    expect(sys.equippedSpell?.id).toBe("kindle");
   });
 
   it("restoreFromSave ignores unknown spell ids", () => {
-    sys.restoreFromSave({ knownSpellIds: ["flames", "ghost_spell_xyz"], equippedSpellId: null });
-    expect(sys.knowsSpell("flames")).toBe(true);
+    sys.restoreFromSave({ knownSpellIds: ["kindle", "ghost_spell_xyz"], equippedSpellId: null });
+    expect(sys.knowsSpell("kindle")).toBe(true);
     expect(sys.knowsSpell("ghost_spell_xyz")).toBe(false);
   });
 
   it("restoreFromSave clears equipped spell if not in restored known list", () => {
-    sys.restoreFromSave({ knownSpellIds: [], equippedSpellId: "flames" });
+    sys.restoreFromSave({ knownSpellIds: [], equippedSpellId: "kindle" });
     expect(sys.equippedSpell).toBeNull();
   });
 
@@ -287,18 +287,18 @@ describe("SpellSystem", () => {
   it("reports spell:cast on a successful cast", () => {
     const hook = vi.fn();
     listen(sys, "spell:cast", hook);
-    sys.learnSpell("flames");
-    sys.equipSpell("flames");
+    sys.learnSpell("kindle");
+    sys.equipSpell("kindle");
     expect(sys.castSpell().success).toBe(true);
     expect(hook).toHaveBeenCalledTimes(1);
-    expect(hook.mock.calls[0][0]).toMatchObject({ spellId: "flames" });
+    expect(hook.mock.calls[0][0]).toMatchObject({ spellId: "kindle" });
   });
 
   it("fires onHostileHit when a damaging spell lands", () => {
     const onHostile = vi.fn();
     listen(sys, "combat:hostileHit", (p) => onHostile(p.npc, p.damage));
-    sys.learnSpell("flames");
-    sys.equipSpell("flames");
+    sys.learnSpell("kindle");
+    sys.equipSpell("kindle");
     sys.castSpell();
     expect(npc.takeDamage).toHaveBeenCalled();
     expect(onHostile).toHaveBeenCalledWith(npc, expect.any(Number));
@@ -316,8 +316,8 @@ describe("SpellSystem", () => {
   });
 
   it("can cast Alteration self-buff spell (Oakflesh)", () => {
-    sys.learnSpell("oakflesh");
-    sys.equipSpell("oakflesh");
+    sys.learnSpell("barkskin");
+    sys.equipSpell("barkskin");
     const initialMagicka = player.magicka;
     const result = sys.castSpell();
     expect(result.success).toBe(true);
@@ -325,8 +325,8 @@ describe("SpellSystem", () => {
   });
 
   it("can cast holy Restoration offensive spell (Turn Undead) and hit NPC", () => {
-    sys.learnSpell("turn_undead");
-    sys.equipSpell("turn_undead");
+    sys.learnSpell("banish_dead");
+    sys.equipSpell("banish_dead");
     const result = sys.castSpell();
     expect(result.success).toBe(true);
     expect(result.hitNpc).toBe(npc.mesh.name);
