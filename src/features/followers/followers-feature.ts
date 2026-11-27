@@ -19,7 +19,9 @@ import { createServiceKey } from "../../core/kernel";
 import type { Scene } from "@babylonjs/core/scene";
 import { simClock } from "../../core/sim-clock";
 import { FollowerSystem, type FollowerCombatRole } from "../../systems/follower-system";
-import { FollowerUI } from "../../ui/follower-ui";
+import type { FollowerUI } from "../../ui/follower-ui";
+import { CompanionChip, followerChip } from "../../ui/companion-chip";
+import { LazyPanel } from "../../ui/lazy-panel";
 import { CompanionBody, COMPANION_CATCH_UP } from "../../entities/companion-body";
 import type { NPC } from "../../entities/npc";
 import { ActorsKey, AnimationKey, FeedbackKey, GameplayKey, LooksKey, ModalKey, PlayerKey, PurseKey, ownSave } from "../services";
@@ -41,7 +43,7 @@ const LOOKS: Record<FollowerCombatRole, { r: number; g: number; b: number }> = {
 
 export interface FollowersService {
   readonly followers: FollowerSystem;
-  readonly panel: FollowerUI;
+  readonly panel: LazyPanel<FollowerUI>;
   /** G: open or close the follower panel. */
   togglePanel(): void;
 }
@@ -51,7 +53,16 @@ export const FollowersKey = createServiceKey<FollowersService>("followers");
 export class FollowersFeature implements Feature {
   public readonly id = "followers";
   public readonly followers = new FollowerSystem();
-  public readonly panel = new FollowerUI();
+  /** The follower panel (G), loaded the first time it opens. */
+  public readonly panel = new LazyPanel<FollowerUI>(async () => {
+    const { FollowerUI } = await import("../../ui/follower-ui");
+    const panel = new FollowerUI();
+    this._wirePanel?.(panel);
+    return panel;
+  });
+  /** The active follower's HUD chip. */
+  public readonly hud = new CompanionChip(2);
+  private _wirePanel: ((panel: FollowerUI) => void) | null = null;
   private _body: CompanionBody | null = null;
   private _blowTimer = 0;
   private _struckTimer = STRUCK_EVERY;
@@ -86,28 +97,32 @@ export class FollowersFeature implements Feature {
       if (remaining <= 0) notify("Your follower needs help!", 2000);
     };
 
-    this.panel.onRecruit = (templateId) => {
-      if (!this._hiring) return;
-      const purse = s.get(PurseKey);
-      if (!f.recruitFollower(templateId, purse.gold())) return;
-      const cost = f.getFollowerTemplate(templateId)?.hireCost ?? 0;
-      if (cost > 0) purse.spend(cost);
-      this._refresh();
+    this._wirePanel = (panel) => {
+      panel.onRecruit = (templateId) => {
+        if (!this._hiring) return;
+        const purse = s.get(PurseKey);
+        if (!f.recruitFollower(templateId, purse.gold())) return;
+        const cost = f.getFollowerTemplate(templateId)?.hireCost ?? 0;
+        if (cost > 0) purse.spend(cost);
+        this._refresh();
+      };
+      panel.onDismiss = () => {
+        f.dismissFollower();
+        this._refresh();
+      };
+      panel.onCommand = (command) => {
+        f.commandFollower(command);
+        this._refresh();
+      };
+      panel.onClose = () => s.get(ModalKey).restoreGameplay();
     };
-    this.panel.onDismiss = () => {
-      f.dismissFollower();
-      this._refresh();
-    };
-    this.panel.onCommand = (command) => {
-      f.commandFollower(command);
-      this._refresh();
-    };
-    this.panel.onClose = () => s.get(ModalKey).restoreGameplay();
     const open = (hiring: boolean) => {
       this._hiring = hiring;
-      const v = this._view();
-      this.panel.open(v.templates, v.active, v.deceased, this._gold(), hiring);
       s.get(ModalKey).suspendGameplay();
+      void this.panel.get().then((panel) => {
+        const v = this._view();
+        panel.open(v.templates, v.active, v.deceased, this._gold(), hiring);
+      });
     };
     ctx.on("dialogue:action", ({ eventId }) => { if (eventId === "followers:hire") this._hireAfterTalk = true; });
     ctx.on("dialogue:closed", () => {
@@ -135,16 +150,15 @@ export class FollowersFeature implements Feature {
 
     ctx.system({ id: "followers.ai", phase: "sim", update: (dt) => this._updateAI(s, dt) });
 
-    // The follower HUD chip, redrawn when the follower or their health changes.
-    let hudId: string | null | undefined, hudHealth = -1;
+    // The follower HUD chip, redrawn when the follower, their health or their order changes.
+    let hudKey = "";
     ctx.system({
       id: "followers.hud", phase: "ui", update: () => {
         const active = f.getActiveFollower();
-        const id = active?.templateId ?? null;
-        if (id === hudId && (!active || active.health === hudHealth)) return;
-        hudId = id;
-        hudHealth = active?.health ?? -1;
-        this.panel.updateHUD(active);
+        const key = active ? `${active.templateId}|${active.health}|${active.command}` : "";
+        if (key === hudKey) return;
+        hudKey = key;
+        this.hud.show(active && followerChip(active, f.getFollowerTemplate(active.templateId)?.combatRole));
       },
     });
 
@@ -243,7 +257,6 @@ export class FollowersFeature implements Feature {
 
   private _refresh(): void {
     const v = this._view();
-    this.panel.refresh(v.templates, v.active, v.deceased, this._gold(), this._hiring);
-    this.panel.updateHUD(v.active);
+    this.panel.current?.refresh(v.templates, v.active, v.deceased, this._gold(), this._hiring);
   }
 }

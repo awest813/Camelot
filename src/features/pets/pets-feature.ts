@@ -25,7 +25,9 @@ import type { Feature, FeatureContext, ServiceRegistry } from "../../core/kernel
 import { createServiceKey } from "../../core/kernel";
 import { PetSystem, type Pet } from "../../systems/pet-system";
 import { CompanionBody } from "../../entities/companion-body";
-import { PetUI } from "../../ui/pet-ui";
+import type { PetUI } from "../../ui/pet-ui";
+import { LazyPanel } from "../../ui/lazy-panel";
+import { CompanionChip, petChip } from "../../ui/companion-chip";
 import type { NPC } from "../../entities/npc";
 import { ActorsKey, AnimationKey, FeedbackKey, GameplayKey, ModalKey, PlayerKey, ownSave } from "../services";
 
@@ -39,7 +41,7 @@ const FAMILIAR = { damage: 14, reach: 2.4, every: 1.4, speed: 7 };
 
 export interface PetsService {
   readonly pets: PetSystem;
-  readonly panel: PetUI;
+  readonly panel: LazyPanel<PetUI>;
   /** P: open or close the companion panel. */
   togglePanel(): void;
 }
@@ -49,7 +51,16 @@ export const PetsKey = createServiceKey<PetsService>("pets");
 export class PetsFeature implements Feature {
   public readonly id = "pets";
   public readonly pets = new PetSystem();
-  public readonly panel = new PetUI();
+  /** The companion panel (P), loaded the first time it opens. */
+  public readonly panel = new LazyPanel<PetUI>(async () => {
+    const { PetUI } = await import("../../ui/pet-ui");
+    const panel = new PetUI();
+    this._wirePanel?.(panel);
+    return panel;
+  });
+  /** The summoned companion's HUD chip. */
+  public readonly hud = new CompanionChip(1, 120, false);
+  private _wirePanel: ((panel: PetUI) => void) | null = null;
   private _mesh: Mesh | null = null;
   private _body: PhysicsAggregate | null = null;
   private _attackTimer = 0;
@@ -104,15 +115,17 @@ export class PetsFeature implements Feature {
       events.emit("pet:levelUp", { petId: pet.id, petName: pet.name, newLevel });
     };
 
-    this.panel.onSummon = (petId) => {
-      this.pets.summonPet(petId);
-      this.panel.refresh(this.pets.pets, this.pets.activePet?.id ?? null);
+    this._wirePanel = (panel) => {
+      panel.onSummon = (petId) => {
+        this.pets.summonPet(petId);
+        panel.refresh(this.pets.pets, this.pets.activePet?.id ?? null);
+      };
+      panel.onDismiss = () => {
+        this.pets.dismissPet();
+        panel.refresh(this.pets.pets, null);
+      };
+      panel.onClose = () => s.get(ModalKey).restoreGameplay();
     };
-    this.panel.onDismiss = () => {
-      this.pets.dismissPet();
-      this.panel.refresh(this.pets.pets, null);
-    };
-    this.panel.onClose = () => s.get(ModalKey).restoreGameplay();
 
     ctx.provide(PetsKey, {
       pets: this.pets,
@@ -128,8 +141,8 @@ export class PetsFeature implements Feature {
           feedback().notify("You have no companions yet.", 2000);
           return;
         }
-        this.panel.open(this.pets.pets, this.pets.activePet?.id ?? null);
         s.get(ModalKey).suspendGameplay();
+        void this.panel.get().then((panel) => panel.open(this.pets.pets, this.pets.activePet?.id ?? null));
       },
     });
 
@@ -154,15 +167,14 @@ export class PetsFeature implements Feature {
 
     ctx.system({ id: "pets.ai", phase: "sim", update: (dt) => { this._updateAI(dt); this._updateFamiliar(dt); } });
     // The companion HUD chip, redrawn when the companion or its health changes.
-    let hudId: string | null | undefined, hudHealth = -1;
+    let hudKey: string | null = null;
     ctx.system({
       id: "pets.hud", phase: "ui", update: () => {
         const pet = this.pets.activePet;
-        const id = pet?.id ?? null;
-        if (id === hudId && (!pet || pet.health === hudHealth)) return;
-        hudId = id;
-        hudHealth = pet?.health ?? -1;
-        this.panel.updateHUD(pet);
+        const key = pet ? `${pet.id}|${pet.health}|${pet.level}` : "";
+        if (key === hudKey) return;
+        hudKey = key;
+        this.hud.show(pet && petChip(pet));
       },
     });
 
@@ -303,7 +315,7 @@ export class PetsFeature implements Feature {
     }
     if (target) {
       target.takeDamage(this.pets.getEffectiveAttackDamage());
-      if (this.pets.petGainXP(5)) this.panel.refresh(this.pets.pets, this.pets.activePet?.id ?? null);
+      if (this.pets.petGainXP(5)) this.panel.current?.refresh(this.pets.pets, this.pets.activePet?.id ?? null);
       this._attackTimer = ATTACK_COOLDOWN;
     } else {
       this._attackTimer = 0.4;

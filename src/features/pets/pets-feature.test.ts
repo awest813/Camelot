@@ -43,7 +43,7 @@ function setup() {
 }
 
 describe("PetsFeature (headless, through the kernel)", () => {
-  it("P with no companion says so; with one it opens and closes the panel", () => {
+  it("P with no companion says so; with one it opens and closes the panel", async () => {
     const t = setup();
     t.pets.togglePanel();
     expect(t.notes.at(-1)).toMatch(/no companions/);
@@ -52,6 +52,8 @@ describe("PetsFeature (headless, through the kernel)", () => {
     t.pets.pets.grantPet("pet_wolf");
     expect(t.notes.at(-1)).toMatch(/gained a companion: Wolf/);
     t.pets.togglePanel();
+    await t.pets.panel.get();
+    await new Promise((r) => setTimeout(r, 0));
     expect(t.pets.panel.isVisible).toBe(true);
     expect(t.modal.suspendGameplay).toHaveBeenCalledOnce();
     t.pets.togglePanel();
@@ -60,10 +62,10 @@ describe("PetsFeature (headless, through the kernel)", () => {
     t.k.uninstall("pets");
   });
 
-  it("summoned, the companion bites a hostile in range and gains XP", () => {
+  it("summoned, the companion bites a hostile in range and gains XP", async () => {
     const t = setup();
     t.pets.pets.grantPet("pet_wolf");
-    t.pets.panel.onSummon!("pet_wolf");
+    (await t.pets.panel.get()).onSummon!("pet_wolf");
     expect(t.events).toEqual(["pet:acquired", "pet:summoned"]);
     const body = t.scene.getMeshByName("pet_pet_wolf");
     expect(body, "a body beside the player").toBeTruthy();
@@ -84,7 +86,7 @@ describe("PetsFeature (headless, through the kernel)", () => {
     t.k.phases.run("sim", 0.1);
     expect(bandit.health).toBe(after);
 
-    t.pets.panel.onDismiss!();
+    (await t.pets.panel.get()).onDismiss!();
     expect(t.scene.getMeshByName("pet_pet_wolf")).toBeNull();
     t.k.uninstall("pets");
   });

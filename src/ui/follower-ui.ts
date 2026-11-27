@@ -12,7 +12,7 @@
  * Implemented as plain DOM so it matches the PetUI / StableUI / SaddlebagUI pattern.
  */
 
-import { addHudChip } from "./hud-chips";
+import { CompanionChip, ROLE_ICON, COMMAND_LABEL, followerChip } from "./companion-chip";
 import type {
   FollowerTemplate,
   ActiveFollowerState,
@@ -43,21 +43,6 @@ const C = {
   MONO:     "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
 };
 
-/** Unicode icons for each combat role. */
-const ROLE_ICON: Record<FollowerCombatRole, string> = {
-  warrior: "⚔️",
-  archer:  "🏹",
-  mage:    "✨",
-  rogue:   "🗡️",
-};
-
-/** Command display labels. */
-const COMMAND_LABEL: Record<FollowerCommand, string> = {
-  follow: "Following",
-  wait:   "Waiting",
-  trade:  "Trading",
-};
-
 function pct(val: number, max: number): string {
   if (max <= 0) return "0%";
   return `${Math.min(100, Math.max(0, (val / max) * 100)).toFixed(1)}%`;
@@ -83,13 +68,8 @@ export class FollowerUI {
   public onCommand:   ((command: FollowerCommand) => void) | null = null;
   public onClose:     (() => void) | null = null;
 
-  // ── HUD widget ─────────────────────────────────────────────────────────────
-  private _hudRoot:      HTMLDivElement  | null = null;
-  private _hudIcon:      HTMLSpanElement | null = null;
-  private _hudName:      HTMLSpanElement | null = null;
-  private _hudHpFill:    HTMLDivElement  | null = null;
-  private _hudHpText:    HTMLSpanElement | null = null;
-  private _hudCommand:   HTMLSpanElement | null = null;
+  // ── HUD chip ───────────────────────────────────────────────────────────────
+  private readonly _hud = new CompanionChip(2);
 
   // ── Management panel ────────────────────────────────────────────────────────
   private _panelRoot:    HTMLDivElement | null = null;
@@ -106,29 +86,15 @@ export class FollowerUI {
   // ── HUD widget ────────────────────────────────────────────────────────────
   // ══════════════════════════════════════════════════════════════════════════
 
-  /** Show / refresh the HUD widget with the currently active follower. */
+  /** Show / refresh the HUD chip (the feature drives its own FollowerHud; this is for a panel used alone). */
   public updateHUD(activeFollower: ActiveFollowerState | null): void {
-    if (typeof document === "undefined") return;
-    this._ensureHUD();
-
-    if (!activeFollower) {
-      this._hudRoot!.style.display = "none";
-      return;
-    }
-
-    // Find the template to get combat role icon
-    const tmpl = this._templates.find(t => t.id === activeFollower.templateId);
-    this._hudIcon!.textContent  = tmpl ? ROLE_ICON[tmpl.combatRole] : "🛡️";
-    this._hudName!.textContent  = activeFollower.name;
-    this._hudHpFill!.style.width = pct(activeFollower.health, activeFollower.maxHealth);
-    this._hudHpText!.textContent = `${Math.ceil(activeFollower.health)} / ${activeFollower.maxHealth}`;
-    this._hudCommand!.textContent = COMMAND_LABEL[activeFollower.command];
-    this._hudRoot!.style.display = "flex";
+    const tmpl = activeFollower ? this._templates.find((t) => t.id === activeFollower.templateId) : undefined;
+    this._hud.show(activeFollower && followerChip(activeFollower, tmpl?.combatRole));
   }
 
-  /** Hide the HUD widget entirely (e.g. in menus). */
+  /** Hide the HUD chip. */
   public hideHUD(): void {
-    if (this._hudRoot) this._hudRoot.style.display = "none";
+    this._hud.hide();
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -185,76 +151,6 @@ export class FollowerUI {
   // ══════════════════════════════════════════════════════════════════════════
   // ── Private — HUD construction ────────────────────────────────────────────
   // ══════════════════════════════════════════════════════════════════════════
-
-  private _ensureHUD(): void {
-    if (this._hudRoot) return;
-
-    const root = document.createElement("div");
-    Object.assign(root.style, {
-      display:     "none",           // hidden until a follower is active
-      alignItems:  "center",
-      gap:         "6px",
-      background:  C.BG,
-      border:      `1px solid ${C.BORDER}`,
-      borderRadius:"6px",
-      padding:     "5px 8px",
-      pointerEvents:"none",
-      fontFamily:  C.FONT,
-      minWidth:    "180px",
-    });
-
-    const icon = document.createElement("span");
-    icon.style.fontSize = "18px";
-
-    const info = document.createElement("div");
-    Object.assign(info.style, { display: "flex", flexDirection: "column", gap: "2px", flex: "1" });
-
-    const nameRow = document.createElement("div");
-    Object.assign(nameRow.style, {
-      display: "flex", justifyContent: "space-between", alignItems: "baseline",
-    });
-
-    const nameEl = document.createElement("span");
-    Object.assign(nameEl.style, { color: C.TITLE, fontSize: "14px", fontWeight: "bold" });
-
-    const commandEl = document.createElement("span");
-    Object.assign(commandEl.style, { color: C.DIM, fontSize: "13px", fontStyle: "italic" });
-
-    nameRow.append(nameEl, commandEl);
-
-    // HP bar
-    const hpOuter = document.createElement("div");
-    Object.assign(hpOuter.style, {
-      background:   C.HP_BG,
-      borderRadius: "2px",
-      height:       "6px",
-      width:        "140px",
-      overflow:     "hidden",
-    });
-    const hpFill = document.createElement("div");
-    Object.assign(hpFill.style, {
-      background:    C.HP_FILL,
-      height:        "100%",
-      width:         "100%",
-      borderRadius:  "2px",
-      transition:    "width 0.2s ease",
-    });
-    hpOuter.appendChild(hpFill);
-
-    const hpText = document.createElement("span");
-    Object.assign(hpText.style, { color: C.DIM, fontSize: "12px" });
-
-    info.append(nameRow, hpOuter, hpText);
-    root.append(icon, info);
-    addHudChip(root, 2); // the HUD chips' stack (ui/hud-chips.ts)
-
-    this._hudRoot    = root;
-    this._hudIcon    = icon;
-    this._hudName    = nameEl;
-    this._hudHpFill  = hpFill;
-    this._hudHpText  = hpText;
-    this._hudCommand = commandEl;
-  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // ── Private — Panel construction ──────────────────────────────────────────

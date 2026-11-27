@@ -348,7 +348,7 @@ export class GameState {
   public animationSystem: AnimationSystem;
   public get pets(): PetsService { return this.kernel.services.get(PetsKey); }
   public get petSystem(): PetSystem { return this.pets.pets; }
-  public get petUI(): PetUI { return this.pets.panel; }
+  public get petUI(): LazyPanel<PetUI> { return this.pets.panel; }
 
   // v24 systems
   public markRecallSystem: MarkRecallSystem;
@@ -357,7 +357,7 @@ export class GameState {
   // v26 systems
   public get followers(): FollowersService { return this.kernel.services.get(FollowersKey); }
   public get followerSystem(): FollowerSystem { return this.followers.followers; }
-  public get followerUI(): FollowerUI { return this.followers.panel; }
+  public get followerUI(): LazyPanel<FollowerUI> { return this.followers.panel; }
 
   // v27 systems
   public perkSystem!: PerkSystem;
