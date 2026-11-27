@@ -2190,3 +2190,15 @@ body:has(.death-veil:not(.is-lifting)) .hud-crosshair { visibility: hidden; }
   background: linear-gradient(180deg, rgba(125, 33, 23, 0.85), rgba(80, 18, 12, 0.9));
   color: var(--tome-gilt-bright);
 }
+
+/* An old save the title can't continue: said plainly, under the menu. */
+.title-screen__note {
+  max-width: 30em;
+  margin: 18px auto 0;
+  font-family: var(--tome-font-book);
+  font-style: italic;
+  font-size: 16px;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--tome-leather-dim);
+}

@@ -49,9 +49,15 @@ import type { GameEventBus } from "./event-bus";
 
 const SAVE_KEY = SAVE_STORAGE_KEY;
 // v29: stealth crouch state + player combat status effects.
-const SAVE_VERSION = 29;
-/** Oldest save version that can still be loaded (forward-compat window). */
-const SAVE_VERSION_MIN = 5;
+const SAVE_VERSION = 30;
+/**
+ * Oldest save version that can still be loaded.  Version 30 is the game's
+ * own setting (docs/original-setting-plan.md): its ids replaced the borrowed
+ * ones, and saves from before it are not migrated.
+ */
+const SAVE_VERSION_MIN = 30;
+/** What the player is told when a save is too old (or too new) to load. */
+export const OLD_SAVE_MESSAGE = "This save is from another version of Camelot and can't be loaded.";
 
 interface PlayerSaveData {
   position: { x: number; y: number; z: number };
@@ -643,7 +649,7 @@ export class SaveSystem {
     }
 
     if (data.version < SAVE_VERSION_MIN || data.version > SAVE_VERSION) {
-      this._ui.showNotification("Incompatible save version.", 2500);
+      this._ui.showNotification(OLD_SAVE_MESSAGE, 4000);
       return false;
     }
 
@@ -764,14 +770,19 @@ export class SaveSystem {
     return true;
   }
 
-  /** The stored save in brief (for a "Continue" line); null when there is none or it can't be read. */
-  public peekSummary(): { name: string; level: number; savedAt: number } | null {
+  /**
+   * The stored save in brief (for a "Continue" line); null when there is none
+   * or it can't be read.  `old` marks a save from another version (it won't load).
+   */
+  public peekSummary(): { name: string; level: number; savedAt: number; old?: true } | null {
     try {
       const raw = this._storage().getItem(SAVE_KEY);
       if (!raw) return null;
-      const data = JSON.parse(raw) as { timestamp?: number; player?: { name?: string; level?: number } };
+      const data = JSON.parse(raw) as { version?: number; timestamp?: number; player?: { name?: string; level?: number } };
       if (!data.player) return null;
-      return { name: data.player.name?.trim() || "Hero", level: data.player.level ?? 1, savedAt: data.timestamp ?? 0 };
+      const v = data.version ?? 0;
+      const old = v < SAVE_VERSION_MIN || v > SAVE_VERSION;
+      return { name: data.player.name?.trim() || "Hero", level: data.player.level ?? 1, savedAt: data.timestamp ?? 0, ...(old ? { old: true as const } : {}) };
     } catch {
       return null;
     }
@@ -863,7 +874,7 @@ export class SaveSystem {
     }
 
     if (data?.version === undefined || data.version < SAVE_VERSION_MIN || data.version > SAVE_VERSION) {
-      this._ui.showNotification("Import failed: incompatible save version.", 2500);
+      this._ui.showNotification(`Import failed. ${OLD_SAVE_MESSAGE}`, 4000);
       return false;
     }
 

@@ -1,10 +1,10 @@
 {
   "description": "Mid-game: 250 gold, iron and potions, a discovered village with an active job, clock advanced 5 h.",
-  "saveVersion": 29,
-  "capturedAt": "2026-11-22",
+  "saveVersion": 30,
+  "capturedAt": "2026-11-27",
   "save": {
-    "version": 29,
-    "timestamp": 1795379244136,
+    "version": 30,
+    "timestamp": 1795742233215,
     "player": {
       "position": {
         "x": 1.2686834433116019,
@@ -15,7 +15,7 @@
       "magicka": 140,
       "stamina": 170,
       "level": 1,
-      "experience": 20,
+      "experience": 0,
       "experienceToNextLevel": 100,
       "carryWeight": 8.2,
       "maxCarryWeight": 450,
@@ -60,7 +60,7 @@
         "name": "Gold Coins",
         "description": "",
         "stackable": true,
-        "quantity": 265,
+        "quantity": 250,
         "weight": 0
       },
       {
@@ -73,63 +73,10 @@
       }
     ],
     "equipment": [],
-    "quests": [
-      {
-        "id": "quest_kill_guard",
-        "isCompleted": false,
-        "isActive": true,
-        "isFailed": false,
-        "objectives": [
-          {
-            "id": "obj_kill_guard",
-            "current": 0,
-            "completed": false
-          }
-        ]
-      },
-      {
-        "id": "quest_collect_potions",
-        "isCompleted": false,
-        "isActive": true,
-        "isFailed": false,
-        "objectives": [
-          {
-            "id": "obj_collect_potions",
-            "current": 0,
-            "completed": false
-          }
-        ]
-      },
-      {
-        "id": "quest_speak_guard",
-        "isCompleted": false,
-        "isActive": true,
-        "isFailed": false,
-        "objectives": [
-          {
-            "id": "obj_talk_guard",
-            "current": 0,
-            "completed": false
-          }
-        ]
-      },
-      {
-        "id": "job_inn_0_3",
-        "isCompleted": false,
-        "isActive": true,
-        "isFailed": false,
-        "objectives": [
-          {
-            "id": "job_inn_0_3_obj",
-            "current": 2,
-            "completed": false
-          }
-        ]
-      }
-    ],
+    "quests": [],
     "skills": [],
     "skillPoints": 0,
-    "framework": "{\"schemaVersion\":1,\"savedAt\":1795379244137,\"profileId\":\"default\",\"state\":{\"dialogueState\":{},\"questState\":{\"quests\":{\"quest_guard_resolution\":{\"status\":\"inactive\",\"nodes\":{\"talk_to_guard\":{\"active\":false,\"completed\":false,\"progress\":0},\"defeat_ruin_guard\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_bandit_bounty\":{\"status\":\"inactive\",\"nodes\":{\"kill_bandits\":{\"active\":false,\"completed\":false,\"progress\":0},\"collect_proof\":{\"active\":false,\"completed\":false,\"progress\":0}}}}},\"inventoryState\":{\"capacity\":20,\"items\":[{\"itemId\":\"gold_coins\",\"quantity\":265}],\"equipped\":{}},\"factionState\":{\"reputations\":{\"village_guard\":10,\"bandits\":-50,\"merchants_guild\":10,\"mages_college\":0}},\"flags\":{},\"legacyState\":{}}}",
+    "framework": "{\"schemaVersion\":1,\"savedAt\":1795742233215,\"profileId\":\"default\",\"state\":{\"dialogueState\":{},\"questState\":{\"quests\":{\"quest_guard_resolution\":{\"status\":\"active\",\"nodes\":{\"talk_to_guard\":{\"active\":true,\"completed\":false,\"progress\":0},\"defeat_ruin_guard\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_bandit_bounty\":{\"status\":\"inactive\",\"nodes\":{\"kill_bandits\":{\"active\":false,\"completed\":false,\"progress\":0},\"collect_proof\":{\"active\":false,\"completed\":false,\"progress\":0}}},\"quest_kill_guard\":{\"status\":\"active\",\"nodes\":{\"obj_kill_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_collect_potions\":{\"status\":\"active\",\"nodes\":{\"obj_collect_potions\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"quest_speak_guard\":{\"status\":\"active\",\"nodes\":{\"obj_talk_guard\":{\"active\":true,\"completed\":false,\"progress\":0}}},\"job_inn_0_3\":{\"status\":\"active\",\"nodes\":{\"hunt\":{\"active\":true,\"completed\":false,\"progress\":0},\"report\":{\"active\":false,\"completed\":false,\"progress\":0}}}},\"radiant\":{\"job_inn_0_3\":{\"templateId\":\"clear_camp\",\"vars\":{\"place\":\"Craigagel Cross\",\"camp\":\"Gorseford Bandit Camp\",\"landmark\":\"site_bandit-camp_1_6\"}}}},\"inventoryState\":{\"capacity\":20,\"items\":[],\"equipped\":{}},\"factionState\":{\"reputations\":{\"village_guard\":0,\"bandits\":-50,\"merchants_guild\":10,\"mages_college\":0}},\"flags\":{},\"legacyState\":{}}}",
     "attributes": {
       "base": {
         "strength": 70,
@@ -143,8 +90,8 @@
       "pendingPoints": 0
     },
     "time": {
-      "gameTime": 789.2000000000004,
-      "elapsedGameTime": 789.2000000000004
+      "gameTime": 793.600000000001,
+      "elapsedGameTime": 793.600000000001
     },
     "crime": {
       "bounties": {},
@@ -473,7 +420,7 @@
     },
     "weather": {
       "state": "clear",
-      "nextChangeIn": 244.6981366574726
+      "nextChangeIn": 592.4258932956184
     },
     "quickSlots": {
       "slots": {
@@ -549,7 +496,8 @@
     "fastTravel": {
       "discoveredIds": [
         "start_village",
-        "village_0_3"
+        "village_0_3",
+        "site_bandit-camp_1_6"
       ],
       "locations": [
         {
@@ -569,6 +517,15 @@
             "y": 2,
             "z": 155.4636897343709
           }
+        },
+        {
+          "id": "site_bandit-camp_1_6",
+          "name": "Gorseford Bandit Camp",
+          "position": {
+            "x": 42.045400152450725,
+            "y": 2,
+            "z": 317.80166072219566
+          }
         }
       ]
     },
@@ -581,9 +538,6 @@
     },
     "jail": {
       "records": []
-    },
-    "spellMaking": {
-      "customSpells": []
     },
     "respawn": {
       "zones": [
@@ -655,39 +609,6 @@
         "Barkeeper_10006"
       ]
     },
-    "horse": {
-      "horses": [
-        {
-          "id": "bay_mare",
-          "name": "Bay Mare",
-          "speed": 1.8,
-          "saddlebagCapacity": 8,
-          "isOwned": false,
-          "stableId": "starter_stable",
-          "saddlebag": []
-        },
-        {
-          "id": "black_stallion",
-          "name": "Black Stallion",
-          "speed": 2.2,
-          "saddlebagCapacity": 6,
-          "isOwned": false,
-          "stableId": "starter_stable",
-          "saddlebag": []
-        },
-        {
-          "id": "grey_gelding",
-          "name": "Grey Gelding",
-          "speed": 2,
-          "saddlebagCapacity": 10,
-          "isOwned": false,
-          "stableId": "starter_stable",
-          "saddlebag": []
-        }
-      ],
-      "currentHorseId": null,
-      "isMounted": false
-    },
     "swimming": {
       "currentBreath": 30,
       "maxBreath": 30,
@@ -710,19 +631,6 @@
       "eventLog": [],
       "scheduledEvents": []
     },
-    "pets": {
-      "activePetId": null,
-      "pets": [
-        {
-          "id": "pet_wolf",
-          "health": 120,
-          "level": 1,
-          "experience": 0,
-          "mood": 80,
-          "isDead": false
-        }
-      ]
-    },
     "markRecall": {
       "hasMarked": false,
       "position": null,
@@ -732,13 +640,119 @@
       "sessionsThisLevel": 0,
       "maxSessionsPerLevel": 5
     },
+    "itemCondition": {
+      "conditions": {}
+    },
+    "perks": {
+      "unlockedPerkIds": [],
+      "perkPoints": 0
+    },
+    "dynamicWorldEvents": [
+      {
+        "id": "roadside_bandit_cache",
+        "lastTriggeredAt": null,
+        "triggerCount": 0
+      },
+      {
+        "id": "storm_lost_supplies",
+        "lastTriggeredAt": null,
+        "triggerCount": 0
+      },
+      {
+        "id": "hidden_cache_followup",
+        "lastTriggeredAt": null,
+        "triggerCount": 0
+      }
+    ],
+    "travelEvents": [
+      {
+        "id": "travel_wanderer_rumor",
+        "lastFiredAt": null,
+        "fired": false
+      },
+      {
+        "id": "travel_sandstorm_tales",
+        "lastFiredAt": null,
+        "fired": false
+      },
+      {
+        "id": "travel_storm_refuge",
+        "lastFiredAt": null,
+        "fired": false
+      },
+      {
+        "id": "travel_frost_warning",
+        "lastFiredAt": null,
+        "fired": false
+      }
+    ],
+    "ambientEvents": [
+      {
+        "id": "ambient_wolf_howl",
+        "lastFiredAt": null,
+        "fired": false
+      },
+      {
+        "id": "ambient_shooting_star",
+        "lastFiredAt": null,
+        "fired": false
+      },
+      {
+        "id": "ambient_market_news",
+        "lastFiredAt": 13.123333333333328,
+        "fired": true
+      },
+      {
+        "id": "ambient_birdsong",
+        "lastFiredAt": null,
+        "fired": false
+      }
+    ],
+    "stealth": {
+      "isCrouching": false
+    },
+    "combatEffects": [],
+    "world": {
+      "seed": {
+        "seed": "fixture-capture",
+        "numeric": false,
+        "options": {
+          "worldType": "normal",
+          "biomeScale": "medium",
+          "structureDensity": "normal",
+          "startingBiome": null,
+          "temperatureShift": 0
+        }
+      },
+      "rng": {
+        "seed": "fixture-capture",
+        "streams": {
+          "travel-arrival": 1231568263,
+          "loot-drops": 437937998,
+          "world-events": 3439300144,
+          "armor-wear": 674109082,
+          "raids": 2640109065,
+          "combat": 2599579815,
+          "projectiles": 2814101893,
+          "schedules": 2237198815,
+          "weather": 2125067193,
+          "leveled-lists": 3091145522,
+          "pickpocket-rolls": 213186001,
+          "persuasion": 2103988268,
+          "loot-tables": 3480476585,
+          "alchemy": 4180063934
+        }
+      }
+    },
     "pickpocket": {
       "totalAttempts": 0,
       "totalSuccesses": 0,
       "totalCaught": 0
     },
-    "itemCondition": {
-      "conditions": {}
+    "survival": {
+      "hunger": 99.52777777777789,
+      "fatigue": 99.05555555555577,
+      "cold": 100
     },
     "crafting": {
       "recipeSnapshots": [
@@ -801,20 +815,21 @@
         "smith_steel_cuirass"
       ]
     },
-    "villageJobs": {
-      "active": [
-        {
-          "boardId": "inn_0_3",
-          "placeName": "Craigagel Cross",
-          "templateId": "supply_leather",
-          "progress": 0
-        }
-      ],
-      "completed": {},
-      "declined": {}
+    "spellMaking": {
+      "customSpells": []
     },
-    "villageRaids": {
-      "lastRaidAt": {}
+    "pets": {
+      "activePetId": null,
+      "pets": [
+        {
+          "id": "pet_wolf",
+          "health": 120,
+          "level": 1,
+          "experience": 0,
+          "mood": 80,
+          "isDead": false
+        }
+      ]
     },
     "dragonShouts": {
       "dragonSouls": 0,
@@ -933,87 +948,69 @@
       "abilityLastUsedAtHours": null,
       "comboLastUsedAtHours": {}
     },
-    "perks": {
-      "unlockedPerkIds": [],
-      "perkPoints": 0
+    "horse": {
+      "horses": [
+        {
+          "id": "bay_mare",
+          "name": "Bay Mare",
+          "speed": 1.8,
+          "saddlebagCapacity": 8,
+          "isOwned": false,
+          "stableId": "starter_stable",
+          "saddlebag": []
+        },
+        {
+          "id": "black_stallion",
+          "name": "Black Stallion",
+          "speed": 2.2,
+          "saddlebagCapacity": 6,
+          "isOwned": false,
+          "stableId": "starter_stable",
+          "saddlebag": []
+        },
+        {
+          "id": "grey_gelding",
+          "name": "Grey Gelding",
+          "speed": 2,
+          "saddlebagCapacity": 10,
+          "isOwned": false,
+          "stableId": "starter_stable",
+          "saddlebag": []
+        }
+      ],
+      "currentHorseId": null,
+      "isMounted": false
     },
-    "survival": {
-      "hunger": 99.68055555555563,
-      "fatigue": 99.36111111111126,
-      "cold": 100
+    "landmarks": {
+      "cleared": {}
     },
-    "dynamicWorldEvents": [
-      {
-        "id": "roadside_bandit_cache",
-        "lastTriggeredAt": 13.103333333333328,
-        "triggerCount": 1
-      },
-      {
-        "id": "storm_lost_supplies",
-        "lastTriggeredAt": null,
-        "triggerCount": 0
-      },
-      {
-        "id": "hidden_cache_followup",
-        "lastTriggeredAt": null,
-        "triggerCount": 0
-      }
-    ],
-    "travelEvents": [
-      {
-        "id": "travel_wanderer_rumor",
-        "lastFiredAt": null,
-        "fired": false
-      },
-      {
-        "id": "travel_sandstorm_tales",
-        "lastFiredAt": null,
-        "fired": false
-      },
-      {
-        "id": "travel_storm_refuge",
-        "lastFiredAt": null,
-        "fired": false
-      },
-      {
-        "id": "travel_frost_warning",
-        "lastFiredAt": null,
-        "fired": false
-      }
-    ],
-    "ambientEvents": [
-      {
-        "id": "ambient_wolf_howl",
-        "lastFiredAt": null,
-        "fired": false
-      },
-      {
-        "id": "ambient_shooting_star",
-        "lastFiredAt": null,
-        "fired": false
-      },
-      {
-        "id": "ambient_market_news",
-        "lastFiredAt": 13.103333333333328,
-        "fired": true
-      },
-      {
-        "id": "ambient_birdsong",
-        "lastFiredAt": null,
-        "fired": false
-      }
-    ],
-    "stealth": {
-      "isCrouching": false
+    "villageRaids": {
+      "lastRaidAt": {}
     },
-    "combatEffects": []
+    "villageJobs": {
+      "active": [
+        {
+          "boardId": "inn_0_3",
+          "placeName": "Craigagel Cross",
+          "templateId": "clear_camp",
+          "progress": 0,
+          "camp": {
+            "id": "site_bandit-camp_1_6",
+            "name": "Gorseford Bandit Camp",
+            "direction": "north"
+          }
+        }
+      ],
+      "completed": {},
+      "declined": {}
+    }
   },
   "expect": {
     "playerName": "Fixture",
     "level": 1,
-    "gold": 265,
+    "gold": 250,
     "items": [
-      "gold_coins×265",
+      "gold_coins×250",
       "iron_ingot×6",
       "leather_strips×2",
       "potion_hp_01×2",
@@ -1021,15 +1018,17 @@
     ],
     "hour": 13,
     "activeJobs": [
-      "inn_0_3:supply_leather:0"
+      "inn_0_3:clear_camp:0"
     ],
     "discovered": [
+      "site_bandit-camp_1_6",
       "start_village",
       "village_0_3"
     ],
     "activeQuests": [
       "job_inn_0_3",
       "quest_collect_potions",
+      "quest_guard_resolution",
       "quest_kill_guard",
       "quest_speak_guard"
     ]

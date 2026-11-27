@@ -19,3 +19,13 @@ describe("architecture guardrails", () => {
     expect(counts["composition-root-lines"]).toBeGreaterThan(counts["game-ts-lines"]);
   });
 });
+
+describe("borrowed-names", () => {
+  it("counts whole words in any case, apostrophes included, and nothing inside other words", async () => {
+    const { countBorrowed } = await import("./check-guardrails.mjs");
+    expect(countBorrowed("A Nord, a nord and a NORD")).toBe(3);
+    expect(countBorrowed("J'zargo uses the Thu'um")).toBe(2);
+    expect(countBorrowed("Petty Soul Gem, two soul gems")).toBe(2);
+    expect(countBorrowed("Nordic north, Bretony, normal")).toBe(0);
+  });
+});

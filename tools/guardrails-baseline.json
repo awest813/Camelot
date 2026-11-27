@@ -1,9 +1,10 @@
 {
   "counts": {
     "game-ts-lines": 64,
-    "composition-root-lines": 3330,
+    "composition-root-lines": 3323,
     "unseeded-random": 0,
     "callback-properties": 0,
-    "babylon-gui-files": 8
+    "babylon-gui-files": 8,
+    "borrowed-names": 601
   }
 }

@@ -9,7 +9,8 @@ import { manageDialogFocus } from "./dialog-focus";
 import { PanelHost } from "./preact/panel-host";
 
 export interface TitleScreenProps {
-  saved: { name: string; level: number; savedAt: number } | null;
+  /** The save to continue; `old` when it is from another version (shown, not offered). */
+  saved: { name: string; level: number; savedAt: number; old?: true } | null;
   onContinue(): void;
   onNewGame(): void;
   onSettings(): void;
@@ -38,7 +39,7 @@ export function TitleScreen(p: TitleScreenProps) {
     return () => focus.release();
   }, []);
   const items: Array<{ label: string; detail?: string; run: () => void; quiet?: boolean }> = [];
-  if (p.saved) {
+  if (p.saved && !p.saved.old) {
     items.push({
       label: "Continue",
       detail: `${p.saved.name} · Level ${p.saved.level}${p.saved.savedAt ? ` · saved ${savedAgo(p.saved.savedAt)}` : ""}`,
@@ -75,6 +76,11 @@ export function TitleScreen(p: TitleScreenProps) {
             </button>
           ))}
         </nav>
+        {p.saved?.old && (
+          <p class="title-screen__note" role="note">
+            The saved tale of {p.saved.name} is from another version of Camelot and can't be continued. A new game will replace it when you save.
+          </p>
+        )}
       </div>
       <p class="title-screen__foot">↑ ↓ to choose · Enter to begin</p>
     </div>

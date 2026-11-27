@@ -130,7 +130,7 @@ export function wireGameplay(g: Game): void {
     credits: () => g.kernel.services.get(SettingsKey).openCredits(),
     quit: desktop ? () => desktop.quit() : () => window.location.reload(),
     quitLabel: desktop ? "Quit to Desktop" : "Quit to Menu",
-    savedAt: () => g.saveSystem.peekSummary()?.savedAt ?? null,
+    savedAt: () => { const p = g.saveSystem.peekSummary(); return p && !p.old ? p.savedAt : null; },
   });
 
   // Wire decoupled input adapter after all systems are initialized

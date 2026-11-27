@@ -329,8 +329,8 @@ export const TravelKey = createServiceKey<TravelService>("travel");
 
 /** What the title screen needs from the game. */
 export interface TitleHostService {
-  /** The save "Continue" would load, in brief; null when there is none. */
-  savedGame(): { name: string; level: number; savedAt: number } | null;
+  /** The save "Continue" would load, in brief; null when there is none; `old` when it can't load. */
+  savedGame(): { name: string; level: number; savedAt: number; old?: true } | null;
   /** Pause play and take input while the title is up (false gives them back). */
   hold(on: boolean): void;
   /** Load the save and play; false when it could not be loaded. */

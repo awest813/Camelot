@@ -38,6 +38,14 @@ describe("TitleFeature", () => {
     t.k.uninstall("title");
   });
 
+  it("a save from another version isn't offered; the title says so", () => {
+    const t = setup({ savedGame: () => ({ name: "Gawain", level: 4, savedAt: 1, old: true }) });
+    t.title.show();
+    expect(t.labels()).toEqual(["New Game", "Settings", "Credits"]);
+    expect(document.querySelector(".title-screen__note")?.textContent).toContain("The saved tale of Gawain is from another version of Camelot");
+    t.k.uninstall("title");
+  });
+
   it("Continue names the saved hero and loads; a save that won't load starts a new game", () => {
     const t = setup({ savedGame: () => ({ name: "Gawain", level: 4, savedAt: Date.now() - 3 * 3_600_000 }), quit: () => {} });
     t.title.show();

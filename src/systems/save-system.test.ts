@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { SaveSystem, SaveData } from './save-system';
+import { SaveSystem, SaveData, OLD_SAVE_MESSAGE } from './save-system';
 import { Item } from './inventory-system';
 import { listen } from "../testing/listen";
 
@@ -80,7 +80,7 @@ describe('SaveSystem', () => {
         expect(localStorage.setItem).toHaveBeenCalledOnce();
         const raw = localStorageMock['camelot_save'];
         const data: SaveData = JSON.parse(raw);
-        expect(data.version).toBe(29);
+        expect(data.version).toBe(30);
         expect(data.player.health).toBe(80);
         expect(data.player.magicka).toBe(60);
         expect(data.player.stamina).toBe(90);
@@ -470,12 +470,12 @@ describe('SaveSystem', () => {
         localStorageMock['camelot_save'] = JSON.stringify(badData);
         const result = saveSystem.load();
         expect(result).toBe(false);
-        expect(mockUI.showNotification).toHaveBeenCalledWith('Incompatible save version.', 2500);
+        expect(mockUI.showNotification).toHaveBeenCalledWith(OLD_SAVE_MESSAGE, 4000);
     });
 
-    it('should reject saves with a version below the minimum supported (v4)', () => {
+    it('should reject saves from before the game\'s own setting (v29)', () => {
         const oldData: SaveData = {
-            version: 4,
+            version: 29,
             timestamp: Date.now(),
             player: { position: { x: 0, y: 0, z: 0 }, health: 100, magicka: 100, stamina: 100, level: 1, experience: 0, experienceToNextLevel: 100 },
             inventory: [],
@@ -485,18 +485,18 @@ describe('SaveSystem', () => {
         localStorageMock['camelot_save'] = JSON.stringify(oldData);
         const result = saveSystem.load();
         expect(result).toBe(false);
-        expect(mockUI.showNotification).toHaveBeenCalledWith('Incompatible save version.', 2500);
+        expect(mockUI.showNotification).toHaveBeenCalledWith(OLD_SAVE_MESSAGE, 4000);
     });
 
-    it('should load a v5 save successfully (backward-compatible with v6)', () => {
+    it('should load a v30 save whose optional parts are absent', () => {
         const v5Data: SaveData = {
-            version: 5,
+            version: 30,
             timestamp: Date.now(),
             player: { position: { x: 1, y: 2, z: 3 }, health: 75, magicka: 50, stamina: 90, level: 2, experience: 50, experienceToNextLevel: 200 },
             inventory: [],
             equipment: [],
             quests: [],
-            // v6 fields (spells/persuasion) absent — should be handled gracefully
+            // optional parts (spells, persuasion, …) absent — handled gracefully
         };
         localStorageMock['camelot_save'] = JSON.stringify(v5Data);
         const result = saveSystem.load();
@@ -521,7 +521,7 @@ describe('SaveSystem', () => {
         data.version = 999;
         const result = saveSystem.importFromJson(JSON.stringify(data));
         expect(result).toBe(false);
-        expect(mockUI.showNotification).toHaveBeenCalledWith('Import failed: incompatible save version.', 2500);
+        expect(mockUI.showNotification).toHaveBeenCalledWith(`Import failed. ${OLD_SAVE_MESSAGE}`, 4000);
     });
 
     it('importFromJson loads valid save data and notifies the player', () => {

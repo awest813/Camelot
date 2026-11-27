@@ -166,20 +166,20 @@ not named) can stay generic.
 - **Creatures:** Draugr become barrow-dead.
 - **Coins:** the coin icon's "Septim" becomes "crown".
 
-## 3. How to change it without breaking saves
+## 3. How to change it
 
-1. **Ids migrate, names change freely.** Display names and text are just
-   replaced. Saved ids (race, birthsign, class, follower templates, spells,
-   items, ingredients, diseases, shout ids) get an **alias table**
-   (`systems/id-aliases.ts`, old id → new id) applied when a save loads. The save
-   version goes up by one. Mods referencing old ids go through the same table.
-2. **A guardrail keeps it out.** `tools/check-guardrails.mjs` gains a denylist
-   (Tamriel, Skyrim, Oblivion, Daedric, Thu'um, Argonian, Khajiit, Lydia,
-   Draugr …). It is enforced on `src/` (code and comments) and README, with only
-   the alias table allowed to mention old ids. It starts as a count baseline that
-   may only go down, then goes to zero.
-3. **One area per commit**, each with its tests updated and a save written before
-   it loading after it (a migration test per area).
+1. **Old saves are not migrated** (decided). The save version went to 30 and
+   30 is the oldest that loads. A save from before is refused with one plain
+   message, and the title screen says it can't be continued instead of
+   offering Continue. Ids are renamed freely. The save-fixture corpus keeps one
+   current save (`tests/fixtures/saves/v30-midgame.json`), recaptured
+   (`SAVE_FIXTURE_CAPTURE=1`) after each phase that renames saved ids.
+2. **A guardrail keeps it out.** `tools/check-guardrails.mjs` counts the
+   `BORROWED_NAMES` (Tamriel, Skyrim, Oblivion, Daedric, Thu'um, Argonian,
+   Khajiit, Lydia, Draugr, the diseases and ingredients …) across `src/`
+   (tests and comments included) and the README. The count, `borrowed-names`,
+   may only go down. It started at 601 and goes to zero by phase 7.
+3. **One area per commit**, each with its tests updated.
 4. **Screenshots** of the creator, the sheet, the words window, the companion
    window and the alchemy bench after each player-facing phase.
 
@@ -187,7 +187,7 @@ not named) can stay generic.
 
 | Phase | Content | Why first | Size |
 |---|---|---|---|
-| 0 | Alias table + save-version bump + guardrail baseline | Everything after relies on it | S |
+| 0 | Save version 30 (older refused), guardrail baseline | Everything after relies on it | S, done |
 | 1 | Heritages, omens, callings (the creator) | The first screen a player sees | L |
 | 2 | Companions; delete the parked standing stones | Named characters are the most recognisable | M |
 | 3 | Words of the Old Tongue (shouts) | The most distinctive borrowing | L |
@@ -196,17 +196,13 @@ not named) can stay generic.
 | 6 | Skills and magic schools (ids stay, names change) | Touches perks and UI everywhere | M |
 | 7 | README, ROADMAP, CHANGELOG, store copy, code comments; guardrail to zero | Nothing left to find | S |
 
-Each phase ends with unit tests, guardrails, the bundle check and the browser
-tests green, and the phase's migration test passing.
+Each phase ends with unit tests, guardrails (the borrowed-names count lower),
+the bundle check and the browser tests green.
 
-## 5. Decisions for you
+## 5. Decisions (2026-11-27)
 
-1. **Setting:** Arthurian Britain as above, or something else entirely?
-2. **Heritages:** invented peoples (recommended), or none at all, with a
-   background-and-calling creator instead?
-3. **Standing stones:** delete the parked system now (recommended), or redesign
-   them as stone circles in phase 2?
-4. **Words:** keep a learned-power system at all? Dropping it is simpler, and the
-   spells already cover the same ground.
-5. **Old saves:** migrate (recommended), or accept that saves from before the
-   change won't load?
+1. **Setting:** Arthurian Britain, as above.
+2. **Heritages:** invented peoples of the realm, not real ones.
+3. **Standing stones:** the parked system is deleted (phase 2).
+4. **Words:** a learned-power system stays, as Words of the Old Tongue.
+5. **Old saves:** not migrated; saves from before version 30 won't load.

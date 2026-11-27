@@ -26,6 +26,9 @@
  *   - callback-properties     `x.onY = ` wiring in the composition root (src/game.ts
  *                             and src/game/), to become events and services
  *   - babylon-gui-files       src/ files importing @babylonjs/gui (to become Preact)
+ *   - borrowed-names          names taken from The Elder Scrolls (BORROWED_NAMES) in
+ *                             src/ (tests and comments included) and the README, to
+ *                             reach zero (docs/original-setting-plan.md)
  *
  * Usage:
  *   node tools/check-guardrails.mjs            # check
@@ -59,12 +62,43 @@ const MESH_NAME_ALLOWLIST = ["src/systems/map-editor-system.ts"];
 /** Files allowed to call Math.random (the RNG module, which seeds everything else). */
 const RANDOM_ALLOWLIST = [/^src\/core\/rng\//];
 
+/**
+ * Names that belong to The Elder Scrolls (places, peoples, characters, the
+ * shouts, diseases, ingredients and the rest), matched as whole words, any case.
+ */
+export const BORROWED_NAMES = [
+  "Skyrim", "Oblivion", "Tamriel", "Cyrodiil", "Whiterun", "Dragonsreach", "Bethesda", "Elder Scrolls",
+  "Septim", "Daedric", "Daedra", "Thu'um", "Dragonborn", "Draugr", "Dwemer", "Falmer",
+  "Argonian", "Khajiit", "Altmer", "Bosmer", "Dunmer", "Orsimer", "Redguard", "Nord", "Nords", "Breton",
+  "Lydia", "Aela", "J'zargo", "Jenassa", "Farkas", "Borgakh", "Marcurio", "Uthgerd",
+  "Atronach", "Nightblade", "Spellsword", "Battlemage", "Mysticism", "Fus Ro", "soul gem", "soul gems",
+  "Harrada", "Clannfear", "Spiddal", "Cairn Bolete", "Imp Gall", "Wisp Stalk",
+  "Witbane", "Collywobbles", "Rust Chancre", "Porphyric", "Yellow Tick", "Swamp Rot", "Brain Rot",
+  "Oakflesh", "Standing Stone", "Standing Stones", "Guardian Stone", "Guardian Stones",
+];
+const BORROWED_RE = new RegExp(`(?<![\\w'])(?:${BORROWED_NAMES.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?![\\w'])`, "gi");
+
+/** Borrowed names in `text`. */
+export function countBorrowed(text) {
+  return (text.match(BORROWED_RE) ?? []).length;
+}
+
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
     const st = statSync(p);
     if (st.isDirectory()) walk(p, out);
     else if (/\.(ts|tsx)$/.test(name) && !/\.test\.tsx?$/.test(name) && !name.endsWith(".d.ts")) out.push(p);
+  }
+  return out;
+}
+
+/** Every .ts/.tsx under `dir`, tests included. */
+function walkAll(dir, out = []) {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) walkAll(p, out);
+    else if (/\.(ts|tsx)$/.test(name) && !name.endsWith(".d.ts")) out.push(p);
   }
   return out;
 }
@@ -118,14 +152,25 @@ export function measure() {
   const callbackProps = root.reduce((n, f) =>
     n + (stripComments(f.text).match(/^\s*(?:this\.|game\.|gi\.)?\w+(?:\.\w+)*\.on[A-Z]\w*\s*=(?!=)/gm) ?? []).length, 0);
 
+  // Borrowed names: all of src/ (tests and comments too) and the README.
+  const borrowedByFile = {};
+  let borrowed = 0;
+  const everything = [...walkAll(SRC), join(ROOT, "README.md")];
+  for (const p of everything) {
+    const n = countBorrowed(readFileSync(p, "utf8"));
+    if (n) { borrowed += n; borrowedByFile[rel(p)] = n; }
+  }
+
   return {
     violations,
+    borrowedByFile,
     counts: {
       "game-ts-lines": gameLines,
       "composition-root-lines": rootLines,
       "unseeded-random": unseededRandom,
       "callback-properties": callbackProps,
       "babylon-gui-files": babylonGuiFiles,
+      "borrowed-names": borrowed,
     },
     randomByFile,
   };
@@ -158,6 +203,9 @@ function main() {
       console.log(`• ${key}: ${now} (no baseline — run with --update)`);
     } else if (now > was + (SLACK[key] ?? 0)) {
       console.error(`✖ ${key}: ${now} > baseline ${was}${SLACK[key] ? ` + ${SLACK[key]} slack` : ""} (this should only go down)`);
+      if (key === "borrowed-names") {
+        console.error("  The setting is the game's own (docs/original-setting-plan.md). Per file:", report.borrowedByFile);
+      }
       if (key === "unseeded-random") {
         console.error("  Use a seeded RNG stream instead of Math.random(). Per file:", report.randomByFile);
       }
