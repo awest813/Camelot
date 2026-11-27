@@ -126,6 +126,8 @@ export interface SiteContext {
   size: number;
   /** Whether a landmark's site loads empty (no NPCs or dragon): cleared lately. */
   quiet?(landmarkId: string): boolean;
+  /** Whether a site's chest loads empty: emptied lately. */
+  chestLooted?(siteId: string): boolean;
 }
 
 const wrap = (v: number, n: number) => ((v % n) + n) % n;
@@ -158,7 +160,7 @@ export function buildWildChunk(c: SiteContext, scatter: WildScatter, specs: read
       if (empty && ("npc" in part || "dragon" in part)) continue;
       if (part.when?.variant && !part.when.variant.includes(variant)) continue;
       if (part.when?.roll && r(part.when.roll.slot) >= part.when.roll.chance) continue;
-      const actor = buildPart(c, part, origin, variant, r, id, empty);
+      const actor = buildPart(c, part, origin, variant, r, id, empty || !!c.chestLooted?.(id));
       if (actor) spawned.push(actor);
     }
     const lm = spec.landmark;

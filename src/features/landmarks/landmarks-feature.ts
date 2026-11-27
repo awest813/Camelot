@@ -44,6 +44,14 @@ export class LandmarksFeature implements Feature {
   private readonly _standing = new Map<string, Set<unknown>>();
   /** When each landmark was last cleared, in elapsed game hours (saved). */
   private readonly _cleared = new Map<string, number>();
+  /** When each site's chest was last emptied, in elapsed game hours (saved). */
+  private readonly _looted = new Map<string, number>();
+
+  /** The site's chest was emptied and has not filled again yet. */
+  public isChestLooted(id: string): boolean {
+    const at = this._looted.get(id);
+    return at !== undefined && this._now() - at < QUIET_HOURS;
+  }
   private _now: () => number = () => 0;
 
   /** Cleared and still empty (it fills again QUIET_HOURS after its clearing). */
@@ -62,9 +70,17 @@ export class LandmarksFeature implements Feature {
     this._now = () => s.tryGet(ClockKey)?.elapsedHours() ?? 0;
     ownSave(ctx, {
       key: "landmarks",
-      save: () => ({ cleared: Object.fromEntries([...this._cleared].sort(([a], [b]) => (a < b ? -1 : 1))) }),
+      save: () => ({
+        cleared: Object.fromEntries([...this._cleared].sort(([a], [b]) => (a < b ? -1 : 1))),
+        looted: Object.fromEntries([...this._looted].sort(([a], [b]) => (a < b ? -1 : 1))),
+      }),
       load: (data) => {
         this._cleared.clear();
+        this._looted.clear();
+        const looted = (data as { looted?: unknown } | undefined)?.looted;
+        if (looted && typeof looted === "object") {
+          for (const [id, at] of Object.entries(looted)) if (typeof at === "number") this._looted.set(id, at);
+        }
         const cleared = (data as { cleared?: unknown } | undefined)?.cleared;
         // (A list of ids: the first saves, before sites filled again; long quiet by now.)
         if (Array.isArray(cleared)) for (const id of cleared) { if (typeof id === "string") this._cleared.set(id, -QUIET_HOURS); }
@@ -105,11 +121,18 @@ export class LandmarksFeature implements Feature {
       },
       isCleared: (id) => this.isCleared(id),
       quiet: (id) => this.isCleared(id),
+      chestLooted: (id) => this.isChestLooted(id),
       mark: (id) => {
         const m = /_(-?\d+)_(-?\d+)$/.exec(id);
         const lm = m ? landmarksOf(Number(m[1]), Number(m[2])).find((l) => l.id === id) : undefined;
         return lm ? discover(lm) : false;
       },
+    });
+    // A site's chest emptied: it stays empty for a while (no refilling it by leaving and coming back).
+    ctx.on("container:emptied", ({ id }) => {
+      if (!id.startsWith("chest_site_")) return;
+      this._looted.set(id.slice("chest_".length), this._now());
+      s.get(FeedbackKey).markDirty();
     });
     ctx.on("chunk:unloaded", ({ chunkKey }) => {
       for (const lm of this._loaded.get(chunkKey) ?? []) this._standing.delete(lm.id);

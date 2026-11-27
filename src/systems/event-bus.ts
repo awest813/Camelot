@@ -73,6 +73,8 @@ export interface GameEvents {
   "npc:released": { npcName: string };
   /** A place was discovered (a village or a landmark): on the map and for fast travel. */
   "location:discovered": { id: string; name: string; /** Places known now, this one included. */ known?: number };
+  /** The player took the last thing out of a container. */
+  "container:emptied": { id: string };
   /** A landmark's foes have all fallen (once per world). */
   "landmark:cleared": { id: string; name: string };
   /** A world chunk unloaded (its content and NPCs are gone). */

@@ -99,7 +99,11 @@ export const WILD_SITES: readonly SiteSpec[] = [
   {
     id: "haunted-house", biomes: ["tundra"], roll: { slot: 17, chance: 0.1 }, at: { x: 18, z: 19, spread: 0.55 },
     landmark: { kind: "Manor", xp: 20, radius: 18, arrive: { dx: 0, dz: 10 } },
-    parts: [{ asset: "hauntedHouse", yaw: 20, scale: 1.2, tier: "structure" }],
+    parts: [
+      { asset: "hauntedHouse", yaw: 20, scale: 1.2, tier: "structure" },
+      // Left on the step by whoever fled: an old coffer, stiffly locked.
+      { chest: { name: "Old Coffer", lock: 55, loot: "dungeon_loot" }, dx: 2, dz: 6, rot: 0.3 },
+    ],
   },
   {
     id: "graveyard", biomes: ["plains", "forest"], roll: { slot: 21, chance: 0.1 }, at: { x: 22, z: 23, spread: 0.6 },

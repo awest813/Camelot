@@ -10,7 +10,7 @@
  *
  * Inputs:   services trade-host, purse, feedback, modal; events
  *           `dialogue:action` ("barter:open"), `dialogue:closed`.
- * Outputs:  the `trade` service.
+ * Outputs:  the `trade` service; event `container:emptied`.
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
  */
@@ -101,11 +101,15 @@ export class TradeFeature implements Feature {
       if (!active) return;
       if (containers.takeItem(active.id, itemId)) dirty();
       this.containerPanel.update(containers);
-      if (containers.activeContainer?.contents.length === 0) this._closeContainer();
+      if (containers.activeContainer?.contents.length === 0) {
+        ctx.kernel.events.emit("container:emptied", { id: active.id });
+        this._closeContainer();
+      }
     };
     this.containerPanel.onTakeAll = () => {
       const active = containers.activeContainer;
       if (active) containers.takeAll(active.id);
+      if (active && active.contents.length === 0) ctx.kernel.events.emit("container:emptied", { id: active.id });
       dirty();
       this._closeContainer();
     };

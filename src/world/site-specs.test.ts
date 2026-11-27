@@ -12,8 +12,7 @@ function recorder() {
   const site = {
     placeBuilding: log("building"), placeProp: log("prop"), placeAsset: log("asset"),
     placeSmithy: log("smithy"), spawnDragon: log("dragon"),
-    // A chest places the chest model the hand-written code placed as a prop.
-    placeChest: (chunkKey: string, c: { x: number; z: number; rot: number }) => { calls.push(["prop", chunkKey, "qChest", c.x, c.z, c.rot]); },
+    placeChest: (chunkKey: string, c: { id: string; x: number; z: number; rot: number }) => { calls.push(["chest", chunkKey, c.id, c.x, c.z, c.rot]); },
   } as unknown as SiteBuilderService;
   return { site, calls, spawn: log("npc") };
 }
@@ -29,7 +28,9 @@ describe("data-driven wild sites", () => {
         legacyPopulateWild(before.site, before.spawn, 50, `${cx},${cz}`, cx, cz, biome);
         const c: SiteContext = { site: after.site, spawn: after.spawn, chunkKey: `${cx},${cz}`, cx, cz, biome, size: 50 };
         buildWildChunk(c, WILD_SCATTER, WILD_SITES);
-        expect(after.calls, `${biome} ${cx},${cz}`).toEqual(before.calls);
+        // Chests came after the hand-written code (the camp's was a plain prop then): set them aside.
+        const noChests = (calls: unknown[][]) => calls.filter((k) => k[0] !== "chest" && !(k[0] === "prop" && k[2] === "qChest"));
+        expect(noChests(after.calls), `${biome} ${cx},${cz}`).toEqual(noChests(before.calls));
         sites += before.calls.filter((call) => call[0] !== "asset").length;
       }
     }
@@ -116,5 +117,22 @@ describe("data-driven wild sites", () => {
       return;
     }
     throw new Error("no bandit camp in the sample");
+  });
+
+  it("a manor's coffer is a stiff lock with dungeon loot; a looted chest loads empty", () => {
+    for (let cx = -60; cx < 60; cx++) for (let cz = -30; cz < 30; cz++) {
+      const chests: Array<{ id: string; name: string; lock: number; loot: string; empty: boolean }> = [];
+      const t = recorder();
+      const site = { ...(t.site as object), placeChest: (_k: string, c: { id: string; name: string; lock: number; loot: string; empty: boolean }) => chests.push(c) } as unknown as SiteBuilderService;
+      const base = { site, spawn: t.spawn, chunkKey: "k", cx, cz, biome: "tundra" as const, size: 50 };
+      const manors = buildWildChunk(base, { ...WILD_SCATTER, pool: {} }, WILD_SITES).filter((l) => l.kind === "Manor");
+      if (manors.length === 0) continue;
+      expect(chests).toEqual([expect.objectContaining({ id: `chest_${manors[0].id}`, name: "Old Coffer", lock: 55, loot: "dungeon_loot", empty: false })]);
+      chests.length = 0;
+      buildWildChunk({ ...base, chestLooted: (id) => id === manors[0].id }, { ...WILD_SCATTER, pool: {} }, WILD_SITES);
+      expect(chests[0].empty).toBe(true);
+      return;
+    }
+    throw new Error("no manor in the sample");
   });
 });

@@ -77,8 +77,10 @@ describe("TradeFeature (headless, through the kernel)", () => {
     t.k.uninstall("trade");
   });
 
-  it("a container closes once it is emptied", () => {
+  it("a container closes once it is emptied, and says so (a site's chest stays empty a while)", () => {
     const t = setup();
+    const emptied: string[] = [];
+    t.k.events.on("container:emptied", ({ id }) => emptied.push(id));
     t.containers.onContainerOpen!();
     expect(t.svc.containerPanel.isVisible).toBe(true);
     t.svc.containerPanel.onTakeItem!("gold");
@@ -86,6 +88,7 @@ describe("TradeFeature (headless, through the kernel)", () => {
     t.svc.containerPanel.onTakeItem!("sword");
     expect(t.svc.containerPanel.isVisible).toBe(false);
     expect(t.containers.closeContainer).toHaveBeenCalled();
+    expect(emptied).toEqual(["chest"]);
     t.k.uninstall("trade");
   });
 });

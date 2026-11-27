@@ -100,7 +100,7 @@ describe("LandmarksFeature (headless, through the kernel)", () => {
 
     // Saved with when it was cleared, and back after a load.
     const saved = t.codec().save();
-    expect(saved).toEqual({ cleared: { [camp.id]: 10 + QUIET_HOURS } });
+    expect(saved).toEqual({ cleared: { [camp.id]: 10 + QUIET_HOURS }, looted: {} });
     const u = setup();
     u.hours = 10 + QUIET_HOURS + 5;
     u.codec().load(saved);
@@ -127,5 +127,23 @@ describe("LandmarksFeature (headless, through the kernel)", () => {
     expect(t.discovered.get(camp!.id)?.name).toBe(camp!.name);
     expect(t.grants, "marking is not finding: no experience").toEqual([]);
     expect(lm.mark!("site_nothing_0_0")).toBe(false);
+  });
+
+  it("a site's chest, once emptied, stays empty for three days (and the save keeps it)", () => {
+    const t = setup();
+    t.hours = 5;
+    const lm = t.k.services.get(LandmarksKey);
+    t.k.events.emit("container:emptied", { id: "chest_01" });
+    expect(lm.chestLooted!("01"), "a chest that is no site's is not tracked").toBe(false);
+    t.k.events.emit("container:emptied", { id: "chest_site_haunted-house_2_3" });
+    expect(lm.chestLooted!("site_haunted-house_2_3")).toBe(true);
+    const saved = t.codec().save() as { looted: Record<string, number> };
+    expect(saved.looted).toEqual({ "site_haunted-house_2_3": 5 });
+    t.hours = 5 + QUIET_HOURS;
+    expect(lm.chestLooted!("site_haunted-house_2_3"), "filled again").toBe(false);
+    const u = setup();
+    u.hours = 6;
+    u.codec().load(saved);
+    expect(u.k.services.get(LandmarksKey).chestLooted!("site_haunted-house_2_3")).toBe(true);
   });
 });

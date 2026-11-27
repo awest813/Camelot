@@ -231,6 +231,8 @@ export interface LandmarksService {
   isCleared?(id: string): boolean;
   /** Whether a site should load without its occupants (cleared, and still empty). */
   quiet?(id: string): boolean;
+  /** Whether a site's chest was emptied lately (it loads empty until it fills again). */
+  chestLooted?(id: string): boolean;
 }
 export const LandmarksKey = createServiceKey<LandmarksService>("landmarks");
 export const SiteBuilderKey = createServiceKey<SiteBuilderService>("site-builder");
