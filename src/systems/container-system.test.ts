@@ -134,8 +134,19 @@ describe("ContainerSystem", () => {
     expect(pickChance(100, 0)).toBe(0.95);
   });
 
+  it("a save loaded before a chest's model has loaded is applied when the chest registers (not a site's)", () => {
+    containerSystem.restoreFromSave({ containers: [
+      { id: "chest_01", contents: [], isLocked: false },
+      { id: "chest_site_bandit-camp_1_1", contents: [], isLocked: false },
+    ] });
+    const old = containerSystem.registerChest("chest_01", "Old Chest", { metadata: null, getChildMeshes: () => [] } as any, [sampleItem], 0);
+    expect(old.contents, "the save says it was emptied").toEqual([]);
+    const camp = containerSystem.registerChest("chest_site_bandit-camp_1_1", "Strongbox", { metadata: null, getChildMeshes: () => [] } as any, [sampleItem], 35);
+    expect(camp.contents, "a site's chest follows the landmarks, not the save").toHaveLength(1);
+  });
+
   it("a chest in the world: registered on its model, forgotten when its chunk goes", () => {
-    const mesh: any = { metadata: null };
+    const mesh: any = { metadata: null, getChildMeshes: () => [] };
     const c = containerSystem.registerChest("chest_site_x", "Bandits' Strongbox", mesh, [sampleItem], 35);
     expect(c.isLocked).toBe(true);
     expect(mesh.metadata).toEqual({ type: "container", container: c });

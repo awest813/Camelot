@@ -5,7 +5,6 @@
  * contents come from a loot table, rolled the same for the same world and
  * chest, or nothing when the site was cleared lately.
  */
-import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { ChunkContent } from "./chunk-content";
 import type { ContainerSystem } from "../systems/container-system";
@@ -32,9 +31,7 @@ export function placeChest(d: ChestDeps, chunkKey: string, chest: ChestPlacement
     if (d.chunks.record(chunkKey) !== record) { root.dispose(); return; }
     root.position.set(chest.x, 0, chest.z);
     setInstanceYaw(root, chest.rot);
-    const meshes: AbstractMesh[] = [root, ...root.getChildMeshes(false)];
-    const container = d.containers.registerChest(chest.id, chest.name, root as Mesh, chest.empty ? [] : mergeStacks(d.contents(chest.loot, chest.id)), chest.lock);
-    for (const m of meshes) { m.isPickable = true; m.metadata = { type: "container", container }; }
+    d.containers.registerChest(chest.id, chest.name, root as Mesh, chest.empty ? [] : mergeStacks(d.contents(chest.loot, chest.id)), chest.lock);
     root.onDisposeObservable.addOnce(() => d.containers.unregister(chest.id));
     d.chunks.track(chunkKey, record, root, "prop");
   });

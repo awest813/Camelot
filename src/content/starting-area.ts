@@ -14,7 +14,8 @@ import type { Item } from "../systems/inventory-system";
 import type { QuestDefinition } from "../framework/quests/quest-types";
 import type { ContainerSystem } from "../systems/container-system";
 import type { CellManager } from "../world/cell-manager";
-import { setInstanceScale, type FantasyAssetLoader } from "../systems/fantasy-asset-loader";
+import { setInstanceScale, setInstanceYaw, type FantasyAssetLoader } from "../systems/fantasy-asset-loader";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { HEALTH_POTION_STATS } from "./starter-merchants";
 
 interface GroundWeapon {
@@ -102,21 +103,28 @@ export function seedStartingArea(d: StartingAreaDeps): void {
 
   d.placeSmithy(STARTER_FORGE.x, STARTER_FORGE.z);
 
-  d.containers.spawnContainer({
-    id: "chest_01",
-    name: "Old Chest",
-    position: new Vector3(5, 1, 5),
-    contents: [
-      { id: "gold_coins", name: "Gold Coins", description: "A handful of gold coins.", stackable: true, quantity: 50, weight: 0.1, stats: { value: 1 } },
-      { id: "iron_sword", name: "Iron Sword", description: "A basic iron sword.", stackable: false, quantity: 1, slot: "mainHand", weight: 3, stats: { damage: 10, value: 80 } },
-      { ...LOCKPICK, quantity: 3, stats: { ...LOCKPICK.stats } },
-    ],
-  });
+  // Chests drawn with the chest model (the plain box only if it can't load).
+  const chest = (id: string, name: string, x: number, z: number, yaw: number, contents: Item[], lock = 0) => {
+    d.assets.getInstance("qChest", (root) => {
+      if (!root) {
+        d.containers.spawnContainer({ id, name, position: new Vector3(x, 1, z), contents, isLocked: lock > 0, lockDifficulty: lock });
+        return;
+      }
+      root.position.set(x, 1, z);
+      setInstanceYaw(root, yaw);
+      d.containers.registerChest(id, name, root as Mesh, contents, lock);
+      d.castShadow(root);
+    });
+  };
+  chest("chest_01", "Old Chest", 5, 5, 0.2, [
+    { id: "gold_coins", name: "Gold Coins", description: "A handful of gold coins.", stackable: true, quantity: 50, weight: 0.1, stats: { value: 1 } },
+    { id: "iron_sword", name: "Iron Sword", description: "A basic iron sword.", stackable: false, quantity: 1, slot: "mainHand", weight: 3, stats: { damage: 10, value: 80 } },
+    { ...LOCKPICK, quantity: 3, stats: { ...LOCKPICK.stats } },
+  ]);
   // A practice lock beside it: the picks in the Old Chest open it, given a try or two.
-  d.containers.spawnContainer({
-    id: "chest_02", name: "Rusted Strongbox", position: new Vector3(6.5, 1, 5), isLocked: true, lockDifficulty: 30,
-    contents: [{ id: "gold_coins", name: "Gold Coins", description: "A handful of gold coins.", stackable: true, quantity: 40, weight: 0.1, stats: { value: 1 } }],
-  });
+  chest("chest_02", "Rusted Strongbox", 6.6, 5, -0.25, [
+    { id: "gold_coins", name: "Gold Coins", description: "A handful of gold coins.", stackable: true, quantity: 40, weight: 0.1, stats: { value: 1 } },
+  ], 30);
 
   // The Old Cave's entrance, with where the player comes back out.
   d.cells.buildSimpleInterior("cave_01", "Old Cave", "portal_cave_entrance", new Vector3(-8, 1, 8), new Vector3(-8, 2, 8));

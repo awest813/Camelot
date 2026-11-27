@@ -131,7 +131,7 @@ export class ContainerSystem {
     };
 
     mesh.metadata = { type: "container", container };
-    this._containers.set(def.id, container);
+    this._register(container);
     return container;
   }
 
@@ -203,8 +203,9 @@ export class ContainerSystem {
    */
   public registerChest(id: string, name: string, mesh: Mesh, contents: Item[], lockDifficulty: number): Container {
     const container: Container = { id, name, mesh, contents: [...contents], isLocked: lockDifficulty > 0, lockDifficulty, isOpen: false };
-    mesh.metadata = { type: "container", container };
-    this._containers.set(id, container);
+    // The model's meshes all answer to the player's look (a chest is several meshes).
+    for (const m of [mesh, ...mesh.getChildMeshes(false)]) { m.isPickable = true; m.metadata = { type: "container", container }; }
+    this._register(container);
     return container;
   }
 
@@ -289,12 +290,28 @@ export class ContainerSystem {
   }
 
   public restoreFromSave(state: ContainerSaveState): void {
+    this._pending.clear();
     for (const saved of state?.containers ?? []) {
       const container = this._containers.get(saved.id);
-      if (container) {
-        container.contents = [...saved.contents];
-        container.isLocked = saved.isLocked;
-      }
+      if (container) this._apply(container, saved);
+      // Not here yet (its model is still loading): applied when it registers.
+      // A site's chest is the landmarks' to fill or empty, not the save's.
+      else if (!saved.id.startsWith("chest_site_")) this._pending.set(saved.id, saved);
     }
+  }
+
+  /** Saved state for containers that had not registered when the save loaded. */
+  private readonly _pending = new Map<string, ContainerSaveState["containers"][number]>();
+
+  private _apply(container: Container, saved: ContainerSaveState["containers"][number]): void {
+    container.contents = [...saved.contents];
+    container.isLocked = saved.isLocked;
+  }
+
+  /** Register a container, applying any saved state that was waiting for it. */
+  private _register(container: Container): void {
+    this._containers.set(container.id, container);
+    const saved = this._pending.get(container.id);
+    if (saved) { this._pending.delete(container.id); this._apply(container, saved); }
   }
 }
