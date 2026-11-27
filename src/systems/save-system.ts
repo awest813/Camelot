@@ -172,6 +172,9 @@ export interface SaveCodec {
   load(data: unknown): void;
 }
 
+/** Save parts renamed since version 30: the key a save from before the rename used. */
+const FORMER_KEYS: Readonly<Record<string, string>> = { oldTongue: "dragonShouts" };
+
 /** Default load order for feature codecs: after every built-in part. */
 export const FEATURE_CODEC_ORDER = 1000;
 
@@ -742,7 +745,8 @@ export class SaveSystem {
     // only knows the core fields.
     for (const codec of this._codecsInOrder()) {
       try {
-        codec.load((parsed as Record<string, unknown>)[codec.key]);
+        const raw = parsed as Record<string, unknown>;
+        codec.load(raw[codec.key] ?? (FORMER_KEYS[codec.key] ? raw[FORMER_KEYS[codec.key]] : undefined));
       } catch (error) {
         console.error(`[SaveSystem] "${codec.key}" save data was invalid:`, error);
       }

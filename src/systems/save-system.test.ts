@@ -99,6 +99,19 @@ describe('SaveSystem', () => {
         expect(data.inventory[0].instanceId).toBe('tidied');
     });
 
+    it('a renamed part is read from its former key in a save from before the rename', () => {
+        const loads: unknown[] = [];
+        const unregister = saveSystem.registerCodec({ key: 'oldTongue', save: () => ({ awen: 1 }), load: (d) => { loads.push(d); } });
+        saveSystem.save();
+        const raw = JSON.parse(localStorageMock['camelot_save']);
+        raw.dragonShouts = { dragonSouls: 3 };
+        delete raw.oldTongue;
+        localStorageMock['camelot_save'] = JSON.stringify(raw);
+        expect(saveSystem.load()).toBe(true);
+        expect(loads.at(-1)).toEqual({ dragonSouls: 3 });
+        unregister();
+    });
+
     it('feature codecs own their part of the save: written, read back, and absent saves reset', () => {
         let pets = ['wolf'];
         const loads: unknown[] = [];
