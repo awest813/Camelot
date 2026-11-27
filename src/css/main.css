@@ -4114,7 +4114,11 @@ body::before {
 
 .character-sheet-ui__identity-row .character-sheet-ui__row-value {
   text-align: right;
-  text-transform: capitalize;
+}
+/* Only the first letter: "Man-at-arms", "The Sword in the Stone" keep their own
+   casing (capitalize made "Man-At-Arms"); a lower-case id ("combat") still reads well. */
+.character-sheet-ui__identity-row .character-sheet-ui__row-value::first-letter {
+  text-transform: uppercase;
 }
 
 /* Skill rows have three cells (name, level, xp%): let the name take the slack so

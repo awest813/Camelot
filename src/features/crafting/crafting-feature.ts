@@ -103,6 +103,12 @@ export class CraftingFeature implements Feature {
   private _rng: Rng | null = null;
   private _forgeAfterTalk = false;
 
+  /** Potency follows the Alchemy skill (trainer lessons count), never dropping below the brewer's own practice. */
+  private _syncAlchemySkill(): void {
+    const level = this._s?.tryGet(SkillsKey)?.level("alchemy") ?? 0;
+    this.alchemy.alchemySkill = Math.max(this.alchemy.alchemySkill, level);
+  }
+
   constructor(deps: CraftingDeps) {
     this.alchemy = new AlchemySystem(deps.player, deps.ui);
     this.enchanting = new EnchantingSystem(deps.player, deps.inventory, deps.equipment, deps.ui);
@@ -161,8 +167,7 @@ export class CraftingFeature implements Feature {
     this._wire = {
       alchemy: (p) => {
         p.onCraft = (ids) => {
-          // Potency follows the Alchemy skill (lessons from a trainer count).
-          this.alchemy.alchemySkill = Math.max(this.alchemy.alchemySkill, s.get(SkillsKey).level("alchemy"));
+          this._syncAlchemySkill();
           this.alchemy.craftPotion(ids);
           p.refresh();
         };
@@ -193,6 +198,7 @@ export class CraftingFeature implements Feature {
       }
       if (!canAct()) return;
       modal().suspendGameplay();
+      this._syncAlchemySkill();
       void this.alchemyPanel.get().then((p) => p.toggle(true));
     };
     const toggleEnchanting = () => {

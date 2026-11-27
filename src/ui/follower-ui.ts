@@ -383,6 +383,15 @@ export class FollowerUI {
       return;
     }
 
+    if (!this._hiring) {
+      // Away from an inn the roster is for reading; hiring is done there.
+      const where = document.createElement("p");
+      where.className = "follower-ui__hire-hint";
+      Object.assign(where.style, { color: C.DIM, fontSize: "13px", fontStyle: "italic", margin: "0 0 8px" });
+      where.textContent = "Hirelings drink at the inns: ask an innkeeper or barkeeper for company on the road.";
+      list.appendChild(where);
+    }
+
     for (const tmpl of this._templates) {
       // Don't show the active follower in the available list
       if (this._activeFollower && tmpl.id === this._activeFollower.templateId) {

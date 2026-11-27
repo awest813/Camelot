@@ -310,9 +310,9 @@ export class CharacterSheetUI {
       { label: "Name",           value: data.name         },
       { label: "Character level", value: data.level       },
       { label: "Combat XP level", value: data.xpLevel     },
-      { label: "Race",           value: data.raceName     },
-      { label: "Class",          value: data.className    },
-      { label: "Birthsign",      value: data.birthsignName },
+      { label: "Heritage",       value: data.raceName     },
+      { label: "Calling",        value: data.className    },
+      { label: "Omen",           value: data.birthsignName },
       { label: "Specialization", value: data.specialization },
     ];
 
