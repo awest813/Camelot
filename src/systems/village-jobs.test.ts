@@ -15,10 +15,10 @@ function ctx(bag: Record<string, number>, level = 1): JobContext {
 }
 
 /** Find a board id whose first offer is the given template. */
-function boardOffering(templateId: string, level = 1, hasCamp = false): string {
+function boardOffering(templateId: string, level = 1, near: string | null = null): string {
   const b = new VillageJobBoard();
   for (let i = 0; i < 2000; i++) {
-    if (b.offerFor(`board_${i}`, level, hasCamp).id === templateId) return `board_${i}`;
+    if (b.offerFor(`board_${i}`, level, (t) => t.site?.kind === near).id === templateId) return `board_${i}`;
   }
   throw new Error(`no board offers ${templateId}`);
 }
@@ -31,10 +31,13 @@ describe("VillageJobBoard", () => {
     expect(board.offerFor("inn_3_4", 1)).toEqual(board.offerFor("inn_3_4", 1));
     for (let i = 0; i < 300; i++) expect(board.offerFor(`b${i}`, 1).id).not.toBe("bounty_dragon");
     const offered = new Set(Array.from({ length: 300 }, (_, i) => board.offerFor(`b${i}`, 10).id));
+    const clearances = JOB_TEMPLATES.filter((t) => t.kind === "clear").length;
     expect(offered.has("clear_camp"), "no camp near: no clearance").toBe(false);
-    expect(offered.size).toBe(JOB_TEMPLATES.length - 1);
-    const withCamp = new Set(Array.from({ length: 300 }, (_, i) => board.offerFor(`b${i}`, 10, true).id));
-    expect(withCamp.size).toBe(JOB_TEMPLATES.length);
+    expect(offered.size).toBe(JOB_TEMPLATES.length - clearances);
+    const withSites = new Set(Array.from({ length: 300 }, (_, i) => board.offerFor(`b${i}`, 10, () => true).id));
+    expect(withSites.size).toBe(JOB_TEMPLATES.length);
+    const low = new Set(Array.from({ length: 300 }, (_, i) => board.offerFor(`b${i}`, 1, () => true).id));
+    expect(low.has("clear_roost"), "a roost is for veterans").toBe(false);
   });
 
   it("asking first accepts the job, with the place named", () => {
@@ -143,13 +146,13 @@ describe("VillageJobBoard", () => {
   });
 
   it("clearances: offered near a camp, name it and its direction; the camp's clearing completes the hunt", () => {
-    const id = boardOffering("clear_camp", 1, true);
+    const id = boardOffering("clear_camp", 1, "Bandit Camp");
     const camp = { id: "site_bandit-camp_5_6", name: "Ravenwick Bandit Camp", direction: "north-east" };
-    const c = { ...ctx({}), campNear: () => camp };
+    const c = { ...ctx({}), campNear: (_b: string, kind: string) => (kind === "Bandit Camp" ? camp : null) };
     const view = board.view(id, "Millbrook", c);
     expect(view.template.id).toBe("clear_camp");
     expect(view.description).toContain("Ravenwick Bandit Camp, north-east of Millbrook");
-    const job = board.accept(id, "Millbrook", 1, camp);
+    const job = board.accept(id, "Millbrook", 1, (t) => (t.site?.kind === "Bandit Camp" ? camp : null));
     expect(job.camp).toEqual(camp);
     expect(board.view(id, "Millbrook", { ...ctx({}), campNear: () => null }).description, "the job keeps its camp").toContain("Ravenwick");
 
@@ -166,10 +169,23 @@ describe("VillageJobBoard", () => {
   });
 
   it("saves and restores a clearance's camp", () => {
-    const id = boardOffering("clear_camp", 1, true);
-    board.accept(id, "Millbrook", 1, { id: "c1", name: "Thornfell Bandit Camp", direction: "west" });
+    const id = boardOffering("clear_camp", 1, "Bandit Camp");
+    board.accept(id, "Millbrook", 1, () => ({ id: "c1", name: "Thornfell Bandit Camp", direction: "west" }));
     const b2 = new VillageJobBoard();
     b2.restoreFromSave(JSON.parse(JSON.stringify(board.getSaveState())));
     expect(b2.activeAt(id)?.camp).toEqual({ id: "c1", name: "Thornfell Bandit Camp", direction: "west" });
+  });
+
+  it("a roost clearance names the roost, for veterans, from further out", () => {
+    const id = boardOffering("clear_roost", 6, "Roost");
+    const reaches: number[] = [];
+    const c = { ...ctx({}, 6), campNear: (_b: string, kind: string, reach: number) => {
+      reaches.push(reach);
+      return kind === "Roost" ? { id: "site_dragon_9_9", name: "Coldfell Roost", direction: "north" } : null;
+    } };
+    const view = board.view(id, "Millbrook", c);
+    expect(view.template.id).toBe("clear_roost");
+    expect(view.description).toContain("Coldfell Roost, north of Millbrook");
+    expect(reaches).toContain(8);
   });
 });

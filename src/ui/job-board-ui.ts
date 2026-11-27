@@ -70,7 +70,10 @@ export class JobBoardUI {
       const prog = document.createElement("p");
       prog.className = "job-board__progress";
       if (t.kind === "clear") {
-        prog.textContent = view.progress >= t.required ? "The camp is cleared. Collect your pay." : "The camp still stands.";
+        const roost = t.site?.kind === "Roost";
+        prog.textContent = view.progress >= t.required
+          ? (roost ? "The dragon is dead. Collect your pay." : "The camp is cleared. Collect your pay.")
+          : (roost ? "The dragon still lives." : "The camp still stands.");
       } else {
         prog.textContent = `${t.kind === "bounty" ? "Slain" : "Carried"}: ${view.progress} / ${t.required}`;
       }

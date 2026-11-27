@@ -1598,3 +1598,6 @@ Left as decisions:
   `cleared:<landmark>`), and the board pays 220 gold and 110 XP. Boards with
   no camp near offer what they did before. The landmarks service finds camps
   in chunks not loaded by building their sites dry.
+- From level 5, a board with a dragon roost within eight chunks can offer
+  "The Dragon's Roost" (700 gold, 350 XP), the same way. A clearance
+  template names its site (`site: { kind, reach }`).

@@ -6,8 +6,9 @@
  *    the restless dead, a dragon for veterans), then return to collect;
  *  • supply runs — bring N of an item (iron, leather, healing potions),
  *    handed over and paid on the spot;
- *  • camp clearances — clear a named bandit camp near the board (offered
- *    only where there is one still standing), then return to collect.
+ *  • clearances — clear a named bandit camp near the board, or (for
+ *    veterans) a dragon's roost further out; offered only where there is
+ *    one still standing; then return to collect.
  *
  * Pure state + rules (no Babylon / UI): which job each board offers (the
  * same per board and per number of jobs finished there, so a reload offers
@@ -33,6 +34,8 @@ export interface JobTemplate {
   rewardXp: number;
   /** Only offered from this character level up. */
   minLevel?: number;
+  /** Clearances: the kind of landmark to clear, and how far (chunks) from the board it may be. */
+  site?: { kind: string; reach: number };
 }
 
 export const JOB_TEMPLATES: readonly JobTemplate[] = [
@@ -54,7 +57,12 @@ export const JOB_TEMPLATES: readonly JobTemplate[] = [
   {
     id: "clear_camp", kind: "clear", title: "Clear the Camp",
     description: "Bandits have dug in at {camp}, {direction} of {place}, and the roads are not safe. Clear the camp, every last one of them.",
-    target: "", required: 1, rewardGold: 220, rewardXp: 110,
+    target: "", required: 1, rewardGold: 220, rewardXp: 110, site: { kind: "Bandit Camp", reach: 4 },
+  },
+  {
+    id: "clear_roost", kind: "clear", title: "The Dragon's Roost",
+    description: "A dragon has made its roost at {camp}, {direction} of {place}. Slay it, and the hills will sleep again.",
+    target: "", required: 1, rewardGold: 700, rewardXp: 350, minLevel: 5, site: { kind: "Roost", reach: 8 },
   },
   {
     id: "supply_iron", kind: "supply", title: "Iron for the Forge",
@@ -115,8 +123,8 @@ export interface JobContext {
   countItem: (itemId: string) => number;
   /** Remove items (all or nothing); returns false when short. */
   removeItem: (itemId: string, amount: number) => boolean;
-  /** The nearest camp still standing near a board, or null (no clearances offered then). */
-  campNear?: (boardId: string) => JobCamp | null;
+  /** The nearest site of a kind still standing within `reach` chunks of a board, or null (no clearance then). */
+  campNear?: (boardId: string, kind: string, reach: number) => JobCamp | null;
 }
 
 export type AskResult =
@@ -141,6 +149,11 @@ export interface BoardView {
   progress: number;
   /** Whether "Hand in" would succeed now. */
   canHandIn: boolean;
+}
+
+/** A clearance's site near a board, through the context (none without one). */
+function siteFinder(boardId: string, ctx: JobContext): (t: JobTemplate) => JobCamp | null {
+  return (t) => (t.site && ctx.campNear ? ctx.campNear(boardId, t.site.kind, t.site.reach) : null);
 }
 
 function hash(s: string): number {
@@ -168,9 +181,9 @@ export class VillageJobBoard {
       .replace("{direction}", camp?.direction ?? "out");
   }
 
-  /** The job a board offers next (deterministic per board and jobs done there); clearances need a camp. */
-  public offerFor(boardId: string, playerLevel: number, hasCamp = false): JobTemplate {
-    const pool = JOB_TEMPLATES.filter((t) => (t.minLevel ?? 0) <= playerLevel && (t.kind !== "clear" || hasCamp));
+  /** The job a board offers next (deterministic per board and jobs done there); a clearance needs its site (`has`). */
+  public offerFor(boardId: string, playerLevel: number, has: (t: JobTemplate) => boolean = () => false): JobTemplate {
+    const pool = JOB_TEMPLATES.filter((t) => (t.minLevel ?? 0) <= playerLevel && (t.kind !== "clear" || has(t)));
     const n = this._completed.get(boardId) ?? 0;
     const d = this._declined.get(boardId) ?? 0;
     return pool[hash(`${boardId}#${n}${d ? `~${d}` : ""}`) % pool.length];
@@ -195,7 +208,7 @@ export class VillageJobBoard {
   public ask(boardId: string, placeName: string, ctx: JobContext): AskResult {
     const job = this._active.get(boardId);
     if (!job) {
-      const fresh = this.accept(boardId, placeName, ctx.playerLevel, ctx.campNear?.(boardId) ?? null);
+      const fresh = this.accept(boardId, placeName, ctx.playerLevel, siteFinder(boardId, ctx));
       const template = VillageJobBoard.template(fresh.templateId)!;
       return { type: "accepted", job: fresh, template, text: VillageJobBoard.describe(template, placeName, fresh.camp) };
     }
@@ -218,8 +231,9 @@ export class VillageJobBoard {
   /** The board's current state: its active job, or the job it offers. */
   public view(boardId: string, placeName: string, ctx: JobContext): BoardView {
     const job = this._active.get(boardId) ?? null;
-    const camp = job ? job.camp ?? null : ctx.campNear?.(boardId) ?? null;
-    const template = job ? VillageJobBoard.template(job.templateId)! : this.offerFor(boardId, ctx.playerLevel, !!camp);
+    const find = siteFinder(boardId, ctx);
+    const template = job ? VillageJobBoard.template(job.templateId)! : this.offerFor(boardId, ctx.playerLevel, (t) => !!find(t));
+    const camp = job ? job.camp ?? null : template.kind === "clear" ? find(template) : null;
     const place = job?.placeName ?? placeName;
     const progress = template.kind === "supply"
       ? Math.min(ctx.countItem(template.target), template.required)
@@ -233,12 +247,13 @@ export class VillageJobBoard {
     };
   }
 
-  /** Take the board's offered job (no-op if one is already active there); `camp` is the one nearby, if any. */
-  public accept(boardId: string, placeName: string, playerLevel: number, camp: JobCamp | null = null): ActiveJob {
+  /** Take the board's offered job (no-op if one is already active there); `find` gives a clearance its site. */
+  public accept(boardId: string, placeName: string, playerLevel: number, find: (t: JobTemplate) => JobCamp | null = () => null): ActiveJob {
     const existing = this._active.get(boardId);
     if (existing) return existing;
-    const template = this.offerFor(boardId, playerLevel, !!camp);
-    const job: ActiveJob = { boardId, placeName, templateId: template.id, progress: 0, ...(template.kind === "clear" && camp ? { camp: { ...camp } } : {}) };
+    const template = this.offerFor(boardId, playerLevel, (t) => !!find(t));
+    const camp = template.kind === "clear" ? find(template) : null;
+    const job: ActiveJob = { boardId, placeName, templateId: template.id, progress: 0, ...(camp ? { camp: { ...camp } } : {}) };
     this._active.set(boardId, job);
     return job;
   }

@@ -4,9 +4,9 @@
  * `radiantTemplateOf`): the engine counts bounty kills, the log shows it, the
  * save keeps it, and the quest bridge pays for it on hand-in.
  *
- * A board with a bandit camp still standing within a few chunks can also
- * offer to clear it: taking the job marks the camp on the map, and the
- * camp's clearing (landmarks feature) completes the hunt.
+ * A board with a bandit camp (or, for veterans, a dragon's roost) still
+ * standing near it can also offer to clear it: taking the job marks the
+ * site on the map, and its clearing (landmarks feature) completes the hunt.
  *
  * Inputs:   events `quest:progressed`, `dialogue:action` ("jobs:ask"),
  *           `dialogue:closed`, `save:loaded`, `landmark:cleared`; services
@@ -50,9 +50,6 @@ interface JobDeps {
   readonly villages: VillagesService;
 }
 
-/** How far from a board (in chunks) a camp can be and still be its business. */
-const CAMP_REACH_CHUNKS = 4;
-
 const COMPASS = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"] as const;
 /** Which way (dx, dz) points, as a word (north is +z). */
 export function compassWord(dx: number, dz: number): string {
@@ -70,7 +67,7 @@ export class VillageJobsFeature implements Feature {
   /** "Any work going?" opens the window once the conversation has closed. */
   private _pending: JobBoardRef | null = null;
   /** The camp a board could send the player to clear (none until installed). */
-  private _campNear: (boardId: string) => JobCamp | null = () => null;
+  private _campNear: (boardId: string, kind: string, reach: number) => JobCamp | null = () => null;
   /** Put a landmark on the map. */
   private _mark: (id: string) => boolean = () => false;
 
@@ -114,13 +111,13 @@ export class VillageJobsFeature implements Feature {
 
     // A camp a clearance names has fallen: the hunt is done (whoever did it).
     ctx.on("landmark:cleared", ({ id }) => { deps.quests.apply("custom", clearedEvent(id)); });
-    this._campNear = (boardId) => {
+    this._campNear = (boardId, kind, reach) => {
       const m = /_(-?\d+)_(-?\d+)$/.exec(boardId);
       const landmarks = s.tryGet(LandmarksKey);
       if (!m || !landmarks?.nearest) return null;
       const size = s.get(WorldInfoKey).chunkSize;
       const bx = Number(m[1]) * size, bz = Number(m[2]) * size;
-      const camp = landmarks.nearest("Bandit Camp", bx, bz, CAMP_REACH_CHUNKS);
+      const camp = landmarks.nearest(kind, bx, bz, reach);
       return camp && { id: camp.id, name: camp.name, direction: compassWord(camp.x - bx, camp.z - bz) };
     };
     this._mark = (id) => s.tryGet(LandmarksKey)?.mark?.(id) ?? false;
@@ -172,7 +169,7 @@ export class VillageJobsFeature implements Feature {
     this.window.onAccept = () => {
       const b = this._active, deps = this._deps;
       if (!b || !deps) return;
-      const job = this.rules.accept(b.boardId, b.placeName, deps.player.level(), this._campNear(b.boardId));
+      const job = this.rules.accept(b.boardId, b.placeName, deps.player.level(), (t) => (t.site ? this._campNear(b.boardId, t.site.kind, t.site.reach) : null));
       this._startQuest(job);
       const t = VillageJobBoard.template(job.templateId);
       if (t) deps.feedback.notify(`New job: ${t.title}`, 2600);
@@ -212,7 +209,7 @@ export class VillageJobsFeature implements Feature {
       playerLevel: deps.player.level(),
       countItem: (id) => deps.inventory.count(id),
       removeItem: (id, n) => deps.inventory.remove(id, n),
-      campNear: (boardId) => this._campNear(boardId),
+      campNear: (boardId, kind, reach) => this._campNear(boardId, kind, reach),
     };
   }
 

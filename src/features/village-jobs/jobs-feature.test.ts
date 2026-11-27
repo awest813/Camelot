@@ -9,7 +9,7 @@ import { provideQuests } from "../../testing/quests";
 /** A board id whose first offer is the given template. */
 function boardOffering(templateId: string, hasCamp = false): string {
   const b = new VillageJobBoard();
-  for (let i = 0; i < 3000; i++) if (b.offerFor(`inn_${i}_0`, 3, hasCamp).id === templateId) return `inn_${i}_0`;
+  for (let i = 0; i < 3000; i++) if (b.offerFor(`inn_${i}_0`, 3, (t) => hasCamp && t.site?.kind === "Bandit Camp").id === templateId) return `inn_${i}_0`;
   throw new Error(`no board offers ${templateId}`);
 }
 
