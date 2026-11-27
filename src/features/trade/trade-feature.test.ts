@@ -28,7 +28,7 @@ function setup(opts: { open?: boolean } = {}) {
   };
   const modal = { suspendGameplay: vi.fn(), restoreGameplay: vi.fn() };
   k.services.provide(TradeHostKey, {
-    barter, shops, containers, items: () => [], hour: () => 12, reputationFactor: (n) => (n === "Friend" ? 0.5 : 1.2),
+    barter, shops, containers, items: () => [], hour: () => 12, reputationFactor: (shop) => (shop === "merchant_weapons_01" ? 0.5 : 1.2),
   } as unknown as TradeHostService);
   k.services.provide(PurseKey, { gold: () => 77, spend: () => true });
   k.services.provide(FeedbackKey, { notify: (t) => { notes.push(t); }, grant: vi.fn(), addFame: vi.fn(), markDirty: vi.fn() });
@@ -106,5 +106,48 @@ describe("TradeFeature (headless, through the kernel)", () => {
     t.svc.containerPanel.onTakeItem!("gold");
     expect(crimes, "no owner, no crime").toHaveLength(1);
     t.k.uninstall("trade");
+  });
+
+  it("haggling: a Persuasion roll once a day per shop warms or cools it", () => {
+    const t = setup();
+    const rolls: string[] = [];
+    let disposition = 50;
+    t.k.services.provide(LawKey, {
+      now: () => 600,
+      persuasion: {
+        attemptPersuasionAction: (shop: string) => { rolls.push(shop); disposition += 10; return { outcome: "success", newDisposition: disposition }; },
+        getDisposition: () => disposition,
+        setDisposition: (_: string, v: number) => { disposition = v; },
+        getDispositionBand: () => (disposition >= 60 ? "friendly" : "neutral"),
+      },
+    } as never);
+    const haggle = () => {
+      t.k.events.emit("dialogue:action", { eventId: "barter:haggle", npcName: "Smith", payload: { merchantId: "merchant_weapons_01" } });
+      t.k.events.emit("dialogue:closed", {});
+    };
+    haggle();
+    expect(rolls).toEqual(["merchant_weapons_01"]);
+    expect(t.notes.at(-1)).toMatch(/warms to you \(friendly\)/);
+    haggle();
+    expect(rolls, "once a day").toHaveLength(1);
+    expect(t.notes.at(-1)).toMatch(/once today/);
+    expect(t.barter.openBarter, "haggling opens no shop").not.toHaveBeenCalled();
+  });
+
+  it("a failed haggle costs a shop at most a little goodwill", () => {
+    const t = setup();
+    let disposition = 50;
+    t.k.services.provide(LawKey, {
+      now: () => 0,
+      persuasion: {
+        attemptPersuasionAction: () => { disposition = 20; return { outcome: "critical_failure", newDisposition: 20 }; },
+        getDisposition: () => disposition,
+        setDisposition: (_: string, v: number) => { disposition = v; },
+        getDispositionBand: () => "neutral",
+      },
+    } as never);
+    t.k.events.emit("dialogue:action", { eventId: "barter:haggle", npcName: "Smith", payload: { merchantId: "merchant_armor_01" } });
+    t.k.events.emit("dialogue:closed", {});
+    expect(disposition).toBe(45);
   });
 });

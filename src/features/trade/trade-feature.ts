@@ -37,8 +37,8 @@ export interface TradeHostService {
   /** The player's pack, for the sell column. */
   items(): readonly Item[];
   hour(): number;
-  /** Price factor from fame, and from `npcName`'s disposition when known. */
-  reputationFactor(npcName: string | null): number;
+  /** Price factor from fame, and from how `shop` (a merchant id) feels about the player. */
+  reputationFactor(shop: string | null): number;
   /** This place's own branch of a shop (registered on first use); its merchant id. */
   branch?(baseMerchantId: string, placeId: string): string;
 }
@@ -57,6 +57,9 @@ export type ItemTag = (item: Item) => string | null;
 export const TradeHostKey = createServiceKey<TradeHostService>("trade-host");
 export const TradeKey = createServiceKey<TradeService>("trade");
 
+/** The most a failed haggle costs a shop's goodwill. */
+const HAGGLE_LOSS = 5;
+
 export class TradeFeature implements Feature {
   public readonly id = "trade";
   /** The barter window: its code loads the first time a merchant opens it. */
@@ -71,10 +74,17 @@ export class TradeFeature implements Feature {
   private _itemTag: ItemTag | null = null;
   public readonly containerPanel = new ContainerUI();
   private _pending: { merchantId: string; npcName: string | null } | null = null;
+  /** "Surely you can do better?" asked in conversation: settled once it ends. */
+  private _haggle: string | null = null;
+  /** The game day each shop was last haggled with (once a day; not saved). */
+  private readonly _haggled = new Map<string, number>();
+  private _haggleRoll: () => number = () => 0.5;
   private _s: ServiceRegistry | null = null;
 
   public install(ctx: FeatureContext): void {
-    declareStateless(ctx, "merchant stock and gold belong to the barter and restock systems, which the save system saves");
+    declareStateless(ctx, "merchant stock and gold belong to the barter and restock systems, which the save system saves; a shop's disposition is the persuasion system's; the once-a-day haggle mark is not kept");
+    const haggleRng = ctx.kernel.rng.stream("haggle");
+    this._haggleRoll = () => haggleRng.next();
     const s = ctx.kernel.services;
     this._s = s;
     const host = () => s.get(TradeHostKey);
@@ -139,7 +149,10 @@ export class TradeFeature implements Feature {
       const merchantId = typeof payload?.merchantId === "string" ? payload.merchantId : DEFAULT_MERCHANT;
       this._pending = { merchantId, npcName };
     });
-    ctx.on("dialogue:closed", () => this._openPending());
+    ctx.on("dialogue:action", ({ eventId, payload }) => {
+      if (eventId === "barter:haggle" && typeof payload?.merchantId === "string") this._haggle = payload.merchantId;
+    });
+    ctx.on("dialogue:closed", () => { this._settleHaggle(); this._openPending(); });
 
     ctx.provide(TradeKey, {
       barterPanel: this.barterPanel,
@@ -159,6 +172,46 @@ export class TradeFeature implements Feature {
     });
   }
 
+  /** This village's own branch of a shop (each village keeps its own shelves and purse), or the shop itself. */
+  private _shopHere(baseId: string): string {
+    const s = this._s;
+    if (!s) return baseId;
+    const h = s.get(TradeHostKey);
+    const village = s.tryGet(VillagesKey)?.currentVillage()?.plan.id;
+    return village && h.branch ? h.branch(baseId, village) : baseId;
+  }
+
+  /**
+   * "Surely you can do better on the price?": a Persuasion roll against how
+   * the shop feels about you, once a game day per shop. Success warms it
+   * (lower prices from friendly on), failure cools it.
+   */
+  private _settleHaggle(): void {
+    const base = this._haggle, s = this._s;
+    this._haggle = null;
+    if (!base || !s) return;
+    const law = s.get(LawKey), feedback = s.get(FeedbackKey), skills = s.tryGet(SkillsKey);
+    const shop = this._shopHere(base);
+    const day = Math.floor(law.now() / (24 * 60));
+    if (this._haggled.get(shop) === day) {
+      feedback.notify("\"I've heard your patter once today. The prices stand.\"", 2600);
+      return;
+    }
+    this._haggled.set(shop, day);
+    const speech = skills?.level("speechcraft") ?? 20;
+    const before = law.persuasion.getDisposition(shop);
+    const r = law.persuasion.attemptPersuasionAction(shop, speech, "admire", this._haggleRoll());
+    const won = r.outcome === "success" || r.outcome === "critical_success";
+    // A failed haggle sours the shop a little, not into a grudge (the persuasion roll's own penalty is for real persuasion).
+    if (!won && r.newDisposition < before - HAGGLE_LOSS) law.persuasion.setDisposition(shop, before - HAGGLE_LOSS);
+    skills?.gainXP("speechcraft", won ? 8 : 3);
+    const band = law.persuasion.getDispositionBand(shop);
+    feedback.notify(won
+      ? `"Well... for you, perhaps." The shop warms to you (${band}).`
+      : `"Don't push your luck." The shop cools a little (${band}).`, 3000);
+    feedback.markDirty();
+  }
+
   private _openPending(): void {
     const pending = this._pending, s = this._s;
     this._pending = null;
@@ -170,11 +223,10 @@ export class TradeFeature implements Feature {
       s.get(FeedbackKey).notify(`${shop.name} is closed right now.`, 2600);
       return;
     }
-    // Each village keeps its own shelves and purse.
-    const village = s.tryGet(VillagesKey)?.currentVillage()?.plan.id;
-    const merchantId = village && h.branch ? h.branch(pending.merchantId, village) : pending.merchantId;
+    const merchantId = this._shopHere(pending.merchantId);
     if (!h.barter.openBarter(merchantId, hour)) return;
-    h.barter.sessionBuyPriceFactor = Math.min(1.5, Math.max(0.7, h.reputationFactor(pending.npcName)));
+    // Fame, and how the shop feels about you (haggling moves it), set the prices.
+    h.barter.sessionBuyPriceFactor = Math.min(1.5, Math.max(0.7, h.reputationFactor(merchantId)));
     h.barter.playerGold = s.get(PurseKey).gold();
     // Haggling is a matter of Persuasion: better prices both ways as it rises.
     h.barter.barterSkill = Math.max(5, s.tryGet(SkillsKey)?.level("speechcraft") ?? 20);

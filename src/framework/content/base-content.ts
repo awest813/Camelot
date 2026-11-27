@@ -348,6 +348,12 @@ export const frameworkBaseContent: RpgContentBundle = {
               effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_general_01" } }],
             },
             {
+              id: "haggle",
+              text: "Surely you can do better on the price?",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "barter:haggle", payload: { merchantId: "merchant_general_01" } }],
+            },
+            {
               id: "rumors",
               text: "Heard anything useful lately?",
               nextNodeId: "rumors_reply",
@@ -391,6 +397,12 @@ export const frameworkBaseContent: RpgContentBundle = {
               effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_weapons_01" } }],
             },
             {
+              id: "haggle",
+              text: "Surely you can do better on the price?",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "barter:haggle", payload: { merchantId: "merchant_weapons_01" } }],
+            },
+            {
               id: "ask_repair",
               text: "Can you repair my gear?",
               nextNodeId: "repair_reply",
@@ -432,6 +444,12 @@ export const frameworkBaseContent: RpgContentBundle = {
               text: "Let me see your stock.",
               endsDialogue: true,
               effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_armor_01" } }],
+            },
+            {
+              id: "haggle",
+              text: "Surely you can do better on the price?",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "barter:haggle", payload: { merchantId: "merchant_armor_01" } }],
             },
             {
               id: "ask_light",
@@ -494,6 +512,12 @@ export const frameworkBaseContent: RpgContentBundle = {
               text: "I'd like to browse your potions.",
               endsDialogue: true,
               effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_alchemist_01" } }],
+            },
+            {
+              id: "haggle",
+              text: "Surely you can do better on the price?",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "barter:haggle", payload: { merchantId: "merchant_alchemist_01" } }],
             },
             {
               id: "ask_lore",
@@ -649,6 +673,12 @@ export const frameworkBaseContent: RpgContentBundle = {
               text: "I need ingots and hammers.",
               endsDialogue: true,
               effects: [{ type: "emit_event", eventId: "barter:open", payload: { merchantId: "merchant_armor_01" } }],
+            },
+            {
+              id: "haggle",
+              text: "Surely you can do better on the price?",
+              endsDialogue: true,
+              effects: [{ type: "emit_event", eventId: "barter:haggle", payload: { merchantId: "merchant_armor_01" } }],
             },
             {
               id: "leave",

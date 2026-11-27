@@ -189,9 +189,9 @@ export function installGameFeatures(game: Game): void {
         items: () => game.inventorySystem.items,
         hour: () => game.timeSystem.hour,
         branch: (baseId, placeId) => branchMerchant(game.barterSystem, game.merchantRestockSystem, baseId, placeId, game.timeSystem.elapsedGameTime),
-        reputationFactor: (npcName) => {
+        reputationFactor: (shop) => {
           const fame = 1 - (game.fameSystem.dispositionModifier / 20) * 0.15;
-          return fame * (npcName ? game.persuasionSystem.getMerchantPriceMultiplier(npcName) : 1.0);
+          return fame * (shop ? game.persuasionSystem.getMerchantPriceMultiplier(shop) : 1.0);
         },
       });
       k.install(game._trade);
