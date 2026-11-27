@@ -8,14 +8,13 @@
  *
  * Timeline (game starts at 08:00, default 120-second real day):
  *   08:00 — Character creation (Hill-folk / Warrior class / Warrior birthsign)
- *   09:00 — Morning exploration, first wolf encounter
+ *   09:00 — Morning exploration
  *   10:00 — Visit weapons shop (open 08–20), buy a health potion
  *   11:00 — Active-effects / potion use, skill XP from combat
  *   12:00 — Noon: Fast travel to a second location
  *   13:00 — Quest pickup, fame from completion
  *   14:00 — Disease contraction + cure
  *   15:00 — Racial power activation (Hill-fury)
- *   16:00 — Offscreen NPC simulation (merchant restock ticks)
  *   17:00 — Ambient events in forest biome
  *   18:00 — NPCs begin heading home (schedule shift)
  *   19:00 — Last chance to trade before shops close
@@ -38,9 +37,7 @@ import { FameSystem } from "./fame-system";
 import { DiseaseSystem, BUILT_IN_DISEASES } from "./disease-system";
 import { ShopSystem } from "./shop-system";
 import { MerchantRestockSystem } from "./merchant-restock-system";
-import { EncounterSystem } from "./encounter-system";
 import { AmbientEventSystem } from "./ambient-event-system";
-import { OffscreenSimulationSystem } from "./offscreen-simulation-system";
 import { FastTravelSystem } from "./fast-travel-system";
 import { InventorySystem } from "./inventory-system";
 import { BarterSystem } from "./barter-system";
@@ -109,9 +106,7 @@ interface PlaytestWorld {
   disease: DiseaseSystem;
   shop: ShopSystem;
   restock: MerchantRestockSystem;
-  encounter: EncounterSystem;
   ambient: AmbientEventSystem;
-  offscreen: OffscreenSimulationSystem;
   fastTravel: FastTravelSystem;
   inventory: InventorySystem;
   barter: BarterSystem;
@@ -119,7 +114,6 @@ interface PlaytestWorld {
   ui: ReturnType<typeof makeMockUI>;
   levelUpReadyFired: boolean;
   levelUpCompleteFired: boolean;
-  encountersTriggered: string[];
 }
 
 function buildWorld(): PlaytestWorld {
@@ -139,9 +133,7 @@ function buildWorld(): PlaytestWorld {
   const disease = new DiseaseSystem();
   const shop = new ShopSystem();
   const restock = new MerchantRestockSystem();
-  const encounter = new EncounterSystem();
   const ambient = new AmbientEventSystem();
-  const offscreen = new OffscreenSimulationSystem();
   const fastTravel = new FastTravelSystem();
   const inventory = new InventorySystem(player, ui, mockCanvas);
   const barter = new BarterSystem(inventory, ui);
@@ -157,15 +149,11 @@ function buildWorld(): PlaytestWorld {
   playerLevel.onLevelUpReady = () => { levelUpReadyFired = true; };
   playerLevel.onLevelUpComplete = () => { levelUpCompleteFired = true; };
 
-  // Track encounter triggers
-  const encountersTriggered: string[] = [];
-  encounter.onEncounterStarted = (result) => { encountersTriggered.push(result.templateId); };
-
   return {
     time, wait, attrs, skills, playerLevel, race, cls, birthsign,
-    effects, fame, disease, shop, restock, encounter, ambient, offscreen,
+    effects, fame, disease, shop, restock, ambient,
     fastTravel, inventory, barter, player, ui,
-    levelUpReadyFired, levelUpCompleteFired, encountersTriggered,
+    levelUpReadyFired, levelUpCompleteFired,
   };
 }
 
@@ -249,37 +237,6 @@ describe("Playtest — new game to 12 gameplay hours", () => {
       );
       expect(isNew).toBe(true);
       expect(w.fastTravel.isDiscovered("town_start")).toBe(true);
-    });
-
-    it("registers a wolf encounter template", () => {
-      w.encounter.addTemplate({
-        id: "wolves_road",
-        label: "Road Wolves",
-        tableId: "wolves_basic",
-        biomeIds: ["plains"],
-        minCount: 1,
-        maxCount: 3,
-        cooldownHours: 2,
-        spawnChance: 1.0,
-      });
-
-      expect(w.encounter.getTemplate("wolves_road")).not.toBeNull();
-    });
-
-    it("triggers wolf encounter on the road", () => {
-      w.encounter.addTemplate({
-        id: "wolves_road",
-        label: "Road Wolves",
-        tableId: "wolves_basic",
-        biomeIds: ["plains"],
-        minCount: 1,
-        maxCount: 2,
-        cooldownHours: 2,
-        spawnChance: 1.0,
-      });
-
-      w.encounter.triggerEncounter("wolves_road", { gameTimeHours: 8, playerLevel: 1 });
-      expect(w.encountersTriggered).toContain("wolves_road");
     });
 
     it("advances clock to 09:00 after one in-game hour", () => {
@@ -589,68 +546,6 @@ describe("Playtest — new game to 12 gameplay hours", () => {
     });
   });
 
-  // ── 9. Offscreen NPC simulation — 16:00 ──────────────────────────────────
-
-  describe("16:00 — Offscreen NPC and merchant simulation", () => {
-    it("offscreen merchant gold regenerates during fast travel", () => {
-      w.offscreen.setGameHour(8); // started at 8
-
-      w.offscreen.register("merchant_wanderer", {
-        scheduleBlocks: [
-          { startHour: 6, behavior: "work" },
-          { startHour: 22, behavior: "sleep" },
-        ],
-        lastKnownPosition: { x: 100, y: 0, z: 100 },
-        health: 80,
-        maxHealth: 100,
-        isDead: false,
-        merchantId: "merchant_wanderer",
-        merchantGold: 50,
-        merchantMaxGold: 500,
-      });
-
-      // 8 hours elapsed (8 AM → 4 PM = 16:00)
-      w.offscreen.advanceTime(8);
-
-      const state = w.offscreen.getState("merchant_wanderer");
-      expect(state).not.toBeNull();
-      // Gold regen: 2/hour × 8 hours = 16 added (50 → 66)
-      expect(state!.merchantGold).toBeGreaterThan(50);
-    });
-
-    it("offscreen NPC health regenerates during elapsed time", () => {
-      w.offscreen.register("guard_01", {
-        scheduleBlocks: [{ startHour: 6, behavior: "patrol" }],
-        lastKnownPosition: { x: 10, y: 0, z: 10 },
-        health: 60,
-        maxHealth: 100,
-        isDead: false,
-      });
-
-      w.offscreen.advanceTime(8); // 8 hours of offscreen time
-
-      const state = w.offscreen.getState("guard_01");
-      // 5 HP/h × 8 h = +40 HP (60 → 100, capped at maxHealth)
-      expect(state!.health).toBeGreaterThan(60);
-    });
-
-    it("dead NPCs are not simulated offscreen", () => {
-      w.offscreen.register("bandit_dead", {
-        scheduleBlocks: [],
-        lastKnownPosition: { x: 0, y: 0, z: 0 },
-        health: 0,
-        maxHealth: 80,
-        isDead: true,
-      });
-
-      w.offscreen.advanceTime(8);
-
-      const state = w.offscreen.getState("bandit_dead");
-      expect(state!.currentBehavior).toBe("idle");
-      expect(state!.health).toBe(0); // dead NPCs don't regenerate
-    });
-  });
-
   // ── 10. Ambient events in the forest — 17:00 ────────────────────────────
 
   describe("17:00 — Ambient events (forest biome)", () => {
@@ -708,22 +603,6 @@ describe("Playtest — new game to 12 gameplay hours", () => {
   // ── 11. Dusk — 18:00 to 19:00 ────────────────────────────────────────────
 
   describe("18:00–19:00 — Dusk, NPC schedules shifting", () => {
-    it("second encounter triggers in the evening (bandit camp)", () => {
-      w.encounter.addTemplate({
-        id: "bandit_camp",
-        label: "Bandit Camp",
-        tableId: "bandits_tier1",
-        biomeIds: ["hills"],
-        minCount: 2,
-        maxCount: 4,
-        cooldownHours: 6,
-        spawnChance: 1.0,
-      });
-
-      w.encounter.triggerEncounter("bandit_camp", { gameTimeHours: 18, playerLevel: 1 });
-      expect(w.encountersTriggered).toContain("bandit_camp");
-    });
-
     it("time is in the dusk range (18:00–20:00)", () => {
       // Advance from 08:00 to 18:00
       w.time.advanceHours(10);
@@ -909,71 +788,6 @@ describe("Playtest — new game to 12 gameplay hours", () => {
       expect(restored.chosenBirthsign?.id).toBe("sword_stone");
     });
 
-    it("OffscreenSimulationSystem snapshot round-trips NPC state", () => {
-      w.offscreen.register("npc_01", {
-        scheduleBlocks: [{ startHour: 6, behavior: "work" }],
-        lastKnownPosition: { x: 5, y: 0, z: 5 },
-        health: 90,
-        maxHealth: 100,
-        isDead: false,
-      });
-      w.offscreen.advanceTime(12);
-
-      const snap = w.offscreen.getSnapshot();
-      const restored = new OffscreenSimulationSystem();
-      restored.restoreSnapshot(snap);
-
-      const state = restored.getState("npc_01");
-      expect(state).not.toBeNull();
-      expect(state!.health).toBeGreaterThan(90);
-    });
   });
 
-  // ── 15. Encounter cooldown enforcement across the session ────────────────
-
-  describe("Cross-session encounter cooldown integrity", () => {
-    it("wolf encounter cannot retrigger within its 2-hour cooldown", () => {
-      w.encounter.addTemplate({
-        id: "wolves_evening",
-        label: "Evening Wolves",
-        tableId: "wolves_basic",
-        biomeIds: ["plains"],
-        minCount: 1,
-        maxCount: 2,
-        cooldownHours: 2,
-        spawnChance: 1.0,
-      });
-
-      w.encounter.triggerEncounter("wolves_evening", { gameTimeHours: 8 });
-      const first = w.encountersTriggered.length;
-
-      // Try again immediately — cooldown should block it
-      const result = w.encounter.triggerEncounter("wolves_evening", { gameTimeHours: 8.5 });
-      expect(result).toBeNull(); // blocked by cooldown
-    });
-
-    it("encounter round-trips its snapshot", () => {
-      w.encounter.addTemplate({
-        id: "wolves_snap",
-        label: "Wolves Snap",
-        tableId: "wolves_basic",
-        biomeIds: [],
-        cooldownHours: 2,
-      });
-      w.encounter.triggerEncounter("wolves_snap", { gameTimeHours: 10 });
-
-      const snap = w.encounter.getSnapshot();
-      const restored = new EncounterSystem();
-      restored.addTemplate({
-        id: "wolves_snap",
-        label: "Wolves Snap",
-        tableId: "wolves_basic",
-        biomeIds: [],
-        cooldownHours: 2,
-      });
-      restored.restoreSnapshot(snap);
-
-      expect(restored.getLastTriggeredAt("wolves_snap")).toBe(10);
-    });
-  });
 });

@@ -117,8 +117,8 @@ export interface TravelContext {
   /** Emit a game event by id (used to apply `emitEvent` outcomes). */
   emitEvent?: (eventId: string) => void;
   /**
-   * Discover a landmark by id (used to apply `landmarkId` outcomes).
-   * The game layer wires this to `LandmarkSystem.discoverLandmark()`.
+   * Discover a landmark by id (used to apply `landmarkId` outcomes; no
+   * built-in event has one, so the game leaves it unset).
    */
   discoverLandmark?: (landmarkId: string) => void;
 }
@@ -152,7 +152,6 @@ export interface TravelEventSnapshot {
  * travelEventSystem.onTravelEventFired = (id, outcome) => {
  *   if (outcome.notification)  hud.notify(outcome.notification);
  *   if (outcome.emitEvent)     eventBus.emit(outcome.emitEvent);
- *   if (outcome.landmarkId)    landmarkSystem.discoverLandmark(outcome.landmarkId);
  * };
  *
  * // Called by FastTravelSystem once per simulated hour of travel:

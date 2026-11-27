@@ -338,18 +338,6 @@ export class DialogueCreatorUI {
     termRow.appendChild(termLabel);
     wrap.appendChild(termRow);
 
-    wrap.appendChild(
-      this._makeField(
-        "Camera sequence id",
-        node.cameraSequenceId ?? "",
-        "text",
-        "Optional CameraScriptingSystem sequence id",
-        (v) => {
-          this._sys.updateNode(node.id, { cameraSequenceId: v.trim() || undefined });
-        },
-      ),
-    );
-
     // Choices
     const choicesSect = document.createElement("div");
     choicesSect.className = "dlg-creator__choices-section";

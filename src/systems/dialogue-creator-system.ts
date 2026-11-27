@@ -28,7 +28,6 @@ export interface DialogueNodeDraft {
    * Optional id of a `CameraSequenceDefinition` to play when this node is
    * shown during runtime dialogue.
    */
-  cameraSequenceId?: string;
   choices: DialogueChoiceDraft[];
 }
 
@@ -108,7 +107,6 @@ export class DialogueCreatorSystem {
       terminal: partial.terminal ?? false,
       x:        partial.x       ?? pos.x,
       y:        partial.y       ?? pos.y,
-      cameraSequenceId: partial.cameraSequenceId,
       choices:  [],
     };
     this._draft.nodes.push(node);
@@ -133,21 +131,9 @@ export class DialogueCreatorSystem {
     if (updates.terminal !== undefined) node.terminal = updates.terminal;
     if (updates.x        !== undefined) node.x        = updates.x;
     if (updates.y        !== undefined) node.y        = updates.y;
-    if (updates.cameraSequenceId !== undefined) node.cameraSequenceId = updates.cameraSequenceId || undefined;
     return true;
   }
 
-  /**
-   * Convenience helper to assign or clear the camera sequence linked to a node.
-   * Passing `null` or an empty string clears any existing sequence id.
-   * Returns `false` when `nodeId` is not found.
-   */
-  updateNodeCamera(nodeId: string, sequenceId: string | null): boolean {
-    const node = this._draft.nodes.find(n => n.id === nodeId);
-    if (!node) return false;
-    node.cameraSequenceId = sequenceId || undefined;
-    return true;
-  }
 
   /**
    * Remove a node and prune all choice references to it.
@@ -353,7 +339,6 @@ export class DialogueCreatorSystem {
         speaker:          n.speaker,
         text:             n.text,
         terminal:         n.terminal || undefined,
-        cameraSequenceId: n.cameraSequenceId || undefined,
         choices:  n.choices.map(c => ({
           id:          c.id,
           text:        c.text,
@@ -409,7 +394,6 @@ export class DialogueCreatorSystem {
             speaker:          n.speaker,
             text:             n.text,
             terminal:         n.terminal ?? false,
-            cameraSequenceId: n.cameraSequenceId || undefined,
             x:        pos.x,
             y:        pos.y,
             choices:  (n.choices ?? []).map(c => ({

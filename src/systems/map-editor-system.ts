@@ -946,7 +946,7 @@ export class MapEditorSystem {
   /**
    * Static validation helper — run validation rules against a `MapExportData`
    * object directly, without requiring a live `MapEditorSystem` instance.
-   * Suitable for offline / pack-level validation (e.g. inside `MapPackSystem`).
+   * Suitable for offline validation (an imported map, a content bundle).
    */
   static validateMapData(
     data: MapExportData,

@@ -167,7 +167,8 @@ All creatures contain embedded AnimationGroup clips.
 ### Modular Character Outfits
 
 Modular armour/clothing pieces that attach to a base humanoid character mesh.
-Managed by `EquipmentVisualSystem` (`src/systems/equipment-visual-system.ts`).
+Nothing attaches them yet (the player is first-person; the system meant to
+dress characters in them was never wired and has been removed).
 
 | Key | Description | Slot | Path | Format |
 |-----|-------------|------|------|--------|
@@ -216,25 +217,6 @@ Rigged GLB models are animated by the `AnimationSystem`
 (`src/systems/animation-system.ts`), which plays their AnimationGroup clips
 (the separate `SkeletalAnimationSystem` was folded into it in the engine
 overhaul, Phase 4).
-
-### EquipmentVisualSystem
-
-`src/systems/equipment-visual-system.ts` — Manages visual outfit piece
-attachment/detachment on character meshes.  Tracks which asset is equipped
-in each slot (head, chest, legs, feet, back, offhand).
-
-```ts
-const equipVis = new EquipmentVisualSystem();
-equipVis.onOutfitAttach = (characterId, slot, assetKey) => {
-  // Load and parent the outfit mesh to the character skeleton
-};
-equipVis.onOutfitDetach = (characterId, slot) => {
-  // Remove the outfit mesh from the character
-};
-equipVis.registerCharacter("player");
-equipVis.equip("player", "head", "qHelmetHeavy");
-equipVis.equip("player", "chest", "qChestHeavy");
-```
 
 ---
 

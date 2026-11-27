@@ -24,9 +24,7 @@ import { FameSystem } from "./fame-system";
 import { DiseaseSystem, BUILT_IN_DISEASES } from "./disease-system";
 import { ShopSystem } from "./shop-system";
 import { MerchantRestockSystem } from "./merchant-restock-system";
-import { EncounterSystem } from "./encounter-system";
 import { AmbientEventSystem } from "./ambient-event-system";
-import { OffscreenSimulationSystem } from "./offscreen-simulation-system";
 import { FastTravelSystem } from "./fast-travel-system";
 import { InventorySystem, type Item } from "./inventory-system";
 import { BarterSystem } from "./barter-system";
@@ -116,9 +114,7 @@ interface PlaytestEnvironment {
   disease: DiseaseSystem;
   shop: ShopSystem;
   restock: MerchantRestockSystem;
-  encounter: EncounterSystem;
   ambient: AmbientEventSystem;
-  offscreen: OffscreenSimulationSystem;
   fastTravel: FastTravelSystem;
   inventory: InventorySystem;
   barter: BarterSystem;
@@ -147,9 +143,7 @@ function createPlaytestEnv(): PlaytestEnvironment {
   const disease = new DiseaseSystem();
   const shop = new ShopSystem();
   const restock = new MerchantRestockSystem();
-  const encounter = new EncounterSystem();
   const ambient = new AmbientEventSystem();
-  const offscreen = new OffscreenSimulationSystem();
   const fastTravel = new FastTravelSystem();
   const inventory = new InventorySystem(player, ui, mockCanvas);
   const barter = new BarterSystem(inventory, ui);
@@ -170,7 +164,7 @@ function createPlaytestEnv(): PlaytestEnvironment {
 
   return {
     player, ui, time, wait, attrs, skills, playerLevel, race, cls, birthsign,
-    effects, fame, disease, shop, restock, encounter, ambient, offscreen,
+    effects, fame, disease, shop, restock, ambient,
     fastTravel, inventory, barter, crime, alchemy, spells, spellMaking, quests, stealth,
   };
 }
