@@ -19,6 +19,7 @@ import { ActiveEffectHUD } from "../ui/active-effect-hud";
 import { QuickSlotHUD } from "../ui/quickslot-hud";
 import { PerkSystem } from "../systems/perk-system";
 import { TitleKey } from "../features/title/title-feature";
+import { CharacterHostKey } from "../features/character/character-feature";
 
 export function setupProgressionAndStart(g: Game): void {
   // ── v24: Mark & Recall ────────────────────────────────────────────────
@@ -105,11 +106,7 @@ export function setupProgressionAndStart(g: Game): void {
     const spent = g.attributeSystem.spendPoint(name);
     if (spent) {
       g.saveSystem.markDirty();
-      // Sync derived stats back to player after spending
-      g.player.maxHealth      = g.attributeSystem.maxHealth;
-      g.player.maxMagicka     = g.attributeSystem.maxMagicka;
-      g.player.maxStamina     = g.attributeSystem.maxStamina;
-      g.player.maxCarryWeight = g.attributeSystem.carryWeight;
+      g.kernel.services.get(CharacterHostKey).syncMaxStats(); // the maxima follow (keeping omen, perk and gear bonuses)
       g.spellSystem.magicDamageBonus = g.attributeSystem.magicDamageBonus;
       // Refresh the attribute panel display
       g.ui.refreshAttributePanel(g.attributeSystem);

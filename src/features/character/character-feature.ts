@@ -27,10 +27,8 @@ export type CharacterChoice = CharacterCreationResult;
 export interface CharacterHostService {
   readonly attributes: AttributeSystem;
   readonly skills: SkillProgressionSystem;
-  /** Max health, magicka, stamina and carry weight from the attributes. */
+  /** Bring max health, magicka, stamina and carry weight up to date with the attributes, the omen and any disease. */
   syncMaxStats(): void;
-  /** A birthsign's flat bonuses on top. */
-  addMaxStats(b: { maxHealth: number; maxMagicka: number; maxStamina: number; carryWeight: number }): void;
   setRacialTraits(t: { waterBreathing: boolean; diseaseImmune: boolean }): void;
   /** The wizard owns the screen (play paused, pointer free), then hands it back. */
   beginCreation(): void;
@@ -80,7 +78,7 @@ export class CharacterFeature implements Feature {
     };
     this.birthsigns.onBirthsignChosen = (sign) => {
       feedback().notify(`Omen: ${sign.name}${sign.power ? ` — Power: ${sign.power.name}` : ""}`, 3000);
-      host().addMaxStats(this.birthsigns.getStatBonuses());
+      host().syncMaxStats(); // the omen's bonus goes on top
       feedback().markDirty();
     };
     this.classes.onClassChosen = (cls) => {

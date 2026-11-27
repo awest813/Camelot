@@ -13,7 +13,6 @@ function setup(answer: () => Promise<CharacterChoice>) {
     attributes: new AttributeSystem(),
     skills: new SkillProgressionSystem(),
     syncMaxStats: () => calls.push("sync"),
-    addMaxStats: () => calls.push("bonus"),
     setRacialTraits: (t) => calls.push(`traits:${t.waterBreathing}:${t.diseaseImmune}`),
     beginCreation: () => calls.push("begin"),
     endCreation: () => calls.push("end"),

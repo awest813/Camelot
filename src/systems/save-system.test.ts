@@ -145,7 +145,7 @@ describe('SaveSystem', () => {
     });
 
     it('round-trips every built-in part through its codec, in load order', () => {
-        const special = new Set(['setStorage', 'setQuestSystem', 'setSkillTreeSystem', 'setFrameworkRuntime', 'setAttributeSystem', 'setAutosaveInterval']);
+        const special = new Set(['setStorage', 'setQuestSystem', 'setSkillTreeSystem', 'setFrameworkRuntime', 'setAttributeSystem', 'setAutosaveInterval', 'setMaximaRestorer']);
         const setters = Object.getOwnPropertyNames(SaveSystem.prototype).filter((n) => n.startsWith('set') && !special.has(n));
         expect(setters.length, 'every system setter').toBeGreaterThanOrEqual(36);
         const restored: Array<{ setter: string; data: unknown }> = [];
@@ -277,6 +277,36 @@ describe('SaveSystem', () => {
 
         saveSystem.load();
         expect(mockEquipment.unequipSilent).toHaveBeenCalledWith('head');
+    });
+
+    it('takes the old gear off before resetting stats and puts the saved gear on after the maxima', () => {
+        // Real gear arithmetic: an amulet adds to max health, a sword to damage.
+        const amulet = { id: 'amulet', name: 'Amulet', description: '', stackable: false, quantity: 1, slot: 'neck', stats: { healthBonus: 20 } };
+        const worn = new Map<string, any>([['neck', amulet], ['mainHand', sword]]);
+        mockEquipment.getEquipped.mockImplementation(() => worn);
+        mockEquipment.equipSilent.mockImplementation((item: any, slot: string) => {
+            worn.set(slot, item);
+            mockPlayer.maxHealth += item.stats?.healthBonus ?? 0;
+            mockPlayer.bonusDamage = (mockPlayer.bonusDamage ?? 0) + (item.stats?.damage ?? 0);
+        });
+        mockEquipment.unequipSilent.mockImplementation((slot: string) => {
+            const item = worn.get(slot);
+            worn.delete(slot);
+            mockPlayer.maxHealth -= item?.stats?.healthBonus ?? 0;
+            mockPlayer.bonusDamage = (mockPlayer.bonusDamage ?? 0) - (item?.stats?.damage ?? 0);
+        });
+        mockPlayer.maxHealth = 120;
+        mockPlayer.health = 120;
+        mockPlayer.bonusDamage = sword.stats?.damage ?? 0;
+        saveSystem.save();
+        const restore = vi.fn();
+        saveSystem.setMaximaRestorer(restore);
+
+        saveSystem.load();
+        expect(mockPlayer.bonusDamage, 'the sword still counts once').toBe(sword.stats?.damage ?? 0);
+        expect(mockPlayer.maxHealth, 'the amulet lands on top of the reset maximum').toBe(120);
+        expect(mockPlayer.health, 'full health stays full').toBe(120);
+        expect(restore).toHaveBeenCalledOnce();
     });
 
     it('should show a load notification on success', () => {

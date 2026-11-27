@@ -33,6 +33,7 @@ import { ProgressionHostKey } from "../features/progression/progression-feature"
 import { DialogueServicesFeature, DialogueHostKey } from "../features/dialogue-services/dialogue-services-feature";
 import { SurvivalHostKey } from "../features/survival/survival-feature";
 import { isColdHere } from "../systems/survival-system";
+import { MaxStatLedger, addStats, maxStatsFromAttributeDeltas, type MaxStats } from "../systems/max-stat-ledger";
 import { ProvisionsFeature } from "../features/provisions/provisions-feature";
 import { SpellMakingFeature } from "../features/spell-making/spell-making-feature";
 import { persistSkipOnboardingTips } from "../onboarding-preferences";
@@ -204,22 +205,18 @@ export function installGameFeatures(game: Game): void {
         drop: (at, item) => { new Loot(game.scene, at, item); },
       });
       k.install(new SpoilsFeature());
-      const syncMax = () => {
-        game.player.maxHealth = game.attributeSystem.maxHealth;
-        game.player.maxMagicka = game.attributeSystem.maxMagicka;
-        game.player.maxStamina = game.attributeSystem.maxStamina;
-        game.player.maxCarryWeight = game.attributeSystem.carryWeight;
-      };
+      // The maxima: attributes + the omen's bonus + the diseases' penalties (perks and enchantments add their own on top).
+      const a = game.attributeSystem;
+      const fromAttributes = (): MaxStats => ({ maxHealth: a.maxHealth, maxMagicka: a.maxMagicka, maxStamina: a.maxStamina, carryWeight: a.carryWeight });
+      const maxStats = new MaxStatLedger(() => addStats(fromAttributes(), game.birthsignSystem.getStatBonuses(),
+        maxStatsFromAttributeDeltas(game.diseaseSystem.getAttributePenalties())), game.player, fromAttributes());
+      for (const e of ["disease:contracted", "disease:cured"] as const) game.eventBus.on(e, () => maxStats.sync());
+      // A load resets the maxima to the attributes' (the save system), then the omen and diseases go back on.
+      game.saveSystem.setMaximaRestorer(() => { maxStats.adopt(fromAttributes()); maxStats.sync(); });
       k.services.provide(CharacterHostKey, {
         get attributes() { return game.attributeSystem; },
         get skills() { return game.skillProgressionSystem; },
-        syncMaxStats: syncMax,
-        addMaxStats: (b) => {
-          game.player.maxHealth += b.maxHealth;
-          game.player.maxMagicka += b.maxMagicka;
-          game.player.maxStamina += b.maxStamina;
-          game.player.maxCarryWeight += b.carryWeight;
-        },
+        syncMaxStats: () => maxStats.sync(),
         setRacialTraits: (t) => {
           game.swimSystem.hasWaterBreathing = t.waterBreathing;
           game.diseaseSystem.diseaseResistanceChance = t.diseaseImmune ? 1.0 : 0;
@@ -266,7 +263,7 @@ export function installGameFeatures(game: Game): void {
         get attributes() { return game.attributeSystem; },
         get classes() { return game.classSystem; },
         perks: () => game.perkSystem,
-        syncMaxStats: syncMax,
+        syncMaxStats: () => maxStats.sync(),
         levelReached: () => game.trainerSystem.onCharacterLevelUp(),
         offerAttributes: () => {
           if (game.isPaused || game.ui.isAttributePanelOpen || isCombatInputBlocked(game)) return;

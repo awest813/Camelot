@@ -452,6 +452,17 @@ export class SaveSystem {
 
   // ── v14 system injection ──────────────────────────────────────────────────
 
+  /**
+   * Called on load once every part is restored (the maxima rebuilt from the
+   * attributes, gear and skill ranks), before current health/magicka/stamina
+   * are clamped to them: the game puts back what else it keeps on the maxima
+   * (the omen, diseases).
+   */
+  public setMaximaRestorer(restore: () => void): void {
+    this._restoreMaxima = restore;
+  }
+  private _restoreMaxima: (() => void) | null = null;
+
   public setBirthsignSystem(s: BirthsignSystem): void           { this._birthsignSystem = s; this._own("birthsign", 200, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
   public setClassSystem(s: ClassSystem): void                   { this._classSystem = s; this._own("characterClass", 210, () => s.getSaveState(), (d) => s.restoreFromSave(d as any)); }
 
@@ -662,6 +673,13 @@ export class SaveSystem {
       data.player.position.y,
       data.player.position.z,
     );
+    // Take off this session's gear first, while its bonuses are still on the
+    // player (they come off with it); the stats below are then reset, and the
+    // saved gear goes back on after the maxima are.
+    for (const slot of Array.from(this._equipment.getEquipped().keys())) {
+      this._equipment.unequipSilent(slot);
+    }
+
     this._player.health = data.player.health;
     this._player.magicka = data.player.magicka;
     this._player.stamina = data.player.stamina;
@@ -694,25 +712,12 @@ export class SaveSystem {
     // Restore inventory
     this._inventory.items = data.inventory;
 
-    // Clear all equipment silently, then restore from save
-    for (const slot of Array.from(this._equipment.getEquipped().keys())) {
-      this._equipment.unequipSilent(slot);
-    }
-    for (const { slot, item } of data.equipment) {
-      this._equipment.equipSilent(item, slot as EquipSlot);
-    }
 
     // Restore quest progress
     if (this._quests && data.quests?.length) {
       this._quests.restoreState(data.quests);
     }
 
-    // Restore skill tree state. Always pass an array so loading a save with
-    // no skills correctly clears any in-session skill ranks/effects.
-    this._player.skillPoints = data.skillPoints ?? 0;
-    if (this._skills) {
-      this._skills.restoreState(Array.isArray(data.skills) ? data.skills : []);
-    }
 
     if (this._frameworkRuntime && typeof data.framework === "string") {
       try {
@@ -734,10 +739,20 @@ export class SaveSystem {
       this._player.maxMagicka     = this._attributes.maxMagicka;
       this._player.maxStamina     = this._attributes.maxStamina;
       this._player.maxCarryWeight = this._attributes.carryWeight;
-      // Clamp restored resources to the restored maxima.
-      this._player.health  = Math.min(this._player.health, this._player.maxHealth);
-      this._player.magicka = Math.min(this._player.magicka, this._player.maxMagicka);
-      this._player.stamina = Math.min(this._player.stamina, this._player.maxStamina);
+    }
+
+    // Gear and skill ranks go back on after the maxima are reset above, so
+    // what they add to a maximum (an amulet's +health, a rank's +25 stamina)
+    // lands on top instead of being wiped.
+    for (const { slot, item } of data.equipment) {
+      this._equipment.equipSilent(item, slot as EquipSlot);
+    }
+
+    // Restore skill tree state. Always pass an array so loading a save with
+    // no skills correctly clears any in-session skill ranks/effects.
+    this._player.skillPoints = data.skillPoints ?? 0;
+    if (this._skills) {
+      this._skills.restoreState(Array.isArray(data.skills) ? data.skills : []);
     }
 
     // Every registered part, in load order: the save system's own systems
@@ -751,6 +766,13 @@ export class SaveSystem {
         console.error(`[SaveSystem] "${codec.key}" save data was invalid:`, error);
       }
     }
+
+    // Every part is back (the omen, diseases …): the game puts its share of the
+    // maxima back on, then current resources are clamped to them.
+    this._restoreMaxima?.();
+    this._player.health  = Math.min(this._player.health, this._player.maxHealth);
+    this._player.magicka = Math.min(this._player.magicka, this._player.maxMagicka);
+    this._player.stamina = Math.min(this._player.stamina, this._player.maxStamina);
 
     // Restore player name (v15+; keep default "Hero" for older saves)
     if (typeof data.player.name === "string" && data.player.name.trim()) {
