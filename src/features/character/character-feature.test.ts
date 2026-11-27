@@ -67,4 +67,12 @@ describe("CharacterFeature (headless, through the kernel)", () => {
     t.k.uninstall("character");
     expect(document.querySelector(".powers-hud"), "the feature takes its chip away").toBeNull();
   });
+
+  it("catching or curing a disease brings the maxima up to date", () => {
+    const t = setup(async () => choice);
+    t.calls.length = 0;
+    t.k.events.emit("disease:contracted", { diseaseId: "flux" });
+    t.k.events.emit("disease:cured", { diseaseId: "flux" });
+    expect(t.calls).toEqual(["sync", "sync"]);
+  });
 });

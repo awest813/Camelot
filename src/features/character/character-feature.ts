@@ -90,6 +90,9 @@ export class CharacterFeature implements Feature {
       feedback().notify(`${p.name}: ${p.description}`, 3000);
       feedback().markDirty();
     };
+    // A disease saps the maxima; its cure gives them back.
+    ctx.on("disease:contracted", () => host().syncMaxStats());
+    ctx.on("disease:cured", () => host().syncMaxStats());
     this.races.onPowerActivated = power;
     this.birthsigns.onPowerActivated = power;
 

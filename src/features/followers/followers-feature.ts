@@ -22,7 +22,7 @@ import { FollowerSystem, type FollowerCombatRole } from "../../systems/follower-
 import { FollowerUI } from "../../ui/follower-ui";
 import { CompanionBody, COMPANION_CATCH_UP } from "../../entities/companion-body";
 import type { NPC } from "../../entities/npc";
-import { ActorsKey, AnimationKey, FeedbackKey, GameplayKey, ModalKey, PlayerKey, PurseKey, ownSave } from "../services";
+import { ActorsKey, AnimationKey, FeedbackKey, GameplayKey, LooksKey, ModalKey, PlayerKey, PurseKey, ownSave } from "../services";
 
 /** How far each kind of fighter reaches (m), and seconds between blows. */
 const REACH: Record<FollowerCombatRole, number> = { warrior: 2.6, rogue: 2.4, archer: 16, mage: 14 };
@@ -30,6 +30,10 @@ const BLOW_EVERY = 1.6;
 /** A hostile this close (m) to the follower lands a blow on them every `STRUCK_EVERY` s. */
 const STRUCK_REACH = 2.2;
 const STRUCK_EVERY = 2;
+/** The women of the roster (the rest wear the men's models). */
+const WOMEN = new Set(["lynette"]);
+/** Fighters wear mail; a mage goes in plain clothes. */
+const MODEL: Record<FollowerCombatRole, "Ranger" | "Peasant"> = { warrior: "Ranger", archer: "Ranger", rogue: "Ranger", mage: "Peasant" };
 const LOOKS: Record<FollowerCombatRole, { r: number; g: number; b: number }> = {
   warrior: { r: 0.45, g: 0.12, b: 0.1 }, archer: { r: 0.2, g: 0.36, b: 0.16 },
   mage: { r: 0.22, g: 0.2, b: 0.5 }, rogue: { r: 0.18, g: 0.16, b: 0.14 },
@@ -164,10 +168,12 @@ export class FollowersFeature implements Feature {
     if (!this._scene || !active || !tmpl) return;
     const p = s.get(PlayerKey).position();
     this._body = new CompanionBody(this._scene, {
-      name: `follower_${tmpl.id}`, radius: 0.4, height: 1.8, color: LOOKS[tmpl.combatRole],
+      // An NPC's height, so a character model stands on the ground.
+      name: `follower_${tmpl.id}`, radius: 0.4, height: 2, color: LOOKS[tmpl.combatRole],
     }, { x: p.x - 1.5, y: Math.max(1.5, (p.y ?? 2) - 0.5), z: p.z - 1.5 });
     this._blowTimer = 0;
     this._struckTimer = STRUCK_EVERY;
+    s.tryGet(LooksKey)?.dress(this._body.mesh, `${MODEL[tmpl.combatRole]}_${WOMEN.has(tmpl.id) ? "Female" : "Male"}`);
     s.tryGet(AnimationKey)?.idle(this._body.mesh);
   }
 

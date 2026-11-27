@@ -34,6 +34,8 @@ export class InventorySystem {
   public _canvas: HTMLCanvasElement;
 
   private readonly _absorbers: Array<(item: Item) => string | null> = [];
+  /** Whether the last `addItem` went to an absorber (the quiver, the satchel …) rather than the pack. */
+  public lastAddAbsorbed = false;
 
   constructor(player: Player, ui: UIManager, canvas: HTMLCanvasElement) {
     this._player = player;
@@ -68,10 +70,12 @@ export class InventorySystem {
       this._ui.showNotification("Invalid item quantity.", 2000);
       return false;
     }
+    this.lastAddAbsorbed = false;
     for (const absorb of this._absorbers) {
       const notice = absorb(newItem);
       if (notice !== null) {
         this._ui.showNotification(notice, 2200);
+        this.lastAddAbsorbed = true;
         return true;
       }
     }

@@ -13,7 +13,7 @@ import { Loot } from "../entities/loot";
 import { VillageRaidFeature } from "../features/village-raids/raid-feature";
 import { actors } from "../entities/actors";
 import { Aggressive, Dead, Engaged } from "../core/ecs/actors";
-import { undeclaredFeatures, ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, ModalKey, PlayerKey, QuestsKey, TitleHostKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
+import { undeclaredFeatures, ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, LooksKey, ModalKey, PlayerKey, QuestsKey, TitleHostKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
 import { VillagesFeature } from "../features/villages/villages-feature";
 import { WorldSitesFeature } from "../features/world-sites/world-sites-feature";
 import { LandmarksFeature } from "../features/landmarks/landmarks-feature";
@@ -210,7 +210,6 @@ export function installGameFeatures(game: Game): void {
       const fromAttributes = (): MaxStats => ({ maxHealth: a.maxHealth, maxMagicka: a.maxMagicka, maxStamina: a.maxStamina, carryWeight: a.carryWeight });
       const maxStats = new MaxStatLedger(() => addStats(fromAttributes(), game.birthsignSystem.getStatBonuses(),
         maxStatsFromAttributeDeltas(game.diseaseSystem.getAttributePenalties())), game.player, fromAttributes());
-      for (const e of ["disease:contracted", "disease:cured"] as const) game.eventBus.on(e, () => maxStats.sync());
       // A load resets the maxima to the attributes' (the save system), then the omen and diseases go back on.
       game.saveSystem.setMaximaRestorer(() => { maxStats.adopt(fromAttributes()); maxStats.sync(); });
       k.services.provide(CharacterHostKey, {
@@ -501,6 +500,7 @@ export function installGameFeatures(game: Game): void {
       });
       const shouts = new ShoutsFeature();
       k.install(shouts);
+      k.services.provide(LooksKey, { dress: (mesh, model) => game._npcVisuals.dress(mesh, model) });
       const followers = new FollowersFeature(game.scene);
       k.install(followers);
       // A starter wolf companion for new games.

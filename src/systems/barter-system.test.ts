@@ -207,6 +207,26 @@ describe("BarterSystem", () => {
     expect(m.inventory.find((i) => i.id === "potion_hp")?.quantity).toBe(2);
   });
 
+  it("an item that goes straight to the quiver or satchel is still paid for and leaves the stock", () => {
+    const absorbingInv = {
+      items: [] as typeof potion[],
+      lastAddAbsorbed: false,
+      addItem(_item: typeof potion) { this.lastAddAbsorbed = true; return true; },
+      removeItem() { return true; },
+    };
+    const b = new BarterSystem(absorbingInv as unknown as InventorySystem, mockUI);
+    b.playerGold = 200;
+    b.barterSkill = 20;
+    b.registerMerchant({
+      id: "merch_01", name: "Trader", factionId: "town", inventory: [{ ...potion, quantity: 2 }],
+      gold: 500, priceMultiplier: 1.0, isOpen: true, openHour: 8, closeHour: 20,
+    });
+    const price = b.getBuyPrice(potion, "merch_01");
+    expect(b.buyItem("merch_01", "potion_hp")).toBe(true);
+    expect(b.playerGold).toBe(200 - price);
+    expect(b.getMerchant("merch_01")!.inventory.find((i) => i.id === "potion_hp")?.quantity).toBe(1);
+  });
+
   // ── sellItem ──────────────────────────────────────────────────────────────
 
   it("sellItem adds gold to player and deducts from merchant", () => {

@@ -172,6 +172,8 @@ export class BarterSystem {
 
     const added = this._inventory.addItem({ ...item, quantity: 1 });
     if (!added) return false;
+    // Arrows, herbs, tomes … go straight to where they're used, not the pack.
+    const absorbed = this._inventory.lastAddAbsorbed === true;
 
     this.playerGold -= price;
     merchant.gold += price;
@@ -183,7 +185,7 @@ export class BarterSystem {
     }
 
     const verify = this._inventory.items.find((i) => i.id === item.id);
-    if (!verify || verify.quantity < 1) {
+    if (!absorbed && (!verify || verify.quantity < 1)) {
       this._inventory.removeItem(item.id, 1);
       this.playerGold += price;
       merchant.gold -= price;

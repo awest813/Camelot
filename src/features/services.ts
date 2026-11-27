@@ -9,6 +9,7 @@
 import type { CrimeSystem } from "../systems/crime-system";
 import type { PersuasionSystem } from "../systems/persuasion-system";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import type { CharacterModelId } from "../rendering/character-models";
 import type { NPC } from "../entities/npc";
 import type { ProgressionSkillId } from "../systems/skill-progression-system";
 import type { Scene } from "@babylonjs/core/scene";
@@ -250,6 +251,12 @@ export interface LawService {
 }
 export const LawKey = createServiceKey<LawService>("law");
 export const SiteBuilderKey = createServiceKey<SiteBuilderService>("site-builder");
+
+/** How bodies that aren't NPCs (a follower) look: a rigged character model on their capsule. */
+export interface LooksService {
+  dress(mesh: Mesh, model: CharacterModelId): void;
+}
+export const LooksKey = createServiceKey<LooksService>("looks");
 export const InventoryKey = createServiceKey<InventoryService>("inventory");
 
 /** The quest engine (the framework's) and the way quest events reach it. */

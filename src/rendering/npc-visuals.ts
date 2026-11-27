@@ -10,7 +10,8 @@ import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import type { Scene } from "@babylonjs/core/scene";
 import { AIState, NPC } from "../entities/npc";
-import { CharacterModelLibrary, modelForNpcName, type CharacterRig } from "./character-models";
+import { CharacterModelLibrary, modelForNpcName, type CharacterModelId, type CharacterRig } from "./character-models";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AnimationSystem } from "../systems/animation-system";
 import { setInstanceYaw } from "../systems/fantasy-asset-loader";
 import { actors } from "../entities/actors";
@@ -32,6 +33,9 @@ export interface NpcVisualsDeps {
 export class NpcVisuals {
   private readonly _rigs = new Map<NPC, CharacterRig>();
   private readonly _dragons = new Map<NPC, DragonBody>();
+  /** Bodies that are not NPCs (a follower): their rigs follow their capsules. */
+  private readonly _companions = new Map<Mesh, CharacterRig>();
+  private _library: CharacterModelLibrary | null = null;
 
   constructor(private readonly _d: NpcVisualsDeps) {}
 
@@ -43,6 +47,7 @@ export class NpcVisuals {
    */
   public init(): void {
     const library = new CharacterModelLibrary(this._d.scene, this._d.modelBase, this._d.shadows);
+    this._library = library;
     library.preload();
     NPC.onCreated = (npc) => {
       const id = modelForNpcName(npc.key);
@@ -57,6 +62,20 @@ export class NpcVisuals {
         this._d.animation()?.registerSkeletal(npc.mesh, rig);
       });
     };
+  }
+
+  /** Give a companion's capsule a rigged, animated body (it walks with the capsule). */
+  public dress(mesh: Mesh, model: CharacterModelId): void {
+    if (!this._library) return;
+    void this._library.attach(mesh, model).then((rig) => {
+      if (!rig) return;
+      this._companions.set(mesh, rig);
+      this._d.animation()?.registerSkeletal(mesh, rig);
+      mesh.onDisposeObservable.addOnce(() => {
+        this._companions.delete(mesh);
+        this._d.animation()?.unregisterSkeletal(mesh);
+      });
+    });
   }
 
   /** A dragon's body, parented to its capsule, turning and breathing with it. */
@@ -81,6 +100,7 @@ export class NpcVisuals {
     }
     this._updateDragons(dt, playerPos);
     this._updateRigs(dt, playerPos);
+    for (const [mesh, rig] of this._companions) rig.update(dt, mesh.position, null);
   }
 
   /** Dragons face the player when fighting, else where they go; they slump on death. */
