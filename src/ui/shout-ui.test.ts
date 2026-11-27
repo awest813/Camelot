@@ -104,9 +104,9 @@ describe("ShoutUI", () => {
     const view = makeView({ learned: [true, false, false], unlocked: [true, false, false] });
     ui.open([view], 0, null);
     const text = (document.querySelector(".shout-ui") as HTMLDivElement).textContent ?? "";
-    expect(text).toContain("GWYNT · Wind");     // unlocked → revealed
-    expect(text).toContain("??? · Unknown");   // unknown words masked
-    expect(text).not.toContain("RO · Balance");
+    expect(text).toContain("GWYNTWind");     // unlocked → revealed
+    expect(text).toContain("Rank 2unknown");   // unknown words masked
+    expect(text, "an unknown rank keeps its word hidden").not.toContain("CRYF");
   });
 
   it("shows an empty-state message when no shouts are provided", () => {

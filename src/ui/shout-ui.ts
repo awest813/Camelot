@@ -193,7 +193,7 @@ export class ShoutUI {
     Object.assign(pips.style, { color: C.DIM, fontSize: "13px", fontFamily: C.MONO });
 
     const state = document.createElement("span");
-    Object.assign(state.style, { fontSize: "13px", fontFamily: C.MONO, fontWeight: "bold" });
+    Object.assign(state.style, { fontSize: "12px", fontFamily: C.FONT, fontWeight: "bold", letterSpacing: "1px" });
 
     root.append(icon, name, pips, state);
     document.body.appendChild(root);
@@ -352,7 +352,7 @@ export class ShoutUI {
       const badge = document.createElement("span");
       Object.assign(badge.style, {
         background: C.BORDER, color: "#FFF8DC", fontSize: "12px",
-        padding: "2px 5px", borderRadius: "3px", fontFamily: C.MONO,
+        padding: "2px 7px", borderRadius: "2px", fontFamily: C.FONT, letterSpacing: "1.5px",
       });
       badge.textContent = "CHOSEN";
       topRow.appendChild(badge);
@@ -368,17 +368,24 @@ export class ShoutUI {
     Object.assign(wordsRow.style, { display: "flex", gap: "6px", flexWrap: "wrap" });
 
     def.words.forEach((word, i) => {
+      // A rank: its word in the Old Tongue over what it means, or a blank for an unknown one.
       const chip = document.createElement("span");
       Object.assign(chip.style, {
-        fontSize: "13px", fontFamily: C.MONO,
-        padding: "2px 6px", borderRadius: "3px",
+        display: "inline-flex", flexDirection: "column", alignItems: "center", minWidth: "84px",
+        padding: "4px 10px 3px", borderRadius: "2px", lineHeight: "1.15",
         border: `1px solid ${unlocked[i] ? C.TITLE : learned[i] ? C.BORDER : "rgba(120, 100, 70, 0.4)"}`,
+        borderStyle: learned[i] || unlocked[i] ? "solid" : "dashed",
         color: unlocked[i] ? C.TITLE : learned[i] ? C.TEXT : C.LOCKED,
         background: unlocked[i] ? "rgba(107, 79, 18, 0.35)" : "transparent",
       });
-      chip.textContent = learned[i] || unlocked[i]
-        ? `${word!.word} · ${word!.translation}`
-        : "??? · Unknown";
+      const known = learned[i] || unlocked[i];
+      const top = document.createElement("span");
+      Object.assign(top.style, { fontFamily: C.FONT, fontSize: "14px", fontWeight: "600", letterSpacing: "1.5px" });
+      top.textContent = known ? word!.word : `Rank ${i + 1}`;
+      const under = document.createElement("span");
+      Object.assign(under.style, { fontFamily: C.BODY, fontStyle: "italic", fontSize: "13px", opacity: "0.85" });
+      under.textContent = known ? word!.translation : "unknown";
+      chip.append(top, under);
       chip.setAttribute(
         "aria-label",
         `Word ${i + 1}: ${unlocked[i] ? "unlocked" : learned[i] ? "learned, not unlocked" : "unknown"}`,
