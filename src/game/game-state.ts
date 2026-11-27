@@ -203,7 +203,7 @@ export class GameState {
   public readonly _progression = new ProgressionFeature();
   public get levelUpUI(): LevelUpUI { return this._progression.levelUp; }
   /** Tab-open HTML overlay — identity, attributes, skills, reputation. */
-  public get characterSheetUI(): CharacterSheetUI { return this._progression.sheet; }
+  public get characterSheetUI(): LazyPanel<CharacterSheetUI> { return this._progression.sheet; }
   public get stableUI(): LazyPanel<StableUI> { return this.mounts.stable; }
   public get saddlebagUI(): LazyPanel<SaddlebagUI> { return this.mounts.saddlebag; }
   public uiAnimator: UIAnimator = new UIAnimator();

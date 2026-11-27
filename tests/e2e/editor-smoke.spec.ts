@@ -131,7 +131,8 @@ test("editor and tool chords reach their handlers", async ({ page }) => {
   await canvas.click({ force: true });
   await canvas.focus();
   await page.keyboard.press("Tab");
-  expect(await g<boolean>("g.characterSheetUI.isVisible"), "Tab opens the character sheet").toBe(true);
+  // (Its code loads the first time it opens.)
+  await expect.poll(() => g<boolean>("g.characterSheetUI.isVisible"), { message: "Tab opens the character sheet" }).toBe(true);
   await page.keyboard.press("Tab");
   expect(await g<boolean>("g.characterSheetUI.isVisible")).toBe(false);
   expect(errors).toEqual([]);

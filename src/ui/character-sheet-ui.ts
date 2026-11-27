@@ -144,6 +144,11 @@ export class CharacterSheetUI {
     if (!this._focusSession && this._root) this._focusSession = manageDialogFocus(this._root);
   }
 
+  /** Close it (as the other windows do): hide it. */
+  public close(): void {
+    this.hide();
+  }
+
   /** Hide the panel without destroying its DOM. */
   public hide(): void {
     if (this._root) this._root.style.display = "none";

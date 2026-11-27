@@ -65,9 +65,11 @@ describe("ProgressionFeature (headless, through the kernel)", () => {
     expect(t.notes).toContain("Character Level 2!");
   });
 
-  it("Tab opens the character sheet with the level, and closes it", () => {
+  it("Tab opens the character sheet (loading it the first time) with the level, and closes it", async () => {
     const t = setup();
     t.svc.toggleSheet();
+    t.svc.toggleSheet(); // pressed again while it loads: ignored
+    await t.svc.sheet.get();
     expect(t.svc.sheet.isVisible).toBe(true);
     t.svc.toggleSheet();
     expect(t.svc.sheet.isVisible).toBe(false);

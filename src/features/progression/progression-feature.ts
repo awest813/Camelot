@@ -13,7 +13,8 @@ import type { Feature, FeatureContext, ServiceRegistry } from "../../core/kernel
 import { createServiceKey } from "../../core/kernel";
 import { PlayerLevelSystem } from "../../systems/player-level-system";
 import { LevelUpUI } from "../../ui/level-up-ui";
-import { CharacterSheetUI, type CharacterSheetData } from "../../ui/character-sheet-ui";
+import type { CharacterSheetUI, CharacterSheetData } from "../../ui/character-sheet-ui";
+import { LazyPanel } from "../../ui/lazy-panel";
 import type { AttributeSystem } from "../../systems/attribute-system";
 import type { ClassSystem } from "../../systems/class-system";
 import type { PerkSystem } from "../../systems/perk-system";
@@ -38,7 +39,8 @@ export interface ProgressionHostService {
 export interface ProgressionService {
   readonly levels: PlayerLevelSystem;
   readonly levelUp: LevelUpUI;
-  readonly sheet: CharacterSheetUI;
+  /** The sheet (loaded on first use). */
+  readonly sheet: LazyPanel<CharacterSheetUI>;
   /** Tab: the character sheet. */
   toggleSheet(): void;
   closeSheet(): void;
@@ -54,7 +56,14 @@ export class ProgressionFeature implements Feature {
   public readonly levels = new PlayerLevelSystem();
   /** The one level-up dialog. (There used to be two, and the one shown lost its confirm.) */
   public readonly levelUp = new LevelUpUI();
-  public readonly sheet = new CharacterSheetUI();
+  /** The character sheet: its code loads the first time it opens. */
+  public readonly sheet = new LazyPanel<CharacterSheetUI>(async () => {
+    const { CharacterSheetUI } = await import("../../ui/character-sheet-ui");
+    const ui = new CharacterSheetUI();
+    this._wireSheet?.(ui);
+    return ui;
+  });
+  private _wireSheet: ((ui: CharacterSheetUI) => void) | null = null;
   private _s: ServiceRegistry | null = null;
 
   public install(ctx: FeatureContext): void {
@@ -96,19 +105,23 @@ export class ProgressionFeature implements Feature {
       host().offerAttributes();
     };
 
-    this.sheet.onClose = () => {
-      host().setSheetOpen(false);
-      modal().restoreGameplay();
-    };
-    this.sheet.onPerkUnlock = (perkId) => {
-      if (!host().perks().unlock(perkId)) return;
-      feedback().markDirty();
-      this._refresh();
+    this._wireSheet = (ui) => {
+      ui.onClose = () => {
+        host().setSheetOpen(false);
+        modal().restoreGameplay();
+      };
+      ui.onPerkUnlock = (perkId) => {
+        if (!host().perks().unlock(perkId)) return;
+        feedback().markDirty();
+        this._refresh();
+      };
     };
 
+    /** The sheet's code is loading (Tab again waits for it). */
+    let opening = false;
     const close = () => {
       if (!this.sheet.isVisible) return;
-      this.sheet.hide();
+      this.sheet.current?.hide();
       host().setSheetOpen(false);
       modal().restoreGameplay();
     };
@@ -121,11 +134,15 @@ export class ProgressionFeature implements Feature {
       closeSheet: close,
       toggleSheet: () => {
         if (this.sheet.isVisible) { close(); return; }
-        if (!s.get(GameplayKey).canAct()) return;
-        this._refresh();
-        this.sheet.show();
-        host().setSheetOpen(true);
+        if (opening || !s.get(GameplayKey).canAct()) return;
+        opening = true;
         modal().suspendGameplay();
+        host().setSheetOpen(true);
+        void this.sheet.get().then((ui) => {
+          opening = false;
+          this._refresh();
+          ui.show();
+        });
       },
       skillRaised: (id) => this.levels.handleSkillLevelUp(id as never),
     });
@@ -133,7 +150,9 @@ export class ProgressionFeature implements Feature {
     ctx.scope.add(() => {
       this.levels.onLevelUpReady = this.levels.onLevelUpComplete = null;
       this.levelUp.onConfirm = null;
-      this.sheet.onClose = this.sheet.onPerkUnlock = null;
+      const ui = this.sheet.current;
+      if (ui) { ui.close(); ui.onClose = ui.onPerkUnlock = null; }
+      this._wireSheet = null;
       this._s = null;
     });
   }
@@ -144,6 +163,6 @@ export class ProgressionFeature implements Feature {
     if (!s) return;
     const host = s.get(ProgressionHostKey);
     const perks = host.perks();
-    this.sheet.update({ ...host.sheet(), level: this.levels.characterLevel, perkPoints: perks.perkPoints, perks: perks.getAllPerks() });
+    this.sheet.current?.update({ ...host.sheet(), level: this.levels.characterLevel, perkPoints: perks.perkPoints, perks: perks.getAllPerks() });
   }
 }
