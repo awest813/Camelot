@@ -157,12 +157,14 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
   await page.keyboard.press("p");
   const pets = await page.evaluate(async () => {
     const g = (window as any).__camelotGame;
+    const panel = await g.petUI.get(); // the panel loads on first open
+    await new Promise((r) => setTimeout(r, 0));
     const panelOpen = g.petUI.isVisible as boolean;
-    g.petUI.onSummon("pet_wolf");
+    panel.onSummon("pet_wolf");
     await new Promise((r) => setTimeout(r, 500));
     const body = g.scene.getMeshByName("pet_pet_wolf");
     const out = { panelOpen, spawned: !!body, physics: !!body?.physicsBody, same: g.petSystem === g.pets.pets };
-    g.petUI.onDismiss();
+    panel.onDismiss();
     return { ...out, gone: !g.scene.getMeshByName("pet_pet_wolf") };
   });
   expect(pets, "companion panel, summon and dismiss").toEqual({ panelOpen: true, spawned: true, physics: true, same: true, gone: true });
@@ -171,7 +173,8 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
 
   // G — the follower panel opens and closes.
   await page.keyboard.press("g");
-  expect(await page.evaluate(() => (window as any).__camelotGame.followerUI.isVisible), "follower panel open").toBe(true);
+  // (It loads on first open.)
+  await expect.poll(() => page.evaluate(() => (window as any).__camelotGame.followerUI.isVisible), { message: "follower panel open" }).toBe(true);
   await page.keyboard.press("g");
   expect(await page.evaluate(() => (window as any).__camelotGame.followerUI.isVisible), "follower panel closed").toBe(false);
   await page.locator("#renderCanvas").click({ force: true });
