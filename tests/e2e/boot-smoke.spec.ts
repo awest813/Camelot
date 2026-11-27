@@ -181,7 +181,7 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
 
   // N — the shouts panel; Shift+N with nothing equipped says so.
   await page.keyboard.press("n");
-  expect(await page.evaluate(() => (window as any).__camelotGame.shoutUI.isVisible), "shouts panel open").toBe(true);
+  await expect.poll(() => page.evaluate(() => (window as any).__camelotGame.shoutUI.isVisible), { message: "shouts panel open (loads on first use)" }).toBe(true);
   // Escape closes it (it used to pause the game underneath instead).
   await page.keyboard.press("Escape");
   expect(await page.evaluate(() => {

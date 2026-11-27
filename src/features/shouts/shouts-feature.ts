@@ -15,7 +15,9 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Feature, FeatureContext, ServiceRegistry } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { OldTongueSystem, type ShoutTierEffect } from "../../systems/old-tongue-system";
-import { ShoutUI, type ShoutView } from "../../ui/shout-ui";
+import type { ShoutUI, ShoutView } from "../../ui/shout-ui";
+import { ShoutChip } from "../../ui/shout-chip";
+import { LazyPanel } from "../../ui/lazy-panel";
 import type { ActiveEffect } from "../../systems/active-effects-system";
 import type { DamageType, NPC } from "../../entities/npc";
 import { FeedbackKey, GameplayKey, ModalKey, ownSave } from "../services";
@@ -39,7 +41,7 @@ export interface ShoutHostService {
 
 export interface ShoutsService {
   readonly shouts: OldTongueSystem;
-  readonly panel: ShoutUI;
+  readonly panel: LazyPanel<ShoutUI>;
   /** N: open or close the shouts panel. */
   togglePanel(): void;
   /** Shift+N: shout the equipped shout. */
@@ -63,7 +65,16 @@ const MAX_DASH = 30;
 export class ShoutsFeature implements Feature {
   public readonly id = "shouts";
   public readonly shouts = new OldTongueSystem();
-  public readonly panel = new ShoutUI();
+  /** The words panel (N), loaded the first time it opens. */
+  public readonly panel = new LazyPanel<ShoutUI>(async () => {
+    const { ShoutUI } = await import("../../ui/shout-ui");
+    const panel = new ShoutUI();
+    this._wirePanel?.(panel);
+    return panel;
+  });
+  /** The ready word's HUD chip. */
+  public readonly chip = new ShoutChip();
+  private _wirePanel: ((panel: ShoutUI) => void) | null = null;
   private _timeScale = 1;
   private _slowTimeLeft = 0;
   private _furyLeft = 0;
@@ -90,19 +101,21 @@ export class ShoutsFeature implements Feature {
     };
     sh.onAwenGained = (total) => feedback().notify(`Awen gained (${total} held).`, 3000);
 
-    this.panel.onEquip = (shoutId) => {
-      if (!sh.equipShout(shoutId)) return;
-      this._refreshPanel();
-      const def = sh.getShout(shoutId);
-      feedback().notify(`${def?.name ?? shoutId} ready: Shift+N to speak it.`, 2400);
-      feedback().markDirty();
+    this._wirePanel = (panel) => {
+      panel.onEquip = (shoutId) => {
+        if (!sh.equipShout(shoutId)) return;
+        this._refreshPanel();
+        const def = sh.getShout(shoutId);
+        feedback().notify(`${def?.name ?? shoutId} ready: Shift+N to speak it.`, 2400);
+        feedback().markDirty();
+      };
+      panel.onUnlockWord = (shoutId, wordIndex) => {
+        if (!sh.unlockWord(shoutId, wordIndex)) {
+          feedback().notify("You need awen to master that rank.", 2400);
+        }
+      };
+      panel.onClose = () => modal().restoreGameplay();
     };
-    this.panel.onUnlockWord = (shoutId, wordIndex) => {
-      if (!sh.unlockWord(shoutId, wordIndex)) {
-        feedback().notify("You need awen to master that rank.", 2400);
-      }
-    };
-    this.panel.onClose = () => modal().restoreGameplay();
 
     ctx.provide(ShoutsKey, {
       shouts: sh,
@@ -114,8 +127,8 @@ export class ShoutsFeature implements Feature {
           return;
         }
         if (!s.get(GameplayKey).canAct()) return;
-        this.panel.open(this._views(), sh.awen, sh.equippedShoutId);
         modal().suspendGameplay();
+        void this.panel.get().then((panel) => panel.open(this._views(), sh.awen, sh.equippedShoutId));
       },
       use: () => {
         if (!s.get(GameplayKey).canAct()) return;
@@ -143,8 +156,8 @@ export class ShoutsFeature implements Feature {
       },
       updateHud: () => {
         const id = sh.equippedShoutId;
-        if (!id) { this.panel.updateHUD(null); return; }
-        this.panel.updateHUD({
+        if (!id) { this.chip.update(null); return; }
+        this.chip.update({
           name: sh.getShout(id)?.name ?? id,
           tier: sh.getUnlockedTier(id),
           cooldownSeconds: sh.cooldownRemaining(id, host().gameTime()),
@@ -207,7 +220,7 @@ export class ShoutsFeature implements Feature {
   }
 
   private _refreshPanel(): void {
-    this.panel.refresh(this._views(), this.shouts.awen, this.shouts.equippedShoutId);
+    this.panel.current?.refresh(this._views(), this.shouts.awen, this.shouts.equippedShoutId);
   }
 
   /** A validated shout's tier effects, delivered to the world. */

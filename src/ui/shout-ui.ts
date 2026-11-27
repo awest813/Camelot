@@ -13,7 +13,9 @@
  * Implemented as plain DOM so it matches the PetUI / StableUI pattern.
  */
 
-import { addHudChip } from "./hud-chips";
+import { ShoutChip, type ShoutHudInfo } from "./shout-chip";
+
+export type { ShoutHudInfo };
 import type { ShoutDefinition } from "../systems/old-tongue-system";
 import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 
@@ -47,15 +49,6 @@ export interface ShoutView {
   unlocked: boolean[];
 }
 
-/** Snapshot for the persistent HUD chip (null hides the chip). */
-export interface ShoutHudInfo {
-  name: string;
-  /** Number of unlocked words (0–3). */
-  tier: number;
-  /** Seconds of cooldown remaining; 0 means ready to shout. */
-  cooldownSeconds: number;
-}
-
 // ── ShoutUI ──────────────────────────────────────────────────────────────────
 
 export class ShoutUI {
@@ -69,11 +62,7 @@ export class ShoutUI {
   public onClose:      (() => void) | null = null;
 
   // ── HUD chip ───────────────────────────────────────────────────────────────
-  private _hudRoot:      HTMLDivElement | null = null;
-  private _hudName:      HTMLSpanElement | null = null;
-  private _hudPips:      HTMLSpanElement | null = null;
-  private _hudState:     HTMLSpanElement | null = null;
-  private _lastHudSerial: string = "";
+  private readonly _chip = new ShoutChip();
 
   // ── Management panel ────────────────────────────────────────────────────────
   private _panelRoot:    HTMLDivElement | null = null;
@@ -89,35 +78,9 @@ export class ShoutUI {
   // ── HUD chip ──────────────────────────────────────────────────────────────
   // ══════════════════════════════════════════════════════════════════════════
 
-  /**
-   * Show / refresh the HUD chip.  Pass `null` to hide it (no shout equipped).
-   * Cheap to call every frame — DOM writes are skipped when nothing changed.
-   */
+  /** Show / refresh the HUD chip (the feature drives its own chip; this is for a panel used alone). */
   public updateHUD(info: ShoutHudInfo | null): void {
-    if (typeof document === "undefined") return;
-
-    if (!info) {
-      if (this._hudRoot) this._hudRoot.style.display = "none";
-      this._lastHudSerial = "";
-      return;
-    }
-
-    this._ensureHUD();
-
-    const serial = `${info.name}|${info.tier}|${Math.ceil(info.cooldownSeconds)}`;
-    if (serial === this._lastHudSerial) return;
-    this._lastHudSerial = serial;
-
-    this._hudName!.textContent = info.name;
-    this._hudPips!.textContent = "◆".repeat(info.tier) + "◇".repeat(Math.max(0, 3 - info.tier));
-    if (info.cooldownSeconds > 0) {
-      this._hudState!.textContent = `${Math.ceil(info.cooldownSeconds)}s`;
-      this._hudState!.style.color = C.COOLDOWN;
-    } else {
-      this._hudState!.textContent = "READY";
-      this._hudState!.style.color = C.READY;
-    }
-    this._hudRoot!.style.display = "flex";
+    this._chip.update(info);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -158,48 +121,6 @@ export class ShoutUI {
   // ══════════════════════════════════════════════════════════════════════════
   // ── Private — HUD construction ────────────────────────────────────────────
   // ══════════════════════════════════════════════════════════════════════════
-
-  private _ensureHUD(): void {
-    if (this._hudRoot) return;
-
-    const root = document.createElement("div");
-    root.setAttribute("role", "status");
-    root.setAttribute("aria-live", "polite");
-    root.setAttribute("aria-label", "Word ready to speak");
-    Object.assign(root.style, {
-      display:       "none",
-      alignItems:    "center",
-      gap:           "6px",
-      background:    C.BG,
-      border:        `1px solid ${C.BORDER}`,
-      borderRadius:  "6px",
-      padding:       "5px 8px",
-      pointerEvents: "none",
-      fontFamily:    C.FONT,
-      minWidth:      "150px",
-    });
-
-    const icon = document.createElement("span");
-    icon.style.fontSize = "15px";
-    icon.textContent = "🜂";
-
-    const name = document.createElement("span");
-    Object.assign(name.style, { color: C.TITLE, fontSize: "14px", fontWeight: "bold", flex: "1" });
-
-    const pips = document.createElement("span");
-    Object.assign(pips.style, { color: C.DIM, fontSize: "13px", fontFamily: C.MONO });
-
-    const state = document.createElement("span");
-    Object.assign(state.style, { fontSize: "12px", fontFamily: C.FONT, fontWeight: "bold", letterSpacing: "1px" });
-
-    root.append(icon, name, pips, state);
-    addHudChip(root, 3); // the HUD chips' stack (ui/hud-chips.ts)
-
-    this._hudRoot  = root;
-    this._hudName  = name;
-    this._hudPips  = pips;
-    this._hudState = state;
-  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // ── Private — Panel construction ──────────────────────────────────────────

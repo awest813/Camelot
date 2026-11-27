@@ -368,7 +368,7 @@ export class GameState {
   // Words of the Old Tongue (shouts in code; state persists via saveSystem)
   public get shouts(): ShoutsService { return this.kernel.services.get(ShoutsKey); }
   public get oldTongueSystem(): OldTongueSystem { return this.shouts.shouts; }
-  public get shoutUI(): ShoutUI { return this.shouts.panel; }
+  public get shoutUI(): LazyPanel<ShoutUI> { return this.shouts.panel; }
 
   /** Fantasy asset loader — streams BabylonJS CDN models (weapons, structures, creatures). */
   public fantasyAssets: FantasyAssetLoader;

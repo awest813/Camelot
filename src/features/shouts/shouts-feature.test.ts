@@ -47,7 +47,7 @@ function ready(t: ReturnType<typeof setup>, shoutId: string) {
   t.svc.shouts.learnWord(shoutId, 0);
   t.svc.shouts.gainAwen();
   expect(t.svc.shouts.unlockWord(shoutId, 0)).toBe(true);
-  t.svc.panel.onEquip!(shoutId);
+  expect(t.svc.shouts.equipShout(shoutId)).toBe(true);
 }
 
 describe("ShoutsFeature (headless, through the kernel)", () => {
@@ -124,10 +124,14 @@ describe("ShoutsFeature (headless, through the kernel)", () => {
     t.k.uninstall("shouts");
   });
 
-  it("N opens and closes the panel", () => {
+  it("N opens and closes the panel (loading it the first time)", async () => {
     const t = setup();
     t.svc.togglePanel();
+    const panel = await t.svc.panel.get();
+    await new Promise((r) => setTimeout(r, 0));
     expect(t.svc.panel.isVisible).toBe(true);
+    panel.onEquip!("gust");
+    expect(t.notes.at(-1), "the loaded panel is wired").toMatch(/Gust ready: Shift\+N/);
     t.svc.togglePanel();
     expect(t.svc.panel.isVisible).toBe(false);
     expect(t.modal.restoreGameplay).toHaveBeenCalled();
