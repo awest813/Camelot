@@ -90,7 +90,7 @@ vi.mock('@babylonjs/core/Physics/v2/physicsAggregate', () => ({
   },
 }));
 
-vi.mock('@babylonjs/core/Physics', () => ({
+vi.mock('@babylonjs/core/Physics/v2/IPhysicsEnginePlugin', () => ({
   PhysicsShapeType: { BOX: 'BOX', CYLINDER: 'CYLINDER', CAPSULE: 'CAPSULE' },
 }));
 

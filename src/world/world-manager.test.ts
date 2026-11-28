@@ -95,7 +95,7 @@ vi.mock('@babylonjs/core/Meshes/mesh', () => ({
   },
 }));
 
-vi.mock('@babylonjs/core/Physics', () => ({
+vi.mock('@babylonjs/core/Physics/v2/IPhysicsEnginePlugin', () => ({
   PhysicsShapeType: { BOX: 'BOX' },
 }));
 

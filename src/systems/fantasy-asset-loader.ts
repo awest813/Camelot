@@ -35,7 +35,7 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import "@babylonjs/core/Meshes/instancedMesh"; // Mesh.prototype.createInstance
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Quaternion } from "@babylonjs/core/Maths/math.vector";
-import "@babylonjs/loaders/glTF";
+import "../rendering/gltf-loading";
 
 // ── Asset catalogue ──────────────────────────────────────────────────────────
 

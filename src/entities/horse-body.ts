@@ -17,6 +17,7 @@ import type { Material } from "@babylonjs/core/Materials/material";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { asyncWork } from "../core/async-work";
+import "../rendering/gltf-loading";
 
 export type HorseCoat = { r: number; g: number; b: number };
 

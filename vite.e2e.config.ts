@@ -38,5 +38,13 @@ export default defineConfig({
 
   optimizeDeps: {
     exclude: ["@babylonjs/havok"],
+    // The lazy glTF loader (src/rendering/gltf-loading.ts): pre-bundled in one
+    // pass with its extension registry, so the loader and the registered
+    // extensions share one copy of it in the dev server.
+    include: [
+      "@babylonjs/loaders/glTF/glTFFileLoader.metadata",
+      "@babylonjs/loaders/glTF/2.0/glTFLoader",
+      "@babylonjs/loaders/glTF/2.0/Extensions/dynamic",
+    ],
   },
 });

@@ -1,6 +1,5 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
-import { AxesViewer } from "@babylonjs/core/Debug/axesViewer";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { WebGPUEngine } from "@babylonjs/core/Engines/webgpuEngine";
 import { guardEarlyDeviceLoss, pickRenderer } from "./rendering/renderer-choice";
@@ -10,6 +9,10 @@ import { MeshoptCompression } from "@babylonjs/core/Meshes/Compression/meshoptCo
 // ships with the game instead of coming from Babylon's CDN.
 MeshoptCompression.Configuration = { decoder: { url: `${import.meta.env.BASE_URL ?? "/"}vendor/meshopt_decoder.js` } };
 import { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
+// scene.enablePhysics (the v2 engine): its own import, not the Physics barrel's
+// side effect (the barrel also bundled the v1 Ammo/Cannon/Oimo plugins).
+import "@babylonjs/core/Physics/joinedPhysicsEngineComponent";
+import "@babylonjs/core/Physics/v2/physicsEngineComponent";
 import HavokPhysics from "@babylonjs/havok";
 
 import MainScene from "./playground/main-scene";
@@ -201,7 +204,8 @@ export class App {
   _config(): void {
     // Axes — only in dev to avoid adding extra meshes in production
     if (import.meta.env.DEV) {
-      new AxesViewer(this.scene);
+      // Loaded on demand: a static import put the gizmo code in every build.
+      void import("@babylonjs/core/Debug/axesViewer").then(({ AxesViewer }) => new AxesViewer(this.scene));
     }
 
     // Inspector and other stuff

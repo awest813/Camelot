@@ -6,17 +6,21 @@ function pathResolve(dir: string) {
   return resolve(__dirname, ".", dir);
 }
 
-type ModuleInfoLookup = (id: string) => { isEntry: boolean; importers: readonly string[] } | null;
+type ModuleInfoLookup = (id: string) => { isEntry: boolean; importers: readonly string[]; dynamicImporters?: readonly string[] } | null;
 const staticReachCache = new Map<string, Map<string, boolean>>();
 
 /** The entry modules: the game page and the editor page. */
 const GAME_ENTRY = "/index.html";
 const EDITOR_ENTRY = "/editor.html";
 
-/** True when `id` is reachable from an entry module (by path suffix) through static imports only. */
-function isStaticallyReachable(id: string, getModuleInfo: ModuleInfoLookup, entry = GAME_ENTRY): boolean {
-  let cache = staticReachCache.get(entry);
-  if (!cache) staticReachCache.set(entry, (cache = new Map()));
+/**
+ * True when `id` is reachable from an entry module (by path suffix): through
+ * static imports only, or (`viaDynamic`) through dynamic `import()`s too.
+ */
+function isStaticallyReachable(id: string, getModuleInfo: ModuleInfoLookup, entry = GAME_ENTRY, viaDynamic = false): boolean {
+  const cacheKey = viaDynamic ? `${entry}+dynamic` : entry;
+  let cache = staticReachCache.get(cacheKey);
+  if (!cache) staticReachCache.set(cacheKey, (cache = new Map()));
   const cached = cache.get(id);
   if (cached !== undefined) return cached;
   // Breadth-first walk up the static importer graph.
@@ -31,7 +35,7 @@ function isStaticallyReachable(id: string, getModuleInfo: ModuleInfoLookup, entr
       reachable = true;
       break;
     }
-    for (const importer of info.importers) {
+    for (const importer of viaDynamic ? [...info.importers, ...(info.dynamicImporters ?? [])] : info.importers) {
       if (!seen.has(importer)) {
         seen.add(importer);
         queue.push(importer);
@@ -127,6 +131,11 @@ export default ({ mode }: { mode: string }) => {
         // Two apps: the game, and the editor (the game plus the editor suite).
         input: { index: pathResolve("index.html"), editor: pathResolve("editor.html") },
         output: {
+          // A manual chunk holds only the modules assigned to it: Rollup would
+          // otherwise pull their unassigned dependencies in too (the editor's
+          // GUI chunk swallowed Babylon modules the game's lazy glTF loader
+          // also needs, so loading a model fetched editor code).
+          onlyExplicitManualChunks: true,
           manualChunks(id, { getModuleInfo }) {
             // Only claim Babylon modules reachable through static imports. Babylon
             // lazy-loads large optional code (WebGPU WGSL shaders, glTF FlowGraph
@@ -135,8 +144,11 @@ export default ({ mode }: { mode: string }) => {
             if (id.includes("@babylonjs")) {
               if (isStaticallyReachable(id, getModuleInfo)) return "babylon-vendor";
               // Static Babylon code only the editor app loads (GUI, …): its own
-              // chunk, so the game page never fetches it.
-              if (isStaticallyReachable(id, getModuleInfo, EDITOR_ENTRY)) return "babylon-editor";
+              // chunk, so the game page never fetches it.  Code the game also
+              // reaches lazily (the glTF loader, fetched with the first model)
+              // stays with its lazy importer instead, or loading a model would
+              // fetch the editor's chunk.
+              if (isStaticallyReachable(id, getModuleInfo, EDITOR_ENTRY) && !isStaticallyReachable(id, getModuleInfo, GAME_ENTRY, true)) return "babylon-editor";
               // Lazily-loaded shaders: one chunk per language, so WebGL fetches a
               // single GLSL file on first material compile (not a waterfall of
               // tiny chunks) and WGSL is only ever fetched by the WebGPU engine.
@@ -159,6 +171,14 @@ export default ({ mode }: { mode: string }) => {
 
     optimizeDeps: {
       exclude: ["@babylonjs/havok"],
+      // The lazy glTF loader (src/rendering/gltf-loading.ts): pre-bundled in one
+      // pass with its extension registry, so the loader and the registered
+      // extensions share one copy of it in the dev server.
+      include: [
+        "@babylonjs/loaders/glTF/glTFFileLoader.metadata",
+        "@babylonjs/loaders/glTF/2.0/glTFLoader",
+        "@babylonjs/loaders/glTF/2.0/Extensions/dynamic",
+      ],
     },
   });
 };

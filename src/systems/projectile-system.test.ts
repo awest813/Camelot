@@ -49,7 +49,7 @@ vi.mock("@babylonjs/core/Physics/v2/physicsAggregate", () => ({
   },
 }));
 
-vi.mock("@babylonjs/core/Physics", () => ({
+vi.mock("@babylonjs/core/Physics/v2/IPhysicsEnginePlugin", () => ({
   PhysicsShapeType: { SPHERE: 1, CYLINDER: 2 },
   PhysicsMotionType: { DYNAMIC: 1 },
 }));

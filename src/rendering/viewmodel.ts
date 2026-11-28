@@ -12,7 +12,7 @@ import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import "@babylonjs/loaders/glTF";
+import "./gltf-loading";
 import type { WeaponArchetype } from "../systems/combat-shared";
 
 interface Pose { px: number; py: number; pz: number; rx: number; ry: number; rz: number }

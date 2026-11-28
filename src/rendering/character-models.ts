@@ -30,7 +30,7 @@ import { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
-import "@babylonjs/loaders/glTF";
+import "./gltf-loading";
 import type { AnimationClip } from "../systems/animation-system";
 
 export type QuaterniusHumanId = "Peasant_Male" | "Peasant_Female" | "Ranger_Male" | "Ranger_Female" | "Orc_Brute";

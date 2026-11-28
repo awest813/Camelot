@@ -209,7 +209,7 @@ export class PetsFeature implements Feature {
     mesh.material = mat;
     mesh.receiveShadows = true;
     // No physics engine (headless tests): the pet stands still but still fights.
-    if (this._scene.getPhysicsEngine()) {
+    if (this._scene.getPhysicsEngine?.()) {
       const body = new PhysicsAggregate(mesh, PhysicsShapeType.CAPSULE, { mass: 0.5, restitution: 0 }, this._scene);
       body.body.setMotionType(PhysicsMotionType.DYNAMIC);
       // Lock rotation so the capsule stays upright.

@@ -3,7 +3,7 @@ import { UniversalCamera } from "@babylonjs/core/Cameras/universalCamera";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Ray } from "@babylonjs/core/Culling/ray";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
-import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics";
+import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 // Side-effect import: registers Scene.CollisionCoordinatorFactory. Without it the
 // camera's first collision query (checkCollisions below) throws inside the render

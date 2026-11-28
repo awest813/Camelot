@@ -4,7 +4,7 @@ import { actors } from './actors';
 import { Engaged } from '../core/ecs/actors';
 import { Vector3 } from '@babylonjs/core/Maths/math.vector';
 import { Color3 } from '@babylonjs/core/Maths/math.color';
-import { PhysicsMotionType } from '@babylonjs/core/Physics';
+import { PhysicsMotionType } from '@babylonjs/core/Physics/v2/IPhysicsEnginePlugin';
 
 // Mock BabylonJS core features to avoid complex initialization
 vi.mock('@babylonjs/core/Meshes/meshBuilder', () => {
@@ -61,7 +61,7 @@ vi.mock('@babylonjs/core/Physics/v2/physicsAggregate', () => {
     };
 });
 
-vi.mock('@babylonjs/core/Physics', () => ({
+vi.mock('@babylonjs/core/Physics/v2/IPhysicsEnginePlugin', () => ({
     PhysicsShapeType: { SPHERE: 1, CAPSULE: 2, BOX: 3 },
     PhysicsMotionType: { DYNAMIC: 1, STATIC: 2 }
 }));
