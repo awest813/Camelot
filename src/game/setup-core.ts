@@ -91,7 +91,7 @@ export function setupCoreSystems(g: Game): void {
   g.ui.events = g.eventBus;
   g.eventBus.on("ui:skillPurchase", ({ treeIndex, skillIndex }) => g.skillTreeSystem.purchaseSkill(treeIndex, skillIndex));
   g.saveSystem.setSkillTreeSystem(g.skillTreeSystem);
-  g.audioSystem        = new AudioSystem();
+  g.audioSystem        = new AudioSystem(); g.audioSystem.listen(g.eventBus); // the game's events, voiced
   // The base content plus the starter quests (one quest engine for all).
   g.frameworkRuntime   = new FrameworkRuntime({ ...frameworkBaseContent, quests: [...frameworkBaseContent.quests, ...STARTER_QUESTS] }, {
     inventoryCapacity: g.inventorySystem.maxCapacity,

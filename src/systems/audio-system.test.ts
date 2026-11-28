@@ -145,6 +145,58 @@ describe('AudioSystem', () => {
         expect(mockCtx.createOscillator.mock.calls.length).toBe(oscCountAfterStep);
     });
 
+    it('steps keep pace with the ground covered: a sprint quickens them, a horse makes hoofbeats', () => {
+        const step = (_from: number, to: number, dt: number, gait = {}) => {
+            const before = mockCtx.createOscillator.mock.calls.length;
+            audio.updateFootsteps(dt, new Vector3(0, 0, to), gait);
+            return mockCtx.createOscillator.mock.calls.length - before;
+        };
+        audio.updateFootsteps(0.016, new Vector3(0, 0, 0));
+        expect(step(0, 0.5, 0.1), 'the first step sounds at once').toBeGreaterThan(0);
+        expect(step(0.5, 1.0, 0.1), 'half a stride on: silent').toBe(0);
+        expect(step(1.0, 2.2, 0.1), 'a stride covered: a step').toBeGreaterThan(0);
+        // Mounted: two knocks per hoofbeat, every 2.4 m.
+        expect(step(2.2, 5.0, 0.1, { mounted: true })).toBe(2);
+        // Swimming or flying: nothing.
+        expect(step(5, 9, 0.1, { airborne: true })).toBe(0);
+        // A teleport isn't a step.
+        expect(step(9, 900, 0.016)).toBe(0);
+    });
+
+    it('voices the game\'s events through listen(), and stops when unsubscribed', () => {
+        const handlers = new Map<string, Array<(p: unknown) => void>>();
+        const bus = {
+            on: (name: string, fn: (p: unknown) => void) => {
+                handlers.set(name, [...(handlers.get(name) ?? []), fn]);
+                return () => handlers.set(name, (handlers.get(name) ?? []).filter((f) => f !== fn));
+            },
+        };
+        const off = audio.listen(bus as never);
+        const sounds = (name: string, payload: unknown = {}) => {
+            const before = mockCtx.createOscillator.mock.calls.length;
+            for (const fn of handlers.get(name) ?? []) fn(payload);
+            return mockCtx.createOscillator.mock.calls.length - before;
+        };
+        for (const e of ['spell:cast', 'combat:blocked', 'loot:pickedUp', 'player:levelUp', 'quest:completed', 'portal:entered', 'item:consumed', 'stealth:detected']) {
+            expect(sounds(e, { itemId: 'gold_coins' }), e).toBeGreaterThan(0);
+        }
+        off();
+        expect(sounds('combat:blocked')).toBe(0);
+    });
+
+    it('a storm brings thunder, outdoors; indoors the weather is near silent', () => {
+        const handlers = new Map<string, (p: unknown) => void>();
+        audio.listen({ on: (n: string, fn: (p: unknown) => void) => { handlers.set(n, fn); return () => {}; } } as never);
+        handlers.get('weather:changed')!({ state: 'storm' });
+        const before = mockCtx.createBufferSource.mock.calls.length;
+        for (let i = 0; i < 70 * 60; i++) audio.updateFootsteps(1 / 60, new Vector3(0, 0, 0));
+        expect(mockCtx.createBufferSource.mock.calls.length, 'a thunderclap within 70 s').toBeGreaterThan(before);
+        handlers.get('cell:changed')!({ cellId: 'cave_01', cellName: 'Old Cave' });
+        const inside = mockCtx.createBufferSource.mock.calls.length;
+        for (let i = 0; i < 70 * 60; i++) audio.updateFootsteps(1 / 60, new Vector3(0, 0, 0));
+        expect(mockCtx.createBufferSource.mock.calls.length, 'no thunder in the cave').toBe(inside);
+    });
+
     it('playMeleeAttack creates oscillator and buffer source nodes', () => {
         const oscBefore = mockCtx.createOscillator.mock.calls.length;
         const srcBefore = mockCtx.createBufferSource.mock.calls.length;

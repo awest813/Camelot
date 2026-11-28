@@ -18,7 +18,7 @@ const NPC_FALL_RECOVERY_Y = -30;
 
 export function updateGameplayStep(g: Game, deltaTime: number): void {
   g.player.update(deltaTime);
-  g.audioSystem.updateFootsteps(deltaTime, g.player.camera.position);
+  g.audioSystem.updateFootsteps(deltaTime, g.player.camera.position, { mounted: g.mounts?.horses.isMounted, crouching: g.stealthSystem.isCrouching, airborne: !g.player.camera.applyGravity || g.swimSystem.isSubmerged });
   g.world.update(g.player.camera.position);
 
   g.timeSystem.update(deltaTime);

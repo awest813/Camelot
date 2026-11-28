@@ -454,7 +454,7 @@ export class GameState {
     blocked: () => isCombatInputBlocked(this.asGame),
     free: () => !this.isPaused && !this.dialogueSystem.isInDialogue,
     swing: (power) => { this._viewModel?.swing(power); this.audioSystem.playMeleeAttack(); },
-    twang: () => this.audioSystem.playMeleeAttack(),
+    twang: () => this.audioSystem.playBowShot(),
     notify: (text, ms) => this.ui.showNotification(text, ms),
   });
   /** Who has the player's input; the one place pointer lock changes. */
