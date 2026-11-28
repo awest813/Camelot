@@ -91,6 +91,27 @@ describe("MountsFeature (headless, through the kernel)", () => {
     t.k.uninstall("mounts");
   });
 
+  it("O rides the horse just bought, not always the first one owned", () => {
+    const t = setup({ gold: 5000 });
+    t.mounts.horses.purchaseHorse("Ostler", "bay_mare", 5000);
+    t.mounts.horses.purchaseHorse("Ostler", "black_stallion", 5000);
+    t.mounts.toggleMount();
+    expect(t.mounts.horses.currentHorse?.id).toBe("black_stallion");
+    t.k.uninstall("mounts");
+  });
+
+  it("a horse the purse can't cover says so", async () => {
+    const t = setup({ gold: 100 });
+    t.k.events.emit("dialogue:action", { eventId: "stable:open", npcName: "Ostler" });
+    t.k.events.emit("dialogue:closed", {} as never);
+    const stable = await t.mounts.stable.get();
+    const status = vi.spyOn(stable, "showStatus");
+    stable.onPurchase!("bay_mare");
+    expect(status).toHaveBeenCalledWith("Not enough gold: this horse costs 500g.", true);
+    expect(t.gold()).toBe(100);
+    t.k.uninstall("mounts");
+  });
+
   it("does nothing while gameplay is blocked (paused, in a conversation)", () => {
     const t = setup();
     t.block();

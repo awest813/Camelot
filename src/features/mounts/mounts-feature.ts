@@ -41,7 +41,7 @@ export interface MountsService {
   /** The stable and saddlebag windows (loaded on first use). */
   readonly stable: LazyPanel<StableUI>;
   readonly saddlebag: LazyPanel<SaddlebagUI>;
-  /** O: mount the first owned horse, or dismount. */
+  /** O: mount a horse (the one just bought, else the one last ridden), or dismount. */
   toggleMount(): void;
   /** Shift+O: the saddlebag while mounted, otherwise the stable. */
   toggleStableOrSaddlebag(): void;
@@ -171,6 +171,8 @@ export class MountsFeature implements Feature {
   private _model: HorseInstance | null = null;
   /** Where the horse stands, if it does (saved). */
   private _parked: Parked | null = null;
+  /** A horse bought since the last ride: O calls it rather than the old one. */
+  private _justBought: string | null = null;
   /** Bumped on every change, so a model that finishes loading late is dropped. */
   private _bodyToken = 0;
   private _bob = 0;
@@ -224,6 +226,7 @@ export class MountsFeature implements Feature {
       feedback().markDirty();
     };
     this.horses.onHorsePurchased = (horse) => {
+      this._justBought = horse.id;
       feedback().notify(`Purchased ${horse.name}!`, 2500);
       host().unlockAchievement("ACH_SADDLED");
       feedback().markDirty();
@@ -233,8 +236,11 @@ export class MountsFeature implements Feature {
       stable.onClose = () => modal().restoreGameplay();
       stable.onPurchase = (horseId) => {
         if (!this.horses.getStableNPC(STABLE_MASTER)) return;
+        const asking = this.horses.getStableNPC(STABLE_MASTER)?.prices[horseId] ?? 0;
         const price = this.horses.purchaseHorse(STABLE_MASTER, horseId, purse().gold());
-        if (price === -2) {
+        if (price === -1 && purse().gold() < asking) {
+          stable.showStatus(`Not enough gold: this horse costs ${asking}g.`, true);
+        } else if (price === -2) {
           stable.showStatus("You already own this horse.", true);
         } else if (price < 0) {
           stable.showStatus("Unable to complete the purchase.", true);
@@ -274,7 +280,11 @@ export class MountsFeature implements Feature {
         }
         const owned = this.horses.ownedHorses;
         if (owned.length === 0) feedback().notify("You don't own a horse. The ostler at a village inn sells them.", 2500);
-        else this.horses.mountHorse(owned[0].id);
+        else {
+          const pick = [this._justBought, this._parked?.horseId].find((id) => id && owned.some((h) => h.id === id));
+          this._justBought = null;
+          this.horses.mountHorse(pick ?? owned[0].id);
+        }
       },
       toggleStableOrSaddlebag: () => {
         // Closing comes first: the open window itself counts as "can't act".

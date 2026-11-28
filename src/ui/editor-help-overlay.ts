@@ -9,7 +9,7 @@ const BASE_CONTROLS: readonly string[] = [
   "V: Heritage power · Shift+V: Omen power · H: Fame / Status · Y: Fast Travel Menu (Recall) · M: Map · Shift+M: Mark · F7: Mute",
   "N: Words of the Old Tongue · Shift+N: Speak the word · Great deeds bring awen",
   "C: Crouch (sneak) · E while undetected: Pickpocket · P: Pets · G: Followers",
-  "O: Mount / Dismount · Shift+O: Stable (buy horse) or Saddlebag (if mounted)",
+  "O: Mount / Dismount · Shift+O: Saddlebag (mounted) · Buy horses from a village ostler",
   "Shift+1–3: Melee stance · Shift+4–6: Magic stance · CapsLock: Auto-run",
   "1–0: Quick Slots (F8: list) · F4: Toggle POV · F5/F9: Save/Load · F3: Debug Overlay",
   "PrintScreen: Screenshot",
