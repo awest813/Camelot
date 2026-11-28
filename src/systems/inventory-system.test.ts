@@ -116,4 +116,13 @@ describe('InventorySystem', () => {
         expect(mockUI.toggleInventory).toHaveBeenCalledWith(false);
         expect(mockPlayer.camera.attachControl).toHaveBeenCalled();
     });
+
+    it('a full bag refuses a find, but takes what the game owes (overfill)', () => {
+        inventorySystem.maxCapacity = 1;
+        const rock = { id: 'rock', name: 'Rock', description: '', stackable: false, quantity: 1 };
+        expect(inventorySystem.addItem(rock)).toBe(true);
+        expect(inventorySystem.addItem({ ...rock, id: 'stone' })).toBe(false);
+        expect(inventorySystem.addItem({ id: 'gold_coins', name: 'Gold Coins', description: '', stackable: true, quantity: 150 }, { overfill: true })).toBe(true);
+        expect(inventorySystem.items.map((i) => i.id)).toEqual(['rock', 'gold_coins']);
+    });
 });

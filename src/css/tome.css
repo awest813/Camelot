@@ -871,6 +871,9 @@
 .inventory .inventory__grid {
   gap: 8px;
   align-content: start;
+  /* Five rows; an overfull bag (gold, a quest's reward) scrolls. */
+  max-height: calc(5 * 84px + 4 * 8px);
+  overflow-y: auto;
 }
 .inventory .inventory__slot {
   position: relative;

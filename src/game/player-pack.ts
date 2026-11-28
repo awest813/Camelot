@@ -29,7 +29,7 @@ export function goldCoins(quantity: number): Item {
 
 export interface PackInventory {
   items: Item[];
-  addItem(item: Item, opts?: { quiet?: boolean }): boolean;
+  addItem(item: Item, opts?: { quiet?: boolean; overfill?: boolean }): boolean;
   removeItem(itemId: string, amount?: number): boolean;
 }
 
@@ -55,7 +55,7 @@ export class PlayerPack {
 
   public addGold(amount: number, opts?: { quiet?: boolean }): void {
     if (amount <= 0) return;
-    this._inv().addItem(goldCoins(amount), opts);
+    this._inv().addItem(goldCoins(amount), { ...opts, overfill: true }); // the purse is never refused
   }
 
   /** Make the gold stack equal `target` (barter keeps its own running total). */
@@ -63,7 +63,7 @@ export class PlayerPack {
     const want = Math.max(0, Math.floor(target));
     const have = this.gold();
     if (have > want) this._inv().removeItem(GOLD_ITEM_ID, have - want);
-    else if (want > have) this._inv().addItem(goldCoins(want - have));
+    else if (want > have) this._inv().addItem(goldCoins(want - have), { overfill: true });
   }
 
   /** How many of a framework item the player carries. */
@@ -86,8 +86,9 @@ export class PlayerPack {
     const id = FRAMEWORK_TO_GAME[frameworkId] ?? frameworkId;
     const inv = this._inv();
     const existing = inv.items.find((i) => i.id === id);
+    // Given (a quest's reward, a gift): taken even into a full bag.
     if (existing) {
-      inv.addItem({ ...existing, quantity });
+      inv.addItem({ ...existing, quantity }, { overfill: true });
       return true;
     }
     const shop = stockItem(id);
@@ -96,7 +97,7 @@ export class PlayerPack {
       stats: shop?.stats ?? (frameworkId === "health_potion" ? { ...HEALTH_POTION_STATS } : { value: 10 }),
     };
     if (def.slot) item.slot = def.slot;
-    inv.addItem(item);
+    inv.addItem(item, { overfill: true });
     return true;
   }
 

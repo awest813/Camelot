@@ -1,5 +1,5 @@
 /**
- * The inventory (I): a 4×5 grid of the first twenty items, the hovered or
+ * The inventory (I): a 4×5 grid of the items (it grows a row past twenty), the hovered or
  * focused item's details, the character's stats and what is worn (click a
  * worn item to take it off; click gear in the bag to put it on).  A Preact panel on the DOM layer (engine overhaul,
  * Phase 8; it was Babylon GUI in the UI manager, which still opens, updates
@@ -48,7 +48,7 @@ export function itemHint(s: InventoryState, item: Item): string {
 export function InventoryPanel(p: { state: InventoryState; onItem(item: Item): void; onClose(): void }) {
   const s = p.state;
   const [shown, setShown] = useState<Item | null>(null);
-  const items = s.items.slice(0, INVENTORY_SLOTS);
+  const items = s.items; // all of them: past twenty (an overfull bag) the grid grows a row
   const current = shown && items.includes(shown) ? shown : null;
   return (
     <ModalDialog id="inventory-title" title="Inventory" className="craft-panel inventory" panelClassName="craft-panel__panel inventory__panel" onClose={p.onClose}>

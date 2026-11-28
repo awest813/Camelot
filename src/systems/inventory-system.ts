@@ -64,8 +64,12 @@ export class InventorySystem {
     this._absorbers.push(fn);
   }
 
-  /** Add an item; `quiet` skips the "Added …" notice (the caller says it another way). */
-  public addItem(newItem: Item, opts?: { quiet?: boolean }): boolean {
+  /**
+   * Add an item; `quiet` skips the "Added …" notice (the caller says it
+   * another way); `overfill` takes it even into a full bag (gold, a quest's
+   * reward: things the game owes, never refused).
+   */
+  public addItem(newItem: Item, opts?: { quiet?: boolean; overfill?: boolean }): boolean {
     if (newItem.quantity <= 0) {
       this._ui.showNotification("Invalid item quantity.", 2000);
       return false;
@@ -92,7 +96,7 @@ export class InventorySystem {
       }
     }
 
-    if (this.items.length >= this.maxCapacity) {
+    if (this.items.length >= this.maxCapacity && !opts?.overfill) {
       this._ui.showNotification("Inventory Full!", 2000);
       return false;
     }
