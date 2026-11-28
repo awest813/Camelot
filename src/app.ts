@@ -21,6 +21,7 @@ import { applyPrefs, loadPrefs } from "./ui/accessibility";
 import type { EditorFactory } from "./game/editor-plugin";
 import { dismissBootCover } from "./ui/boot-cover";
 import { pinLightLimit } from "./rendering/light-budget";
+import { installPhysicalKeys } from "./input/physical-keys";
 
 export interface AppOptions {
   /** The editor app plugs its suite into the game (see game/editor-plugin.ts). */
@@ -47,6 +48,8 @@ export class App {
   constructor(private readonly _options: AppOptions = {}) {
     // Before any material exists: every lit material shades a fixed number of lights.
     pinLightLimit();
+    // Keys by place, so WASD and the number row work on any keyboard layout.
+    installPhysicalKeys();
     // Interface scale and reduced motion, before any UI is drawn.
     applyPrefs(loadPrefs());
     // create the canvas html element and attach it to the webpage

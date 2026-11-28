@@ -118,6 +118,10 @@ The editors live in the **editor app**, a second page next to the game: `/editor
 
 ## Controls
 
+Keys are named as on a QWERTY keyboard and work by place on any layout: on
+AZERTY, forward is Z (the key above S) and the number row gives quick slots
+without Shift. Typing in text fields is unaffected.
+
 ### Gameplay
 
 | Key / Button   | Action                                                   |
