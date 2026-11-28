@@ -19,7 +19,7 @@ describe("buildHelpOverlayLines", () => {
     const joined = lines.join("\n");
     expect(joined).toContain("O: Mount / Dismount");
     expect(joined).toContain("Shift+O");
-    expect(joined).toContain("Stable");
+    expect(joined).toContain("ostler");
     expect(joined).toContain("Saddlebag");
   });
 
