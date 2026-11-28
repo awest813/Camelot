@@ -804,11 +804,14 @@ export class SaveSystem {
     try {
       const raw = this._storage().getItem(SAVE_KEY);
       if (!raw) return null;
-      const data = JSON.parse(raw) as { version?: number; timestamp?: number; player?: { name?: string; level?: number } };
+      const data = JSON.parse(raw) as { version?: number; timestamp?: number; player?: { name?: string; level?: number }; playerLevel?: { characterLevel?: unknown } };
       if (!data.player) return null;
       const v = data.version ?? 0;
       const old = v < SAVE_VERSION_MIN || v > SAVE_VERSION;
-      return { name: data.player.name?.trim() || "Hero", level: data.player.level ?? 1, savedAt: data.timestamp ?? 0, ...(old ? { old: true as const } : {}) };
+      // The character level the HUD shows (player.level is the experience level).
+      const shown = data.playerLevel?.characterLevel;
+      const level = typeof shown === "number" && Number.isFinite(shown) ? shown : data.player.level ?? 1;
+      return { name: data.player.name?.trim() || "Hero", level, savedAt: data.timestamp ?? 0, ...(old ? { old: true as const } : {}) };
     } catch {
       return null;
     }

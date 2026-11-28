@@ -92,6 +92,16 @@ describe('SaveSystem', () => {
         expect(data.equipment[0].item.id).toBe('sword_01');
     });
 
+    it("the Continue line shows the character level (the HUD's), not the experience level", () => {
+        const store = new Map<string, string>();
+        saveSystem.setStorage({ getItem: (k) => store.get(k) ?? null, setItem: (k, v) => { store.set(k, v); }, removeItem: (k) => { store.delete(k); } } as never);
+        saveSystem.save(true);
+        const key = [...store.keys()][0];
+        const data = JSON.parse(store.get(key)!);
+        store.set(key, JSON.stringify({ ...data, player: { ...data.player, level: 9 }, playerLevel: { characterLevel: 4 } }));
+        expect(saveSystem.peekSummary()?.level).toBe(4);
+    });
+
     it('runs onBeforeSave before serialising, so its changes land in the save', () => {
         listen(saveSystem, "save:beforeSave", (_p) => (() => { mockInventory.items[0].instanceId = 'tidied'; })());
         saveSystem.save();
