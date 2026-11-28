@@ -42,7 +42,7 @@ export const STARTER_MERCHANTS: readonly StarterMerchant[] = [
     closeHour: 20,
     shop: { id: "shop_trader_elan", name: "Trader Elan's Stall", type: "general", description: "Roadside trader with potions and arrows." },
     stock: () => [
-      { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 5, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
+      { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 5, weight: 0.5, stats: { ...HEALTH_POTION_STATS } },
       { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 3, weight: 1, stats: { value: 15 } },
       { ...LOCKPICK, quantity: 6, stats: { ...LOCKPICK.stats } },
     ],
@@ -57,7 +57,7 @@ export const STARTER_MERCHANTS: readonly StarterMerchant[] = [
     closeHour: 21,
     shop: { id: "shop_village_general", name: "Village General Goods", type: "general" },
     stock: () => [
-      { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 8, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
+      { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 8, weight: 0.5, stats: { ...HEALTH_POTION_STATS } },
       { id: "arrow_bundle", name: "Arrows (20)", description: "A bundle of iron arrows.", stackable: true, quantity: 4, weight: 1, stats: { value: 15 } },
       { ...LOCKPICK, quantity: 10, stats: { ...LOCKPICK.stats } },
       { id: "bread", name: "Loaf of Bread", description: "Hearty bread. Restores hunger.", stackable: true, quantity: 6, weight: 0.2, stats: { value: 5, nutrition: 30 } },
@@ -110,9 +110,9 @@ export const STARTER_MERCHANTS: readonly StarterMerchant[] = [
     closeHour: 18,
     shop: { id: "shop_stillwater_reagents", name: "Stillwater Reagents", type: "alchemist" },
     stock: () => [
-      { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 12, weight: 0.3, stats: { ...HEALTH_POTION_STATS } },
-      { id: "potion_mp_01", name: "Magicka Potion", description: "Restores 50 magicka.", stackable: true, quantity: 8, weight: 0.3, stats: { value: 30, magicka: 50 } },
-      { id: "potion_cure", name: "Cure Disease", description: "A bitter draught. Drink to clear any sickness.", stackable: true, quantity: 4, weight: 0.1, stats: { value: 40, cure: 1 } },
+      { id: "potion_hp_01", name: "Health Potion", description: "Restores 50 health.", stackable: true, quantity: 12, weight: 0.5, stats: { ...HEALTH_POTION_STATS } },
+      { id: "potion_mp_01", name: "Magicka Potion", description: "Restores 50 magicka.", stackable: true, quantity: 8, weight: 0.5, stats: { value: 30, magicka: 50 } },
+      { id: "potion_cure", name: "Cure Disease", description: "A bitter draught. Drink to clear any sickness.", stackable: true, quantity: 4, weight: 0.5, stats: { value: 40, cure: 1 } },
       { id: "henbane", name: "Henbane", description: "A reagent for the alchemy bench (L).", stackable: true, quantity: 6, weight: 0.1, stats: { value: 6 } },
       { id: "eyebright", name: "Eyebright", description: "A reagent for the alchemy bench (L).", stackable: true, quantity: 6, weight: 0.1, stats: { value: 5 } },
       { id: "st_johns_wort", name: "St John's Wort", description: "A reagent for the alchemy bench (L).", stackable: true, quantity: 6, weight: 0.1, stats: { value: 5 } },

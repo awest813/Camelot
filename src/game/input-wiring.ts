@@ -31,7 +31,7 @@ export function wireInputAdapter(g: Game): void {
 
   // Movement
   adapter.onAction("toggleCrouch", () => {
-      if (!g.isPaused && !g.dialogueSystem.isInDialogue) {
+      if (!isCombatInputBlocked(g)) { // not with a panel open, mid-talk or paused
       const crouching = g.stealthSystem.toggleCrouch();
       g.ui.showNotification(crouching ? "Sneaking..." : "Standing", 1200);
       g._tips.did("sneak");
@@ -120,7 +120,7 @@ export function wireInputAdapter(g: Game): void {
     g.togglePause();
   });
   adapter.onAction("save", () => { if (!g.isPaused) g.saveSystem.save(); });
-  adapter.onAction("load", () => { if (!g.isPaused) g.saveSystem.load(); });
+  adapter.onAction("load", () => { if (!g.isPaused && !g.dialogueSystem.isInDialogue) { g._modals.closeAll(); g.saveSystem.load(); } }); // no panel left showing the old state
   adapter.onAction("toggleMap", () => g.kernel.services.get(MapKey).toggle());
   adapter.onAction("toggleMute", () => {
     g.audioSystem.toggleMute();
