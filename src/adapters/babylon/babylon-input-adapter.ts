@@ -248,7 +248,8 @@ export const DEFAULT_BINDINGS: readonly InputBinding[] = [
   // Scene Notes, Ctrl+Shift+M = Mod Manifest).  F7 = mute (Shift+F7 is the editor's).
   { key: "m", action: "toggleMap", caseInsensitive: true, ctrlOrMeta: false, shift: false },
   { key: "F7", action: "toggleMute", shift: false }, // play only: F7 in the map editor is its validation panel
-  { key: "PrintScreen", action: "screenshot", caseInsensitive: true, contexts: BOTH },
+  // On key-up: Windows sends PrintScreen's key-up only.
+  { key: "PrintScreen", action: "screenshot", phase: "up", caseInsensitive: true, contexts: BOTH },
 ];
 
 // ── System ─────────────────────────────────────────────────────────────────────
