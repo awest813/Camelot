@@ -237,6 +237,13 @@ describe("BarterSystem", () => {
     expect(barter.getMerchant("merch_01")!.gold).toBe(500 - sellPrice);
   });
 
+  it("rapport with a shop not yet registered (a village branch) survives a load", () => {
+    const saved = { merchants: [], playerGold: 200, merchantRapport: { "smith@ashford": 8, merch_01: 3 } };
+    barter.restoreFromSave(saved as never);
+    expect(barter.getMerchantRapport("smith@ashford")).toBe(8);
+    expect(barter.getSaveState().merchantRapport).toMatchObject({ "smith@ashford": 8, merch_01: 3 });
+  });
+
   it("gold coins can't be sold for gold (each sale made a coin)", () => {
     mockInventory.items = [{ id: "gold_coins", name: "Gold Coins", description: "", stackable: true, quantity: 100, weight: 0, stats: { value: 1 } }];
     expect(barter.sellItem("merch_01", "gold_coins")).toBe(false);

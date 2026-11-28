@@ -305,12 +305,11 @@ export class BarterSystem {
       this.playerGold = state.playerGold;
     }
 
-    if (state?.merchantRapport) {
-      for (const [merchantId, value] of Object.entries(state.merchantRapport)) {
-        if (this._merchants.has(merchantId)) {
-          this._merchantRapport.set(merchantId, this._clampRapport(value));
-        }
-      }
+    // Every merchant's, registered yet or not (a village branch registers
+    // when its village is first visited, after the load).
+    this._merchantRapport.clear();
+    for (const [merchantId, value] of Object.entries(state?.merchantRapport ?? {})) {
+      if (typeof value === "number") this._merchantRapport.set(merchantId, this._clampRapport(value));
     }
   }
 
