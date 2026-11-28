@@ -33,6 +33,15 @@ describe("StealthSystem", () => {
     stealthSystem = new StealthSystem(mockPlayer, [mockNpc], mockUI);
   });
 
+  it("counts who you are sneaking past: someone near who hasn't spotted you (not a far one)", () => {
+    stealthSystem.toggleCrouch();
+    stealthSystem.update(0.01, 0.0);
+    expect(stealthSystem.sneakingPast).toBe(1);
+    mockNpc.mesh.position = new Vector3(0, 0, 200);
+    stealthSystem.update(0.01, 0.0);
+    expect(stealthSystem.sneakingPast, "alone in a field").toBe(0);
+  });
+
   it("starts not crouching", () => {
     expect(stealthSystem.isCrouching).toBe(false);
   });

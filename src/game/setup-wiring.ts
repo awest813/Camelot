@@ -14,7 +14,7 @@ import { SettingsKey } from "../features/settings/settings-feature";
 import { isSettlementNpc } from "./npcs";
 import { forwardDialogToggleKey, openSaveImportPicker, wireInputAdapter } from "./input-wiring";
 import { isCombatInputBlocked, registerModals } from "./play-focus";
-import { loadGamepadOnConnect } from "../systems/gamepad-loader";
+import { loadGamepadOnConnect } from "../systems/gamepad-loader"; import { OncePerDay } from "../systems/once-per-day";
 
 export function wireGameplay(g: Game): void {
   // Prevent browser context menu from capturing right-click combat input.
@@ -66,10 +66,10 @@ export function wireGameplay(g: Game): void {
       g._tips.did("interact");
   });
   g.dialogueSystem.events = g.eventBus;
+  const spokenToday = new OncePerDay(); // Speechcraft for a conversation: once a day per person, not per greeting
   g.eventBus.on("dialogue:started", ({ npcName }) => {
       g._quests.apply("talk", g._quests.targetId(npcName));
-      // Speechcraft XP each time dialogue is initiated
-      g.skillProgressionSystem.gainXP("speechcraft", 8 * g.classSystem.xpMultiplierFor("speechcraft"));
+      if (spokenToday.take(npcName, g.timeSystem.elapsedGameTime)) g.skillProgressionSystem.gainXP("speechcraft", 8 * g.classSystem.xpMultiplierFor("speechcraft"));
       g._tips.did("interact");
   });
   // After the features' dialogue:closed handlers: forget who we spoke to.

@@ -63,6 +63,9 @@ const PARTIAL_DETECTION_THRESHOLD = 50;
  *   5. Call `pushNoise(level, duration)` when the player makes an audible action.
  *   6. Set `shadowFactor` each frame to reflect how well-lit the player's position is.
  */
+/** Within this many metres of someone who hasn't spotted you, crouching teaches Sneak. */
+const SNEAK_PAST_RADIUS = 15;
+
 export class StealthSystem {
   /** Where this system reports what happened (the game's event bus). */
   public events: GameEventBus | null = null;
@@ -193,6 +196,8 @@ export class StealthSystem {
    */
   /** Seconds the player stays unseen and unheard (the Under the Hill omen). */
   public unseenSeconds = 0;
+  /** How many NPCs near you haven't spotted you: who you're sneaking past (Sneak is learnt only then). */
+  public sneakingPast = 0;
 
   public update(deltaTime: number, ambientIntensity: number = 1.0): void {
     if (this.unseenSeconds > 0) this.unseenSeconds = Math.max(0, this.unseenSeconds - deltaTime);
@@ -203,6 +208,7 @@ export class StealthSystem {
     // phase-staggered by its list index so occlusion rays spread evenly across
     // frames instead of bursting on a single tick.
     this._raycastFrameCounter++;
+    let sneakingPast = 0;
 
     for (let i = 0; i < this._npcs.length; i++) {
       const npc = this._npcs[i];
@@ -216,6 +222,7 @@ export class StealthSystem {
       const canHear = this._canNPCHear(npc);
       const wasFullyDetected = (this._detectionLevels.get(npc) ?? 0) >= 100;
 
+      if (!wasFullyDetected && Vector3.DistanceSquared(npc.mesh.position, this._player.camera.position) <= SNEAK_PAST_RADIUS * SNEAK_PAST_RADIUS) sneakingPast++;
       if (canSee || canHear) {
         const rate = canSee ? SIGHT_DETECTION_RATE : HEAR_DETECTION_RATE;
         const prev = this._detectionLevels.get(npc) ?? 0;
@@ -240,6 +247,7 @@ export class StealthSystem {
         this._detectionLevels.set(npc, next);
       }
     }
+    this.sneakingPast = sneakingPast;
   }
 
   private _canNPCSee(npc: NPC, ambientIntensity: number, shouldRaycast: boolean): boolean {

@@ -47,7 +47,7 @@ export function updateGameplayStep(g: Game, deltaTime: number): void {
   // open — the player can't act, so detection shouldn't build or expire.
   if (!isCombatInputBlocked(g)) {
     g.stealthSystem.update(deltaTime, compositeLight);
-    if (g.stealthSystem.isCrouching) {
+    if (g.stealthSystem.isCrouching && g.stealthSystem.sneakingPast > 0) { // past someone, not alone in a field
       g.skillProgressionSystem.gainXP(
         "sneak", deltaTime * SNEAK_XP_PER_SECOND * g.classSystem.xpMultiplierFor("sneak"),
       );
