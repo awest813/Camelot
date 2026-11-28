@@ -170,6 +170,7 @@ export class CraftingFeature implements Feature {
           this._syncAlchemySkill();
           this.alchemy.craftPotion(ids);
           p.refresh();
+          feedback().markDirty(); // ingredients spent, a potion made: saved state
         };
         p.onDrink = (potionId) => { this.alchemy.drinkPotion(potionId); feedback().markDirty(); };
         p.onClosed = () => modal().restoreGameplay(); // its own ✕

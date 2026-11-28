@@ -557,7 +557,7 @@ export class AlchemySystem {
    * permanent bonuses.
    */
   public effects: {
-    timed(kind: "fortify_strength" | "fortify_health" | "fortify_magicka" | "resist_damage" | "burden", magnitude: number, seconds: number, name: string): void;
+    timed(kind: "fortify_strength" | "fortify_health" | "fortify_magicka" | "resist_damage" | "burden" | "silence", magnitude: number, seconds: number, name: string): void;
     unseen(seconds: number): void;
   } | null = null;
 
@@ -577,6 +577,10 @@ export class AlchemySystem {
         case "burden": fx.timed("burden", magnitude, secs, "Weight"); return `-${magnitude} carry weight (${secs}s)`;
         case "resist_fire": case "resist_frost": case "resist_shock":
           fx.timed("resist_damage", Math.round(magnitude / 2), secs, "Resist harm"); return `Harm taken -${Math.round(magnitude / 2)}% (${secs}s)`;
+        case "weakness_fire": case "weakness_frost": case "weakness_shock":
+          // A negative resistance: harm taken goes up.
+          fx.timed("resist_damage", -Math.round(magnitude / 2), secs, "Weakness"); return `Harm taken +${Math.round(magnitude / 2)}% (${secs}s)`;
+        case "silence": fx.timed("silence", 1, secs, "Silenced"); return `Silenced: no spells (${secs}s)`;
         case "invisibility": fx.unseen(secs); return `Unseen (${secs}s)`;
         default: break;
       }
@@ -641,7 +645,7 @@ export class AlchemySystem {
       case "invisibility":
         return `Invisible (${_duration}s)`;
       case "night_eye":
-        return `Owl-sight (${_duration}s)`;
+        return "Your eyes sting, and the dark stays dark."; // no owl-sight in the game yet: say so, not that it worked
       case "silence":
         return `Silenced (${_duration}s)`;
       default:

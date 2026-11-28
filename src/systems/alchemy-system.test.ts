@@ -381,4 +381,16 @@ describe("AlchemySystem — lasting potion effects go through the game's effects
     expect(player.bonusDamage, "no permanent bonus").toBe(0);
     expect(player.maxCarryWeight).toBe(300);
   });
+
+  it("weakness and silence draughts do what they say (a weakness is negative resistance)", () => {
+    const player = { health: 50, maxHealth: 100 } as any;
+    const sys = new AlchemySystem(player, { showNotification: () => {} } as any);
+    const timed: unknown[][] = [];
+    sys.effects = { timed: (...a) => { timed.push(a); }, unseen: () => {} };
+    const apply = (id: string, m: number, d: number) => (sys as any)._applyEffectToPlayer(id, m, d);
+    apply("weakness_frost", 30, 20);
+    apply("silence", 1, 15);
+    expect(timed.map((a) => a.slice(0, 3))).toEqual([["resist_damage", -15, 20], ["silence", 1, 15]]);
+    expect(apply("night_eye", 10, 30), "owl-sight isn't in the game: no claim it worked").not.toMatch(/Owl-sight/);
+  });
 });

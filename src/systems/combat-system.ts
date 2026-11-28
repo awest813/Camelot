@@ -1999,10 +1999,11 @@ export class CombatSystem {
     // Difficulty setting scales everything NPCs deal to the player.
     dmg = Math.max(1, Math.round(dmg * this.difficultyMultiplier));
 
-    // Apply resist_damage from active magical effects (potions, spells, enchantments).
-    const resistPct = Math.min(100, Math.max(0,
+    // Apply resist_damage from active magical effects (potions, spells,
+    // enchantments); below zero (a weakness draught) harm taken goes up, at most double.
+    const resistPct = Math.min(100, Math.max(-100,
       this._activeEffectsSystem?.totalMagnitude("resist_damage") ?? 0));
-    if (resistPct > 0) {
+    if (resistPct !== 0) {
       dmg = Math.max(1, Math.round(dmg * (1 - resistPct / 100)));
     }
     return dmg;
