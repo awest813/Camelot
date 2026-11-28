@@ -61,14 +61,18 @@ export type AnimationClip =
   | "telegraph"
   | "stagger"
   | "hit"
-  | "death";
+  | "death"
+  | "talk";
 
 const FPS = 60;
+/** Ground speeds (m/s) past which a body walks, and runs. */
+const WALK_SPEED = 0.35;
+const RUN_SPEED = 3.2;
 
 /** Runtime set of all valid clip names — used for snapshot validation. */
 const VALID_CLIPS = new Set<string>([
   "idle", "walk", "run", "alert", "investigate", "return",
-  "victory", "spawn", "telegraph", "stagger", "hit", "death",
+  "victory", "spawn", "telegraph", "stagger", "hit", "death", "talk",
 ]);
 
 /**
@@ -120,7 +124,7 @@ export class AnimationSystem {
     const animator = this._skeletal.get(keyOf(mesh));
     if (!animator) return false;
     const looping = clip === "idle" || clip === "walk" || clip === "run" || clip === "alert"
-      || clip === "investigate" || clip === "return" || clip === "victory";
+      || clip === "investigate" || clip === "return" || clip === "victory" || clip === "talk";
     animator.play(clip, looping || clip === "death" ? undefined : () => {
       if (this._active.get(keyOf(mesh)) === clip) this._active.delete(keyOf(mesh));
       onComplete?.();
@@ -329,6 +333,19 @@ export class AnimationSystem {
     ]);
     mesh.animations = [anim];
     this._scene.beginAnimation(mesh, 0, 32, true);
+  }
+
+  /**
+   * Talking: a skeletal rig's talking idle (gestures); a tween-only mesh just
+   * keeps its idle swell.  No-op if already talking or dead.
+   */
+  public playTalk(mesh: Mesh): void {
+    const current = this._active.get(keyOf(mesh));
+    if (current === "talk" || current === "death") return;
+    if (!this.hasSkeletal(mesh)) { this.playIdle(mesh); return; }
+    this._stopAll(mesh);
+    this._active.set(keyOf(mesh), "talk");
+    this._playSkeletal(mesh, "talk");
   }
 
   // ── One-shot clips ─────────────────────────────────────────────────────────
@@ -640,6 +657,10 @@ export class AnimationSystem {
    * @param isStaggered        True while the NPC is staggered.
    * @param isDead             True when the NPC has died.
    * @param justTakenDamage    True for one frame after non-lethal damage.
+   * @param motion             How fast the body really moves (m/s), and whether
+   *                           it is in a conversation: locomotion follows the
+   *                           ground covered, not the AI state (a patrol standing
+   *                           at its post idles; a villager walking home walks).
    */
   public updateNPCAnimation(
     mesh: Mesh,
@@ -648,6 +669,7 @@ export class AnimationSystem {
     isStaggered: boolean,
     isDead: boolean,
     justTakenDamage: boolean = false,
+    motion?: { speed: number; talking?: boolean },
   ): void {
     if (isDead) {
       if (!this.isDeadClip(mesh)) {
@@ -676,6 +698,20 @@ export class AnimationSystem {
       if (this._active.get(keyOf(mesh)) !== "telegraph") {
         this.playAttackTelegraph(mesh);
       }
+      return;
+    }
+
+    if (motion) {
+      const engaged = aiState === "ALERT" || aiState === "ATTACK" || aiState === "CHASE";
+      if (motion.speed > RUN_SPEED) this.playRun(mesh);
+      else if (motion.speed > WALK_SPEED) {
+        if (aiState === "INVESTIGATE") this.playInvestigate(mesh);
+        else if (aiState === "RETURN") this.playReturn(mesh);
+        else this.playWalk(mesh);
+      } else if (motion.talking) this.playTalk(mesh);
+      else if (engaged) this.playAlert(mesh);
+      else if (aiState === "VICTORY") this.playVictory(mesh);
+      else this.playIdle(mesh);
       return;
     }
 

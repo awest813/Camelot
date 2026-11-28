@@ -95,7 +95,10 @@ export class NpcVisuals {
         // aiState once it comes nearer, so skip the work.  Dead NPCs always
         // route so death animations play.
         if (!npc.isDead && !hitReact && isFar(npc)) continue;
-        anim.updateNPCAnimation(npc.mesh, npc.aiState, npc.isAttackTelegraphing, npc.isStaggered, npc.isDead, hitReact);
+        // A rigged body's gait follows its measured speed (and talks in a conversation).
+        const rig = this._rigs.get(npc);
+        anim.updateNPCAnimation(npc.mesh, npc.aiState, npc.isAttackTelegraphing, npc.isStaggered, npc.isDead, hitReact,
+          rig ? { speed: rig.speed, talking: npc.isInDialogue } : undefined);
       }
     }
     this._updateDragons(dt, playerPos);

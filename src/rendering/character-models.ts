@@ -114,6 +114,7 @@ function ualClipFor(clip: AnimationClip, model: QuaterniusHumanId): { name: stri
     case "stagger":     return { name: "Hit_Head", loop: false };
     case "hit":         return { name: "Hit_Chest", loop: false };
     case "death":       return { name: "Death01", loop: false };
+    case "talk":        return { name: "Idle_Talking_Loop", loop: true };
     default:            return { name: "Idle_Loop", loop: true };
   }
 }
@@ -155,6 +156,7 @@ export function skeletalClipFor(clip: AnimationClip, model: CharacterModelId): {
     case "stagger":     return { name: "Hit_B", loop: false };
     case "hit":         return { name: "Hit_A", loop: false };
     case "death":       return { name: "Death_A", loop: false };
+    case "talk":        return { name: "Idle", loop: true }; // (no talking clip in this kit)
   }
 }
 

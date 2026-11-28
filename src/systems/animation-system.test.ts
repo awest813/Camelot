@@ -912,3 +912,33 @@ describe("AnimationSystem — meshes are told apart by id, not name", () => {
     expect(sys.getActiveClip(b)).toBe("walk");
   });
 });
+
+describe("AnimationSystem — gait follows the ground covered", () => {
+  const setup = () => {
+    const scene = { beginAnimation: vi.fn(), stopAnimation: vi.fn() } as any;
+    const sys = new AnimationSystem(scene);
+    const mesh = { ...makeMesh("Villager"), uniqueId: 7 };
+    const played: string[] = [];
+    sys.registerSkeletal(mesh as any, { play: (clip: string) => { played.push(clip); } } as any);
+    return { sys, mesh, played };
+  };
+
+  it("a patrol standing at its post idles; a villager walking home in IDLE walks; a sprint runs", () => {
+    const t = setup();
+    t.sys.updateNPCAnimation(t.mesh, "PATROL", false, false, false, false, { speed: 0 });
+    expect(t.sys.getActiveClip(t.mesh)).toBe("idle");
+    t.sys.updateNPCAnimation(t.mesh, "IDLE", false, false, false, false, { speed: 1.4 });
+    expect(t.sys.getActiveClip(t.mesh)).toBe("walk");
+    t.sys.updateNPCAnimation(t.mesh, "CHASE", false, false, false, false, { speed: 5 });
+    expect(t.sys.getActiveClip(t.mesh)).toBe("run");
+    t.sys.updateNPCAnimation(t.mesh, "ATTACK", false, false, false, false, { speed: 0 });
+    expect(t.sys.getActiveClip(t.mesh), "squared up, not walking in place").toBe("alert");
+  });
+
+  it("someone you're talking to talks (a rig's talking idle)", () => {
+    const t = setup();
+    t.sys.updateNPCAnimation(t.mesh, "IDLE", false, false, false, false, { speed: 0, talking: true });
+    expect(t.sys.getActiveClip(t.mesh)).toBe("talk");
+    expect(t.played.at(-1)).toBe("talk");
+  });
+});
