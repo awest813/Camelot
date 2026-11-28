@@ -77,6 +77,11 @@ export class CharacterFeature implements Feature {
       host().setRacialTraits({ waterBreathing: race.waterBreathing ?? false, diseaseImmune: race.diseaseImmune ?? false });
       feedback().markDirty();
     };
+    // A loaded hero keeps their people's gifts (the save restores the choice, not its effects).
+    ctx.on("save:loaded", () => {
+      const race = this.races.chosenRace;
+      host().setRacialTraits({ waterBreathing: race?.waterBreathing ?? false, diseaseImmune: race?.diseaseImmune ?? false });
+    });
     this.birthsigns.onBirthsignChosen = (sign) => {
       feedback().notify(`Omen: ${sign.name}${sign.power ? ` — Power: ${sign.power.name}` : ""}`, 3000);
       host().syncMaxStats(); // the omen's bonus goes on top

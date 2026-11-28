@@ -31,6 +31,14 @@ function setup(answer: () => Promise<CharacterChoice>) {
 const choice: CharacterChoice = { name: "Gawain", raceId: "fenfolk", birthsignId: "lady_lake", classId: "wardruid", skipGameplayTips: true, worldSeed: null };
 
 describe("CharacterFeature (headless, through the kernel)", () => {
+  it("a loaded Fen-folk hero breathes water and shrugs off disease again", () => {
+    const t = setup(async () => choice);
+    t.f.races.restoreFromSave({ chosenId: "fenfolk" } as never);
+    t.k.events.emit("save:loaded", {});
+    expect(t.calls).toContain("traits:true:true");
+    t.k.uninstall("character");
+  });
+
   it("the wizard's choices make the hero", async () => {
     const t = setup(async () => choice);
     const run = t.svc.create();
