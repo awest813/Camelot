@@ -82,3 +82,19 @@ describe("LazyPanel: an open called off while loading", () => {
     expect(lazy.isVisible).toBe(true);
   });
 });
+
+describe("LazyPanel: a called-off open releases at once", () => {
+  it("releases when called off, not again when the code arrives", async () => {
+    let resolve!: (p: { isVisible: boolean; close(): void }) => void;
+    const lazy = new LazyPanel(() => new Promise<{ isVisible: boolean; close(): void }>((r) => { resolve = r; }));
+    const show = vi.fn(), release = vi.fn();
+    lazy.openWith(show, release);
+    lazy.close();
+    expect(release, "at once").toHaveBeenCalledOnce();
+    lazy.close();
+    resolve({ isVisible: false, close() {} });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(release, "not again later").toHaveBeenCalledOnce();
+    expect(show).not.toHaveBeenCalled();
+  });
+});
