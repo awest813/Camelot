@@ -569,10 +569,20 @@ export class SpellSystem {
       let reportedDamage: number | undefined;
 
       if (spell.aoeRadius && spell.aoeRadius > 0) {
-        const forward = this._player.camera.getForwardRay
-          ? this._player.camera.getForwardRay(range).direction
-          : new Vector3(0, 0, 1);
-        const impactPoint = playerPos.add(forward.scale(range));
+        // The blast lands where it strikes: the foe aimed at, else the first
+        // thing in its path, else full range (it used to land at full range
+        // always, sailing over anyone nearer).
+        const aimed = this._findTargetNpc(playerPos, range);
+        let impactPoint: Vector3;
+        if (aimed) {
+          impactPoint = aimed.mesh.position.clone();
+        } else {
+          let ray: ReturnType<NonNullable<typeof this._player.camera.getForwardRay>> | null = null;
+          try { ray = this._player.camera.getForwardRay?.(range) ?? null; } catch { /* no Ray module (tests) */ }
+          impactPoint = playerPos.add((ray?.direction ?? new Vector3(0, 0, 1)).scale(range));
+          const hit = ray && this._scene ? this._scene.pickWithRay(ray, (m) => m.isPickable && m.isVisible) : null;
+          if (hit?.hit && hit.pickedPoint) impactPoint = hit.pickedPoint;
+        }
 
         for (const npc of this._npcs) {
           if (npc.isDead) continue;

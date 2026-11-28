@@ -176,6 +176,14 @@ describe("SpellSystem", () => {
     expect(emitted).toContain("npc:killed");
   });
 
+  it("an area spell bursts on the foe aimed at, near or far (not always at full range)", () => {
+    player.magicka = 500;
+    sys.learnSpell("balefire");
+    sys.equipSpell("balefire");
+    sys.castSpell();
+    expect(npc.takeDamage, "a bandit 5 m off is caught in the blast").toHaveBeenCalled();
+  });
+
   it("castSpell does not hit dead NPCs", () => {
     const deadNpc = makeNPC(2, false);
     sys.npcs = [deadNpc];
