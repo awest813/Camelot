@@ -292,7 +292,7 @@ export function installGameFeatures(game: Game): void {
       k.install(game._progression);
       k.services.provide(SettingsHostKey, {
         tier: () => game.graphics.tier,
-        applyTier: (tier) => { game.lodSystem?.setQuality(tier); location.reload(); },
+        applyTier: (tier) => { game.lodSystem?.setQuality(tier); }, // the rest of the tier when the game next starts
         setDamageTaken: (m) => { game.combatSystem.difficultyMultiplier = m; },
         get audio() { return game.audioSystem; },
         setLookSensibility: (v) => { if (game.player?.camera) game.player.camera.angularSensibility = v; },

@@ -273,7 +273,7 @@ export class GraphicsSettingsUI {
       card.appendChild(labelEl);
       card.appendChild(descEl);
       card.addEventListener("click", () => {
-        this.showStatus(`Preset selected: ${TIER_LABELS[tier]} (applies on reload)`);
+        this.showStatus(`Preset selected: ${TIER_LABELS[tier]}. Takes full effect the next time the game starts.`);
         this.onTierSelect?.(tier);
       });
 

@@ -23,7 +23,7 @@ export const LOOK_SENSIBILITY: Record<CameraSensitivity, number> = { low: 1200, 
 
 export interface SettingsHostService {
   tier(): QualityTier;
-  /** A new tier takes a reload; tell the culling first. */
+  /** A new tier: the culling follows at once; the rest of it when the game next starts. */
   applyTier(tier: QualityTier): void;
   setDamageTaken(multiplier: number): void;
   readonly audio: { readonly isMuted: boolean; readonly masterVolume: number; toggleMute(): void; setMasterVolume(v: number): void };
@@ -48,6 +48,37 @@ export const SettingsKey = createServiceKey<SettingsService>("settings");
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
+/** Where the player's settings live between sessions (the graphics tier has its own key). */
+export const SETTINGS_PREFS_KEY = "camelot_settings_prefs";
+
+export interface SettingsPrefs {
+  difficulty?: Difficulty;
+  sensitivity?: CameraSensitivity;
+  volume?: number;
+  muted?: boolean;
+}
+
+export function loadSettingsPrefs(): SettingsPrefs {
+  try {
+    const raw = typeof localStorage === "undefined" ? null : localStorage.getItem(SETTINGS_PREFS_KEY);
+    const p = raw ? (JSON.parse(raw) as SettingsPrefs) : {};
+    return {
+      difficulty: p.difficulty && p.difficulty in DIFFICULTY_DAMAGE ? p.difficulty : undefined,
+      sensitivity: p.sensitivity && p.sensitivity in LOOK_SENSIBILITY ? p.sensitivity : undefined,
+      volume: typeof p.volume === "number" && p.volume >= 0 && p.volume <= 1 ? p.volume : undefined,
+      muted: typeof p.muted === "boolean" ? p.muted : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function saveSettingsPrefs(prefs: SettingsPrefs): void {
+  try {
+    if (typeof localStorage !== "undefined") localStorage.setItem(SETTINGS_PREFS_KEY, JSON.stringify(prefs));
+  } catch { /* private mode, quota: the choice holds for this session */ }
+}
+
 export class SettingsFeature implements Feature {
   public readonly id = "settings";
   /** Loaded the first time it opens (out of the start-up bundle). */
@@ -65,7 +96,7 @@ export class SettingsFeature implements Feature {
   private _s: ServiceRegistry | null = null;
 
   public install(ctx: FeatureContext): void {
-    declareStateless(ctx, "settings are player preferences, kept outside the save");
+    declareStateless(ctx, "settings are player preferences, kept in localStorage outside the save");
     const s = ctx.kernel.services;
     this._s = s;
     const host = () => s.get(SettingsHostKey);
@@ -73,28 +104,43 @@ export class SettingsFeature implements Feature {
     // Back to play (or to the pause menu it was opened from).
     const back = () => { if (!host().paused()) s.get(ModalKey).restoreGameplay(); };
     this.credits.onClose = back;
+    // The player's settings come back from the last session.
+    const prefs = loadSettingsPrefs();
+    const remember = (change: SettingsPrefs) => { Object.assign(prefs, change); saveSettingsPrefs(prefs); };
+    try {
+      if (prefs.difficulty) { this._difficulty = prefs.difficulty; host().setDamageTaken(DIFFICULTY_DAMAGE[prefs.difficulty]); }
+      if (prefs.sensitivity) { this._sensitivity = prefs.sensitivity; host().setLookSensibility(LOOK_SENSIBILITY[prefs.sensitivity]); }
+      const audio = host().audio;
+      if (prefs.volume !== undefined) audio.setMasterVolume(prefs.volume);
+      if (prefs.muted !== undefined && audio.isMuted !== prefs.muted) audio.toggleMute();
+    } catch { /* a host still starting up: the dialog's choices apply as made */ }
     this._wire = (d) => {
       d.onTierSelect = (tier) => {
+        if (tier === host().tier()) return;
         persistGraphicsTier(tier);
         host().applyTier(tier);
       };
       d.onDifficultySelect = (difficulty) => {
         this._difficulty = difficulty;
         host().setDamageTaken(DIFFICULTY_DAMAGE[difficulty]);
+        remember({ difficulty });
         notify(`Difficulty: ${cap(difficulty)}`, 2400);
       };
       d.onAudioMuteToggle = (muted) => {
         const audio = host().audio;
         if (audio.isMuted !== muted) audio.toggleMute();
+        remember({ muted });
         notify(muted ? "Audio muted" : "Audio unmuted", 1500);
       };
       d.onVolumeChange = (volume) => {
         host().audio.setMasterVolume(volume);
+        remember({ volume });
         notify(`Master volume: ${Math.round(volume * 100)}%`, 1500);
       };
       d.onCameraSensitivityChange = (sens) => {
         this._sensitivity = sens;
         host().setLookSensibility(LOOK_SENSIBILITY[sens]);
+        remember({ sensitivity: sens });
         notify(`Look Sensitivity: ${cap(sens)}`, 1500);
       };
       d.onClose = back;

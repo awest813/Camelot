@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { Kernel } from "../../core/kernel";
 import { FeedbackKey, GameplayKey, ModalKey } from "../services";
-import { SettingsFeature, SettingsHostKey, SettingsKey, type SettingsHostService } from "./settings-feature";
+import { SETTINGS_PREFS_KEY, SettingsFeature, SettingsHostKey, SettingsKey, type SettingsHostService } from "./settings-feature";
 
 function setup(paused = false) {
   const k = new Kernel();
@@ -55,5 +55,39 @@ describe("SettingsFeature (headless, through the kernel)", () => {
     (await t.svc.dialog.get()).onClose!();
     expect(t.modal.restoreGameplay).not.toHaveBeenCalled();
     t.k.uninstall("settings");
+  });
+
+  it("choices are remembered and come back in the next session", async () => {
+    localStorage.removeItem(SETTINGS_PREFS_KEY);
+    const a = setup();
+    const d = await a.svc.dialog.get();
+    d.onDifficultySelect!("hard");
+    d.onAudioMuteToggle!(true);
+    d.onVolumeChange!(0.4);
+    d.onCameraSensitivityChange!("high");
+    a.k.uninstall("settings");
+
+    const b = setup();
+    expect(b.svc.difficulty).toBe("hard");
+    expect(b.damage()).toBe(1.5);
+    expect(b.look()).toBe(500);
+    expect(b.audio.isMuted).toBe(true);
+    expect(b.audio.setMasterVolume).toHaveBeenCalledWith(0.4);
+    b.k.uninstall("settings");
+    localStorage.removeItem(SETTINGS_PREFS_KEY);
+  });
+
+  it("junk in storage is ignored; picking the current tier does nothing", async () => {
+    localStorage.setItem(SETTINGS_PREFS_KEY, JSON.stringify({ difficulty: "impossible", volume: 7, muted: "yes" }));
+    const t = setup();
+    expect(t.svc.difficulty).toBe("normal");
+    expect(t.audio.setMasterVolume).not.toHaveBeenCalled();
+    const d = await t.svc.dialog.get();
+    d.onTierSelect!("high");
+    expect(vi.mocked(t.k.services.get(SettingsHostKey).applyTier)).not.toHaveBeenCalled();
+    d.onTierSelect!("low");
+    expect(vi.mocked(t.k.services.get(SettingsHostKey).applyTier)).toHaveBeenCalledWith("low");
+    t.k.uninstall("settings");
+    localStorage.removeItem(SETTINGS_PREFS_KEY);
   });
 });
