@@ -4,7 +4,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
 // Mocks so NPC constructor doesn't explode
-vi.mock("@babylonjs/core/Meshes/meshBuilder", () => ({
+vi.mock("../rendering/mesh-builder", () => ({
   MeshBuilder: {
     CreateCapsule: vi.fn(() => ({
       position: new Vector3(),

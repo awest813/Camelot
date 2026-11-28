@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { DungeonGenerator } from "./dungeon-generator";
 
-vi.mock("@babylonjs/core/Meshes/meshBuilder", () => ({
+vi.mock("../rendering/mesh-builder", () => ({
   MeshBuilder: {
     CreateGround: vi.fn((name, _options) => ({
       name,

@@ -28,7 +28,7 @@ import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { LensFlareSystem } from "@babylonjs/core/LensFlares/lensFlareSystem";
 import { LensFlare } from "@babylonjs/core/LensFlares/lensFlare";
 import "@babylonjs/core/LensFlares/lensFlareSystemSceneComponent";
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { MeshBuilder } from "./mesh-builder";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Color3 } from "@babylonjs/core/Maths/math.color";

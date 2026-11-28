@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { MeshBuilder } from "./mesh-builder";
 import { AIState, type NPC } from "../entities/npc";
 import type { AnimationSystem } from "../systems/animation-system";
 import { NpcVisuals } from "./npc-visuals";

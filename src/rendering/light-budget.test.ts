@@ -3,11 +3,12 @@ import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { Scene } from "@babylonjs/core/scene";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
-import { pinLightLimit, LIGHTS_PER_MATERIAL } from "./light-budget";
+import { pinLightLimit, pinPbrLightLimit, LIGHTS_PER_MATERIAL } from "./light-budget";
 
 describe("light budget", () => {
-  it("every lit material shades the budget from the start, whatever a loader asks", () => {
+  it("every lit material shades the budget from the start, whatever a loader asks (PBR once the loader comes)", async () => {
     pinLightLimit();
+    await pinPbrLightLimit();
     const scene = new Scene(new NullEngine());
     const std = new StandardMaterial("std", scene);
     const pbr = new PBRMaterial("pbr", scene);

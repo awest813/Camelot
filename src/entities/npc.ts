@@ -4,7 +4,7 @@ import { actors } from "./actors";
 import { Aggressive, Asleep, Dead, Engaged, Guard, HitReact, HostileOnSight, InDialogue, Provoked, Staggered, Telegraphing, Unblockable, type ActorId } from "../core/ecs/actors";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { MeshBuilder } from "../rendering/mesh-builder";
 import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";

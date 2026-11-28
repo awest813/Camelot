@@ -7,7 +7,7 @@ import { AttributeSystem } from './attribute-system';
 import { listen } from "../testing/listen";
 
 // Mock BabylonJS core features to avoid complex initialization
-vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
+vi.mock('../rendering/mesh-builder', () => ({
     MeshBuilder: {
         CreateSphere: vi.fn(() => ({
             position: new Vector3(),

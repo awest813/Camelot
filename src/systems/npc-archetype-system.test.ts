@@ -8,7 +8,7 @@ import { Scene } from "@babylonjs/core/scene";
 
 // Minimal mesh and physics mocks — NPC constructor needs these to not throw.
 // Includes the extra shapes added by fantasy-prop visual accessories.
-vi.mock("@babylonjs/core/Meshes/meshBuilder", () => {
+vi.mock("../rendering/mesh-builder", () => {
   const mesh = () => ({
     position: { set: vi.fn(), x: 0, y: 0, z: 0 },
     rotation: { y: 0, z: 0 },

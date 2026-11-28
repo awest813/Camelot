@@ -12,7 +12,7 @@ const { mockMeshDispose, mockBodyDispose } = vi.hoisted(() => ({
 
 // ── Babylon mocks ─────────────────────────────────────────────────────────────
 
-vi.mock('@babylonjs/core/Meshes/meshBuilder', () => ({
+vi.mock('../rendering/mesh-builder', () => ({
   MeshBuilder: {
     CreateGround: vi.fn(function() {
       return {

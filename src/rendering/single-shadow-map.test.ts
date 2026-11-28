@@ -4,7 +4,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { MeshBuilder } from "./mesh-builder";
 import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { SINGLE_MAP_AREA, fixSingleMapArea, lightAxes, snapSunToTexels } from "./render-pipeline";
 

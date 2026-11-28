@@ -14,6 +14,7 @@
 import { RegisterSceneLoaderPlugin } from "@babylonjs/core/Loading/sceneLoader";
 import { GLTFFileLoaderMetadata } from "@babylonjs/loaders/glTF/glTFFileLoader.metadata";
 import { registerBuiltInGLTFExtensions } from "@babylonjs/loaders/glTF/2.0/Extensions/dynamic";
+import { pinPbrLightLimit } from "./light-budget";
 
 let registered = false;
 
@@ -24,7 +25,8 @@ export function registerLazyGltfLoader(): void {
   RegisterSceneLoaderPlugin({
     ...GLTFFileLoaderMetadata,
     createPlugin: async (options: Record<string, unknown>) => {
-      const { GLTFFileLoader } = await import("@babylonjs/loaders/glTF/2.0/glTFLoader");
+      // The models' PBR materials obey the light budget too (rendering/light-budget.ts).
+      const [{ GLTFFileLoader }] = await Promise.all([import("@babylonjs/loaders/glTF/2.0/glTFLoader"), pinPbrLightLimit()]);
       return new GLTFFileLoader(options[GLTFFileLoaderMetadata.name] as never);
     },
   } as never);

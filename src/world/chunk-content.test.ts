@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { Scene } from "@babylonjs/core/scene";
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { MeshBuilder } from "../rendering/mesh-builder";
 import type { NPC } from "../entities/npc";
 import { ChunkContent, type ChunkContentDeps } from "./chunk-content";
 import { actors } from "../entities/actors";

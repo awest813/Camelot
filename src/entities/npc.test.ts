@@ -7,7 +7,7 @@ import { Color3 } from '@babylonjs/core/Maths/math.color';
 import { PhysicsMotionType } from '@babylonjs/core/Physics/v2/IPhysicsEnginePlugin';
 
 // Mock BabylonJS core features to avoid complex initialization
-vi.mock('@babylonjs/core/Meshes/meshBuilder', () => {
+vi.mock('../rendering/mesh-builder', () => {
     const mockPrimitive = (name: string) => ({
         name,
         position: new Vector3(),

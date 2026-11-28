@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { MeshBuilder } from "../rendering/mesh-builder";
 import { NavigationSystem } from "./navigation-system";
 import { markNavObstacle } from "./navmesh-build";
 import { ScheduleSystem } from "./schedule-system";

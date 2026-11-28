@@ -5,7 +5,7 @@ import { listen } from "../testing/listen";
 
 // ── Babylon mocks ─────────────────────────────────────────────────────────────
 
-vi.mock("@babylonjs/core/Meshes/meshBuilder", () => ({
+vi.mock("../rendering/mesh-builder", () => ({
   MeshBuilder: {
     CreateBox: vi.fn(() => ({
       position: { x: 0, y: 0, z: 0, clone: vi.fn(() => new Vector3(0, 0, 0)) },

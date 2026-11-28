@@ -136,6 +136,11 @@ export function measure() {
     for (const m of code.matchAll(/^\s*import\s+(type\s+)?(?:[^;]*?from\s+)?["'](@babylonjs\/(?:core|loaders|gui|materials|serializers)(?:\/(?:Physics|Particles|Materials|Meshes|Misc|Engines|Loading|PostProcesses|Rendering|Lights|Cameras|Behaviors|Gizmos|Debug|Audio|AudioV2|glTF|glTF\/2\.0|glTF\/2\.0\/Extensions|FlowGraph))?)["']/gm)) {
       if (!m[1]) violations.push({ rule: "babylon-barrel-import", file: f.path, detail: m[2] });
     }
+    // Babylon's MeshBuilder object imports every builder it has: the game's
+    // nine come through rendering/mesh-builder.ts.
+    if (/from\s+["']@babylonjs\/core\/Meshes\/meshBuilder["']/.test(code)) {
+      violations.push({ rule: "babylon-barrel-import", file: f.path, detail: "@babylonjs/core/Meshes/meshBuilder (use rendering/mesh-builder)" });
+    }
     if (/\b(requestPointerLock|exitPointerLock)\s*\(/.test(code) && !POINTER_LOCK_ALLOWLIST.includes(f.path)) {
       violations.push({ rule: "pointer-lock-owner", file: f.path });
     }

@@ -4,7 +4,7 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 
 // ── Babylon mocks ─────────────────────────────────────────────────────────────
 
-vi.mock("@babylonjs/core/Meshes/meshBuilder", () => ({
+vi.mock("../rendering/mesh-builder", () => ({
   MeshBuilder: {
     CreateBox: vi.fn(() => ({
       position: { x: 0, y: 0, z: 0, copyFrom: vi.fn() },
