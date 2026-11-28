@@ -216,3 +216,14 @@ describe("MerchantRestockSystem", () => {
     expect(mrs2.getEntry("m")!.nextRestockAt).toBe(mrs.getEntry("m")!.nextRestockAt);
   });
 });
+
+describe("MerchantRestockSystem: a branch registered after the load", () => {
+  it("gets its saved deadline, and keeps it in saves until then", () => {
+    const sys = new MerchantRestockSystem();
+    sys.restoreFromSave({ entries: [{ merchantId: "smith@ashford", intervalHours: 24, nextRestockAt: 5000 }] });
+    expect(sys.getSaveState().entries).toEqual([{ merchantId: "smith@ashford", intervalHours: 24, nextRestockAt: 5000 }]);
+    sys.registerMerchant("smith@ashford", [], 100, 24, 4900);
+    expect(sys.getEntry("smith@ashford")?.nextRestockAt).toBe(5000);
+    expect(sys.getSaveState().entries).toHaveLength(1);
+  });
+});

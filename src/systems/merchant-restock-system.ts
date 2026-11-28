@@ -79,6 +79,8 @@ export class MerchantRestockSystem {
   public events: GameEventBus | null = null;
 
   private _entries: Map<string, RestockEntry> = new Map();
+  /** Saved deadlines of merchants not registered yet (a village branch, until its village is visited). */
+  private _unclaimed = new Map<string, { intervalHours: number; nextRestockAt: number }>();
 
   // ── Registration ───────────────────────────────────────────────────────────
 
@@ -99,12 +101,14 @@ export class MerchantRestockSystem {
     currentGameTimeMinutes: number = 0,
   ): void {
     const clamped = Math.max(MIN_RESTOCK_HOURS, Math.min(MAX_RESTOCK_HOURS, Math.round(intervalHours)));
+    const saved = this._unclaimed.get(merchantId);
+    this._unclaimed.delete(merchantId);
     this._entries.set(merchantId, {
       merchantId,
       templateInventory: templateInventory.map((i) => ({ ...i })),
       templateGold: Math.max(0, Math.round(templateGold)),
-      intervalHours: clamped,
-      nextRestockAt: currentGameTimeMinutes + clamped * 60,
+      intervalHours: saved?.intervalHours ?? clamped,
+      nextRestockAt: saved?.nextRestockAt ?? currentGameTimeMinutes + clamped * 60,
     });
   }
 
@@ -157,24 +161,30 @@ export class MerchantRestockSystem {
    */
   public getSaveState(): MerchantRestockSaveState {
     return {
-      entries: Array.from(this._entries.values()).map((e) => ({
-        merchantId:    e.merchantId,
-        intervalHours: e.intervalHours,
-        nextRestockAt: e.nextRestockAt,
-      })),
+      entries: [
+        ...Array.from(this._unclaimed, ([merchantId, e]) => ({ merchantId, ...e })),
+        ...Array.from(this._entries.values()).map((e) => ({
+          merchantId:    e.merchantId,
+          intervalHours: e.intervalHours,
+          nextRestockAt: e.nextRestockAt,
+        })),
+      ],
     };
   }
 
   public restoreFromSave(state: MerchantRestockSaveState): void {
     if (!state || !Array.isArray(state.entries)) return;
+    this._unclaimed.clear();
     for (const saved of state.entries) {
+      if (!Number.isFinite(saved.intervalHours) || !Number.isFinite(saved.nextRestockAt)) continue;
+      const intervalHours = Math.max(MIN_RESTOCK_HOURS, Math.min(MAX_RESTOCK_HOURS, Math.round(saved.intervalHours)));
       const entry = this._entries.get(saved.merchantId);
-      if (!entry) continue; // only restore registered merchants
-      if (typeof saved.intervalHours === "number" && Number.isFinite(saved.intervalHours)) {
-        entry.intervalHours = Math.max(MIN_RESTOCK_HOURS, Math.min(MAX_RESTOCK_HOURS, Math.round(saved.intervalHours)));
-      }
-      if (typeof saved.nextRestockAt === "number" && Number.isFinite(saved.nextRestockAt)) {
+      if (entry) {
+        entry.intervalHours = intervalHours;
         entry.nextRestockAt = saved.nextRestockAt;
+      } else {
+        // Kept for when it registers (a village branch, on the village's first visit after the load).
+        this._unclaimed.set(saved.merchantId, { intervalHours, nextRestockAt: saved.nextRestockAt });
       }
     }
   }
