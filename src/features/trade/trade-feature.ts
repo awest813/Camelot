@@ -134,7 +134,7 @@ export class TradeFeature implements Feature {
     };
     this.containerPanel.onTakeAll = () => {
       const active = containers.activeContainer;
-      if (active) { theft(); containers.takeAll(active.id); }
+      if (active && containers.takeAll(active.id) > 0) theft(); // nothing taken (a full pack) is no theft
       if (active && active.contents.length === 0) ctx.kernel.events.emit("container:emptied", { id: active.id });
       dirty();
       this._closeContainer();

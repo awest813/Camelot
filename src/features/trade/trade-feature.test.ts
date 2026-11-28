@@ -108,6 +108,23 @@ describe("TradeFeature (headless, through the kernel)", () => {
     t.k.uninstall("trade");
   });
 
+  it("Take All on someone's chest is theft only if something was taken (a full pack takes nothing)", () => {
+    const t = setup();
+    const crimes: string[] = [];
+    t.k.services.provide(LawKey, { crime: { commitCrime: (type: string) => { crimes.push(type); return 0; } }, now: () => 0 } as never);
+    t.containers.activeContainer = { id: "chest_a", contents: [{ id: "gold" }], owner: "village_guard" } as never;
+    t.containers.onContainerOpen!();
+    t.containers.takeAll.mockReturnValueOnce(0 as never);
+    t.svc.containerPanel.onTakeAll!();
+    expect(crimes, "nothing taken").toEqual([]);
+    t.containers.activeContainer = { id: "chest_b", contents: [{ id: "gold" }], owner: "village_guard" } as never;
+    t.containers.onContainerOpen!();
+    t.containers.takeAll.mockReturnValueOnce(1 as never);
+    t.svc.containerPanel.onTakeAll!();
+    expect(crimes).toEqual(["theft"]);
+    t.k.uninstall("trade");
+  });
+
   it("haggling: a Persuasion roll once a day per shop warms or cools it", () => {
     const t = setup();
     const rolls: string[] = [];
