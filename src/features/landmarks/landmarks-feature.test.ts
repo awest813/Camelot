@@ -129,6 +129,17 @@ describe("LandmarksFeature (headless, through the kernel)", () => {
     expect(lm.mark!("site_nothing_0_0")).toBe(false);
   });
 
+  it("a site's chest taken from at all doesn't refill for three days (no partial-take refills)", () => {
+    const t = setup();
+    t.hours = 5;
+    const lm = t.k.services.get(LandmarksKey);
+    t.k.events.emit("container:plundered", { id: "chest_site_graveyard_1_1" });
+    expect(lm.chestLooted!("site_graveyard_1_1")).toBe(true);
+    t.hours = 7;
+    t.k.events.emit("container:plundered", { id: "chest_site_graveyard_1_1" });
+    expect((t.codec().save() as { looted: Record<string, number> }).looted, "from the first take").toEqual({ "site_graveyard_1_1": 5 });
+  });
+
   it("a site's chest, once emptied, stays empty for three days (and the save keeps it)", () => {
     const t = setup();
     t.hours = 5;

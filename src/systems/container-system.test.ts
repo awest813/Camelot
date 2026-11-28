@@ -63,6 +63,23 @@ describe("ContainerSystem", () => {
     containerSystem = new ContainerSystem(mockScene, mockPlayer, mockInventory, mockUI);
   });
 
+  it("a site's chest taken from keeps what was left while away (and across a save), until it refills", () => {
+    const mesh = () => ({ metadata: null, getChildMeshes: () => [] }) as any;
+    const ring = { id: "ring", name: "Ring", description: "", stackable: false, quantity: 1 };
+    containerSystem.registerChest("chest_site_manor_1_1", "Coffer", mesh(), [sampleItem, ring], 0);
+    expect(containerSystem.takeItem("chest_site_manor_1_1", "ring")).toBe(true);
+    containerSystem.unregister("chest_site_manor_1_1"); // walked away
+    const saved = JSON.parse(JSON.stringify(containerSystem.getSaveState()));
+    containerSystem.restoreFromSave(saved);
+    // Back within its quiet time: the landmarks build it empty; it has what was left.
+    const back = containerSystem.registerChest("chest_site_manor_1_1", "Coffer", mesh(), [], 0);
+    expect(back.contents.map((i) => i.id)).toEqual(["gold"]);
+    // After it refilled (built full), leftovers don't apply.
+    containerSystem.unregister("chest_site_manor_1_1");
+    const refilled = containerSystem.registerChest("chest_site_manor_1_1", "Coffer", mesh(), [sampleItem, ring], 0);
+    expect(refilled.contents.map((i) => i.id)).toEqual(["gold", "ring"]);
+  });
+
   it("saves the Warden's Key charges left", () => {
     containerSystem.masterKeys = 2;
     const saved = containerSystem.getSaveState();

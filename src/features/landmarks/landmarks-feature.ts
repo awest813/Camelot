@@ -134,6 +134,13 @@ export class LandmarksFeature implements Feature {
       this._looted.set(id.slice("chest_".length), this._now());
       s.get(FeedbackKey).markDirty();
     });
+    // Taken from at all: it doesn't fill again for a while either (what's left
+    // in it stays, the container system keeps it; no partial-take refills).
+    ctx.on("container:plundered", ({ id }) => {
+      if (!id.startsWith("chest_site_") || this.isChestLooted(id.slice("chest_".length))) return;
+      this._looted.set(id.slice("chest_".length), this._now());
+      s.get(FeedbackKey).markDirty();
+    });
     ctx.on("chunk:unloaded", ({ chunkKey }) => {
       for (const lm of this._loaded.get(chunkKey) ?? []) this._standing.delete(lm.id);
       this._loaded.delete(chunkKey);

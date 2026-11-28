@@ -125,7 +125,7 @@ export class TradeFeature implements Feature {
     this.containerPanel.onTakeItem = (itemId) => {
       const active = containers.activeContainer;
       if (!active) return;
-      if (containers.takeItem(active.id, itemId)) { theft(); dirty(); }
+      if (containers.takeItem(active.id, itemId)) { theft(); dirty(); ctx.kernel.events.emit("container:plundered", { id: active.id }); }
       this.containerPanel.update(containers);
       if (containers.activeContainer?.contents.length === 0) {
         ctx.kernel.events.emit("container:emptied", { id: active.id });
@@ -134,7 +134,7 @@ export class TradeFeature implements Feature {
     };
     this.containerPanel.onTakeAll = () => {
       const active = containers.activeContainer;
-      if (active && containers.takeAll(active.id) > 0) theft(); // nothing taken (a full pack) is no theft
+      if (active && containers.takeAll(active.id) > 0) { theft(); ctx.kernel.events.emit("container:plundered", { id: active.id }); } // nothing taken (a full pack) is no theft
       if (active && active.contents.length === 0) ctx.kernel.events.emit("container:emptied", { id: active.id });
       dirty();
       this._closeContainer();

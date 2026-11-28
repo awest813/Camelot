@@ -48,10 +48,14 @@ export interface Container {
   isOpen: boolean;
   /** Whose it is (a faction): taking from it is theft, if anyone sees. */
   owner?: string;
+  /** Something has been taken from it (a site's chest then keeps what is left, not a fresh roll). */
+  plundered?: boolean;
 }
 
 export interface ContainerSaveState {
-  containers: Array<{ id: string; contents: Item[]; isLocked: boolean }>;
+  containers: Array<{ id: string; contents: Item[]; isLocked: boolean; plundered?: boolean }>;
+  /** What was left in sites' chests taken from, while their chunks are away. */
+  leftovers?: Array<{ id: string; contents: Item[]; isLocked: boolean }>;
   /** Charges left on the Warden's Key. */
   masterKeys?: number;
 }
@@ -207,6 +211,13 @@ export class ContainerSystem {
    */
   public registerChest(id: string, name: string, mesh: Mesh, contents: Item[], lockDifficulty: number, owner?: string): Container {
     const container: Container = { id, name, mesh, contents: [...contents], isLocked: lockDifficulty > 0, lockDifficulty, isOpen: false, ...(owner ? { owner } : {}) };
+    // Taken from before and still within its quiet time (it comes back empty):
+    // what was left in it, not nothing. Refilled since, the leftovers are moot.
+    const left = this._leftovers.get(id);
+    if (left) {
+      this._leftovers.delete(id);
+      if (contents.length === 0) Object.assign(container, { contents: [...left.contents], isLocked: left.isLocked, plundered: true });
+    }
     // The model's meshes all answer to the player's look (a chest is several meshes).
     for (const m of [mesh, ...mesh.getChildMeshes(false)]) { m.isPickable = true; m.metadata = { type: "container", container }; }
     this._register(container);
@@ -219,6 +230,7 @@ export class ContainerSystem {
     if (!c) return;
     if (this.activeContainer === c) this.activeContainer = null;
     this._containers.delete(id);
+    if (c.plundered && id.startsWith("chest_site_")) this._leftovers.set(id, { contents: [...c.contents], isLocked: c.isLocked });
   }
 
   /** Locks the player can open regardless of difficulty (each opens one). */
@@ -235,6 +247,7 @@ export class ContainerSystem {
     const item = container.contents[idx];
     const added = this._inventory.addItem({ ...item, quantity: 1 });
     if (!added) return false;
+    container.plundered = true;
 
     if (item.quantity > 1) {
       container.contents[idx] = { ...item, quantity: item.quantity - 1 };
@@ -261,6 +274,7 @@ export class ContainerSystem {
     }
     container.contents = remaining;
     if (taken > 0) {
+      container.plundered = true;
       this._ui.showNotification(`Took ${taken} item(s)`, 1500);
     }
     return taken;
@@ -288,13 +302,16 @@ export class ContainerSystem {
   public getSaveState(): ContainerSaveState {
     const containers: ContainerSaveState["containers"] = [];
     for (const c of this._containers.values()) {
-      containers.push({ id: c.id, contents: [...c.contents], isLocked: c.isLocked });
+      containers.push({ id: c.id, contents: [...c.contents], isLocked: c.isLocked, ...(c.plundered ? { plundered: true } : {}) });
     }
-    return { containers, masterKeys: this.masterKeys };
+    const leftovers = [...this._leftovers].map(([id, l]) => ({ id, contents: [...l.contents], isLocked: l.isLocked }));
+    return { containers, ...(leftovers.length ? { leftovers } : {}), masterKeys: this.masterKeys };
   }
 
   public restoreFromSave(state: ContainerSaveState): void {
     this._pending.clear();
+    this._leftovers.clear();
+    for (const l of state?.leftovers ?? []) this._leftovers.set(l.id, { contents: [...l.contents], isLocked: l.isLocked });
     if (typeof state?.masterKeys === "number" && Number.isFinite(state.masterKeys)) this.masterKeys = Math.max(0, Math.floor(state.masterKeys));
     for (const saved of state?.containers ?? []) {
       const container = this._containers.get(saved.id);
@@ -311,7 +328,11 @@ export class ContainerSystem {
   private _apply(container: Container, saved: ContainerSaveState["containers"][number]): void {
     container.contents = [...saved.contents];
     container.isLocked = saved.isLocked;
+    container.plundered = !!saved.plundered;
   }
+
+  /** Sites' chests taken from, by id: what was left (see registerChest). */
+  private readonly _leftovers = new Map<string, { contents: Item[]; isLocked: boolean }>();
 
   /** Register a container, applying any saved state that was waiting for it. */
   private _register(container: Container): void {
