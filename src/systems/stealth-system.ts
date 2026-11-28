@@ -198,6 +198,8 @@ export class StealthSystem {
   public unseenSeconds = 0;
   /** How many NPCs near you haven't spotted you: who you're sneaking past (Sneak is learnt only then). */
   public sneakingPast = 0;
+  /** Each NPC's last line-of-sight raycast: true when nothing stood between. */
+  private readonly _clearSight = new WeakMap<NPC, boolean>();
 
   public update(deltaTime: number, ambientIntensity: number = 1.0): void {
     if (this.unseenSeconds > 0) this.unseenSeconds = Math.max(0, this.unseenSeconds - deltaTime);
@@ -278,18 +280,23 @@ export class StealthSystem {
 
     if (!this._scene) return true;
 
-    if (!shouldRaycast) return true;
+    // Between its raycasts (every 3rd update) an NPC keeps the last answer:
+    // a wall between you stays a wall (it used to see through it two updates in three).
+    if (!shouldRaycast) return this._clearSight.get(npc) ?? true;
 
     this._scratchRayOrigin.set(npcPos.x, npcPos.y + 1.3, npcPos.z);
     this._scratchRay.origin.copyFrom(this._scratchRayOrigin);
     this._scratchRay.direction.copyFrom(toPlayerNorm);
     this._scratchRay.length = dist;
 
+    // Anything in the way will do (fastCheck: the first hit, not the nearest).
     const hit = this._scene.pickWithRay(this._scratchRay, (mesh: AbstractMesh) => {
-        return mesh !== npc.mesh && mesh.name !== "player_camera_helper" && mesh.checkCollisions;
-    });
+        return mesh.checkCollisions && mesh !== npc.mesh && mesh.name !== "player_camera_helper";
+    }, true);
 
-    return !hit || !hit.hit;
+    const clear = !hit || !hit.hit;
+    this._clearSight.set(npc, clear);
+    return clear;
   }
 
   private _canNPCHear(npc: NPC): boolean {
