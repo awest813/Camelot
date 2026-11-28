@@ -459,3 +459,15 @@ describe("PlayerLevelSystem — SkillProgressionSystem integration", () => {
     expect(pls.availableBonuses["willpower"]).toBe(4);
   });
 });
+
+describe("PlayerLevelSystem — a level-up pending at save time", () => {
+  it("is offered again after the load", () => {
+    const pls = new PlayerLevelSystem();
+    const offered = vi.fn();
+    pls.onLevelUpReady = offered;
+    pls.restoreFromSave({ characterLevel: 3, majorLevelUpsThisLevel: 10, levelUpPending: true } as never);
+    expect(offered).toHaveBeenCalledOnce();
+    pls.restoreFromSave({ characterLevel: 3, majorLevelUpsThisLevel: 2, levelUpPending: false } as never);
+    expect(offered, "not when none is pending").toHaveBeenCalledOnce();
+  });
+});

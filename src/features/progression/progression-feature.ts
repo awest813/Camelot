@@ -83,6 +83,7 @@ export class ProgressionFeature implements Feature {
     this.levels.onLevelUpReady = (bonuses) => { pending = bonuses; };
     ctx.system({
       id: "progression.level-up-when-free", phase: "ui", update: () => {
+        if (pending && !this.levels.levelUpPending) pending = null; // a load took it back
         if (!pending || this.levelUp.isVisible || !s.get(GameplayKey).canAct()) return;
         const bonuses = pending;
         pending = null;

@@ -333,6 +333,8 @@ export class PlayerLevelSystem {
     }
     if (typeof state.levelUpPending === "boolean") {
       this._levelUpPending = state.levelUpPending;
+      // Saved mid-level-up: offer it again (else it waits forever, blocking the next).
+      if (this._levelUpPending) this.onLevelUpReady?.(this.availableBonuses);
     }
   }
 }
