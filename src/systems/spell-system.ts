@@ -397,8 +397,12 @@ export class SpellSystem {
    * Add a spell to the player's known pool.
    * Returns false if the spell is already known or the id is invalid.
    */
+  /** The saved equipped spell, still to be registered (a forged one, see restoreFromSave). */
+  private _equipOnLearn: string | null = null;
+
   public learnSpell(spellId: string): boolean {
     if (!this._definitions.has(spellId)) return false;
+    if (spellId === this._equipOnLearn) { this._equipOnLearn = null; this._equippedSpellId = spellId; }
     if (this._knownSpellIds.has(spellId)) return false;
     this._knownSpellIds.add(spellId);
     return true;
@@ -725,10 +729,14 @@ export class SpellSystem {
     if (Array.isArray(state?.knownSpellIds)) {
       this._knownSpellIds = new Set(state.knownSpellIds.filter(id => this._definitions.has(id)));
     }
+    this._equipOnLearn = null;
     if (state?.equippedSpellId && this._knownSpellIds.has(state.equippedSpellId)) {
       this._equippedSpellId = state.equippedSpellId;
     } else {
       this._equippedSpellId = null;
+      // A forged spell is registered (and relearned) after this load runs:
+      // it goes back in hand when it is.
+      if (state?.equippedSpellId) this._equipOnLearn = state.equippedSpellId;
     }
   }
 }

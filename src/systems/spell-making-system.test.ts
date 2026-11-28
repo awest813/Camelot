@@ -251,3 +251,22 @@ describe("SpellMakingSystem — what the components really do", () => {
     expect(hush.damage).toBeUndefined();
   });
 });
+
+describe("a forged spell in hand at save time", () => {
+  it("is in hand again after a load (spells load before the forge re-registers it)", async () => {
+    const { SpellSystem } = await import("./spell-system");
+    const make = () => {
+      const spells = new SpellSystem({ camera: { position: { clone: () => ({}) } }, magicka: 100, maxMagicka: 100 } as never, [], { showNotification: () => {} } as never);
+      return { spells, forge: new SpellMakingSystem(spells) };
+    };
+    const a = make();
+    const r = a.forge.forgeSpell("Ember", [{ effectType: "damage", school: "destruction", magnitude: 5, duration: 0, damageType: "fire" }], null);
+    a.spells.equipSpell(r.spell!.id);
+    const spellSave = JSON.parse(JSON.stringify(a.spells.getSaveState()));
+    const forgeSave = JSON.parse(JSON.stringify(a.forge.getSaveState()));
+    const b = make();
+    b.spells.restoreFromSave(spellSave); // order 60
+    b.forge.restoreFromSave(forgeSave);  // order 1000
+    expect(b.spells.equippedSpell?.id).toBe(r.spell!.id);
+  });
+});
