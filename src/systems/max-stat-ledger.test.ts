@@ -43,3 +43,16 @@ describe("MaxStatLedger", () => {
     expect(b.maxMagicka).toBe(170);
   });
 });
+
+describe("playerMaxStats — a follower carries for you", () => {
+  it("their carry bonus is added while they're with you, and taken off when they go", async () => {
+    const { playerMaxStats } = await import("./max-stat-ledger");
+    const body = { maxHealth: 100, maxMagicka: 100, maxStamina: 100, maxCarryWeight: 300, health: 100, magicka: 100, stamina: 100 };
+    let carried = 0;
+    const m = playerMaxStats({ attributes: { maxHealth: 100, maxMagicka: 100, maxStamina: 100, carryWeight: 300 }, omen: () => undefined, diseases: () => undefined, effects: () => undefined, carried: () => carried, body });
+    carried = 50; m.sync();
+    expect(body.maxCarryWeight).toBe(350);
+    carried = 0; m.sync();
+    expect(body.maxCarryWeight).toBe(300);
+  });
+});

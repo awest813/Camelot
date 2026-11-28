@@ -46,7 +46,7 @@ import { PetsFeature } from "../features/pets/pets-feature";
 import { ThiefHostKey } from "../features/pickpocket/pickpocket-feature";
 import { TradeHostKey } from "../features/trade/trade-feature";
 import type { Item } from "../systems/inventory-system";
-import { FollowersFeature } from "../features/followers/followers-feature";
+import { FollowersFeature, FollowersKey } from "../features/followers/followers-feature";
 import { ShoutsFeature, ShoutHostKey } from "../features/shouts/shouts-feature";
 import { SettingsHostKey, SettingsKey } from "../features/settings/settings-feature";
 import { presentCell } from "./cells";
@@ -205,7 +205,7 @@ export function installGameFeatures(game: Game): void {
       });
       k.install(new SpoilsFeature());
       // The maxima: attributes + omen + diseases + fortify/burden effects; a load resets them to the attributes' first.
-      const maxStats = playerMaxStats({ attributes: game.attributeSystem, omen: () => game.birthsignSystem, diseases: () => game.diseaseSystem, effects: () => game.activeEffectsSystem, body: game.player });
+      const maxStats = playerMaxStats({ attributes: game.attributeSystem, omen: () => game.birthsignSystem, diseases: () => game.diseaseSystem, effects: () => game.activeEffectsSystem, carried: () => game.kernel.services.tryGet(FollowersKey)?.followers.activeCarryWeightBonus ?? 0, body: game.player });
       game.saveSystem.setMaximaRestorer(() => maxStats.afterLoad());
       k.services.provide(CharacterHostKey, {
         get attributes() { return game.attributeSystem; },

@@ -85,13 +85,15 @@ export class MaxStatLedger {
   }
 }
 
-/** The player's ledger: attributes + the omen's bonus + diseases' penalties + fortify / burden effects. */
+/** The player's ledger: attributes + the omen's bonus + diseases' penalties + fortify / burden effects + a follower's carrying. */
 export function playerMaxStats(d: {
   attributes: MaxStatsOf<"maxHealth" | "maxMagicka" | "maxStamina" | "carryWeight">;
   /** Lazily: these may be built after the ledger. */
   omen: () => { getStatBonuses(): MaxStats } | undefined;
   diseases: () => { getAttributePenalties(): Record<string, number> } | undefined;
   effects: () => { totalMagnitude(type: "fortify_health" | "fortify_magicka" | "burden"): number } | undefined;
+  /** What a follower carries for the player (their carry-weight bonus). */
+  carried?: () => number;
   body: MaxStatBody;
 }): PlayerMaxStats {
   const a = d.attributes;
@@ -101,7 +103,7 @@ export function playerMaxStats(d: {
     fromAttributes(),
     d.omen()?.getStatBonuses() ?? NO_STATS,
     maxStatsFromAttributeDeltas(d.diseases()?.getAttributePenalties() ?? {}),
-    { maxHealth: fx("fortify_health"), maxMagicka: fx("fortify_magicka"), maxStamina: 0, carryWeight: -fx("burden") },
+    { maxHealth: fx("fortify_health"), maxMagicka: fx("fortify_magicka"), maxStamina: 0, carryWeight: -fx("burden") + (d.carried?.() ?? 0) },
   ), d.body, fromAttributes());
   return {
     sync: () => ledger.sync(),

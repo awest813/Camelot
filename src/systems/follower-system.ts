@@ -665,7 +665,7 @@ export class FollowerSystem {
 
   /** Returns the carry-weight bonus contributed by the active follower. */
   public get activeCarryWeightBonus(): number {
-    if (!this._activeFollower) return 0;
+    if (!this._activeFollower?.isAlive) return 0; // a fallen one carries nothing
     const tmpl = this._templates.get(this._activeFollower.templateId);
     return tmpl?.carryWeightBonus ?? 0;
   }

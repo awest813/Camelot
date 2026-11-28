@@ -50,9 +50,13 @@ export interface FollowersService {
 
 export const FollowersKey = createServiceKey<FollowersService>("followers");
 
+/** Seconds after its last wound that a follower counts as still fighting (no mending). */
+const FIGHT_COOLDOWN = 8;
+
 export class FollowersFeature implements Feature {
   public readonly id = "followers";
   private _reportKill: (npc: NPC) => void = () => {};
+  private _sinceStruck = Number.POSITIVE_INFINITY;
   public readonly followers = new FollowerSystem();
   /** The follower panel (G), loaded the first time it opens. */
   public readonly panel = new LazyPanel<FollowerUI>(async () => {
@@ -151,7 +155,13 @@ export class FollowersFeature implements Feature {
       },
     });
 
-    ctx.system({ id: "followers.ai", phase: "sim", update: (dt) => this._updateAI(s, dt) });
+    ctx.system({ id: "followers.ai", phase: "sim", update: (dt) => {
+      this._updateAI(s, dt);
+      // Wounds mend out of a fight (about a hundred seconds from near death).
+      this._sinceStruck += dt;
+      const f = this.followers.getActiveFollower();
+      if (f?.isAlive && f.health < f.maxHealth && this._sinceStruck >= FIGHT_COOLDOWN) this.followers.followerHeal(f.maxHealth * 0.01 * dt);
+    } });
 
     // The follower HUD chip, redrawn when the follower, their health or their order changes.
     let hudKey = "";
@@ -244,6 +254,7 @@ export class FollowersFeature implements Feature {
     if (near && this._struckTimer <= 0) {
       this._struckTimer = STRUCK_EVERY;
       this.followers.followerTakeDamage(Math.max(1, near.attackDamage));
+      this._sinceStruck = 0;
     } else if (!near) {
       this._struckTimer = Math.max(this._struckTimer, 0.5);
     }

@@ -49,6 +49,17 @@ function setup(gold = 600, scene: Scene | null = null) {
 }
 
 describe("FollowersFeature (headless, through the kernel)", () => {
+  it("a follower's wounds mend out of a fight", () => {
+    const t = setup();
+    t.f.followers.recruitFollower("dagonet");
+    const max = t.f.followers.getActiveFollower()!.maxHealth;
+    t.f.followers.followerTakeDamage(max - 1);
+    expect(t.f.followers.getActiveFollower()!.health).toBe(1);
+    for (let i = 0; i < 200; i++) t.k.phases.run("sim", 1);
+    expect(t.f.followers.getActiveFollower()!.health).toBe(max);
+    t.k.uninstall("followers");
+  });
+
   it("asking an innkeeper opens the hiring panel; hiring costs gold; orders and dismissal notify", async () => {
     const t = setup(600);
     await t.askInnkeeper();
