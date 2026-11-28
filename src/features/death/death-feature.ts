@@ -41,6 +41,8 @@ export interface DeathHostService {
   /** The player goes down (the view sags; input is held) and gets back up. */
   fall(): void;
   rise(): void;
+  /** Whether a place is where the player is: this room when indoors, the open world outside. */
+  sameCell?(placeId: string): boolean;
 }
 
 export const DeathHostKey = createServiceKey<DeathHostService>("death-host");
@@ -100,6 +102,8 @@ export class DeathFeature implements Feature {
     let nearest: { name: string; position: { x: number; y: number; z: number } } | null = null;
     let best = Number.POSITIVE_INFINITY;
     for (const loc of s.get(TravelKey).places.discoveredLocations) {
+      // Only places here: the cave's spot is in the room's own coordinates, not the world's.
+      if (host.sameCell && !host.sameCell(loc.id)) continue;
       const dx = loc.position.x - pos.x, dy = loc.position.y - pos.y, dz = loc.position.z - pos.z;
       const d = dx * dx + dy * dy + dz * dz;
       if (d < best) { best = d; nearest = loc; }

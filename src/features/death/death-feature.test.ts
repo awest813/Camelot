@@ -14,6 +14,8 @@ function setup() {
   const host = {
     health: () => health, maxHealth: () => 120, setHealth: (v: number) => { health = v; },
     position: () => pos, flash: vi.fn(), closeScreens: vi.fn(), purgeEffects: vi.fn(), calmAttackers: vi.fn(), fall: vi.fn(), rise: vi.fn(),
+    indoors: false,
+    sameCell: (id: string) => (host.indoors ? id === "cave_01" : id !== "cave_01"),
   };
   k.services.provide(DeathHostKey, host);
   k.services.provide(PurseKey, { gold: () => gold, spend: (n) => { gold -= n; return true; } });
@@ -22,6 +24,7 @@ function setup() {
     places: { discoveredLocations: [
       { id: "far", name: "Far Keep", position: { x: 900, y: 2, z: 900 } },
       { id: "near", name: "Millbrook", position: { x: 110, y: 2, z: 95 } },
+      { id: "cave_01", name: "Old Cave", position: { x: 101, y: 2, z: 101 } }, // room coordinates: no place outside
     ] },
   } as unknown as TravelService);
   const died: number[] = [];
@@ -52,6 +55,14 @@ describe("DeathFeature (headless, through the kernel)", () => {
     // One fall, one event.
     t.step(10);
     expect(t.died).toHaveLength(1);
+  });
+
+  it("waking indoors stays in the room; outdoors the room's spot is not a place to wake", () => {
+    const t = setup();
+    t.host.indoors = true;
+    t.hit(0);
+    t.step(REVIVE_DELAY + 1);
+    expect(t.notes.at(-1)).toMatch(/^You awaken at Old Cave/);
   });
 
   it("healed before waking: no revive", () => {

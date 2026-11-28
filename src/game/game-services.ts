@@ -145,8 +145,8 @@ export function installGameFeatures(game: Game): void {
         health: () => game.player.health,
         maxHealth: () => game.player.maxHealth,
         setHealth: (v) => { game.player.health = v; },
-        position: () => game.player.camera.position,
-        flash: () => game.ui.showHitFlash("rgba(180, 0, 0, 0.55)"),
+        position: () => game.player.camera.position, flash: () => game.ui.showHitFlash("rgba(180, 0, 0, 0.55)"),
+        sameCell: (id) => (game.cellManager.isInterior ? id === game.cellManager.currentCell?.id : game.cellManager.getCellDefinition(id)?.type !== "interior"),
         closeScreens: () => {
           if (game.dialogueSystem.isInDialogue) game.dialogueSystem.endDialogue();
           if (game.inventorySystem.isOpen) game.inventorySystem.toggleInventory();
