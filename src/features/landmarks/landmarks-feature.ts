@@ -156,7 +156,7 @@ export class LandmarksFeature implements Feature {
         const fb = s.get(FeedbackKey);
         if (first) fb.grant({ xp: lm.clear.xp, gold: lm.clear.gold, label: `Cleared: ${lm.name}` });
         else fb.notify(`Cleared: ${lm.name}`, 2600);
-        ctx.kernel.events.emit("landmark:cleared", { id, name: lm.name });
+        ctx.kernel.events.emit("landmark:cleared", { id, name: lm.name, first });
         fb.markDirty();
         return;
       }

@@ -463,7 +463,7 @@ export function installGameFeatures(game: Game): void {
       const pets = new PetsFeature(game.scene);
       k.install(pets);
       k.services.provide(ShoutHostKey, {
-        gameTime: () => game.timeSystem.gameTime,
+        gameTime: () => game.timeSystem.playSeconds / 60, // play time, in minutes: cooldowns are real seconds, and never wrap at midnight
         stance: () => {
           const forward = game.player.getForwardDirection(1);
           forward.y = 0;
@@ -493,7 +493,7 @@ export function installGameFeatures(game: Game): void {
           }
         },
         setAttackSpeedMultiplier: (m) => { game.combatSystem.externalAttackSpeedMultiplier = m; },
-        clearWeather: () => game.weatherSystem.forceWeather("clear"),
+        clearWeather: (lifts) => { if (!lifts.includes(game.weatherSystem.state)) return false; game.weatherSystem.forceWeather("clear"); return true; },
       });
       const shouts = new ShoutsFeature();
       k.install(shouts);

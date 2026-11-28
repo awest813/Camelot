@@ -80,6 +80,15 @@ export class TimeSystem {
   // ── Getters ───────────────────────────────────────────────────────────────
 
   /** Total in-game minutes since midnight (0 – <1440). */
+  /**
+   * Seconds of play the clock has run since the game began (monotonic, saved
+   * with the clock; waiting adds its hours at the day's pace).  For real-time
+   * cooldowns that must not wrap at midnight.
+   */
+  public get playSeconds(): number {
+    return (this._elapsedGameTime * this._dayLengthSeconds) / (24 * 60);
+  }
+
   public get gameTime(): number {
     return this._gameTime;
   }

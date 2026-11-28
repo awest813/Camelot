@@ -24,7 +24,7 @@ import { FeedbackKey, GameplayKey, ModalKey, ownSave } from "../services";
 
 /** What a shout does to the world, through the game. */
 export interface ShoutHostService {
-  /** In-game minutes (cooldowns run on game time). */
+  /** Minutes of play (a real-time clock that never wraps; cooldowns are real seconds). */
   gameTime(): number;
   /** The player's position and the flat direction they face. */
   stance(): { origin: Vector3; forward: Vector3 };
@@ -36,7 +36,8 @@ export interface ShoutHostService {
   /** Resisted damage, with aggro and the usual kill handling. */
   damage(npc: NPC, raw: number, type: DamageType): void;
   setAttackSpeedMultiplier(multiplier: number): void;
-  clearWeather(): void;
+  /** Clear the sky if the weather is one of `lifts`; false (unchanged) otherwise. */
+  clearWeather(lifts: readonly string[]): boolean;
 }
 
 export interface ShoutsService {
@@ -60,7 +61,8 @@ export const ShoutsKey = createServiceKey<ShoutsService>("shouts");
 /** A shout reaches 16 m ahead, within about 75° of where the player faces. */
 const REACH = 16;
 const CONE_COS = 0.25;
-const MAX_DASH = 30;
+/** Swift Feet's longest rank (the dash stops short of any wall on the way). */
+const MAX_DASH = 75;
 
 export class ShoutsFeature implements Feature {
   public readonly id = "shouts";
@@ -170,8 +172,9 @@ export class ShoutsFeature implements Feature {
     ctx.on("player:kill", ({ npcId }) => {
       if (/^DragonBoss/.test(npcId)) s.get(ShoutsKey).greatDeed();
     });
-    ctx.on("landmark:cleared", ({ id }) => {
-      if (id.startsWith("site_bandit-camp_")) s.get(ShoutsKey).greatDeed();
+    ctx.on("landmark:cleared", ({ id, first }) => {
+      // Once per camp, as its other rewards: re-clearing a refilled camp isn't a new deed.
+      if (first !== false && id.startsWith("site_bandit-camp_")) s.get(ShoutsKey).greatDeed();
     });
     // The old places teach: finding an obelisk (an old waymarker) teaches the
     // next rank of a word.  Mastering it still takes awen.
@@ -313,7 +316,11 @@ export class ShoutsFeature implements Feature {
       this._furyLeft = fx.attack_speed_duration;
     }
 
-    if (fx.clear_fog) host.clearWeather();
+    // Clear Sky, by rank: fog; fog and cloud; any weather, storms too.
+    if (fx.clear_fog) {
+      const lifts = fx.clear_weather ? ["foggy", "overcast", "rain", "storm"] : fx.clear_overcast ? ["foggy", "overcast"] : ["foggy"];
+      if (!host.clearWeather(lifts)) s.get(FeedbackKey).notify("The sky doesn't heed so small a word: this weather needs a stronger rank.", 2600);
+    }
   }
 
   /** Expire Slow Time and Elemental Fury. */

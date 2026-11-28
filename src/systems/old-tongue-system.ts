@@ -352,17 +352,17 @@ export const BUILTIN_SHOUTS: ReadonlyArray<ShoutDefinition> = [
     ],
     tiers: [
       {
-        description: "Clear nearby fog for 30 seconds.",
+        description: "Lift the fog.",
         cooldownSeconds: 5,
         effects: { clear_fog: 30 },
       },
       {
-        description: "Dispel fog and light cloud cover for 60 seconds.",
+        description: "Lift fog and cloud.",
         cooldownSeconds: 5,
         effects: { clear_fog: 60, clear_overcast: 1 },
       },
       {
-        description: "Banish all storms and clouds, bringing clear skies.",
+        description: "Banish any weather, storms too, and bring clear skies.",
         cooldownSeconds: 5,
         effects: { clear_fog: 120, clear_weather: 1 },
       },
@@ -662,6 +662,7 @@ export class OldTongueSystem {
     const tierDef = def.tiers[tier - 1]!;
     const cooldownMinutes = tierDef.cooldownSeconds / 60;
     const elapsed = gameTimeMinutes - state.lastUsedMinutes;
+    if (elapsed < 0) return 0; // the clock went back (a save from before it was spoken)
     const remaining = cooldownMinutes - elapsed;
 
     return remaining > 0 ? remaining * 60 : 0;

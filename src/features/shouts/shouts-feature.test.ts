@@ -35,11 +35,12 @@ function setup() {
     addEffect: vi.fn(),
     damage: (npc, raw, type) => { hits.push([npc.mesh.name, raw, type]); },
     setAttackSpeedMultiplier: (m) => { speed = m; },
-    clearWeather: vi.fn(),
+    clearWeather: vi.fn(() => true),
   });
   k.install(new ShoutsFeature());
   const svc = k.services.get(ShoutsKey);
-  return { k, notes, hits, npcs, modal, svc, speed: () => speed, later: (m: number) => { minutes += m; } };
+  const host = k.services.get(ShoutHostKey);
+  return { k, notes, hits, npcs, modal, svc, host, speed: () => speed, later: (m: number) => { minutes += m; } };
 }
 
 /** Learn and unlock the first word of a shout, then equip it. */
@@ -50,7 +51,26 @@ function ready(t: ReturnType<typeof setup>, shoutId: string) {
   expect(t.svc.shouts.equipShout(shoutId)).toBe(true);
 }
 
+/** Learn and unlock every rank of a shout, then equip it. */
+function master(t: ReturnType<typeof setup>, shoutId: string) {
+  for (const i of [0, 1, 2] as const) { t.svc.shouts.learnWord(shoutId, i); t.svc.shouts.gainAwen(); t.svc.shouts.unlockWord(shoutId, i); }
+  expect(t.svc.shouts.equipShout(shoutId)).toBe(true);
+}
+
 describe("ShoutsFeature (headless, through the kernel)", () => {
+  it("each rank does more: Swift Feet's third dashes 75 m; Clear Sky's ranks lift more weather", () => {
+    const t = setup();
+    master(t, "swift_feet");
+    t.svc.use();
+    expect(t.host.dash).toHaveBeenCalledWith(75);
+    t.k.uninstall("shouts");
+    const u = setup();
+    ready(u, "clear_sky");
+    u.svc.use();
+    expect(u.host.clearWeather).toHaveBeenCalledWith(["foggy"]);
+    u.k.uninstall("shouts");
+  });
+
   it("without a shout, Shift+N says what to do; a slain dragon teaches a word", () => {
     const t = setup();
     t.svc.use();
@@ -77,6 +97,9 @@ describe("ShoutsFeature (headless, through the kernel)", () => {
     expect(t.svc.shouts.awen).toBe(0);
     t.k.events.emit("landmark:cleared", { id: "site_bandit-camp_1_1", name: "Camp" });
     expect(t.svc.shouts.awen).toBe(1);
+    const awen = t.svc.shouts.awen;
+    t.k.events.emit("landmark:cleared", { id: "site_bandit-camp_1_1", name: "Camp", first: false });
+    expect(t.svc.shouts.awen, "the same camp cleared again: no new deed").toBe(awen);
     t.k.uninstall("shouts");
   });
 

@@ -79,7 +79,8 @@ export interface GameEvents {
   /** Something was taken from a container. */
   "container:plundered": { id: string };
   /** A landmark's foes have all fallen (once per world). */
-  "landmark:cleared": { id: string; name: string };
+  /** `first`: the first time it was cleared (its rewards are paid once). */
+  "landmark:cleared": { id: string; name: string; first?: boolean };
   /** A world chunk unloaded (its content and NPCs are gone). */
   "chunk:unloaded": { chunkKey: string; cx?: number; cz?: number };
   /** A world chunk finished loading (its ground and vegetation are in). */
