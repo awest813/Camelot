@@ -131,6 +131,7 @@ export class FastTravelFeature implements Feature {
       // Teleporting and its message are the recall system's own.
       if (host.inCombat()) { refuse("Cannot recall while in combat."); this.menu.close(); return; }
       if (host.sneaking()) { refuse("Cannot recall while sneaking."); this.menu.close(); return; }
+      if (host.encumbered()) { refuse("Cannot recall while overencumbered."); this.menu.close(); return; } // as fast travel
       this.menu.close();
       if (!host.hasMark()) { refuse("No mark has been placed.", 2000); return; }
       const cell = host.markCell();

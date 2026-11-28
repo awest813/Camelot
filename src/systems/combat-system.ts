@@ -2003,6 +2003,7 @@ export class CombatSystem {
     // enchantments); below zero (a weakness draught) harm taken goes up, at most double.
     const resistPct = Math.min(100, Math.max(-100,
       this._activeEffectsSystem?.totalMagnitude("resist_damage") ?? 0));
+    if (resistPct >= 100) return 0; // fully warded (Shade-step): no harm at all, not the 1 the floor gave
     if (resistPct !== 0) {
       dmg = Math.max(1, Math.round(dmg * (1 - resistPct / 100)));
     }
