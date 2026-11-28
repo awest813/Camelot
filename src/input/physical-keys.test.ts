@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { installPhysicalKeys, physicalKey } from "./physical-keys";
 
-const press = (code: string, key: string, shiftKey = false, altKey = false) => ({ code, key, shiftKey, altKey });
+const press = (code: string, key: string, shiftKey = false, altKey = false) => ({ code, key, shiftKey, altKey, ctrlKey: false, metaKey: false });
 
 describe("keys by where they are", () => {
   it("AZERTY: the key above S is forward; the number row gives digits without Shift", () => {
@@ -36,5 +36,27 @@ describe("keys by where they are", () => {
     expect(seen).toEqual(["w/87", "z/90"]);
     off();
     canvas.remove(); field.remove();
+  });
+});
+
+describe("keys by place: shortcuts and canvas text fields", () => {
+  it("Ctrl/Cmd shortcuts keep the key's own letter (undo is the key marked Z)", () => {
+    expect(physicalKey({ code: "KeyW", key: "z", shiftKey: false, altKey: false, ctrlKey: true, metaKey: false })).toBeNull();
+    expect(physicalKey({ code: "KeyW", key: "z", shiftKey: false, altKey: false, ctrlKey: false, metaKey: true })).toBeNull();
+  });
+
+  it("a Babylon GUI field being typed in gets the layout's own letters", async () => {
+    const { setCanvasTyping } = await import("./physical-keys");
+    const off = installPhysicalKeys(window);
+    const canvas = document.createElement("canvas");
+    document.body.append(canvas);
+    const seen: string[] = [];
+    canvas.addEventListener("keydown", (e) => seen.push(e.key));
+    setCanvasTyping(true);
+    canvas.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyW", key: "z", bubbles: true }));
+    setCanvasTyping(false);
+    canvas.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyW", key: "z", bubbles: true }));
+    expect(seen).toEqual(["z", "w"]);
+    off(); canvas.remove();
   });
 });

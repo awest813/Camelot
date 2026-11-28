@@ -13,7 +13,7 @@ import { createServiceKey } from "../../core/kernel";
 import type { GraphicsSettingsUI, CameraSensitivity, Difficulty } from "../../ui/graphics-settings-ui";
 import { LazyPanel } from "../../ui/lazy-panel";
 import { CreditsUI } from "../../ui/credits-ui";
-import { persistGraphicsTier, type QualityTier } from "../../systems/graphics-system";
+import { persistGraphicsTier, readSavedGraphicsTier, type QualityTier } from "../../systems/graphics-system";
 import { FeedbackKey, GameplayKey, ModalKey, declareStateless } from "../services";
 
 /** NPC damage to the player, by difficulty. */
@@ -63,8 +63,8 @@ export function loadSettingsPrefs(): SettingsPrefs {
     const raw = typeof localStorage === "undefined" ? null : localStorage.getItem(SETTINGS_PREFS_KEY);
     const p = raw ? (JSON.parse(raw) as SettingsPrefs) : {};
     return {
-      difficulty: p.difficulty && p.difficulty in DIFFICULTY_DAMAGE ? p.difficulty : undefined,
-      sensitivity: p.sensitivity && p.sensitivity in LOOK_SENSIBILITY ? p.sensitivity : undefined,
+      difficulty: p.difficulty && Object.hasOwn(DIFFICULTY_DAMAGE, p.difficulty) ? p.difficulty : undefined,
+      sensitivity: p.sensitivity && Object.hasOwn(LOOK_SENSIBILITY, p.sensitivity) ? p.sensitivity : undefined,
       volume: typeof p.volume === "number" && p.volume >= 0 && p.volume <= 1 ? p.volume : undefined,
       muted: typeof p.muted === "boolean" ? p.muted : undefined,
     };
@@ -91,6 +91,7 @@ export class SettingsFeature implements Feature {
   private _wire: ((d: GraphicsSettingsUI) => void) | null = null;
   public readonly credits = new CreditsUI();
   private _difficulty: Difficulty = "normal";
+  private _chosenTier: () => QualityTier = () => "medium" as QualityTier;
   private _sensitivity: CameraSensitivity = "standard";
   private _button: HTMLButtonElement | null = null;
   private _s: ServiceRegistry | null = null;
@@ -106,6 +107,9 @@ export class SettingsFeature implements Feature {
     this.credits.onClose = back;
     // The player's settings come back from the last session.
     const prefs = loadSettingsPrefs();
+    // The preset picked last (it takes full effect at the next start), else the one running.
+    const chosenTier = () => readSavedGraphicsTier() ?? host().tier();
+    this._chosenTier = chosenTier;
     const remember = (change: SettingsPrefs) => { Object.assign(prefs, change); saveSettingsPrefs(prefs); };
     try {
       if (prefs.difficulty) { this._difficulty = prefs.difficulty; host().setDamageTaken(DIFFICULTY_DAMAGE[prefs.difficulty]); }
@@ -116,7 +120,7 @@ export class SettingsFeature implements Feature {
     } catch { /* a host still starting up: the dialog's choices apply as made */ }
     this._wire = (d) => {
       d.onTierSelect = (tier) => {
-        if (tier === host().tier()) return;
+        if (tier === chosenTier()) return;
         persistGraphicsTier(tier);
         host().applyTier(tier);
       };
@@ -178,7 +182,7 @@ export class SettingsFeature implements Feature {
   private _open(): void {
     const host = this._s?.get(SettingsHostKey);
     if (!host) return;
-    void this.dialog.get().then((d) => d.show(host.tier(), this._difficulty, host.audio.isMuted, host.audio.masterVolume, this._sensitivity));
+    void this.dialog.get().then((d) => d.show(this._chosenTier(), this._difficulty, host.audio.isMuted, host.audio.masterVolume, this._sensitivity));
   }
 
   /** A gear button (⚙) that is always on screen, so settings need no key. */

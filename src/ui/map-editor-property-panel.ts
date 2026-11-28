@@ -1,5 +1,6 @@
 import { AdvancedDynamicTexture, Control, Rectangle, StackPanel, TextBlock, Button, InputText } from "@babylonjs/gui/2D";
 import type { EditorPlacementType, EditorEntityProperties } from "../systems/map-editor-system";
+import { setCanvasTyping } from "../input/physical-keys";
 
 // ── Design tokens (aligned with UIManager) ──────────────────────────────────
 const P = {
@@ -312,6 +313,10 @@ export class MapEditorPropertyPanel {
       row.addControl(lbl);
 
       const input = new InputText(`prop_input_${key}`, (properties[key] as string | undefined) ?? "");
+      // Typed text follows the keyboard's own layout (not the controls' QWERTY places).
+      input.onFocusObservable.add(() => setCanvasTyping(true));
+      input.onBlurObservable.add(() => setCanvasTyping(false));
+      input.onDisposeObservable.add(() => setCanvasTyping(false));
       input.width          = "120px";
       input.height         = "22px";
       input.color          = P.TEXT;

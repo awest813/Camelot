@@ -60,7 +60,7 @@ vi.mock('@babylonjs/gui/2D', () => {
         Button: class extends MockControl {
             static CreateSimpleButton(_name: string, _text: string) { return new this(); }
         },
-        InputText: class extends MockControl {},
+        InputText: class extends MockControl { onFocusObservable = { add: vi.fn() }; onBlurObservable = { add: vi.fn() }; onDisposeObservable = { add: vi.fn() }; },
         Ellipse: class extends MockControl {},
     };
 });

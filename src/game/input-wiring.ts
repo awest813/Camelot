@@ -131,8 +131,7 @@ export function wireInputAdapter(g: Game): void {
     g.ui.showNotification(shown ? "Debug overlay ON" : "Debug overlay OFF", 1200);
   });
   adapter.onAction("screenshot", () => {
-    g.scene.onAfterRenderObservable.addOnce(() => g.screenshotSystem.download(g.canvas)); // just drawn: the canvas keeps no buffer between frames
-    g.ui.showNotification("Screenshot saved", 1500);
+    g.scene.onAfterRenderObservable.addOnce(() => { g.screenshotSystem.download(g.canvas); g.ui.showNotification("Screenshot saved", 1500); }); // just drawn: no buffer kept between frames
   });
   adapter.onAction("helpOverlay", () => {
     toggleHelpOverlay(g);

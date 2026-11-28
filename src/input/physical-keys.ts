@@ -7,7 +7,8 @@
  *
  * The rewrite happens once, in a capture listener on the window, before the
  * game, Babylon's camera or the editors see the event. Typing in a text
- * field, and AltGr characters, are left as they are.
+ * field (a page one, or a Babylon GUI one on the canvas), AltGr characters
+ * and Ctrl/Cmd shortcuts are left as they are.
  */
 
 /** The QWERTY characters of Shift + the number row. */
@@ -16,8 +17,10 @@ const SHIFTED_DIGITS = ")!@#$%^&*(";
 export interface PhysicalKey { key: string; keyCode: number }
 
 /** The QWERTY key in this press's place, or null to leave the press as it is. */
-export function physicalKey(ev: Pick<KeyboardEvent, "code" | "key" | "shiftKey" | "altKey">): PhysicalKey | null {
-  if (ev.altKey) return null; // AltGr (Ctrl+Alt) characters: @ # { [ on many layouts
+export function physicalKey(ev: Pick<KeyboardEvent, "code" | "key" | "shiftKey" | "altKey" | "ctrlKey" | "metaKey">): PhysicalKey | null {
+  // AltGr (Ctrl+Alt) characters (@ # { [ on many layouts), and Ctrl/Cmd
+  // shortcuts (undo is the key marked Z, as in every other program).
+  if (ev.altKey || ev.ctrlKey || ev.metaKey) return null;
   const letter = /^Key([A-Z])$/.exec(ev.code);
   if (letter) {
     const upper = letter[1];
@@ -36,9 +39,15 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 /** Rewrite every key press on the page to its QWERTY place (see above). */
+/** Text fields drawn on the canvas (Babylon GUI) say when they are typed in. */
+let canvasFieldFocused = false;
+export function setCanvasTyping(focused: boolean): void {
+  canvasFieldFocused = focused;
+}
+
 export function installPhysicalKeys(win: Window = window): () => void {
   const rewrite = (ev: KeyboardEvent) => {
-    if (isTyping(ev.target)) return;
+    if (isTyping(ev.target) || canvasFieldFocused) return;
     const p = physicalKey(ev);
     if (!p || (p.key === ev.key && p.keyCode === ev.keyCode)) return;
     // The event's fields are prototype getters: an own property shadows them.

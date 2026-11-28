@@ -276,11 +276,13 @@ export class MountsFeature implements Feature {
         const horse = this.horses.currentHorse;
         const item = host().carried().find((i) => i.id === itemId);
         if (!horse || !item) return;
-        if (!this.horses.saddlebagAddItem(horse.id, { ...item, quantity: 1 })) {
+        const copy = { ...item, quantity: 1 };
+        if (!host().take(itemId)) return;
+        if (!this.horses.saddlebagAddItem(horse.id, copy)) {
+          host().give(copy); // back in the pack
           saddlebag.showStatus("The saddlebag is full.");
           return;
         }
-        host().take(itemId);
         this._refreshSaddlebag();
         saddlebag.showStatus(`Stowed ${item.name}.`);
         feedback().markDirty();
