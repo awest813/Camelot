@@ -160,7 +160,9 @@ export function buildWildChunk(c: SiteContext, scatter: WildScatter, specs: read
       if (empty && ("npc" in part || "dragon" in part)) continue;
       if (part.when?.variant && !part.when.variant.includes(variant)) continue;
       if (part.when?.roll && r(part.when.roll.slot) >= part.when.roll.chance) continue;
-      const actor = buildPart(c, part, origin, variant, r, id, empty || !!c.chestLooted?.(id));
+      // The chest is empty only if it was taken from (a camp cleared but its
+      // strongbox unopened keeps its spoils for you).
+      const actor = buildPart(c, part, origin, variant, r, id, !!c.chestLooted?.(id));
       if (actor) spawned.push(actor);
     }
     const lm = spec.landmark;

@@ -3,7 +3,7 @@
  * chest model, owned by its chunk, whose meshes carry the container so the
  * player can look at it and press E.  Locked at the site's difficulty; its
  * contents come from a loot table, rolled the same for the same world and
- * chest, or nothing when the site was cleared lately.
+ * chest, or nothing when it was taken from lately (what was left then stays in it).
  */
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { ChunkContent } from "./chunk-content";

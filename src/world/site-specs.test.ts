@@ -102,7 +102,7 @@ describe("data-driven wild sites", () => {
     throw new Error("no bandit camp in the sample");
   });
 
-  it("a bandit camp's strongbox is a locked chest, empty while the camp is quiet", () => {
+  it("a bandit camp's strongbox is a locked chest; cleared, it keeps its spoils until taken from", () => {
     for (let cx = -60; cx < 60; cx++) for (let cz = -30; cz < 30; cz++) {
       const chests: Array<{ id: string; lock: number; empty: boolean }> = [];
       const t = recorder();
@@ -113,7 +113,10 @@ describe("data-driven wild sites", () => {
       expect(chests).toEqual([expect.objectContaining({ id: `chest_${camps[0].id}`, lock: 35, empty: false })]);
       chests.length = 0;
       buildWildChunk({ ...base, quiet: () => true }, { ...WILD_SCATTER, pool: {} }, WILD_SITES);
-      expect(chests[0].empty, "cleared lately: nothing to steal yet").toBe(true);
+      expect(chests[0].empty, "cleared, the strongbox unopened: still yours to open").toBe(false);
+      chests.length = 0;
+      buildWildChunk({ ...base, quiet: () => true, chestLooted: () => true }, { ...WILD_SCATTER, pool: {} }, WILD_SITES);
+      expect(chests[0].empty, "taken from: empty for its quiet days").toBe(true);
       return;
     }
     throw new Error("no bandit camp in the sample");
