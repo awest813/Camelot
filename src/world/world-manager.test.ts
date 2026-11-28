@@ -253,6 +253,16 @@ describe('WorldManager chunk load queue', () => {
     expect(wm.loadQueueLength).toBe(0);
   });
 
+  it('indoors (the world hidden) nothing streams in; it catches up on the way out', async () => {
+    const wm = new WorldManager(mockScene);
+    (wm as unknown as { visible: boolean }).visible = false; // as setVisible(false) leaves it (the mock scene has no structures)
+    await advanceFrames(wm, 10);
+    expect(wm.loadedChunkCount, "no chunk shows up through the room").toBe(0);
+    (wm as unknown as { visible: boolean }).visible = true;
+    await advanceFrames(wm, 10);
+    expect(wm.loadedChunkCount).toBeGreaterThan(0);
+  });
+
   it('prunes stale queued chunks immediately when the player changes chunk', async () => {
     const wm = new WorldManager(mockScene);
     await advanceFrames(wm, 10);

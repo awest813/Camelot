@@ -344,6 +344,10 @@ export class WorldManager implements ChunkSource<WorldChunkData>, ChunkAdapter<W
   }
 
   public async update(playerPosition: Vector3): Promise<void> {
+    // Indoors the open world is hidden: it doesn't stream either (a chunk
+    // loading then came up visible, and solid, through the room). It catches
+    // up on the way out.
+    if (!this.visible) return;
     await this._chunkManager.update({ x: playerPosition.x, y: playerPosition.z });
   }
 

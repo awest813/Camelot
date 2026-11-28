@@ -53,8 +53,8 @@ export function hydrateCellAfterLoad(g: Game): void {
       if (cell.type !== "exterior") {
         g.fastTravelSystem.discoverLocation(cell.id, cell.name, g.player.camera.position.clone());
       }
-      // Sync world visibility with cell type
-      g.world.setVisible(cell.type !== "interior");
+      // World visibility, and an interior's torches and textures (as on entering it).
+      presentCell(g, cell.id);
   }
 }
 
