@@ -58,6 +58,8 @@ export interface ContainerSaveState {
   leftovers?: Array<{ id: string; contents: Item[]; isLocked: boolean }>;
   /** Charges left on the Warden's Key. */
   masterKeys?: number;
+  /** One-of-a-kind ground pickups already taken (the starting area's weapons…). */
+  takenPickups?: string[];
 }
 
 /**
@@ -233,6 +235,9 @@ export class ContainerSystem {
     if (c.plundered && id.startsWith("chest_site_")) this._leftovers.set(id, { contents: [...c.contents], isLocked: c.isLocked });
   }
 
+  /** One-of-a-kind ground pickups taken (saved; see Loot.pickupKey). */
+  public takenPickups = new Set<string>();
+
   /** Locks the player can open regardless of difficulty (each opens one). */
   public masterKeys = 0;
 
@@ -305,12 +310,16 @@ export class ContainerSystem {
       containers.push({ id: c.id, contents: [...c.contents], isLocked: c.isLocked, ...(c.plundered ? { plundered: true } : {}) });
     }
     const leftovers = [...this._leftovers].map(([id, l]) => ({ id, contents: [...l.contents], isLocked: l.isLocked }));
-    return { containers, ...(leftovers.length ? { leftovers } : {}), masterKeys: this.masterKeys };
+    return {
+      containers, ...(leftovers.length ? { leftovers } : {}), masterKeys: this.masterKeys,
+      ...(this.takenPickups.size ? { takenPickups: [...this.takenPickups].sort() } : {}),
+    };
   }
 
   public restoreFromSave(state: ContainerSaveState): void {
     this._pending.clear();
     this._leftovers.clear();
+    this.takenPickups = new Set((state?.takenPickups ?? []).filter((k): k is string => typeof k === "string"));
     for (const l of state?.leftovers ?? []) this._leftovers.set(l.id, { contents: [...l.contents], isLocked: l.isLocked });
     if (typeof state?.masterKeys === "number" && Number.isFinite(state.masterKeys)) this.masterKeys = Math.max(0, Math.floor(state.masterKeys));
     for (const saved of state?.containers ?? []) {

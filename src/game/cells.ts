@@ -71,7 +71,7 @@ export function cleanupCollectedLoot(g: Game): void {
   for (const mesh of g.scene.meshes.slice()) {
       if (mesh.metadata?.type === 'loot') {
           const loot = mesh.metadata.loot;
-          if (collectedIds.has(loot.item.id)) {
+          if (collectedIds.has(loot.item.id) || (loot.pickupKey && g.containerSystem.takenPickups.has(loot.pickupKey))) {
               loot.dispose();
           }
       }

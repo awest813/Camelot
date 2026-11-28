@@ -80,6 +80,14 @@ describe("ContainerSystem", () => {
     expect(refilled.contents.map((i) => i.id)).toEqual(["gold", "ring"]);
   });
 
+  it("remembers the one-of-a-kind pickups taken (the starting area's), across a save", () => {
+    containerSystem.takenPickups.add("starter_weapon_runesword");
+    const saved = JSON.parse(JSON.stringify(containerSystem.getSaveState()));
+    containerSystem.takenPickups.clear();
+    containerSystem.restoreFromSave(saved);
+    expect([...containerSystem.takenPickups]).toEqual(["starter_weapon_runesword"]);
+  });
+
   it("saves the Warden's Key charges left", () => {
     containerSystem.masterKeys = 2;
     const saved = containerSystem.getSaveState();

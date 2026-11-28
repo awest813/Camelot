@@ -156,6 +156,7 @@ export class InteractionSystem {
       } else if (metadata.type === 'loot') {
           const loot = metadata.loot;
           if (this.inventorySystem.addItem(loot.item)) {
+              if (loot.pickupKey) this.containerSystem?.takenPickups.add(loot.pickupKey);
               loot.dispose();
               this.events?.emit("loot:pickedUp", { itemId: loot.item.id });
           }

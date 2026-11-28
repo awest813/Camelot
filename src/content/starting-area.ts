@@ -129,12 +129,16 @@ export function seedStartingArea(d: StartingAreaDeps): void {
   // The Old Cave's entrance, with where the player comes back out.
   d.cells.buildSimpleInterior("cave_01", "Old Cave", "portal_cave_entrance", new Vector3(-8, 1, 8), new Vector3(-8, 2, 8));
 
-  for (const g of STARTER_GROUND_ITEMS) new Loot(d.scene, new Vector3(...g.at), { ...g.item, stats: { ...g.item.stats } });
+  // Each is placed every session; once taken it stays taken (Loot.pickupKey).
+  STARTER_GROUND_ITEMS.forEach((g, i) => {
+    new Loot(d.scene, new Vector3(...g.at), { ...g.item, stats: { ...g.item.stats } }).pickupKey = `starter_ground_${i}`;
+  });
 
   // Each weapon is an ordinary pickup, drawn by its model once that loads
   // (the pickup sphere shows if the model can't).
   for (const w of STARTER_WEAPONS) {
     const loot = new Loot(d.scene, new Vector3(...w.at), { ...w.item, stackable: false, quantity: 1 } as Item);
+    loot.pickupKey = `starter_weapon_${w.item.id}`;
     const mat = loot.mesh.material as { alpha: number } | null;
     if (mat) mat.alpha = 0;
     d.assets.getInstance(w.model, (root) => {

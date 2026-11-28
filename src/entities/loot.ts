@@ -12,6 +12,8 @@ export class Loot {
   public mesh: Mesh;
   public item: Item;
   public physicsAggregate: PhysicsAggregate;
+  /** A one-of-a-kind pickup placed every session (the starting area's): once taken, gone for good (saved). */
+  public pickupKey?: string;
 
   private static _equipMatCache = new WeakMap<Scene, StandardMaterial>();
   private static _consumableMatCache = new WeakMap<Scene, StandardMaterial>();
