@@ -9,6 +9,7 @@
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
  */
+import { every } from "../../core/every";
 import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
 import { SurvivalChip } from "../../ui/survival-chip";
@@ -80,7 +81,7 @@ export class SurvivalFeature implements Feature {
       },
     });
 
-    ctx.system({ id: "survival.chip", phase: "ui", update: () => this.chip.update(n.hungerLevel, n.fatigueLevel, n.coldLevel, s.get(SurvivalHostKey).ailments?.() ?? []) });
+    ctx.system({ id: "survival.chip", phase: "ui", update: every(0.25, () => this.chip.update(n.hungerLevel, n.fatigueLevel, n.coldLevel, s.get(SurvivalHostKey).ailments?.() ?? [])) });
 
     ctx.scope.add(() => {
       n.onHungerLevelChanged = n.onFatigueLevelChanged = n.onColdLevelChanged = null;

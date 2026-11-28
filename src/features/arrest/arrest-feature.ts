@@ -10,6 +10,7 @@
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
  */
+import { every } from "../../core/every";
 import { simClock } from "../../core/sim-clock";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import type { Feature, FeatureContext, ServiceRegistry } from "../../core/kernel";
@@ -57,10 +58,10 @@ export class ArrestFeature implements Feature {
     // While a bounty is on your head the HUD says so (guards will stop you).
     const wanted = statusChip(0, "Bounty on your head");
     ctx.system({
-      id: "arrest.wanted", phase: "ui", update: () => {
+      id: "arrest.wanted", phase: "ui", update: every(0.25, () => {
         const bounty = s.get(LawKey).crime.getTotalBounty();
         wanted.set(bounty > 0 ? `⚖ Wanted: ${bounty}g bounty` : null);
-      },
+      }),
     });
 
     // Killing or striking a peaceful settler is a crime; witnesses post a

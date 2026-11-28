@@ -8,6 +8,7 @@
  *
  * Extracted from game.ts (engine overhaul, Phase 1).
  */
+import { every } from "../../core/every";
 import { skillName } from "../../systems/skill-progression-system";
 import type { Feature, FeatureContext } from "../../core/kernel";
 import { createServiceKey } from "../../core/kernel";
@@ -94,7 +95,7 @@ export class CharacterFeature implements Feature {
     // potion wearing off): the sync only moves them by what changed.
     ctx.on("disease:contracted", () => host().syncMaxStats());
     ctx.on("disease:cured", () => host().syncMaxStats());
-    ctx.system({ id: "character.maxima", phase: "sim", update: () => { if (!this._creating) host().syncMaxStats(); } });
+    ctx.system({ id: "character.maxima", phase: "sim", update: every(0.25, () => { if (!this._creating) host().syncMaxStats(); }) });
     this.races.onPowerActivated = power;
     this.birthsigns.onPowerActivated = power;
 
