@@ -25,7 +25,7 @@ import { Scope } from "../core/scope";
 import { actors } from "../entities/actors";
 import { ChunkOwned } from "../core/ecs/actors";
 import type { LodSystem } from "../systems/lod-system";
-import type { FireFx } from "../rendering/particles-fx";
+import type { FireSink } from "../rendering/fire-fx-port";
 import type { ForgeRegistry } from "../systems/smithing-controller";
 import { setInstanceYaw, type FantasyAssetKey, type FantasyAssetLoader } from "../systems/fantasy-asset-loader";
 import { buildingFootprint, buildingLayout, buildingWallColliders, toWorld, WALL_HEIGHT, type BuildingKind } from "./village-buildings";
@@ -103,7 +103,7 @@ export interface ChunkContentDeps {
   assets: FantasyAssetLoader;
   lod: LodSystem;
   shadows(): ShadowGenerator | null;
-  fireFx(): FireFx | null;
+  fireFx(): FireSink | null;
   forges(): ForgeRegistry;
   /** Unregister a chunk NPC from every system and dispose it. */
   releaseNpc(npc: NPC): void;

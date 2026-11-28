@@ -19,7 +19,8 @@ import { Scene } from "@babylonjs/core/scene";
 import { AtmosphereController } from "./sky-dome";
 import { HorizonMountains } from "./horizon";
 import { WaterRenderer } from "./water";
-import { FireFx, WeatherFx } from "./particles-fx";
+import type { FireFx, WeatherFx } from "./particles-fx";
+import { FireFxPort } from "./fire-fx-port";
 import { createFoliageMaterials, GrassField, WindState } from "./foliage";
 import { createSunShadows, snapSunToTexels } from "./render-pipeline";
 import type { PostFxHandle } from "./post-fx";
@@ -50,7 +51,9 @@ export class WorldEnvironment {
   public pipeline: DefaultRenderingPipeline | null = null;
   public water: WaterRenderer | null = null;
   public grass: GrassField | null = null;
-  public fireFx: FireFx | null = null;
+  /** Where fires are lit (they wait there until the particle code arrives). */
+  public readonly fireFx = new FireFxPort();
+  private _fire: FireFx | null = null;
   public weatherFx: WeatherFx | null = null;
   private _precipitation = 0;
   private _world: WorldManager | null = null;
@@ -143,10 +146,16 @@ export class WorldEnvironment {
       );
     }
     const particleScale = Math.min(1.5, this._g.performance.maxParticles / 512);
-    this.fireFx = new FireFx(this._scene, particleScale);
-    world.structures.onFire = (info) => this.fireFx?.attach(info);
+    world.structures.onFire = (info) => this.fireFx.attach(info);
     world.structures.mergeStatic = true;
-    this.weatherFx = new WeatherFx(this._scene, this._g.effects.ambientParticles ? particleScale : particleScale * 0.5);
+    // Fire and weather particles: their code arrives after the world is set up
+    // (out of the start-up bundle); fires lit meanwhile wait in the port.
+    void import("./particles-fx").then(({ FireFx, WeatherFx }) => {
+      if (this._scene.isDisposed) return;
+      this._fire = new FireFx(this._scene, particleScale);
+      this.fireFx.connect(this._fire);
+      this.weatherFx = new WeatherFx(this._scene, this._g.effects.ambientParticles ? particleScale : particleScale * 0.5);
+    });
 
     world.onVisibilityChanged = (visible) => {
       this.grass?.setVisible(visible);
@@ -210,9 +219,9 @@ export class WorldEnvironment {
       }
     }
     const daylight = Math.max(0, Math.min(1, (state.ambientIntensity - 0.42) / 0.58));
-    if (this.fireFx && player) {
-      this.fireFx.night = daylight < 0.3;
-      this.fireFx.update(dt, player);
+    if (this._fire && player) {
+      this._fire.night = daylight < 0.3;
+      this._fire.update(dt, player);
     }
     this._windowGlow(daylight);
     this.water?.update(dt, state, { x: WindState.dirX * WindState.strength, z: WindState.dirZ * WindState.strength });

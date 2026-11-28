@@ -12,12 +12,12 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import type { Scene } from "@babylonjs/core/scene";
 import type { ProceduralTextureManager } from "../systems/procedural-texture-manager";
-import type { FireFx } from "../rendering/particles-fx";
+import type { FireSink } from "../rendering/fire-fx-port";
 
 export interface InteriorDressingDeps {
   scene: Scene;
   textures: ProceduralTextureManager;
-  fireFx: FireFx | null;
+  fireFx: FireSink | null;
 }
 
 export function dressInterior(cellId: string, d: InteriorDressingDeps): void {
