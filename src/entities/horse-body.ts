@@ -86,8 +86,8 @@ export function groundUnder(scene: Scene, x: number, y: number, z: number): numb
 
 // ── The horse model (public/model/horse/Horse.glb) ────────────────────────────
 
-/** Its four clips, and "stand": the walk's first pose held (head up; idle grazes). */
-export type HorseClip = "idle" | "walk" | "run" | "lie" | "stand";
+/** Its three clips, and "stand": the walk's first pose held (head up; idle grazes). */
+export type HorseClip = "idle" | "walk" | "run" | "stand";
 
 /** One placed horse: its root (set position and yaw on it) and its clips. */
 export interface HorseInstance {
@@ -155,7 +155,7 @@ export async function spawnHorseModel(scene: Scene, name: string, tint?: HorseCo
       current?.stop();
       current = g;
       standing = held;
-      g.start(clip !== "lie" && !held, 1.0, g.from, g.to);
+      g.start(!held, 1.0, g.from, g.to);
       if (held) { g.goToFrame(g.from); g.pause(); }
     },
     dispose() {

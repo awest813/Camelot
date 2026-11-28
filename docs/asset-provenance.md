@@ -28,9 +28,11 @@ These assets require attribution in shipped builds.
 
 - File: `public/model/horse/Horse.glb`, the horses you buy from the ostler and ride.
 - Source: `horsestylizedchestnut.blend`, supplied by the project owner (its licence is theirs to record here).
-- Contents: a stylized chestnut horse (about 3,000 polygons, 71 bones) with idle, walk, run and lie clips.
+- Contents: a stylized chestnut horse (about 3,000 polygons, 71 bones) with idle, walk and run clips
+  (the file's "lie" clip is left out: the game never lays a horse down).
 - Conversion: exported to glTF with Blender 5.0 (its Diffuse shaders swapped for Principled so the
-  textures carry), then `node tools/optimize-models.mjs` (meshopt geometry, WebP textures): 1.6 MB → 0.4 MB.
+  textures carry; clips sampled every second frame), then `node tools/optimize-models.mjs` (meshopt
+  geometry, WebP textures): 1.6 MB → 0.3 MB.
 - The Black Stallion is the same model with its coat tinted dark in code (`HORSE_MODEL_TINT`).
 
 ### KayKit Adventurers (rigged NPC characters)
