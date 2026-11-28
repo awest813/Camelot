@@ -384,7 +384,7 @@ state, scope and save codec.
       feature.
 
   13. **Arrest** (`src/features/arrest/`): a guard's challenge, with paying
-      the fine, jail, persuasion and resisting (also Escape). New `law`
+      the fine, jail, persuasion and resisting (Escape is no answer: the guard asks again). New `law`
       service (crime, persuasion, jail time, infamy).
 
   14. **Fast travel** (`src/features/fast-travel/`): known places, the travel

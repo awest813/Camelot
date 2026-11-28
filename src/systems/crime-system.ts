@@ -3,6 +3,7 @@ import { Ray } from "@babylonjs/core/Culling/ray";
 import { NPC, AIState } from "../entities/npc";
 import { Player } from "../entities/player";
 import { UIManager } from "../ui/ui-manager";
+import { titleFromId } from "../core/readable-name";
 
 export type CrimeType = "trespass" | "theft" | "assault" | "murder";
 
@@ -130,7 +131,7 @@ export class CrimeSystem {
     const next = prev + value;
     this._bounties.set(factionId, next);
 
-    this._ui.showNotification(`Crime witnessed! Bounty +${value}g (${factionId})`, 3000);
+    this._ui.showNotification(`Crime witnessed! Bounty +${value}g with the ${titleFromId(factionId)}`, 3000);
     return next;
   }
 

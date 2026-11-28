@@ -363,13 +363,15 @@ describe("GuardEncounterUI", () => {
       expect(payBtn?.getAttribute("aria-disabled")).toBe("false");
     });
 
-    it("resolves encounter with resist_arrest when Escape is pressed", () => {
-      const onResolve = vi.fn();
+    it("Escape is no answer: it doesn't resolve the encounter", () => {
+      const onResolve = vi.fn(), onEscape = vi.fn();
       ui.onResolve = onResolve;
+      ui.onEscape = onEscape;
       ui.open(makeView());
       const root = document.querySelector(".guard-encounter") as HTMLElement;
       root.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-      expect(onResolve).toHaveBeenCalledWith("resist_arrest");
+      expect(onResolve).not.toHaveBeenCalled();
+      expect(onEscape).toHaveBeenCalledOnce();
     });
   });
 });

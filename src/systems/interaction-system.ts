@@ -187,7 +187,7 @@ export class InteractionSystem {
     const sneakLevel = this.sneakLevelProvider?.() ?? 0;
     const check = this.pickpocketSystem.canAttempt(npcId, true, false, "", sneakLevel);
     if (!check.canAttempt || check.successChance == null) return null;
-    return `[E] Pickpocket ${npcId} (${Math.round(check.successChance)}%)`;
+    return `[E] Pickpocket ${npc.displayName} (${Math.round(check.successChance)}%)`;
   }
 
   private _raycast() {

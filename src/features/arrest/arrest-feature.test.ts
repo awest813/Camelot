@@ -73,10 +73,19 @@ describe("ArrestFeature (headless, through the kernel)", () => {
     t.k.uninstall("arrest");
   });
 
-  it("resisting (or Escape) raises the bounty and the guard attacks", () => {
+  it("Escape doesn't walk away from the guard, nor resist: the panel stays and asks again", () => {
     const t = setup({ bounty: 100 });
     t.stop();
-    t.k.services.get(ArrestKey).resist();
+    t.k.services.get(ArrestKey).escape();
+    expect(t.panel.isVisible).toBe(true);
+    expect(t.bounty()).toBe(100);
+    t.k.uninstall("arrest");
+  });
+
+  it("resisting raises the bounty and the guard attacks", () => {
+    const t = setup({ bounty: 100 });
+    t.stop();
+    t.panel.onResolve!("resist_arrest");
     expect(t.bounty()).toBe(125);
     expect(t.guard.aiState).toBe(AIState.CHASE);
     expect(t.guard.lastKnownPlayerPos).toEqual(new Vector3(1, 2, 3));

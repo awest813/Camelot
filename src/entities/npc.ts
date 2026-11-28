@@ -9,6 +9,8 @@ import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
 import { PhysicsShapeType, PhysicsMotionType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { readableName } from "../core/readable-name";
+export { readableName };
 
 /**
  * AI state machine states for NPC behaviour.
@@ -95,11 +97,6 @@ export interface ScheduleBlock {
   anchorPosition?: Vector3;
 }
 
-/** A key's readable form: no trailing `_12` / `_3_-4` ids, underscores and joined words spaced. */
-export function readableName(key: string): string {
-  const name = key.replace(/(_-?\d+)+$/, "").replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").trim();
-  return name || key;
-}
 
 export class NPC {
   public mesh: Mesh;

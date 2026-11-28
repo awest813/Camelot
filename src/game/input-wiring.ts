@@ -113,7 +113,7 @@ export function wireInputAdapter(g: Game): void {
     if (g._inCharacterCreation) return;
     if (g.dialogueSystem.isInDialogue) return;
     if (g.levelUpUI.isVisible) return;
-    if (g.guardEncounterUI.isVisible) { g.kernel.services.get(ArrestKey).resist(); return; }
+    if (g.guardEncounterUI.isVisible) { g.kernel.services.get(ArrestKey).escape(); return; }
     if (g.editors?.mapEditorActive) { g.editors.exitMapEditor(); return; }
     // Otherwise close the top panel, or pause.
     if (g._modals.closeTop()) return;

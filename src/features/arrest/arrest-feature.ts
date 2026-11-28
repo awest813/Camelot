@@ -19,6 +19,7 @@ import { statusChip } from "../../ui/hud-chips";
 import { GuardEncounterUI, type GuardEncounterAction } from "../../ui/guard-encounter-ui";
 import { AIState, type NPC } from "../../entities/npc";
 import { FeedbackKey, LawKey, ModalKey, PlayerKey, PurseKey, SkillsKey, declareStateless } from "../services";
+import { titleFromId } from "../../core/readable-name";
 export { LawKey };
 
 export type { LawService } from "../services";
@@ -27,8 +28,9 @@ const ASSAULT_DEBOUNCE_MS = 3000;
 
 export interface ArrestService {
   readonly panel: GuardEncounterUI;
-  /** Escape: refusing to answer counts as resisting. */
-  resist(): void;
+  /** Escape: the guard won't be walked away from, and waits for an answer (an
+   *  Escape pressed by habit used to count as resisting arrest). */
+  escape(): void;
 }
 
 export const ArrestKey = createServiceKey<ArrestService>("arrest");
@@ -54,6 +56,8 @@ export class ArrestFeature implements Feature {
       ctx.kernel.events.emit("crime:committed", { crimeType: "challenge", factionId, bounty });
     };
     this.panel.onResolve = (action) => this._resolve(action, ctx);
+    const escape = () => { if (this.panel.isVisible) this._show("\"Not so fast.\" Pay, come quietly, or resist.", true); };
+    this.panel.onEscape = escape;
 
     // While a bounty is on your head the HUD says so (guards will stop you).
     const wanted = statusChip(0, "Bounty on your head");
@@ -80,12 +84,13 @@ export class ArrestFeature implements Feature {
 
     ctx.provide(ArrestKey, {
       panel: this.panel,
-      resist: () => { if (this.panel.isVisible) this._resolve("resist_arrest", ctx); },
+      escape,
     });
 
     ctx.scope.add(() => {
       crime.onGuardChallenge = null;
       this.panel.onResolve = null;
+      this.panel.onEscape = null;
       if (this.panel.isVisible) this.panel.close();
       this._challenge = null;
       this._s = null;
@@ -101,8 +106,8 @@ export class ArrestFeature implements Feature {
     const c = this._challenge, s = this._s;
     if (!c || !s) return;
     this.panel.open({
-      guardName: c.guard.key,
-      factionId: c.factionId,
+      guardName: c.guard.displayName,
+      factionId: c.factionId, factionName: titleFromId(c.factionId),
       bounty: c.bounty,
       playerGold: s.get(PurseKey).gold(),
       canPersuade: s.get(LawKey).persuasion.canAttemptPersuasion(c.guard.key, this._speech()),

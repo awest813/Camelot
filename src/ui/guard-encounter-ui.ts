@@ -7,6 +7,8 @@ export type GuardEncounterAction = "pay_fine" | "go_to_jail" | "resist_arrest" |
 export interface GuardEncounterView {
   guardName: string;
   factionId: string;
+  /** The faction as the player reads it ("Village Guard"); the id when absent. */
+  factionName?: string;
   bounty: number;
   playerGold: number;
   canPersuade: boolean;
@@ -20,6 +22,8 @@ export class GuardEncounterUI {
   /** Active focus trap/restore session while the panel is open (null when closed). */
   private _focusSession: DialogFocusSession | null = null;
   public onResolve: ((action: GuardEncounterAction) => void) | null = null;
+  /** Escape pressed in the panel: no answer, so the guard asks again. */
+  public onEscape: (() => void) | null = null;
 
   private _root: HTMLDivElement | null = null;
   private _statusEl: HTMLParagraphElement | null = null;
@@ -40,7 +44,7 @@ export class GuardEncounterUI {
     if (!this._root || !this._headerEl || !this._bountyEl || !this._payBtn || !this._persuadeBtn) return;
 
     this._headerEl.textContent = `${view.guardName}: "You are under arrest."`;
-    this._bountyEl.textContent = `Faction: ${view.factionId}  •  Bounty: ${view.bounty}g  •  Your Gold: ${view.playerGold}g`;
+    this._bountyEl.textContent = `${view.factionName ?? view.factionId}  •  Bounty: ${view.bounty}g  •  Your Gold: ${view.playerGold}g`;
 
     const cannotPay = view.playerGold < view.bounty;
     this._payBtn.setAttribute("aria-disabled", cannotPay.toString());
@@ -139,7 +143,7 @@ export class GuardEncounterUI {
       if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
-        this.onResolve?.("resist_arrest");
+        this.onEscape?.();
       }
     });
 
