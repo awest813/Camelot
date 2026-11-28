@@ -85,7 +85,7 @@ export const BUILT_IN_DISEASES: DiseaseDefinition[] = [
   {
     id: "tick_fever",
     name: "Tick Fever",
-    description: "Spread by ticks in the long grass; it stiffens every joint.",
+    description: "Spread by ticks in the long grass; it stiffens every joint (and the fingers at a lock).",
     attributeEffects: { agility: -5 },
   },
   {

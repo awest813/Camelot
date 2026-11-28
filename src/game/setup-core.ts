@@ -127,7 +127,7 @@ export function setupCoreSystems(g: Game): void {
   g.crimeSystem     = new CrimeSystem(g.player, g.scheduleSystem.npcs, g.ui, g.scene);
   g.crimeSystem.stealth = g.stealthSystem; // sneaking and unseen players have fewer witnesses
   g.containerSystem = new ContainerSystem(g.scene, g.player, g.inventorySystem, g.ui); g.projectileSystem = new ProjectileSystem(g.scene, g.player, g.scheduleSystem.npcs, g.ui);
-  Object.assign(g.containerSystem, { lockSkill: () => ((g.skillProgressionSystem.getSkill("sneak")?.level ?? 0) + g.attributeSystem.get("agility")) / 2, lockRng: () => g.kernel.rng.stream("lockpick").next(), onLockPicked: () => g.skillProgressionSystem.gainXP("sneak", 15) }); // locks: skill is half Sneak plus half Agility; picks roll a seeded stream; a pick teaches Sneak
+  Object.assign(g.containerSystem, { lockSkill: () => ((g.skillProgressionSystem.getSkill("sneak")?.level ?? 0) + g.attributeSystem.get("agility") + (g.diseaseSystem?.getAttributePenalties().agility ?? 0)) / 2, lockRng: () => g.kernel.rng.stream("lockpick").next(), onLockPicked: () => g.skillProgressionSystem.gainXP("sneak", 15) }); // locks: skill is half Sneak plus half Agility (less a disease's stiffness); picks roll a seeded stream; a pick teaches Sneak
   g.projectileSystem.stealthSystem = g.stealthSystem;
   g.combatSystem.playerUnseen = () => g.stealthSystem.unseenSeconds > 0; // the Under the Hill omen
   g.barterSystem    = new BarterSystem(g.inventorySystem, g.ui); g.shopSystem = new ShopSystem();
