@@ -84,6 +84,8 @@ export interface PickpocketSaveState {
   totalAttempts:  number;
   totalSuccesses: number;
   totalCaught:    number;
+  /** Item ids lifted from each NPC (gone from their pockets). */
+  lifted?: Record<string, string[]>;
 }
 
 // ── System ────────────────────────────────────────────────────────────────────
@@ -129,6 +131,10 @@ export class PickpocketSystem {
   public random: () => number = unseededRandom;
 
   private _inventories: Map<string, PickpocketableItem[]> = new Map();
+  /** What has been lifted from each NPC: gone from their pockets for good (saved), not back on the next visit. */
+  private _lifted: Map<string, string[]> = new Map();
+  /** What each registered NPC carries before any lifting. */
+  private _full: Map<string, PickpocketableItem[]> = new Map();
   private _totalAttempts  = 0;
   private _totalSuccesses = 0;
   private _totalCaught    = 0;
@@ -169,7 +175,18 @@ export class PickpocketSystem {
    * Stores a defensive copy of the provided array.
    */
   public registerNpcInventory(npcId: string, items: PickpocketableItem[]): void {
-    this._inventories.set(npcId, items.map(i => ({ ...i })));
+    this._full.set(npcId, items.map(i => ({ ...i })));
+    this._fill(npcId);
+  }
+
+  /** An NPC's pockets: what they carry, less what has been lifted. */
+  private _fill(npcId: string): void {
+    const pockets = (this._full.get(npcId) ?? []).map(i => ({ ...i }));
+    for (const id of this._lifted.get(npcId) ?? []) {
+      const at = pockets.findIndex(i => i.id === id);
+      if (at !== -1) pockets.splice(at, 1);
+    }
+    this._inventories.set(npcId, pockets);
   }
 
   /**
@@ -177,6 +194,7 @@ export class PickpocketSystem {
    * @returns `true` if an inventory existed and was removed.
    */
   public removeNpcInventory(npcId: string): boolean {
+    this._full.delete(npcId);
     return this._inventories.delete(npcId);
   }
 
@@ -332,6 +350,7 @@ export class PickpocketSystem {
       const items = this._inventories.get(npcId)!;
       const idx   = items.findIndex(i => i.id === itemId);
       if (idx !== -1) items.splice(idx, 1);
+      this._lifted.set(npcId, [...(this._lifted.get(npcId) ?? []), itemId]);
 
       this._totalSuccesses += 1;
       this.onPickpocketSuccess?.(npcId, itemId, SNEAK_XP_PER_PICKPOCKET);
@@ -377,6 +396,7 @@ export class PickpocketSystem {
       totalAttempts:  this._totalAttempts,
       totalSuccesses: this._totalSuccesses,
       totalCaught:    this._totalCaught,
+      lifted:         Object.fromEntries(this._lifted),
     };
   }
 
@@ -389,5 +409,11 @@ export class PickpocketSystem {
     this._totalAttempts  = Math.max(0, state.totalAttempts  ?? 0);
     this._totalSuccesses = Math.max(0, state.totalSuccesses ?? 0);
     this._totalCaught    = Math.max(0, state.totalCaught    ?? 0);
+    this._lifted.clear();
+    for (const [npcId, ids] of Object.entries(state.lifted ?? {})) {
+      if (Array.isArray(ids)) this._lifted.set(npcId, ids.filter((id): id is string => typeof id === "string"));
+    }
+    // Those already about (registered before the load) lose what the save says was lifted.
+    for (const npcId of this._inventories.keys()) this._fill(npcId);
   }
 }

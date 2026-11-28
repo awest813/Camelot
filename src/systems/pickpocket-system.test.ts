@@ -481,3 +481,25 @@ describe("PickpocketSystem — constants", () => {
   it("WEIGHT_PENALTY is a positive number", () => expect(WEIGHT_PENALTY).toBeGreaterThan(0));
   it("VALUE_DIVISOR is a positive number", () => expect(VALUE_DIVISOR).toBeGreaterThan(0));
 });
+
+describe("PickpocketSystem — lifted pockets stay lifted", () => {
+  const ring = { id: "gold_ring", name: "Gold Ring", weight: 0.1, value: 50 };
+  const coin = { id: "coin_purse", name: "Coin Purse", weight: 0.2, value: 20 };
+  it("across a walk away and back, and a save and load; a load from before brings it back", () => {
+    const sys = new PickpocketSystem();
+    sys.registerNpcInventory("Miller", [ring, coin, coin]);
+    const before = JSON.parse(JSON.stringify(sys.getSaveState()));
+    expect(sys.attempt("Miller", "coin_purse", 100, 0, true, false, () => 0).success).toBe(true);
+    // Walk off (the NPC unloads) and come back: the purse is still gone.
+    sys.removeNpcInventory("Miller");
+    sys.registerNpcInventory("Miller", [ring, coin, coin]);
+    expect(sys.getNpcInventory("Miller")!.map((i) => i.id)).toEqual(["gold_ring", "coin_purse"]);
+    // Saved, loaded (the NPC already about): one purse gone, not two.
+    const after = JSON.parse(JSON.stringify(sys.getSaveState()));
+    sys.restoreFromSave(after);
+    expect(sys.getNpcInventory("Miller")!.map((i) => i.id)).toEqual(["gold_ring", "coin_purse"]);
+    // A save from before the lift: the purse is back in the pocket.
+    sys.restoreFromSave(before);
+    expect(sys.getNpcInventory("Miller")!.map((i) => i.id)).toEqual(["gold_ring", "coin_purse", "coin_purse"]);
+  });
+});
