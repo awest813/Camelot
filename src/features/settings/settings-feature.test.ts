@@ -90,4 +90,15 @@ describe("SettingsFeature (headless, through the kernel)", () => {
     t.k.uninstall("settings");
     localStorage.removeItem(SETTINGS_PREFS_KEY);
   });
+
+  it("going back to the running preset replaces the stored choice", async () => {
+    const { readSavedGraphicsTier } = await import("../../systems/graphics-system");
+    const t = setup();
+    const d = await t.svc.dialog.get();
+    d.onTierSelect!("low");
+    expect(readSavedGraphicsTier()).toBe("low");
+    d.onTierSelect!("high"); // the one running
+    expect(readSavedGraphicsTier()).toBe("high");
+    t.k.uninstall("settings");
+  });
 });
