@@ -232,7 +232,8 @@ export class BarterSystem {
     const inventoryItem =
       (instanceId ? this._inventory.items.find((i) => i.instanceId === instanceId) : undefined)
       ?? this._inventory.items.find((i) => i.id === itemId);
-    if (!inventoryItem) return false;
+    // Coins are the purse, not goods: selling one paid more coins for it.
+    if (!inventoryItem || inventoryItem.id === "gold_coins") return false;
 
     const sellPrice = this.getSellPrice(inventoryItem, merchantId);
     if (merchant.gold < sellPrice) {

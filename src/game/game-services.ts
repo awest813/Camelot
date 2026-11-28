@@ -24,7 +24,7 @@ import { WorldEventsFeature } from "../features/world-events/world-events-featur
 import { NoticesFeature } from "../features/notices/notices-feature";
 import { SaveTriggersFeature } from "../features/notices/save-triggers-feature";
 import { VillageJobsFeature } from "../features/village-jobs/jobs-feature";
-import { spawnDragon } from "../world/dragon-lair"; import { placeChest } from "../world/chest";
+import { spawnDragon } from "../world/dragon-lair"; import { placeChest } from "../world/chest"; import { GOLD_ITEM_ID } from "./player-pack";
 import { TravelHostKey } from "../features/fast-travel/fast-travel-feature";
 import { DeathFeature, DeathHostKey } from "../features/death/death-feature";
 import { SpoilsFeature, SpoilsHostKey } from "../features/spoils/spoils-feature";
@@ -185,7 +185,7 @@ export function installGameFeatures(game: Game): void {
         get barter() { return game.barterSystem; },
         get shops() { return game.shopSystem; },
         get containers() { return game.containerSystem; },
-        items: () => game.inventorySystem.items,
+        items: () => game.inventorySystem.items.filter((i) => i.id !== GOLD_ITEM_ID), // the purse isn't for sale
         hour: () => game.timeSystem.hour,
         branch: (baseId, placeId) => branchMerchant(game.barterSystem, game.merchantRestockSystem, baseId, placeId, game.timeSystem.elapsedGameTime),
         reputationFactor: (shop) => {

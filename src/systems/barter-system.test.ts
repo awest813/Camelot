@@ -237,6 +237,13 @@ describe("BarterSystem", () => {
     expect(barter.getMerchant("merch_01")!.gold).toBe(500 - sellPrice);
   });
 
+  it("gold coins can't be sold for gold (each sale made a coin)", () => {
+    mockInventory.items = [{ id: "gold_coins", name: "Gold Coins", description: "", stackable: true, quantity: 100, weight: 0, stats: { value: 1 } }];
+    expect(barter.sellItem("merch_01", "gold_coins")).toBe(false);
+    expect(barter.playerGold).toBe(200);
+    expect(mockInventory.items[0].quantity).toBe(100);
+  });
+
   it("sellItem sells the exact copy named by instanceId", () => {
     const worn  = { ...sampleItem, instanceId: "sword#worn" };
     const fresh = { ...sampleItem, instanceId: "sword#fresh" };
