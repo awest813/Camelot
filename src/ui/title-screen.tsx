@@ -1,10 +1,11 @@
 /**
  * The title screen, in the tome style: the name in gilt over a lozenge
  * rule, a line of verse, and the menu as engraved lines.  Continue shows
- * whose tale it is and when it was saved.  Arrow keys move between the
- * lines; Enter chooses.
+ * whose tale it is and when it was saved.  New Game over a saved tale asks
+ * first (the save has one slot: the new tale replaces it).  Arrow keys move
+ * between the lines; Enter chooses.
  */
-import { useLayoutEffect, useRef } from "preact/hooks";
+import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { manageDialogFocus } from "./dialog-focus";
 import { PanelHost } from "./preact/panel-host";
 
@@ -32,6 +33,12 @@ export function savedAgo(savedAt: number, now = Date.now()): string {
 
 export function TitleScreen(p: TitleScreenProps) {
   const root = useRef<HTMLDivElement>(null);
+  const [confirming, setConfirming] = useState(false);
+  const tale = p.saved && !p.saved.old ? p.saved : null;
+  useLayoutEffect(() => {
+    // Asking (or back from asking): focus its first line, so Enter does the safe thing.
+    root.current?.querySelector<HTMLButtonElement>(".title-screen__item")?.focus();
+  }, [confirming]);
   useLayoutEffect(() => {
     if (!root.current) return;
     const focus = manageDialogFocus(root.current);
@@ -46,7 +53,7 @@ export function TitleScreen(p: TitleScreenProps) {
       run: p.onContinue,
     });
   }
-  items.push({ label: "New Game", run: p.onNewGame });
+  items.push({ label: "New Game", run: tale ? () => setConfirming(true) : p.onNewGame });
   items.push({ label: "Settings", run: p.onSettings, quiet: true });
   items.push({ label: "Credits", run: p.onCredits, quiet: true });
   if (p.onQuit) items.push({ label: "Quit", run: p.onQuit, quiet: true });
@@ -68,6 +75,19 @@ export function TitleScreen(p: TitleScreenProps) {
         <h1 id="title-screen-name" class="title-screen__name">Camelot</h1>
         <div class="title-screen__rule" aria-hidden="true">◆</div>
         <p class="title-screen__verse">The sword is drawn, the road is long,<br />and every hall remembers a song.</p>
+        {confirming && tale ? (
+          <div class="title-screen__menu" role="group" aria-labelledby="title-screen-confirm">
+            <p id="title-screen-confirm" class="title-screen__note">
+              Begin a new tale? {tale.name}'s (Level {tale.level}) will be replaced when the new one is saved.
+            </p>
+            <button type="button" class="title-screen__item" onClick={() => setConfirming(false)}>
+              <span class="title-screen__label">Keep {tale.name}'s tale</span>
+            </button>
+            <button type="button" class="title-screen__item" onClick={p.onNewGame}>
+              <span class="title-screen__label">Begin anew</span>
+            </button>
+          </div>
+        ) : (
         <nav class="title-screen__menu" aria-label="Main menu">
           {items.map((it) => (
             <button key={it.label} type="button" class={`title-screen__item${it.quiet ? " is-quiet" : ""}`} onClick={it.run}>
@@ -76,6 +96,7 @@ export function TitleScreen(p: TitleScreenProps) {
             </button>
           ))}
         </nav>
+        )}
         {p.saved?.old && (
           <p class="title-screen__note" role="note">
             The saved tale of {p.saved.name} is from another version of Camelot and can't be continued. A new game will replace it when you save.

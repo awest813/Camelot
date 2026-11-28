@@ -62,6 +62,25 @@ describe("TitleFeature", () => {
     u.k.uninstall("title");
   });
 
+  it("New Game over a saved tale asks first; keeping it goes back, beginning anew starts over", async () => {
+    const t = setup({ savedGame: () => ({ name: "Gawain", level: 4, savedAt: Date.now() }) });
+    t.title.show();
+    const settle = () => new Promise((r) => setTimeout(r, 0));
+    t.items()[1].click(); // New Game
+    await settle();
+    expect(t.labels()).toEqual(["Keep Gawain's tale", "Begin anew"]);
+    expect(document.querySelector(".title-screen__note")?.textContent).toContain("Gawain's (Level 4) will be replaced");
+    expect(document.activeElement, "Enter keeps the tale").toBe(t.items()[0]);
+    t.items()[0].click();
+    await settle();
+    expect(t.labels()[0]).toBe("Continue");
+    t.items()[1].click();
+    await settle();
+    t.items()[1].click(); // Begin anew
+    expect(t.calls).toEqual(["hold", "release", "new"]);
+    t.k.uninstall("title");
+  });
+
   it("arrow keys move between the lines; settings and credits keep the title up", () => {
     const t = setup();
     t.title.show();
