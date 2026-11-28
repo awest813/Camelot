@@ -21,7 +21,8 @@ import { HorizonMountains } from "./horizon";
 import { WaterRenderer } from "./water";
 import { FireFx, WeatherFx } from "./particles-fx";
 import { createFoliageMaterials, GrassField, WindState } from "./foliage";
-import { createPostFx, createSunShadows, snapSunToTexels, type PostFxHandle } from "./render-pipeline";
+import { createSunShadows, snapSunToTexels } from "./render-pipeline";
+import type { PostFxHandle } from "./post-fx";
 import { CascadedShadowGenerator } from "@babylonjs/core/Lights/Shadows/cascadedShadowGenerator";
 import type { GraphicsSystem } from "../systems/graphics-system";
 import type { WeatherSystem } from "../systems/weather-system";
@@ -44,6 +45,8 @@ export class WorldEnvironment {
   public sky: Mesh | null = null;
   public horizon: HorizonMountains | null = null;
   public postFx: PostFxHandle | null = null;
+  /** Whether the open world is shown (an interior hides it), for the post stack once it loads. */
+  private _outdoors = true;
   public pipeline: DefaultRenderingPipeline | null = null;
   public water: WaterRenderer | null = null;
   public grass: GrassField | null = null;
@@ -114,8 +117,14 @@ export class WorldEnvironment {
     // ── Post-processing stack ────────────────────────────────────────────────
     // HDR pipeline (bloom, AA, grade, grain…), SSAO, god rays and lens flare,
     // each gated by the quality tier.  Skipped on WebGPU (driver issues).
-    this.postFx = createPostFx(this._scene, camera, this._g, this.sky);
-    this.pipeline = this.postFx.pipeline;
+    // Its code arrives after the world is set up (out of the start-up bundle);
+    // until then the frames draw ungraded.
+    void import("./post-fx").then(({ createPostFx }) => {
+      if (this._scene.isDisposed) return;
+      this.postFx = createPostFx(this._scene, camera, this._g, this.sky);
+      this.pipeline = this.postFx.pipeline;
+      this.postFx.outdoors = this._outdoors;
+    });
   }
 
   /** Water, foliage materials and grass, fire and weather particles (needs the world). */
@@ -143,6 +152,7 @@ export class WorldEnvironment {
       this.grass?.setVisible(visible);
       this.horizon?.setVisible(visible);
       this.atmosphere?.mesh.setEnabled(visible);
+      this._outdoors = visible;
       if (this.postFx) this.postFx.outdoors = visible;
     };
   }
