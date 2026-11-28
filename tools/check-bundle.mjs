@@ -83,6 +83,9 @@ export function measure() {
     sizes: {
       // The game page's own code loaded up front (vendor chunks apart).
       "entry-js": [...upFront].filter((f) => !vendor(f)).reduce((n, f) => n + size(f), 0),
+      // Everything the game page loads before its first frame: its code and
+      // Babylon's (the real start-up figure; docs/startup-overhaul.md).
+      "upfront-js": [...upFront].reduce((n, f) => n + size(f), 0),
       // All JS the game page can load (the editor app's extra chunks apart).
       "total-js": gameJs.reduce((n, f) => n + f.size, 0),
       "largest-js": largest.size,
