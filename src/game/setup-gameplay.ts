@@ -47,7 +47,7 @@ export function setupGameplaySystems(g: Game): void {
   g.spellSystem.learnSpell("mending");
   g.spellSystem.equipSpell("kindle");
   // Sync magic damage bonus from attributes
-  g.spellSystem.magicDamageBonus = g.attributeSystem.magicDamageBonus;
+  g.spellSystem.magicDamageBonus = g.attributeSystem.magicDamageBonus; g.spellSystem.silenced = () => g.activeEffectsSystem?.isSilenced ?? false;
 
   g.persuasionSystem = new PersuasionSystem();
 

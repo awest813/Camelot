@@ -129,6 +129,16 @@ describe("SpellSystem", () => {
     expect(result.reason).toBe("on_cooldown");
   });
 
+  it("castSpell fails while silenced, and spends no magicka", () => {
+    sys.learnSpell("kindle");
+    sys.equipSpell("kindle");
+    sys.silenced = () => true;
+    const before = player.magicka;
+    const result = sys.castSpell();
+    expect(result).toMatchObject({ success: false, reason: "silenced" });
+    expect(player.magicka).toBe(before);
+  });
+
   // ── Cast effects ───────────────────────────────────────────────────────────
 
   it("castSpell (destruction) deducts magicka", () => {

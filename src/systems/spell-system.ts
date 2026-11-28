@@ -75,7 +75,7 @@ export function isUndeadName(key: string): boolean {
 export interface SpellCastResult {
   success: boolean;
   /** Why the cast failed, if success === false. */
-  reason?: "no_spell_equipped" | "insufficient_magicka" | "on_cooldown";
+  reason?: "no_spell_equipped" | "insufficient_magicka" | "on_cooldown" | "silenced";
   damage?: number;
   heal?: number;
   hitNpc?: string;
@@ -447,12 +447,20 @@ export class SpellSystem {
    * - Notifies the UI.
    * - Reports `spell:cast`, `spell:hit`, `spell:heal`.
    */
+  /** Whether a Silence effect is on the caster (the game wires its active effects). */
+  public silenced: () => boolean = () => false;
+
   public castSpell(): SpellCastResult {
     const spell = this.equippedSpell;
     if (!spell) return { success: false, reason: "no_spell_equipped" };
 
     if (this._cooldownRemaining > 0) {
       return { success: false, reason: "on_cooldown" };
+    }
+
+    if (this.silenced()) {
+      this._ui.showNotification("You are silenced: no spell will come.", 1500);
+      return { success: false, reason: "silenced" };
     }
 
     if (this._player.magicka < spell.magickaCost) {
