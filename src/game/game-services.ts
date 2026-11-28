@@ -124,7 +124,8 @@ export function installGameFeatures(game: Game): void {
           fadeOutMs: 400, holdMs: 120, fadeInMs: 450, onBlack, onComplete: onDone,
         }),
         passHours: (hours) => {
-          game.timeSystem.advanceHours(hours);
+          const before = game.timeSystem.playSeconds; game.timeSystem.advanceHours(hours);
+          game.eventBus.emit("clock:skipped", { hours, seconds: game.timeSystem.playSeconds - before }); // the road's hunger and weariness
           game.respawnSystem.update(game.timeSystem.elapsedGameTime);
           game.merchantRestockSystem.update(game.timeSystem.elapsedGameTime, game.barterSystem);
           updateDynamicWorldEventsOnHourChange(game);

@@ -76,6 +76,8 @@ export interface GameEvents {
   "location:discovered": { id: string; name: string; /** Places known now, this one included. */ known?: number };
   /** The player took the last thing out of a container. */
   "container:emptied": { id: string };
+  /** The clock was moved on at a stroke (fast travel): `seconds` of play time went by. */
+  "clock:skipped": { hours: number; seconds: number };
   /** Something was taken from a container. */
   "container:plundered": { id: string };
   /** A landmark's foes have all fallen (once per world). */

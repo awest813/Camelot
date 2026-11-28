@@ -26,6 +26,14 @@ describe("SurvivalFeature (headless, through the kernel)", () => {
     expect(t.body.notifyDamageTaken).toHaveBeenCalled();
   });
 
+  it("hours on the road (fast travel) leave you hungrier and wearier", () => {
+    const t = setup(false);
+    const before = { hunger: t.f.needs.hunger, fatigue: t.f.needs.fatigue };
+    t.k.events.emit("clock:skipped", { hours: 10, seconds: 50 });
+    expect(t.f.needs.hunger).toBeLessThan(before.hunger);
+    expect(t.f.needs.fatigue).toBeLessThan(before.fatigue);
+  });
+
   it("in the warm, cold never builds", () => {
     const t = setup(false);
     t.live(60 * 30);

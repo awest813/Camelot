@@ -81,6 +81,9 @@ export class SurvivalFeature implements Feature {
       },
     });
 
+    // Hours on the road (fast travel) wear as walking them would (the cold mends: you kept moving).
+    ctx.on("clock:skipped", ({ seconds }) => n.update(seconds, false));
+
     ctx.system({ id: "survival.chip", phase: "ui", update: every(0.25, () => this.chip.update(n.hungerLevel, n.fatigueLevel, n.coldLevel, s.get(SurvivalHostKey).ailments?.() ?? [])) });
 
     ctx.scope.add(() => {
