@@ -29,6 +29,7 @@ import type { FireSink } from "../rendering/fire-fx-port";
 import type { ForgeRegistry } from "../systems/smithing-controller";
 import { setInstanceYaw, type FantasyAssetKey, type FantasyAssetLoader } from "../systems/fantasy-asset-loader";
 import { buildingFootprint, buildingLayout, buildingWallColliders, toWorld, WALL_HEIGHT, type BuildingKind } from "./village-buildings";
+import { freezeStatic } from "../rendering/freeze-static";
 
 /**
  * A loaded chunk: a scope owning what was placed for it, and its NPCs.
@@ -184,6 +185,9 @@ export class ChunkContent {
       root.dispose();
       return;
     }
+    // Placed for good (all but a dragon, which flies): frozen where it stands,
+    // so the frame's mesh selection stops re-checking its matrices.
+    if (tier !== "boss") freezeStatic(root);
     const shadows = this._d.shadows();
     if (castShadow) shadows?.addShadowCaster(root, true);
     this._d.lod.registerHierarchy(root, DRAW_DISTANCE[tier]);
