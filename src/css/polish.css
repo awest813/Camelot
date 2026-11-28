@@ -540,6 +540,18 @@
   padding-right: 4px;
 }
 
+/* The saddlebag and the pack share the panel: each list gets half the height. */
+.saddlebag__list { min-height: 60px; max-height: 200px; }
+
+.saddlebag__pack-title {
+  margin: 4px 0 0;
+  color: #a89880;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .saddlebag__row {
   display: flex;
   justify-content: space-between;

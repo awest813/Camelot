@@ -506,6 +506,7 @@ export function installGameFeatures(game: Game): void {
         canAct: () => !isCombatInputBlocked(game), // not over another menu either
         setMoveSpeedMultiplier: (m) => { game.player.speedMultiplier = Math.max(0, m); },
         unlockAchievement: (id) => { game._achievements?.unlock(id as never); }, give: (item) => { game.inventorySystem.addItem(item); },
+        carried: () => game.inventorySystem.items, take: (id) => game.inventorySystem.removeItem(id, 1),
       });
       const mounts = new MountsFeature(game.scene); k.install(mounts);
 

@@ -34,6 +34,10 @@ export interface MountHostService {
   setMoveSpeedMultiplier(multiplier: number): void;
   unlockAchievement(id: string): void;
   give(item: Item): void;
+  /** What the player carries (worn things aren't in it). */
+  carried(): readonly Item[];
+  /** Take one of a carried item out of the player's pack. */
+  take(itemId: string): boolean;
 }
 
 export interface MountsService {
@@ -166,6 +170,7 @@ export class MountsFeature implements Feature {
 
   /** The horse you left standing (dismounted), and the neck and head you see while riding. */
   private _standing: TransformNode | null = null;
+  private _carried: () => readonly Item[] = () => [];
   private _riderView: TransformNode | null = null;
   /** The horse model, when it has loaded (riding or standing). */
   private _model: HorseInstance | null = null;
@@ -207,6 +212,7 @@ export class MountsFeature implements Feature {
       },
     });
     const host = () => s.get(MountHostKey);
+    this._carried = () => host().carried();
     const feedback = () => s.get(FeedbackKey);
     const modal = () => s.get(ModalKey);
     const purse = () => s.get(PurseKey);
@@ -266,6 +272,19 @@ export class MountsFeature implements Feature {
           saddlebag.showStatus(`Took ${entry.name}.`);
         }
       };
+      saddlebag.onStowItem = (itemId) => {
+        const horse = this.horses.currentHorse;
+        const item = host().carried().find((i) => i.id === itemId);
+        if (!horse || !item) return;
+        if (!this.horses.saddlebagAddItem(horse.id, { ...item, quantity: 1 })) {
+          saddlebag.showStatus("The saddlebag is full.");
+          return;
+        }
+        host().take(itemId);
+        this._refreshSaddlebag();
+        saddlebag.showStatus(`Stowed ${item.name}.`);
+        feedback().markDirty();
+      };
     };
 
     ctx.provide(MountsKey, {
@@ -295,7 +314,7 @@ export class MountsFeature implements Feature {
           const horse = this.horses.currentHorse!;
           const bag = this.horses.getSaddlebag(horse.id) ?? [];
           modal().suspendGameplay();
-          this.saddlebag.openWith((panel) => panel.open(horse.name, bag.map(toRow), bag.length, horse.saddlebagCapacity), () => modal().restoreGameplay());
+          this.saddlebag.openWith((panel) => panel.open(horse.name, bag.map(toRow), bag.length, horse.saddlebagCapacity, host().carried().map(toRow)), () => modal().restoreGameplay());
           return;
         }
         feedback().notify("To buy a horse, talk to the ostler at a village inn.", 2500);
@@ -357,7 +376,7 @@ export class MountsFeature implements Feature {
     const horse = this.horses.currentHorse;
     if (!horse) return;
     const bag = this.horses.getSaddlebag(horse.id) ?? [];
-    this.saddlebag.current?.refresh(bag.map(toRow), bag.length, horse.saddlebagCapacity);
+    this.saddlebag.current?.refresh(bag.map(toRow), bag.length, horse.saddlebagCapacity, this._carried().map(toRow));
   }
 }
 

@@ -11,8 +11,8 @@ import { manageDialogFocus, type DialogFocusSession } from "./dialog-focus";
 /**
  * HTML-driven saddlebag inventory dialog.
  *
- * Shows the contents of the currently mounted horse's saddlebag.
- * Allows the player to remove items back to their main inventory.
+ * Shows the contents of the currently mounted horse's saddlebag, and what the
+ * player carries: items move between the two (Take / Stow).
  *
  * Wire-up:
  * ```ts
@@ -26,12 +26,15 @@ export class SaddlebagUI {
   /** Active focus trap/restore session while the panel is open (null when closed). */
   private _focusSession: DialogFocusSession | null = null;
   public onRemoveItem: ((itemId: string) => void) | null = null;
+  /** Stow one of a carried item in the saddlebag. */
+  public onStowItem: ((itemId: string) => void) | null = null;
   public onClose: (() => void) | null = null;
 
   private _root: HTMLDivElement | null = null;
   private _titleEl: HTMLHeadingElement | null = null;
   private _capacityEl: HTMLParagraphElement | null = null;
   private _listEl: HTMLDivElement | null = null;
+  private _packEl: HTMLDivElement | null = null;
   private _statusEl: HTMLParagraphElement | null = null;
   private _animator: UIAnimator | null = null;
 
@@ -48,6 +51,7 @@ export class SaddlebagUI {
     items: SaddlebagItemView[],
     capacityUsed: number,
     capacityMax: number,
+    pack: SaddlebagItemView[] = [],
   ): void {
     if (typeof document === "undefined") return;
     this._ensureDom();
@@ -57,6 +61,7 @@ export class SaddlebagUI {
     this._capacityEl.textContent = `Slots used: ${capacityUsed} / ${capacityMax}`;
 
     this._renderItems(items);
+    this._renderPack(pack);
 
     this._root.style.display = "grid";
     this._animator?.panelIn(this._root);
@@ -80,10 +85,11 @@ export class SaddlebagUI {
   }
 
   /** Refresh the list with updated item data. */
-  public refresh(items: SaddlebagItemView[], capacityUsed: number, capacityMax: number): void {
+  public refresh(items: SaddlebagItemView[], capacityUsed: number, capacityMax: number, pack: SaddlebagItemView[] = []): void {
     if (!this._root || !this._capacityEl) return;
     this._capacityEl.textContent = `Slots used: ${capacityUsed} / ${capacityMax}`;
     this._renderItems(items);
+    this._renderPack(pack);
   }
 
   /** Show a status message in the dialog. */
@@ -147,6 +153,15 @@ export class SaddlebagUI {
     panel.appendChild(list);
     this._listEl = list;
 
+    const packTitle = document.createElement("h3");
+    packTitle.className = "saddlebag__pack-title";
+    packTitle.textContent = "Your pack";
+    panel.appendChild(packTitle);
+    const pack = document.createElement("div");
+    pack.className = "saddlebag__list saddlebag__list--pack";
+    panel.appendChild(pack);
+    this._packEl = pack;
+
     const status = document.createElement("p");
     status.className = "saddlebag__status";
     panel.appendChild(status);
@@ -165,6 +180,33 @@ export class SaddlebagUI {
 
     document.body.appendChild(root);
     this._root = root;
+  }
+
+  private _renderPack(items: SaddlebagItemView[]): void {
+    if (!this._packEl) return;
+    this._packEl.innerHTML = "";
+    if (items.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "saddlebag__empty";
+      empty.textContent = "You carry nothing to stow.";
+      this._packEl.appendChild(empty);
+      return;
+    }
+    for (const item of items) {
+      const row = document.createElement("div");
+      row.className = "saddlebag__row";
+      const nameEl = document.createElement("span");
+      nameEl.className = "saddlebag__row-name";
+      nameEl.textContent = item.stackable ? `${item.name} ×${item.quantity}` : item.name;
+      const stowBtn = document.createElement("button");
+      stowBtn.type = "button";
+      stowBtn.className = "saddlebag__row-remove";
+      stowBtn.textContent = "Stow";
+      stowBtn.setAttribute("aria-label", `Stow ${item.name} in saddlebag`);
+      stowBtn.addEventListener("click", () => this.onStowItem?.(item.id));
+      row.append(nameEl, stowBtn);
+      this._packEl.appendChild(row);
+    }
   }
 
   private _renderItems(items: SaddlebagItemView[]): void {

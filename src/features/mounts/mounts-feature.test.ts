@@ -12,6 +12,7 @@ function setup(opts: { gold?: number } = {}) {
   let canAct = true;
   const notes: string[] = [];
   const given: Item[] = [];
+  const pack: Item[] = [{ id: "iron_ingot", name: "Iron Ingot", description: "", stackable: true, quantity: 2, weight: 1 }];
   const modal = { suspendGameplay: vi.fn(), restoreGameplay: vi.fn() };
   const codecs = new Map<string, SaveCodec>();
   k.services.provide(SavesKey, { register: (c) => { codecs.set(c.key, c); return () => codecs.delete(c.key); } });
@@ -26,11 +27,13 @@ function setup(opts: { gold?: number } = {}) {
     setMoveSpeedMultiplier: (m) => { speed = m; },
     unlockAchievement: vi.fn(),
     give: (item) => { given.push(item); },
+    carried: () => pack,
+    take: (id) => { const i = pack.findIndex((p) => p.id === id); if (i < 0) return false; if (--pack[i].quantity <= 0) pack.splice(i, 1); return true; },
   });
   const feature = new MountsFeature();
   k.install(feature);
   return {
-    k, feature, notes, given, modal, codecs, mounts: k.services.get(MountsKey),
+    k, feature, notes, given, pack, modal, codecs, mounts: k.services.get(MountsKey),
     gold: () => gold, speed: () => speed, block: () => { canAct = false; },
   };
 }
@@ -60,12 +63,15 @@ describe("MountsFeature (headless, through the kernel)", () => {
     expect(t.mounts.horses.isMounted).toBe(true);
     expect(t.speed()).toBe(1.8);
 
-    // Shift+O mounted: the saddlebag; take an item out.
+    // Shift+O mounted: the saddlebag; stow from the pack, then take back out.
     const horse = t.mounts.horses.currentHorse!;
-    t.mounts.horses.saddlebagAddItem(horse.id, { id: "iron_ingot", name: "Iron Ingot", description: "", stackable: true, quantity: 2, weight: 1 });
     t.mounts.toggleStableOrSaddlebag();
     const saddlebag = await t.mounts.saddlebag.get();
     expect(t.mounts.saddlebag.isVisible).toBe(true);
+    saddlebag.onStowItem!("iron_ingot");
+    saddlebag.onStowItem!("iron_ingot");
+    expect(t.pack).toEqual([]);
+    expect(t.mounts.horses.getSaddlebag(horse.id)).toMatchObject([{ id: "iron_ingot", quantity: 2 }]);
     saddlebag.onRemoveItem!("iron_ingot");
     expect(t.given[0]).toMatchObject({ id: "iron_ingot", quantity: 1 });
 
@@ -137,7 +143,7 @@ describe("MountsFeature — the horse in the world", () => {
     k.services.provide(FeedbackKey, { notify: vi.fn(), grant: vi.fn(), addFame: vi.fn(), markDirty: vi.fn() });
     k.services.provide(ModalKey, { suspendGameplay: vi.fn(), restoreGameplay: vi.fn() });
     k.services.provide(PurseKey, { gold: () => 5000, spend: () => true });
-    k.services.provide(MountHostKey, { canAct: () => true, setMoveSpeedMultiplier: vi.fn(), unlockAchievement: vi.fn(), give: vi.fn() });
+    k.services.provide(MountHostKey, { canAct: () => true, setMoveSpeedMultiplier: vi.fn(), unlockAchievement: vi.fn(), give: vi.fn(), carried: () => [], take: () => false });
     k.services.provide(PlayerKey, { position: () => camera.position, level: () => 1, heading: () => 0 });
     const codecs = new Map<string, SaveCodec>();
     k.services.provide(SavesKey, { register: (c) => { codecs.set(c.key, c); return () => codecs.delete(c.key); } });

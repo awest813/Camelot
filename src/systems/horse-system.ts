@@ -236,16 +236,15 @@ export class HorseSystem {
     const bag = this._saddlebags.get(horseId);
     if (!horse || !bag) return false;
 
-    // Each unique item entry (stack or single) occupies one slot.
-    const itemCount = bag.length;
-    if (itemCount >= horse.saddlebagCapacity) return false;
-
+    // Each unique item entry (stack or single) occupies one slot; a stack
+    // already in the bag takes more without a new one.
     const existing = item.stackable ? bag.find(i => i.id === item.id) : null;
     if (existing) {
       existing.quantity += item.quantity;
-    } else {
-      bag.push({ ...item });
+      return true;
     }
+    if (bag.length >= horse.saddlebagCapacity) return false;
+    bag.push({ ...item });
     return true;
   }
 
