@@ -37,6 +37,13 @@ export class App {
   private _lastFpsWriteMs = Number.NEGATIVE_INFINITY;
   private _boundEvents = false;
 
+  /**
+   * The physics engine's WebAssembly, fetched and compiled from the start: in
+   * parallel with the engine and scene set-up instead of after them (the
+   * page's HTML preloads the file too).
+   */
+  private readonly _havok = HavokPhysics();
+
   constructor(private readonly _options: AppOptions = {}) {
     // Before any material exists: every lit material shades a fixed number of lights.
     pinLightLimit();
@@ -85,6 +92,12 @@ export class App {
   }
 
   private async _initWebGPUEngine(): Promise<void> {
+    // Ask for an adapter first: a browser can expose WebGPU and still have
+    // no adapter to give (blocklisted or headless GPUs), and Babylon logs
+    // that as a fatal error. Asked before the WebGPU engine's code is fetched,
+    // so a WebGL machine never downloads it (nor the WGSL shaders it pulls in).
+    const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
+    if (!gpu || !(await gpu.requestAdapter())) throw new Error("no WebGPU adapter");
     // Loaded on demand: the WebGPU engine (and the WGSL shaders it pulls in)
     // stays out of the default WebGL bundle.
     const [{ WebGPUEngine }] = await Promise.all([
@@ -93,11 +106,6 @@ export class App {
       // separate modules (the WebGL engine's come with it).
       import("@babylonjs/core/Engines/WebGPU/Extensions/index"),
     ]);
-    // Ask for an adapter first: a browser can expose WebGPU and still have
-    // no adapter to give (blocklisted or headless GPUs), and Babylon logs
-    // that as a fatal error.
-    const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
-    if (!gpu || !(await gpu.requestAdapter())) throw new Error("no WebGPU adapter");
     const webgpu = new WebGPUEngine(this.canvas, {
       adaptToDeviceRatio: true,
       antialias: false,
@@ -150,7 +158,7 @@ export class App {
 
   async _setPhysics(): Promise<void> {
     const gravity = new Vector3(0, -9.81, 0);
-    const hk = await HavokPhysics();
+    const hk = await this._havok;
     const plugin = new HavokPlugin(true, hk);
     this.scene.enablePhysics(gravity, plugin);
   }

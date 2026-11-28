@@ -9,6 +9,7 @@ Camelot uses three asset lanes:
 ## Brand & UI Identity Assets
 
 - `public/camelot-icon.png`: High-resolution Arthurian crest featuring a glowing golden crown and sword on a royal navy and gold heraldic shield.
+- `public/camelot-touch-icon.png`: the crest at 180 px (15 KB), the touch icon and PNG favicon fallback; the 1024 px original (462 KB) used to load with every page.
 - `public/favicon.svg`: Vector SVG favicon providing crisp rendering at all tab sizes (16px, 32px, retina).
 - `public/camelot-logo.png`: Full game title banner and crest.
 - `public/logo_babylonpress.png`: Kept for backwards compatibility and updated with the Camelot crest.
