@@ -72,6 +72,16 @@ describe("radiant quests", () => {
     expect(loaded.getRadiantInstance("job_inn_1")).toEqual({ templateId: "bounty_bandits", vars: { place: "Ashford" } });
   });
 
+  it("loading a save from before a job was taken drops the job", () => {
+    const e = engine();
+    const before = JSON.parse(JSON.stringify(e.getSnapshot()));
+    e.startRadiant("bounty_bandits", "job_inn_1", { place: "Ashford" });
+    e.restoreSnapshot(before);
+    expect(e.getQuestDefinition("job_inn_1")).toBeUndefined();
+    expect(e.getQuestStatus("job_inn_1")).not.toBe("active");
+    expect(e.getSnapshot().radiant ?? {}).not.toHaveProperty("job_inn_1");
+  });
+
   it("defend quests: the count and rewards come from the instance (a raid's size)", () => {
     const RAID: RadiantTemplate = {
       id: "raid", kind: "defend", name: "Raid on {place}", description: "", objective: "Drive off the raiders ({required})",

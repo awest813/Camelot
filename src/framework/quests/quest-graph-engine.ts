@@ -224,6 +224,11 @@ export class QuestGraphEngine {
   }
 
   public restoreSnapshot(snapshot: QuestSnapshot): void {
+    // A radiant quest taken after the save isn't in it: it goes (else a job
+    // from after the save stays in the log, counting kills, never handed in).
+    for (const questId of [...this._radiant.keys()]) {
+      if (!snapshot.radiant?.[questId]) this.removeQuest(questId);
+    }
     // Radiant quests are rebuilt from their templates first, so their saved
     // state has a quest to go to.
     for (const [questId, r] of Object.entries(snapshot.radiant ?? {})) {
