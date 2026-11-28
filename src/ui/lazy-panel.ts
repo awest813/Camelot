@@ -26,9 +26,9 @@ export class LazyPanel<T extends ClosablePanel> {
   /** `load` builds the panel (dynamic import + wiring); it runs once. */
   constructor(private readonly _load: () => Promise<T>) {}
 
-  /** Shown, or on its way (loading to be shown). */
+  /** Shown, or on its way (loading to be shown, and not called off). */
   public get isVisible(): boolean {
-    return this._opening || (this._panel?.isVisible ?? false);
+    return this.isOpening || (this._panel?.isVisible ?? false);
   }
 
   /** Close it (or, while it loads, call the open off). */
@@ -40,9 +40,9 @@ export class LazyPanel<T extends ClosablePanel> {
     this._panel?.close();
   }
 
-  /** Whether it is loading to be shown. */
+  /** Whether it is loading to be shown (an open called off is not). */
   public get isOpening(): boolean {
-    return this._opening;
+    return this._opening && !this._cancelled;
   }
 
   /**
@@ -51,7 +51,8 @@ export class LazyPanel<T extends ClosablePanel> {
    * load (`err` set).
    */
   public openWith(show: (panel: T) => void, release?: (err?: unknown) => void): void {
-    if (this._opening) return;
+    // Opened again while still loading: an open called off is back on.
+    if (this._opening) { this._cancelled = false; return; }
     this._opening = true;
     this._cancelled = false;
     this.get().then(

@@ -62,3 +62,23 @@ describe("LazyPanel.openWith", () => {
     warn.mockRestore();
   });
 });
+
+describe("LazyPanel: an open called off while loading", () => {
+  it("reads as closed at once, and a second open puts it back on", async () => {
+    let resolve!: (p: { isVisible: boolean; close(): void }) => void;
+    const panel = { isVisible: false, close() { this.isVisible = false; } };
+    const lazy = new LazyPanel(() => new Promise<typeof panel>((r) => { resolve = r; }));
+    const show = vi.fn((p: typeof panel) => { p.isVisible = true; });
+    lazy.openWith(show);
+    expect(lazy.isVisible).toBe(true);
+    lazy.close();
+    expect(lazy.isVisible, "the toggle that closed it sees it closed").toBe(false);
+    lazy.openWith(show);
+    expect(lazy.isVisible).toBe(true);
+    resolve(panel);
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(show).toHaveBeenCalledOnce();
+    expect(lazy.isVisible).toBe(true);
+  });
+});
