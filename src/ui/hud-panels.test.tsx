@@ -101,7 +101,7 @@ describe("SkillTreeView", () => {
 });
 
 describe("InventoryPanelView", () => {
-  it("shows twenty slots, marks equipped items, describes the hovered item, and clicks only usable ones", async () => {
+  it("shows twenty slots, describes the hovered item, clicks only usable ones, and takes off worn gear", async () => {
     const { InventoryPanelView } = await import("./inventory-panel");
     const items = [
       { id: "sword", name: "Iron Sword", description: "Sharp.", stackable: false, quantity: 1, slot: "mainHand" },
@@ -109,8 +109,10 @@ describe("InventoryPanelView", () => {
       { id: "rock", name: "Rock", description: "A rock.", stackable: true, quantity: 1 },
     ] as never[];
     const clicked: string[] = [];
+    const wornSword = { id: "sword", name: "Iron Sword", description: "", stackable: false, quantity: 1, slot: "mainHand" } as never;
     const view = new InventoryPanelView(() => ({
       items, equippedIds: new Set(["sword"]), stats: [{ label: "Health", value: "10 / 10", fill: 1, kind: "health" }], equipment: ["Main Hand: Iron Sword", "Head: --"],
+      worn: [wornSword, null],
       isConsumable: (i) => (i as { id: string }).id === "potion", detail: () => "",
     }));
     view.open({ onItem: (i) => clicked.push((i as { id: string }).id), onClose: () => {} });
@@ -118,18 +120,21 @@ describe("InventoryPanelView", () => {
     const slots = Array.from(document.querySelectorAll<HTMLButtonElement>("button.inventory__slot"));
     expect(slots.map((b) => b.querySelector(".inventory__name")?.textContent)).toEqual(["Iron Sword", "Potion", "Rock"]);
     expect(slots.map((b) => b.querySelector(".inventory__qty")?.textContent ?? null)).toEqual([null, "3", null]);
-    expect(slots[0].classList.contains("is-equipped")).toBe(true);
+    expect(slots[0].classList.contains("is-equipped"), "a bag copy isn't the worn one").toBe(false);
     slots[0].dispatchEvent(new FocusEvent("focus"));
     await Promise.resolve();
     slots[0].focus();
     await new Promise((r) => setTimeout(r, 0));
-    expect(document.querySelector(".inventory__hint")?.textContent).toBe("[Click to Unequip]");
+    expect(document.querySelector(".inventory__hint")?.textContent).toBe("[Click to Equip]");
     for (const b of slots) b.click();
     expect(clicked, "the rock does nothing").toEqual(["sword", "potion"]);
     expect(document.querySelector(".inventory__stat--health dd")!.textContent).toBe("10 / 10");
     expect(document.querySelector<HTMLElement>(".inventory__stat--health .inventory__stat-bar > span")!.style.width).toBe("100%");
     const equip = Array.from(document.querySelectorAll(".inventory__equip")).map((e) => [e.querySelector("dt")!.textContent, e.querySelector("dd")!.textContent, e.classList.contains("is-empty")]);
     expect(equip).toEqual([["Main Hand", "Iron Sword", false], ["Head", "—", true]]);
+    clicked.length = 0;
+    document.querySelector<HTMLButtonElement>(".inventory__unequip")!.click();
+    expect(clicked, "the worn sword, from the Equipped list").toEqual(["sword"]);
     expect(view.isOpen).toBe(true);
     view.close();
     expect(view.isOpen).toBe(false);

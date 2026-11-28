@@ -52,6 +52,7 @@ export class UIManager {
     equippedIds: this._equippedIds,
     stats: this._stats,
     equipment: this._equipmentLines,
+    worn: this._worn,
     isConsumable: (item) => !!this.isConsumableItem?.(item),
     detail: (item) => this.itemDetailSuffix?.(item) ?? "",
   }));
@@ -61,6 +62,7 @@ export class UIManager {
   private _lastStatsKey = "";
 
   private _equippedIds: Set<string> = new Set();
+  private _worn: (Item | null)[] = [];
 
   /** Extra detail line(s) appended to an inventory item's hover text (e.g. gear condition). */
   public itemDetailSuffix: ((item: Item) => string) | null = null;
@@ -356,6 +358,7 @@ export class UIManager {
       { key: "feet",     label: "Feet"      },
     ];
     this._equipmentLines = slotLabels.map(({ key, label }) => `${label}: ${slots.get(key)?.name ?? "--"}`);
+    this._worn = slotLabels.map(({ key }) => slots.get(key) ?? null);
     this._inventory.render();
   }
 

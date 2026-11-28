@@ -1012,6 +1012,18 @@
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
+/* Worn gear: click to take it off. */
+.inventory__unequip {
+  all: unset;
+  cursor: pointer;
+  border-bottom: 1px dotted rgba(201, 154, 62, 0.5);
+}
+.inventory__unequip:hover,
+.inventory__unequip:focus-visible {
+  color: var(--tome-gold, #d4a017);
+  border-bottom-style: solid;
+}
+.inventory__unequip:focus-visible { outline: 2px solid rgba(212, 160, 23, 0.7); outline-offset: 2px; }
 .inventory__equip.is-empty dd {
   color: rgba(180, 159, 120, 0.55);
   font-weight: 400;

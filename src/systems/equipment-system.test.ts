@@ -133,10 +133,27 @@ describe('EquipmentSystem', () => {
         expect(equipmentSystem.isEquipped('sword_01')).toBe(true);
     });
 
-    it('handleItemClick unequips an already-equipped item', () => {
+    it('handleItemClick on the worn item (from the Equipped list) takes it off', () => {
         equipmentSystem.equip(sword);
-        equipmentSystem.handleItemClick(sword);
+        equipmentSystem.handleItemClick(equipmentSystem.getEquipped().get('mainHand')!);
         expect(equipmentSystem.isEquipped('sword_01')).toBe(false);
+    });
+
+    it('handleItemClick on a spare copy in the bag puts it on, not off', () => {
+        const worn = { ...sword, instanceId: 'sword#worn' }, spare = { ...sword, instanceId: 'sword#spare' };
+        mockInventory.items = [worn, spare];
+        equipmentSystem.equip(worn);
+        equipmentSystem.handleItemClick(spare);
+        expect(equipmentSystem.getEquipped().get('mainHand')?.instanceId).toBe('sword#spare');
+        expect(mockInventory.items.map((i: Item) => i.instanceId)).toEqual(['sword#worn']);
+    });
+
+    it('a full bag keeps the item worn', () => {
+        equipmentSystem.equip(sword);
+        mockInventory.addItem.mockReturnValueOnce(false);
+        equipmentSystem.unequip('mainHand');
+        expect(equipmentSystem.isEquipped('sword_01')).toBe(true);
+        expect(mockPlayer.bonusDamage).toBe(10);
     });
 
     it('should update the UI on equip and unequip', () => {

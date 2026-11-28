@@ -20,31 +20,32 @@ export class EquipmentSystem {
     this._ui = ui;
   }
 
-  /** Called when a player clicks an inventory item. Equips it if unequipped, unequips if already equipped. */
+  /**
+   * A click on an item: worn gear (the object in its slot) comes off; an item
+   * from the bag is put on, the worn one in its slot going to the bag. (By
+   * object, not id: a spare Iron Sword in the bag is put on, not taken for
+   * the worn one.)
+   */
   public handleItemClick(item: Item): void {
     if (!item.slot) return;
-    const slot = item.slot as EquipSlot;
-    if (this.isEquipped(item.id)) {
-      this.unequip(slot);
-    } else {
-      this.equip(item);
+    for (const [slot, worn] of this._slots) {
+      if (worn === item) { this.unequip(slot); return; }
     }
+    this.equip(item);
   }
 
   public equip(item: Item): void {
     if (!item.slot) return;
     const slot = item.slot as EquipSlot;
 
-    // If something is already in this slot, swap it back to inventory
+    // Out of the bag first (the exact copy clicked: two Iron Swords may
+    // differ in wear), so the worn one always has room to go back.
+    this._inventory.removeInstance(item, 1);
     const current = this._slots.get(slot);
     if (current) {
       this._removeStats(current);
-      this._inventory.items.push({ ...current });
+      this._inventory.addItem({ ...current }, { quiet: true });
     }
-
-    // Remove from inventory (non-stackable equippables — remove one)
-    // Remove the exact copy that was clicked (two Iron Swords may differ in wear).
-    this._inventory.removeInstance(item, 1);
 
     // Equip
     this._slots.set(slot, { ...item, quantity: 1 });
@@ -58,10 +59,11 @@ export class EquipmentSystem {
   public unequip(slot: EquipSlot): void {
     const item = this._slots.get(slot);
     if (!item) return;
+    // Into the bag the usual way (its room, carry weight): a full bag keeps it worn.
+    if (!this._inventory.addItem({ ...item }, { quiet: true })) return;
 
     this._removeStats(item);
     this._slots.delete(slot);
-    this._inventory.items.push({ ...item });
 
     this._refreshUI();
     this._ui.showNotification(`Unequipped ${item.name}`);

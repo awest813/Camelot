@@ -1,7 +1,7 @@
 /**
- * The inventory (I): a 4×5 grid of the first twenty items (equipped ones
- * marked), the hovered or focused item's details, the character's stats
- * and what is equipped.  A Preact panel on the DOM layer (engine overhaul,
+ * The inventory (I): a 4×5 grid of the first twenty items, the hovered or
+ * focused item's details, the character's stats and what is worn (click a
+ * worn item to take it off; click gear in the bag to put it on).  A Preact panel on the DOM layer (engine overhaul,
  * Phase 8; it was Babylon GUI in the UI manager, which still opens, updates
  * and closes it).
  */
@@ -30,6 +30,8 @@ export interface InventoryState {
   stats: readonly InventoryStat[];
   /** "Main Hand: Iron Sword" … */
   equipment: readonly string[];
+  /** What each equipment line wears (same order), clicked to take it off. */
+  worn?: readonly (Item | null)[];
   /** True when clicking the item uses it (potions, food). */
   isConsumable(item: Item): boolean;
   /** Extra detail for an item (e.g. its condition). */
@@ -39,7 +41,7 @@ export interface InventoryState {
 /** What clicking an item does, shown under its description ("" if nothing). */
 export function itemHint(s: InventoryState, item: Item): string {
   if (s.isConsumable(item)) return "[Click to Use]";
-  if (item.slot) return s.equippedIds.has(item.id) ? "[Click to Unequip]" : "[Click to Equip]";
+  if (item.slot) return "[Click to Equip]"; // bag gear; worn gear is in the Equipped list
   return "";
 }
 
@@ -56,8 +58,8 @@ export function InventoryPanel(p: { state: InventoryState; onItem(item: Item): v
             const usable = s.isConsumable(item) || !!item.slot;
             return (
               <li key={item.instanceId ?? item.id}>
-                <button type="button" class={`inventory__slot${s.equippedIds.has(item.id) ? " is-equipped" : ""}`}
-                  aria-disabled={!usable} aria-label={`${item.name}${item.quantity > 1 ? `, ${item.quantity}` : ""}${s.equippedIds.has(item.id) ? ", equipped" : ""}`}
+                <button type="button" class="inventory__slot"
+                  aria-disabled={!usable} aria-label={`${item.name}${item.quantity > 1 ? `, ${item.quantity}` : ""}`}
                   onMouseEnter={() => setShown(item)} onFocus={() => setShown(item)}
                   onMouseLeave={() => setShown((cur) => (cur === item ? null : cur))}
                   onClick={() => { if (usable) p.onItem(item); }}>
@@ -100,13 +102,17 @@ export function InventoryPanel(p: { state: InventoryState; onItem(item: Item): v
           <div class="inventory__equipment">
             <h3 class="craft-panel__section-title">Equipped</h3>
             <dl>
-              {s.equipment.map((line) => {
+              {s.equipment.map((line, i) => {
                 const at = line.indexOf(": ");
                 const slot = at < 0 ? line : line.slice(0, at), what = at < 0 ? "" : line.slice(at + 2);
                 const empty = !what || what === "--";
                 return (
                   <div key={slot} class={`inventory__equip${empty ? " is-empty" : ""}`}>
-                    <dt>{slot}</dt><dd>{empty ? "—" : what}</dd>
+                    <dt>{slot}</dt>
+                    <dd>{empty || !s.worn?.[i] ? (empty ? "—" : what) : (
+                      <button type="button" class="inventory__unequip" title="Click to unequip"
+                        aria-label={`Unequip ${what}`} onClick={() => p.onItem(s.worn![i]!)}>{what}</button>
+                    )}</dd>
                   </div>
                 );
               })}
