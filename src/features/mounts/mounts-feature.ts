@@ -52,6 +52,9 @@ export const MountsKey = createServiceKey<MountsService>("mounts");
 
 const STABLE_MASTER = "Ostler";
 
+/** A horse left standing: which, where, facing. */
+interface Parked { horseId: string; x: number; y: number; z: number; yaw: number }
+
 /** Where the ridden horse sits under the camera: a rider's eye (1.7 m up, in its stance) over its back (1.6 m), its head (2 m) ahead. */
 const RIDE_OFFSET = { x: 0, y: -1.7, z: 0.35 };
 
@@ -109,6 +112,15 @@ export class MountsFeature implements Feature {
     // A pace and a half to your right.
     const x = p.x + Math.cos(yaw) * 2, z = p.z - Math.sin(yaw) * 2;
     const y = groundUnder(scene, x, p.y ?? 2, z) ?? (p.y ?? 2) - 1.8;
+    this._standAt(horseId, x, y, z, yaw);
+  }
+
+  /** The horse standing at (x, y, z) facing `yaw` (the model replaces the shape horse once loaded). */
+  private _standAt(horseId: string, x: number, y: number, z: number, yaw: number): void {
+    this._clearBodies();
+    const scene = this._scene;
+    if (!scene) return;
+    this._parked = { horseId, x, y, z, yaw };
     const shape = buildStandingHorse(scene, `horse_${horseId}`, HORSE_COATS[horseId] ?? HORSE_COATS.bay_mare);
     shape.position.set(x, y, z);
     shape.rotation.y = yaw;
@@ -140,6 +152,7 @@ export class MountsFeature implements Feature {
 
   private _clearBodies(): void {
     this._bodyToken++;
+    this._parked = null;
     this._standing?.dispose(false, true);
     this._riderView?.dispose(false, true);
     this._model?.dispose();
@@ -156,6 +169,8 @@ export class MountsFeature implements Feature {
   private _riderView: TransformNode | null = null;
   /** The horse model, when it has loaded (riding or standing). */
   private _model: HorseInstance | null = null;
+  /** Where the horse stands, if it does (saved). */
+  private _parked: Parked | null = null;
   /** Bumped on every change, so a model that finishes loading late is dropped. */
   private _bodyToken = 0;
   private _bob = 0;
@@ -176,12 +191,17 @@ export class MountsFeature implements Feature {
     const s = ctx.kernel.services;
     ownSave(ctx, {
       key: "horse",
-      save: () => this.horses.getSaveState(),
+      // Where a horse was left standing travels with the save too.
+      save: () => ({ ...this.horses.getSaveState(), parked: this._parked }),
       load: (data) => {
         if (data) this.horses.restoreFromSave(data as never); // a mounted save re-mounts (onMount sets the speed)
         if (!this.horses.isMounted) s.get(MountHostKey).setMoveSpeedMultiplier(1); // on foot in the save: walk
         this._clearBodies();
         if (this.horses.isMounted) this._ride(this.horses.currentHorse!.id);
+        const parked = (data as { parked?: Parked | null } | undefined)?.parked;
+        if (!this.horses.isMounted && parked && this.horses.getHorse(parked.horseId)?.isOwned) {
+          this._standAt(parked.horseId, parked.x, parked.y, parked.z, parked.yaw);
+        }
       },
     });
     const host = () => s.get(MountHostKey);

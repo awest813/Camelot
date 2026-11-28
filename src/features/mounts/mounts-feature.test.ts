@@ -118,6 +118,8 @@ describe("MountsFeature — the horse in the world", () => {
     k.services.provide(PurseKey, { gold: () => 5000, spend: () => true });
     k.services.provide(MountHostKey, { canAct: () => true, setMoveSpeedMultiplier: vi.fn(), unlockAchievement: vi.fn(), give: vi.fn() });
     k.services.provide(PlayerKey, { position: () => camera.position, level: () => 1, heading: () => 0 });
+    const codecs = new Map<string, SaveCodec>();
+    k.services.provide(SavesKey, { register: (c) => { codecs.set(c.key, c); return () => codecs.delete(c.key); } });
     const feature = new MountsFeature(scene);
     k.install(feature);
     feature.horses.purchaseHorse("Ostler", "black_stallion", 5000);
@@ -128,6 +130,12 @@ describe("MountsFeature — the horse in the world", () => {
     expect(scene.getTransformNodeByName("rider_black_stallion")).toBeNull();
     const standing = scene.getTransformNodeByName("horse_black_stallion")!;
     expect(standing.position.x, "two paces to the right").toBeCloseTo(12);
+    // Saved and loaded, it is still standing there.
+    const saved = JSON.parse(JSON.stringify(codecs.get("horse")!.save()));
+    codecs.get("horse")!.load({ ...saved, parked: null });
+    expect(scene.getTransformNodeByName("horse_black_stallion"), "gone with a save that has none").toBeNull();
+    codecs.get("horse")!.load(saved);
+    expect(scene.getTransformNodeByName("horse_black_stallion")!.position.x).toBeCloseTo(12);
     k.uninstall("mounts");
     expect(scene.getTransformNodeByName("horse_black_stallion")).toBeNull();
     scene.dispose();
