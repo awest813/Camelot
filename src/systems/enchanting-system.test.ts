@@ -208,13 +208,22 @@ describe("EnchantingSystem — enchantItem", () => {
     expect(grandMag).toBeGreaterThan(smallMag);
   });
 
-  it("applies stat delta to player when item is currently equipped", () => {
-    const equipped = makeEquipment(new Set(["helm_01"]));
+  it("a spare copy of worn gear gains no bonus while in the bag", () => {
+    const equipped = makeEquipment(new Set(["helm_01"])); // the worn helm has the same id
     const sys = new EnchantingSystem(makePlayer(), makeInventory([makeArmor()]), equipped, makeUI());
     sys.addVessel("silver");
-    const before = sys["_player"].bonusDamage;
-    sys.enchantItem("helm_01", "fortify_strength", "silver");
-    expect(sys["_player"].bonusDamage).toBeGreaterThan(before);
+    const before = { ...sys["_player"] };
+    expect(sys.enchantItem("helm_01", "fortify_strength", "silver")).not.toBeNull();
+    expect(sys["_player"].bonusDamage).toBe(before.bonusDamage);
+  });
+
+  it("of two copies, the plain one is enchanted", () => {
+    const enchanted = { ...makeArmor(), name: "Mighty Helm", stats: { armor: 5, enchantment: { effectId: "fortify_strength", magnitude: 3, vesselType: "clay" as const } } };
+    const inv = makeInventory([enchanted, makeArmor()]);
+    const sys = new EnchantingSystem(makePlayer(), inv, makeEquipment(), makeUI());
+    sys.addVessel("silver");
+    expect(sys.enchantItem("helm_01", "fortify_health", "silver")).not.toBeNull();
+    expect(inv.items.filter((i) => i.stats?.enchantment)).toHaveLength(2);
   });
 
   it("fires onItemEnchanted callback on success", () => {

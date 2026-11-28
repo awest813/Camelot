@@ -306,8 +306,11 @@ export class EnchantingSystem {
       return null;
     }
 
-    // Find the item in inventory
-    const itemIndex = this._inventory.items.findIndex(i => i.id === itemId);
+    // Find the item in inventory: of two copies with one id, the plain one
+    // (the altar lists only plain items, and the enchanted copy refuses).
+    const items = this._inventory.items;
+    let itemIndex = items.findIndex(i => i.id === itemId && !i.stats?.enchantment);
+    if (itemIndex === -1) itemIndex = items.findIndex(i => i.id === itemId);
     if (itemIndex === -1) {
       this._ui.showNotification("Item not found in inventory.", 2000);
       return null;
@@ -367,10 +370,9 @@ export class EnchantingSystem {
     // Replace item in inventory
     this._inventory.items[itemIndex] = enchantedItem;
 
-    // If the item is currently equipped, re-apply stat delta
-    if (this._equipment.isEquipped(itemId) && effectDef.statField) {
-      this._applyStatDelta(effectDef.statField, magnitude);
-    }
+    // (No stat change now: a worn item isn't in the bag, so this one isn't
+    // worn; its bonus applies when it is equipped. Checking by id gave a
+    // spare copy of worn gear a lasting bonus.)
 
     // Raise skill (more complex enchants from larger vessels = more XP)
     const gemTiers: Record<VesselType, number> = { clay: 1, pewter: 2, silver: 3, gold: 4, grail: 5 };
@@ -379,19 +381,6 @@ export class EnchantingSystem {
     this._ui.showNotification(`Enchanted: ${newName} (+${magnitude} ${effectDef.name})`, 3000);
     this.onItemEnchanted?.(enchantedItem, enchantment);
     return enchantedItem;
-  }
-
-  // ── Private helpers ──────────────────────────────────────────────────────
-
-  /** Apply a direct stat delta to the player (used when enchanting an equipped item). */
-  private _applyStatDelta(statField: string, delta: number): void {
-    switch (statField) {
-      case "damage":       this._player.bonusDamage   += delta; break;
-      case "armor":        this._player.bonusArmor    += delta; break;
-      case "healthBonus":  this._player.maxHealth     += delta; break;
-      case "magickaBonus": this._player.maxMagicka    += delta; break;
-      case "staminaBonus": this._player.maxStamina    += delta; break;
-    }
   }
 
   // ── Persistence ──────────────────────────────────────────────────────────
