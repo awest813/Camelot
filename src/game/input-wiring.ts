@@ -209,11 +209,11 @@ export function wireInputAdapter(g: Game): void {
 export function forwardDialogToggleKey(g: Game, ev: KeyboardEvent): void {
   if (ev.repeat || ev.defaultPrevented || g._inCharacterCreation) return;
   const target = ev.target;
-  if (!(target instanceof HTMLElement) || target === g.canvas) return;
-  if (!target.closest('[role="dialog"], [aria-modal="true"]')) return;
-  if (target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return;
+  if (!(target instanceof HTMLElement) || target === g.canvas || !target.closest('[role="dialog"], [aria-modal="true"]')) return;
   const modifiers = { shift: ev.shiftKey, ctrlOrMeta: ev.ctrlKey || ev.metaKey };
   const action = g._inputAdapter.matchAction(ev.key, "down", modifiers);
+  if (action && /^F\d{1,2}$/.test(ev.key)) ev.preventDefault(); // F5 in a panel: not the browser's reload
+  if (target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]')) return;
   if (!action || !DIALOG_TOGGLE_ACTIONS.has(action)) return;
   ev.preventDefault();
   g._inputAdapter.handleKeyEvent(ev.key, "down", modifiers);
