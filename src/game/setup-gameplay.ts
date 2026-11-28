@@ -20,6 +20,7 @@ import { WeatherSystem } from "../systems/weather-system";
 import { QuickSlotSystem, isConsumableItem } from "../systems/quickslot-system";
 import { WaitSystem } from "../systems/wait-system";
 import { tryAssignQuickSlotFromClick } from "./input-wiring";
+import { actors } from "../entities/actors"; import { Dead, Engaged } from "../core/ecs/actors";
 
 export function setupGameplaySystems(g: Game): void {
   // ── v3 system wiring ──────────────────────────────────────────────────────
@@ -144,8 +145,8 @@ export function setupGameplaySystems(g: Game): void {
   // ── v7 system wiring (QoL: Wait + Compass) ────────────────────────────────
   g.waitSystem = new WaitSystem();
   g.saveSystem.setWaitSystem(g.waitSystem);
-  // Wire the Wait Dialog confirm callback
   g.eventBus.on("ui:waitConfirm", ({ hours }) => {
+    if (actors.bodies([Engaged], [Dead]).length > 0) { g.ui.showNotification("You cannot wait with enemies nearby.", 2400); return; } // as fast travel: no resting mid-fight
     const result = g.waitSystem.wait(hours, g.timeSystem, g.player);
     if (result.ok) {
       // Waiting counts as light sleep — resting at an inn restores more.
