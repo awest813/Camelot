@@ -13,7 +13,7 @@ import { Loot } from "../entities/loot";
 import { VillageRaidFeature } from "../features/village-raids/raid-feature";
 import { actors } from "../entities/actors";
 import { Aggressive, Dead, Engaged } from "../core/ecs/actors";
-import { undeclaredFeatures, ActorsKey, AnimationKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, LooksKey, ModalKey, PlayerKey, QuestsKey, TitleHostKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
+import { undeclaredFeatures, ActorsKey, AnimationKey, FlagsKey, SavesKey, BuildingsKey, ClockKey, FeedbackKey, GameplayKey, InventoryKey, PurseKey, SkillsKey, LootKey, LooksKey, ModalKey, PlayerKey, QuestsKey, TitleHostKey, ScheduleKey, SiteBuilderKey, WorldInfoKey, WorldStateKey } from "../features/services";
 import { VillagesFeature } from "../features/villages/villages-feature";
 import { WorldSitesFeature } from "../features/world-sites/world-sites-feature";
 import { LandmarksFeature } from "../features/landmarks/landmarks-feature";
@@ -87,6 +87,7 @@ export function installGameFeatures(game: Game): void {
       // First, so features can own their part of the save as they install.
       k.services.provide(SavesKey, { register: (codec) => game.saveSystem.registerCodec(codec) });
       k.services.provide(ClockKey, { hour: () => game.timeSystem.hour, elapsedHours: () => game.timeSystem.elapsedGameHours });
+      k.services.provide(FlagsKey, { get: (flag) => game.frameworkRuntime.getFlag(flag), set: (flag, value) => game.frameworkRuntime.setFlag(flag, value) });
       k.services.provide(PlayerKey, { position: () => game.player.camera.position, level: () => game.playerLevelSystem.characterLevel, heading: () => game.player.camera.rotation.y });
       k.services.provide(FeedbackKey, { notify: (text, ms) => game.ui.showNotification(text, ms ?? 3000), grant: (reward) => grantDynamicWorldEventReward(game, reward),
         addFame: (n) => game.fameSystem.addFame(n), markDirty: () => game.saveSystem.markDirty() });
@@ -134,8 +135,7 @@ export function installGameFeatures(game: Game): void {
           activeBiomeIds: [game.world.getBiome(Math.floor(at.x / game.world.chunkSize), Math.floor(at.z / game.world.chunkSize))],
           weatherId: game.weatherSystem.state,
           playerLevel: game.playerLevelSystem.characterLevel,
-          getFlag: (flag) => game.frameworkRuntime.getFlag(flag),
-          setFlag: (flag, value) => game.frameworkRuntime.setFlag(flag, value),
+          getFlag: (flag) => game.frameworkRuntime.getFlag(flag), setFlag: (flag, value) => game.frameworkRuntime.setFlag(flag, value),
         }, () => k.rng.stream("travel-events").next())?.notification ?? null,
         hasMark: () => game.markRecallSystem.hasMarked, markCell: () => game.markRecallSystem.markedCellId,
         recall: () => !!game.markRecallSystem.recall(),

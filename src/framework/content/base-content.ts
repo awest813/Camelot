@@ -251,7 +251,7 @@ export const frameworkBaseContent: RpgContentBundle = {
               effects: [
                 { type: "consume_item", itemId: "gold_coins", quantity: 25 },
                 { type: "set_flag", flag: "bought_kitten", value: true },
-                { type: "emit_event", eventId: "pets:grant", payload: { petId: "pet_cat" } },
+                { type: "emit_event", eventId: "pets:grant", payload: { petId: "pet_cat", purchaseFlag: "bought_kitten" } },
               ],
             },
             {
@@ -535,7 +535,7 @@ export const frameworkBaseContent: RpgContentBundle = {
               effects: [
                 { type: "consume_item", itemId: "gold_coins", quantity: 60 },
                 { type: "set_flag", flag: "bought_raven", value: true },
-                { type: "emit_event", eventId: "pets:grant", payload: { petId: "pet_raven" } },
+                { type: "emit_event", eventId: "pets:grant", payload: { petId: "pet_raven", purchaseFlag: "bought_raven" } },
               ],
             },
             {

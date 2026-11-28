@@ -67,6 +67,8 @@ export interface Pet extends PetTemplate {
   isDead: boolean;
   /** True while the pet is spawned in the world (summoned). */
   isActive: boolean;
+  /** The dialogue flag its purchase set: cleared if it falls, so another can be bought. */
+  purchaseFlag?: string;
 }
 
 export interface PetSaveState {
@@ -78,6 +80,7 @@ export interface PetSaveState {
     experience: number;
     mood: number;
     isDead: boolean;
+    purchaseFlag?: string;
   }>;
 }
 
@@ -185,10 +188,11 @@ export class PetSystem {
    * Returns the new Pet, or null if the template is unknown or already owned.
    * The pet starts unsummoned with full health.
    */
-  public grantPet(templateId: string, overrideName?: string): Pet | null {
+  public grantPet(templateId: string, overrideName?: string, opts: { purchaseFlag?: string } = {}): Pet | null {
     const tpl = this._templates.get(templateId);
     if (!tpl) return null;
-    if (this._pets.has(templateId)) return null; // already owned
+    // Already owned, unless it fell: a new one takes its place (bought again).
+    if (this._pets.get(templateId)?.isDead === false) return null;
 
     const pet: Pet = {
       ...tpl,
@@ -199,6 +203,7 @@ export class PetSystem {
       mood: 80,
       isDead: false,
       isActive: false,
+      ...(opts.purchaseFlag ? { purchaseFlag: opts.purchaseFlag } : {}),
     };
     this._pets.set(templateId, pet);
     this.onPetAcquired?.(pet);
@@ -369,6 +374,7 @@ export class PetSystem {
         experience: p.experience,
         mood: p.mood,
         isDead: p.isDead,
+        ...(p.purchaseFlag ? { purchaseFlag: p.purchaseFlag } : {}),
       })),
     };
   }
@@ -397,6 +403,7 @@ export class PetSystem {
         mood: saved.mood,
         isDead: saved.isDead,
         isActive: false,
+        ...(typeof saved.purchaseFlag === "string" ? { purchaseFlag: saved.purchaseFlag } : {}),
         maxHealth,
         attackDamage,
       };

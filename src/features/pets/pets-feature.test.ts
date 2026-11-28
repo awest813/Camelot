@@ -4,7 +4,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Kernel } from "../../core/kernel";
 import { AIState, type NPC } from "../../entities/npc";
-import { ActorsKey, AnimationKey, FeedbackKey, GameplayKey, ModalKey, PlayerKey } from "../services";
+import { ActorsKey, AnimationKey, FeedbackKey, FlagsKey, GameplayKey, ModalKey, PlayerKey } from "../services";
 import { PetsFeature, PetsKey } from "./pets-feature";
 
 /** Just what the companion looks at and hits. */
@@ -27,6 +27,8 @@ function setup() {
   const anim = { idle: vi.fn(), walk: vi.fn(), run: vi.fn(), death: vi.fn(), release: vi.fn() };
   k.services.provide(FeedbackKey, { notify: (t) => { notes.push(t); }, grant: vi.fn(), addFame: vi.fn(), markDirty: vi.fn() });
   k.services.provide(ModalKey, modal);
+  const flags = new Map<string, boolean>([["bought_kitten", true]]);
+  k.services.provide(FlagsKey, { get: (f) => flags.get(f) ?? false, set: (f, v) => { flags.set(f, v); } });
   k.services.provide(AnimationKey, anim);
   k.services.provide(GameplayKey, { canAct: () => canAct });
   k.services.provide(PlayerKey, { position: () => ({ x: 0, y: 2, z: 0 }), level: () => 1 });
@@ -39,7 +41,7 @@ function setup() {
   k.install(feature);
   const events: string[] = [];
   for (const e of ["pet:acquired", "pet:summoned", "pet:dismissed"] as const) k.events.on(e, () => events.push(e));
-  return { k, scene, notes, npcs, modal, anim, events, pets: k.services.get(PetsKey), block: () => { canAct = false; } };
+  return { k, scene, notes, npcs, modal, anim, events, flags, pets: k.services.get(PetsKey), block: () => { canAct = false; } };
 }
 
 describe("PetsFeature (headless, through the kernel)", () => {
@@ -112,6 +114,19 @@ describe("PetsFeature (headless, through the kernel)", () => {
     t.npcs.push(foe);
     for (let i = 0; i < 3; i++) t.k.phases.run("sim", 1);
     expect(t.pets.pets.activePet!.health).toBeLessThan(hp);
+    t.k.uninstall("pets");
+  });
+
+  it("a bought kitten that falls can be bought again: its seller's offer comes back", () => {
+    const t = setup();
+    t.k.events.emit("dialogue:action", { eventId: "pets:grant", npcName: "Barkeeper", payload: { petId: "pet_cat", purchaseFlag: "bought_kitten" } });
+    t.pets.pets.summonPet("pet_cat");
+    t.pets.pets.petTakeDamage(10_000);
+    expect(t.pets.pets.pets[0].isDead).toBe(true);
+    expect(t.flags.get("bought_kitten"), "the barkeeper offers another").toBe(false);
+    expect(t.notes.some((n) => /seller may have another/.test(n))).toBe(true);
+    t.k.events.emit("dialogue:action", { eventId: "pets:grant", npcName: "Barkeeper", payload: { petId: "pet_cat", purchaseFlag: "bought_kitten" } });
+    expect(t.pets.pets.pets[0].isDead, "a new kitten").toBe(false);
     t.k.uninstall("pets");
   });
 

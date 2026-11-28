@@ -525,3 +525,20 @@ describe("PetSystem — wounds mend", () => {
     expect(wolf.health).toBe(wolf.maxHealth);
   });
 });
+
+describe("PetSystem — a fallen companion bought again", () => {
+  it("a new one replaces a fallen one (not a live one), and remembers the purchase across a save", () => {
+    const ps = new PetSystem();
+    expect(ps.grantPet("pet_cat", undefined, { purchaseFlag: "bought_kitten" })).not.toBeNull();
+    expect(ps.grantPet("pet_cat"), "one alive already").toBeNull();
+    const saved = JSON.parse(JSON.stringify(ps.getSaveState()));
+    const loaded = new PetSystem();
+    loaded.restoreFromSave(saved);
+    expect(loaded.pets[0].purchaseFlag).toBe("bought_kitten");
+    loaded.pets[0].isDead = true;
+    const fresh = loaded.grantPet("pet_cat", undefined, { purchaseFlag: "bought_kitten" });
+    expect(fresh?.isDead).toBe(false);
+    expect(fresh?.health).toBe(fresh?.maxHealth);
+    expect(loaded.pets).toHaveLength(1);
+  });
+});

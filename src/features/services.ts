@@ -374,3 +374,10 @@ export interface TitleHostService {
   skip(): boolean;
 }
 export const TitleHostKey = createServiceKey<TitleHostService>("title-host");
+
+/** The story's flags (the ones dialogue conditions read: "bought_kitten"…). */
+export interface FlagsService {
+  get(flag: string): boolean;
+  set(flag: string, value: boolean): void;
+}
+export const FlagsKey = createServiceKey<FlagsService>("flags");

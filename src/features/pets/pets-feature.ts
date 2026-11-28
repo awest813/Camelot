@@ -29,7 +29,7 @@ import type { PetUI } from "../../ui/pet-ui";
 import { LazyPanel } from "../../ui/lazy-panel";
 import { CompanionChip, petChip } from "../../ui/companion-chip";
 import type { NPC } from "../../entities/npc";
-import { ActorsKey, AnimationKey, FeedbackKey, GameplayKey, ModalKey, PlayerKey, ownSave } from "../services";
+import { ActorsKey, AnimationKey, FeedbackKey, FlagsKey, GameplayKey, ModalKey, PlayerKey, ownSave } from "../services";
 
 /** Seconds between a companion's attacks. */
 const ATTACK_COOLDOWN = 2.0;
@@ -100,7 +100,9 @@ export class PetsFeature implements Feature {
       events.emit("pet:dismissed", { petId: pet.id, petName: pet.name });
     };
     this.pets.onPetDied = (pet) => {
-      feedback().notify(`${pet.name} has fallen in battle!`, 3500);
+      // A bought companion can be bought again (its seller's offer comes back).
+      if (pet.purchaseFlag) s.tryGet(FlagsKey)?.set(pet.purchaseFlag, false);
+      feedback().notify(`${pet.name} has fallen in battle!${pet.purchaseFlag ? " Its seller may have another." : ""}`, 3500);
       events.emit("pet:died", { petId: pet.id, petName: pet.name });
       // Let the death animation play on the body before it goes.
       const mesh = this._mesh, body = this._body;
@@ -155,7 +157,8 @@ export class PetsFeature implements Feature {
     // Bought or given in conversation (a kitten from the barkeeper, a raven from the alchemist).
     ctx.on("dialogue:action", ({ eventId, payload }) => {
       if (eventId !== "pets:grant" || typeof payload?.petId !== "string") return;
-      if (!this.pets.grantPet(payload.petId)) return;
+      const purchaseFlag = typeof payload.purchaseFlag === "string" ? payload.purchaseFlag : undefined;
+      if (!this.pets.grantPet(payload.petId, undefined, { purchaseFlag })) return;
       feedback().notify("P opens the companion panel: summon them from there.", 3000);
       feedback().markDirty();
     });
