@@ -450,6 +450,13 @@ export class SpellSystem {
   /** Whether a Silence effect is on the caster (the game wires its active effects). */
   public silenced: () => boolean = () => false;
 
+  /** A spell's killing blow counts like a sword's: XP, spoils, quest credit. */
+  private _reportKill(npc: NPC): void {
+    if (!npc.isDead) return;
+    this._ui.showNotification(`${npc.displayName} defeated!`);
+    this.events?.emit("npc:killed", { npcName: npc.key, xp: npc.xpReward, npc });
+  }
+
   public castSpell(): SpellCastResult {
     const spell = this.equippedSpell;
     if (!spell) return { success: false, reason: "no_spell_equipped" };
@@ -570,6 +577,7 @@ export class SpellSystem {
             const finalDmg = applyDamageWithResistance(this._baneFor(spell, npc, rawHit), npc, damageType);
             npc.takeDamage(finalDmg);
             this.events?.emit("combat:hostileHit", { npc, damage: finalDmg });
+            this._reportKill(npc);
             this._applySpellDoT(spell, npc);
             if (hitNpcName === undefined) {
               hitNpcName = npc.key;
@@ -583,6 +591,7 @@ export class SpellSystem {
           const finalDmg = applyDamageWithResistance(this._baneFor(spell, target, rawHit), target, damageType);
           target.takeDamage(finalDmg);
           this.events?.emit("combat:hostileHit", { npc: target, damage: finalDmg });
+          this._reportKill(target);
           this._applySpellDoT(spell, target);
           hitNpcName = target.key;
           reportedDamage = finalDmg;

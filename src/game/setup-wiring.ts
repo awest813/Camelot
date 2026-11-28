@@ -42,7 +42,7 @@ export function wireGameplay(g: Game): void {
       g.audioSystem.playNPCDeath();
 
   });
-  // (Arrow and spell kills report npc:killed too.)
+  // (Arrow, spell, companion and follower kills report npc:killed too.)
   // Striking a peaceful settler is an assault (the arrest feature books it).
   g.eventBus.on("combat:npcDamaged", ({ npc }) => {
     if (npc.isDead || !isSettlementNpc(g, npc)) return;

@@ -72,12 +72,15 @@ export class PetsFeature implements Feature {
   private _services: ServiceRegistry | null = null;
 
   constructor(private readonly _scene: Scene) {}
+  private _reportKill: (npc: NPC) => void = () => {};
 
   public install(ctx: FeatureContext): void {
     ownSave(ctx, { key: "pets", save: () => this.pets.getSaveState(), load: (data) => { if (data) this.pets.restoreFromSave(data as never); } });
     const s = ctx.kernel.services;
     this._services = s;
     const events = ctx.kernel.events;
+    // A companion's killing blow is the player's kill (XP, spoils, quest credit), as a follower's is.
+    this._reportKill = (npc) => { if (npc.isDead) events.emit("npc:killed", { npcName: npc.key, xp: npc.xpReward, npc }); };
     const feedback = () => s.get(FeedbackKey);
     const anim = () => s.get(AnimationKey);
 
@@ -254,6 +257,7 @@ export class PetsFeature implements Feature {
     f.bite -= dt;
     if (foe && best <= FAMILIAR.reach * FAMILIAR.reach && f.bite <= 0) {
       foe.takeDamage(FAMILIAR.damage);
+      this._reportKill(foe);
       f.bite = FAMILIAR.every;
     }
   }
@@ -315,6 +319,7 @@ export class PetsFeature implements Feature {
     }
     if (target) {
       target.takeDamage(this.pets.getEffectiveAttackDamage());
+      this._reportKill(target);
       if (this.pets.petGainXP(5)) this.panel.current?.refresh(this.pets.pets, this.pets.activePet?.id ?? null);
       this._attackTimer = ATTACK_COOLDOWN;
     } else {

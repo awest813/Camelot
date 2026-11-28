@@ -52,6 +52,7 @@ export const FollowersKey = createServiceKey<FollowersService>("followers");
 
 export class FollowersFeature implements Feature {
   public readonly id = "followers";
+  private _reportKill: (npc: NPC) => void = () => {};
   public readonly followers = new FollowerSystem();
   /** The follower panel (G), loaded the first time it opens. */
   public readonly panel = new LazyPanel<FollowerUI>(async () => {
@@ -79,6 +80,8 @@ export class FollowersFeature implements Feature {
     ownSave(ctx, { key: "follower", save: () => this.followers.getSaveState(), load: (data) => { if (data) this.followers.restoreFromSave(data as never); } });
     const s = ctx.kernel.services;
     const notify = (text: string, ms: number) => s.get(FeedbackKey).notify(text, ms);
+    // A follower's killing blow counts as the player's (XP, spoils, quest credit).
+    this._reportKill = (npc) => { if (npc.isDead) ctx.kernel.events.emit("npc:killed", { npcName: npc.key, xp: npc.xpReward, npc }); };
     const f = this.followers;
 
     f.onFollowerRecruited = (_id, name) => { notify(`${name} has joined you.`, 3000); this._spawn(s); };
@@ -234,6 +237,7 @@ export class FollowersFeature implements Feature {
     if (target && this._blowTimer <= 0) {
       body.face(target.mesh.position.x, target.mesh.position.z);
       target.takeDamage(active.attackDamage);
+      this._reportKill(target);
       this._blowTimer = BLOW_EVERY;
     }
     this._struckTimer -= dt;

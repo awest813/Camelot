@@ -166,6 +166,16 @@ describe("SpellSystem", () => {
     expect(npc.takeDamage).toHaveBeenCalled();
   });
 
+  it("a spell's killing blow is reported as a kill (XP, spoils, quest credit)", () => {
+    const emitted: string[] = [];
+    sys.events = { emit: (name: string) => { emitted.push(name); } } as never;
+    npc.takeDamage.mockImplementation(() => { npc.isDead = true; });
+    sys.learnSpell("kindle");
+    sys.equipSpell("kindle");
+    sys.castSpell();
+    expect(emitted).toContain("npc:killed");
+  });
+
   it("castSpell does not hit dead NPCs", () => {
     const deadNpc = makeNPC(2, false);
     sys.npcs = [deadNpc];
