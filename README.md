@@ -128,13 +128,16 @@ without Shift. Typing in text fields is unaffected.
 | -------------- | -------------------------------------------------------- |
 | WASD           | Move                                                     |
 | Mouse          | Look                                                     |
+| Space          | Jump                                                     |
+| Shift (hold)   | Sprint                                                   |
 | Left Click     | Melee attack (Stamina)                                   |
 | Right Click    | Block / parry (hold)                                     |
 | Q              | Cast equipped spell (Magicka) / charge staff             |
 | Z              | Cycle equipped spell                                     |
 | R              | Draw bow (hold); release to fire                         |
 | C              | Toggle crouch / sneak                                    |
-| E              | Interact / pick up / talk                                |
+| E              | Interact / pick up / talk (pickpocket while unseen)      |
+| Shift+E        | Power attack                                             |
 | I              | Toggle inventory                                         |
 | J              | Toggle quest log                                         |
 | K              | Toggle skill tree                                        |
@@ -162,13 +165,14 @@ without Shift. Typing in text fields is unaffected.
 | P              | Toggle pet companion panel                               |
 | G              | Toggle follower panel                                    |
 | O              | Mount / dismount horse                                   |
-| Shift+O        | Browse stable (unmounted) / open saddlebag (mounted)     |
+| Shift+O        | Saddlebag (mounted); buy horses from a village ostler    |
 | F4             | Toggle first / third person                              |
 | F7             | Toggle audio mute                                        |
 | F1             | Toggle controls / help overlay                           |
 | F3             | Toggle debug overlay                                     |
 | F5             | Quick save                                               |
 | F9             | Quick load                                               |
+| PrintScreen    | Screenshot                                               |
 | Esc            | Pause menu / close open panel                            |
 
 ### Map Editor (editor app only; active while F2 mode is on — these keys override their gameplay bindings)

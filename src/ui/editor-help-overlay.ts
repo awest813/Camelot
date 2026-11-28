@@ -1,7 +1,7 @@
 import type { MapValidationReport } from "../systems/map-editor-system";
 
 const BASE_CONTROLS: readonly string[] = [
-  "WASD: Move · Mouse: Look",
+  "WASD: Move · Mouse: Look · Space: Jump · Shift (hold): Sprint",
   "Left Click: Attack · Right Click (hold): Block · E: Interact (talk / take / open) · Shift+E: Power Attack",
   "F: Dodge Roll · R (hold): Draw Bow, release to fire",
   "I: Inventory · Tab: Character Sheet · J: Quest Log · K: Skills · U: Attributes",
