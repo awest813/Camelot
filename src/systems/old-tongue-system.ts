@@ -236,7 +236,7 @@ export const BUILTIN_SHOUTS: ReadonlyArray<ShoutDefinition> = [
     ],
     tiers: [
       {
-        description: "Step half out of the world for 8 seconds; you cannot attack or be harmed.",
+        description: "Step half out of the world for 8 seconds; no blade or spell can harm you.",
         cooldownSeconds: 26,
         effects: { ethereal_duration: 8 },
       },

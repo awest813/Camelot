@@ -382,14 +382,8 @@ export class FollowerUI {
       waitBtn.setAttribute("aria-label", "Command follower to wait");
       waitBtn.addEventListener("click", () => { if (waitBtn.getAttribute("aria-disabled") !== "true") this.onCommand?.("wait"); });
 
-      const tradeBtn = document.createElement("button");
-      tradeBtn.type = "button";
-      tradeBtn.setAttribute("aria-disabled", follower.command === "trade" ? "true" : "false");
-      _styleButton(tradeBtn, "Trade", { fontSize: "13px", padding: "3px 8px" });
-      tradeBtn.setAttribute("aria-label", "Open trade with follower");
-      tradeBtn.addEventListener("click", () => { if (tradeBtn.getAttribute("aria-disabled") !== "true") this.onCommand?.("trade"); });
-
-      cmdRow.append(followBtn, waitBtn, tradeBtn);
+      // No Trade button: a follower carries for you (the carry-weight bonus), with no pack of their own to swap with.
+      cmdRow.append(followBtn, waitBtn);
     }
 
     // ── Dismiss button ────────────────────────────────────────────────────────

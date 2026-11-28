@@ -350,7 +350,7 @@ export class ShoutUI {
           unlockBtn.setAttribute("aria-disabled", "true");
           unlockBtn.style.opacity = "0.45";
           unlockBtn.style.cursor = "not-allowed";
-          unlockBtn.title = "No awen. Great deeds (a dragon slain) bring it.";
+          unlockBtn.title = "No awen. Great deeds bring it: a dragon slain, a bandit camp cleared.";
         } else {
           unlockBtn.addEventListener("click", () => {
             this.onUnlockWord?.(def.id, nextIndex);
