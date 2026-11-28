@@ -21,10 +21,8 @@ export function wireEarlyReactions(g: Game): void {
     hydrateCellAfterLoad(g);
     // Saved equipment bypasses equip() — re-sync the weapon archetype.
     syncWeaponArchetype(g);
-    // Don't re-announce the bandit bounty if it's already live/finished.
-    if (g.frameworkRuntime.questEngine.getQuestStatus("quest_bandit_bounty") !== "inactive") {
-      g._banditQuestStarted = true;
-    }
+    // The bandit bounty is live or done in this save, or still to come (a save from before it).
+    g._banditQuestStarted = g.frameworkRuntime.questEngine.getQuestStatus("quest_bandit_bounty") !== "inactive";
   });
   bus.on("dialogue:closed", () => { g.barterSystem.playerGold = g._pack.gold(); });
   bus.on("chunk:loaded", ({ chunkKey, cx, cz, biome }) => {
