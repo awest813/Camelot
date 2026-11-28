@@ -11,7 +11,6 @@
  * Headless: no BabylonJS dependencies — all state is supplied by the caller
  * via a lightweight `TravelContext`.
  */
-import { hoursSince } from "./game-hours";
 import { unseededRandom } from "../core/rng/rng";
 
 // ── Conditions ────────────────────────────────────────────────────────────────
@@ -102,7 +101,10 @@ export interface TravelEventDefinition {
  * All optional fields are treated as "unknown / not applicable" when absent.
  */
 export interface TravelContext {
-  /** Current in-game time expressed as fractional hours in [0, 24). */
+  /**
+   * In-game hours since the game began (fractional). Not the hour on the clock:
+   * a cooldown of 24 hours or more can't be measured on a 24-hour face.
+   */
   gameTimeHours: number;
   /** Biome ids the player is travelling through. */
   activeBiomeIds?: string[];
@@ -321,7 +323,7 @@ export class TravelEventSystem {
     // Cooldown check
     const cooldown = def.cooldownHours ?? 0;
     if (cooldown > 0 && record.lastFiredAt !== null) {
-      const elapsed = hoursSince(record.lastFiredAt, ctx.gameTimeHours);
+      const elapsed = ctx.gameTimeHours - record.lastFiredAt;
       if (elapsed < cooldown) return false;
     }
 

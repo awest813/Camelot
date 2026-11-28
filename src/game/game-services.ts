@@ -130,7 +130,7 @@ export function installGameFeatures(game: Game): void {
           return game.timeSystem.timeString;
         },
         arrivalEvent: (at) => game.travelEventSystem.rollEvent({
-          gameTimeHours: game.timeSystem.elapsedGameHours % 24,
+          gameTimeHours: game.timeSystem.elapsedGameHours, // hours since the start, not the clock: cooldowns of a day or more
           activeBiomeIds: [game.world.getBiome(Math.floor(at.x / game.world.chunkSize), Math.floor(at.z / game.world.chunkSize))],
           weatherId: game.weatherSystem.state,
           playerLevel: game.playerLevelSystem.characterLevel,

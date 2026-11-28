@@ -308,14 +308,17 @@ describe("TravelEventSystem — cooldown", () => {
     expect(outcome).not.toBeNull();
   });
 
-  it("handles midnight wrap-around in cooldown calculation", () => {
+  it("cooldowns count hours since the start, so they pass midnight and last past a day", () => {
     const sys = new TravelEventSystem();
     sys.addEvent(banditAmbush); // cooldownHours: 4
     sys.rollEvent(makeCtx({ gameTimeHours: 22 }));
-    // 3h later (past midnight: 01:00) — not yet elapsed
-    expect(sys.rollEvent(makeCtx({ gameTimeHours: 1 }))).toBeNull();
-    // 5h later (past midnight: 03:00) — elapsed
-    expect(sys.rollEvent(makeCtx({ gameTimeHours: 3 }))).not.toBeNull();
+    expect(sys.rollEvent(makeCtx({ gameTimeHours: 25 })), "3 h later, past midnight").toBeNull();
+    expect(sys.rollEvent(makeCtx({ gameTimeHours: 27 })), "5 h later").not.toBeNull();
+    const daily = new TravelEventSystem();
+    daily.addEvent({ ...banditAmbush, id: "hunter", cooldownHours: 24 });
+    daily.rollEvent(makeCtx({ gameTimeHours: 10 }));
+    expect(daily.rollEvent(makeCtx({ gameTimeHours: 30 })), "20 h later").toBeNull();
+    expect(daily.rollEvent(makeCtx({ gameTimeHours: 35 })), "a day and more later: again").not.toBeNull();
   });
 
   it("event with no cooldown fires every call", () => {
