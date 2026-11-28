@@ -199,7 +199,7 @@ export class CraftingFeature implements Feature {
       if (!canAct()) return;
       modal().suspendGameplay();
       this._syncAlchemySkill();
-      void this.alchemyPanel.get().then((p) => p.toggle(true));
+      this.alchemyPanel.openWith((p) => p.toggle(true), () => modal().restoreGameplay());
     };
     const toggleEnchanting = () => {
       if (this.enchantingPanel.isVisible) {
@@ -209,7 +209,7 @@ export class CraftingFeature implements Feature {
       }
       if (!canAct()) return;
       modal().suspendGameplay();
-      void this.enchantingPanel.get().then((p) => p.toggle(true));
+      this.enchantingPanel.openWith((p) => p.toggle(true), () => modal().restoreGameplay());
     };
     const toggleSmithing = () => {
       if (this.forgePanel.isVisible) {
@@ -271,10 +271,10 @@ export class CraftingFeature implements Feature {
     const s = this._s;
     if (!s || this.forgePanel.isVisible) return;
     s.get(ModalKey).suspendGameplay();
-    void this.forgePanel.get().then((panel) => {
+    this.forgePanel.openWith((panel) => {
       panel.show();
       this._refreshForge();
-    });
+    }, () => s.get(ModalKey).restoreGameplay());
     if (!this._station()) {
       s.get(FeedbackKey).notify("No forge nearby: field smithing only. Steel work needs a forge.", 3000);
     }

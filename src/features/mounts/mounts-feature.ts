@@ -284,10 +284,8 @@ export class MountsFeature implements Feature {
         if (this.horses.isMounted) {
           const horse = this.horses.currentHorse!;
           const bag = this.horses.getSaddlebag(horse.id) ?? [];
-          void this.saddlebag.get().then((panel) => {
-            panel.open(horse.name, bag.map(toRow), bag.length, horse.saddlebagCapacity);
-            modal().suspendGameplay();
-          });
+          modal().suspendGameplay();
+          this.saddlebag.openWith((panel) => panel.open(horse.name, bag.map(toRow), bag.length, horse.saddlebagCapacity), () => modal().restoreGameplay());
           return;
         }
         feedback().notify("To buy a horse, talk to the ostler at a village inn.", 2500);
@@ -309,10 +307,8 @@ export class MountsFeature implements Feature {
           saddlebagCapacity: h.saddlebagCapacity, price: stable.prices[id] ?? 0, isOwned: h.isOwned,
         };
       });
-      void this.stable.get().then((panel) => {
-        panel.open(STABLE_MASTER, offers, purse().gold());
-        modal().suspendGameplay();
-      });
+      modal().suspendGameplay();
+      this.stable.openWith((panel) => panel.open(STABLE_MASTER, offers, purse().gold()), () => modal().restoreGameplay());
     };
 
     // While riding, the horse's neck nods with your pace.

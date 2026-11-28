@@ -128,7 +128,7 @@ export class ShoutsFeature implements Feature {
         }
         if (!s.get(GameplayKey).canAct()) return;
         modal().suspendGameplay();
-        void this.panel.get().then((panel) => panel.open(this._views(), sh.awen, sh.equippedShoutId));
+        this.panel.openWith((panel) => panel.open(this._views(), sh.awen, sh.equippedShoutId), () => modal().restoreGameplay());
       },
       use: () => {
         if (!s.get(GameplayKey).canAct()) return;

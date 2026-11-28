@@ -55,7 +55,7 @@ export class MapFeature implements Feature {
         if (panel.isVisible) { close(); return; }
         if (!s.get(GameplayKey).canAct()) return;
         s.get(ModalKey).suspendGameplay();
-        void panel.get().then((view) => view.open(source, close));
+        panel.openWith((view) => view.open(source, close), () => s.get(ModalKey).restoreGameplay());
       },
       get isOpen() { return panel.isVisible; },
     });

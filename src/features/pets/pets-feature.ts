@@ -142,7 +142,7 @@ export class PetsFeature implements Feature {
           return;
         }
         s.get(ModalKey).suspendGameplay();
-        void this.panel.get().then((panel) => panel.open(this.pets.pets, this.pets.activePet?.id ?? null));
+        this.panel.openWith((panel) => panel.open(this.pets.pets, this.pets.activePet?.id ?? null), () => s.get(ModalKey).restoreGameplay());
       },
     });
 

@@ -138,10 +138,15 @@ export class ProgressionFeature implements Feature {
         opening = true;
         modal().suspendGameplay();
         host().setSheetOpen(true);
-        void this.sheet.get().then((ui) => {
+        this.sheet.get().then((ui) => {
           opening = false;
           this._refresh();
           ui.show();
+        }, () => {
+          // Couldn't load (a chunk that failed to arrive): give the input back; the next Tab tries again.
+          opening = false;
+          host().setSheetOpen(false);
+          modal().restoreGameplay();
         });
       },
       skillRaised: (id) => this.levels.handleSkillLevelUp(id as never),

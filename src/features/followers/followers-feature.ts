@@ -119,10 +119,10 @@ export class FollowersFeature implements Feature {
     const open = (hiring: boolean) => {
       this._hiring = hiring;
       s.get(ModalKey).suspendGameplay();
-      void this.panel.get().then((panel) => {
+      this.panel.openWith((panel) => {
         const v = this._view();
         panel.open(v.templates, v.active, v.deceased, this._gold(), hiring);
-      });
+      }, () => s.get(ModalKey).restoreGameplay());
     };
     ctx.on("dialogue:action", ({ eventId }) => { if (eventId === "followers:hire") this._hireAfterTalk = true; });
     ctx.on("dialogue:closed", () => {

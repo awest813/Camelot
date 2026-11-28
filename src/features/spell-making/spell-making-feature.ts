@@ -94,7 +94,7 @@ export class SpellMakingFeature implements Feature {
         if (this.panel.isVisible) { this.panel.close(); return; }
         if (!s.get(GameplayKey).canAct()) return;
         modal().suspendGameplay();
-        void this.panel.get().then((panel) => panel.open());
+        this.panel.openWith((panel) => panel.open(), () => modal().restoreGameplay());
       },
     });
 
