@@ -154,10 +154,29 @@ describe("SpellMakingSystem", () => {
   });
 
   it("forgeSpell with two components produces a combined spell", () => {
-    const result = sms.forgeSpell("FlameBolt", [FIRE_COMPONENT, HEAL_COMPONENT], barter);
+    const crush: SpellComponent = { effectType: "burden", school: "alteration" as never, magnitude: 25, duration: 0 };
+    const result = sms.forgeSpell("FlameBolt", [FIRE_COMPONENT, crush], barter);
     expect(result.ok).toBe(true);
-    // damage from fire + some heal contribution from heal
-    expect(result.spell!.damage).toBeGreaterThan(0);
+    expect(result.spell!.damage, "fire 20 + crush 10").toBe(30);
+  });
+
+  it("effects that would cancel each other are refused, not charged for", () => {
+    const silence: SpellComponent = { effectType: "silence", school: "illusion" as never, magnitude: 1, duration: 10 };
+    expect(sms.forgeSpell("Mixed", [FIRE_COMPONENT, HEAL_COMPONENT], barter)).toMatchObject({ ok: false, reason: "incompatible" });
+    expect(sms.forgeSpell("Loud Hush", [FIRE_COMPONENT, silence], barter)).toMatchObject({ ok: false, reason: "incompatible" });
+    expect(barter.playerGold).toBe(1000);
+  });
+
+  it("a restoring spell costs more magicka than it gives back", () => {
+    const well: SpellComponent = { effectType: "restore_magicka", school: "restoration", magnitude: 25, duration: 0 };
+    const r = sms.forgeSpell("Well", [well], barter);
+    expect(r.ok).toBe(true);
+    expect(r.spell!.magickaCost).toBeGreaterThan(25);
+  });
+
+  it("past the altar's dearest price, a spell is refused (not given away at the cap)", () => {
+    const huge: SpellComponent = { ...FIRE_COMPONENT, magnitude: 5000, duration: 30 };
+    expect(sms.forgeSpell("Sun", [huge], makeBarterSystem(1_000_000))).toMatchObject({ ok: false, reason: "too_powerful" });
   });
 
   it("forgeSpell generates unique IDs for different spells", () => {

@@ -92,7 +92,7 @@ export interface SpellComponent {
 
 export interface SpellMakingResult {
   ok: boolean;
-  reason?: "insufficient_gold" | "no_components" | "too_many_components" | "invalid_name" | "duplicate_name";
+  reason?: "insufficient_gold" | "no_components" | "too_many_components" | "invalid_name" | "duplicate_name" | "incompatible" | "too_powerful";
   /** The newly forged SpellDefinition, present only when ok === true. */
   spell?: SpellDefinition;
   /** Gold deducted, present only when ok === true. */
@@ -105,9 +105,28 @@ export interface SpellMakingSaveState {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Compute the raw gold cost for one component. */
+/** Effects that land at once (a duration does nothing for them). */
+const INSTANT: ReadonlySet<SpellComponentEffect> = new Set<SpellComponentEffect>(["heal", "restore_magicka", "restore_stamina", "burden"]);
+/** Effects on the caster; the rest go to a target. */
+const ON_SELF: ReadonlySet<SpellComponentEffect> = new Set<SpellComponentEffect>(["heal", "restore_magicka", "restore_stamina"]);
+
+/** Compute the raw gold cost for one component (an instant effect's duration is free: it does nothing). */
 function componentCost(c: SpellComponent): number {
-  return c.magnitude * Math.max(1, c.duration) * COST_FACTOR;
+  return c.magnitude * Math.max(1, INSTANT.has(c.effectType) ? 0 : c.duration) * COST_FACTOR;
+}
+
+/**
+ * Why two components can't share a spell, or null. A spell goes to the
+ * caster or a target, not both; and Silence (calming the target) can't ride
+ * with harm, which would wake it. Either way one effect would be lost.
+ */
+function incompatibility(components: readonly SpellComponent[]): string | null {
+  const self = components.some((c) => ON_SELF.has(c.effectType));
+  const target = components.some((c) => !ON_SELF.has(c.effectType));
+  if (self && target) return "self and target";
+  const silence = components.some((c) => c.effectType === "silence");
+  const harm = components.some((c) => c.effectType === "damage" || c.effectType === "burden");
+  return silence && harm ? "silence and harm" : null;
 }
 
 /** Build a SpellDefinition id that is safe for use as a map key. */
@@ -191,6 +210,12 @@ export class SpellMakingSystem {
       }
     }
 
+    if (incompatibility(components)) return { ok: false, reason: "incompatible" };
+    // Past the altar's dearest spell the price stops rising: refused, not given away.
+    if (components.reduce((sum, c) => sum + componentCost(c), 0) > MAX_SPELL_COST) {
+      return { ok: false, reason: "too_powerful" };
+    }
+
     const goldCost = this.computeCost(components);
 
     // Gold check
@@ -212,7 +237,10 @@ export class SpellMakingSystem {
       delivery:     primary.effectType === "heal" || primary.effectType === "restore_magicka" || primary.effectType === "restore_stamina"
                     ? "self"
                     : "target",
-      magickaCost:  Math.round(goldCost / 5),  // magicka roughly proportional to gold cost
+      // Magicka roughly in proportion to gold, and never less than a
+      // restoring spell gives back (else it was an endless well).
+      magickaCost:  Math.max(Math.round(goldCost / 5),
+                    5 + components.reduce((s, c) => s + (c.effectType === "restore_magicka" ? c.magnitude : 0), 0)),
       cooldown:     Math.max(0.5, Math.min(4, components.reduce((s, c) => s + c.duration * 0.1 + 0.3, 0))),
       damage:       undefined,
       heal:         undefined,
@@ -300,15 +328,15 @@ export class SpellMakingSystem {
         case "damage":
           return `${c.magnitude} ${c.damageType ?? "magic"} damage${c.duration > 0 ? ` for ${c.duration}s` : ""}`;
         case "heal":
-          return `Restore ${c.magnitude} health${c.duration > 0 ? ` over ${c.duration}s` : ""}`;
+          return `Restore ${c.magnitude} health`;
         case "restore_magicka":
-          return `Restore ${c.magnitude} magicka${c.duration > 0 ? ` over ${c.duration}s` : ""}`;
+          return `Restore ${c.magnitude} magicka`;
         case "restore_stamina":
-          return `Restore ${c.magnitude} stamina${c.duration > 0 ? ` over ${c.duration}s` : ""}`;
+          return `Restore ${c.magnitude} stamina`;
         case "silence":
-          return `Silence target for ${c.duration}s`;
+          return `Calm the target for ${Math.max(c.duration, 5)}s`;
         case "burden":
-          return `Weigh the target down by ${c.magnitude} units for ${c.duration}s`;
+          return `Crush the target for ${Math.round(c.magnitude * 0.4)} harm`;
         default:
           return "Unknown effect";
       }

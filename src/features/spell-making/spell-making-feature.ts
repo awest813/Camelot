@@ -32,6 +32,8 @@ export const SpellMakingKey = createServiceKey<SpellMakingService>("spell-making
 const REASONS: Record<string, string> = {
   insufficient_gold: "Not enough gold to forge this spell.",
   duplicate_name: "A custom spell with that name already exists.",
+  incompatible: "Those effects can't share a spell: one goes to you and one to a foe, or Silence would be broken by harm.",
+  too_powerful: "Too strong for the altar: lower the magnitude or duration.",
   no_components: "Add at least one spell component.",
   too_many_components: "You can only combine up to two components.",
   invalid_name: "Enter a valid spell name.",
