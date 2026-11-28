@@ -295,6 +295,19 @@ export class PetSystem {
   }
 
   /**
+   * Wounds mend with time: every living pet heals `fractionPerSecond` of its
+   * health a second, except the active one while it fights (`fighting`).
+   */
+  public regenerate(dt: number, fighting: boolean, fractionPerSecond = 0.01): void {
+    const active = this.activePet;
+    for (const pet of this.pets) {
+      if (pet.isDead || pet.health >= pet.maxHealth || (fighting && pet === active)) continue;
+      pet.health = Math.min(pet.maxHealth, pet.health + pet.maxHealth * fractionPerSecond * dt);
+      if (pet === active) this.onPetHealthChanged?.(pet);
+    }
+  }
+
+  /**
    * Award XP to the active pet.  Handles levelling automatically.
    * Returns true if a level-up occurred.
    */

@@ -36,6 +36,8 @@ const ATTACK_COOLDOWN = 2.0;
 /** A hostile this close (m) to the companion bites back every `STRUCK_EVERY` s. */
 const STRUCK_REACH = 2.0;
 const STRUCK_EVERY = 2.0;
+/** Seconds after its last wound that a companion counts as still fighting (no mending). */
+const FIGHT_COOLDOWN = 8;
 /** Call the Familiar: a spirit wolf's bite, reach (m) and pace. */
 const FAMILIAR = { damage: 14, reach: 2.4, every: 1.4, speed: 7 };
 
@@ -73,6 +75,7 @@ export class PetsFeature implements Feature {
 
   constructor(private readonly _scene: Scene) {}
   private _reportKill: (npc: NPC) => void = () => {};
+  private _sinceStruck = Number.POSITIVE_INFINITY;
 
   public install(ctx: FeatureContext): void {
     ownSave(ctx, { key: "pets", save: () => this.pets.getSaveState(), load: (data) => { if (data) this.pets.restoreFromSave(data as never); } });
@@ -168,7 +171,13 @@ export class PetsFeature implements Feature {
       this._familiar = { body, left: duration, bite: 0 };
     });
 
-    ctx.system({ id: "pets.ai", phase: "sim", update: (dt) => { this._updateAI(dt); this._updateFamiliar(dt); } });
+    ctx.system({ id: "pets.ai", phase: "sim", update: (dt) => {
+      this._updateAI(dt);
+      this._updateFamiliar(dt);
+      // Wounds mend, about a hundred seconds from near death, but not mid-fight.
+      this._sinceStruck += dt;
+      this.pets.regenerate(dt, this._sinceStruck < FIGHT_COOLDOWN);
+    } });
     // The companion HUD chip, redrawn when the companion or its health changes.
     let hudKey: string | null = null;
     ctx.system({
@@ -314,7 +323,7 @@ export class PetsFeature implements Feature {
         const ex = npc.mesh.position.x - petPos.x, ez = npc.mesh.position.z - petPos.z;
         return ex * ex + ez * ez < reach;
       });
-      if (foe) this.pets.petTakeDamage(Math.max(1, foe.attackDamage));
+      if (foe) { this.pets.petTakeDamage(Math.max(1, foe.attackDamage)); this._sinceStruck = 0; }
       if (!this._mesh) return; // it fell
     }
     if (target) {

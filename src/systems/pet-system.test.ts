@@ -509,3 +509,19 @@ describe("PetSystem", () => {
     });
   });
 });
+
+describe("PetSystem — wounds mend", () => {
+  it("every living pet heals with time; the active one not while it fights", () => {
+    const ps = new PetSystem();
+    ps.grantPet("pet_wolf");
+    ps.grantPet("pet_cat");
+    ps.summonPet("pet_wolf");
+    const wolf = ps.activePet!, cat = ps.pets.find((p) => p.id === "pet_cat")!;
+    wolf.health = 1; cat.health = 1;
+    ps.regenerate(10, true);
+    expect(wolf.health, "fighting: no mending").toBe(1);
+    expect(cat.health).toBeGreaterThan(1);
+    ps.regenerate(1000, false);
+    expect(wolf.health).toBe(wolf.maxHealth);
+  });
+});
