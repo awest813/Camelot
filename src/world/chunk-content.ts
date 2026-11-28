@@ -30,6 +30,7 @@ import type { ForgeRegistry } from "../systems/smithing-controller";
 import { setInstanceYaw, type FantasyAssetKey, type FantasyAssetLoader } from "../systems/fantasy-asset-loader";
 import { buildingFootprint, buildingLayout, buildingWallColliders, toWorld, WALL_HEIGHT, type BuildingKind } from "./village-buildings";
 import { freezeStatic } from "../rendering/freeze-static";
+import { ChunkCuller } from "../rendering/chunk-culler";
 
 /**
  * A loaded chunk: a scope owning what was placed for it, and its NPCs.
@@ -119,7 +120,12 @@ export class ChunkContent {
   public readonly footprints = new Set<Footprint>();
   private _candleMat: StandardMaterial | null = null;
 
-  constructor(private readonly _d: ChunkContentDeps) {}
+  /** Whole chunks of props left out of the frame's mesh selection when out of view. */
+  private readonly _culler: ChunkCuller;
+
+  constructor(private readonly _d: ChunkContentDeps) {
+    this._culler = new ChunkCuller(_d.scene);
+  }
 
   /** The live record for a chunk, if it is loaded. */
   public record(chunkKey: string): ChunkRecord | undefined {
@@ -187,7 +193,11 @@ export class ChunkContent {
     }
     // Placed for good (all but a dragon, which flies): frozen where it stands,
     // so the frame's mesh selection stops re-checking its matrices.
-    if (tier !== "boss") freezeStatic(root);
+    const parts = tier !== "boss" ? [root, ...root.getChildMeshes(false)] : [];
+    if (tier !== "boss") {
+      freezeStatic(root);
+      this._culler.add(chunkKey, parts);
+    }
     const shadows = this._d.shadows();
     if (castShadow) shadows?.addShadowCaster(root, true);
     this._d.lod.registerHierarchy(root, DRAW_DISTANCE[tier]);
@@ -195,6 +205,7 @@ export class ChunkContent {
     record.own(root, () => {
       this._d.lod.unregister(root);
       shadows?.removeShadowCaster(root, true);
+      this._culler.forget(chunkKey, parts);
     });
   }
 
