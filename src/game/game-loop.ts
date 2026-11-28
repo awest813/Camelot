@@ -9,7 +9,7 @@ import { weaponArchetypeOf } from "./weapon-archetype";
 import { updateDynamicWorldEventsOnHourChange } from "./rewards";
 import { recoverFallenNpc } from "./npcs";
 import { isCombatInputBlocked } from "./play-focus";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector"; import { owedTimeOf } from "../core/owed-time";
 
 /** XP awarded to the Sneak skill for each second of active sneaking. */
 const SNEAK_XP_PER_SECOND = 2;
@@ -90,13 +90,12 @@ export function updateGameplayStep(g: Game, deltaTime: number): void {
   // into its light application so day/night darken the scene (sun dies at
   // night, ambient keeps a readable floor, fog follows).
   g.weatherSystem.daylightScale = g.timeSystem.ambientIntensity;
-  if (tick % 6 === 0) g.weatherSystem.update(deltaTime);
-
-  // activeEffectsSystem: 30 Hz (every 2nd frame)
-  if (tick % 2 === 0) g.activeEffectsSystem.update(deltaTime, g.player);
-
-  // swimSystem: 20 Hz (every 3rd frame)
-  if (tick % 3 === 0) g.swimSystem.update(deltaTime, g.player);
+  // Each throttled system is given all the time since its last call (one
+  // step's was a sixth, half, a third of it: effects, breath, weather ran slow).
+  const owed = owedTimeOf(g).pass(deltaTime, "weather", "effects", "swim");
+  if (tick % 6 === 0) g.weatherSystem.update(owed.take("weather"));
+  if (tick % 2 === 0) g.activeEffectsSystem.update(owed.take("effects"), g.player); // 30 Hz
+  if (tick % 3 === 0) g.swimSystem.update(owed.take("swim"), g.player); // 20 Hz
 
   // crimeSystem: every step — its guard-challenge cooldown decays by the
   // passed delta, so starving it to a 1 Hz call made the 15 s cooldown
