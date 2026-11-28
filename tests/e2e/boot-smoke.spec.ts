@@ -403,7 +403,7 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
   expect(await page.evaluate(() => (window as any).__camelotGame.isPaused), "Escape closed the credits, not paused").toBe(false);
   await page.locator("#renderCanvas").click({ force: true });
 
-  // A guard stops the player for a bounty; Escape resists arrest.
+  // A guard stops the player for a bounty; Escape doesn't dodge it, resisting raises it.
   const arrest = await page.evaluate(() => {
     const g = (window as any).__camelotGame;
     const guard = g.scheduleSystem.npcs.find((n: any) => !n.isDead);
@@ -415,11 +415,14 @@ test("game boots, plays, saves, and loads without errors", async ({ page, baseUR
   expect(arrest.skipped, "an NPC to play the guard").toBe(false);
   {
     expect(arrest.open, "the arrest panel opens").toBe(true);
-    await page.keyboard.press("Escape");
-    expect(await page.evaluate(() => {
+    const state = () => page.evaluate(() => {
       const g = (window as any).__camelotGame;
       return { open: g.guardEncounterUI.isVisible, bounty: g.crimeSystem.getBounty("town") };
-    })).toEqual({ open: false, bounty: 50 });
+    });
+    await page.keyboard.press("Escape");
+    expect(await state(), "Escape is no answer: the guard asks again").toEqual({ open: true, bounty: 40 });
+    await page.getByRole("button", { name: "Resist Arrest" }).click();
+    expect(await state()).toEqual({ open: false, bounty: 50 });
     await page.evaluate(() => (window as any).__camelotGame.crimeSystem.clearBounty("town"));
     await page.locator("#renderCanvas").click({ force: true });
   }
